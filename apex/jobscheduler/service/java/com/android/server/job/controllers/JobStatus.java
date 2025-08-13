@@ -1426,15 +1426,7 @@ public final class JobStatus {
      * @return true if the exemption status changed
      */
     public boolean updateMediaBackupExemptionStatus() {
-        if (mJobSchedulerInternal == null) {
-            mJobSchedulerInternal = LocalServices.getService(JobSchedulerInternal.class);
-        }
-        boolean hasMediaExemption = mHasExemptedMediaUrisOnly
-                && !job.hasLateConstraint()
-                && job.getRequiredNetwork() != null
-                && getEffectivePriority() >= JobInfo.PRIORITY_DEFAULT
-                && sourcePackageName.equals(
-                        mJobSchedulerInternal.getCloudMediaProviderPackage(sourceUserId));
+        final boolean hasMediaExemption = hasMediaBackupExemption();
         if (mHasMediaBackupExemption == hasMediaExemption) {
             return false;
         }
@@ -2569,6 +2561,28 @@ public final class JobStatus {
         }
 
         return (sat & mRequiredConstraintsOfInterest) == mRequiredConstraintsOfInterest;
+    }
+
+    private boolean hasMediaBackupExemption() {
+        if (mJobSchedulerInternal == null) {
+            mJobSchedulerInternal = LocalServices.getService(JobSchedulerInternal.class);
+        }
+
+        // Check the legacy policy first.
+        if (mHasExemptedMediaUrisOnly
+                && !job.hasLateConstraint()
+                && job.getRequiredNetwork() != null
+                && getEffectivePriority() >= JobInfo.PRIORITY_DEFAULT
+                && sourcePackageName.equals(
+                        mJobSchedulerInternal.getCloudMediaProviderPackage(sourceUserId))) {
+            return true;
+        }
+
+        // Check the new policy.
+        return Flags.updateMediaBackupExemptionPolicy()
+                && getEffectivePriority() == JobInfo.PRIORITY_HIGH
+                && sourcePackageName.equals(
+                        mJobSchedulerInternal.getCloudMediaProviderPackage(sourceUserId));
     }
 
     /**

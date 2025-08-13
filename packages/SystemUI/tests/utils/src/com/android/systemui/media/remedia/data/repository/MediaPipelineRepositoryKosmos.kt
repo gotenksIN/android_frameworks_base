@@ -16,24 +16,24 @@
 
 package com.android.systemui.media.remedia.data.repository
 
-import com.android.systemui.Flags
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.media.controls.data.repository.mediaFilterRepository
 import com.android.systemui.media.controls.shared.model.MediaData
+import com.android.systemui.media.remedia.shared.flag.MediaControlsInComposeFlag
 
 val Kosmos.mediaPipelineRepository by
     Kosmos.Fixture {
-        if (Flags.mediaControlsInCompose()) {
+        if (MediaControlsInComposeFlag.isEnabled) {
             mediaRepository
         } else {
             mediaFilterRepository
         }
     }
 
-fun Kosmos.setHasActiveMedia(visible: Boolean) {
+fun Kosmos.setHasMedia(visible: Boolean, active: Boolean = true) {
     if (visible) {
-        mediaPipelineRepository.addCurrentUserMediaEntry(MediaData(active = true))
+        mediaPipelineRepository.addCurrentUserMediaEntry(MediaData(active = active))
     } else {
         mediaPipelineRepository.clearCurrentUserMedia()
     }

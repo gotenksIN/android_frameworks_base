@@ -20,11 +20,15 @@ import androidx.annotation.FloatRange
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.LifecycleOwner
 import com.android.app.tracing.coroutines.launchTraced as launch
+import com.android.systemui.Flags
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.media.controls.domain.pipeline.interactor.MediaCarouselInteractor
+import com.android.systemui.media.remedia.ui.compose.MediaUiBehavior
+import com.android.systemui.media.remedia.ui.viewmodel.MediaCarouselVisibility
+import com.android.systemui.media.remedia.ui.viewmodel.MediaViewModel
 import com.android.systemui.qs.FooterActionsController
 import com.android.systemui.qs.footer.ui.viewmodel.FooterActionsViewModel
 import com.android.systemui.qs.panels.domain.interactor.TileSquishinessInteractor
@@ -39,12 +43,14 @@ import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.statusbar.disableflags.domain.interactor.DisableFlagsInteractor
 import com.android.systemui.unfold.domain.interactor.UnfoldTransitionInteractor
+import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteractor
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -65,6 +71,7 @@ constructor(
     val brightnessMirrorViewModelFactory: BrightnessMirrorViewModel.Factory,
     val mediaCarouselInteractor: MediaCarouselInteractor,
     private val shadeModeInteractor: ShadeModeInteractor,
+    val mediaViewModelFactory: MediaViewModel.Factory,
     disableFlagsInteractor: DisableFlagsInteractor,
     private val footerActionsViewModelFactory: FooterActionsViewModel.Factory,
     private val footerActionsController: FooterActionsController,
@@ -72,9 +79,25 @@ constructor(
     deviceEntryInteractor: DeviceEntryInteractor,
     private val sceneInteractor: SceneInteractor,
     private val tileSquishinessInteractor: TileSquishinessInteractor,
+    windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
 ) : ExclusiveActivatable() {
 
     private val hydrator = Hydrator("ShadeSceneContentViewModel.hydrator")
+
+    /**
+     * Whether the shade container transparency effect should be enabled (`true`), or whether to
+     * render a fully-opaque shade container (`false`).
+     */
+    val isTransparencyEnabled: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "isTransparencyEnabled",
+            source =
+                if (Flags.notificationShadeBlur()) {
+                    windowRootViewBlurInteractor.isBlurCurrentlySupported
+                } else {
+                    MutableStateFlow(false)
+                },
+        )
 
     val shadeMode: ShadeMode by
         hydrator.hydratedStateOf(traceName = "shadeMode", source = shadeModeInteractor.shadeMode)
@@ -87,9 +110,10 @@ constructor(
             source = deviceEntryInteractor.isDeviceEntered.map { !it },
         )
 
-    val isMediaVisible: Boolean by
+    val showMedia: Boolean by
         hydrator.hydratedStateOf(
             traceName = "isMediaVisible",
+            // mediaCarouselInteractor.hasAnyMedia if in SplitShade.
             source = mediaCarouselInteractor.hasActiveMedia,
         )
 
@@ -110,6 +134,14 @@ constructor(
             initialValue = 0f,
             source = unfoldTransitionInteractor.unfoldTranslationX(isOnStartSide = true),
         )
+
+    val qqsMediaUiBehavior =
+        MediaUiBehavior(
+            isCarouselDismissible = true,
+            carouselVisibility = MediaCarouselVisibility.WhenAnyCardIsActive,
+        )
+
+    fun onMediaSwipeToDismiss() = mediaCarouselInteractor.onSwipeToDismiss()
 
     private val footerActionsControllerInitialized = AtomicBoolean(false)
 

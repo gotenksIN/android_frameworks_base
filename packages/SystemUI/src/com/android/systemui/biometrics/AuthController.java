@@ -138,7 +138,7 @@ public class AuthController implements
         DozeReceiver {
 
     private static final String TAG = "AuthController";
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
     private static final int SENSOR_PRIVACY_DELAY = 500;
 
     private final Handler mHandler;
@@ -1329,7 +1329,7 @@ public class AuthController implements
     }
 
     private void maybeShowSecondaryDisplayToast() {
-        if (!DesktopExperienceFlags.SHOW_BIOMETRIC_PROMPT_SECONDARY_DISPLAY_TOAST.isTrue()) return;
+        if (!DesktopExperienceFlags.SHOW_BIOMETRIC_PROMPT_SECONDARY_DISPLAY_MESSAGE.isTrue()) return;
         int focusedDisplayId = mFocusedDisplayRepository.getFocusedDisplayId().getValue();
         if (focusedDisplayId != Display.DEFAULT_DISPLAY) {
             Display focusedDisplay = mDisplayManager.getDisplay(focusedDisplayId);

@@ -41,6 +41,8 @@ import android.view.WindowManager;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import com.android.server.wm.WindowManagerInternal;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -61,6 +63,10 @@ public class ComputerControlSessionTest {
     private PackageManager mPackageManager;
     @Mock
     private ComputerControlSessionProcessor.VirtualDeviceFactory mVirtualDeviceFactory;
+    @Mock
+    private WindowManagerInternal mWindowManagerInternal;
+    @Mock
+    private ComputerControlSessionImpl.OnClosedListener mOnClosedListener;
     @Mock
     private IVirtualDevice mVirtualDevice;
     @Captor
@@ -98,7 +104,8 @@ public class ComputerControlSessionTest {
                 .thenReturn(mVirtualDevice);
         when(mVirtualDevice.createVirtualDisplay(any(), any())).thenReturn(VIRTUAL_DISPLAY_ID);
         mSession = new ComputerControlSessionImpl(mAppToken, mParams,
-                AttributionSource.myAttributionSource(), mPackageManager, mVirtualDeviceFactory);
+                AttributionSource.myAttributionSource(), mPackageManager, mVirtualDeviceFactory,
+                mWindowManagerInternal, mOnClosedListener);
     }
 
     @After
@@ -160,10 +167,17 @@ public class ComputerControlSessionTest {
     public void closeSession_closesVirtualDevice() throws Exception {
         mSession.close();
         verify(mVirtualDevice).close();
+        verify(mOnClosedListener).onClosed(mSession.asBinder());
     }
 
     @Test
     public void getVirtualDisplayId_returnsCreatedDisplay() {
         assertThat(mSession.getVirtualDisplayId()).isEqualTo(VIRTUAL_DISPLAY_ID);
+    }
+
+    @Test
+    public void createSession_disablesAnimationsOnDisplay() {
+        verify(mWindowManagerInternal).setAnimationsDisabledForDisplay(eq(VIRTUAL_DISPLAY_ID),
+                eq(true));
     }
 }

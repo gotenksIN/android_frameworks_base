@@ -34,6 +34,7 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.admin.DevicePolicyManager.ACTION_DEVICE_POLICY_MANAGER_STATE_CHANGED;
 import static android.content.pm.PackageManager.FEATURE_FREEFORM_WINDOW_MANAGEMENT;
 import static android.content.pm.PackageManager.FEATURE_PC;
+import static android.content.pm.PackageManager.FEATURE_WATCH;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.BACK_NAVIGATION;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowManagerServiceDumpProto.FOCUSED_APP;
@@ -83,6 +84,7 @@ import static android.view.WindowManager.LayoutParams.INVALID_WINDOW_TYPE;
 import static android.view.WindowManager.LayoutParams.LAST_APPLICATION_WINDOW;
 import static android.view.WindowManager.LayoutParams.LAST_SUB_WINDOW;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY;
+import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_TRUSTED_OVERLAY;
 import static android.view.WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS;
 import static android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
@@ -475,9 +477,12 @@ public class WindowManagerService extends IWindowManager.Stub
     // Enums for animation scale update types.
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({WINDOW_ANIMATION_SCALE, TRANSITION_ANIMATION_SCALE, ANIMATION_DURATION_SCALE})
-    private @interface UpdateAnimationScaleMode {};
-    private static final int WINDOW_ANIMATION_SCALE = 0;
-    private static final int TRANSITION_ANIMATION_SCALE = 1;
+    private @interface UpdateAnimationScaleMode {}
+
+    @VisibleForTesting
+    static final int WINDOW_ANIMATION_SCALE = 0;
+    @VisibleForTesting
+    static final int TRANSITION_ANIMATION_SCALE = 1;
     private static final int ANIMATION_DURATION_SCALE = 2;
 
     private static final int ANIMATION_COMPLETED_TIMEOUT_MS = 5000;
@@ -599,16 +604,6 @@ public class WindowManagerService extends IWindowManager.Stub
      */
     @VisibleForTesting
     boolean mSkipActivityRelaunchWhenDocking;
-
-    /** Device default insets types provided non-decor insets. */
-    final int mDecorTypes;
-
-    /** Device default insets types shall be excluded from config app sizes. */
-    final int mConfigTypes;
-
-    final int mOverrideConfigTypes;
-
-    final int mOverrideDecorTypes;
 
     final boolean mLimitedAlphaCompositing;
     final int mMaxUiWidth;
@@ -747,6 +742,8 @@ public class WindowManagerService extends IWindowManager.Stub
      * - TODO: Show mouse pointer on external screen.
      */
     boolean mForceDesktopModeOnExternalDisplays;
+
+    public boolean mAlwaysSeqId;
 
     boolean mDisableTransitionAnimation;
 
@@ -1127,6 +1124,7 @@ public class WindowManagerService extends IWindowManager.Stub
     private float mWindowAnimationScaleSetting = DEFAULT_ANIMATION_SCALE;
     @GuardedBy("mGlobalLock")
     private float mTransitionAnimationScaleSetting = DEFAULT_ANIMATION_SCALE;
+
     boolean mPointerLocationEnabled = false;
 
     private final SharedMemoryBackedCurrentAnimatorScale mAnimatorScale =
@@ -1326,6 +1324,8 @@ public class WindowManagerService extends IWindowManager.Stub
         mContext = context;
         mFlags = new WindowManagerFlags();
         mIsPc = mContext.getPackageManager().hasSystemFeature(FEATURE_PC);
+        mAlwaysSeqId = mContext.getPackageManager().hasSystemFeature(FEATURE_WATCH)
+                ? Flags.alwaysSeqIdLayoutWear() : Flags.alwaysSeqIdLayout();
         mAllowBootMessages = showBootMsgs;
         mLimitedAlphaCompositing = context.getResources().getBoolean(
                 com.android.internal.R.bool.config_sf_limitedAlpha);
@@ -1347,29 +1347,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 com.android.internal.R.bool.config_assistantOnTopOfDream);
         mSkipActivityRelaunchWhenDocking = context.getResources()
                 .getBoolean(R.bool.config_skipActivityRelaunchWhenDocking);
-        final boolean isScreenSizeDecoupledFromStatusBarAndCutout = context.getResources()
-                .getBoolean(R.bool.config_decoupleStatusBarAndDisplayCutoutFromScreenSize)
-                && mFlags.mAllowsScreenSizeDecoupledFromStatusBarAndCutout;
-
-        if (mFlags.mInsetsDecoupledConfiguration) {
-            mDecorTypes = 0;
-            mConfigTypes = 0;
-        } else {
-            mDecorTypes = WindowInsets.Type.displayCutout() | WindowInsets.Type.navigationBars();
-            mConfigTypes = WindowInsets.Type.displayCutout() | WindowInsets.Type.statusBars()
-                    | WindowInsets.Type.navigationBars();
-        }
-        if (isScreenSizeDecoupledFromStatusBarAndCutout && !mFlags.mInsetsDecoupledConfiguration) {
-            // If the global new behavior is not there, but the partial decouple flag is on.
-            mOverrideConfigTypes = 0;
-            mOverrideDecorTypes = 0;
-        } else {
-            mOverrideConfigTypes =
-                    WindowInsets.Type.displayCutout() | WindowInsets.Type.statusBars()
-                            | WindowInsets.Type.navigationBars();
-            mOverrideDecorTypes = WindowInsets.Type.displayCutout()
-                    | WindowInsets.Type.navigationBars();
-        }
 
         mAppCompatConfiguration = appCompat;
 
@@ -1696,6 +1673,12 @@ public class WindowManagerService extends IWindowManager.Stub
                     return WindowManagerGlobal.ADD_BAD_SUBWINDOW_TOKEN;
                 }
             }
+            // Update whether the session should be able to add system application overlays for any
+            // attempt to add a system application overlay.
+            if ((attrs.privateFlags & PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY) != 0) {
+                session.updateCanCreateSystemApplicationOverlay(mPermissionManager);
+            }
+
             final DisplayContent displayContent = parentWindow != null
                     ? parentWindow.mDisplayContent
                     : getDisplayContentOrCreate(displayId, attrs.token);
@@ -2503,7 +2486,7 @@ public class WindowManagerService extends IWindowManager.Stub
             }
 
             if (win.cancelAndRedraw(syncSeqId)
-                    && (Flags.alwaysSeqIdLayout() || (win.mPrepareSyncSeqId <= syncSeqId))) {
+                    && (mAlwaysSeqId || (win.mPrepareSyncSeqId <= syncSeqId))) {
                 // The client has reported the sync draw, but we haven't finished it yet.
                 // Don't let the client perform a non-sync draw at this time.
                 result |= RELAYOUT_RES_CANCEL_AND_REDRAW;
@@ -2653,6 +2636,7 @@ public class WindowManagerService extends IWindowManager.Stub
             }
 
             final int oldVisibility = win.mViewVisibility;
+            final int oldBufferSeqId = win.mBufferSeqId;
 
             // If the window is becoming visible, visibleOrAdding may change which may in turn
             // change the IME layering target.
@@ -2873,7 +2857,7 @@ public class WindowManagerService extends IWindowManager.Stub
             }
 
             if (outRelayoutResult != null) {
-                if (!Flags.alwaysSeqIdLayout()
+                if (!mAlwaysSeqId
                         && win.syncNextBuffer() && viewVisibility == View.VISIBLE
                         && win.mSyncSeqId > syncSeqId && !displayContent.mWaitingForConfig) {
                     outRelayoutResult.syncSeqId = win.shouldSyncWithBuffers()
@@ -2881,6 +2865,11 @@ public class WindowManagerService extends IWindowManager.Stub
                             : -1;
                     win.markRedrawForSyncReported();
                 } else {
+                    if (win.mBufferSeqId > oldBufferSeqId) {
+                        // A sync was started so this current layout is invalid until subsequent
+                        // reportResized.
+                        result |= RELAYOUT_RES_CANCEL_AND_REDRAW;
+                    }
                     outRelayoutResult.syncSeqId = -1;
                 }
             }
@@ -3764,9 +3753,8 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-
     @Override
-    public void setAnimationScale(int which, float scale) {
+    public void setAnimationScale(@UpdateAnimationScaleMode int which, float scale) {
         if (!checkCallingPermission(android.Manifest.permission.SET_ANIMATION_SCALE,
                 "setAnimationScale()")) {
             throw new SecurityException("Requires SET_ANIMATION_SCALE permission");
@@ -3774,18 +3762,20 @@ public class WindowManagerService extends IWindowManager.Stub
 
         scale = fixScale(scale);
         switch (which) {
-            case 0:
+            case WINDOW_ANIMATION_SCALE:
                 synchronized (mGlobalLock) {
                     mWindowAnimationScaleSetting = scale;
                 }
                 break;
-            case 1:
+            case TRANSITION_ANIMATION_SCALE:
                 synchronized (mGlobalLock) {
                     mTransitionAnimationScaleSetting = scale;
                 }
                 break;
-            case 2:
-                mAnimatorScale.setCurrentScale(scale);
+            case ANIMATION_DURATION_SCALE:
+                synchronized (mGlobalLock) {
+                    mAnimatorScale.setCurrentScale(scale);
+                }
                 break;
         }
 
@@ -3812,7 +3802,9 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
             }
             if (scales.length >= 3) {
-                mAnimatorScale.setCurrentScale(fixScale(scales[2]));
+                synchronized (mGlobalLock) {
+                    mAnimatorScale.setCurrentScale(fixScale(scales[2]));
+                }
                 dispatchNewAnimatorScaleLocked(null);
             }
         }
@@ -3821,67 +3813,52 @@ public class WindowManagerService extends IWindowManager.Stub
         mH.sendEmptyMessage(H.PERSIST_ANIMATION_SCALE);
     }
 
+    @VisibleForTesting
+    void setAnimationsDisabledForDisplay(int displayId, boolean disabled) {
+        if (!android.companion.virtualdevice.flags.Flags.enableAnimationsPerDisplay()) {
+            Slog.e(TAG, "Required feature flag is disabled");
+            return;
+        }
+
+        synchronized (mGlobalLock) {
+            DisplayContent displayContent = mRoot.getDisplayContentOrCreate(displayId);
+            displayContent.setAnimationsDisabledLocked(disabled);
+        }
+    }
+
     private void setAnimatorDurationScale(float scale) {
         mAnimatorScale.setCurrentScale(scale);
         ValueAnimator.setDurationScale(scale);
     }
 
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-    private float animationScalesCheck (int which) {
-        float value = -1.0f;
-        if (!mAnimatorScale.isAnimationsDisabled()) {
-            if (value == -1.0f) {
-                switch (which) {
-                    case WINDOW_ANIMATION_SCALE: value = mWindowAnimationScaleSetting; break;
-                    case TRANSITION_ANIMATION_SCALE: value = mTransitionAnimationScaleSetting; break;
-                    case ANIMATION_DURATION_SCALE: value = mAnimatorScale.getCurrentScale(); break;
-                }
-            }
-        } else {
-            value = 0;
-        }
-        return value;
-    }
-
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-    public float getWindowAnimationScaleLocked() {
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-        return animationScalesCheck(WINDOW_ANIMATION_SCALE);
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-    }
-
-    public float getTransitionAnimationScaleLocked() {
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-        return animationScalesCheck(TRANSITION_ANIMATION_SCALE);
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-    }
-
     @Override
-    public float getAnimationScale(int which) {
-        switch (which) {
-            case 0:
-                synchronized (mGlobalLock) {
-                    return mWindowAnimationScaleSetting;
-                }
-            case 1:
-                synchronized (mGlobalLock) {
-                    return mTransitionAnimationScaleSetting;
-                }
-            case 2: return mAnimatorScale.getCurrentScale();
+    public float getAnimationScale(@UpdateAnimationScaleMode int which) {
+        synchronized (mGlobalLock) {
+            return getAnimationScaleLocked(which);
         }
-        return 0;
+    }
+
+    float getAnimationScaleLocked(@UpdateAnimationScaleMode int which) {
+        return switch (which) {
+            case WINDOW_ANIMATION_SCALE -> mWindowAnimationScaleSetting;
+            case TRANSITION_ANIMATION_SCALE -> mTransitionAnimationScaleSetting;
+            case ANIMATION_DURATION_SCALE -> mAnimatorScale.getCurrentScale();
+            default -> 0;
+        };
     }
 
     @Override
     public float[] getAnimationScales() {
         float windowAnimationScale;
         float transitionAnimationScale;
+        float animatorDurationScale;
         synchronized (mGlobalLock) {
             windowAnimationScale = mWindowAnimationScaleSetting;
             transitionAnimationScale = mTransitionAnimationScaleSetting;
+            animatorDurationScale = mAnimatorScale.getCurrentScale();
         }
         return new float[] { windowAnimationScale, transitionAnimationScale,
-                mAnimatorScale.getCurrentScale() };
+                animatorDurationScale };
     }
 
     @Override
@@ -3889,6 +3866,10 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized (mGlobalLock) {
             return mAnimatorScale.getCurrentScale();
         }
+    }
+
+    boolean isAnimationsDisabledLocked() {
+        return mAnimatorScale.isAnimationsDisabled();
     }
 
     void dispatchNewAnimatorScaleLocked(Session session) {
@@ -8427,6 +8408,11 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
+        public void setAnimationsDisabledForDisplay(int displayId, boolean disabled) {
+            WindowManagerService.this.setAnimationsDisabledForDisplay(displayId, disabled);
+        }
+
+        @Override
         public boolean isHardKeyboardAvailable() {
             synchronized (mGlobalLock) {
                 return mHardKeyboardAvailable;
@@ -8694,6 +8680,23 @@ public class WindowManagerService extends IWindowManager.Stub
         @Override
         public @DisplayImePolicy int getDisplayImePolicy(int displayId) {
             return WindowManagerService.this.getDisplayImePolicy(displayId);
+        }
+
+        @Override
+        public void onDisplayUiModeChanged(int displayId) {
+            synchronized (mGlobalLock) {
+                final DisplayContent displayContent = getDisplayContentOrCreate(displayId, null);
+                if (displayContent == null) {
+                    ProtoLog.w(WM_ERROR,
+                            "Received UI mode change on a display that does not exist: %d",
+                            displayId);
+                    return;
+                }
+
+                displayContent.getDisplayPolicy().onDisplayUiModeChanged();
+                // Trigger a configuration change.
+                displayContent.reconfigureDisplayLocked();
+            }
         }
 
         @Override

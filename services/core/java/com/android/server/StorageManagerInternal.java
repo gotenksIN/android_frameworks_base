@@ -139,6 +139,39 @@ public abstract class StorageManagerInternal {
     public abstract List<String> getPrimaryVolumeIds();
 
     /**
+     * Creates the keys for a user's credential-encrypted (CE) and device-encrypted (DE) storage.
+     *
+     * <p>This creates the user's CE key and DE key for internal storage, then adds them to the
+     * kernel. Then, if the user is not ephemeral, this stores the DE key (encrypted) on flash. (The
+     * CE key is not stored until {@link #setCeStorageProtection()}.)
+     *
+     * <p>This does not create the CE and DE directories themselves. For that, see {@link
+     * #prepareUserStorage()}.
+     *
+     * <p>This is intended to be called only by UserManagerService, as part of creating a user.
+     *
+     * @param userId ID of the user
+     * @param ephemeral whether the user is ephemeral
+     */
+    public abstract void createUserStorageKeys(int userId, boolean ephemeral);
+
+    /**
+     * Destroys the keys for a user's credential-encrypted (CE) and device-encrypted (DE) storage.
+     *
+     * <p>This evicts the keys from the kernel (if present), which "locks" the corresponding
+     * directories. Then, this deletes the encrypted keys from flash. This operates on all the
+     * user's CE and DE keys, for both internal and adoptable storage.
+     *
+     * <p>This does not destroy the CE and DE directories themselves. For that, see {@link
+     * #destroyUserStorage()}.
+     *
+     * <p>This is intended to be called only by UserManagerService, as part of removing a user.
+     *
+     * @param userId ID of the user
+     */
+    public abstract void destroyUserStorageKeys(int userId);
+
+    /**
      * Tells StorageManager that CE storage for this user has been prepared.
      *
      * @param userId userId for which CE storage has been prepared
@@ -152,6 +185,28 @@ public abstract class StorageManagerInternal {
      * it's ok to access and modify CE directories on volumes for this user.
      */
     public abstract boolean isCeStoragePrepared(@UserIdInt int userId);
+
+    /**
+     * Protects a user's CE storage using the given secret.
+     *
+     * <p>This is intended to be used only by LockSettingsService.
+     *
+     * @param userId ID of the user whose CE storage to protect
+     * @param secret the secret with which the CE storage will be protected
+     * @throws RuntimeException on failure
+     */
+    public abstract void setCeStorageProtection(@UserIdInt int userId, byte[] secret);
+
+    /**
+     * Unlocks a user's CE storage using the given secret.
+     *
+     * <p>This is intended to be used only by LockSettingsService.
+     *
+     * @param userId ID of the user whose CE storage to unlock
+     * @param secret the secret with which the CE storage will be unlocked
+     * @throws RuntimeException on failure
+     */
+    public abstract void unlockCeStorage(@UserIdInt int userId, byte[] secret);
 
     /**
      * A listener for changes to the cloud provider.

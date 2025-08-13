@@ -89,6 +89,8 @@ import static android.view.WindowManager.LayoutParams.isSystemAlertWindowType;
 import static android.view.WindowManagerGlobal.ADD_OKAY;
 import static android.view.WindowManagerGlobal.ADD_PERMISSION_DENIED;
 import static android.view.contentprotection.flags.Flags.createAccessibilityOverlayAppOpEnabled;
+import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN;
+import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH;
 
 import static com.android.hardware.input.Flags.enableNew25q2Keycodes;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_CANCEL;
@@ -5270,7 +5272,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 try {
                     IUiModeManager uiModeService = IUiModeManager.Stub.asInterface(
                             ServiceManager.getService(Context.UI_MODE_SERVICE));
-                    mUiMode = uiModeService.getCurrentModeType();
+                    mUiMode = uiModeService.getCurrentModeType(DEFAULT_DISPLAY);
                 } catch (RemoteException e) {
                 }
             }
@@ -5678,7 +5680,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     mHandler.removeMessages(MSG_KEYGUARD_DRAWN_TIMEOUT);
                     mHandler.sendEmptyMessageDelayed(MSG_KEYGUARD_DRAWN_TIMEOUT,
                             getKeyguardDrawnTimeout());
-                    mKeyguardDelegate.onScreenTurningOn(mKeyguardDrawnCallback);
+                    final int reason = mDefaultDisplayPolicy.isDisplaySwitching()
+                            ? SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH
+                            : SCREEN_TURNING_ON_REASON_UNKNOWN;
+                    mKeyguardDelegate.onScreenTurningOn(reason, mKeyguardDrawnCallback);
                 } else {
                     if (DEBUG_WAKEUP) Slog.d(TAG,
                             "null mKeyguardDelegate: setting mKeyguardDrawComplete.");
@@ -6222,7 +6227,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     ServiceManager.getService(Context.UI_MODE_SERVICE));
         }
         try {
-            mUiMode = mUiModeManager.getCurrentModeType();
+            // The uiMode on DEFAULT_DISPLAY is equivalent to the device-level uiMode.
+            // Per-display overrides of uiMode are disallowed on DEFAULT_DISPLAY.
+            mUiMode = mUiModeManager.getCurrentModeType(DEFAULT_DISPLAY);
         } catch (RemoteException e) {
         }
     }

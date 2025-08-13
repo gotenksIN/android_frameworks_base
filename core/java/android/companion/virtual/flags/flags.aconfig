@@ -213,6 +213,13 @@ flag {
 }
 
 flag {
+    name: "device_aware_ui_mode"
+    namespace: "virtual_devices"
+    description: "Device and display awareness for UiModeManager"
+    bug: "340667076"
+}
+
+flag {
     name: "fix_vdm_opt_out_on_mirror_displays"
     namespace: "virtual_devices"
     description: "Do not show content from opted out activities on mirror displays"
@@ -245,6 +252,16 @@ flag {
     namespace: "virtual_devices"
     description: "Allow virtual external cameras to be aded to a virtual device with a default camera policy"
     bug: "371167033"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_animations_per_display"
+    namespace: "virtual_devices"
+    description: "Enable/disable window and transition animations per display"
+    bug: "427437362"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

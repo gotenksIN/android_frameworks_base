@@ -15,12 +15,14 @@
  */
 package com.android.server.pm;
 
+import static android.app.admin.flags.Flags.FLAG_APP_RESTRICTIONS_COEXISTENCE;
 import static android.content.pm.PackageManager.FEATURE_AUTOMOTIVE;
 import static android.content.pm.PackageManager.FEATURE_EMBEDDED;
 import static android.content.pm.PackageManager.FEATURE_LEANBACK;
 import static android.content.pm.PackageManager.FEATURE_WATCH;
 import static android.content.pm.UserInfo.FLAG_ADMIN;
 import static android.content.pm.UserInfo.FLAG_FULL;
+import static android.content.pm.UserInfo.flagsToString;
 import static android.multiuser.Flags.FLAG_BLOCK_PRIVATE_SPACE_CREATION;
 import static android.multiuser.Flags.FLAG_DEMOTE_MAIN_USER;
 import static android.multiuser.Flags.FLAG_DISALLOW_REMOVING_LAST_ADMIN_USER;
@@ -38,7 +40,6 @@ import static android.os.UserManager.USER_TYPE_FULL_SECONDARY;
 import static android.os.UserManager.USER_TYPE_PROFILE_MANAGED;
 import static android.os.UserManager.USER_TYPE_PROFILE_PRIVATE;
 import static android.os.UserManager.USER_TYPE_PROFILE_SUPERVISING;
-import static android.content.pm.UserInfo.flagsToString;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
@@ -71,16 +72,17 @@ import android.app.ActivityManager;
 import android.app.ActivityManagerInternal;
 import android.app.KeyguardManager;
 import android.app.PropertyInvalidatedCache;
+import android.app.admin.DevicePolicyManagerInternal;
 import android.content.Context;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.UserInfo;
 import android.content.res.Resources;
+import android.os.Bundle;
 import android.os.PowerManager;
 import android.os.ServiceSpecificException;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
-import android.os.storage.StorageManager;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.RequiresFlagsEnabled;
@@ -98,6 +100,7 @@ import com.android.dx.mockito.inline.extended.MockedVoidMethod;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.testing.ExtendedMockitoRule;
 import com.android.server.LocalServices;
+import com.android.server.StorageManagerInternal;
 import com.android.server.am.UserState;
 import com.android.server.locksettings.LockSettingsInternal;
 import com.android.server.pm.UserJourneyLogger.UserJourney;
@@ -203,9 +206,10 @@ public final class UserManagerServiceMockedTest {
     private @Mock UserJourneyLogger mUserJourneyLogger;
     private @Mock ActivityManagerInternal mActivityManagerInternal;
     private @Mock DeviceStorageMonitorInternal mDeviceStorageMonitorInternal;
-    private @Mock StorageManager mStorageManager;
+    private @Mock StorageManagerInternal mStorageManagerInternal;
     private @Mock LockSettingsInternal mLockSettingsInternal;
     private @Mock PackageManagerInternal mPackageManagerInternal;
+    private @Mock DevicePolicyManagerInternal mDevicePolicyManagerInternal;
     private @Mock KeyguardManager mKeyguardManager;
     private @Mock PowerManager mPowerManager;
     private @Mock TelecomManager mTelecomManager;
@@ -231,7 +235,7 @@ public final class UserManagerServiceMockedTest {
         // Called when creating new users
         when(mDeviceStorageMonitorInternal.isMemoryLow()).thenReturn(false);
         mockGetLocalService(DeviceStorageMonitorInternal.class, mDeviceStorageMonitorInternal);
-        when(mSpiedContext.getSystemService(StorageManager.class)).thenReturn(mStorageManager);
+        mockGetLocalService(StorageManagerInternal.class, mStorageManagerInternal);
         doReturn(mKeyguardManager).when(mSpiedContext).getSystemService(KeyguardManager.class);
         when(mSpiedContext.getSystemService(PowerManager.class)).thenReturn(mPowerManager);
         when(mSpiedContext.getSystemService(TelecomManager.class)).thenReturn(mTelecomManager);
@@ -1580,7 +1584,7 @@ public final class UserManagerServiceMockedTest {
     @EnableFlags(FLAG_DEMOTE_MAIN_USER)
     public void testSetMainUser_userNotFound() {
         assumeDoesntHaveMainUser();
-        int userId = 666;
+        int userId = OTHER_USER_ID;
 
         expect.withMessage("setMainUser(%s)", userId).that(mUms.setMainUser(userId)).isFalse();
 
@@ -1870,6 +1874,62 @@ public final class UserManagerServiceMockedTest {
         assertThat(mUsers.get(USER_ID).info.isAdmin()).isTrue();
     }
 
+    // NOTE: tests for getApplicationRestrictionsForUser were added to check when DPMI is null, so
+    // they don't encompass all scenarios (like when FLAG_APP_RESTRICTIONS_COEXISTENCE is not set)
+
+    @Test
+    public void testGetApplicationRestrictionsForUser_invalidUser() {
+        mockCallingUserId(USER_ID);
+
+        assertThrows(SecurityException.class, () -> mUms
+                .getApplicationRestrictionsForUser(mRealContext.getPackageName(), OTHER_USER_ID));
+    }
+
+    @Test
+    public void testGetApplicationRestrictionsForUser_differentPackage() {
+        // Should throw because it's not the same as the calling uid package
+        assertThrows(SecurityException.class,
+                () -> mUms.getApplicationRestrictions("Age, the name is Pack Age"));
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_APP_RESTRICTIONS_COEXISTENCE)
+    public void testGetApplicationRestrictionsForUser_flagEnabled_noDPMI() {
+        mockGetLocalService(DevicePolicyManagerInternal.class, null);
+
+        var result = mUms.getApplicationRestrictions(mRealContext.getPackageName());
+
+        assertThat(result).isSameInstanceAs(Bundle.EMPTY);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_APP_RESTRICTIONS_COEXISTENCE)
+    public void testGetApplicationRestrictionsForUser_flagEnabled_noRestrictions() {
+        String pkg = mRealContext.getPackageName();
+        mockCallingUserId(USER_ID);
+        mockDpmiGetApplicationRestrictionsPerAdminForUser(pkg, USER_ID);
+        mockGetLocalService(DevicePolicyManagerInternal.class, mDevicePolicyManagerInternal);
+
+        var result = mUms.getApplicationRestrictions(pkg);
+
+        assertThat(result).isSameInstanceAs(Bundle.EMPTY);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_APP_RESTRICTIONS_COEXISTENCE)
+    public void testGetApplicationRestrictionsForUser_flagEnabled_multipleRestrictions() {
+        String pkg = mRealContext.getPackageName();
+        Bundle bundle1 = new Bundle();
+        Bundle bundle2 = new Bundle();
+        mockCallingUserId(USER_ID);
+        mockDpmiGetApplicationRestrictionsPerAdminForUser(pkg, USER_ID, bundle1, bundle2);
+        mockGetLocalService(DevicePolicyManagerInternal.class, mDevicePolicyManagerInternal);
+
+        var result = mUms.getApplicationRestrictions(pkg);
+
+        assertThat(result).isSameInstanceAs(bundle1);
+    }
+
     /**
      * Returns true if the user's XML file has Default restrictions
      * @param userId Id of the user.
@@ -2022,6 +2082,17 @@ public final class UserManagerServiceMockedTest {
 
     private void mockCallingUserId(@UserIdInt int userId) {
         doReturn(userId).when(UserHandle::getCallingUserId);
+    }
+
+    private void mockDpmiGetApplicationRestrictionsPerAdminForUser(String pkgName,
+            @UserIdInt int userId, Bundle...bundles) {
+        List<Bundle> list = Arrays.asList(bundles);
+
+        Log.d(TAG, "mockDpmiGetApplicationRestrictionsPerAdminForAnyUser(" + pkgName
+                + ", " + userId + "): will return " + list);
+        when(mDevicePolicyManagerInternal
+                .getApplicationRestrictionsPerAdminForUser(pkgName, userId))
+                        .thenReturn(list);
     }
 
     private void expectUserJourneyLogged(@UserIdInt int userId, @UserJourney int journey) {

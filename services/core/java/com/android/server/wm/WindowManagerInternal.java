@@ -731,6 +731,12 @@ public abstract class WindowManagerInternal {
     public abstract boolean removeImeScreenshot(int displayId);
 
     /**
+     * Enables/disables window and transition animations for the given display. Animations are
+     * enabled by default on any display.
+     */
+    public abstract void setAnimationsDisabledForDisplay(int displayId, boolean disabled);
+
+    /**
       * Returns true when the hardware keyboard is available.
       */
     public abstract boolean isHardKeyboardAvailable();
@@ -922,6 +928,13 @@ public abstract class WindowManagerInternal {
      * @return The policy for how the display should show IME.
      */
     public abstract @DisplayImePolicy int getDisplayImePolicy(int displayId);
+
+    /**
+     * Called by UiModeManager when the UI mode for the given display has changed.
+     *
+     * @param displayId The id of the display
+     */
+    public abstract void onDisplayUiModeChanged(int displayId);
 
     /**
      * Tell window manager about a package that should be running with a restricted range of

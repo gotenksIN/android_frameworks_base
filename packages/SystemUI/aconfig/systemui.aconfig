@@ -485,6 +485,16 @@ flag {
 }
 
 flag {
+    name: "status_bar_show_icons_in_secure_camera"
+    namespace: "systemui"
+    description: "Show status bar icons in secure camera if user swipes down from top of screen"
+    bug: "435653753"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "status_bar_always_use_region_sampling"
     namespace: "systemui"
     description: "Have the status bar *always* use region sampling to calculate icon contrast"
@@ -979,6 +989,16 @@ flag {
 }
 
 flag {
+    name: "qs_material_expressive_tiles"
+    namespace: "systemui"
+    description: "Uses the Material Expressive button groups for QS tiles."
+    bug: "419309247"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "qs_edit_mode_tabs"
     namespace: "systemui"
     description: "Splits the Quick Settings edit mode in tabs. This feature is for the compose version of Quick Settings."
@@ -1200,6 +1220,16 @@ flag {
   name: "dream_transition_fixes"
   namespace: "systemui"
   description: "Flags some minor transition fixes for opening the dream"
+  bug: "409720192"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "dream_bouncer_transition_fix"
+  namespace: "systemui"
+  description: "Flag for a minor transition fix when entering the dream with the bouncer open"
   bug: "409720192"
   metadata {
     purpose: PURPOSE_BUGFIX
@@ -1746,17 +1776,6 @@ flag {
 }
 
 flag {
-    name: "notifications_launch_radius"
-    namespace: "systemui"
-    description: "Fixes a discrepancy in corner radius between expanding notification and opening window during launch animations."
-    bug: "396054791"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-
-flag {
     name: "lockscreen_font"
     namespace: "systemui"
     description: "Read-only flag for lockscreen font"
@@ -1919,9 +1938,9 @@ flag {
 }
 
 flag {
-    name: "desktop_screen_capture"
+    name: "large_screen_screencapture"
     namespace: "systemui"
-    description: "Enables the pre and post capture UI and the Quick Settings button for the desktop screen capture feature."
+    description: "Enables the pre and post capture UI and the Quick Settings button for the Large Screen screen capture feature."
     bug: "412421893"
 }
 
@@ -1949,7 +1968,7 @@ flag {
 flag {
     name: "large_screen_sharing"
     namespace: "systemui"
-    description: "Enables the new large screen window sharing experience."
+    description: "Enables the new large screen window and tab sharing experience."
     bug: "430582532"
 }
 
@@ -2000,6 +2019,16 @@ flag {
     namespace: "systemui"
     description: "Fixes the blurring issue on hub after the shade is pulled down slightly."
     bug: "412261838"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "block_mouse_edge_back_gesture"
+    namespace: "systemui"
+    description: "Blocks the back gesture from being triggered by a mouse pointer."
+    bug: "403094305"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -2138,3 +2167,12 @@ flag {
     }
 }
 
+flag {
+    name: "dream_suppression"
+    namespace: "systemui"
+    description: "Suppress dream when device is in a vehicle."
+    bug: "433984504"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}

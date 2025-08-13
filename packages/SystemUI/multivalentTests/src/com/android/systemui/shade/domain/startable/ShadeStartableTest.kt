@@ -29,7 +29,6 @@ import com.android.systemui.display.data.repository.createFakeDisplaySubcomponen
 import com.android.systemui.display.data.repository.displayStateRepository
 import com.android.systemui.display.data.repository.displaySubcomponentPerDisplayRepository
 import com.android.systemui.display.domain.interactor.createDisplayStateInteractor
-import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.flags.parameterizeSceneContainerFlag
 import com.android.systemui.keyguard.data.repository.fakeDeviceEntryFingerprintAuthRepository
@@ -225,80 +224,60 @@ class ShadeStartableTest(flags: FlagsParameterization) : SysuiTestCase() {
     @EnableSceneContainer
     fun hydrateFullWidth_singleShade() =
         kosmos.runTest {
-            val isShadeLayoutWide by collectLastValue(shadeRepository.isShadeLayoutWide)
+            val isWideScreen by collectLastValue(shadeRepository.isWideScreen)
+            val legacyUseSplitShade by collectLastValue(shadeRepository.legacyUseSplitShade)
             enableSingleShade()
             underTest.start()
 
             verify(notificationStackScrollLayoutController).setIsFullWidth(true)
             assertThat(scrimController.clipQsScrim).isFalse()
-            assertThat(isShadeLayoutWide).isFalse()
+            assertThat(isWideScreen).isFalse()
+            assertThat(legacyUseSplitShade).isFalse()
         }
 
     @Test
     @EnableSceneContainer
     fun hydrateFullWidth_splitShade() =
         kosmos.runTest {
-            val isShadeLayoutWide by collectLastValue(shadeRepository.isShadeLayoutWide)
+            val isWideScreen by collectLastValue(shadeRepository.isWideScreen)
+            val legacyUseSplitShade by collectLastValue(shadeRepository.legacyUseSplitShade)
             enableSplitShade()
             underTest.start()
 
             verify(notificationStackScrollLayoutController).setIsFullWidth(false)
             assertThat(scrimController.clipQsScrim).isFalse()
-            assertThat(isShadeLayoutWide).isTrue()
+            assertThat(isWideScreen).isTrue()
+            assertThat(legacyUseSplitShade).isTrue()
         }
 
     @Test
     @EnableSceneContainer
     fun hydrateFullWidth_dualShade_narrowScreen() =
         kosmos.runTest {
-            val isShadeLayoutWide by collectLastValue(shadeRepository.isShadeLayoutWide)
+            val isWideScreen by collectLastValue(shadeRepository.isWideScreen)
+            val legacyUseSplitShade by collectLastValue(shadeRepository.legacyUseSplitShade)
             enableDualShade(wideLayout = false)
             underTest.start()
 
             verify(notificationStackScrollLayoutController).setIsFullWidth(true)
             assertThat(scrimController.clipQsScrim).isFalse()
-            assertThat(isShadeLayoutWide).isFalse()
+            assertThat(isWideScreen).isFalse()
+            assertThat(legacyUseSplitShade).isFalse()
         }
 
     @Test
     @EnableSceneContainer
     fun hydrateFullWidth_dualShade_wideScreen() =
         kosmos.runTest {
-            val isShadeLayoutWide by collectLastValue(shadeRepository.isShadeLayoutWide)
+            val isWideScreen by collectLastValue(shadeRepository.isWideScreen)
+            val legacyUseSplitShade by collectLastValue(shadeRepository.legacyUseSplitShade)
             enableDualShade(wideLayout = true)
             underTest.start()
 
             verify(notificationStackScrollLayoutController).setIsFullWidth(false)
             assertThat(scrimController.clipQsScrim).isFalse()
-            assertThat(isShadeLayoutWide).isTrue()
-        }
-
-    @Test
-    @EnableSceneContainer
-    fun hydrateLargeScreen_sceneContainer() =
-        kosmos.runTest {
-            val isLargeScreen by collectLastValue(shadeRepository.isLargeScreen)
-            underTest.start()
-
-            displayStateRepository.setIsLargeScreen(false)
-            assertThat(isLargeScreen).isFalse()
-
-            displayStateRepository.setIsLargeScreen(true)
-            assertThat(isLargeScreen).isTrue()
-        }
-
-    @Test
-    @DisableSceneContainer
-    fun hydrateLargeScreen_nonSceneContainer() =
-        kosmos.runTest {
-            val isLargeScreen by collectLastValue(shadeRepository.isLargeScreen)
-            underTest.start()
-
-            displayStateRepository.setIsLargeScreen(false)
-            assertThat(isLargeScreen).isFalse()
-
-            displayStateRepository.setIsLargeScreen(true)
-            assertThat(isLargeScreen).isTrue()
+            assertThat(isWideScreen).isTrue()
+            assertThat(legacyUseSplitShade).isFalse()
         }
 
     private fun Kosmos.changeScene(

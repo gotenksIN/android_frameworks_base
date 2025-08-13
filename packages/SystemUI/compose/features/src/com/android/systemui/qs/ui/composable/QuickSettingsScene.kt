@@ -17,7 +17,6 @@
 package com.android.systemui.qs.ui.composable
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clipScrollableContainer
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Box
@@ -41,7 +40,9 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,16 +51,16 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleStartEffect
 import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.animateContentFloatAsState
-import com.android.compose.animation.scene.animateSceneDpAsState
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.compose.lifecycle.LaunchedEffectWithLifecycle
 import com.android.compose.modifiers.thenIf
 import com.android.compose.windowsizeclass.LocalWindowSizeClass
 import com.android.internal.jank.InteractionJankMonitor
@@ -71,21 +72,16 @@ import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.rememberViewModel
-import com.android.systemui.media.controls.ui.composable.MediaCarousel
 import com.android.systemui.media.controls.ui.composable.isLandscape
-import com.android.systemui.media.controls.ui.controller.MediaCarouselController
-import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager
-import com.android.systemui.media.controls.ui.view.MediaHost
-import com.android.systemui.media.controls.ui.view.MediaHostState.Companion.EXPANDED
-import com.android.systemui.media.dagger.MediaModule
+import com.android.systemui.media.remedia.ui.compose.Media
+import com.android.systemui.media.remedia.ui.compose.MediaPresentationStyle
 import com.android.systemui.notifications.ui.composable.HeadsUpNotificationSpace
 import com.android.systemui.notifications.ui.composable.NotificationScrollingStack
 import com.android.systemui.qs.composefragment.ui.GridAnchor
 import com.android.systemui.qs.footer.ui.compose.FooterActionsWithAnimatedVisibility
 import com.android.systemui.qs.panels.ui.compose.TileGrid
 import com.android.systemui.qs.shared.ui.ElementKeys
-import com.android.systemui.qs.ui.composable.QuickSettings.SharedValues.MediaLandscapeTopOffset
-import com.android.systemui.qs.ui.composable.QuickSettings.SharedValues.MediaOffset.InQS
+import com.android.systemui.qs.ui.viewmodel.QuickSettingsContainerViewModel
 import com.android.systemui.qs.ui.viewmodel.QuickSettingsSceneContentViewModel
 import com.android.systemui.qs.ui.viewmodel.QuickSettingsUserActionsViewModel
 import com.android.systemui.res.R
@@ -94,13 +90,12 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.composable.Scene
 import com.android.systemui.shade.ui.composable.CollapsedShadeHeader
 import com.android.systemui.shade.ui.composable.ExpandedShadeHeader
-import com.android.systemui.shade.ui.composable.Shade
+import com.android.systemui.shade.ui.composable.ShadePanelScrim
 import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
 import com.android.systemui.statusbar.notification.stack.ui.view.NotificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationsPlaceholderViewModel
 import dagger.Lazy
 import javax.inject.Inject
-import javax.inject.Named
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
 
@@ -114,8 +109,6 @@ constructor(
     private val notificationsPlaceholderViewModelFactory: NotificationsPlaceholderViewModel.Factory,
     private val actionsViewModelFactory: QuickSettingsUserActionsViewModel.Factory,
     private val contentViewModelFactory: QuickSettingsSceneContentViewModel.Factory,
-    private val mediaCarouselController: MediaCarouselController,
-    @Named(MediaModule.QS_PANEL) private val mediaHost: MediaHost,
     private val jankMonitor: InteractionJankMonitor,
 ) : ExclusiveActivatable(), Scene {
     override val key = Scenes.QuickSettings
@@ -126,7 +119,7 @@ constructor(
 
     override val userActions: Flow<Map<UserAction, UserActionResult>> = actionsViewModel.actions
 
-    override val alwaysCompose: Boolean = false
+    override val alwaysCompose: Boolean = true
 
     override suspend fun onActivated(): Nothing {
         actionsViewModel.activate()
@@ -145,18 +138,10 @@ constructor(
             viewModel = viewModel,
             headerViewModel = viewModel.qsContainerViewModel.shadeHeaderViewModel,
             notificationsPlaceholderViewModel = notificationsPlaceholderViewModel,
-            mediaCarouselController = mediaCarouselController,
-            mediaHost = mediaHost,
             modifier = modifier,
             shadeSession = shadeSession,
             jankMonitor = jankMonitor,
         )
-    }
-
-    init {
-        mediaHost.expansion = EXPANDED
-        mediaHost.showsOnlyActiveMedia = false
-        mediaHost.init(MediaHierarchyManager.LOCATION_QS)
     }
 }
 
@@ -166,8 +151,6 @@ private fun ContentScope.QuickSettingsScene(
     viewModel: QuickSettingsSceneContentViewModel,
     headerViewModel: ShadeHeaderViewModel,
     notificationsPlaceholderViewModel: NotificationsPlaceholderViewModel,
-    mediaCarouselController: MediaCarouselController,
-    mediaHost: MediaHost,
     modifier: Modifier = Modifier,
     shadeSession: SaveableSession,
     jankMonitor: InteractionJankMonitor,
@@ -227,25 +210,22 @@ private fun ContentScope.QuickSettingsScene(
                 is TransitionState.Transition -> state.fromContent == Scenes.QuickSettings
             }
 
+        LaunchedEffectWithLifecycle(isScrollable) {
+            if (!isScrollable) {
+                scrollState.scrollTo(0)
+            }
+        }
+
         // ############# NAV BAR paddings ###############
 
         val navBarBottomHeight =
             WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
         // ############# Media ###############
-        val isMediaVisible = viewModel.isMediaVisible
+        val isMediaVisible = viewModel.qsContainerViewModel.showMedia
         val mediaInRow = isMediaVisible && isLandscape()
-        val mediaOffset by
-            animateSceneDpAsState(value = InQS, key = MediaLandscapeTopOffset, canOverflow = false)
 
-        // This is the background for the whole scene, as the elements don't necessarily provide
-        // a background that extends to the edges.
-        Spacer(
-            modifier =
-                Modifier.element(Shade.Elements.BackgroundScrim)
-                    .fillMaxSize()
-                    .background(colorResource(R.color.shade_scrim_background_dark))
-        )
+        ShadePanelScrim(viewModel.isTransparencyEnabled)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier =
@@ -273,6 +253,14 @@ private fun ContentScope.QuickSettingsScene(
                             CollapsedShadeHeader(viewModel = headerViewModel, isSplitShade = false)
                     }
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    var listening by remember { mutableStateOf(false) }
+                    LifecycleStartEffect(Unit) {
+                        listening = true
+
+                        onStopOrDispose { listening = false }
+                    }
+
                     QuickSettingsPanelLayout(
                         brightness =
                             @Composable {
@@ -296,24 +284,24 @@ private fun ContentScope.QuickSettingsScene(
                             @Composable {
                                 Box {
                                     GridAnchor()
-                                    TileGrid(viewModel.qsContainerViewModel.tileGridViewModel)
+                                    TileGrid(
+                                        viewModel.qsContainerViewModel.tileGridViewModel,
+                                        listening = { listening },
+                                    )
                                 }
                             },
                         media =
                             @Composable {
-                                MediaCarousel(
-                                    isVisible = isMediaVisible,
-                                    mediaHost = mediaHost,
-                                    modifier =
-                                        Modifier.fillMaxWidth()
-                                            .padding(
-                                                horizontal =
-                                                    dimensionResource(
-                                                        id = R.dimen.qs_horizontal_margin
-                                                    )
-                                            ),
-                                    carouselController = mediaCarouselController,
-                                )
+                                Element(key = Media.Elements.mediaCarousel, modifier = Modifier) {
+                                    Media(
+                                        viewModelFactory =
+                                            viewModel.qsContainerViewModel.mediaViewModelFactory,
+                                        presentationStyle = MediaPresentationStyle.Default,
+                                        behavior = QuickSettingsContainerViewModel.mediaUiBehavior,
+                                        onDismissed =
+                                            viewModel.qsContainerViewModel::onMediaSwipeToDismiss,
+                                    )
+                                }
                             },
                         mediaInRow = mediaInRow,
                         modifier =

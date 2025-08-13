@@ -136,6 +136,7 @@
          as custom(package/class). Relative class name is supported. -->
     <string-array name="config_quickSettingsAutoAdd" translatable="false">
         <item>accessibility_font_scaling_has_been_changed:font_scaling</item>
+        <item>accessibility_force_invert_color_enabled:dark</item>
     </string-array>
 
     <!-- Use collapsed layout for media player in landscape QQS -->
@@ -1158,8 +1159,8 @@
     <!-- If AOD can show an ambient version of the wallpaper (-1 means ignore) -->
     <integer name="config_dozeSupportsAodWallpaperOverride">-1</integer>
 
-    <!-- Whether to enable the desktop screen capture. -->
-    <bool name="config_enableDesktopScreenCapture">false</bool>
+    <!-- Whether to enable large screen UI for screen capture. -->
+    <bool name="config_enableLargeScreenScreencapture">false</bool>
 
     <!-- Whether to enable features improving large screen interaction -->
     <bool name="config_improveLargeScreenInteractionOnLockscreen">false</bool>
@@ -1179,4 +1180,7 @@
 
     <!-- Indicates post recording flow to use flat bottom bar to save vertical space -->
     <bool name="screen_record_post_recording_flat_bottom_bar">false</bool>
+
+    <!-- Indicates whether the blurred wallpaper is supported -->
+    <bool name="config_supportBlurredWallpaper">true</bool>
 </resources>

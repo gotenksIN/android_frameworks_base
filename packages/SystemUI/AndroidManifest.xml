@@ -409,7 +409,6 @@
     <protected-broadcast android:name="com.android.settingslib.action.UNREGISTER_SLICE_RECEIVER" />
     <protected-broadcast android:name="com.android.settings.flashlight.action.FLASHLIGHT_CHANGED" />
     <protected-broadcast android:name="com.android.systemui.action.ACTION_LAUNCH_MEDIA_OUTPUT_BROADCAST_DIALOG" />
-    <protected-broadcast android:name="com.android.systemui.action.LAUNCH_MEDIA_OUTPUT_DIALOG" />
     <protected-broadcast android:name="com.android.systemui.action.LAUNCH_SYSTEM_MEDIA_OUTPUT_DIALOG" />
     <protected-broadcast android:name="com.android.systemui.STARTED" />
 
@@ -1102,16 +1101,6 @@
                   android:grantUriPermissions="true"
                   android:exported="true">
         </provider>
-
-        <receiver
-            android:name=".statusbar.KeyboardShortcutsReceiver"
-            android:visibleToInstantApps="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.android.intent.action.DISMISS_KEYBOARD_SHORTCUTS" />
-                <action android:name="com.android.intent.action.SHOW_KEYBOARD_SHORTCUTS" />
-            </intent-filter>
-        </receiver>
 
         <receiver android:name=".media.dialog.MediaOutputDialogReceiver"
                   android:exported="true">

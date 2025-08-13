@@ -217,6 +217,16 @@ flag {
 }
 
 flag {
+    name: "enable_camera_compat_sandbox_display_rotation_on_external_displays_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Whether to use primary display rotation when sandboxing rotation for responsive camera apps."
+    bug: "395063101"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_camera_compat_track_task_and_app_bugfix"
     namespace: "lse_desktop_experience"
     description: "Whether to use taskId and app process to track camera apps, and notify the policies only on first camera open and final close"
@@ -875,6 +885,16 @@ flag {
 }
 
 flag {
+    name: "enable_dream_activity_windowing_exclusion"
+    namespace: "lse_desktop_experience"
+    description: "When enabled activities with type dream will be exempt from desktop windowing"
+    bug: "414619063"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_dynamic_radius_computation_bugfix"
     namespace: "lse_desktop_experience"
     description: "Enables bugfix to compute the corner/shadow radius of desktop windows dynamically with the current window context."
@@ -981,6 +1001,17 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables a bugfix for input layer disposal during certain transitions."
     bug: "371473978"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_interaction_dependent_tab_tearing_bounds"
+    namespace: "lse_desktop_experience"
+    description: "Update bounds of a torn tab and position it with respect to user /n"
+                 "interactions such drag-drop location and existing size of the parent window."
+    bug: "436502207"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -1528,6 +1559,16 @@ flag {
 }
 
 flag {
+    name: "fix_leaking_visual_indicator"
+    namespace: "lse_desktop_experience"
+    description: "Fixes a visual indicator leak that blocked input to non-top apps"
+    bug: "418225224"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "force_close_top_transparent_fullscreen_task"
     namespace: "lse_desktop_experience"
     description: "If a top transparent fullscreen task is on top of desktop mode, force it to /n"
@@ -1695,6 +1736,16 @@ flag {
 }
 
 flag {
+    name: "repository_based_persistence_bg_thread"
+    namespace: "lse_desktop_experience"
+    description: "Enables repository based persistence to run on background thread."
+    bug: "436785583"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "respect_fullscreen_activity_option_in_desktop_launch_params"
     namespace: "lse_desktop_experience"
     description: "Prevents DesktopModeLaunchParamsModifier from modifying launch params for /n"
@@ -1726,9 +1777,9 @@ flag {
 }
 
 flag {
-    name: "show_biometric_prompt_secondary_display_toast"
-    namespace: "systemui"
-    description: "Shows a toast on secondary screens to direct users to use their device to finish biometric authorization"
+    name: "show_biometric_prompt_secondary_display_message"
+    namespace: "lse_desktop_experience"
+    description: "Shows a message on secondary screens to direct users to use their device to finish biometric authorization"
     bug: "419799860"
     metadata {
          purpose: PURPOSE_BUGFIX

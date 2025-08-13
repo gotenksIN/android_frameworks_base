@@ -2296,6 +2296,17 @@ public class DevicePolicyManager {
     public static final String EXTRA_RESTRICTION = "android.app.extra.RESTRICTION";
 
     /**
+     * A parcelable extra that contains {@link EnforcingAdmin} information that enforces a user
+     * restriction or policy.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENFORCING_ADMIN_EXTRA_ENABLED)
+    // Suppress API linter warning to have consistent value with other extras in this file.
+    @SuppressLint("ActionValue")
+    public static final String EXTRA_ENFORCING_ADMIN = "android.app.extra.ENFORCING_ADMIN";
+
+    /**
      * Activity action: have the user enter a new password.
      *
      * <p>For admin apps, this activity should be launched after using {@link
@@ -18533,7 +18544,7 @@ public class DevicePolicyManager {
      * Flag used by {@link #setPolicy} to apply the policy to the parent user of the context user.
      */
     @FlaggedApi(FLAG_POLICY_STREAMLINING)
-    public static final int POLICY_SCOPE_PARENT = 0x0003;
+    public static final int POLICY_SCOPE_PARENT_USER = 0x0003;
 
     /**
      * Possible policy scopes
@@ -18543,7 +18554,7 @@ public class DevicePolicyManager {
     @IntDef(prefix = { "POLICY_SCOPE_" }, value = {
             POLICY_SCOPE_USER,
             POLICY_SCOPE_DEVICE,
-            POLICY_SCOPE_PARENT,
+            POLICY_SCOPE_PARENT_USER,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface PolicyScope {}
@@ -18554,7 +18565,8 @@ public class DevicePolicyManager {
      * @param id The policy identifier to update. It must be one of the values inside
      * {@link DevicePolicyIdentifier}.
      * @param scope The scope the policy will apply to.
-     * @param value The value of the policy.
+     * @param value The value of the policy. If value is set to null, the policy is cleared.
+     * Check the documentation of individual identifiers for more details about the default.
      * @throws SecurityException If the caller does not have sufficient permissions to set the
      * specified id. Check the documentation of individual identifiers for more details.
      * @throws IllegalArgumentException The passed value failed validation. Check the

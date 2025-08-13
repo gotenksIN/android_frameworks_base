@@ -398,6 +398,7 @@ public class UserManagerService extends IUserManager.Stub {
     private final Object mAppRestrictionsLock = new Object();
 
     private final Handler mHandler;
+    private final MultiuserDeprecationReporter mDeprecationReporter;
 
     private final ThreadPoolExecutor mInternalExecutor;
 
@@ -414,6 +415,7 @@ public class UserManagerService extends IUserManager.Stub {
     private DevicePolicyManagerInternal mDevicePolicyManagerInternal;
     private ActivityManagerInternal mAmInternal;
     private LockSettingsInternal mLockSettingsInternal;
+    private StorageManagerInternal mStorageManagerInternal;
 
     /** Indicates that this is the 1st boot after the system user mode was changed by emulation. */
     private boolean mUpdatingSystemUserMode;
@@ -1111,6 +1113,7 @@ public class UserManagerService extends IUserManager.Stub {
         mPackagesLock = packagesLock;
         mUsers = users != null ? users : new SparseArray<>();
         mHandler = new MainHandler();
+        mDeprecationReporter = new MultiuserDeprecationReporter(mHandler);
         mInternalExecutor = new ThreadPoolExecutor(/* corePoolSize */ 0, /* maximumPoolSize */ 1,
                 /* keepAliveTime */ 24, TimeUnit.HOURS, new LinkedBlockingQueue<>());
         mUserVisibilityMediator = new UserVisibilityMediator(mHandler);
@@ -1369,6 +1372,7 @@ public class UserManagerService extends IUserManager.Stub {
     @Override
     public @CanBeNULL @UserIdInt int getMainUserId() {
         checkQueryOrCreateUsersPermission("get main user id");
+        mDeprecationReporter.logGetMainUserCall();
         return getMainUserIdUnchecked();
     }
 
@@ -1384,13 +1388,19 @@ public class UserManagerService extends IUserManager.Stub {
         int userSize = mUsers.size();
         for (int i = 0; i < userSize; i++) {
             UserInfo user = mUsers.valueAt(i).info;
-            if (user.isMain() && !mRemovingUserIds.get(user.id)) {
+            if (user.isMainUnlogged() && !mRemovingUserIds.get(user.id)) {
                 return user;
             }
         }
         return null;
     }
 
+    @Override
+    public boolean isMainUser(int userId) {
+        mDeprecationReporter.logIsMainUserCall();
+        UserInfo user = getUserInfo(userId);
+        return user != null && user.isMainUnlogged();
+    }
 
     private @CanBeNULL @UserIdInt int getPrivateProfileUserId() {
         synchronized (mUsersLock) {
@@ -1926,8 +1936,17 @@ public class UserManagerService extends IUserManager.Stub {
         availabilityIntent.putExtra(Intent.EXTRA_USER_HANDLE,
                 profileInfo.getUserHandle().getIdentifier());
         if (profileInfo.isManagedProfile()) {
-            getDevicePolicyManagerInternal().broadcastIntentToManifestReceivers(
-                    availabilityIntent, parentHandle, /* requiresPermission= */ true);
+            var dpmi = getDevicePolicyManagerInternal();
+            if (dpmi == null) {
+                // This should never happen because the profile is a managed profile, but it doesn't
+                // hurt to check...
+                Slogf.wtf(LOG_TAG, "broadcastProfileAvailabilityChanges(profile=%s, parent=%s): "
+                        + "not calling dmpi.broadcastIntentToManifestReceivers() because dpmi is "
+                        + "null", profileInfo, parentHandle);
+            } else {
+                dpmi.broadcastIntentToManifestReceivers(availabilityIntent, parentHandle,
+                    /* requiresPermission= */ true);
+            }
         }
         availabilityIntent.addFlags(
                 Intent.FLAG_RECEIVER_REGISTERED_ONLY | Intent.FLAG_RECEIVER_FOREGROUND);
@@ -2527,7 +2546,7 @@ public class UserManagerService extends IUserManager.Stub {
             }
             return getOwnerName();
         }
-        if (user.isMain()) {
+        if (user.isMainUnlogged()) {
             return getOwnerName();
         }
         if (user.isGuest()) {
@@ -3229,7 +3248,8 @@ public class UserManagerService extends IUserManager.Stub {
                 return false;
             }
         }
-        return !getDevicePolicyManagerInternal().isUserOrganizationManaged(userId);
+        var dpmi = getDevicePolicyManagerInternal();
+        return dpmi == null || !dpmi.isUserOrganizationManaged(userId);
     }
 
     @Override
@@ -4765,10 +4785,13 @@ public class UserManagerService extends IUserManager.Stub {
     /**
      * Checks whether the default state of the device is headless system user mode, i.e. what the
      * mode would be if we did a fresh factory reset.
-     * If the mode is  being emulated (via SYSTEM_USER_MODE_EMULATION_PROPERTY) then that will be
-     * returned instead.
-     * Note that, even in the absence of emulation, a device might deviate from the current default
-     * due to an OTA changing the default (which won't change the already-decided mode).
+     *
+     * <p>If the mode is being emulated (through the
+     * {@link UserManager#SYSTEM_USER_MODE_EMULATION_PROPERTY} system property) then the value
+     * represented by that system property will be returned instead.
+     *
+     * <p>Note that, even in the absence of emulation, a device might deviate from the current
+     * default due to an OTA changing the default (which won't change the already-decided mode).
      */
     private boolean isDefaultHeadlessSystemUserMode() {
         if (!Build.isDebuggable()) {
@@ -6384,8 +6407,7 @@ public class UserManagerService extends IUserManager.Stub {
             }
 
             t.traceBegin("createUserStorageKeys");
-            final StorageManager storage = mContext.getSystemService(StorageManager.class);
-            storage.createUserStorageKeys(userId, userInfo.isEphemeral());
+            getStorageManagerInternal().createUserStorageKeys(userId, userInfo.isEphemeral());
             t.traceEnd();
 
             // Only prepare DE storage here.  CE storage will be prepared later, when the user is
@@ -7226,7 +7248,7 @@ public class UserManagerService extends IUserManager.Stub {
         // Evict and destroy the user's CE and DE encryption keys.  At this point, the user's CE and
         // DE storage is made inaccessible, except to delete its contents.
         try {
-            mContext.getSystemService(StorageManager.class).destroyUserStorageKeys(userId);
+            getStorageManagerInternal().destroyUserStorageKeys(userId);
         } catch (IllegalStateException e) {
             // This may be simply because the user was partially created.
             Slog.i(LOG_TAG, "Destroying storage keys for user " + userId
@@ -7314,13 +7336,22 @@ public class UserManagerService extends IUserManager.Stub {
         mContext.sendBroadcastAsUser(intent, parentHandle, /* receiverPermission= */null);
     }
 
-    private void sendManagedProfileRemovedBroadcast(int parentUserId, int removedUserId) {
+    private void sendManagedProfileRemovedBroadcast(@UserIdInt int parentUserId,
+            @UserIdInt int removedUserId) {
+        var dpmi = getDevicePolicyManagerInternal();
+        if (dpmi == null) {
+            // This should never happen (because current caller checks if removed used is of type
+            // UserManager.USER_TYPE_PROFILE_MANAGED), but it doesn't hurt to check...
+            Slogf.wtf(LOG_TAG, "sendManagedProfileRemovedBroadcast(parent=%d, removed=%d): ignoring"
+                    + " as device doesn't have DPMI", parentUserId, removedUserId);
+            return;
+        }
         Intent managedProfileIntent = new Intent(Intent.ACTION_MANAGED_PROFILE_REMOVED);
         managedProfileIntent.putExtra(Intent.EXTRA_USER, UserHandle.of(removedUserId));
         managedProfileIntent.putExtra(Intent.EXTRA_USER_HANDLE, removedUserId);
         final UserHandle parentHandle = UserHandle.of(parentUserId);
-        getDevicePolicyManagerInternal().broadcastIntentToManifestReceivers(
-                managedProfileIntent, parentHandle, /* requiresPermission= */ false);
+        dpmi.broadcastIntentToManifestReceivers(managedProfileIntent, parentHandle,
+                /* requiresPermission= */ false);
         managedProfileIntent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY
                 | Intent.FLAG_RECEIVER_FOREGROUND);
         mContext.sendBroadcastAsUser(managedProfileIntent, parentHandle,
@@ -7338,23 +7369,27 @@ public class UserManagerService extends IUserManager.Stub {
                 || !UserHandle.isSameApp(Binder.getCallingUid(), getUidForPackage(packageName))) {
             checkSystemOrRoot("get application restrictions for other user/app " + packageName);
         }
+
         if (android.app.admin.flags.Flags.appRestrictionsCoexistence()) {
-            List<Bundle> restrictions =
-                    getDevicePolicyManagerInternal().getApplicationRestrictionsPerAdminForUser(
-                            packageName, userId);
-            if (restrictions.isEmpty()) {
+            List<Bundle> restrictions = null;
+            var dpmi = getDevicePolicyManagerInternal();
+            if (dpmi != null) {
+                restrictions = dpmi.getApplicationRestrictionsPerAdminForUser(packageName, userId);
+            }
+            if (restrictions == null || restrictions.isEmpty()) {
                 return Bundle.EMPTY;
-            } else {
-                if (restrictions.size() > 1) {
-                    Slog.w(LOG_TAG, "Application restriction list contains more than one element.");
-                }
-                return restrictions.getFirst();
             }
-        } else {
-            synchronized (mAppRestrictionsLock) {
-                // Read the restrictions from XML
-                return readApplicationRestrictionsLAr(packageName, userId);
+            int size = restrictions.size();
+            if (size > 1) {
+                Slogf.w(LOG_TAG, "Application restriction list contains more than one (%d) element;"
+                        + " returning first", size);
             }
+            return restrictions.getFirst();
+        }
+
+        synchronized (mAppRestrictionsLock) {
+            // Read the restrictions from XML
+            return readApplicationRestrictionsLAr(packageName, userId);
         }
     }
 
@@ -7769,8 +7804,7 @@ public class UserManagerService extends IUserManager.Stub {
         mUserDataPreparer.prepareUserData(userInfo, StorageManager.FLAG_STORAGE_CE);
         t.traceEnd();
 
-        StorageManagerInternal smInternal = LocalServices.getService(StorageManagerInternal.class);
-        smInternal.markCeStoragePrepared(userId);
+        getStorageManagerInternal().markCeStoragePrepared(userId);
 
         t.traceBegin("reconcileAppsData-" + userId);
         getPackageManagerInternal().reconcileAppsData(userId, StorageManager.FLAG_STORAGE_CE,
@@ -8018,6 +8052,9 @@ public class UserManagerService extends IUserManager.Stub {
                 case "--visibility-mediator":
                     mUserVisibilityMediator.dump(pw, args);
                     return;
+                case "--deprecated-calls":
+                    mDeprecationReporter.dump(pw);
+                    return;
             }
         }
 
@@ -8156,17 +8193,23 @@ public class UserManagerService extends IUserManager.Stub {
             mUserTypes.valueAt(i).dump(pw, "        ");
         }
 
-        // TODO: create IndentingPrintWriter at the beginning of dump() and use the proper
-        // indentation methods instead of explicit printing "  "
-        try (IndentingPrintWriter ipw = new IndentingPrintWriter(pw)) {
+        pw.println();
+        mDeprecationReporter.dump(pw);
 
+        // NOTE: add new stuff here, as pw is closed after the try-with-resources block below
+
+        // TODO(b/163423525): create IndentingPrintWriter at the beginning of dump() and use the
+        // proper indentation methods instead of explicit printing "  "; that would also solve the
+        // pw closure as well.
+        try (IndentingPrintWriter ipw = new IndentingPrintWriter(pw)) {
             // Dump SystemPackageInstaller info
             ipw.println();
             mSystemPackageInstaller.dump(ipw);
-
-            // NOTE: pw's not available after this point as it's auto-closed by ipw, so new dump
-            // statements should use ipw below
         }
+
+        // NOTE: pw's not available after this point as it's auto-closed by ipw, so new dump
+        // statements should use ipw below
+
     }
 
     private void dumpUser(PrintWriter pw, @CanBeCURRENT @UserIdInt int userId, StringBuilder sb,
@@ -8325,8 +8368,8 @@ public class UserManagerService extends IUserManager.Stub {
                         if (userData != null) {
                             writeUserLP(userData);
                         } else {
-                            Slog.i(LOG_TAG, "handle(WRITE_USER_MSG): no data for user " + userId
-                                    + ", it was probably removed before handler could handle it");
+                            Slogf.i(LOG_TAG, "handle(WRITE_USER_MSG): no data for user %d, it was "
+                                    + "probably removed before handler could handle it", userId);
                         }
                     }
                     break;
@@ -8789,6 +8832,7 @@ public class UserManagerService extends IUserManager.Stub {
 
         @Override
         public @UserIdInt int getMainUserId() {
+            UserManager.logStaticDeprecation();
             return getMainUserIdUnchecked();
         }
 
@@ -8833,8 +8877,6 @@ public class UserManagerService extends IUserManager.Stub {
             }
         }
     } // class LocalService
-
-
 
     /**
      * Check if user has restrictions
@@ -8954,15 +8996,20 @@ public class UserManagerService extends IUserManager.Stub {
 
     /** Retrieves the internal package manager interface. */
     private PackageManagerInternal getPackageManagerInternal() {
-        // Don't need to synchonize; worst-case scenario LocalServices will be called twice.
+        // Don't need to synchronize; worst-case scenario LocalServices will be called twice.
         if (mPmInternal == null) {
             mPmInternal = LocalServices.getService(PackageManagerInternal.class);
         }
         return mPmInternal;
     }
 
-    /** Returns the internal device policy manager interface. */
-    private DevicePolicyManagerInternal getDevicePolicyManagerInternal() {
+    /**
+     * Returns the internal device policy manager interface.
+     *
+     * <p>NOTE: it's {@code null} when the device doesn't have the
+     * {@code android.software.device_admin} feature.
+     */
+    private @Nullable DevicePolicyManagerInternal getDevicePolicyManagerInternal() {
         if (mDevicePolicyManagerInternal == null) {
             mDevicePolicyManagerInternal =
                     LocalServices.getService(DevicePolicyManagerInternal.class);
@@ -8984,6 +9031,14 @@ public class UserManagerService extends IUserManager.Stub {
             mLockSettingsInternal = LocalServices.getService(LockSettingsInternal.class);
         }
         return mLockSettingsInternal;
+    }
+
+    /** Returns the internal storage manager interface. */
+    private StorageManagerInternal getStorageManagerInternal() {
+        if (mStorageManagerInternal == null) {
+            mStorageManagerInternal = LocalServices.getService(StorageManagerInternal.class);
+        }
+        return mStorageManagerInternal;
     }
 
     /**
@@ -9127,5 +9182,4 @@ public class UserManagerService extends IUserManager.Stub {
     public UserJourneyLogger getUserJourneyLogger() {
         return mUserJourneyLogger;
     }
-
 }

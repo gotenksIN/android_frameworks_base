@@ -50,7 +50,8 @@ public class ChooserActivityLoggerImpl implements ChooserActivityLogger {
                 /* intentType = 9 */ typeFromIntentString(intent),
                 /* num_provided_custom_actions = 10 */ 0,
                 /* reselection_action_provided = 11 */ false,
-                /* is_interactive_mode = 12 */ false);
+                /* is_interactive_mode = 12 */ false,
+                /* is_text_toggle_shown = 13 */ false);
     }
 
     @Override
@@ -61,7 +62,8 @@ public class ChooserActivityLoggerImpl implements ChooserActivityLogger {
                 /* package_name = 2 */ packageName,
                 /* instance_id = 3 */ getInstanceId().getId(),
                 /* position_picked = 4 */ positionPicked,
-                /* is_pinned = 5 */ isPinned);
+                /* is_pinned = 5 */ isPinned,
+                /* included_extra_text_when_sharing_file = 6 */ false);
     }
 
     @Override

@@ -28,6 +28,8 @@ import android.window.DesktopExperienceFlags
 import android.window.DesktopModeFlags
 import androidx.core.util.forEach
 import androidx.core.util.valueIterator
+import androidx.tracing.Trace
+import com.android.app.tracing.traceSection
 import com.android.internal.annotations.VisibleForTesting
 import com.android.internal.protolog.ProtoLog
 import com.android.wm.shell.common.WorkSerializer
@@ -252,10 +254,10 @@ class DesktopRepository(
     }
 
     /** Adds the given desk under the given display. */
-    fun addDesk(displayId: Int, deskId: Int) {
+    fun addDesk(displayId: Int, deskId: Int, uniqueDisplayId: String? = null) {
         logD("addDesk for displayId=%d and deskId=%d", displayId, deskId)
         val couldCreateDesk = canCreateDesks()
-        desktopData.createDesk(displayId, deskId)
+        desktopData.createDesk(displayId, deskId, uniqueDisplayId)
         val canCreateDesk = canCreateDesks()
         deskChangeListeners.forEach { (listener, executor) ->
             executor.execute {
@@ -268,12 +270,13 @@ class DesktopRepository(
     }
 
     /** Update the data to reflect a desk changing displays. */
-    fun onDeskDisplayChanged(deskId: Int, newDisplayId: Int) {
+    fun onDeskDisplayChanged(deskId: Int, newDisplayId: Int, newUniqueDisplayId: String?) {
         val couldCreateDesk = canCreateDesks()
         val desk =
             desktopData.getDesk(deskId)?.deepCopy()
                 ?: error("Expected to find desk with id: $deskId")
         desk.displayId = newDisplayId
+        desk.uniqueDisplayId = newUniqueDisplayId
         // TODO: b/412484513 - consider de-duping unnecessary updates to listeners, such as the one
         //  made here by |removeDesk| that will be reverted at the end of this method.
         removeDesk(deskId)
@@ -1180,87 +1183,101 @@ class DesktopRepository(
             }
             .toTypedArray()
 
-    private fun updatePersistentRepository(displayId: Int) {
-        logD("updatePersistentRepository: displayId=%d", displayId)
-        if (displayId == INVALID_DISPLAY) return
+    private fun updatePersistentRepository(displayId: Int): Unit =
+        traceSection("DesktopRepository#updatePersistentRepository") {
+            logD("updatePersistentRepository: displayId=%d", displayId)
+            if (displayId == INVALID_DISPLAY) return
 
-        val desks = desktopData.desksSequence(displayId).map { it.deepCopy() }.toList()
-        if (desks.isEmpty()) {
-            logD("updatePersistentRepository: no desks found for displayId=%d, skipping", displayId)
-            return
-        }
-        if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
-            persistentUpdateQueue.post {
-                try {
+            val desks = desktopData.desksSequence(displayId).map { it.deepCopy() }.toList()
+            if (desks.isEmpty()) {
+                logD(
+                    "updatePersistentRepository: no desks found for displayId=%d, skipping",
+                    displayId,
+                )
+                return
+            }
+            if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
+                persistentUpdateQueue.post {
+                    Trace.beginSection("DesktopRepository#UpdateRepoWork")
                     logD("updatePersistentRepository user=%d display=%d", userId, displayId)
-                    persistentRepository.addOrUpdateRepository(userId, desks)
-                } catch (exception: Exception) {
-                    logE(
-                        "An exception occurred while updating the persistent repository \n%s",
-                        exception.stackTrace,
-                    )
+                    try {
+                        persistentRepository.addOrUpdateRepository(userId, desks)
+                    } catch (exception: Exception) {
+                        logE(
+                            "An exception occurred while updating the persistent repository \n%s",
+                            exception.stackTrace,
+                        )
+                    } finally {
+                        Trace.endSection()
+                    }
+                }
+            } else {
+                mainCoroutineScope.launch {
+                    desks.forEach { desk -> updatePersistentRepositoryForDesk(desk) }
                 }
             }
-        } else {
-            mainCoroutineScope.launch {
-                desks.forEach { desk -> updatePersistentRepositoryForDesk(desk) }
+        }
+
+    @Deprecated(
+        "Use updatePersistentRepository() instead.",
+        ReplaceWith("updatePersistentRepository()"),
+    )
+    private fun updatePersistentRepositoryForDesk(deskId: Int): Unit =
+        traceSection("DesktopRepository#updatePersistentRepositoryForDeskId") {
+            val desk = desktopData.getDesk(deskId)?.deepCopy() ?: return
+            mainCoroutineScope.launch { updatePersistentRepositoryForDesk(desk) }
+        }
+
+    @Deprecated(
+        "Use updatePersistentRepository() instead.",
+        ReplaceWith("updatePersistentRepository()"),
+    )
+    private suspend fun updatePersistentRepositoryForDesk(desk: Desk): Unit =
+        traceSection("DesktopRepository#updatePersistentRepositoryForDesk") {
+            try {
+                persistentRepository.addOrUpdateDesktop(
+                    userId = userId,
+                    desktopId = desk.deskId,
+                    uniqueDisplayId = desk.uniqueDisplayId,
+                    visibleTasks = desk.visibleTasks,
+                    minimizedTasks = desk.minimizedTasks,
+                    freeformTasksInZOrder = desk.freeformTasksInZOrder,
+                    leftTiledTask = desk.leftTiledTaskId,
+                    rightTiledTask = desk.rightTiledTaskId,
+                )
+            } catch (exception: Exception) {
+                logE(
+                    "An exception occurred while updating the persistent repository \n%s",
+                    exception.stackTrace,
+                )
             }
         }
-    }
 
     @Deprecated(
         "Use updatePersistentRepository() instead.",
         ReplaceWith("updatePersistentRepository()"),
     )
-    private fun updatePersistentRepositoryForDesk(deskId: Int) {
-        val desk = desktopData.getDesk(deskId)?.deepCopy() ?: return
-        mainCoroutineScope.launch { updatePersistentRepositoryForDesk(desk) }
-    }
-
-    @Deprecated(
-        "Use updatePersistentRepository() instead.",
-        ReplaceWith("updatePersistentRepository()"),
-    )
-    private suspend fun updatePersistentRepositoryForDesk(desk: Desk) {
-        try {
-            persistentRepository.addOrUpdateDesktop(
-                userId = userId,
-                desktopId = desk.deskId,
-                visibleTasks = desk.visibleTasks,
-                minimizedTasks = desk.minimizedTasks,
-                freeformTasksInZOrder = desk.freeformTasksInZOrder,
-                leftTiledTask = desk.leftTiledTaskId,
-                rightTiledTask = desk.rightTiledTaskId,
-            )
-        } catch (exception: Exception) {
-            logE(
-                "An exception occurred while updating the persistent repository \n%s",
-                exception.stackTrace,
-            )
-        }
-    }
-
-    @Deprecated(
-        "Use updatePersistentRepository() instead.",
-        ReplaceWith("updatePersistentRepository()"),
-    )
-    private fun removeDeskFromPersistentRepository(desk: Desk) {
-        mainCoroutineScope.launch {
-            try {
+    private fun removeDeskFromPersistentRepository(desk: Desk) =
+        traceSection("DesktopRepository#removeDeskFromPersistentRepository") {
+            mainCoroutineScope.launch {
                 logD(
                     "updatePersistentRepositoryForRemovedDesk user=%d desk=%d",
                     userId,
                     desk.deskId,
                 )
-                persistentRepository.removeDesktop(userId = userId, desktopId = desk.deskId)
-            } catch (throwable: Throwable) {
-                logE(
-                    "An exception occurred while updating the persistent repository \n%s",
-                    throwable.stackTrace,
-                )
+                Trace.beginSection("DesktopRepository#removeDeskWork")
+                try {
+                    persistentRepository.removeDesktop(userId = userId, desktopId = desk.deskId)
+                } catch (throwable: Throwable) {
+                    logE(
+                        "An exception occurred while updating the persistent repository \n%s",
+                        throwable.stackTrace,
+                    )
+                } finally {
+                    Trace.endSection()
+                }
             }
         }
-    }
 
     private fun canCreateDesks(): Boolean {
         if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) return false
@@ -1338,7 +1355,7 @@ class DesktopRepository(
     /** An interface for the desktop hierarchy's data managed by this repository. */
     private interface DesktopData {
         /** Creates a desk record. */
-        fun createDesk(displayId: Int, deskId: Int)
+        fun createDesk(displayId: Int, deskId: Int, uniqueDisplayId: String?)
 
         /** Adds an existing desk to a specific display */
         fun addDesk(displayId: Int, desk: Desk)
@@ -1413,16 +1430,19 @@ class DesktopRepository(
         private val deskByDisplayId =
             object : SparseArray<Desk>() {
                 /** Gets [Desk] for existing [displayId] or creates a new one. */
-                fun getOrCreate(displayId: Int): Desk =
+                fun getOrCreate(displayId: Int, uniqueDisplayId: String? = null): Desk =
                     this[displayId]
-                        ?: Desk(deskId = displayId, displayId = displayId).also {
-                            this[displayId] = it
-                        }
+                        ?: Desk(
+                                deskId = displayId,
+                                displayId = displayId,
+                                uniqueDisplayId = uniqueDisplayId,
+                            )
+                            .also { this[displayId] = it }
             }
 
-        override fun createDesk(displayId: Int, deskId: Int) {
+        override fun createDesk(displayId: Int, deskId: Int, uniqueDisplayId: String?) {
             check(displayId == deskId) { "Display and desk ids must match" }
-            deskByDisplayId.getOrCreate(displayId)
+            deskByDisplayId.getOrCreate(displayId, uniqueDisplayId)
         }
 
         override fun addDesk(displayId: Int, desk: Desk) {
@@ -1498,14 +1518,16 @@ class DesktopRepository(
     private class MultiDesktopData : DesktopData {
         private val desktopDisplays = SparseArray<DesktopDisplay>()
 
-        override fun createDesk(displayId: Int, deskId: Int) {
+        override fun createDesk(displayId: Int, deskId: Int, uniqueDisplayId: String?) {
             val display =
                 desktopDisplays[displayId]
                     ?: DesktopDisplay(displayId).also { desktopDisplays[displayId] = it }
             check(display.orderedDesks.none { desk -> desk.deskId == deskId }) {
                 "Attempting to create desk#$deskId that already exists in display#$displayId"
             }
-            display.orderedDesks.add(Desk(deskId = deskId, displayId = displayId))
+            display.orderedDesks.add(
+                Desk(deskId = deskId, displayId = displayId, uniqueDisplayId = uniqueDisplayId)
+            )
         }
 
         override fun addDesk(displayId: Int, desk: Desk) {

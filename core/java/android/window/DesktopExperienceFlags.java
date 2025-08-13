@@ -162,10 +162,14 @@ public enum DesktopExperienceFlags {
     ENABLE_DRAG_END_STABLE_BOUNDS_RESET(Flags::enableDragEndStableBoundsReset, false,
             Flags.FLAG_ENABLE_DRAG_END_STABLE_BOUNDS_RESET),
     ENABLE_DRAG_TO_MAXIMIZE(Flags::enableDragToMaximize, true, Flags.FLAG_ENABLE_DRAG_TO_MAXIMIZE),
+    ENABLE_DREAM_ACTIVITY_WINDOWING_EXCLUSION(Flags::enableDreamActivityWindowingExclusion, false,
+            Flags.FLAG_ENABLE_DREAM_ACTIVITY_WINDOWING_EXCLUSION),
     ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX(Flags::enableDynamicRadiusComputationBugfix, true,
             Flags.FLAG_ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX),
     ENABLE_EMPTY_DESK_ON_MINIMIZE(Flags::enableEmptyDeskOnMinimize, true,
             Flags.FLAG_ENABLE_EMPTY_DESK_ON_MINIMIZE),
+    ENABLE_FIX_LEAKING_VISUAL_INDICATOR(Flags::fixLeakingVisualIndicator, false,
+            Flags.FLAG_FIX_LEAKING_VISUAL_INDICATOR),
     ENABLE_FREEFORM_BOX_SHADOWS(Flags::enableFreeformBoxShadows, false,
             Flags.FLAG_ENABLE_FREEFORM_BOX_SHADOWS),
     ENABLE_FREEFORM_DISPLAY_LAUNCH_PARAMS(Flags::enableFreeformDisplayLaunchParams, true,
@@ -177,6 +181,9 @@ public enum DesktopExperienceFlags {
     ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP(
             Flags::enableInorderTransitionCallbacksForDesktop, false,
             Flags.FLAG_ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP),
+    ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS(
+            Flags::enableInteractionDependentTabTearingBounds, false,
+            Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS),
     ENABLE_INTERACTIVE_PICTURE_IN_PICTURE(Flags::enableInteractivePictureInPicture, false,
             Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE),
     ENABLE_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS(Flags::keyboardShortcutsToSwitchDesks, true,
@@ -308,9 +315,9 @@ public enum DesktopExperienceFlags {
     RESPECT_FULLSCREEN_ACTIVITY_OPTION_IN_DESKTOP_LAUNCH_PARAMS(
             Flags::respectFullscreenActivityOptionInDesktopLaunchParams, true,
             Flags.FLAG_RESPECT_FULLSCREEN_ACTIVITY_OPTION_IN_DESKTOP_LAUNCH_PARAMS),
-    SHOW_BIOMETRIC_PROMPT_SECONDARY_DISPLAY_TOAST(
-            Flags::showBiometricPromptSecondaryDisplayToast, true,
-            Flags.FLAG_SHOW_BIOMETRIC_PROMPT_SECONDARY_DISPLAY_TOAST),
+    SHOW_BIOMETRIC_PROMPT_SECONDARY_DISPLAY_MESSAGE(
+            Flags::showBiometricPromptSecondaryDisplayMessage, true,
+            Flags.FLAG_SHOW_BIOMETRIC_PROMPT_SECONDARY_DISPLAY_MESSAGE),
     SKIP_DEACTIVATION_OF_DESK_WITH_NOTHING_IN_FRONT(
             Flags::skipDeactivationOfDeskWithNothingInFront, true,
             Flags.FLAG_SKIP_DEACTIVATION_OF_DESK_WITH_NOTHING_IN_FRONT),

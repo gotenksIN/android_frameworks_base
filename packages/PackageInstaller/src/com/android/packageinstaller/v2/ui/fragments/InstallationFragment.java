@@ -80,6 +80,9 @@ public class InstallationFragment extends DialogFragment {
     private boolean mIsMoreDetailsExpanded = false;
     private View mButtonPanel = null;
 
+    private TextView mInstallWithoutVerifyingTextView = null;
+    private TextView mMoreDetailsExpandedTextView = null;
+
     @Override
     public void onAttach(@NonNull Context context) {
         super.onAttach(context);
@@ -107,6 +110,9 @@ public class InstallationFragment extends DialogFragment {
                 R.id.more_details_clickable_layout);
         mMoreDetailsExpandedLayout = dialogView.requireViewById(
                 R.id.more_details_expanded_layout);
+        mInstallWithoutVerifyingTextView = dialogView.requireViewById(
+                R.id.install_without_verifying_text);
+        mMoreDetailsExpandedTextView = dialogView.requireViewById(R.id.more_details_expanded_text);
 
         String title = getString(R.string.title_install_staging);
         mDialog = UiUtil.getAlertDialog(requireContext(), title, dialogView,
@@ -687,12 +693,15 @@ public class InstallationFragment extends DialogFragment {
         PackageInstaller.DeveloperVerificationUserConfirmationInfo verificationInfo =
                 installStage.getVerificationInfo();
         assert verificationInfo != null;
+        int verificationUserActionNeededReason = verificationInfo.getUserActionNeededReason();
+        int verificationPolicy = verificationInfo.getVerificationPolicy();
 
         // Set title and main message
-        int titleResId = getVerificationConfirmationTitleResourceId(installStage.getActionReason());
+        int titleResId = getVerificationConfirmationTitleResourceId(
+                verificationUserActionNeededReason);
         int msgResId = getVerificationConfirmationMessageResourceId(
-                installStage.getActionReason(), installStage.isAppUpdating(),
-                verificationInfo.getVerificationPolicy());
+                verificationUserActionNeededReason, verificationPolicy,
+                installStage.isAppUpdating());
         dialog.setTitle(titleResId);
         mCustomMessageTextView.setText(
                 Html.fromHtml(getString(msgResId), Html.FROM_HTML_MODE_LEGACY));
@@ -714,22 +723,67 @@ public class InstallationFragment extends DialogFragment {
                         InstallStage.STAGE_VERIFICATION_CONFIRMATION_REQUIRED);
             });
         }
-        // Hide positive button
+        // Normally the positive button is hidden.
         Button positiveButton = UiUtil.getAlertDialogPositiveButton(dialog);
         if (positiveButton != null) {
             positiveButton.setVisibility(View.GONE);
         }
+        // Sometimes there is a retry button. The user can choose to retry the verification if the
+        // previously attempt has failed with a network error and the verification policy is closed.
+        // In that case, the positive button displays OK and negative button displays Retry.
+        if (isVerificationRetryAllowed(verificationUserActionNeededReason, verificationPolicy)) {
+            if (positiveButton != null) {
+                positiveButton.setVisibility(View.VISIBLE);
+                positiveButton.setEnabled(true);
+                positiveButton.setText(R.string.ok);
+                UiUtil.applyFilledButtonStyle(requireContext(), positiveButton);
+                // Notice, even though it's a "positive" button, it still gives a negative response
+                // because it means abort the verification.
+                positiveButton.setOnClickListener(view -> {
+                    // Disable the button to avoid the user clicks it more than once quickly
+                    view.setEnabled(false);
+                    // Don't use installStage.getStageCode() here because it can be
+                    // STAGE_USER_ACTION_REQUIRED if the installation is triggered by Pia itself.
+                    mInstallActionListener.onNegativeResponse(
+                            InstallStage.STAGE_VERIFICATION_CONFIRMATION_REQUIRED);
+                });
+            }
+            if (negativeButton != null) {
+                negativeButton.setVisibility(View.VISIBLE);
+                negativeButton.setEnabled(true);
+                negativeButton.setText(R.string.button_retry);
+                negativeButton.setFilterTouchesWhenObscured(true);
+                UiUtil.applyOutlinedButtonStyle(requireContext(), negativeButton);
+                negativeButton.setOnClickListener(view -> {
+                    // Disable the button to avoid the user clicks it more than once quickly
+                    view.setEnabled(false);
+                    mInstallActionListener.onRetryResponse();
+                });
+            }
+        } else if (isVerificationBypassAllowed(verificationUserActionNeededReason,
+                verificationPolicy)) {
+            if (installStage.isAppUpdating()) {
+                mMoreDetailsExpandedTextView.setText(
+                        R.string.more_details_expanded_update_summary);
+                mInstallWithoutVerifyingTextView.setText(R.string.update_without_verifying);
+            }
+            mInstallWithoutVerifyingTextView.setTypeface(
+                    mInstallWithoutVerifyingTextView.getTypeface(), Typeface.BOLD);
+            mInstallWithoutVerifyingTextView.setOnClickListener(view -> {
+                // Disable the text to avoid the user clicks it more than once quickly
+                view.setEnabled(false);
+                mInstallActionListener.onPositiveResponse(
+                        InstallUserActionRequired.USER_ACTION_REASON_VERIFICATION_CONFIRMATION);
+            });
 
-        if (isVerificationBypassAllowed(verificationInfo)) {
-            if (!mIsMoreDetailsExpanded) {
+            if (mIsMoreDetailsExpanded) {
+                mMoreDetailsExpandedLayout.setVisibility(View.VISIBLE);
+                mInstallWithoutVerifyingTextView.setEnabled(true);
+                mMoreDetailsClickableLayout.setVisibility(View.GONE);
+            } else {
                 mMoreDetailsClickableLayout.setVisibility(View.VISIBLE);
                 mMoreDetailsClickableLayout.setEnabled(true);
                 mMoreDetailsExpandedLayout.setVisibility(View.GONE);
-                // The color of the arrow is the same as the text color
-                TextView textView = dialog.requireViewById(R.id.more_details_text);
-                int textColor = textView.getCurrentTextColor();
-                ImageView imageView = dialog.requireViewById(R.id.keyboard_arrow_down);
-                imageView.setColorFilter(textColor);
             }
 
             mMoreDetailsClickableLayout.setOnClickListener(view -> {
@@ -738,30 +792,13 @@ public class InstallationFragment extends DialogFragment {
                 mIsMoreDetailsExpanded = true;
                 mMoreDetailsClickableLayout.setVisibility(View.GONE);
                 mMoreDetailsExpandedLayout.setVisibility(View.VISIBLE);
-                TextView installWithoutVerifyingTextView = dialog.requireViewById(
-                        R.id.install_without_verifying_text);
-                TextView moreDetailsExpandedTextView =
-                        dialog.requireViewById(R.id.more_details_expanded_text);
-                if (installStage.isAppUpdating()) {
-                    moreDetailsExpandedTextView.setText(
-                            R.string.more_details_expanded_update_summary);
-                    installWithoutVerifyingTextView.setText(R.string.update_without_verifying);
-                }
-                installWithoutVerifyingTextView.setTypeface(
-                        installWithoutVerifyingTextView.getTypeface(), Typeface.BOLD);
-                installWithoutVerifyingTextView.setEnabled(true);
-                installWithoutVerifyingTextView.setOnClickListener(view1 -> {
-                    // Disable the text to avoid the user clicks it more than once quickly
-                    view1.setEnabled(false);
-                    mInstallActionListener.onPositiveResponse(
-                            InstallUserActionRequired.USER_ACTION_REASON_VERIFICATION_CONFIRMATION);
-                });
+                mInstallWithoutVerifyingTextView.setEnabled(true);
             });
         }
     }
 
-    private int getVerificationConfirmationTitleResourceId(int userActionNeededReason) {
-        return switch (userActionNeededReason) {
+    private int getVerificationConfirmationTitleResourceId(int verificationUserActionNeededReason) {
+        return switch (verificationUserActionNeededReason) {
             case DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_UNKNOWN ->
                     R.string.cannot_install_verification_unavailable_title;
 
@@ -773,10 +810,10 @@ public class InstallationFragment extends DialogFragment {
     }
 
     private int getVerificationConfirmationMessageResourceId(
-            int userActionNeededReason, boolean isAppUpdating, int policy) {
-        return switch (userActionNeededReason) {
+            int verificationUserActionNeededReason, int verificationPolicy, boolean isAppUpdating) {
+        return switch (verificationUserActionNeededReason) {
             case DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_UNKNOWN -> {
-                if (policy == DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED) {
+                if (verificationPolicy == DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED) {
                     yield isAppUpdating
                             ? R.string.cannot_update_verification_unavailable_fail_closed_summary
                             : R.string.cannot_install_verification_unavailable_fail_closed_summary;
@@ -804,11 +841,8 @@ public class InstallationFragment extends DialogFragment {
      * based on the verification policy and the reason for user action.
      */
     public static boolean isVerificationBypassAllowed(
-            PackageInstaller.DeveloperVerificationUserConfirmationInfo verificationInfo) {
-        int userActionNeededReason = verificationInfo.getUserActionNeededReason();
-        int verificationPolicy = verificationInfo.getVerificationPolicy();
-
-        return switch (userActionNeededReason) {
+            int verificationUserActionNeededReason, int verificationPolicy) {
+        return switch (verificationUserActionNeededReason) {
             case DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_DEVELOPER_BLOCKED -> false;
 
             case DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_NETWORK_UNAVAILABLE,
@@ -817,9 +851,17 @@ public class InstallationFragment extends DialogFragment {
                     verificationPolicy != DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED;
 
             default -> {
-                Log.e(LOG_TAG, "Unknown user action needed reason: " + userActionNeededReason);
+                Log.e(LOG_TAG, "Unknown user action needed reason: "
+                        + verificationUserActionNeededReason);
                 yield false;
             }
         };
+    }
+
+    private static boolean isVerificationRetryAllowed(
+            int verificationUserActionNeededReason, int verificationPolicy) {
+        return verificationPolicy == DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED
+                && verificationUserActionNeededReason
+                == DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_NETWORK_UNAVAILABLE;
     }
 }

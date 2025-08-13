@@ -21,6 +21,7 @@ import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
 import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.media.controls.domain.pipeline.interactor.mediaCarouselInteractor
+import com.android.systemui.media.remedia.ui.viewmodel.factory.mediaViewModelFactory
 import com.android.systemui.qs.footerActionsController
 import com.android.systemui.qs.footerActionsViewModelFactory
 import com.android.systemui.qs.panels.domain.interactor.tileSquishinessInteractor
@@ -31,6 +32,7 @@ import com.android.systemui.settings.brightness.ui.viewmodel.brightnessMirrorVie
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.statusbar.disableflags.domain.interactor.disableFlagsInteractor
 import com.android.systemui.unfold.domain.interactor.unfoldTransitionInteractor
+import com.android.systemui.window.domain.interactor.windowRootViewBlurInteractor
 
 val Kosmos.shadeSceneContentViewModel: ShadeSceneContentViewModel by Fixture {
     ShadeSceneContentViewModel(
@@ -48,6 +50,8 @@ val Kosmos.shadeSceneContentViewModel: ShadeSceneContentViewModel by Fixture {
         deviceEntryInteractor = deviceEntryInteractor,
         sceneInteractor = sceneInteractor,
         tileSquishinessInteractor = tileSquishinessInteractor,
+        mediaViewModelFactory = mediaViewModelFactory,
+        windowRootViewBlurInteractor = windowRootViewBlurInteractor,
     )
 }
 

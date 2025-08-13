@@ -2647,17 +2647,14 @@ public class AppOpsManager {
 
     /** @hide Access to read heart rate sensor. */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_REPLACE_BODY_SENSOR_PERMISSION_ENABLED)
     public static final String OPSTR_READ_HEART_RATE = "android:read_heart_rate";
 
     /** @hide Access to read oxygen saturation. */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_REPLACE_BODY_SENSOR_PERMISSION_ENABLED)
     public static final String OPSTR_READ_OXYGEN_SATURATION = "android:read_oxygen_saturation";
 
     /** @hide Access to read skin temperature. */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_REPLACE_BODY_SENSOR_PERMISSION_ENABLED)
     public static final String OPSTR_READ_SKIN_TEMPERATURE = "android:read_skin_temperature";
 
     /** @hide Access to ranging */
@@ -2793,9 +2790,9 @@ public class AppOpsManager {
             // Notifications
             OP_POST_NOTIFICATION,
             // Health
-            Flags.replaceBodySensorPermissionEnabled() ? OP_READ_HEART_RATE : OP_NONE,
-            Flags.replaceBodySensorPermissionEnabled() ? OP_READ_SKIN_TEMPERATURE : OP_NONE,
-            Flags.replaceBodySensorPermissionEnabled() ? OP_READ_OXYGEN_SATURATION : OP_NONE,
+            OP_READ_HEART_RATE,
+            OP_READ_SKIN_TEMPERATURE,
+            OP_READ_OXYGEN_SATURATION,
             // Android XR
             android.xr.Flags.xrManifestEntries() ? OP_EYE_TRACKING_COARSE : OP_NONE,
             android.xr.Flags.xrManifestEntries() ? OP_EYE_TRACKING_FINE : OP_NONE,
@@ -3318,22 +3315,17 @@ public class AppOpsManager {
                 OPSTR_RECEIVE_SENSITIVE_NOTIFICATIONS, "RECEIVE_SENSITIVE_NOTIFICATIONS")
                 .setDefaultMode(MODE_IGNORED).build(),
         new AppOpInfo.Builder(OP_READ_HEART_RATE, OPSTR_READ_HEART_RATE, "READ_HEART_RATE")
-            .setPermission(Flags.replaceBodySensorPermissionEnabled() ?
-                HealthPermissions.READ_HEART_RATE : null)
+            .setPermission(HealthPermissions.READ_HEART_RATE)
             .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
         new AppOpInfo.Builder(OP_READ_SKIN_TEMPERATURE, OPSTR_READ_SKIN_TEMPERATURE,
-            "READ_SKIN_TEMPERATURE").setPermission(
-                Flags.replaceBodySensorPermissionEnabled()
-                    ? HealthPermissions.READ_SKIN_TEMPERATURE : null)
+            "READ_SKIN_TEMPERATURE").setPermission(HealthPermissions.READ_SKIN_TEMPERATURE)
             .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
         new AppOpInfo.Builder(OP_RANGING, OPSTR_RANGING, "RANGING")
             .setPermission(Flags.rangingPermissionEnabled()?
                 Manifest.permission.RANGING : null)
             .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
         new AppOpInfo.Builder(OP_READ_OXYGEN_SATURATION, OPSTR_READ_OXYGEN_SATURATION,
-            "READ_OXYGEN_SATURATION").setPermission(
-                Flags.replaceBodySensorPermissionEnabled()
-                    ? HealthPermissions.READ_OXYGEN_SATURATION : null)
+            "READ_OXYGEN_SATURATION").setPermission(HealthPermissions.READ_OXYGEN_SATURATION)
             .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
         new AppOpInfo.Builder(OP_WRITE_SYSTEM_PREFERENCES, OPSTR_WRITE_SYSTEM_PREFERENCES,
             "WRITE_SYSTEM_PREFERENCES").setPermission(
@@ -8258,6 +8250,10 @@ public class AppOpsManager {
     private static final String APP_OP_MODE_CACHING_NAME = "appOpModeCache";
     private static final int APP_OP_MODE_CACHING_SIZE = 2048;
 
+    private static final String CHECK_PACKAGE_CACHING_API = "checkPackage";
+    private static final String CHECK_PACKAGE_CACHING_NAME = "checkPackageCache";
+    private static final int CHECK_PACKAGE_CACHING_SIZE = 512;
+
     private static final IpcDataCache.QueryHandler<AppOpModeQuery, Integer> sGetAppOpModeQuery =
             new IpcDataCache.QueryHandler<>() {
                 @Override
@@ -8278,11 +8274,35 @@ public class AppOpsManager {
                 }
             };
 
+    private static final IpcDataCache.QueryHandler<CheckPackageQuery, Integer> sCheckPackageQuery =
+            new IpcDataCache.QueryHandler<>() {
+                @Override
+                public Integer apply(CheckPackageQuery query) {
+                    IAppOpsService service = getService();
+                    try {
+                        return service.checkPackage(query.uid, query.packageName);
+                    } catch (RemoteException e) {
+                        throw e.rethrowFromSystemServer();
+                    }
+                }
+
+                @Override
+                public boolean shouldBypassCache(@NonNull CheckPackageQuery query) {
+                    // If the flag to enable the new caching behavior is off, bypass the cache.
+                    return !Flags.checkPackageCachingEnabled();
+                }
+            };
+
+
     // A LRU cache on binder clients that caches AppOp mode by uid, packageName, virtualDeviceId
     // and attributionTag.
     private static final IpcDataCache<AppOpModeQuery, Integer> sAppOpModeCache =
             new IpcDataCache<>(APP_OP_MODE_CACHING_SIZE, IpcDataCache.MODULE_SYSTEM,
                     APP_OP_MODE_CACHING_API, APP_OP_MODE_CACHING_NAME, sGetAppOpModeQuery);
+
+    private static final IpcDataCache<CheckPackageQuery, Integer> sCheckPackageCache =
+            new IpcDataCache<>(CHECK_PACKAGE_CACHING_SIZE, IpcDataCache.MODULE_SYSTEM,
+                    CHECK_PACKAGE_CACHING_API, CHECK_PACKAGE_CACHING_NAME, sCheckPackageQuery);
 
     // Ops that we don't want to cache due to:
     // 1) Discrepancy of attributionTag support in checkOp and noteOp that determines if a package
@@ -8318,6 +8338,34 @@ public class AppOpsManager {
     public static void disableAppOpModeCache() {
         if (Flags.appopModeCachingEnabled()) {
             sAppOpModeCache.disableLocal();
+        }
+    }
+
+    /**
+     * @hide
+     */
+    public static void invalidateCheckPackageCache() {
+        if (Flags.checkPackageCachingEnabled()) {
+            IpcDataCache.invalidateCache(IpcDataCache.MODULE_SYSTEM, CHECK_PACKAGE_CACHING_API);
+        }
+    }
+
+    /**
+     * Bypass CheckPackageCache in the local process
+     *
+     * @hide
+     */
+    public static void disableCheckPackageCache() {
+        if (Flags.checkPackageCachingEnabled()) {
+            sCheckPackageCache.disableLocal();
+        }
+    }
+
+    private record CheckPackageQuery(int uid, @NonNull String packageName) {
+        @Override
+        public String toString() {
+            return TextUtils.formatSimple("CheckPackageQuery(uid=%d, packageName=%s)", uid,
+                    packageName);
         }
     }
 
@@ -10122,7 +10170,15 @@ public class AppOpsManager {
     @Deprecated
     public void checkPackage(int uid, @NonNull String packageName) {
         try {
-            if (mService.checkPackage(uid, packageName) != MODE_ALLOWED) {
+            int mode;
+            if (Flags.checkPackageCachingEnabled()) {
+                mode = sCheckPackageCache.query(
+                        new CheckPackageQuery(uid, packageName));
+            } else {
+                mode = mService.checkPackage(uid, packageName);
+            }
+
+            if (mode != MODE_ALLOWED) {
                 throw new SecurityException(
                         "Package " + packageName + " does not belong to " + uid);
             }

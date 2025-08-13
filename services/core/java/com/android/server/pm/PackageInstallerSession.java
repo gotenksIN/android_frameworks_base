@@ -36,6 +36,7 @@ import static android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_POLICY_
 import static android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_ABORT;
 import static android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_ERROR;
 import static android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_INSTALL_ANYWAY;
+import static android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_RETRY;
 import static android.content.pm.PackageInstaller.DeveloperVerificationUserConfirmationInfo.DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_DEVELOPER_BLOCKED;
 import static android.content.pm.PackageInstaller.DeveloperVerificationUserConfirmationInfo.DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_NETWORK_UNAVAILABLE;
 import static android.content.pm.PackageInstaller.DeveloperVerificationUserConfirmationInfo.DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_UNKNOWN;
@@ -246,7 +247,9 @@ import java.io.FileFilter;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
@@ -262,6 +265,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private static final String TAG = "PackageInstallerSession";
@@ -914,8 +919,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private final List<File> mResolvedStagedFiles = new ArrayList<>();
     @GuardedBy("mLock")
     private final List<File> mResolvedInheritedFiles = new ArrayList<>();
-    @GuardedBy("mLock")
-    private final List<String> mResolvedInstructionSets = new ArrayList<>();
+    @GuardedBy("mLock") private final List<String> mResolvedOatSubDirs = new ArrayList<>();
     @GuardedBy("mLock")
     private final List<String> mResolvedNativeLibPaths = new ArrayList<>();
 
@@ -3064,18 +3068,18 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             setSessionFailed(e.error, errorMsg);
             onSessionVerificationFailure(e.error, errorMsg, /* extras= */ null);
         }
-        if (shouldUseVerificationService()) {
-            final String packageName = getPackageName();
-            if (mDeveloperVerifierController.hasExperiments(packageName)) {
-                // This is a local testing environment. Use previously configured test results
-                // instead of doing the real verification.
-                mDeveloperVerifierController.startLocalExperiment(
-                        packageName, mDeveloperVerifierCallback);
-                synchronized (mMetrics) {
-                    mMetrics.onDeveloperVerificationBypassed(
-                            DEVELOPER_VERIFICATION_BYPASSED_REASON_TEST);
-                }
-            } else if (isMultiPackage()) {
+        final String packageName = getPackageName();
+        if (mDeveloperVerifierController.hasExperiments(packageName)) {
+            // This is a local testing environment with previously configured developer verification
+            // results. Use those results instead of doing the real developer verification.
+            mDeveloperVerifierController.startLocalExperiment(
+                    packageName, mDeveloperVerifierCallback);
+            synchronized (mMetrics) {
+                mMetrics.onDeveloperVerificationBypassed(
+                        DEVELOPER_VERIFICATION_BYPASSED_REASON_TEST);
+            }
+        } else if (shouldUseVerificationService()) {
+            if (isMultiPackage()) {
                 // TODO(b/360129657) perform developer verification on each children session before
                 // moving on to the next installation stage.
                 resumeVerify();
@@ -3090,7 +3094,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                         Uri.fromFile(stageDir), signingInfo,
                         declaredLibraries, mCurrentVerificationPolicy.get(),
                         /* extensionParams= */ params.extensionParams,
-                        mDeveloperVerifierCallback)) {
+                        mDeveloperVerifierCallback, /* retry= */ false)) {
                     // A verifier is installed but cannot be connected. Maybe notify user.
                     mDeveloperVerifierCallback.onConnectionInfeasible();
                 }
@@ -3190,6 +3194,44 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             }
         }
         return false;
+    }
+
+    private void retryDeveloperVerificationSession(Supplier<Computer> snapshotSupplier) {
+        final SigningInfo signingInfo;
+        final List<SharedLibraryInfo> declaredLibraries;
+        final String packageName;
+        synchronized (mLock) {
+            signingInfo = new SigningInfo(mSigningDetails);
+            declaredLibraries =
+                    mPackageLite == null ? null : mPackageLite.getDeclaredLibraries();
+            packageName = getPackageName();
+        }
+        // First check if we have any local experiment for this package. If so, use previously
+        // configured test results instead of doing the real verification.
+        if (mDeveloperVerifierController.hasExperiments(packageName)) {
+
+            mDeveloperVerifierController.startLocalExperiment(
+                    packageName, mDeveloperVerifierCallback);
+            synchronized (mMetrics) {
+                mMetrics.onDeveloperVerificationBypassed(
+                        DEVELOPER_VERIFICATION_BYPASSED_REASON_TEST);
+            }
+            return;
+        }
+
+        // Send the request to the verifier and wait for its response before the rest of
+        // the installation can proceed.
+        if (!mDeveloperVerifierController.startVerificationSession(snapshotSupplier, userId,
+                sessionId, getPackageName(),
+                stageDir == null ? Uri.EMPTY : Uri.fromFile(stageDir), signingInfo,
+                declaredLibraries, mCurrentVerificationPolicy.get(), /* extensionParams= */ null,
+                mDeveloperVerifierCallback, /* retry = */ true)) {
+            // A verifier is installed but cannot be connected. Maybe prompt the user again.
+            mDeveloperVerifierCallback.onConnectionInfeasible();
+        }
+        synchronized (mMetrics) {
+            mMetrics.onDeveloperVerificationRetryRequestSent();
+        }
     }
 
     private void resumeVerify() {
@@ -3672,9 +3714,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 }
 
                 if (isLinkPossible(fromFiles, toDir)) {
-                    if (!mResolvedInstructionSets.isEmpty()) {
+                    if (!mResolvedOatSubDirs.isEmpty()) {
                         final File oatDir = new File(toDir, "oat");
-                        createOatDirs(tempPackageName, mResolvedInstructionSets, oatDir);
+                        createOatDirs(tempPackageName, mResolvedOatSubDirs, oatDir);
                     }
                     // pre-create lib dirs for linking if necessary
                     if (!mResolvedNativeLibPaths.isEmpty()) {
@@ -4556,31 +4598,54 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 params.setDontKillApp(false);
             }
 
-            // Inherit compiled oat directory.
             final File packageInstallDir = (new File(appInfo.getBaseCodePath())).getParentFile();
             mInheritedFilesBase = packageInstallDir;
+
+            // Keep track of all dexopt artifacts and their containing directories. If we're linking
+            // (and not copying) inherited files, we can recreate the oat directory hierarchy and
+            // link dexopt artifacts.
+            // Note that not all dexopt artifacts are necessarily needed and usable at the
+            // destination. Here, we blindly link all of them and let ART decide which ones to use.
+            // ART replaces the unusable ones during the next dexopt (typically in a later stage of
+            // the installation) and removes the unneeded ones during the next file GC (typically
+            // when the device is idle).
             final File oatDir = new File(packageInstallDir, "oat");
-            if (oatDir.exists()) {
-                final File[] archSubdirs = oatDir.listFiles();
-
-                // Keep track of all instruction sets we've seen compiled output for.
-                // If we're linking (and not copying) inherited files, we can recreate the
-                // instruction set hierarchy and link compiled output.
-                if (archSubdirs != null && archSubdirs.length > 0) {
-                    final String[] instructionSets = InstructionSets.getAllDexCodeInstructionSets();
-                    for (File archSubDir : archSubdirs) {
-                        // Skip any directory that isn't an ISA subdir.
-                        if (!ArrayUtils.contains(instructionSets, archSubDir.getName())) {
-                            continue;
+            if (Flags.alternativeForDexoptCleanup()) {
+                Path oatPath = oatDir.toPath();
+                try (Stream<Path> stream = Files.walk(oatPath)) {
+                    for (Path path : (Iterable<Path>) stream::iterator) {
+                        if (Files.isRegularFile(path)) {
+                            mResolvedInheritedFiles.add(path.toFile());
+                            String subDir = oatPath.relativize(path.getParent()).toString();
+                            if (!subDir.equals("") && !mResolvedOatSubDirs.contains(subDir)) {
+                                mResolvedOatSubDirs.add(subDir);
+                            }
                         }
+                    }
+                } catch (IOException | UncheckedIOException e) {
+                    Slog.e(TAG, "Error walking directory " + oatDir, e);
+                }
+            } else {
+                if (oatDir.exists()) {
+                    final File[] archSubdirs = oatDir.listFiles();
 
-                        File[] files = archSubDir.listFiles();
-                        if (files == null || files.length == 0) {
-                            continue;
+                    if (archSubdirs != null && archSubdirs.length > 0) {
+                        final String[] instructionSets =
+                                InstructionSets.getAllDexCodeInstructionSets();
+                        for (File archSubDir : archSubdirs) {
+                            // Skip any directory that isn't an ISA subdir.
+                            if (!ArrayUtils.contains(instructionSets, archSubDir.getName())) {
+                                continue;
+                            }
+
+                            File[] files = archSubDir.listFiles();
+                            if (files == null || files.length == 0) {
+                                continue;
+                            }
+
+                            mResolvedOatSubDirs.add(archSubDir.getName());
+                            mResolvedInheritedFiles.addAll(Arrays.asList(files));
                         }
-
-                        mResolvedInstructionSets.add(archSubDir.getName());
-                        mResolvedInheritedFiles.addAll(Arrays.asList(files));
                     }
                 }
             }
@@ -5126,14 +5191,12 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         throw new IOException("File: " + pathStr + " outside base: " + baseStr);
     }
 
-    private void createOatDirs(String packageName, List<String> instructionSets, File fromDir)
+    private void createOatDirs(String packageName, List<String> oatSubDirs, File fromDir)
             throws PackageManagerException {
-        for (String instructionSet : instructionSets) {
-            try {
-                mInstaller.createOatDir(packageName, fromDir.getAbsolutePath(), instructionSet);
-            } catch (InstallerException e) {
-                throw PackageManagerException.from(e);
-            }
+        try {
+            mInstaller.createOatDirs(packageName, fromDir.getAbsolutePath(), oatSubDirs);
+        } catch (InstallerException e) {
+            throw PackageManagerException.from(e);
         }
     }
 
@@ -5296,6 +5359,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
                 setSessionFailed(INSTALL_FAILED_VERIFICATION_FAILURE, errorMsg);
                 onSessionVerificationFailure(INSTALL_FAILED_VERIFICATION_FAILURE, errorMsg, bundle);
+            }
+            case DEVELOPER_VERIFICATION_USER_RESPONSE_RETRY -> {
+                retryDeveloperVerificationSession(mPm::snapshotComputer);
             }
 
             case DEVELOPER_VERIFICATION_USER_RESPONSE_INSTALL_ANYWAY -> resumeVerify();

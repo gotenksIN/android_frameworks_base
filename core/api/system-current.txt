@@ -738,14 +738,14 @@ package android.app {
     field @FlaggedApi("android.permission.flags.ranging_permission_enabled") public static final String OPSTR_RANGING = "android:ranging";
     field @FlaggedApi("android.view.contentprotection.flags.rapid_clear_notifications_by_listener_app_op_enabled") public static final String OPSTR_RAPID_CLEAR_NOTIFICATIONS_BY_LISTENER = "android:rapid_clear_notifications_by_listener";
     field public static final String OPSTR_READ_CLIPBOARD = "android:read_clipboard";
-    field @FlaggedApi("android.permission.flags.replace_body_sensor_permission_enabled") public static final String OPSTR_READ_HEART_RATE = "android:read_heart_rate";
+    field public static final String OPSTR_READ_HEART_RATE = "android:read_heart_rate";
     field public static final String OPSTR_READ_ICC_SMS = "android:read_icc_sms";
     field public static final String OPSTR_READ_MEDIA_AUDIO = "android:read_media_audio";
     field public static final String OPSTR_READ_MEDIA_IMAGES = "android:read_media_images";
     field public static final String OPSTR_READ_MEDIA_VIDEO = "android:read_media_video";
     field public static final String OPSTR_READ_MEDIA_VISUAL_USER_SELECTED = "android:read_media_visual_user_selected";
-    field @FlaggedApi("android.permission.flags.replace_body_sensor_permission_enabled") public static final String OPSTR_READ_OXYGEN_SATURATION = "android:read_oxygen_saturation";
-    field @FlaggedApi("android.permission.flags.replace_body_sensor_permission_enabled") public static final String OPSTR_READ_SKIN_TEMPERATURE = "android:read_skin_temperature";
+    field public static final String OPSTR_READ_OXYGEN_SATURATION = "android:read_oxygen_saturation";
+    field public static final String OPSTR_READ_SKIN_TEMPERATURE = "android:read_skin_temperature";
     field public static final String OPSTR_READ_WRITE_HEALTH_DATA = "android:read_write_health_data";
     field public static final String OPSTR_RECEIVE_AMBIENT_TRIGGER_AUDIO = "android:receive_ambient_trigger_audio";
     field public static final String OPSTR_RECEIVE_EMERGENCY_BROADCAST = "android:receive_emergency_broadcast";
@@ -1439,6 +1439,7 @@ package android.app.admin {
     field public static final int EXEMPT_FROM_HIBERNATION = 3; // 0x3
     field public static final int EXEMPT_FROM_POWER_RESTRICTIONS = 4; // 0x4
     field public static final int EXEMPT_FROM_SUSPENSION = 0; // 0x0
+    field @FlaggedApi("android.app.admin.flags.enforcing_admin_extra_enabled") public static final String EXTRA_ENFORCING_ADMIN = "android.app.extra.ENFORCING_ADMIN";
     field public static final String EXTRA_FORCE_UPDATE_ROLE_HOLDER = "android.app.extra.FORCE_UPDATE_ROLE_HOLDER";
     field public static final String EXTRA_LOST_MODE_LOCATION = "android.app.extra.LOST_MODE_LOCATION";
     field public static final String EXTRA_PROFILE_OWNER_NAME = "android.app.extra.PROFILE_OWNER_NAME";
@@ -1552,6 +1553,7 @@ package android.app.admin {
     ctor public EnforcingAdmin(@NonNull String, @NonNull android.app.admin.Authority, @NonNull android.os.UserHandle);
     method public int describeContents();
     method @NonNull public android.app.admin.Authority getAuthority();
+    method @FlaggedApi("android.app.admin.flags.enforcing_admin_get_component_name_enabled") @Nullable public android.content.ComponentName getComponentName();
     method @NonNull public String getPackageName();
     method @NonNull public android.os.UserHandle getUserHandle();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
@@ -3638,6 +3640,7 @@ package android.companion.virtual {
     method public void setDevicePolicy(int, int);
     method @FlaggedApi("android.companion.virtualdevice.flags.activity_control_api") public void setDevicePolicy(int, int, int);
     method public void setDisplayImePolicy(int, int);
+    method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_ui_mode") public void setDisplayUiMode(int, int);
     method public void setShowPointerIcon(boolean);
     method public void unregisterIntentInterceptor(@NonNull android.companion.virtual.VirtualDeviceManager.IntentInterceptorCallback);
     method @FlaggedApi("android.companion.virtualdevice.flags.device_aware_display_power") public void wakeUp();
@@ -14002,7 +14005,7 @@ package android.service.oemlock {
 
 package android.service.persistentdata {
 
-  public class PersistentDataBlockManager {
+  @RestrictedForEnvironment(environments=android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME, from=android.os.Build.VERSION_CODES.VANILLA_ICE_CREAM) public class PersistentDataBlockManager {
     method @RequiresPermission(android.Manifest.permission.CONFIGURE_FACTORY_RESET_PROTECTION) public boolean deactivateFactoryResetProtection(@NonNull byte[]);
     method @RequiresPermission(android.Manifest.permission.ACCESS_PDB_STATE) public int getDataBlockSize();
     method @RequiresPermission(anyOf={android.Manifest.permission.READ_OEM_UNLOCK_STATE, "android.permission.OEM_UNLOCK_STATE"}) public int getFlashLockState();
@@ -14818,7 +14821,7 @@ package android.telecom {
   public final class Call {
     method @Deprecated public void addListener(android.telecom.Call.Listener);
     method @Deprecated @FlaggedApi("com.android.server.telecom.flags.enable_audio_processing_use_case") public void enterBackgroundAudioProcessing();
-    method @FlaggedApi("com.android.server.telecom.flags.enable_audio_processing_use_case") public void enterBackgroundAudioProcessing(int);
+    method @FlaggedApi("com.android.server.telecom.flags.enable_audio_processing_use_case") @RequiresPermission(allOf={android.Manifest.permission.CAPTURE_AUDIO_OUTPUT, android.Manifest.permission.MODIFY_AUDIO_ROUTING}) public void enterBackgroundAudioProcessing(int);
     method public void exitBackgroundAudioProcessing(boolean);
     method @Deprecated public void removeListener(android.telecom.Call.Listener);
     field @Deprecated public static final int STATE_PRE_DIAL_WAIT = 8; // 0x8

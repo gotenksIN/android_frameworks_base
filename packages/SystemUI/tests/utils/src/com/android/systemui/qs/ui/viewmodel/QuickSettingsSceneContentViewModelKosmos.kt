@@ -19,12 +19,12 @@ package com.android.systemui.qs.ui.viewmodel
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
 import com.android.systemui.kosmos.testDispatcher
-import com.android.systemui.media.controls.domain.pipeline.interactor.mediaCarouselInteractor
 import com.android.systemui.qs.footerActionsController
 import com.android.systemui.qs.footerActionsViewModelFactory
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.shade.ui.viewmodel.shadeHeaderViewModelFactory
+import com.android.systemui.window.domain.interactor.windowRootViewBlurInteractor
 
 val Kosmos.quickSettingsSceneContentViewModel by Fixture {
     QuickSettingsSceneContentViewModel(
@@ -32,10 +32,10 @@ val Kosmos.quickSettingsSceneContentViewModel by Fixture {
         qsContainerViewModelFactory = quickSettingsContainerViewModelFactory,
         footerActionsViewModelFactory = footerActionsViewModelFactory,
         footerActionsController = footerActionsController,
-        mediaCarouselInteractor = mediaCarouselInteractor,
         shadeModeInteractor = shadeModeInteractor,
         sceneInteractor = sceneInteractor,
         mainDispatcher = testDispatcher,
+        windowRootViewBlurInteractor = windowRootViewBlurInteractor,
     )
 }
 

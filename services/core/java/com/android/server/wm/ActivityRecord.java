@@ -1886,19 +1886,12 @@ public final class ActivityRecord extends WindowToken {
         // getOverrideOrientation that requires having mAppCompatController initialised.
         mAppCompatController = new AppCompatController(mWmService, this);
         mResolveConfigHint = new TaskFragment.ConfigOverrideHint();
-        if (mWmService.mFlags.mInsetsDecoupledConfiguration) {
-            // When the stable configuration is the default behavior, override for the legacy apps
-            // without forward override flag.
-            mResolveConfigHint.mUseOverrideInsetsForConfig =
-                    !info.isChangeEnabled(INSETS_DECOUPLED_CONFIGURATION_ENFORCED)
-                            && !info.isChangeEnabled(
-                                    OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION);
-        } else {
-            // When the stable configuration is not the default behavior, forward overriding the
-            // listed apps.
-            mResolveConfigHint.mUseOverrideInsetsForConfig =
-                    info.isChangeEnabled(OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION);
-        }
+        // When the stable configuration is the default behavior, override for the legacy apps
+        // without forward override flag.
+        mResolveConfigHint.mUseOverrideInsetsForConfig =
+                !info.isChangeEnabled(INSETS_DECOUPLED_CONFIGURATION_ENFORCED)
+                        && !info.isChangeEnabled(
+                                OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION);
 
         mTargetSdk = info.applicationInfo.targetSdkVersion;
 
@@ -2332,7 +2325,9 @@ public final class ActivityRecord extends WindowToken {
         final TaskSnapshot snapshot;
         if (Flags.reduceTaskSnapshotMemoryUsage()) {
             snapshot = mWmService.mTaskSnapshotController.getSnapshot(task.mTaskId,
-                    TaskSnapshotManager.RESOLUTION_HIGH);
+                    Flags.respectRequestedTaskSnapshotResolution()
+                            ? TaskSnapshotManager.RESOLUTION_ANY
+                            : TaskSnapshotManager.RESOLUTION_HIGH);
         } else {
             snapshot = mWmService.mTaskSnapshotController.getSnapshot(task.mTaskId,
                     false /* isLowResolution */);
@@ -8169,8 +8164,7 @@ public final class ActivityRecord extends WindowToken {
     }
 
     boolean isImmersiveMode(@NonNull Rect parentBounds) {
-        if (!mResolveConfigHint.mUseOverrideInsetsForConfig
-                && mWmService.mFlags.mInsetsDecoupledConfiguration) {
+        if (!mResolveConfigHint.mUseOverrideInsetsForConfig) {
             return false;
         }
         final Insets navBarInsets = mDisplayContent.getInsetsStateController()

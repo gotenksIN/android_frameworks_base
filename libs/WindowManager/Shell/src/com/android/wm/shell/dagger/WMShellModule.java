@@ -868,10 +868,11 @@ public abstract class WMShellModule {
             @NonNull ShellCommandHandler shellCommandHandler,
             @NonNull ShellTaskOrganizer shellTaskOrganizer,
             @NonNull LaunchAdjacentController launchAdjacentController,
-            @NonNull RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer
-    ) {
+            @NonNull RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
+            @NonNull Optional<TaskChangeListener> taskChangeListener) {
         return new RootTaskDesksOrganizer(shellInit, shellCommandHandler, shellTaskOrganizer,
-                launchAdjacentController, rootTaskDisplayAreaOrganizer);
+                launchAdjacentController, rootTaskDisplayAreaOrganizer,
+                taskChangeListener);
     }
 
     @WMSingleton
@@ -1781,9 +1782,10 @@ public abstract class WMShellModule {
             DesktopPersistentRepository desktopPersistentRepository,
             @ShellMainThread CoroutineScope mainScope,
             DesktopConfig desktopConfig,
-            DesktopState desktopState) {
+            DesktopState desktopState,
+            DisplayController displayController) {
         return new DesktopRepositoryInitializerImpl(context, desktopPersistentRepository,
-                mainScope, desktopConfig, desktopState);
+                mainScope, desktopConfig, desktopState, displayController);
     }
 
     @WMSingleton

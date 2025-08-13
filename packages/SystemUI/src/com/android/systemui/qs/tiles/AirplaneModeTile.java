@@ -56,10 +56,8 @@ import com.android.systemui.settings.UserTracker;
 import com.android.systemui.util.settings.GlobalSettings;
 import com.android.systemui.util.settings.SettingObserver;
 
-// QTI_BEGIN: 2022-01-12: Telephony: show exit SCBM popup dialogue on APM enable
 import com.qti.extphone.ExtTelephonyManager;
 
-// QTI_END: 2022-01-12: Telephony: show exit SCBM popup dialogue on APM enable
 import dagger.Lazy;
 
 import kotlinx.coroutines.Job;
@@ -123,12 +121,10 @@ public class AirplaneModeTile extends QSTileImpl<BooleanState> {
             mActivityStarter.postStartActivityDismissingKeyguard(
                     new Intent(TelephonyManager.ACTION_SHOW_NOTICE_ECM_BLOCK_OTHERS), 0);
             return;
-// QTI_BEGIN: 2022-01-12: Telephony: show exit SCBM popup dialogue on APM enable
         } else if(!airplaneModeEnabled && TelephonyProperties.in_scbm().orElse(false)) {
             mActivityStarter.postStartActivityDismissingKeyguard(
                     new Intent(ExtTelephonyManager.ACTION_SHOW_NOTICE_SCM_BLOCK_OTHERS), 0);
             return;
-// QTI_END: 2022-01-12: Telephony: show exit SCBM popup dialogue on APM enable
         }
 
         if (mClickJob != null && !mClickJob.isCompleted()) {

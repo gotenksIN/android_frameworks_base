@@ -80,12 +80,10 @@ constexpr bool bitmap_ashmem_long_name() { return false; }
 }
 #endif
 
-/* QTI_BEGIN */
 #include <cutils/properties.h>
 extern const char* __progname;
 #define UI_PERFMODE "debug.ui.perfmode.enable"
 #define UI_PERFMODE_PROCESS "debug.ui.perfmode.process"
-/* QTI_END */
 
 namespace android {
 
@@ -646,7 +644,6 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
         return false;
     }
 
-    /* QTI_BEGIN */
     bool ui_perf_enabled = false;
     char value[PROPERTY_VALUE_MAX];
     memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
@@ -658,7 +655,6 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
             ui_perf_enabled = true;
         }
     }
-    /* QTI_END */
 
     switch (format) {
         case JavaCompressFormat::Jpeg: {
@@ -667,14 +663,12 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
             return SkJpegEncoder::Encode(stream, bitmap.pixmap(), options);
         }
         case JavaCompressFormat::Png: {
-            /* QTI_BEGIN */
             if (ui_perf_enabled) {
                 SkPngEncoder::Options options;
                 options.fZLibLevel = 0;
                 options.fFilterFlags = SkPngEncoder::FilterFlag::kNone;
                 return SkPngEncoder::Encode(stream, bitmap.pixmap(), options);
             }
-            /* QTI_END */
             return SkPngEncoder::Encode(stream, bitmap.pixmap(), {});
             }
         case JavaCompressFormat::Webp: {
@@ -694,11 +688,9 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
             options.fQuality = quality;
             options.fCompression = format == JavaCompressFormat::WebpLossy ?
                     SkWebpEncoder::Compression::kLossy : SkWebpEncoder::Compression::kLossless;
-            /* QTI_BEGIN */
             if (ui_perf_enabled) {
                 options.fCompression = SkWebpEncoder::Compression::kLossless;
             }
-            /* QTI_END */
             return SkWebpEncoder::Encode(stream, bitmap.pixmap(), options);
         }
     }

@@ -438,7 +438,7 @@ constructor(
         }
     }
 
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     private fun slotIndexForSubId(subId: Int): Flow<Int> {
         return mobileSubscriptionsChangeEvent.map {
             SubscriptionManager.getSlotIndex(subId)
@@ -448,7 +448,7 @@ constructor(
     }
 
 
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
     private fun createRepositoryForSubId(subId: Int): FullMobileConnectionRepository {
         return fullMobileRepoFactory.build(
             subId,
@@ -456,9 +456,9 @@ constructor(
             subscriptionModelForSubId(subId),
             defaultNetworkName,
             networkNameSeparator,
-// QTI_BEGIN: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
             slotIndexForSubId(subId),
-// QTI_END: 2024-04-17: Android_UI: SystemUI: Fix ImsStateCallback registration failure issue
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
         )
     }
 

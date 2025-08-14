@@ -37,9 +37,7 @@ import static android.window.TransitionInfo.FLAG_IS_OCCLUDED;
 import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 import static android.window.TransitionInfo.FLAG_NO_ANIMATION;
 import static android.window.TransitionInfo.FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
-// QTI_BEGIN: 2024-07-09: Display: wm: Keep Wallpaper always at the bottom
 import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
-// QTI_END: 2024-07-09: Display: wm: Keep Wallpaper always at the bottom
 
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_TRANSITIONS;
 import static com.android.wm.shell.shared.TransitionUtil.FLAG_IS_DESKTOP_WALLPAPER_ACTIVITY;
@@ -609,7 +607,6 @@ public class Transitions implements RemoteCallable<Transitions>,
         final boolean isClosing = isClosingType(transitType);
         final int mode = change.getMode();
         // Put all the OPEN/SHOW on top
-// QTI_BEGIN: 2024-07-09: Display: wm: Keep Wallpaper always at the bottom
         if ((change.getFlags() & FLAG_IS_WALLPAPER) != 0) {
             // Wallpaper is always at the bottom, opening wallpaper on top of closing one.
             if (mode == TRANSIT_OPEN || mode == TRANSIT_TO_FRONT) {
@@ -618,7 +615,6 @@ public class Transitions implements RemoteCallable<Transitions>,
                 return -zSplitLine - i;
             }
         } else if (mode == TRANSIT_OPEN || mode == TRANSIT_TO_FRONT) {
-// QTI_END: 2024-07-09: Display: wm: Keep Wallpaper always at the bottom
             if (isOpening) {
                 // put on top
                 return zSplitLine + numChanges - i;

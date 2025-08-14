@@ -130,9 +130,7 @@ class TaskLaunchParamsModifier implements LaunchParamsModifier {
         }
 
         // STEP 1: Determine the suggested display area to launch the activity/task.
-// QTI_BEGIN: 2024-03-28: Core: Revert PhoneLink in framework/base
         final TaskDisplayArea suggestedDisplayArea = getPreferredLaunchTaskDisplayArea(mSupervisor,
-// QTI_END: 2024-03-28: Core: Revert PhoneLink in framework/base
                 task, options, source, currentParams, activity, request, this::appendLog);
         outParams.mPreferredTaskDisplayArea = suggestedDisplayArea;
         final DisplayContent display = suggestedDisplayArea.mDisplayContent;

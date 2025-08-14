@@ -1132,22 +1132,16 @@ public class AudioDeviceInventory {
         synchronized (mDevicesLock) {
             if (mDeviceBroker.hasScheduledA2dpConnection(btDevice, btInfo.mProfile)) {
                 AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
-// QTI_BEGIN: 2020-12-09: Audio: Update mApmConnectedDevice properly
                         "A2dp config change ignored (scheduled connection change)")
-// QTI_END: 2020-12-09: Audio: Update mApmConnectedDevice properly
 // QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                         .printLog(TAG));
 // QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
-// QTI_BEGIN: 2020-12-09: Audio: Update mApmConnectedDevice properly
                 mmi.set(MediaMetrics.Property.EARLY_RETURN, "A2dp config change ignored")
                         .record();
-// QTI_END: 2020-12-09: Audio: Update mApmConnectedDevice properly
                 return delayMs;
-// QTI_BEGIN: 2020-12-09: Audio: Update mApmConnectedDevice properly
             }
-// QTI_END: 2020-12-09: Audio: Update mApmConnectedDevice properly
-// QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
             final String key = DeviceInfo.makeDeviceListKey(deviceType, address);
+// QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
             final DeviceInfo di = mConnectedDevices.get(key);
 // QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
 // QTI_BEGIN: 2022-10-07: Bluetooth: Merge "base: Reduce A2SP SHO time" into t-keystone-qcom-dev
@@ -1188,6 +1182,7 @@ public class AudioDeviceInventory {
                                         + AudioSystem.audioFormatToString(codec))
                                 .printLog(TAG));
 
+// QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                             // force A2DP device disconnection in case of error so that AudioService
                             // state is consistent with audio policy manager state
                             disconnectDevice = true;
@@ -1198,19 +1193,16 @@ public class AudioDeviceInventory {
                                             + " codec=" + AudioSystem.audioFormatToString(codec))
                                     .printSlog(EventLogger.Event.ALOGI, TAG));
                             delayMs = BT_CONFIG_CHANGE_MUTE_DELAY_MS;
-// QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
 
-// QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                         }
+// QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                     }
                 }
                 if (!codecChanged) {
                     updateBluetoothPreferredModes_l(btDevice /*connectedDevice*/);
                 }
 // QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
-// QTI_BEGIN: 2023-07-03: Audio: base: Reduce A2DP SHO time
             }
-// QTI_END: 2023-07-03: Audio: base: Reduce A2DP SHO time
         if (disconnectDevice) {
             setBluetoothActiveDevice(new AudioDeviceBroker.BtDeviceInfo(btInfo,
                     BluetoothProfile.STATE_DISCONNECTED));
@@ -2377,14 +2369,12 @@ public class AudioDeviceInventory {
                     "APM failed to make available A2DP device addr="
                             + Utils.anonymizeBluetoothAddress(address)
                             + " error=" + res).printSlog(EventLogger.Event.ALOGE, TAG));
-// QTI_BEGIN: 2021-06-29: Audio: AudioService: add device to list incase of audioserver crash.
             // If error is audioserver died,add device to the list,so that during restart AS will
             // restore by triggering onRestoreDevices to add A2DP device to APM by calling
             // setDeviceConnection
             if (res != AudioSystem.AUDIO_STATUS_SERVER_DIED) {
                 return;
             }
-// QTI_END: 2021-06-29: Audio: AudioService: add device to list incase of audioserver crash.
             if (asDeviceConnectionFailure()) {
                 return;
             }
@@ -2682,16 +2672,12 @@ public class AudioDeviceInventory {
 // QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
 
     @GuardedBy("mDevicesLock")
-// QTI_BEGIN: 2021-01-31: Audio: Add support for A2dp Sink device.
     private void makeA2dpSrcAvailable(String address, int a2dpCodec) {
-// QTI_END: 2021-01-31: Audio: Add support for A2dp Sink device.
         final AudioDeviceAttributes ada = new AudioDeviceAttributes(
                 AudioSystem.DEVICE_IN_BLUETOOTH_A2DP, address);
         final int res = mAudioSystem.setDeviceConnectionState(ada,
                 AudioSystem.DEVICE_STATE_AVAILABLE,
-// QTI_BEGIN: 2021-01-31: Audio: Add support for A2dp Sink device.
                 a2dpCodec,
-// QTI_END: 2021-01-31: Audio: Add support for A2dp Sink device.
                 false);
         if (res == AudioSystem.AUDIO_STATUS_ERROR) {
             AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
@@ -2710,17 +2696,11 @@ public class AudioDeviceInventory {
 
     @GuardedBy("mDevicesLock")
     private void makeA2dpSrcUnavailable(String address) {
-// QTI_BEGIN: 2021-01-31: Audio: Add support for A2dp Sink device.
         final String deviceKey =
-// QTI_END: 2021-01-31: Audio: Add support for A2dp Sink device.
-// QTI_BEGIN: 2021-05-17: Audio: support for LC3 a2dp stereo recording
                DeviceInfo.makeDeviceListKey(AudioSystem.DEVICE_IN_BLUETOOTH_A2DP, address);
-// QTI_END: 2021-05-17: Audio: support for LC3 a2dp stereo recording
-// QTI_BEGIN: 2021-01-31: Audio: Add support for A2dp Sink device.
         final DeviceInfo deviceInfo = mConnectedDevices.get(deviceKey);
         final int a2dpCodec = deviceInfo != null ? deviceInfo.mDeviceCodecFormat :
                   AudioSystem.AUDIO_FORMAT_DEFAULT;
-// QTI_END: 2021-01-31: Audio: Add support for A2dp Sink device.
         AudioDeviceAttributes ada = new AudioDeviceAttributes(
                 AudioSystem.DEVICE_IN_BLUETOOTH_A2DP, address);
         mAudioSystem.setDeviceConnectionState(ada,
@@ -3084,9 +3064,7 @@ public class AudioDeviceInventory {
                 return 0;
             }
             mDeviceBroker.postBroadcastBecomingNoisy();
-// QTI_BEGIN: 2019-05-01: Audio: rename vendor.audio.noisy.broadcast.delay property
             delay = SystemProperties.getInt("audio.sys.noisy.broadcast.delay", 700);
-// QTI_END: 2019-05-01: Audio: rename vendor.audio.noisy.broadcast.delay property
         } else {
             Log.i(TAG, "not sending NOISY: device:0x" + Integer.toHexString(device)
                     + " musicDevice:0x" + Integer.toHexString(musicDevice)

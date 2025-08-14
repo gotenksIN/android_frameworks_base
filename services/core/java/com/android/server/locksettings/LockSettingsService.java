@@ -257,9 +257,9 @@ public class LockSettingsService extends ILockSettings.Stub {
     //          mSpManager -> mSoftwareRateLimiter
     // Do not call into ActivityManager while holding mSpManager lock.
     private final Object mSeparateChallengeLock = new Object();
-// QTI_BEGIN: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_BEGIN: 2018-05-29: Core: frameworks: base: Port password retention feature
     private static final String DEFAULT_PASSWORD = "default_password";
-// QTI_END: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_END: 2018-05-29: Core: frameworks: base: Port password retention feature
 
     private final DeviceProvisionedObserver mDeviceProvisionedObserver =
             new DeviceProvisionedObserver();
@@ -285,9 +285,9 @@ public class LockSettingsService extends ILockSettings.Stub {
 
     private final KeyStore mKeyStore;
     private final KeyStoreAuthorization mKeyStoreAuthorization;
-// QTI_BEGIN: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_BEGIN: 2018-05-29: Core: frameworks: base: Port password retention feature
     private static String mSavePassword = DEFAULT_PASSWORD;
-// QTI_END: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_END: 2018-05-29: Core: frameworks: base: Port password retention feature
 
     private final RecoverableKeyStoreManager mRecoverableKeyStoreManager;
     private final UnifiedProfilePasswordCache mUnifiedProfilePasswordCache;
@@ -1516,7 +1516,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         return getCredentialTypeInternal(userId) != CREDENTIAL_TYPE_NONE;
     }
 
-// QTI_BEGIN: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_BEGIN: 2018-05-29: Core: frameworks: base: Port password retention feature
     public void retainPassword(String password) {
         if (LockPatternUtils.isDeviceEncryptionEnabled()) {
             if (password != null)
@@ -1550,17 +1550,17 @@ public class LockSettingsService extends ILockSettings.Stub {
          */
        if (checkCryptKeeperPermissions())
             mContext.enforceCallingOrSelfPermission(
-// QTI_END: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
-// QTI_BEGIN: 2019-11-28: SecureSystems: LockSettingsService : Restrict access to getpassword API
+// QTI_END: 2018-05-29: Core: frameworks: base: Port password retention feature
+// QTI_BEGIN: 2019-11-28: Core: LockSettingsService : Restrict access to getpassword API
                     android.Manifest.permission.ACCESS_KEYGUARD_SECURE_STORAGE,
-// QTI_END: 2019-11-28: SecureSystems: LockSettingsService : Restrict access to getpassword API
-// QTI_BEGIN: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_END: 2019-11-28: Core: LockSettingsService : Restrict access to getpassword API
+// QTI_BEGIN: 2018-05-29: Core: frameworks: base: Port password retention feature
                     "no crypt_keeper or admin permission to get the password");
 
        return mSavePassword;
     }
 
-// QTI_END: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_END: 2018-05-29: Core: frameworks: base: Port password retention feature
     @VisibleForTesting /** Note: this method is overridden in unit tests */
     void initKeystoreSuperKeys(@UserIdInt int userId, SyntheticPassword sp, boolean allowExisting) {
         final byte[] password = sp.deriveKeyStorePassword();
@@ -2215,21 +2215,17 @@ public class LockSettingsService extends ILockSettings.Stub {
 
     private void setCeStorageProtection(@UserIdInt int userId, SyntheticPassword sp) {
         final byte[] secret = sp.deriveFileBasedEncryptionKey();
-// QTI_BEGIN: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
         final long callingId = Binder.clearCallingIdentity();
         try {
-// QTI_END: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
             mStorageManagerInternal.setCeStorageProtection(userId, secret);
         } catch (RuntimeException e) {
             throw new IllegalStateException("Failed to protect CE key for user " + userId, e);
-// QTI_BEGIN: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
         } finally {
             Binder.restoreCallingIdentity(callingId);
             ArrayUtils.zeroize(secret);
         }
     }
 
-// QTI_END: 2018-07-31: SecureSystems: LockSettingsService: Support for separate clear key api
     private boolean isCeStorageUnlocked(int userId) {
         try {
             return mStorageManager.isCeStorageUnlocked(userId);
@@ -2357,9 +2353,9 @@ public class LockSettingsService extends ILockSettings.Stub {
         } finally {
             Binder.restoreCallingIdentity(identity);
             LockscreenCredential.zeroizeIfFromParcel(credential);
-// QTI_BEGIN: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_BEGIN: 2018-05-29: Core: frameworks: base: Port password retention feature
         }
-// QTI_END: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_END: 2018-05-29: Core: frameworks: base: Port password retention feature
     }
 
     @Override

@@ -146,10 +146,8 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
 
     private final Map<Callback, Executor> mCallbackExecutorMap = new ConcurrentHashMap<>();
 
-// QTI_BEGIN: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
     public int mTwspBatteryState;
     public int mTwspBatteryLevel;
-// QTI_END: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
     /**
      * Last time a bt profile auto-connect was attempted.
      * If an ACTION_UUID intent comes in within
@@ -190,7 +188,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
 
     private int mQGroupId;
 // QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
-// QTI_BEGIN: 2020-12-18: Bluetooth: Group-UI: UI frameworks changes
+// QTI_BEGIN: 2020-12-18: Audio: Group-UI: UI frameworks changes
 
     private boolean mIsGroupDevice = false;
 
@@ -200,7 +198,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
     private int mType = UNKNOWN;
     static final int PRIVATE_ADDR = 101;
 
-// QTI_END: 2020-12-18: Bluetooth: Group-UI: UI frameworks changes
+// QTI_END: 2020-12-18: Audio: Group-UI: UI frameworks changes
 // QTI_BEGIN: 2022-10-07: Bluetooth: CSIP: Use Updated API for csip ICON.
     private boolean mIsLeAudioEnabled = false;
 
@@ -265,10 +263,8 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mQGroupId = BluetoothCsipSetCoordinator.GROUP_ID_INVALID;
 // QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
         initDrawableCache();
-// QTI_BEGIN: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
         mTwspBatteryState = -1;
         mTwspBatteryLevel = -1;
-// QTI_END: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
         mUnpairing = false;
         mInputDevice = BluetoothUtils.getInputDevice(mContext, getAddress());
         mIsDeviceStylus = BluetoothUtils.isDeviceStylus(mInputDevice, this);
@@ -281,9 +277,9 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mProfileManager = cachedDevice.mProfileManager;
         mDevice = cachedDevice.mDevice;
         fillData();
+// QTI_END: 2021-02-01: Bluetooth: Add BC profile entry
         mInputDevice = BluetoothUtils.getInputDevice(mContext, getAddress());
         mIsDeviceStylus = BluetoothUtils.isDeviceStylus(mInputDevice, this);
-// QTI_END: 2021-02-01: Bluetooth: Add BC profile entry
         initDrawableCache();
         mUnpairing = false;
 // QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry
@@ -523,9 +519,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             return;
         }
 
-// QTI_BEGIN: 2020-03-11: Bluetooth: GAP: Handle the race condition cases in auto connect logic
         Log.d(TAG, "connect: mConnectAttempted = " + mConnectAttempted);
-// QTI_END: 2020-03-11: Bluetooth: GAP: Handle the race condition cases in auto connect logic
         connectDevice();
     }
 
@@ -1208,9 +1202,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             boolean mIsBondingInitiatedLocally = mDevice.isBondingInitiatedLocally();
             Log.w(TAG, "mIsBondingInitiatedLocally" + mIsBondingInitiatedLocally);
 // QTI_END: 2019-06-26: Bluetooth: GAP: Reset bondingInitiatedLocally flag(1/3)
-// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
             if (mIsBondingInitiatedLocally) {
-// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
                  connect();
             }
 

@@ -18,7 +18,9 @@ package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 
 import com.android.settingslib.mobile.TelephonyIcons
 import com.android.systemui.log.table.TableLogBuffer
+// QTI_BEGIN: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
+// QTI_END: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.NetworkTypeIconModel
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
@@ -80,6 +82,7 @@ class FakeMobileIconInteractor(override val tableLogBuffer: TableLogBuffer) : Mo
     fun setIsDataEnabled(enabled: Boolean) {
         _isDataEnabled.value = enabled
     }
+// QTI_BEGIN: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
 
     override val isConnectionFailed = MutableStateFlow(false)
     override val customizedNetworkName = MutableStateFlow(NetworkNameModel.IntentDerived("demo mode"))
@@ -92,4 +95,5 @@ class FakeMobileIconInteractor(override val tableLogBuffer: TableLogBuffer) : Mo
     override val networkTypeIconCustomization = MutableStateFlow(MobileIconCustomizationMode())
     override val hideNoInternetState = MutableStateFlow(false)
     override val alwaysUseRsrpLevelForLte = MutableStateFlow(false)
+// QTI_END: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
 }

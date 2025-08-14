@@ -752,7 +752,7 @@ public class MediaRecorder implements AudioRouting,
         /** APV video codec */
         @FlaggedApi(FLAG_APV_RECORDING_SUPPORT)
         public static final int APV = 9;
-        public static final int MVHEVC = 10;
+        public static final int MVHEVC = 15;
     }
 
     /**

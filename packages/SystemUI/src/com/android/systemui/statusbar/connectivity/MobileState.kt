@@ -16,10 +16,8 @@
 
 package com.android.systemui.statusbar.connectivity
 
-// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_NONE
 
-// QTI_END: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
 import android.annotation.DrawableRes
 import android.content.Context
 import android.telephony.ServiceState
@@ -55,10 +53,8 @@ class MobileState(
     @JvmField var voiceCapable: Boolean = false,
     @JvmField var videoCapable: Boolean = false,
     @JvmField var mobileDataEnabled: Boolean = false,
-// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
     @JvmField var roamingDataEnabled: Boolean = false,
     @JvmField var imsRegistrationTech: Int = REGISTRATION_TECH_NONE
-// QTI_END: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
 ) : ConnectivityState() {
 
     @JvmField
@@ -119,9 +115,7 @@ class MobileState(
         dataState = o.dataState
         defaultDataOff = o.defaultDataOff
         imsRegistered = o.imsRegistered
-// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
         imsRegistrationTech = o.imsRegistrationTech
-// QTI_END: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
         voiceCapable = o.voiceCapable
         videoCapable = o.videoCapable
         mobileDataEnabled = o.mobileDataEnabled
@@ -179,7 +173,6 @@ class MobileState(
         return networkTypeResIdCache.get(icon, carrierId, context)
     }
 
-// QTI_BEGIN: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
     fun getVoiceNetworkType(): Int {
         return serviceState?.getVoiceNetworkType() ?: TelephonyManager.NETWORK_TYPE_UNKNOWN;
     }
@@ -187,7 +180,6 @@ class MobileState(
     fun getDataNetworkType(): Int {
         return serviceState?.getDataNetworkType() ?: TelephonyManager.NETWORK_TYPE_UNKNOWN;
     }
-// QTI_END: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
     fun setFromMobileStatus(mobileStatus: MobileStatus) {
         activityIn = mobileStatus.activityIn
         activityOut = mobileStatus.activityOut
@@ -216,9 +208,7 @@ class MobileState(
         builder.append("dataState=$dataState,")
         builder.append("defaultDataOff=$defaultDataOff,")
         builder.append("imsRegistered=$imsRegistered,")
-// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
         builder.append("imsRegistrationTech=$imsRegistrationTech,")
-// QTI_END: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
         builder.append("voiceCapable=$voiceCapable,")
         builder.append("videoCapable=$videoCapable,")
         builder.append("mobileDataEnabled=$mobileDataEnabled,")
@@ -314,9 +304,7 @@ class MobileState(
         if (dataState != other.dataState) return false
         if (defaultDataOff != other.defaultDataOff) return false
         if (imsRegistered != other.imsRegistered) return false
-// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
         if (imsRegistrationTech != other.imsRegistrationTech) return false
-// QTI_END: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
         if (voiceCapable != other.voiceCapable) return false
         if (videoCapable != other.videoCapable) return false
         if (mobileDataEnabled != other.mobileDataEnabled) return false
@@ -344,9 +332,7 @@ class MobileState(
         result = 31 * result + dataState
         result = 31 * result + defaultDataOff.hashCode()
         result = 31 * result + imsRegistered.hashCode()
-// QTI_BEGIN: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
         result = 31 * result + imsRegistrationTech.hashCode()
-// QTI_END: 2022-04-26: Android_UI: SystemUI: Display VoWIFI icon when IMS RAT is IWLAN
         result = 31 * result + voiceCapable.hashCode()
         result = 31 * result + videoCapable.hashCode()
         result = 31 * result + mobileDataEnabled.hashCode()

@@ -27,9 +27,7 @@ import android.media.MediaRouter.RouteInfo;
 import android.media.projection.StopReason;
 import android.os.Handler;
 import android.os.Looper;
-// QTI_BEGIN: 2019-07-10: Video: CastTile: Fix availability of Cast Quick Setting Tile
 import android.os.SystemProperties;
-// QTI_END: 2019-07-10: Video: CastTile: Fix availability of Cast Quick Setting Tile
 import android.provider.Settings;
 import android.service.quicksettings.Tile;
 import android.text.TextUtils;
@@ -99,9 +97,7 @@ public class CastTile extends QSTileImpl<BooleanState> {
     private final ShadeDialogContextInteractor mShadeDialogContextInteractor;
     private boolean mCastTransportAllowed;
     private boolean mHotspotConnected;
-// QTI_BEGIN: 2019-07-10: Video: CastTile: Fix availability of Cast Quick Setting Tile
     private static final String WFD_ENABLE = "persist.debug.wfd.enable";
-// QTI_END: 2019-07-10: Video: CastTile: Fix availability of Cast Quick Setting Tile
 
     private final CastDetailsViewModel.Factory mCastDetailsViewModelFactory;
 

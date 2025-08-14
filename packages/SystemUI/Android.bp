@@ -448,9 +448,7 @@ java_defaults {
     resource_dirs: [],
     libs: [
         "keepanno-annotations",
-        // QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
         "extphonelib",
-        // QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
     ],
     javacflags: [
         "-Adagger.fastInit=enabled",
@@ -860,9 +858,7 @@ android_library {
         "android.test.mock.stubs.system",
         "keepanno-annotations",
         "ims-common",
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
         "extphonelib",
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
     ],
     kotlincflags: [
         "-Xjvm-default=all",
@@ -1125,9 +1121,7 @@ android_app {
     libs: [
         "android.car",
         "ims-common",
-// QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
         "extphonelib",
-// QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
     ],
     enforce_uses_libs: false,
 

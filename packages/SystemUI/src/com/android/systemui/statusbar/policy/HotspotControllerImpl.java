@@ -311,9 +311,7 @@ public class HotspotControllerImpl implements HotspotController, WifiManager.Sof
 
     @Override
     public void onConnectedClientsChanged(List<WifiClient> clients) {
-// QTI_BEGIN: 2020-04-08: WLAN: wifi: Deprecate vendor notification for Hotspot client connect/disconnect
         mNumConnectedDevices = clients.size();
-// QTI_END: 2020-04-08: WLAN: wifi: Deprecate vendor notification for Hotspot client connect/disconnect
         fireHotspotChangedCallback();
     }
 }

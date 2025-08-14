@@ -77,8 +77,8 @@ public class NetworkCycleDataForUidLoader extends
                 NetworkCycleDataForUid mQtiObject = builder.build();
                 if (mQtiObject.getBackgroudUsage() >= 0) {
                     mData.add(mQtiObject);
-                }
 // QTI_END: 2025-04-10: Data: Adding Qti object name for NetworkCycleDataForUid
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "Exception querying network detail.", e);

@@ -53,12 +53,10 @@
 #include "NinePatchPeeker.h"
 #include "Utils.h"
 
-/* QTI_BEGIN */
 #include <cutils/properties.h>
 extern const char* __progname;
 #define UI_PERFMODE "debug.ui.perfmode.enable"
 #define UI_PERFMODE_PROCESS "debug.ui.perfmode.process"
-/* QTI_END */
 
 using namespace android;
 
@@ -303,7 +301,6 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
         colorType = decoder->mCodec->computeOutputColorType(colorType);
     }
 
-    /* QTI_BEGIN */
     bool should_use_sw = false;
     if (decoder->mCodec->getEncodedFormat() == SkEncodedImageFormat::kHEIF) {
         char value[PROPERTY_VALUE_MAX];
@@ -317,7 +314,6 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
             }
         }
     }
-    /* QTI_END */
 
     const bool isHardware = !requireMutable
         && ((allocator == kDefault_Allocator && !should_use_sw) ||

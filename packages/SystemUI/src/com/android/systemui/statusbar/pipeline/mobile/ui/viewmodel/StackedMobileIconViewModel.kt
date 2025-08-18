@@ -38,8 +38,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 
 interface StackedMobileIconViewModel {
+    val primaryViewModel: MobileIconViewModelCommon? get() = null
+    val secondaryViewModel: MobileIconViewModelCommon? get() = null
     val dualSim: DualSim?
     val contentDescription: String?
     val networkTypeIcon: Icon.Resource?
@@ -120,6 +123,26 @@ constructor(
                 ),
             initialValue = null,
         )
+
+    override val primaryViewModel: MobileIconViewModelCommon? by
+    hydrator.hydratedStateOf(
+        traceName = "primaryViewModel",
+        source =
+        iconViewModelFlow.mapLatest { viewModels ->
+            viewModels.firstOrNull()
+        },
+        initialValue = null,
+    )
+
+    override val secondaryViewModel: MobileIconViewModelCommon? by
+    hydrator.hydratedStateOf(
+        traceName = "secondaryViewModel",
+        source =
+        iconViewModelFlow.mapLatest { viewModels ->
+            viewModels.lastOrNull()
+        },
+        initialValue = null,
+    )
 
     override val networkTypeIcon: Icon.Resource? by
         hydrator.hydratedStateOf(

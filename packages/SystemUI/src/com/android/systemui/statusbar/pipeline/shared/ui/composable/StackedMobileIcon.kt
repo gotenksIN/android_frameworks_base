@@ -20,6 +20,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement.spacedBy
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -49,9 +51,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.systemui.common.ui.compose.load
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.pipeline.mobile.ui.compose.ActivityIndicators
 import com.android.systemui.statusbar.pipeline.mobile.ui.model.DualSim
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconViewModelCommon
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModel
 import com.android.systemui.statusbar.pipeline.shared.ui.composable.StackedMobileIconDimensions.BarBaseHeightFiveBarsSp
 import com.android.systemui.statusbar.pipeline.shared.ui.composable.StackedMobileIconDimensions.BarBaseHeightFourBarsSp
@@ -125,6 +130,98 @@ fun StackedMobileIcon(viewModel: StackedMobileIconViewModel, modifier: Modifier 
                 contentScale = ContentScale.FillHeight,
             )
         }
+    }
+}
+
+@Composable
+fun CustomStackedMobileIcon(viewModel: StackedMobileIconViewModel, modifier: Modifier = Modifier) {
+    val dualSim = viewModel.dualSim ?: return
+
+    val contentColor = LocalContentColor.current
+    val padding = with(LocalDensity.current) { IconSpacingSp.toDp() }
+    val horizontalArrangement = with(LocalDensity.current) { spacedBy(IconSpacingSp.toDp()) }
+
+    Row(
+        horizontalArrangement = horizontalArrangement,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.padding(horizontal = padding),
+    ) {
+        CustomDualMobileGroupIcon(viewModel)
+        StackedMobileIcon(
+            viewModel = dualSim,
+            color = contentColor,
+            contentDescription = viewModel.contentDescription,
+        )
+
+        if (viewModel.roaming) {
+            val height = with(LocalDensity.current) { RoamingIconHeightSp.toDp() }
+            val paddingTop = with(LocalDensity.current) { RoamingIconPaddingTopSp.toDp() }
+            Image(
+                painter = painterResource(R.drawable.stat_sys_roaming_updated),
+                contentDescription = stringResource(R.string.data_connection_roaming),
+                modifier = Modifier.height(height).offset(y = paddingTop),
+                colorFilter = ColorFilter.tint(contentColor, BlendMode.SrcIn),
+                contentScale = ContentScale.FillHeight,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CustomDualMobileGroupIcon(viewModel: StackedMobileIconViewModel) {
+    val spacer = with(LocalDensity.current) { IconSpacingSp.toDp() }
+    viewModel.primaryViewModel?.let {
+        CustomMobileGroupIcon(it)
+    }
+    Spacer(modifier = Modifier.width(spacer))
+    viewModel.secondaryViewModel?.let {
+        CustomMobileGroupIcon(it)
+    }
+}
+
+@Composable
+private fun CustomMobileGroupIcon(viewModel: MobileIconViewModelCommon) {
+    val networkTypeIcon by
+    viewModel.networkTypeIcon.collectAsStateWithLifecycle(initialValue = null)
+    val activityInVisible by
+    viewModel.activityInVisible.collectAsStateWithLifecycle(initialValue = false)
+    val activityOutVisible by
+    viewModel.activityOutVisible.collectAsStateWithLifecycle(initialValue = false)
+    val activityContainerVisible by
+    viewModel.activityContainerVisible.collectAsStateWithLifecycle(initialValue = false)
+    val volteId by
+    viewModel.volteId.collectAsStateWithLifecycle(initialValue = 0)
+    val contentColor = LocalContentColor.current
+
+    val height = with(LocalDensity.current) { IconHeightSp.toDp() }
+    if (volteId != 0) {
+        val volteHeight = with(LocalDensity.current) {
+            StackedMobileIconDimensions.VolteIconHeightSp.toDp() }
+        Image(
+            painter = painterResource(volteId),
+            contentDescription = null,
+            modifier = Modifier.height(volteHeight),
+            colorFilter = ColorFilter.tint(contentColor, BlendMode.SrcIn),
+            contentScale = ContentScale.FillHeight,
+        )
+    }
+
+    if (activityContainerVisible) {
+        ActivityIndicators(
+            activityInVisible = activityInVisible,
+            activityOutVisible = activityOutVisible,
+            color = contentColor,
+        )
+    }
+
+    networkTypeIcon?.let {
+        Image(
+            painter = painterResource(it.res),
+            contentDescription = it.contentDescription?.load(),
+            modifier = Modifier.height(height),
+            colorFilter = ColorFilter.tint(contentColor, BlendMode.SrcIn),
+            contentScale = ContentScale.FillHeight,
+        )
     }
 }
 
@@ -266,6 +363,7 @@ private object FiveBarsDimensions :
     )
 
 private object StackedMobileIconDimensions {
+    val VolteIconHeightSp = 7.sp
     // Common dimensions
     val IconHeightSp = 12.sp
     val IconPaddingSp = 4.sp

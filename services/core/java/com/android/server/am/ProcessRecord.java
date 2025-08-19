@@ -1043,6 +1043,12 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     @GuardedBy({"mService", "mProcLock"})
     void setKilled(boolean killed) {
         mKilled = killed;
+        if (killed && processName.equals(info.packageName)) {
+            if (mService.mUxPerf != null) {
+                mService.mUxPerf.perfHint(
+                    BoostFramework.VENDOR_HINT_UNPIN_FILE, info.packageName, 0, 0);
+            }
+        }
     }
 
     @GuardedBy(anyOf = {"mService", "mProcLock"})
@@ -1358,7 +1364,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                 description = description + ": " + mErrorState.getAnrAnnotation();
             }
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-            BoostFramework ux_perf = new BoostFramework();
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             if (mService != null && (noisy || info.uid == mService.mCurOomAdjUid)) {
                 mService.reportUidInfoMessageLocked(TAG,
@@ -1384,20 +1389,26 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                     mKillTime = SystemClock.uptimeMillis();
                 }
             }
-            if (ux_perf != null && !mService.mForceStopKill && !mErrorState.isNotResponding()
-                && !mErrorState.isCrashing()) {
-                if (ux_perf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
-                    ux_perf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
-                    ux_perf.perfUXEngine_events(BoostFramework.UXE_EVENT_KILL, 0, this.processName, 0);
+            if (mService.mUxPerf != null && !mService.mForceStopKill
+                && !mErrorState.isNotResponding() && !mErrorState.isCrashing()) {
+                if (mService.mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
+                    mService.mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
+                    mService.mUxPerf.perfUXEngine_events(
+                        BoostFramework.UXE_EVENT_KILL, 0, this.processName, 0);
                 }
 // QTI_BEGIN: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
-                ux_perf.perfEvent(BoostFramework.VENDOR_HINT_KILL,this.processName, 2, 0,getPid());
+                mService.mUxPerf.perfEvent(
+                    BoostFramework.VENDOR_HINT_KILL,this.processName, 2, 0,getPid());
 // QTI_END: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
 // QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
             } else {
                 mService.mForceStopKill = false;
 // QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+            }
+            if (mService.mUxPerf != null && processName.equals(info.packageName)) {
+                mService.mUxPerf.perfHint(
+                    BoostFramework.VENDOR_HINT_UNPIN_FILE, info.packageName, 0, 0);
             }
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
@@ -1780,6 +1791,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
             }
             if (packageName != null) {
                 addPackage(packageName, versionCode, mService.mProcessStats);
+                if (mService.mUxPerf != null && processName.equals(packageName)) {
+                    mService.mUxPerf.perfHint(
+                            BoostFramework.VENDOR_HINT_PIN_FILE, packageName, 0, 0);
+                }
             }
 
             // Update oom adj first, we don't want the additional states are involved in this round.

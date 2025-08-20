@@ -27,7 +27,9 @@ import android.util.Log;
 import android.view.ViewConfiguration;
 import android.view.animation.AnimationUtils;
 import android.view.animation.Interpolator;
+// QTI_BEGIN: 2018-05-21: Core: Fling/Pre-fling Boost: Call perf boost from System Server context
 import android.os.SystemProperties;
+// QTI_END: 2018-05-21: Core: Fling/Pre-fling Boost: Call perf boost from System Server context
 
 /**
  * This class encapsulates scrolling with the ability to overshoot the bounds
@@ -880,7 +882,9 @@ public class OverScroller {
         }
 
         void notifyEdgeReached(int start, int end, int over) {
+// QTI_BEGIN: 2018-05-21: Core: Fling/Pre-fling Boost: Call perf boost from System Server context
             // mState is used to detect successive notifications
+// QTI_END: 2018-05-21: Core: Fling/Pre-fling Boost: Call perf boost from System Server context
             if (mState == SPLINE) {
                 mOver = over;
                 mStartTime = AnimationUtils.currentAnimationTimeMillis();
@@ -950,7 +954,9 @@ public class OverScroller {
             final long currentTime = adjustedTime - mStartTime;
 // QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
 
+// QTI_BEGIN: 2020-11-09: Core: Don't update OverScroller fling state if improper time passed
             if (currentTime <= 0) {
+// QTI_END: 2020-11-09: Core: Don't update OverScroller fling state if improper time passed
                 // Skip work but report that we're still going if we have a nonzero duration.
                 return mDuration > 0;
             }
@@ -990,8 +996,10 @@ public class OverScroller {
                     final float t = (float) (currentTime) / mDuration;
                     final float t2 = t * t;
                     final float sign = Math.signum(mVelocity);
+// QTI_BEGIN: 2018-05-21: Core: Fling/Pre-fling Boost: Call perf boost from System Server context
                     distance = sign * mOver * (3.0f * t2 - 2.0f * t * t2);
                     mCurrVelocity = sign * mOver * 6.0f * (- t + t2);
+// QTI_END: 2018-05-21: Core: Fling/Pre-fling Boost: Call perf boost from System Server context
                     break;
                 }
             }

@@ -1560,7 +1560,9 @@ public class LockSettingsService extends ILockSettings.Stub {
        if (checkCryptKeeperPermissions())
             mContext.enforceCallingOrSelfPermission(
 // QTI_END: 2018-05-29: Core: frameworks: base: Port password retention feature
+// QTI_BEGIN: 2019-11-28: Core: LockSettingsService : Restrict access to getpassword API
                     android.Manifest.permission.ACCESS_KEYGUARD_SECURE_STORAGE,
+// QTI_END: 2019-11-28: Core: LockSettingsService : Restrict access to getpassword API
 // QTI_BEGIN: 2018-05-29: Core: frameworks: base: Port password retention feature
                     "no crypt_keeper or admin permission to get the password");
 

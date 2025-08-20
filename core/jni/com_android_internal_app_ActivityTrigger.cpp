@@ -86,7 +86,9 @@ com_android_internal_app_ActivityTrigger_native_at_init()
     bool errored = false;
 
 // QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
     mDlLibHandler.dlhandle = dlopen(mDlLibHandler.dlname, RTLD_NOW | RTLD_LOCAL);
+// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 // QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     if (mDlLibHandler.dlhandle == NULL) {
         return;
@@ -94,7 +96,9 @@ com_android_internal_app_ActivityTrigger_native_at_init()
 
     *(void **) (&mDlLibHandler.startActivity) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_start");
 // QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
     if (mDlLibHandler.startActivity == NULL) {
+// QTI_END: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
 // QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         errored = true;
     }
@@ -108,7 +112,9 @@ com_android_internal_app_ActivityTrigger_native_at_init()
     if (!errored) {
         *(void **) (&mDlLibHandler.resumeActivity) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_resume");
 // QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
         if (mDlLibHandler.resumeActivity == NULL) {
+// QTI_END: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
 // QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             errored = true;
         }
@@ -116,7 +122,9 @@ com_android_internal_app_ActivityTrigger_native_at_init()
     if (!errored) {
         *(void **) (&mDlLibHandler.pauseActivity) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_pause");
 // QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
         if (mDlLibHandler.pauseActivity == NULL) {
+// QTI_END: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
 // QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             errored = true;
         }
@@ -124,7 +132,9 @@ com_android_internal_app_ActivityTrigger_native_at_init()
     if (!errored) {
         *(void **) (&mDlLibHandler.stopActivity) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_stop");
 // QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
         if (mDlLibHandler.stopActivity == NULL) {
+// QTI_END: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
 // QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             errored = true;
         }
@@ -132,7 +142,9 @@ com_android_internal_app_ActivityTrigger_native_at_init()
     if (!errored) {
         *(void **) (&mDlLibHandler.init) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_init");
 // QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
         if (mDlLibHandler.init == NULL) {
+// QTI_END: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
 // QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             errored = true;
         }
@@ -140,7 +152,9 @@ com_android_internal_app_ActivityTrigger_native_at_init()
     if (!errored) {
         *(void **) (&mDlLibHandler.miscActivity) = dlsym(mDlLibHandler.dlhandle, "activity_trigger_misc");
 // QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
         if (mDlLibHandler.miscActivity == NULL) {
+// QTI_END: 2018-03-27: Core: Activity Trigger: Check return value of dlsym
 // QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
             errored = true;
         }

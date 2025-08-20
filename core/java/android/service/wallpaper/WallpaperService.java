@@ -2727,7 +2727,9 @@ public abstract class WallpaperService extends Service {
                     return;
                 }
                 case MSG_UPDATE_SURFACE:
+// QTI_BEGIN: 2018-09-20: Core: Wallpaper is half black after rotating quickly
                     mEngine.updateSurface(true, false, true/*false*/);
+// QTI_END: 2018-09-20: Core: Wallpaper is half black after rotating quickly
                     break;
                 case MSG_ZOOM:
                     mEngine.setZoom(Float.intBitsToFloat(message.arg1));

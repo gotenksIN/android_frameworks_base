@@ -70,9 +70,7 @@ public class ProcessFreezerManager {
     private static volatile boolean mUseFreezerManager = false;
     private static volatile boolean mUseCpuLoadMonitor = false;
 
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
     private final Freezer mFreezer;
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
 
     public class CpuLoadMonitor {
         private CpuMonitorInternal mCpuMonitorService = null;
@@ -162,9 +160,7 @@ public class ProcessFreezerManager {
         }
     }
 
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
     public static ProcessFreezerManager getInstance() {
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
         if (!ALREADY_READ_PROPERTIES) {
             ALREADY_READ_PROPERTIES = true;
             mUseFreezerManager = Boolean.valueOf(mPerf.perfGetProp(
@@ -205,9 +201,7 @@ public class ProcessFreezerManager {
         if (mInstance == null) {
             synchronized (ProcessFreezerManager.class) {
                 if (mInstance == null) {
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
                     mInstance = new ProcessFreezerManager();
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
                 }
             }
         }
@@ -253,17 +247,13 @@ public class ProcessFreezerManager {
         return freezerManagerThread;
     }
 
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
     private ProcessFreezerManager() {
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
         if (mUseCpuLoadMonitor) {
             mCpuLoadMonitor.setCpuUsageThreshold(mCpuUsageThreshold);
             mCpuLoadMonitor.setCpuSet(mCpuLoadMonitorBG);
         }
 
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
         mFreezer = new Freezer();
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
 
         mFreezerManagerHandler = new Handler(createAndStartFreezeThread().getLooper(), msg -> {
             switch (msg.what) {
@@ -705,9 +695,7 @@ public class ProcessFreezerManager {
         }
 
         try {
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
             int rc = mFreezer.freezeBinder(pid, false, 2 /* timeout_ms */);
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
             if (rc != 0) {
                 Slog.w(TAG, " *unable to unfreeze binder: " +  logInfo + " " + rc );
             } else {
@@ -728,9 +716,7 @@ public class ProcessFreezerManager {
         }
 
         try{
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
             mFreezer.setProcessFrozen(pid, uid, false);
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
             if (mUseDebug) {
                 Slog.d(TAG, "  unfreeze process: " +  logInfo);
             }
@@ -807,9 +793,7 @@ public class ProcessFreezerManager {
         }
 
         try {
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
             int rc = mFreezer.freezeBinder(pid, true, 2 /* timeout_ms */);
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
             if (rc != 0){
                 Slog.w(TAG, " *unable to freeze binder for " + pid + ": " + rc);
             } else {
@@ -832,9 +816,7 @@ public class ProcessFreezerManager {
 
         try {
             if (freezeBinderSuccess) {
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
                 mFreezer.setProcessFrozen(pid, uid, true);
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
                 if (mUseDebug) {
                     Slog.d(TAG, "  freeze process: " + logInfo);
                 }

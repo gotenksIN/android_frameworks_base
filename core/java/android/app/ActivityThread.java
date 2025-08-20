@@ -7654,10 +7654,13 @@ public final class ActivityThread extends ClientTransactionHandler
         /**
          * Switch this process to density compatibility mode if needed.
          */
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         if ((data.appInfo.flags & ApplicationInfo.FLAG_SUPPORTS_SCREEN_DENSITIES)
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
                 == 0) {
             mDensityCompatMode = true;
             Bitmap.setDefaultDensity(DisplayMetrics.DENSITY_DEFAULT);
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         } else {
             int overrideDensity = data.appInfo.getOverrideDensity();
             if(overrideDensity != 0) {
@@ -7665,6 +7668,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 mDensityCompatMode = true;
                 Bitmap.setDefaultDensity(overrideDensity);
             }
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         }
         mConfigurationController.updateDefaultDensity(data.config.densityDpi);
 
@@ -7741,14 +7745,18 @@ public final class ActivityThread extends ClientTransactionHandler
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         if (!Process.isIsolated()) {
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2018-11-22: Core: framework: Adding temporary disk access for Boostframework
             final int old_mask = StrictMode.allowThreadDiskWritesMask();
             try {
+// QTI_END: 2018-11-22: Core: framework: Adding temporary disk access for Boostframework
 // QTI_BEGIN: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                 ux_perf = new BoostFramework(appContext);
 // QTI_END: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2018-11-22: Core: framework: Adding temporary disk access for Boostframework
             } finally {
                  StrictMode.setThreadPolicyMask(old_mask);
             }
+// QTI_END: 2018-11-22: Core: framework: Adding temporary disk access for Boostframework
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         }
 
@@ -7903,6 +7911,7 @@ public final class ActivityThread extends ClientTransactionHandler
         }
         if (ux_perf != null && !Process.isIsolated() && pkg_name != null) {
 // QTI_END: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
             String pkgDir = null;
             try
             {
@@ -7913,6 +7922,7 @@ public final class ActivityThread extends ClientTransactionHandler
             {
                 Slog.e(TAG, "HeavyGameThread () : Exception_1 = " + e);
             }
+// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
             if (ux_perf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                 ux_perf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                 ux_perf.perfUXEngine_events(BoostFramework.UXE_EVENT_BINDAPP, 0,

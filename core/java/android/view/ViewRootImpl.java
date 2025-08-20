@@ -1238,12 +1238,14 @@ public final class ViewRootImpl implements ViewParent,
             Flags.enableInvalidateCheckThread();
     private static boolean sSurfaceFlingerBugfixFlagValue =
             com.android.graphics.surfaceflinger.flags.Flags.vrrBugfix24q4();
+// QTI_BEGIN: 2025-06-10: Core: View: Disable VRR feature to meet power expectations.
     // Disable VRR feature to meet power expectations.
     // VRR wakes up the idle device after 750ms timeout. This bounds Display and GPU to
     // wake up as well, leading to higher power consumption during idling.
     // Disable VRR to avoid this extra wakeup call as it can cause power regression.
     // Google bug: https://partnerissuetracker.corp.google.com/u/0/issues/409971466
     private static final boolean sEnableVrr = false;
+// QTI_END: 2025-06-10: Core: View: Disable VRR feature to meet power expectations.
     private static final boolean sToolkitInitialTouchBoostFlagValue = toolkitInitialTouchBoost();
     private static boolean sToolkitFrameRateDebugFlagValue =  toolkitFrameRateDebug();
 
@@ -2833,7 +2835,9 @@ public final class ViewRootImpl implements ViewParent,
             mBlastBufferQueue.destroy();
         }
         mBlastBufferQueue = new BLASTBufferQueue(mTag, true /* updateDestinationFrame */);
+// QTI_BEGIN: 2022-03-08: Core: Correct mismatch hook of pre-rendering FR due to T-upgrade
         ScrollOptimizer.setBLASTBufferQueue(mBlastBufferQueue);
+// QTI_END: 2022-03-08: Core: Correct mismatch hook of pre-rendering FR due to T-upgrade
         // If we create and destroy BBQ without recreating the SurfaceControl, we can end up
         // queuing buffers on multiple apply tokens causing out of order buffer submissions. We
         // fix this by setting the same apply token on all BBQs created by this VRI.
@@ -8238,10 +8242,12 @@ public final class ViewRootImpl implements ViewParent,
             mAttachInfo.mHandlingPointerEvent = true;
             handled = mView.dispatchPointerEvent(event);
             final int action = event.getActionMasked();
+// QTI_BEGIN: 2019-07-16: Core: perf: Remove Scroll Boosts and use GestureflingBoost
             if (action == MotionEvent.ACTION_MOVE) {
                 mHaveMoveEvent = true;
             } else if (action == MotionEvent.ACTION_UP) {
                 mHaveMoveEvent = false;
+// QTI_END: 2019-07-16: Core: perf: Remove Scroll Boosts and use GestureflingBoost
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             }
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
@@ -10503,10 +10509,12 @@ public final class ViewRootImpl implements ViewParent,
 
             mViewFrameInfo.setInputEvent(mInputEventAssigner.processEvent(q.mEvent));
 
+// QTI_BEGIN: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
             if (q.mEvent instanceof MotionEvent) {
                 ScrollOptimizer.setMotionType(((MotionEvent)q.mEvent).getActionMasked());
             }
 
+// QTI_END: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
             deliverInputEvent(q);
         }
 

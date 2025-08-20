@@ -45,5 +45,4 @@ data class MobileIconCustomizationMode(
 // QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
     val imsRegistrationTech: Int = ImsRegistrationImplBase.REGISTRATION_TECH_NONE,
 // QTI_END: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
-// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
-)// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
+)

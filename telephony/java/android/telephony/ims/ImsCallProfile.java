@@ -347,11 +347,15 @@ public final class ImsCallProfile implements Parcelable {
     /**
      * Presentation unknown for Originating Identity.
      */
+// QTI_BEGIN: 2015-06-29: Telephony: IMS: Map pay phone and unknown presentation with OIR.
     public static final int OIR_PRESENTATION_UNKNOWN = 3;
+// QTI_END: 2015-06-29: Telephony: IMS: Map pay phone and unknown presentation with OIR.
     /**
      * Payphone presentation for Originating Identity.
      */
+// QTI_BEGIN: 2015-06-29: Telephony: IMS: Map pay phone and unknown presentation with OIR.
     public static final int OIR_PRESENTATION_PAYPHONE = 4;
+// QTI_END: 2015-06-29: Telephony: IMS: Map pay phone and unknown presentation with OIR.
     /**
      * Unavailable presentation for Originating Identity.
      */
@@ -386,27 +390,37 @@ public final class ImsCallProfile implements Parcelable {
      */
     public static final int PRIORITY_URGENT = 1;
 
+// QTI_BEGIN: 2014-11-11: Telephony: IMS: Peer capabilities support
     /**
+// QTI_END: 2014-11-11: Telephony: IMS: Peer capabilities support
      * Call is not restricted on peer side and High Definition media is supported
+// QTI_BEGIN: 2014-11-11: Telephony: IMS: Peer capabilities support
      */
     public static final int CALL_RESTRICT_CAUSE_NONE = 0;
+// QTI_END: 2014-11-11: Telephony: IMS: Peer capabilities support
 
     /**
      * High Definition media is not supported on the peer side due to the Radio Access Technology
      * (RAT) it is are connected to.
      */
+// QTI_BEGIN: 2014-11-11: Telephony: IMS: Peer capabilities support
     public static final int CALL_RESTRICT_CAUSE_RAT = 1;
+// QTI_END: 2014-11-11: Telephony: IMS: Peer capabilities support
 
     /**
      * The service has been disabled on the peer side.
      */
+// QTI_BEGIN: 2014-11-11: Telephony: IMS: Peer capabilities support
     public static final int CALL_RESTRICT_CAUSE_DISABLED = 2;
+// QTI_END: 2014-11-11: Telephony: IMS: Peer capabilities support
 
     /**
      * High definition media is not currently supported.
      */
+// QTI_BEGIN: 2014-11-11: Telephony: IMS: Peer capabilities support
     public static final int CALL_RESTRICT_CAUSE_HD = 3;
 
+// QTI_END: 2014-11-11: Telephony: IMS: Peer capabilities support
     /**@hide*/
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "CALL_RESTRICT_CAUSE_", value = {
@@ -423,21 +437,29 @@ public final class ImsCallProfile implements Parcelable {
      *  cna : Calling name
      *  ussd : For network-initiated USSD, MT only
      *  remote_uri : Connected user identity (it can be used for the conference)
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
      *  ChildNum: Child number info.
      *  Codec: Codec info.
      *  DisplayText: Display text for the call.
      *  AdditionalCallInfo: Additional call info.
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
+// QTI_BEGIN: 2016-02-26: Telephony: IMS: ImsCallProfile Extra For Call Pull
      *  CallPull: Boolean value specifying if the call is a pulled call.
+// QTI_END: 2016-02-26: Telephony: IMS: ImsCallProfile Extra For Call Pull
      */
     public static final String EXTRA_OI = "oi";
     public static final String EXTRA_CNA = "cna";
     public static final String EXTRA_USSD = "ussd";
     public static final String EXTRA_REMOTE_URI = "remote_uri";
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     public static final String EXTRA_CHILD_NUMBER = "ChildNum";
     public static final String EXTRA_CODEC = "Codec";
     public static final String EXTRA_DISPLAY_TEXT = "DisplayText";
     public static final String EXTRA_ADDITIONAL_CALL_INFO = "AdditionalCallInfo";
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
+// QTI_BEGIN: 2016-02-26: Telephony: IMS: ImsCallProfile Extra For Call Pull
     public static final String EXTRA_IS_CALL_PULL = "CallPull";
+// QTI_END: 2016-02-26: Telephony: IMS: ImsCallProfile Extra For Call Pull
 
     /**
      * String extra property
@@ -471,7 +493,9 @@ public final class ImsCallProfile implements Parcelable {
      * {@link #EXTRA_CALL_NETWORK_TYPE}.
      */
     @Deprecated
+// QTI_BEGIN: 2015-10-29: Telephony: IMS: Support For Per-Call RAT Info
     public static final String EXTRA_CALL_RAT_TYPE = "CallRadioTech";
+// QTI_END: 2015-10-29: Telephony: IMS: Support For Per-Call RAT Info
 
     /**
      * Extra key with an {@code int} value which can be set in {@link #setCallExtraInt(String, int)}
@@ -953,7 +977,9 @@ public final class ImsCallProfile implements Parcelable {
      * @param callProfile The call profile.
      * @return The video state.
      */
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
     public static int getVideoStateFromImsCallProfile(ImsCallProfile callProfile) {
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
         int videostate = getVideoStateFromCallType(callProfile.mCallType);
         int dualVtCallType = callProfile.getDualVtCallType(videostate);
 
@@ -976,21 +1002,33 @@ public final class ImsCallProfile implements Parcelable {
         switch (callType) {
             case CALL_TYPE_VT_TX:
                 videostate = VideoProfile.STATE_TX_ENABLED;
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
                 break;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
             case CALL_TYPE_VT_RX:
                 videostate = VideoProfile.STATE_RX_ENABLED;
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
                 break;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
             case CALL_TYPE_VT:
                 videostate = VideoProfile.STATE_BIDIRECTIONAL;
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
                 break;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
             case CALL_TYPE_VOICE:
                 videostate = VideoProfile.STATE_AUDIO_ONLY;
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
                 break;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
             default:
                 videostate = VideoProfile.STATE_AUDIO_ONLY;
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
                 break;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
         }
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
         return videostate;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
     }
 
     /**
@@ -1028,10 +1066,12 @@ public final class ImsCallProfile implements Parcelable {
                 return ImsCallProfile.OIR_PRESENTATION_RESTRICTED;
             case PhoneConstants.PRESENTATION_ALLOWED:
                 return ImsCallProfile.OIR_PRESENTATION_NOT_RESTRICTED;
+// QTI_BEGIN: 2015-06-29: Telephony: IMS: Map pay phone and unknown presentation with OIR.
             case PhoneConstants.PRESENTATION_PAYPHONE:
                 return ImsCallProfile.OIR_PRESENTATION_PAYPHONE;
             case PhoneConstants.PRESENTATION_UNKNOWN:
                 return ImsCallProfile.OIR_PRESENTATION_UNKNOWN;
+// QTI_END: 2015-06-29: Telephony: IMS: Map pay phone and unknown presentation with OIR.
             case PhoneConstants.PRESENTATION_UNAVAILABLE:
                 return ImsCallProfile.OIR_PRESENTATION_UNAVAILABLE;
             default:
@@ -1060,17 +1100,22 @@ public final class ImsCallProfile implements Parcelable {
                 return PhoneConstants.PRESENTATION_RESTRICTED;
             case ImsCallProfile.OIR_PRESENTATION_NOT_RESTRICTED:
                 return PhoneConstants.PRESENTATION_ALLOWED;
+// QTI_BEGIN: 2015-06-29: Telephony: IMS: Map pay phone and unknown presentation with OIR.
             case ImsCallProfile.OIR_PRESENTATION_PAYPHONE:
                 return PhoneConstants.PRESENTATION_PAYPHONE;
+// QTI_END: 2015-06-29: Telephony: IMS: Map pay phone and unknown presentation with OIR.
             case ImsCallProfile.OIR_PRESENTATION_UNAVAILABLE:
                 return PhoneConstants.PRESENTATION_UNAVAILABLE;
+// QTI_BEGIN: 2015-06-29: Telephony: IMS: Map pay phone and unknown presentation with OIR.
             case ImsCallProfile.OIR_PRESENTATION_UNKNOWN:
                 return PhoneConstants.PRESENTATION_UNKNOWN;
+// QTI_END: 2015-06-29: Telephony: IMS: Map pay phone and unknown presentation with OIR.
             default:
                 return PhoneConstants.PRESENTATION_UNKNOWN;
         }
     }
 
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
     /**
      * Checks if video call is paused
      * @return true if call is video paused
@@ -1079,6 +1124,7 @@ public final class ImsCallProfile implements Parcelable {
         return mMediaProfile.mVideoDirection == ImsStreamMediaProfile.DIRECTION_INACTIVE;
     }
 
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
     /**
      * Determines if the {@link ImsCallProfile} represents a video call.
      *

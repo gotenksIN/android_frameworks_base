@@ -488,9 +488,7 @@ public final class ActivityRecord extends WindowToken {
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     public int perfActivityBoostHandler = -1; //perflock handler when activity is created.
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
     private int mPerfScenarioBoostHandler = -1;
-// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
     private Task task;              // the task this is in.
     private long createTime = System.currentTimeMillis();
     long lastVisibleTime;         // last time this activity became visible

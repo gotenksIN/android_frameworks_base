@@ -428,7 +428,23 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         // causes flickering. See b/270202228.
         final boolean applyTransactionOnDraw = taskInfo.isFreeform();
         relayout(taskInfo, t, t, applyTransactionOnDraw, shouldSetTaskVisibilityPositionAndCrop,
-                hasGlobalFocus, displayExclusionRegion, /* inSyncWithTransition= */ false);
+                hasGlobalFocus, displayExclusionRegion, /* inSyncWithTransition= */ false,
+                /* forceReinflation= */ false, getLeash());
+        if (!applyTransactionOnDraw) {
+            t.apply();
+        }
+    }
+
+    /** TODO(b/437224867): Remove this workaround for "Wallpaper & Style" bug in Settings */
+    void onThemeChanged() {
+        final SurfaceControl.Transaction t = mSurfaceControlTransactionSupplier.get();
+        final boolean shouldSetTaskVisibilityPositionAndCrop =
+                !mDesktopConfig.isVeiledResizeEnabled()
+                        && mTaskDragResizer.isResizingOrAnimating();
+        final boolean applyTransactionOnDraw = mTaskInfo.isFreeform();
+        relayout(mTaskInfo, t, t, applyTransactionOnDraw, shouldSetTaskVisibilityPositionAndCrop,
+                mHasGlobalFocus, mExclusionRegion, /* inSyncWithTransition= */ false,
+                /* forceReinflation= */ true, getLeash());
         if (!applyTransactionOnDraw) {
             t.apply();
         }
@@ -451,11 +467,12 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         updateDragResizeListenerIfNeeded(mDecorationContainerSurface, inFullImmersive);
     }
 
+    /** TODO(b/437224867): Remove forceReinflation param */
     void relayout(ActivityManager.RunningTaskInfo taskInfo,
             SurfaceControl.Transaction startT, SurfaceControl.Transaction finishT,
             boolean applyStartTransactionOnDraw, boolean shouldSetTaskVisibilityPositionAndCrop,
             boolean hasGlobalFocus, @NonNull Region displayExclusionRegion,
-            boolean inSyncWithTransition) {
+            boolean inSyncWithTransition, boolean forceReinflation, SurfaceControl taskSurface) {
         Trace.beginSection("DesktopModeWindowDecoration#relayout");
 
         if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB.isTrue()) {
@@ -502,14 +519,15 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                         && DesktopModeFlags
                         .ENABLE_DESKTOP_RECENTS_TRANSITIONS_CORNERS_BUGFIX.isTrue(),
                 mDesktopModeCompatPolicy.shouldExcludeCaptionFromAppBounds(taskInfo),
-                mDesktopConfig, inSyncWithTransition, mLockTaskChangeListener.isTaskLocked(),
+                mDesktopConfig, inSyncWithTransition,
+                mLockTaskChangeListener.isTaskLocked(), forceReinflation,
                 /* occludingElementsCalculator = */ () -> getOccludingElements());
 
         final WindowDecorLinearLayout oldRootView = mResult.mRootView;
         final SurfaceControl oldDecorationSurface = mDecorationContainerSurface;
         final WindowContainerTransaction wct = new WindowContainerTransaction();
 
-        relayout(mRelayoutParams, startT, finishT, wct, oldRootView, mResult);
+        relayout(mRelayoutParams, startT, finishT, wct, oldRootView, taskSurface, mResult);
         // After this line, mTaskInfo is up-to-date and should be used instead of taskInfo
 
         if (!wct.isEmpty()) {
@@ -995,6 +1013,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
     }
 
     @VisibleForTesting
+    /** TODO(b/437224867): Remove forceReinflation param */
     static void updateRelayoutParams(
             RelayoutParams relayoutParams,
             Context context,
@@ -1014,6 +1033,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             DesktopConfig desktopConfig,
             boolean inSyncWithTransition,
             boolean isTaskLocked,
+            boolean forceReinflation,
             Supplier<List<OccludingElement>> occludingElementsCalculator) {
         final int captionLayoutId = getDesktopModeWindowDecorLayoutId(taskInfo.getWindowingMode());
         final boolean isAppHeader =
@@ -1026,6 +1046,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 taskInfo.getWindowingMode());
         relayoutParams.mCaptionWidthId = getCaptionWidthId(relayoutParams.mLayoutResId);
         relayoutParams.mHasGlobalFocus = hasGlobalFocus;
+        relayoutParams.mForceReinflation = forceReinflation;
         relayoutParams.mDisplayExclusionRegion.set(displayExclusionRegion);
         // Allow the handle view to be delayed since the handle is just a small addition to the
         // window, whereas the header cannot be delayed because it is expected to be visible from
@@ -1288,7 +1309,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 mUserContext,
                 mTransitions,
                 mTaskInfo,
-                mTaskSurface,
+                getLeash(),
                 mDisplayController,
                 mTaskResourceLoader,
                 mSurfaceControlTransactionSupplier,
@@ -1331,7 +1352,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
     private void createResizeVeilIfNeeded() {
         if (mResizeVeil != null) return;
         mResizeVeil = new ResizeVeil(mContext, mDisplayController, mTaskResourceLoader,
-                mMainDispatcher, mMainScope, mTaskSurface,
+                mMainDispatcher, mMainScope, getLeash(),
                 mSurfaceControlTransactionSupplier, mTaskInfo);
     }
 
@@ -1340,7 +1361,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
      */
     public void showResizeVeil(Rect taskBounds) {
         createResizeVeilIfNeeded();
-        mResizeVeil.showVeil(mTaskSurface, taskBounds, mTaskInfo);
+        mResizeVeil.showVeil(getLeash(), taskBounds, mTaskInfo);
     }
 
     /**
@@ -1348,7 +1369,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
      */
     public void showResizeVeil(SurfaceControl.Transaction tx, Rect taskBounds) {
         createResizeVeilIfNeeded();
-        mResizeVeil.showVeil(tx, mTaskSurface, taskBounds, mTaskInfo, false /* fadeIn */);
+        mResizeVeil.showVeil(tx, getLeash(), taskBounds, mTaskInfo, false /* fadeIn */);
     }
 
     /**
@@ -2010,7 +2031,10 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
      */
     @Override
     public void onMaximizeButtonHoverExit() {
-        asAppHeader(mWindowDecorViewHolder).onMaximizeWindowHoverExit();
+        final AppHeaderViewHolder appHeader = asAppHeader(mWindowDecorViewHolder);
+        if (appHeader != null) {
+            appHeader.onMaximizeWindowHoverExit();
+        }
     }
 
     /**

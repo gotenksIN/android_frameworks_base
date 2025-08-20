@@ -30,6 +30,7 @@ import com.android.settingslib.SignalIcon.IconGroup;
 public class WifiIcons {
 
     public static final int[] WIFI_FULL_ICONS = getIconsBasedOnFlag();
+    public static final int WIFI_NO_SIGNAL = WIFI_FULL_ICONS[0];
 
     /**
      * Check the aconfig flag to decide on which icons to use. Can be removed once the flag is gone
@@ -43,6 +44,7 @@ public class WifiIcons {
             return new int[] {
                 com.android.settingslib.R.drawable.ic_wifi_0,
                 com.android.settingslib.R.drawable.ic_wifi_1,
+                com.android.settingslib.R.drawable.ic_wifi_2,
                 com.android.settingslib.R.drawable.ic_wifi_2,
                 com.android.settingslib.R.drawable.ic_wifi_3
             };
@@ -65,6 +67,7 @@ public class WifiIcons {
             return new int[] {
                 com.android.settingslib.R.drawable.ic_wifi_0_error,
                 com.android.settingslib.R.drawable.ic_wifi_1_error,
+                com.android.settingslib.R.drawable.ic_wifi_2_error,
                 com.android.settingslib.R.drawable.ic_wifi_2_error,
                 com.android.settingslib.R.drawable.ic_wifi_3_error
             };

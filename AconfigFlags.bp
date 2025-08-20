@@ -24,6 +24,7 @@ aconfig_declarations_group {
         "aconfig_settingslib_flags_java_lib",
         "aconfig_trade_in_mode_flags_java_lib",
         "adpf_flags_java_lib",
+        "anomaly-detector-exported-aconfig-flags-lib",
         "android.app.appfunctions.flags-aconfig-java",
         "android.app.assist.flags-aconfig-java",
         "android.app.contextualsearch.flags-aconfig-java",
@@ -350,6 +351,7 @@ aconfig_declarations {
 java_aconfig_library {
     name: "com.android.hardware.input-aconfig-java",
     aconfig_declarations: "com.android.hardware.input.input-aconfig",
+    host_supported: true,
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -838,6 +840,18 @@ cc_aconfig_library {
     host_supported: true,
 }
 
+cc_aconfig_library {
+    name: "android.content.res.flags-aconfig-cc-host-ro",
+    aconfig_declarations: "android.content.res.flags-aconfig",
+    mode: "force-read-only",
+    host_supported: true,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
+}
+
 // Media BetterTogether
 aconfig_declarations {
     name: "com.android.media.flags.bettertogether-aconfig",
@@ -951,6 +965,7 @@ java_aconfig_library {
     min_sdk_version: "30",
     apex_available: [
         "//apex_available:platform",
+        "com.android.appsearch",
         "com.android.extservices",
         "com.android.nfcservices",
         "com.android.permission",
@@ -1779,6 +1794,7 @@ java_aconfig_library {
     name: "android.provider.flags-aconfig-java",
     aconfig_declarations: "android.provider.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    min_sdk_version: "30",
 }
 
 // ContextHub

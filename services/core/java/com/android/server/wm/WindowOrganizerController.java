@@ -380,7 +380,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                                     setAllReadyIfNeeded(nextTransition, wct);
                                 }
                                 mService.mChainTracker.end();
-                            });
+                            }, true /* noopIfDuringDisplayChange */);
                     return nextTransition.getToken();
                 }
                 // The transition already started collecting before sending a request to shell,
@@ -569,7 +569,8 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 // TODO(b/232042367) Redesign the organizer update on activity callback so that we
                 // we will know about the transition explicitly.
                 final ActionChain chain = mService.mChainTracker.startTransit("tfTransact");
-                if (chain.getTransition() == null) {
+                final boolean legacySync = chain.getTransition() == null;
+                if (legacySync) {
                     // This should rarely happen, and we should try to avoid using
                     // {@link #applySyncTransaction} with Shell transition.
                     // We still want to apply and merge the transaction to the active sync
@@ -582,7 +583,9 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                     chain.getTransition().mReadyTracker.add(wctApplied);
                 }
                 applyTransaction(wct, -1 /* syncId */, chain, caller);
-                wctApplied.meet();
+                if (!legacySync) {
+                    wctApplied.meet();
+                }
                 mService.mChainTracker.end();
                 return;
             }
@@ -664,9 +667,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
         try {
             final ArraySet<WindowContainer<?>> haveConfigChanges = new ArraySet<>();
             if (transition != null) {
-                if (transition.applyDisplayChangeIfNeeded(haveConfigChanges)) {
-                    effects |= TRANSACT_EFFECTS_LIFECYCLE;
-                }
+                transition.applyDisplayChangeIfNeeded(haveConfigChanges);
                 if (!haveConfigChanges.isEmpty()) {
                     effects |= TRANSACT_EFFECTS_CLIENT_CONFIG;
                 }
@@ -775,6 +776,9 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                             isInLockTaskMode, caller, t.getErrorCallbackToken(),
                             t.getTaskFragmentOrganizer());
                 }
+            }
+            if (transition != null && transition.applyDisplayRemovalsIfNeeded()) {
+                effects |= TRANSACT_EFFECTS_LIFECYCLE;
             }
             if ((effects & TRANSACT_EFFECTS_LIFECYCLE) != 0) {
                 mService.mTaskSupervisor.setDeferRootVisibilityUpdate(false /* deferUpdate */);
@@ -2509,6 +2513,9 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
     @Override
     public void registerTransitionPlayer(ITransitionPlayer player) {
         enforceTaskPermission("registerTransitionPlayer()");
+        if (Flags.unifyShellBinders()) {
+            throw new IllegalStateException("TransitionPlayer is not independent anymore");
+        }
         final int callerPid = Binder.getCallingPid();
         final int callerUid = Binder.getCallingUid();
         final long ident = Binder.clearCallingIdentity();
@@ -2526,6 +2533,9 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
     @Override
     public void unregisterTransitionPlayer(ITransitionPlayer player) {
         enforceTaskPermission("unregisterTransitionPlayer()");
+        if (Flags.unifyShellBinders()) {
+            throw new IllegalStateException("TransitionPlayer is not independent anymore");
+        }
         final long ident = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {

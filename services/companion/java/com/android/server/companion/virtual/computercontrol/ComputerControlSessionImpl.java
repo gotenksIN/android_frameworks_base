@@ -16,6 +16,10 @@
 
 package com.android.server.companion.virtual.computercontrol;
 
+import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM;
+import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
+import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_RECENTS;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
@@ -80,9 +84,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mParams = params;
         mOnClosedListener = onClosedListener;
         VirtualDeviceParams virtualDeviceParams = new VirtualDeviceParams.Builder()
-                .setName(mParams.name)
-                .setDevicePolicy(VirtualDeviceParams.POLICY_TYPE_RECENTS,
-                        VirtualDeviceParams.DEVICE_POLICY_CUSTOM)
+                .setName(mParams.getName())
+                .setDevicePolicy(POLICY_TYPE_RECENTS, DEVICE_POLICY_CUSTOM)
                 .build();
         String permissionControllerPackage = packageManager.getPermissionControllerPackageName();
         ActivityPolicyExemption permissionController =
@@ -92,7 +95,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
         int displayFlags = DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
                 | DisplayManager.VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED;
-        if (mParams.isDisplayAlwaysUnlocked) {
+        if (mParams.isDisplayAlwaysUnlocked()) {
             displayFlags |= DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
         }
 
@@ -106,9 +109,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 new DisplayManagerGlobal.VirtualDisplayCallback(null, null);
 
         VirtualDisplayConfig virtualDisplayConfig = new VirtualDisplayConfig.Builder(
-                mParams.name + "-display", mParams.displayWidthPx, mParams.displayHeightPx,
-                mParams.displayDpi)
-                .setSurface(mParams.displaySurface)
+                mParams.getName() + "-display", mParams.getDisplayWidthPx(),
+                mParams.getDisplayHeightPx(), mParams.getDisplayDpi())
+                .setSurface(mParams.getDisplaySurface())
                 .setFlags(displayFlags)
                 .build();
 
@@ -129,7 +132,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mVirtualDevice.setDisplayImePolicy(
                     mVirtualDisplayId, WindowManager.DISPLAY_IME_POLICY_HIDE);
 
-            String dpadName = mParams.name + "-dpad";
+            String dpadName = mParams.getName() + "-dpad";
             VirtualDpadConfig virtualDpadConfig =
                     new VirtualDpadConfig.Builder()
                             .setAssociatedDisplayId(mVirtualDisplayId)
@@ -138,7 +141,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mVirtualDpad = mVirtualDevice.createVirtualDpad(
                     virtualDpadConfig, new Binder(dpadName));
 
-            String keyboardName = mParams.name  + "-keyboard";
+            String keyboardName = mParams.getName()  + "-keyboard";
             VirtualKeyboardConfig virtualKeyboardConfig =
                     new VirtualKeyboardConfig.Builder()
                             .setAssociatedDisplayId(mVirtualDisplayId)
@@ -147,10 +150,10 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mVirtualKeyboard = mVirtualDevice.createVirtualKeyboard(
                     virtualKeyboardConfig, new Binder(keyboardName));
 
-            String touchscreenName = mParams.name + "-touchscreen";
+            String touchscreenName = mParams.getName() + "-touchscreen";
             VirtualTouchscreenConfig virtualTouchscreenConfig =
                     new VirtualTouchscreenConfig.Builder(
-                            mParams.displayWidthPx, mParams.displayHeightPx)
+                            mParams.getDisplayWidthPx(), mParams.getDisplayHeightPx())
                             .setAssociatedDisplayId(mVirtualDisplayId)
                             .setInputDeviceName(touchscreenName)
                             .build();
@@ -194,7 +197,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         }
         DisplayInfo displayInfo = new DisplayInfo();
         display.getDisplayInfo(displayInfo);
-        String name = mParams.name + "-display-mirror-" + mMirrorDisplayCounter.getAndIncrement();
+        String name =
+                mParams.getName() + "-display-mirror-" + mMirrorDisplayCounter.getAndIncrement();
         VirtualDisplayConfig virtualDisplayConfig =
                 new VirtualDisplayConfig.Builder(name, width, height, displayInfo.logicalDensityDpi)
                         .setSurface(surface)
@@ -206,6 +210,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     @Override
     public void close() throws RemoteException {
+        mVirtualDevice.setDevicePolicy(POLICY_TYPE_RECENTS, DEVICE_POLICY_DEFAULT);
         mVirtualDevice.close();
         mAppToken.unlinkToDeath(this, 0);
         mOnClosedListener.onClosed(asBinder());

@@ -643,6 +643,11 @@ class MobileConnectionRepositoryImpl(
             .stateIn(scope, SharingStarted.WhileSubscribed(), initial)
     }
 
+    override fun setDataEnabled(enabled: Boolean) {
+        telephonyManager.setDataEnabledForReason(TelephonyManager.DATA_ENABLED_REASON_USER, enabled)
+    }
+
+
 // QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
     override val lteRsrpLevel: StateFlow<Int> =
         callbackEvents

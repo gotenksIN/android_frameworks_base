@@ -33,12 +33,9 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryFaceAuthInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
-import com.android.systemui.deviceentry.shared.FaceAuthUiEvent
-import com.android.systemui.flags.DisableSceneContainer
-import com.android.systemui.flags.EnableSceneContainer
+import com.android.systemui.inputdevice.data.repository.pointerDeviceRepository
 import com.android.systemui.keyguard.data.repository.FakeKeyguardTransitionRepository
 import com.android.systemui.keyguard.data.repository.KeyguardRepository
-import com.android.systemui.keyguard.data.repository.fakeDeviceEntryFaceAuthRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
 import com.android.systemui.keyguard.shared.model.KeyguardState
@@ -47,7 +44,7 @@ import com.android.systemui.power.domain.interactor.powerInteractor
 import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.domain.interactor.sceneInteractor
-import com.android.systemui.scene.shared.model.Overlays
+import com.android.systemui.securelockdevice.domain.interactor.secureLockDeviceInteractor
 import com.android.systemui.shade.pulsingGestureListener
 import com.android.systemui.shared.settings.data.repository.SecureSettingsRepository
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager
@@ -68,10 +65,8 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyLong
-import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -294,86 +289,6 @@ class KeyguardTouchHandlingInteractorTest : SysuiTestCase() {
                 .log(KeyguardTouchHandlingInteractor.LogEvents.LOCK_SCREEN_LONG_PRESS_POPUP_CLICKED)
         }
 
-    @DisableSceneContainer
-    @Test
-    fun triggersFaceAuthWhenLockscreenIsClickedStaysOnKeyguardNoScenes() =
-        testScope.runTest {
-            collectLastValue(underTest.isMenuVisible)
-            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
-            runCurrent()
-            kosmos.fakeDeviceEntryFaceAuthRepository.canRunFaceAuth.value = true
-
-            underTest.onClick(100.0f, 100.0f)
-            runCurrent()
-
-            verify(kosmos.statusBarKeyguardViewManager, never())
-                .showPrimaryBouncer(anyBoolean(), anyString())
-
-            val runningAuthRequest =
-                kosmos.fakeDeviceEntryFaceAuthRepository.runningAuthRequest.value
-            assertThat(runningAuthRequest?.first)
-                .isEqualTo(FaceAuthUiEvent.FACE_AUTH_TRIGGERED_NOTIFICATION_PANEL_CLICKED)
-            assertThat(runningAuthRequest?.second).isEqualTo(true)
-        }
-
-    @EnableSceneContainer
-    @Test
-    fun triggersFaceAuthWhenLockscreenIsClickedStaysOnKeyguard() =
-        testScope.runTest {
-            collectLastValue(underTest.isMenuVisible)
-            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
-            runCurrent()
-            kosmos.fakeDeviceEntryFaceAuthRepository.canRunFaceAuth.value = true
-
-            assertThat(currentOverlays).doesNotContain(Overlays.Bouncer)
-
-            underTest.onClick(100.0f, 100.0f)
-            runCurrent()
-
-            assertThat(currentOverlays).doesNotContain(Overlays.Bouncer)
-
-            val runningAuthRequest =
-                kosmos.fakeDeviceEntryFaceAuthRepository.runningAuthRequest.value
-            assertThat(runningAuthRequest?.first)
-                .isEqualTo(FaceAuthUiEvent.FACE_AUTH_TRIGGERED_NOTIFICATION_PANEL_CLICKED)
-            assertThat(runningAuthRequest?.second).isEqualTo(true)
-        }
-
-    @DisableSceneContainer
-    @Test
-    fun switchesToBouncerWhenLockscreenIsClickedNoFaceAuthNoScenes() =
-        testScope.runTest {
-            collectLastValue(underTest.isMenuVisible)
-            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
-
-            runCurrent()
-            kosmos.fakeDeviceEntryFaceAuthRepository.canRunFaceAuth.value = false
-
-            underTest.onClick(100.0f, 100.0f)
-            runCurrent()
-
-            verify(kosmos.statusBarKeyguardViewManager)
-                .showPrimaryBouncer(anyBoolean(), anyString())
-        }
-
-    @EnableSceneContainer
-    @Test
-    fun switchesToBouncerWhenLockscreenIsClickedNoFaceAuth() =
-        testScope.runTest {
-            collectLastValue(underTest.isMenuVisible)
-            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
-
-            runCurrent()
-            kosmos.fakeDeviceEntryFaceAuthRepository.canRunFaceAuth.value = false
-
-            assertThat(currentOverlays).doesNotContain(Overlays.Bouncer)
-
-            underTest.onClick(100.0f, 100.0f)
-            runCurrent()
-
-            assertThat(currentOverlays).contains(Overlays.Bouncer)
-        }
-
     @Test
     fun showMenu_leaveLockscreen_returnToLockscreen_menuNotVisible() =
         testScope.runTest {
@@ -528,6 +443,8 @@ class KeyguardTouchHandlingInteractorTest : SysuiTestCase() {
                 secureSettingsRepository = secureSettingsRepository,
                 powerManager = powerManager,
                 systemClock = kosmos.fakeSystemClock,
+                pointerDeviceRepository = kosmos.pointerDeviceRepository,
+                secureLockDeviceInteractor = { kosmos.secureLockDeviceInteractor },
             )
         setUpState()
     }

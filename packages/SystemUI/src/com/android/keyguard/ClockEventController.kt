@@ -53,19 +53,19 @@ import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.keyguard.ui.viewmodel.DozingToLockscreenTransitionViewModel
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.log.core.Logger
-import com.android.systemui.plugins.clocks.AlarmData
-import com.android.systemui.plugins.clocks.ClockController
-import com.android.systemui.plugins.clocks.ClockEventListener
-import com.android.systemui.plugins.clocks.ClockFaceController
-import com.android.systemui.plugins.clocks.ClockFaceController.Companion.updateTheme
-import com.android.systemui.plugins.clocks.ClockMessageBuffers
-import com.android.systemui.plugins.clocks.ClockTickRate
-import com.android.systemui.plugins.clocks.TimeFormatKind
-import com.android.systemui.plugins.clocks.VPointF
-import com.android.systemui.plugins.clocks.VRectF
-import com.android.systemui.plugins.clocks.WeatherData
-import com.android.systemui.plugins.clocks.ZenData
-import com.android.systemui.plugins.clocks.ZenData.ZenMode
+import com.android.systemui.plugins.keyguard.VPointF
+import com.android.systemui.plugins.keyguard.VRectF
+import com.android.systemui.plugins.keyguard.data.model.AlarmData
+import com.android.systemui.plugins.keyguard.data.model.WeatherData
+import com.android.systemui.plugins.keyguard.data.model.ZenData
+import com.android.systemui.plugins.keyguard.data.model.ZenData.ZenMode
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockController
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockEventListener
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockFaceController
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockFaceController.Companion.updateTheme
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockMessageBuffers
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockTickRate
+import com.android.systemui.plugins.keyguard.ui.clocks.TimeFormatKind
 import com.android.systemui.res.R as SysuiR
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.settings.UserTracker
@@ -251,7 +251,6 @@ constructor(
     private var isCharging = false
     private var isKeyguardVisible = false
     private var isRegistered = false
-    private var disposableHandle: DisposableHandle? = null
     private val regionSamplingEnabled = featureFlags.isEnabled(REGION_SAMPLING)
     private var largeClockOnSecondaryDisplay = false
 
@@ -460,11 +459,25 @@ constructor(
                 }
     }
 
-    fun registerListeners(parent: View) {
-        if (isRegistered) {
-            return
+    fun bind(parent: View): DisposableHandle {
+        return parent.repeatWhenAttached {
+            repeatOnLifecycle(Lifecycle.State.CREATED) {
+                listenForDnd(this)
+                listenForDozeAmountTransition(this)
+                listenForAnyStateToAodTransition(this)
+                listenForAnyStateToLockscreenTransition(this)
+                listenForAnyStateToDozingTransition(this)
+                if (com.android.systemui.Flags.newDozingKeyguardStates()) {
+                    listenForDozingToLockscreen(this)
+                }
+            }
         }
+    }
+
+    fun registerListeners() {
+        if (isRegistered) return
         isRegistered = true
+
         broadcastDispatcher.registerReceiver(
             localeBroadcastReceiver,
             IntentFilter(Intent.ACTION_LOCALE_CHANGED),
@@ -482,19 +495,6 @@ constructor(
                 }
             )
         }
-        disposableHandle =
-            parent.repeatWhenAttached {
-                repeatOnLifecycle(Lifecycle.State.CREATED) {
-                    listenForDnd(this)
-                    listenForDozeAmountTransition(this)
-                    listenForAnyStateToAodTransition(this)
-                    listenForAnyStateToLockscreenTransition(this)
-                    listenForAnyStateToDozingTransition(this)
-                    if (com.android.systemui.Flags.newDozingKeyguardStates()) {
-                        listenForDozingToLockscreen(this)
-                    }
-                }
-            }
         smallTimeListener?.update(shouldTimeListenerRun)
         largeTimeListener?.update(shouldTimeListenerRun)
 
@@ -505,12 +505,9 @@ constructor(
     }
 
     fun unregisterListeners() {
-        if (!isRegistered) {
-            return
-        }
+        if (!isRegistered) return
         isRegistered = false
 
-        disposableHandle?.dispose()
         broadcastDispatcher.unregisterReceiver(localeBroadcastReceiver)
         configurationController.removeCallback(configListener)
         batteryController.removeCallback(batteryCallback)

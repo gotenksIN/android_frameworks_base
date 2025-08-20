@@ -24,11 +24,10 @@ import androidx.test.filters.RequiresDevice
 import com.android.server.wm.flicker.helpers.ScrollToFinishHelper
 import com.android.wm.shell.Flags
 import com.android.wm.shell.Utils
-import com.android.wm.shell.flicker.bubbles.testcase.DismissExpandedBubbleTestCases
+import com.android.wm.shell.flicker.bubbles.testcase.DismissSingleExpandedBubbleTestCases
 import com.android.wm.shell.flicker.bubbles.utils.ApplyPerParameterRule
 import com.android.wm.shell.flicker.bubbles.utils.BubbleFlickerTestHelper.launchBubbleViaBubbleMenu
 import com.android.wm.shell.flicker.bubbles.utils.BubbleFlickerTestHelper.waitAndVerifyBubbleGone
-import com.android.wm.shell.flicker.bubbles.utils.FlickerPropertyInitializer
 import com.android.wm.shell.flicker.bubbles.utils.RecordTraceWithTransitionRule
 import org.junit.FixMethodOrder
 import org.junit.Rule
@@ -61,7 +60,7 @@ import org.junit.runners.Parameterized
  * ```
  * Verified tests:
  * - [BubbleFlickerTestBase]
- * - [DismissExpandedBubbleTestCases]
+ * - [DismissSingleExpandedBubbleTestCases]
  */
 @FlakyTest(bugId = 433241651)
 @RequiresFlagsEnabled(Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE)
@@ -70,9 +69,11 @@ import org.junit.runners.Parameterized
 @Presubmit
 @RunWith(Parameterized::class)
 class ScrollableBubbleAppTest(navBar: NavBar) : BubbleFlickerTestBase(),
-    DismissExpandedBubbleTestCases {
+    DismissSingleExpandedBubbleTestCases {
 
-    companion object : FlickerPropertyInitializer() {
+    companion object {
+        private val testApp = ScrollToFinishHelper(instrumentation)
+
         private val recordTraceWithTransitionRule = RecordTraceWithTransitionRule(
             setUpBeforeTransition = { launchBubbleViaBubbleMenu(testApp, tapl, wmHelper) },
             transition = {
@@ -82,9 +83,6 @@ class ScrollableBubbleAppTest(navBar: NavBar) : BubbleFlickerTestBase(),
             tearDownAfterTransition = { testApp.exit() }
         )
 
-        override val testApp
-            get() = ScrollToFinishHelper(instrumentation)
-
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
         fun data(): List<NavBar> = listOf(NavBar.MODE_GESTURAL, NavBar.MODE_3BUTTON)
@@ -93,12 +91,11 @@ class ScrollableBubbleAppTest(navBar: NavBar) : BubbleFlickerTestBase(),
     @get:Rule
     val setUpRule = ApplyPerParameterRule(
         Utils.testSetupRule(navBar).around(recordTraceWithTransitionRule),
-        params = arrayOf(navBar)
+        params = arrayOf(navBar),
     )
 
-    // This is necessary or the test will use the testApp from BubbleFlickerTestBase.
-    override val testApp
-        get() = ScrollableBubbleAppTest.testApp
+    // This is necessary or the test will use the default testApp from BubbleFlickerTestBase.
+    override val testApp = Companion.testApp
 
     override val traceDataReader
         get() = recordTraceWithTransitionRule.reader

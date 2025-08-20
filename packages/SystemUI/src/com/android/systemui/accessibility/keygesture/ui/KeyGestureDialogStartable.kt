@@ -62,9 +62,13 @@ constructor(
 ) : CoreStartable {
     @VisibleForTesting var currentDialog: ComponentSystemUIDialog? = null
 
+    @VisibleForTesting var dialogType: Int = 0
+
     override fun start() {
         if (
-            !Flags.enableTalkbackAndMagnifierKeyGestures() && !Flags.enableVoiceAccessKeyGestures()
+            !Flags.enableTalkbackAndMagnifierKeyGestures() &&
+                !Flags.enableSelectToSpeakKeyGestures() &&
+                !Flags.enableVoiceAccessKeyGestures()
         ) {
             return
         }
@@ -77,11 +81,34 @@ constructor(
     }
 
     private fun createDialog(keyGestureConfirmInfo: KeyGestureConfirmInfo?) {
-        if (keyGestureConfirmInfo == null) {
-            dismissDialog()
+        // Ignore other type of first-time keyboard shortcuts while the dialog is showing.
+        if (currentDialog != null) {
             return
         }
-        dismissDialog()
+
+        if (keyGestureConfirmInfo == null) {
+            return
+        }
+
+        val negativeButtonTextId =
+            if (
+                keyGestureConfirmInfo.keyGestureType ==
+                    KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION
+            ) {
+                R.string.accessibility_key_gesture_magnification_dialog_negative_button_text
+            } else {
+                android.R.string.cancel
+            }
+
+        val positiveButtonTextId =
+            if (
+                keyGestureConfirmInfo.keyGestureType ==
+                    KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION
+            ) {
+                R.string.accessibility_key_gesture_magnification_dialog_positive_button_text
+            } else {
+                R.string.accessibility_key_gesture_dialog_positive_button_text
+            }
 
         currentDialog =
             dialogFactory.create { dialog ->
@@ -96,7 +123,7 @@ constructor(
                         },
                         negativeButton = {
                             PlatformOutlinedButton(onClick = { dialog.dismiss() }) {
-                                Text(stringResource(id = android.R.string.cancel))
+                                Text(stringResource(id = negativeButtonTextId))
                             }
                         },
                         positiveButton = {
@@ -108,13 +135,7 @@ constructor(
                                     dialog.dismiss()
                                 }
                             ) {
-                                Text(
-                                    stringResource(
-                                        id =
-                                            R.string
-                                                .accessibility_key_gesture_dialog_positive_button_text
-                                    )
-                                )
+                                Text(stringResource(id = positiveButtonTextId))
                             }
                         },
                     )
@@ -122,22 +143,20 @@ constructor(
             }
 
         currentDialog?.let { dialog ->
-            dialog.show()
+            dialogType = keyGestureConfirmInfo.keyGestureType
+            val tts =
+                if (dialogType == KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER) {
+                    interactor.performTtsPromptForText(keyGestureConfirmInfo.contentText)
+                } else {
+                    null
+                }
 
-            // We need to announce the text for the TalkBack dialog.
-            if (
-                keyGestureConfirmInfo.keyGestureType ==
-                    KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER
-            ) {
-                val tts = interactor.performTtsPromptForText(keyGestureConfirmInfo.contentText)
-                dialog.setOnDismissListener { tts.dismiss() }
+            dialog.setOnDismissListener {
+                tts?.dismiss()
+                currentDialog = null
             }
+            dialog.show()
         }
-    }
-
-    private fun dismissDialog() {
-        currentDialog?.dismiss()
-        currentDialog = null
     }
 
     private fun buildAnnotatedStringFromResource(resourceText: CharSequence): AnnotatedString {

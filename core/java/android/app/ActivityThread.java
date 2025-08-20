@@ -651,6 +651,7 @@ public final class ActivityThread extends ClientTransactionHandler
         boolean hideForNow;
         Configuration createdConfig;
         Configuration overrideConfig;
+        HandoffActivityData handoffActivityData;
         @NonNull
         private final ActivityWindowInfo mActivityWindowInfo = new ActivityWindowInfo();
         @NonNull
@@ -1451,8 +1452,7 @@ public final class ActivityThread extends ClientTransactionHandler
             data.startRequestedElapsedTime = startRequestedElapsedTime;
             data.startRequestedUptime = startRequestedUptime;
             updateCompatOverrideScale(compatInfo);
-            updateCompatOverrideDisplayRotation(compatInfo);
-            updateCompatOverrideCameraRotation(compatInfo);
+            updateCameraCompatInfo(compatInfo);
             CompatibilityInfo.applyOverrideIfNeeded(config);
             sendMessage(H.BIND_APPLICATION, data);
         }
@@ -1467,24 +1467,11 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
-        private void updateCompatOverrideDisplayRotation(@NonNull CompatibilityInfo info) {
-            if (info.isOverrideDisplayRotationRequired()) {
-                CompatibilityInfo.setOverrideDisplayRotation(info.applicationDisplayRotation);
+        private void updateCameraCompatInfo(@NonNull CompatibilityInfo info) {
+            if (info.isOverrideCameraCompatibilityInfoRequired()) {
+                CompatibilityInfo.setCameraCompatibilityInfo(info.cameraCompatibilityInfo);
             } else {
-                CompatibilityInfo.setOverrideDisplayRotation(
-                        WindowConfiguration.ROTATION_UNDEFINED);
-            }
-        }
-
-        private void updateCompatOverrideCameraRotation(@NonNull CompatibilityInfo info) {
-            if (com.android.window.flags.Flags
-                    .enableCameraCompatCompatibilityInfoRotateAndCropBugfix()) {
-                if (info.isOverrideCameraRotationRequired()) {
-                    CompatibilityInfo.setOverrideCameraRotation(info.applicationCameraRotation);
-                } else {
-                    CompatibilityInfo.setOverrideCameraRotation(
-                            WindowConfiguration.ROTATION_UNDEFINED);
-                }
+                CompatibilityInfo.resetCameraCompatibilityInfo();
             }
         }
 
@@ -2190,8 +2177,7 @@ public final class ActivityThread extends ClientTransactionHandler
             ucd.pkg = pkg;
             ucd.info = info;
             updateCompatOverrideScale(info);
-            updateCompatOverrideDisplayRotation(info);
-            updateCompatOverrideCameraRotation(info);
+            updateCameraCompatInfo(info);
             sendMessage(H.UPDATE_PACKAGE_COMPATIBILITY_INFO, ucd);
         }
 
@@ -6314,6 +6300,10 @@ public final class ActivityThread extends ClientTransactionHandler
         stopInfo.setActivity(r);
         stopInfo.setState(r.state);
         stopInfo.setPersistentState(r.persistentState);
+        if (android.companion.Flags.enableTaskContinuity()) {
+            stopInfo.setHandoffActivityData(r.handoffActivityData);
+        }
+
         pendingActions.setStopInfo(stopInfo);
         mSomeActivitiesChanged = true;
     }
@@ -6854,6 +6844,13 @@ public final class ActivityThread extends ClientTransactionHandler
     private void callActivityOnSaveInstanceState(ActivityClientRecord r) {
         r.state = new Bundle();
         r.state.setAllowFds(false);
+
+        if (android.companion.Flags.enableTaskContinuity() && r.activity.isHandoffEnabled()) {
+            final HandoffActivityDataRequestInfo requestInfo
+                    = new HandoffActivityDataRequestInfo(false /* isActiveRequest */);
+            r.handoffActivityData = r.activity.onHandoffActivityDataRequested(requestInfo);
+        }
+
         if (r.isPersistable()) {
             r.persistentState = new PersistableBundle();
             mInstrumentation.callActivityOnSaveInstanceState(r.activity, r.state,
@@ -9318,9 +9315,7 @@ public final class ActivityThread extends ClientTransactionHandler
         NfcFrameworkInitializer.setNfcServiceManager(new NfcServiceManager());
         DeviceConfigInitializer.setDeviceConfigServiceManager(new DeviceConfigServiceManager());
         SeFrameworkInitializer.setSeServiceManager(new SeServiceManager());
-        if (android.server.Flags.telemetryApisService()) {
-            ProfilingFrameworkInitializer.setProfilingServiceManager(new ProfilingServiceManager());
-        }
+        ProfilingFrameworkInitializer.setProfilingServiceManager(new ProfilingServiceManager());
     }
 
     private void purgePendingResources() {

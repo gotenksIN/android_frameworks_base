@@ -328,7 +328,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
         if (com.android.media.flags.Flags.enableOutputSwitcherPersonalAudioSharing()) {
             // We need to stop broadcast when we transfer to another route
-            stopBroadcastIfCurrentlySelected(requestId);
+            stopBroadcastForTransferIfCurrentlySelected();
         }
 
         MediaRoute2InfoHolder mediaRoute2InfoHolder;
@@ -390,12 +390,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
         mHandler.post(() -> mBluetoothRouteController.removeRouteFromBroadcast(routeId));
     }
 
-    private void stopBroadcastIfCurrentlySelected(long requestId) {
+    private void stopBroadcastForTransferIfCurrentlySelected() {
         if (!currentOutputIsBLEBroadcast()) {
             return;
         }
 
-        mHandler.post(mBluetoothRouteController::stopBroadcast);
+        // TODO: b/430200199 - Setting a correct routeId
+        mHandler.post(() -> mBluetoothRouteController.stopBroadcast(/* routeId= */ null));
     }
 
     @RequiresPermission(
@@ -447,9 +448,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
             };
 
         } else {
-            String deviceAddress =
-                    com.android.media.flags.Flags.enableDeviceAddressAsIdentifierInMediaRouter2()
-                            ? mediaRoute2InfoHolder.mMediaRoute2Info.getAddress() : "";
+            String deviceAddress = "";
+
+            if (com.android.media.flags.Flags.enableDeviceAddressAsIdentifierInMediaRouter2()) {
+                deviceAddress = mediaRoute2InfoHolder.mMediaRoute2Info.getAddress();
+                if (deviceAddress == null) {
+                    deviceAddress = "";
+                }
+            }
 
             AudioDeviceAttributes deviceAttributes =
                     new AudioDeviceAttributes(
@@ -588,7 +594,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
         for (AudioDeviceInfo audioDeviceInfo : audioDeviceInfos) {
             if (com.android.media.flags.Flags.enableOutputSwitcherPersonalAudioSharing()) {
-                if (currentOutputIsBLEBroadcast) {
+                if (audioDeviceInfo.getType() == AudioDeviceInfo.TYPE_BLE_BROADCAST) {
                     // Handled previously
                     continue;
                 }
@@ -696,7 +702,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
                         currentOutputIsBLEBroadcast ? mSelectedRoutes : Collections.emptyList();
 
                 if (currentOutputIsBLEBroadcast
-                        || mSelectedRoutes.getFirst().getType()
+                        || mSelectedRoutes.get(0).getType()
                                 != MediaRoute2Info.TYPE_BLE_HEADSET) {
                     mSelectableRoutes = Collections.emptyList();
                 } else {
@@ -825,7 +831,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
         List<AudioDeviceAttributes> devicesForMedia =
                 mAudioManager.getDevicesForAttributes(MEDIA_USAGE_AUDIO_ATTRIBUTES);
         return !devicesForMedia.isEmpty()
-                && devicesForMedia.getFirst().getType() == AudioDeviceInfo.TYPE_BLE_BROADCAST;
+                && devicesForMedia.get(0).getType() == AudioDeviceInfo.TYPE_BLE_BROADCAST;
     }
 
     /**

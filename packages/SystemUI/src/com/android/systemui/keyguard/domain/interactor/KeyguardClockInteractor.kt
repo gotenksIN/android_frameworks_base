@@ -29,8 +29,8 @@ import com.android.systemui.keyguard.shared.model.KeyguardState.DOZING
 import com.android.systemui.keyguard.shared.model.KeyguardState.GONE
 import com.android.systemui.keyguard.shared.model.KeyguardState.LOCKSCREEN
 import com.android.systemui.media.controls.domain.pipeline.interactor.MediaCarouselInteractor
-import com.android.systemui.plugins.clocks.ClockController
-import com.android.systemui.plugins.clocks.ClockId
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockController
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockId
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor
@@ -113,15 +113,15 @@ constructor(
         if (SceneContainerFlag.isEnabled) {
             combine(
                 keyguardClockRepository.forcedClockSize,
-                shadeModeInteractor.isShadeLayoutWide,
+                shadeModeInteractor.isFullWidthShade,
                 areAnyNotificationsPresent,
                 mediaCarouselInteractor.hasActiveMedia,
                 keyguardInteractor.isDozing,
-            ) { forcedClockSize, isShadeLayoutWide, hasNotifs, hasMedia, isDozing ->
+            ) { forcedClockSize, isFullWidthShade, hasNotifs, hasMedia, isDozing ->
                 when {
                     forcedClockSize != null -> forcedClockSize
-                    !isShadeLayoutWide && (hasNotifs || hasMedia) -> ClockSize.SMALL
-                    !isShadeLayoutWide -> ClockSize.LARGE
+                    isFullWidthShade && (hasNotifs || hasMedia) -> ClockSize.SMALL
+                    isFullWidthShade -> ClockSize.LARGE
                     hasMedia && !isDozing -> ClockSize.SMALL
                     else -> ClockSize.LARGE
                 }
@@ -148,21 +148,21 @@ constructor(
     val clockShouldBeCentered: Flow<Boolean> =
         if (SceneContainerFlag.isEnabled) {
             combine(
-                shadeModeInteractor.isShadeLayoutWide,
+                shadeModeInteractor.isFullWidthShade,
                 areAnyNotificationsPresent,
                 isAodPromotedNotificationPresent,
                 isOnAod,
                 headsUpNotificationInteractor.isHeadsUpOrAnimatingAway,
                 keyguardInteractor.isDozing,
             ) {
-                isShadeLayoutWide,
+                isFullWidthShade,
                 areAnyNotificationsPresent,
                 isAodPromotedNotificationPresent,
                 isOnAod,
                 isHeadsUp,
                 isDozing ->
                 when {
-                    !isShadeLayoutWide -> true
+                    isFullWidthShade -> true
                     !areAnyNotificationsPresent -> true
                     // Pulsing notification appears on the right. Move clock left to avoid overlap.
                     isHeadsUp && isDozing -> false
@@ -172,21 +172,21 @@ constructor(
             }
         } else {
             combine(
-                    shadeModeInteractor.isShadeLayoutWide,
+                    shadeModeInteractor.isFullWidthShade,
                     areAnyNotificationsPresent,
                     isAodPromotedNotificationPresent,
                     keyguardInteractor.dozeTransitionModel,
                     keyguardTransitionInteractor.startedKeyguardTransitionStep.map { it.to },
                     keyguardInteractor.isPulsing,
                 ) {
-                    isShadeLayoutWide,
+                    isFullWidthShade,
                     areAnyNotificationsPresent,
                     isAodPromotedNotificationPresent,
                     dozeTransitionModel,
                     toKeyguardState,
                     isPulsing ->
                     when {
-                        !isShadeLayoutWide -> true
+                        isFullWidthShade -> true
                         // [areAnyNotificationsPresent] also reacts to notification stack in
                         // homescreen it may cause unnecessary `false` emission when there's
                         // notification in homescreen but none in lockscreen when going from

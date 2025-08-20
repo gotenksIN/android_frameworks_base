@@ -226,6 +226,10 @@ class CarrierMergedConnectionRepository(
 
     override val dataEnabled: StateFlow<Boolean> = wifiRepository.isWifiEnabled
 
+    override fun setDataEnabled(enabled: Boolean) {
+        telephonyManager.setDataEnabledForReason(TelephonyManager.DATA_ENABLED_REASON_USER, enabled)
+    }
+
 // QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
     override val lteRsrpLevel = MutableStateFlow(SIGNAL_STRENGTH_NONE_OR_UNKNOWN)
     override val voiceNetworkType = MutableStateFlow(TelephonyManager.NETWORK_TYPE_UNKNOWN)
@@ -255,7 +259,6 @@ class CarrierMergedConnectionRepository(
 // QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     override val ciwlanAvailable = MutableStateFlow(false)
 // QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
-
     override suspend fun isInEcmMode(): Boolean =
         withContext(bgContext) { telephonyManager.emergencyCallbackMode }
 

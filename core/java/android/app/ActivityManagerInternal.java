@@ -374,6 +374,7 @@ public abstract class ActivityManagerInternal {
      */
     public abstract boolean hasRunningActivity(int uid, @Nullable String packageName);
 
+    // TODO: b/425766486 - Define the OOM_ADJ_* value by AppProtoEnums.
     /**
      * Oom Adj Reason: none - internal use only, do not use it.
      * @hide
@@ -521,6 +522,11 @@ public abstract class ActivityManagerInternal {
      */
     public static final int OOM_ADJ_REASON_SERVICE_BINDER_CALL = 25;
 
+    /**
+     * Oom Adj Reason: Batched updated request.
+     */
+    public static final int OOM_ADJ_REASON_BATCH_UPDATE_REQUEST = 26;
+
     @IntDef(prefix = {"OOM_ADJ_REASON_"}, value = {
         OOM_ADJ_REASON_NONE,
         OOM_ADJ_REASON_ACTIVITY,
@@ -548,6 +554,7 @@ public abstract class ActivityManagerInternal {
         OOM_ADJ_REASON_FOLLOW_UP,
         OOM_ADJ_REASON_RECONFIGURATION,
         OOM_ADJ_REASON_SERVICE_BINDER_CALL,
+        OOM_ADJ_REASON_BATCH_UPDATE_REQUEST,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface OomAdjReason {}

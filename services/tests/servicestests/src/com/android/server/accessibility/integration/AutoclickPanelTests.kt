@@ -42,7 +42,7 @@ import platform.test.desktop.DesktopMouseTestRule
 
 @RunWith(AndroidJUnit4::class)
 @RequiresFlagsEnabled(Flags.FLAG_ENABLE_AUTOCLICK_INDICATOR)
-@Ignore("b/435284589")
+@Ignore("b/438414507")
 class AutoclickPanelTests {
     @Rule(order = 0)
     @JvmField

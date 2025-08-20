@@ -129,11 +129,16 @@ abstract class WindowDecoration2<T>(
         captionType: CaptionController.CaptionType
     ): CaptionController<T>?
 
-    /** Updates the window decorations when limited information is available. */
+    /**
+     * Updates the window decorations when limited information is available.
+     *
+     * TODO(b/437224867): Remove forceReinflation
+     */
     abstract fun relayout(
         taskInfo: RunningTaskInfo,
         hasGlobalFocus: Boolean,
         displayExclusionRegion: Region,
+        forceReinflation: Boolean = false,
     )
 
     /**
@@ -475,6 +480,11 @@ abstract class WindowDecoration2<T>(
         }
     }
 
+    /** TODO(b/437224867): Remove this workaround for "Wallpaper & Style" bug in Settings */
+    fun onThemeChanged() {
+        relayout(taskInfo, hasGlobalFocus, exclusionRegion, forceReinflation = true)
+    }
+
     /** Updates the window decorations when exclusion region changes. */
     open fun onExclusionRegionChanged(exclusionRegion: Region) {
         relayout(taskInfo, hasGlobalFocus, exclusionRegion)
@@ -499,22 +509,26 @@ abstract class WindowDecoration2<T>(
     }
 
     /** Releases all window decoration views. */
-    private fun releaseViews(wct: WindowContainerTransaction) {
-        val t = surfaceControlTransactionSupplier()
-        var released = false
+    private fun releaseViews(wct: WindowContainerTransaction) =
+        traceSection(
+            traceTag = Trace.TRACE_TAG_WINDOW_MANAGER,
+            name = "WindowDecoration2#releaseViews",
+        ) {
+            val t = surfaceControlTransactionSupplier()
+            var released = false
 
-        decorationContainerSurface?.let {
-            t.remove(it)
-            decorationContainerSurface = null
-            released = true
+            decorationContainerSurface?.let {
+                t.remove(it)
+                decorationContainerSurface = null
+                released = true
+            }
+
+            released = released or (captionController?.releaseViews(wct, t) == true)
+
+            if (released) {
+                t.apply()
+            }
         }
-
-        released = released or (captionController?.releaseViews(wct, t) == true)
-
-        if (released) {
-            t.apply()
-        }
-    }
 
     override fun close() =
         traceSection(traceTag = Trace.TRACE_TAG_WINDOW_MANAGER, name = "WindowDecoration2#close") {
@@ -532,7 +546,11 @@ abstract class WindowDecoration2<T>(
         surfaceControlSupplier: () -> SurfaceControl,
     ) = surfaceControlSupplier().apply { copyFrom(sc, TAG) }
 
-    /** Holds the data required to update the window decorations. */
+    /**
+     * Holds the data required to update the window decorations.
+     *
+     * TODO(b/437224867): Remove forceReinflation
+     */
     data class RelayoutParams(
         val runningTaskInfo: RunningTaskInfo,
         val captionType: CaptionController.CaptionType,
@@ -555,6 +573,7 @@ abstract class WindowDecoration2<T>(
         val shouldSetAppBounds: Boolean = false,
         val shouldSetBackground: Boolean = false,
         val inSyncWithTransition: Boolean = false,
+        val forceReinflation: Boolean = false,
     ) {
 
         /** Returns true if caption input should fall through to the app. */

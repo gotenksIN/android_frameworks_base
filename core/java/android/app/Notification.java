@@ -11824,30 +11824,54 @@ public class Notification implements Parcelable
                     final Metric.MetricValue metricValue = metric.getValue();
                     final Metric.MetricValue.ValueString valueString = metricValue.toValueString(
                             mBuilder.mContext);
+
                     final String metricLabel;
                     if (isExpandedView) {
-                        metricLabel = metric.getLabel();
+                        if (Flags.metricStyleUnitInLabel()
+                                && !TextUtils.isEmpty(valueString.subtext())) {
+                            metricLabel = mBuilder.mContext.getString(
+                                    R.string.notification_metric_label_unit,
+                                    metric.getLabel(), valueString.subtext());
+                        } else {
+                            metricLabel = metric.getLabel();
+                        }
                     } else {
+                        // No unit shown in collapsed view.
                         metricLabel = mBuilder.mContext.getString(
-                                com.android.internal.R.string.notification_metric_label_template,
+                                R.string.notification_metric_label_separator,
                                 metric.getLabel());
                     }
-                    contentView.setTextViewText(metricView.labelId(), metricLabel);
-                    contentView.setViewVisibility(metricView.unitId(),
-                            TextUtils.isEmpty(valueString.subtext()) ? View.GONE : View.VISIBLE);
-                    contentView.setTextViewText(metricView.unitId(), valueString.subtext());
 
-                    if (metricValue instanceof  Metric.TimeDifference timeDifference
+                    contentView.setTextViewText(metricView.labelId(), metricLabel);
+                    if (Flags.metricStyleUnitInLabel()) {
+                        contentView.setViewVisibility(metricView.unitId(), View.GONE);
+                    } else if (isExpandedView) {
+                        contentView.setViewVisibility(metricView.unitId(),
+                                TextUtils.isEmpty(valueString.subtext())
+                                        ? View.GONE
+                                        : View.VISIBLE);
+                        contentView.setTextViewText(metricView.unitId(), valueString.subtext());
+                    }
+
+                    if (metricValue instanceof Metric.TimeDifference timeDifference
                             && timeDifference.getPausedDuration() == null) {
                         contentView.setViewVisibility(metricView.textValueId(), View.GONE);
                         contentView.setViewVisibility(metricView.chronometerId(), View.VISIBLE);
-                        contentView.setBoolean(
-                                metricView.chronometerId(), "setStarted", true);
                         contentView.setChronometerCountDown(
-                                metricView.chronometerId(), timeDifference.mCountDown);
-                        contentView.setLong(
-                                metricView.chronometerId(),
-                                "setBase", calculateBase(timeDifference));
+                                metricView.chronometerId(), timeDifference.isTimer());
+
+                        if (timeDifference.getZeroTime() != null) {
+                            contentView.setChronometer(metricView.chronometerId(),
+                                    timeDifference.getZeroTime(), /* format= */ null,
+                                    /* started= */ true);
+                        } else if (timeDifference.getZeroElapsedRealtime() != null) {
+                            contentView.setChronometer(metricView.chronometerId(),
+                                    timeDifference.getZeroElapsedRealtime(), /* format= */ null,
+                                    /* started= */ true);
+                        } else {
+                            throw new IllegalStateException(
+                                    "No zeroTime for running TimeDifference in " + metric);
+                        }
                         // TODO(b/434910979): implement format support for Chronometer.
                     } else {
                         contentView.setViewVisibility(metricView.chronometerId(), View.GONE);
@@ -11859,17 +11883,6 @@ public class Notification implements Parcelable
                 }
             }
             return contentView;
-        }
-        // TODO(b/435150348): Add Instant support to Chronometer..
-        private long calculateBase(@NonNull Metric.TimeDifference timeDifference) {
-            if (timeDifference.mZeroTime != null) {
-                return getElapsedRealtimeClock().getAsLong()
-                        + (timeDifference.mZeroTime.toEpochMilli() - getSystemClock().millis());
-            } else if (timeDifference.mZeroElapsedRealtime != null) {
-                return timeDifference.mZeroElapsedRealtime;
-            } else {
-                throw new IllegalStateException("None of mZeroTime, mZeroElapsedRealtime set!");
-            }
         }
 
         private record MetricView(int containerId,

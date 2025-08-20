@@ -1311,9 +1311,10 @@ public abstract class WMShellModule {
             DesktopState desktopState,
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             FocusTransitionObserver focusTransitionObserver,
-            ShellController shellController) {
+            ShellController shellController,
+            ShellTaskOrganizer shellTaskOrganizer) {
         return new ShellDesktopStateImpl(desktopState, desktopUserRepositories,
-                focusTransitionObserver, shellController);
+                focusTransitionObserver, shellController, shellTaskOrganizer);
     }
 
     @WMSingleton
@@ -1389,9 +1390,10 @@ public abstract class WMShellModule {
             Transitions transitions,
             Context context,
             InteractionJankMonitor interactionJankMonitor,
-            @ShellMainThread Handler handler) {
+            @ShellMainThread Handler handler,
+            DisplayController displayController) {
         return new ExitDesktopTaskTransitionHandler(
-                transitions, context, interactionJankMonitor, handler);
+                transitions, context, interactionJankMonitor, handler, displayController);
     }
 
     @WMSingleton

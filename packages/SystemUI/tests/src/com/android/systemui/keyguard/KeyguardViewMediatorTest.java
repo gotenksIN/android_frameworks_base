@@ -141,7 +141,7 @@ import com.android.systemui.wallpapers.data.repository.FakeWallpaperRepository;
 import com.android.window.flags.Flags;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 
-import kotlinx.coroutines.CoroutineDispatcher;
+import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.flow.Flow;
 import kotlinx.coroutines.test.TestScope;
 
@@ -234,7 +234,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
     /** Most recent value passed to {@link KeyguardStateController#notifyKeyguardGoingAway}. */
     private boolean mKeyguardGoingAway = false;
 
-    private @Mock CoroutineDispatcher mDispatcher;
+    private @Mock CoroutineScope mApplicationScope;
     private @Mock DreamViewModel mDreamViewModel;
     private @Mock CommunalTransitionViewModel mCommunalTransitionViewModel;
     private @Mock SystemPropertiesHelper mSystemPropertiesHelper;
@@ -1521,7 +1521,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
                 mSystemSettings,
                 mSystemClock,
                 mProcessWrapper,
-                mDispatcher,
+                mApplicationScope,
                 () -> mDreamViewModel,
                 () -> mCommunalTransitionViewModel,
                 mSystemPropertiesHelper,

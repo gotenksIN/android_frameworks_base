@@ -106,6 +106,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
 import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
+import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD_DIALOG;
 import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR_ADDITIONAL;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
 import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
@@ -129,6 +130,7 @@ import static android.internal.perfetto.protos.Inputmethodeditor.InputMethodClie
 import static android.internal.perfetto.protos.Inputmethodeditor.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
 import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION;
 
+import static com.android.graphics.surfaceflinger.flags.Flags.setClientDrawnCornerRadii;
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.text.flags.Flags.disableHandwritingInitiatorForIme;
 import static com.android.window.flags.Flags.alwaysSeqIdLayout;
@@ -1162,6 +1164,8 @@ public final class ViewRootImpl implements ViewParent,
     private int mFrameRateCategoryNormalCount = 0;
     private int mFrameRateCategoryLowCount = 0;
 
+    private CornerRadii mCornerRadii = new CornerRadii();
+
     /*
      * the variables below are used to determine whther a dVRR feature should be enabled
      */
@@ -1211,6 +1215,28 @@ public final class ViewRootImpl implements ViewParent,
                 }
             }
         };
+
+    private BLASTBufferQueue.CornerRadiiCallback mCornerRadiiCallback =
+            new BLASTBufferQueue.CornerRadiiCallback() {
+                @Override
+                public void onCornerRadiiChanged(float[] cornerRadii) {
+                    if (cornerRadii != null && cornerRadii.length == 4) {
+                        CornerRadii newCornerRadii = new CornerRadii();
+                        newCornerRadii.topLeft = cornerRadii[0];
+                        newCornerRadii.topRight = cornerRadii[1];
+                        newCornerRadii.bottomLeft = cornerRadii[2];
+                        newCornerRadii.bottomRight = cornerRadii[3];
+                        if (!mCornerRadii.equals(newCornerRadii)) {
+                            mCornerRadii = newCornerRadii;
+                            invalidate();
+                        }
+                    } else {
+                        Log.wtf(TAG, "Corner radii received is null or invalid"
+                                + (cornerRadii == null ? "null" : "length " + cornerRadii.length));
+                    }
+                }
+            };
+
     private final Rect mChildBoundingInsets = new Rect();
     private boolean mChildBoundingInsetsChanged = false;
 
@@ -1224,7 +1250,6 @@ public final class ViewRootImpl implements ViewParent,
     boolean mHaveMoveEvent = false;
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
-    private final boolean mAppStartInfoTimestampsFlagValue;
     private AtomicBoolean mAppStartTimestampsSent = new AtomicBoolean(false);
     private boolean mAppStartTrackingStarted = false;
     private long mRenderThreadDrawStartTimeNs = -1;
@@ -1327,8 +1352,6 @@ public final class ViewRootImpl implements ViewParent,
         } else {
             mSensitiveContentProtectionService = null;
         }
-
-        mAppStartInfoTimestampsFlagValue = android.app.Flags.appStartInfoTimestamps();
 
         // Disable DRAW_WAKE_LOCK starting U.
         mDisableDrawWakeLock =
@@ -2060,7 +2083,7 @@ public final class ViewRootImpl implements ViewParent,
                 // properly configured dark theme are unaffected by force invert dark theme. For
                 // self-declared light theme apps HWUI then performs its own "color area"
                 // calculation to determine if the app actually renders with light colors.
-                if (a.getBoolean(R.styleable.Theme_isLightTheme, false)) {
+                if (!isInputWindow() && a.getBoolean(R.styleable.Theme_isLightTheme, false)) {
                     return ForceDarkType.FORCE_INVERT_COLOR_DARK;
                 }
             }
@@ -2069,6 +2092,10 @@ public final class ViewRootImpl implements ViewParent,
         } finally {
             a.recycle();
         }
+    }
+
+    private boolean isInputWindow() {
+        return mOrigWindowType == TYPE_INPUT_METHOD || mOrigWindowType == TYPE_INPUT_METHOD_DIALOG;
     }
 
     private boolean shouldApplyForceInvertDark() {
@@ -2836,6 +2863,7 @@ public final class ViewRootImpl implements ViewParent,
                 mWindowAttributes.format);
         mBlastBufferQueue.setTransactionHangCallback(sTransactionHangCallback);
         mBlastBufferQueue.setWaitForBufferReleaseCallback(mChoreographer::onWaitForBufferRelease);
+        mBlastBufferQueue.setCornerRadiiCallback(mCornerRadiiCallback);
         Surface blastSurface;
         if (addSchandleToVriSurface()) {
             blastSurface = mBlastBufferQueue.createSurfaceWithHandle();
@@ -4153,6 +4181,16 @@ public final class ViewRootImpl implements ViewParent,
                             mWindowAttributes.surfaceInsets);
                     mNeedsRendererSetup = false;
                 }
+
+                if (setClientDrawnCornerRadii() && !mCornerRadii.isEmpty()
+                                            && mSurfaceControl.isValid()) {
+                    applyTransactionOnDraw(mTransaction
+                            .setClientDrawnCornerRadius(mSurfaceControl, mCornerRadii.topLeft,
+                            mCornerRadii.topRight, mCornerRadii.bottomLeft,
+                            mCornerRadii.bottomRight,
+                            threadedRenderer.getRoundedClipBounds()));
+                    threadedRenderer.setCornerRadius(mCornerRadii);
+                }
             }
 
             // TODO: In the CL "ViewRootImpl: Fix issue with early draw report in
@@ -4651,7 +4689,7 @@ public final class ViewRootImpl implements ViewParent,
 
         // Only trigger once per {@link ViewRootImpl} instance, so don't add listener if
         // {link mTransactionCompletedTimeNs} has already been set.
-        if (mAppStartInfoTimestampsFlagValue && !mAppStartTrackingStarted) {
+        if (!mAppStartTrackingStarted) {
             mAppStartTrackingStarted = true;
             Transaction transaction = new Transaction();
             transaction.addTransactionCompletedListener(mSimpleExecutor,
@@ -5898,7 +5936,7 @@ public final class ViewRootImpl implements ViewParent,
                 mAttachInfo.mThreadedRenderer.draw(mView, mAttachInfo, this);
 
                 // Only trigger once per {@link ViewRootImpl} instance.
-                if (mAppStartInfoTimestampsFlagValue && mRenderThreadDrawStartTimeNs == -1) {
+                if (mRenderThreadDrawStartTimeNs == -1) {
                     mRenderThreadDrawStartTimeNs = timeNs;
                 }
             } else {
@@ -9775,7 +9813,8 @@ public final class ViewRootImpl implements ViewParent,
                 && params.surfaceInsets.bottom == 0
                 // Don't make surface opaque when resizing to reduce the amount of
                 // artifacts shown in areas the app isn't drawing content to.
-                && !dragResizing) {
+                && !dragResizing
+                && mCornerRadii.isEmpty()) {
             opaque = true;
         }
 
@@ -10166,6 +10205,35 @@ public final class ViewRootImpl implements ViewParent,
             viewCount += other.viewCount;
             renderNodeMemoryUsage += other.renderNodeMemoryUsage;
             renderNodeMemoryAllocated += other.renderNodeMemoryAllocated;
+        }
+    }
+
+    static final class CornerRadii {
+        public float topLeft;
+        public float topRight;
+        public float bottomRight;
+        public float bottomLeft;
+
+        boolean isEmpty() {
+            return topLeft == 0 && topRight == 0
+                    && bottomRight == 0 && bottomLeft == 0;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof CornerRadii)) {
+                return false;
+            }
+            CornerRadii cr = (CornerRadii) o;
+            return topLeft == cr.topLeft &&
+                   topRight == cr.topRight &&
+                   bottomRight == cr.bottomRight &&
+                   bottomLeft == cr.bottomLeft;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(topLeft, topRight, bottomRight, bottomLeft);
         }
     }
 

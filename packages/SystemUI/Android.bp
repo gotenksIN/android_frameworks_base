@@ -450,13 +450,6 @@ java_defaults {
         "keepanno-annotations",
         "extphonelib",
     ],
-    javacflags: [
-        "-Adagger.fastInit=enabled",
-        "-Adagger.explicitBindingConflictsWithInject=ERROR",
-        "-Adagger.strictMultibindingValidation=enabled",
-        "-Adagger.useBindingGraphFix=ENABLED",
-        "-Aroom.schemaLocation=frameworks/base/packages/SystemUI/schemas",
-    ],
     kotlincflags: [
         "-Xjvm-default=all",
         "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
@@ -600,6 +593,9 @@ android_library {
         "displaylib",
         "aconfig_settings_flags_lib",
     ],
+    javacflags: [
+        "-Aroom.schemaLocation=frameworks/base/packages/SystemUI/schemas",
+    ],
 }
 
 platform_compat_config {
@@ -621,7 +617,12 @@ android_library {
         "SystemUI-core",
         "com.android.systemui.pods-api-aosp-handheld",
         "com.android.systemui.pods-impl-aosp-handheld",
-
+    ],
+    javacflags: [
+        "-Adagger.fastInit=enabled",
+        "-Adagger.explicitBindingConflictsWithInject=ERROR",
+        "-Adagger.strictMultibindingValidation=enabled",
+        "-Adagger.useBindingGraphFix=ENABLED",
     ],
     manifest: "AndroidManifest.xml",
 }
@@ -698,7 +699,7 @@ java_library {
     name: "SystemUI-tests-concurrency",
     srcs: [
         "src/com/android/systemui/util/concurrency/DelayableExecutor.java",
-        "pods/com/android/systemui/util/time/SystemClock.java",
+        "pods/src/com/android/systemui/util/time/SystemClock.java",
         "tests/utils/src/com/android/systemui/util/concurrency/FakeExecutor.java",
         "tests/utils/src/com/android/systemui/util/time/FakeSystemClock.java",
     ],

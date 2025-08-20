@@ -41,7 +41,6 @@ import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.fakeSceneDataSource
 import com.android.systemui.shade.ShadeExpansionChangeEvent
-import com.android.systemui.shade.ShadeExpansionListener
 import com.android.systemui.shade.data.repository.fakeShadeDisplaysRepository
 import com.android.systemui.shade.data.repository.shadeRepository
 import com.android.systemui.shade.domain.interactor.enableDualShade
@@ -54,9 +53,6 @@ import com.android.systemui.statusbar.notification.stack.notificationStackScroll
 import com.android.systemui.statusbar.notificationShadeDepthController
 import com.android.systemui.statusbar.phone.scrimController
 import com.android.systemui.testKosmos
-import com.android.systemui.util.mockito.any
-import com.android.systemui.util.mockito.mock
-import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import kotlin.math.max
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -115,20 +111,20 @@ class ShadeStartableTest(flags: FlagsParameterization) : SysuiTestCase() {
     fun hydrateShadeMode_dualShadeDisabled() =
         kosmos.runTest {
             val shadeMode by collectLastValue(shadeMode)
-            val isShadeLayoutWide by collectLastValue(shadeModeInteractor.isShadeLayoutWide)
+            val isFullWidthShade by collectLastValue(shadeModeInteractor.isFullWidthShade)
             underTest.start()
 
             enableSingleShade()
             assertThat(shadeMode).isEqualTo(ShadeMode.Single)
-            assertThat(isShadeLayoutWide).isFalse()
+            assertThat(isFullWidthShade).isTrue()
 
             enableSplitShade()
             assertThat(shadeMode).isEqualTo(ShadeMode.Split)
-            assertThat(isShadeLayoutWide).isTrue()
+            assertThat(isFullWidthShade).isFalse()
 
             enableSingleShade()
             assertThat(shadeMode).isEqualTo(ShadeMode.Single)
-            assertThat(isShadeLayoutWide).isFalse()
+            assertThat(isFullWidthShade).isTrue()
         }
 
     @Test
@@ -136,20 +132,20 @@ class ShadeStartableTest(flags: FlagsParameterization) : SysuiTestCase() {
     fun hydrateShadeMode_dualShadeEnabled() =
         kosmos.runTest {
             val shadeMode by collectLastValue(shadeMode)
-            val isShadeLayoutWide by collectLastValue(shadeModeInteractor.isShadeLayoutWide)
+            val isFullWidthShade by collectLastValue(shadeModeInteractor.isFullWidthShade)
             underTest.start()
 
             enableDualShade(wideLayout = false)
             assertThat(shadeMode).isEqualTo(ShadeMode.Dual)
-            assertThat(isShadeLayoutWide).isFalse()
+            assertThat(isFullWidthShade).isTrue()
 
             enableDualShade(wideLayout = true)
             assertThat(shadeMode).isEqualTo(ShadeMode.Dual)
-            assertThat(isShadeLayoutWide).isTrue()
+            assertThat(isFullWidthShade).isFalse()
 
             enableDualShade(wideLayout = false)
             assertThat(shadeMode).isEqualTo(ShadeMode.Dual)
-            assertThat(isShadeLayoutWide).isFalse()
+            assertThat(isFullWidthShade).isTrue()
         }
 
     @Test
@@ -157,13 +153,8 @@ class ShadeStartableTest(flags: FlagsParameterization) : SysuiTestCase() {
     fun hydrateShadeExpansionStateManager() =
         kosmos.runTest {
             enableSingleShade()
-            val expansionListener = mock<ShadeExpansionListener>()
             var latestChangeEvent: ShadeExpansionChangeEvent? = null
-            whenever(expansionListener.onPanelExpansionChanged(any())).thenAnswer {
-                latestChangeEvent = it.arguments[0] as ShadeExpansionChangeEvent
-                Unit
-            }
-            shadeExpansionStateManager.addExpansionListener(expansionListener)
+            shadeExpansionStateManager.addExpansionListener { latestChangeEvent = it }
 
             underTest.start()
 
@@ -210,10 +201,15 @@ class ShadeStartableTest(flags: FlagsParameterization) : SysuiTestCase() {
             assertThat(currentScene).isEqualTo(Scenes.QuickSettings)
 
             changeScene(Scenes.Lockscreen, transitionState) { progress ->
-                assertThat(latestChangeEvent?.fraction).isZero()
+                if (!transitionState.value.isIdle(Scenes.Lockscreen)) {
+                    assertThat(latestChangeEvent?.fraction).isZero()
+                    assertThat(notificationShadeDepthController.shadeExpansion).isZero()
+                } else {
+                    assertThat(latestChangeEvent?.fraction).isEqualTo(1f)
+                    assertThat(notificationShadeDepthController.shadeExpansion).isEqualTo(1f)
+                }
                 assertThat(notificationShadeDepthController.qsPanelExpansion)
                     .isEqualTo(1 - progress)
-                assertThat(notificationShadeDepthController.shadeExpansion).isZero()
                 assertThat(notificationShadeDepthController.transitionToFullShadeProgress)
                     .isEqualTo(1 - progress)
             }
@@ -277,7 +273,7 @@ class ShadeStartableTest(flags: FlagsParameterization) : SysuiTestCase() {
             verify(notificationStackScrollLayoutController).setIsFullWidth(false)
             assertThat(scrimController.clipQsScrim).isFalse()
             assertThat(isWideScreen).isTrue()
-            assertThat(legacyUseSplitShade).isFalse()
+            assertThat(legacyUseSplitShade).isTrue()
         }
 
     private fun Kosmos.changeScene(

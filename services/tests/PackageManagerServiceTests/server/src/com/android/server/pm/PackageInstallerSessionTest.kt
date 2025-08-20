@@ -16,13 +16,14 @@
 package com.android.server.pm
 
 import android.content.Context
+import android.content.pm.Flags
 import android.content.pm.PackageInstaller
+import android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED
+import android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_OPEN
 import android.content.pm.PackageInstaller.SessionParams
 import android.content.pm.PackageInstaller.SessionParams.PERMISSION_STATE_DEFAULT
 import android.content.pm.PackageInstaller.SessionParams.PERMISSION_STATE_DENIED
 import android.content.pm.PackageInstaller.SessionParams.PERMISSION_STATE_GRANTED
-import android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED
-import android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_OPEN
 import android.content.pm.PackageManager
 import android.content.pm.verify.domain.DomainSet
 import android.os.Parcel
@@ -30,6 +31,9 @@ import android.os.PersistableBundle
 import android.os.Process
 import android.os.UserHandle
 import android.platform.test.annotations.Presubmit
+import android.platform.test.annotations.RequiresFlagsEnabled
+import android.platform.test.flag.junit.CheckFlagsRule
+import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import android.util.AtomicFile
 import android.util.Slog
 import android.util.Xml
@@ -49,18 +53,23 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mock
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserException
 
 @Presubmit
 class PackageInstallerSessionTest {
+
+    @get:Rule val checkFlagsRule: CheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule()
 
     companion object {
         private const val TAG_SESSIONS = "sessions"
@@ -200,14 +209,27 @@ class PackageInstallerSessionTest {
     @Test
     fun testShouldAllowDeveloperVerificationEmergencyBypassForVerifier() {
         val verifierPackageName = "verifierPackageName"
+        val updateOwnerName = "updateOwnerPackageName"
         val mockPs = mock(PackageStateInternal::class.java)
+        val mockUpdateOwnerPs = mock(PackageStateInternal::class.java)
+        val mockUpdateOwnerPkg = mock(AndroidPackageInternal::class.java)
+        val updateOwnerUid = 10200
         whenever(mMockDeveloperVerifierController.verifierPackageName).thenReturn(
             verifierPackageName)
         whenever(mockPs.isSystem).thenReturn(true)
         whenever(mSnapshot.getPackageStateInternal(
             eq(verifierPackageName), eq(Process.SYSTEM_UID)))
             .thenReturn(mockPs)
-        val session = createSession()
+        whenever(mMockPackageManagerInternal.getSystemAppUpdateOwnerPackageName(
+            anyString())).thenReturn(updateOwnerName)
+        whenever(mSnapshot.getPackageStateInternal(
+            eq(updateOwnerName), eq(Process.SYSTEM_UID)))
+            .thenReturn(mockUpdateOwnerPs)
+        whenever(mockUpdateOwnerPs.pkg).thenReturn(mockUpdateOwnerPkg)
+        whenever(mockUpdateOwnerPs.appId).thenReturn(updateOwnerUid)
+        whenever(mSnapshot.checkUidPermission(anyString(), eq(updateOwnerUid)))
+            .thenReturn(PackageManager.PERMISSION_GRANTED)
+        val session = createSession(installerPackageName = updateOwnerName)
         assertThat(session.shouldAllowDeveloperVerificationEmergencyBypass(
             verifierPackageName, mSnapshot)).isTrue()
     }
@@ -224,8 +246,8 @@ class PackageInstallerSessionTest {
             eq(updateOwnerName), eq(Process.SYSTEM_UID)))
             .thenReturn(mockPs)
         whenever(mMockPackageManagerInternal.getSystemAppUpdateOwnerPackageName(
-            anyString())).thenReturn(null)
-        val session = createSession()
+        eq(verifierPackageName))).thenReturn(null)
+        val session = createSession(installerPackageName = updateOwnerName)
         assertThat(session.shouldAllowDeveloperVerificationEmergencyBypass(
             updateOwnerName, mSnapshot)).isFalse()
     }
@@ -234,16 +256,22 @@ class PackageInstallerSessionTest {
     fun testShouldAllowDeveloperVerificationEmergencyBypassForUpdateOwner() {
         val verifierPackageName = "verifierPackageName"
         val updateOwnerName = "updateOwnerPackageName"
-        val mockPs = mock(PackageStateInternal::class.java)
+        val mockUpdateOwnerPs = mock(PackageStateInternal::class.java)
+        val mockUpdateOwnerPkg = mock(AndroidPackageInternal::class.java)
+        val updateOwnerUid = 10200
         whenever(mMockDeveloperVerifierController.verifierPackageName).thenReturn(
             verifierPackageName)
-        whenever(mockPs.isSystem).thenReturn(true)
+        whenever(mockUpdateOwnerPs.isSystem).thenReturn(true)
         whenever(mSnapshot.getPackageStateInternal(
             eq(updateOwnerName), eq(Process.SYSTEM_UID)))
-            .thenReturn(mockPs)
+            .thenReturn(mockUpdateOwnerPs)
         whenever(mMockPackageManagerInternal.getSystemAppUpdateOwnerPackageName(
             eq(verifierPackageName))).thenReturn(updateOwnerName)
-        val session = createSession()
+        whenever(mockUpdateOwnerPs.pkg).thenReturn(mockUpdateOwnerPkg)
+        whenever(mockUpdateOwnerPs.appId).thenReturn(updateOwnerUid)
+        whenever(mSnapshot.checkUidPermission(anyString(), eq(updateOwnerUid)))
+            .thenReturn(PackageManager.PERMISSION_GRANTED)
+        val session = createSession(installerPackageName = updateOwnerName)
         assertThat(session.shouldAllowDeveloperVerificationEmergencyBypass(
             updateOwnerName, mSnapshot)).isTrue()
     }
@@ -253,41 +281,107 @@ class PackageInstallerSessionTest {
         val verifierPackageName = "verifierPackageName"
         val updateOwnerName = "updateOwnerPackageName"
         val emergencyInstallerPackageName = "emergencyInstallerPackageName"
-        val mockPs = mock(PackageStateInternal::class.java)
         val mockUpdateOwnerPs = mock(PackageStateInternal::class.java)
         val mockUpdateOwnerPkg = mock(AndroidPackageInternal::class.java)
-        val mockUid = 10001
+        val mockEmergencyInstallerPs = mock(PackageStateInternal::class.java)
+        val mockEmergencyInstallerPkg = mock(AndroidPackageInternal::class.java)
+        val mockEmergencyInstallerUid = 10001
         val mockUpdateOwnerUid = 10200
-        whenever(mockPs.appId).thenReturn(mockUid)
+
+        whenever(mMockDeveloperVerifierController.verifierPackageName).thenReturn(
+            verifierPackageName)
+        whenever(mMockPackageManagerInternal.getSystemAppUpdateOwnerPackageName(
+            eq(verifierPackageName))).thenReturn(updateOwnerName)
+
+        whenever(mockUpdateOwnerPs.pkg).thenReturn(mockUpdateOwnerPkg)
         whenever(mockUpdateOwnerPs.appId).thenReturn(mockUpdateOwnerUid)
         whenever(mockUpdateOwnerPkg.emergencyInstaller).thenReturn(
             emergencyInstallerPackageName)
-        whenever(mMockDeveloperVerifierController.verifierPackageName).thenReturn(
-            verifierPackageName)
-        whenever(mockPs.isSystem).thenReturn(true)
-        whenever(mockUpdateOwnerPs.isSystem).thenReturn(true)
-        whenever(mockUpdateOwnerPs.pkg).thenReturn(mockUpdateOwnerPkg)
         whenever(mSnapshot.getPackageStateInternal(
             eq(updateOwnerName), eq(Process.SYSTEM_UID)))
             .thenReturn(mockUpdateOwnerPs)
-        whenever(mSnapshot.getPackageStateInternal(
-            eq(updateOwnerName)))
-            .thenReturn(mockUpdateOwnerPs)
-        whenever(mSnapshot.getPackageStateInternal(
-            eq(emergencyInstallerPackageName), eq(Process.SYSTEM_UID)))
-            .thenReturn(mockPs)
-        whenever(mSnapshot.getPackagesForUid(eq(mockUid))).thenReturn(
-            listOf(emergencyInstallerPackageName).toTypedArray())
         whenever(mSnapshot.checkUidPermission(anyString(),
             eq(UserHandle.getUid(USER_ID, mockUpdateOwnerUid))))
             .thenReturn(PackageManager.PERMISSION_GRANTED)
-        whenever(mSnapshot.checkUidPermission(anyString(), eq(mockUid)))
+
+        whenever(mSnapshot.getPackageStateInternal(
+            eq(emergencyInstallerPackageName), eq(Process.SYSTEM_UID)))
+            .thenReturn(mockEmergencyInstallerPs)
+        whenever(mockEmergencyInstallerPs.pkg).thenReturn(mockEmergencyInstallerPkg)
+        whenever(mockEmergencyInstallerPs.appId).thenReturn(mockEmergencyInstallerUid)
+        whenever(mockEmergencyInstallerPs.isSystem).thenReturn(true)
+        whenever(mSnapshot.checkUidPermission(anyString(), eq(mockEmergencyInstallerUid)))
             .thenReturn(PackageManager.PERMISSION_GRANTED)
-        whenever(mMockPackageManagerInternal.getSystemAppUpdateOwnerPackageName(
-            eq(verifierPackageName))).thenReturn(updateOwnerName)
-        val session = createSession()
+
+        val session = createSession(installerPackageName = updateOwnerName)
         assertThat(session.shouldAllowDeveloperVerificationEmergencyBypass(
             emergencyInstallerPackageName, mSnapshot)).isTrue()
+    }
+
+    @Test
+    fun testShouldAllowDeveloperVerificationEmergencyBypassForUpdaterOwnerByEmergencyInstaller() {
+        val verifierPackageName = "verifierPackageName"
+        val updateOwnerName = "updateOwnerPackageName"
+        val emergencyInstallerPackageName = "emergencyInstallerPackageName"
+        val mockUpdateOwnerPs = mock(PackageStateInternal::class.java)
+        val mockUpdateOwnerPkg = mock(AndroidPackageInternal::class.java)
+        val mockEmergencyInstallerPs = mock(PackageStateInternal::class.java)
+        val mockEmergencyInstallerPkg = mock(AndroidPackageInternal::class.java)
+        val mockEmergencyInstallerUid = 10001
+        val mockUpdateOwnerUid = 10200
+
+        whenever(mMockDeveloperVerifierController.verifierPackageName).thenReturn(
+            verifierPackageName)
+        whenever(mMockPackageManagerInternal.getSystemAppUpdateOwnerPackageName(
+            eq(verifierPackageName))).thenReturn(updateOwnerName)
+
+        whenever(mSnapshot.getPackageStateInternal(
+            eq(updateOwnerName), eq(Process.SYSTEM_UID)))
+            .thenReturn(mockUpdateOwnerPs)
+        whenever(mockUpdateOwnerPs.appId).thenReturn(mockUpdateOwnerUid)
+        whenever(mockUpdateOwnerPs.isSystem).thenReturn(true)
+        whenever(mockUpdateOwnerPs.pkg).thenReturn(mockUpdateOwnerPkg)
+        whenever(mSnapshot.checkUidPermission(anyString(),
+            eq(UserHandle.getUid(USER_ID, mockUpdateOwnerUid))))
+            .thenReturn(PackageManager.PERMISSION_GRANTED)
+
+        whenever(mockUpdateOwnerPkg.emergencyInstaller).thenReturn(
+            emergencyInstallerPackageName)
+        whenever(mSnapshot.getPackageStateInternal(
+            eq(emergencyInstallerPackageName), eq(Process.SYSTEM_UID)))
+            .thenReturn(mockEmergencyInstallerPs)
+        whenever(mockEmergencyInstallerPs.pkg).thenReturn(mockEmergencyInstallerPkg)
+        whenever(mockEmergencyInstallerPs.appId).thenReturn(mockEmergencyInstallerUid)
+        whenever(mSnapshot.checkUidPermission(anyString(), eq(mockEmergencyInstallerUid)))
+            .thenReturn(PackageManager.PERMISSION_GRANTED)
+
+        val session = createSession(installerPackageName = emergencyInstallerPackageName)
+        assertThat(session.shouldAllowDeveloperVerificationEmergencyBypass(
+            updateOwnerName, mSnapshot)).isTrue()
+    }
+
+    @RequiresFlagsEnabled(Flags.FLAG_VERIFICATION_SERVICE)
+    @Test
+    fun testShouldBindToVerifierOnNewlyCreatedSession() {
+        val verifierPackageName = "verifierPackageName"
+        whenever(mMockDeveloperVerifierController.verifierPackageName).thenReturn(
+            verifierPackageName)
+
+        createSession()
+        verify(mMockDeveloperVerifierController).bindToVerifierServiceIfNeeded(
+            any(), anyInt(), any())
+    }
+
+    @RequiresFlagsEnabled(Flags.FLAG_VERIFICATION_SERVICE)
+    @Test
+    fun testShouldNotBindToVerifierOnRestoredSession() {
+        val verifierPackageName = "verifierPackageName"
+        whenever(mMockDeveloperVerifierController.verifierPackageName).thenReturn(
+            verifierPackageName)
+
+        createSession(restoredOnReboot = true)
+        verify(mMockDeveloperVerifierController, never()).bindToVerifierServiceIfNeeded(
+            any(), anyInt(), any())
     }
 
     private fun createSession(
@@ -296,6 +390,8 @@ class PackageInstallerSessionTest {
         multiPackage: Boolean = false,
         parentSessionId: Int = PackageInstaller.SessionInfo.INVALID_ID,
         childSessionIds: List<Int> = emptyList(),
+        installerPackageName: String = "testInstaller",
+        restoredOnReboot: Boolean = false,
         block: (SessionParams) -> Unit = {},
     ): PackageInstallerSession {
         val bundle = PersistableBundle()
@@ -309,7 +405,7 @@ class PackageInstallerSessionTest {
 
         val installSource = InstallSource.create(
             "testInstallInitiator",
-            "testInstallOriginator", "testInstaller", -1, "testUpdateOwner",
+            "testInstallOriginator", installerPackageName, -1, "testUpdateOwner",
             "testAttributionTag", PackageInstaller.PACKAGE_SOURCE_UNSPECIFIED
         )
 
@@ -347,7 +443,8 @@ class PackageInstallerSessionTest {
             /* VerifierController */ mMockDeveloperVerifierController,
             /* initialVerificationPolicy */ DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_OPEN,
             /* currentVerificationPolicy */ DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED,
-            /* installDependencyHelper */ null
+            /* installDependencyHelper */ null,
+            /* restoredOnReboot= */ restoredOnReboot
         )
     }
 

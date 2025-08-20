@@ -18,9 +18,6 @@
 
 package com.android.wm.shell.flicker.utils
 
-import android.graphics.Rect
-import android.os.SystemProperties
-import android.tools.PlatformConsts
 import android.tools.flicker.FlickerTest
 import android.tools.helpers.WindowUtils
 import android.tools.traces.component.IComponentMatcher
@@ -40,6 +37,19 @@ fun FlickerTest.cascadingEffectAppliedAtEnd(component: IComponentMatcher) {
         val alignedOnCorners = onRightSide.xor(onLeftSide) and onTopSide.xor(onBottomSide)
 
         check { "window corner must meet display corner" }.that(alignedOnCorners).isEqual(true)
+    }
+}
+
+fun FlickerTest.appLayerPositionedBottomRightAtEnd(component: IComponentMatcher) {
+    assertWmEnd {
+        val displayAppBounds = WindowUtils.getInsetDisplayBounds(scenario.startRotation)
+        val windowBounds = visibleRegion(component).region.bounds
+
+        val onRightSide = windowBounds.right == displayAppBounds.right
+        val onBottomSide = windowBounds.bottom == displayAppBounds.bottom
+
+        check { "window corner must meet display corner" }.that(onRightSide && onBottomSide)
+            .isEqual(true)
     }
 }
 
@@ -159,31 +169,6 @@ fun FlickerTest.appWindowCoversHalfScreenAtEnd(
     }
 }
 
-fun FlickerTest.appWindowHasDesktopModeInitialBoundsAtTheEnd(component: IComponentMatcher) {
-    assertLayersEnd {
-        val displayBounds =
-            entry.physicalDisplayBounds ?: error("Missing physical display bounds")
-        val stableBounds = WindowUtils.getInsetDisplayBounds(scenario.endRotation)
-        val desktopModeInitialBoundsScale =
-            SystemProperties.getInt("persist.wm.debug.desktop_mode_initial_bounds_scale", 72) /
-                100f
-
-        val desiredWidth = displayBounds.width().times(desktopModeInitialBoundsScale)
-        val desiredHeight = displayBounds.height().times(desktopModeInitialBoundsScale)
-
-        val outBounds = Rect(0, 0, desiredWidth.toInt(), desiredHeight.toInt())
-        val xOffset = ((stableBounds.width() - desiredWidth) / 2).toInt()
-        val yOffset =
-            ((stableBounds.height() - desiredHeight) *
-                 PlatformConsts.DESKTOP_MODE_INITIAL_WINDOW_HEIGHT_PROPORTION + stableBounds.top)
-                 .toInt()
-        // Position the task in screen bounds
-        outBounds.offset(xOffset, yOffset)
-
-        visibleRegion(component).coversExactly(outBounds)
-    }
-}
-
 fun FlickerTest.appWindowBecomesPinned(component: IComponentMatcher) {
     assertWm {
         invoke("appWindowIsNotPinned") { it.isNotPinned(component) }
@@ -201,7 +186,7 @@ fun FlickerTest.appWindowOnDefaultDisplayAtEnd(component: IComponentMatcher) {
     }
 }
 
-fun FlickerTest.appWindowReturnsToStartBoundsAndPosition(component: IComponentMatcher){
+fun FlickerTest.appWindowReturnsToStartBoundsAndPosition(component: IComponentMatcher) {
     assertLayers {
         val startRegion = first().visibleRegion(component)
         val endRegion = last().visibleRegion(component)

@@ -224,24 +224,25 @@ constructor(
 
                                 is Transition.ChangeScene ->
                                     when {
-                                        // If transitioning between two scenes and any one of the
-                                        // two scenes is one of the keyguard scenes, report that the
-                                        // keyguard is visible.
+                                        // If transitioning between keyguard and another scene, keep
+                                        // lockscreen visible until the transition ends.
                                         it.fromScene in keyguardScenes -> flowOf(true)
-                                        it.toScene in keyguardScenes -> flowOf(true)
                                         // If transitioning between two non-keyguard scenes but the
                                         // bouncer overlay is showing, report that the keyguard is
                                         // visible.
                                         it.currentOverlays.contains(Overlays.Bouncer) ->
                                             flowOf(true)
-                                        // If transitioning between two shade scenes and the bouncer
-                                        // overlay is not showing, report that the keyguard is
-                                        // visible if the device hasn't yet been entered.
-                                        it.fromScene in shadeScenes && it.toScene in shadeScenes ->
-                                            isDeviceNotEnteredDirectly
-                                        // In all other cases, report that the keyguard isn't
-                                        // visible.
-                                        else -> flowOf(false)
+                                        // Otherwise, default to showing the lockscreen if the
+                                        // device is not yet entered, or leaving it not showing if
+                                        // the device was entered. This covers two requirements:
+                                        // - For LS -> Gone and vice versa, lockscreen visibility
+                                        //   state needs to not change until the end of the
+                                        //   transition, so that animations can play on the LS UI
+                                        //   elements (or over the unlocked app content).
+                                        // - For transitions such as Shade -> LS, which can occur
+                                        //   both while locked and unlocked, the lockscreen
+                                        //   visibility should simply not change.
+                                        else -> isDeviceNotEnteredDirectly
                                     }
 
                                 is Transition.OverlayTransition ->

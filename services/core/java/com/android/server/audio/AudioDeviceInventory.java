@@ -1205,7 +1205,8 @@ public class AudioDeviceInventory {
             }
         if (disconnectDevice) {
             setBluetoothActiveDevice(new AudioDeviceBroker.BtDeviceInfo(btInfo,
-                    BluetoothProfile.STATE_DISCONNECTED));
+                    BluetoothProfile.STATE_DISCONNECTED),
+                    "onBluetoothDeviceConfigChange" /*eventSource*/);
         }
         mmi.record();
         return delayMs;
@@ -2299,7 +2300,8 @@ public class AudioDeviceInventory {
      * Set a Bluetooth device to active.
      */
     @GuardedBy("mDeviceBroker.mDeviceStateLock")
-    public int setBluetoothActiveDevice(@NonNull AudioDeviceBroker.BtDeviceInfo info) {
+    public int setBluetoothActiveDevice(
+            @NonNull AudioDeviceBroker.BtDeviceInfo info, String eventSource) {
         int delay;
         synchronized (mDevicesLock) {
             if (!info.mSupprNoisy
@@ -2318,9 +2320,8 @@ public class AudioDeviceInventory {
             } else {
                 delay = 0;
             }
-            if (AudioService.DEBUG_DEVICES) {
-                Log.i(TAG, "setBluetoothActiveDevice " + info.toString() + " delay(ms): " + delay);
-            }
+            AudioService.sDeviceLogger.enqueue((new EventLogger.StringEvent(
+                    "setBluetoothActiveDevice called from " + eventSource + info)).printLog(TAG));
         }
         mDeviceBroker.postBluetoothActiveDevice(info, delay);
         return delay;

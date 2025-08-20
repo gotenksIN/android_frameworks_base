@@ -16,6 +16,10 @@
 
 package com.android.server.companion.virtual.computercontrol;
 
+import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM;
+import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
+import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_RECENTS;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -36,6 +40,7 @@ import android.hardware.input.VirtualKeyboardConfig;
 import android.hardware.input.VirtualTouchscreenConfig;
 import android.os.Binder;
 import android.os.IBinder;
+import android.platform.test.annotations.Presubmit;
 import android.view.Surface;
 import android.view.WindowManager;
 
@@ -52,6 +57,7 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+@Presubmit
 @RunWith(AndroidJUnit4.class)
 public class ComputerControlSessionTest {
 
@@ -84,19 +90,19 @@ public class ComputerControlSessionTest {
 
     private AutoCloseable mMockitoSession;
     private final IBinder mAppToken = new Binder();
-    private final ComputerControlSessionParams mParams = new ComputerControlSessionParams();
+    private final ComputerControlSessionParams mParams = new ComputerControlSessionParams.Builder()
+            .setName(ComputerControlSessionTest.class.getSimpleName())
+            .setDisplayDpi(100)
+            .setDisplayHeightPx(200)
+            .setDisplayWidthPx(300)
+            .setDisplaySurface(new Surface())
+            .setDisplayAlwaysUnlocked(true)
+            .build();
     private ComputerControlSessionImpl mSession;
 
     @Before
     public void setUp() throws Exception {
         mMockitoSession = MockitoAnnotations.openMocks(this);
-
-        mParams.displayDpi = 100;
-        mParams.displayHeightPx = 200;
-        mParams.displayWidthPx = 300;
-        mParams.displaySurface = new Surface();
-        mParams.isDisplayAlwaysUnlocked = true;
-        mParams.name = ComputerControlSessionTest.class.getSimpleName();
 
         when(mPackageManager.getPermissionControllerPackageName())
                 .thenReturn(PERMISSION_CONTROLLER_PACKAGE);
@@ -117,7 +123,11 @@ public class ComputerControlSessionTest {
     public void createSession_appliesCorrectParams() throws Exception {
         verify(mVirtualDeviceFactory).createVirtualDevice(
                 eq(mAppToken), any(), mVirtualDeviceParamsArgumentCaptor.capture(), any());
-        assertThat(mVirtualDeviceParamsArgumentCaptor.getValue().getName()).isEqualTo(mParams.name);
+        assertThat(mVirtualDeviceParamsArgumentCaptor.getValue().getName())
+                .isEqualTo(mParams.getName());
+        assertThat(mVirtualDeviceParamsArgumentCaptor.getValue()
+                .getDevicePolicy(POLICY_TYPE_RECENTS))
+                .isEqualTo(DEVICE_POLICY_CUSTOM);
 
         verify(mVirtualDevice).addActivityPolicyExemption(
                 mActivityPolicyExemptionArgumentCaptor.capture());
@@ -127,11 +137,11 @@ public class ComputerControlSessionTest {
         verify(mVirtualDevice).createVirtualDisplay(
                 mVirtualDisplayConfigArgumentCaptor.capture(), any());
         VirtualDisplayConfig virtualDisplayConfig = mVirtualDisplayConfigArgumentCaptor.getValue();
-        assertThat(virtualDisplayConfig.getDensityDpi()).isEqualTo(mParams.displayDpi);
-        assertThat(virtualDisplayConfig.getHeight()).isEqualTo(mParams.displayHeightPx);
-        assertThat(virtualDisplayConfig.getWidth()).isEqualTo(mParams.displayWidthPx);
-        assertThat(virtualDisplayConfig.getSurface()).isEqualTo(mParams.displaySurface);
-        assertThat(virtualDisplayConfig.getName()).contains(mParams.name);
+        assertThat(virtualDisplayConfig.getName()).contains(mParams.getName());
+        assertThat(virtualDisplayConfig.getDensityDpi()).isEqualTo(mParams.getDisplayDpi());
+        assertThat(virtualDisplayConfig.getHeight()).isEqualTo(mParams.getDisplayHeightPx());
+        assertThat(virtualDisplayConfig.getWidth()).isEqualTo(mParams.getDisplayWidthPx());
+        assertThat(virtualDisplayConfig.getSurface()).isEqualTo(mParams.getDisplaySurface());
         int expectedDisplayFlags = DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
                 | DisplayManager.VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED
                 | DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
@@ -144,28 +154,29 @@ public class ComputerControlSessionTest {
                 mVirtualDpadConfigArgumentCaptor.capture(), any());
         VirtualDpadConfig virtualDpadConfig = mVirtualDpadConfigArgumentCaptor.getValue();
         assertThat(virtualDpadConfig.getAssociatedDisplayId()).isEqualTo(VIRTUAL_DISPLAY_ID);
-        assertThat(virtualDpadConfig.getInputDeviceName()).contains(mParams.name);
+        assertThat(virtualDpadConfig.getInputDeviceName()).contains(mParams.getName());
 
         verify(mVirtualDevice).createVirtualKeyboard(
                 mVirtualKeyboardConfigArgumentCaptor.capture(), any());
         VirtualKeyboardConfig virtualKeyboardConfig =
                 mVirtualKeyboardConfigArgumentCaptor.getValue();
         assertThat(virtualKeyboardConfig.getAssociatedDisplayId()).isEqualTo(VIRTUAL_DISPLAY_ID);
-        assertThat(virtualKeyboardConfig.getInputDeviceName()).contains(mParams.name);
+        assertThat(virtualKeyboardConfig.getInputDeviceName()).contains(mParams.getName());
 
         verify(mVirtualDevice).createVirtualTouchscreen(
                 mVirtualTouchscreenConfigArgumentCaptor.capture(), any());
         VirtualTouchscreenConfig virtualTouchscreenConfig =
                 mVirtualTouchscreenConfigArgumentCaptor.getValue();
         assertThat(virtualTouchscreenConfig.getAssociatedDisplayId()).isEqualTo(VIRTUAL_DISPLAY_ID);
-        assertThat(virtualTouchscreenConfig.getWidth()).isEqualTo(mParams.displayWidthPx);
-        assertThat(virtualTouchscreenConfig.getHeight()).isEqualTo(mParams.displayHeightPx);
-        assertThat(virtualTouchscreenConfig.getInputDeviceName()).contains(mParams.name);
+        assertThat(virtualTouchscreenConfig.getWidth()).isEqualTo(mParams.getDisplayWidthPx());
+        assertThat(virtualTouchscreenConfig.getHeight()).isEqualTo(mParams.getDisplayHeightPx());
+        assertThat(virtualTouchscreenConfig.getInputDeviceName()).contains(mParams.getName());
     }
 
     @Test
     public void closeSession_closesVirtualDevice() throws Exception {
         mSession.close();
+        verify(mVirtualDevice).setDevicePolicy(POLICY_TYPE_RECENTS, DEVICE_POLICY_DEFAULT);
         verify(mVirtualDevice).close();
         verify(mOnClosedListener).onClosed(mSession.asBinder());
     }

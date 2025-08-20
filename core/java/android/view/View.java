@@ -25552,6 +25552,17 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
+     * @see RenderNode#setUsageHint(int)
+     *
+     * @hide
+     */
+    public void setUsageHint(@RenderNode.UsageHint int usageHint) {
+        if (mRenderNode != null) {
+            mRenderNode.setUsageHint(usageHint);
+        }
+    }
+
+    /**
      * Creates a new display list or updates the existing display list for the
      * specified Drawable.
      *
@@ -34729,6 +34740,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public void setFrameContentVelocity(float pixelsPerSecond) {
         if (mAttachInfo != null && mAttachInfo.mViewVelocityApi) {
             mFrameContentVelocity = Math.abs(pixelsPerSecond);
+
+            if (Trace.isTagEnabled(TRACE_TAG_VIEW)) {
+                Trace.instant(TRACE_TAG_VIEW,
+                        getClass().getSimpleName()
+                            + " - setFrameContentVelocity: " + mFrameContentVelocity);
+            }
 
             if (sToolkitMetricsForFrameRateDecisionFlagValue) {
                 Trace.setCounter("Set frame velocity", (long) mFrameContentVelocity);

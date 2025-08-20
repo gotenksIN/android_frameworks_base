@@ -101,7 +101,11 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
 
     private static final String SYSTEM_PKG = "android";
 
+    // LINT.IfChange
     private static final long DEFAULT_RUNNING_TIME_MS = 5000L;
+    private static final long ADDITIONAL_RUNNING_TIME_LOCATION_ONLY_MS =
+            10_000L - DEFAULT_RUNNING_TIME_MS;
+    // LINT.ThenChange(/packages/SystemUI/src/com/android/systemui/privacy/PrivacyItemController.kt)
     private static final long DEFAULT_RECENT_TIME_MS = 15000L;
 
     private static boolean shouldShowIndicators() {
@@ -597,8 +601,15 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
                         continue;
                     }
 
-                    boolean isRunning = attrOpEntry.isRunning()
-                            || lastAccessTime >= runningThreshold;
+                    String permGroupName = getGroupForOp(op);
+                    boolean isLocationOp =
+                            android.location.flags.Flags.locationIndicatorsEnabled()
+                                    && LOCATION.equals(permGroupName);
+                    long currentRunningThreshold =
+                            runningThreshold
+                                    - (isLocationOp ? ADDITIONAL_RUNNING_TIME_LOCATION_ONLY_MS : 0);
+                    boolean isRunning =
+                            attrOpEntry.isRunning() || lastAccessTime >= currentRunningThreshold;
 
                     OpUsage proxyUsage = null;
                     AppOpsManager.OpEventProxyInfo proxy = attrOpEntry.getLastProxyInfo(opFlags);
@@ -607,9 +618,13 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
                                 op, proxy.getUid(), lastAccessTime, isRunning, null);
                     }
 
-                    String permGroupName = getGroupForOp(op);
-                    if (LOCATION.equals(permGroupName)) {
-                        if (isSystemApp(op, packageName, user, uid) || isBackgroundApp(uid)) {
+                    if (isLocationOp) {
+                        // Only non-system, non-background apps should trigger location indicator.
+                        // But if the location indicator is already visible (e.g. an app
+                        // transitioned from foreground to background), we should not filter it out
+                        // if it's within the holding period.
+                        if (isSystemApp(op, packageName, user, uid)
+                                || (isBackgroundApp(uid) && !isRunning)) {
                             // Remove the system & background apps for location op
                             continue;
                         }

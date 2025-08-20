@@ -20,22 +20,28 @@ import android.app.IUriGrantsManager
 import android.app.appfunctions.AppFunctionAccessServiceInterface
 import android.app.appfunctions.flags.Flags
 import android.content.pm.PackageManagerInternal
+import android.content.pm.SignedPackage
+import android.content.pm.UserInfo
+import android.os.IBinder
 import android.permission.flags.Flags.FLAG_APP_FUNCTION_ACCESS_API_ENABLED
 import android.permission.flags.Flags.FLAG_APP_FUNCTION_ACCESS_SERVICE_ENABLED
 import android.platform.test.annotations.RequiresFlagsEnabled
 import android.platform.test.flag.junit.CheckFlagsRule
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
+import android.provider.DeviceConfig
 import android.testing.TestableContext
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.internal.R
 import com.android.modules.utils.testing.ExtendedMockitoRule
 import com.android.server.LocalServices
+import com.android.server.SystemService
+import com.android.server.SystemService.TargetUser
 import com.android.server.uri.UriGrantsManagerInternal
 import com.google.common.truth.Truth.assertThat
+import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Before
 import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
@@ -43,7 +49,9 @@ import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.spy
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -54,13 +62,18 @@ class AppFunctionManagerServiceImplTest {
 
     @get:Rule
     val extendedMockitoRule =
-        ExtendedMockitoRule.Builder(this).mockStatic(LocalServices::class.java).build()
+        ExtendedMockitoRule.Builder(this)
+            .mockStatic(LocalServices::class.java)
+            .mockStatic(DeviceConfig::class.java)
+            .build()
 
     @get:Rule
     val context: TestableContext =
         spy(TestableContext(ApplicationProvider.getApplicationContext(), null))
 
     private val appFunctionAccessService = mock<AppFunctionAccessServiceInterface>()
+    private val agentAllowlistStorage = mock<AppFunctionAgentAllowlistStorage>()
+    private val multiUserAccessHistory = mock<MultiUserAppFunctionAccessHistory>()
 
     private val serviceImpl =
         AppFunctionManagerServiceImpl(
@@ -68,10 +81,15 @@ class AppFunctionManagerServiceImplTest {
             mock<PackageManagerInternal>(),
             appFunctionAccessService,
             mock<IUriGrantsManager>(),
-            mock<UriGrantsManagerInternal>(),
+            mock<UriGrantsManagerInternal>().apply {
+                whenever(this.newUriPermissionOwner(any())).thenReturn(mock<IBinder>())
+            },
+            mock<AppFunctionsLoggerWrapper>(),
+            agentAllowlistStorage,
+            multiUserAccessHistory,
+            MoreExecutors.directExecutor(),
         )
 
-    @Before
     @After
     fun clear() {
         clearDeviceSettingPackages()
@@ -239,7 +257,7 @@ class AppFunctionManagerServiceImplTest {
         FLAG_APP_FUNCTION_ACCESS_API_ENABLED,
     )
     @Test
-    fun getValidTargets_shouldNotHaveAndroidPackage_whenNoDeviceSettingPacakge() {
+    fun getValidTargets_shouldNotHaveAndroidPackage_whenNoDeviceSettingPackage() {
         val nonDeviceSettingPackage = "non.device.setting.package"
         val deviceSettingPackage1 = "device.setting.package1"
         val deviceSettingPackage2 = "device.setting.package2"
@@ -270,6 +288,79 @@ class AppFunctionManagerServiceImplTest {
         val validTargets = serviceImpl.getValidTargets(0)
 
         assertThat(validTargets).containsExactly("android", nonDeviceSettingPackage)
+    }
+
+    @Test
+    @RequiresFlagsEnabled(
+        FLAG_APP_FUNCTION_ACCESS_SERVICE_ENABLED,
+        FLAG_APP_FUNCTION_ACCESS_API_ENABLED,
+    )
+    fun onBootPhase_writeAllowlistToStorage_whenDeviceConfigValid() {
+        val signatureString = "com.example.test1:abcdef0123456789"
+        whenever(
+                DeviceConfig.getString(
+                    eq("machine_learning"),
+                    eq("allowlisted_app_functions_agents"),
+                    any(),
+                )
+            )
+            .thenReturn(signatureString)
+
+        serviceImpl.onBootPhase(SystemService.PHASE_SYSTEM_SERVICES_READY)
+        verify(agentAllowlistStorage).writeCurrentAllowlist(signatureString)
+    }
+
+    @RequiresFlagsEnabled(
+        FLAG_APP_FUNCTION_ACCESS_SERVICE_ENABLED,
+        FLAG_APP_FUNCTION_ACCESS_API_ENABLED,
+    )
+    @Test
+    fun onBootPhase_readPreviousAllowlist_whenDeviceConfigInvalid() {
+        val validPackages = listOf(SignedPackage("com.valid.package", byteArrayOf()))
+
+        val invalidSignatureString = "com.example.test1:invalid_certificate_string"
+        whenever(
+                DeviceConfig.getString(
+                    eq("machine_learning"),
+                    eq("allowlisted_app_functions_agents"),
+                    any(),
+                )
+            )
+            .thenReturn(invalidSignatureString)
+
+        whenever(agentAllowlistStorage.readPreviousValidAllowlist()).thenReturn(validPackages)
+
+        serviceImpl.onBootPhase(SystemService.PHASE_SYSTEM_SERVICES_READY)
+
+        verify(agentAllowlistStorage).readPreviousValidAllowlist()
+        verify(agentAllowlistStorage, never()).writeCurrentAllowlist(invalidSignatureString)
+    }
+
+    @RequiresFlagsEnabled(
+        FLAG_APP_FUNCTION_ACCESS_SERVICE_ENABLED,
+        FLAG_APP_FUNCTION_ACCESS_API_ENABLED,
+    )
+    @Test
+    fun onUserUnlocked_shouldUnlockTargetUserStorage() {
+        val targetUser = TargetUser(UserInfo(context.userId, "testUser", 0))
+
+        serviceImpl.onUserUnlocked(targetUser)
+
+        verify(multiUserAccessHistory, times(1)).onUserUnlocked(eq(targetUser))
+    }
+
+    @RequiresFlagsEnabled(
+        FLAG_APP_FUNCTION_ACCESS_SERVICE_ENABLED,
+        FLAG_APP_FUNCTION_ACCESS_API_ENABLED,
+    )
+    @Test
+    fun onUserStopping_shouldStopTargetUserStorage() {
+        val targetUser = TargetUser(UserInfo(context.userId, "testUser", 0))
+
+        serviceImpl.onUserUnlocked(targetUser)
+        serviceImpl.onUserStopping(targetUser)
+
+        verify(multiUserAccessHistory, times(1)).onUserStopping(eq(targetUser))
     }
 
     private fun setDeviceSettingPackages(deviceSettings: Array<String>) {

@@ -245,11 +245,11 @@ public class MediaQualityService extends SystemService {
         synchronized (mPictureProfileLock) {
         // TODO handle other users
             UserState userState = getOrCreateUserState(UserHandle.USER_SYSTEM);
-            int n = userState.mActiveProcessingPictureCallbackList.beginBroadcast();
+            int n = userState.mActiveProcessingPictureCallbacks.beginBroadcast();
             for (int i = 0; i < n; ++i) {
                 try {
                     IActiveProcessingPictureListener l = userState
-                            .mActiveProcessingPictureCallbackList
+                            .mActiveProcessingPictureCallbacks
                             .getBroadcastItem(i);
                     ActiveProcessingPictureListenerInfo info =
                             userState.mActiveProcessingPictureListenerMap.get(l);
@@ -282,7 +282,7 @@ public class MediaQualityService extends SystemService {
                     Slog.e(TAG, "failed to report added AD service to callback", e);
                 }
             }
-            userState.mActiveProcessingPictureCallbackList.finishBroadcast();
+            userState.mActiveProcessingPictureCallbacks.finishBroadcast();
         }
     }
 
@@ -1006,7 +1006,7 @@ public class MediaQualityService extends SystemService {
             int callingPid = Binder.getCallingPid();
             mHandler.post(() -> {
                 Long dbId = mSoundProfileTempIdMap.getKey(id);
-                if (!hasPermissionToUpdateSoundProfile(dbId, sp, callingUid)) {
+                if (!hasPermissionToUpdateSoundProfile(dbId, sp, callingUid, callingPid)) {
                     mMqManagerNotifier.notifyOnSoundProfileError(
                             id, SoundProfile.ERROR_NO_PERMISSION, callingUid, callingPid);
                     Slog.e(TAG, "updateSoundProfile: no permission to update sound profile");
@@ -1027,12 +1027,16 @@ public class MediaQualityService extends SystemService {
             });
         }
 
-        private boolean hasPermissionToUpdateSoundProfile(Long dbId, SoundProfile sp, int uid) {
+        private boolean hasPermissionToUpdateSoundProfile(
+                Long dbId, SoundProfile toUpdate, int uid, int pid) {
             SoundProfile fromDb = mMqDatabaseUtils.getSoundProfile(dbId);
-            return fromDb.getProfileType() == sp.getProfileType()
-                    && fromDb.getPackageName().equals(sp.getPackageName())
-                    && fromDb.getName().equals(sp.getName())
-                    && fromDb.getPackageName().equals(getPackageOfUid(uid));
+            boolean isPackageOwner = fromDb.getPackageName().equals(getPackageOfUid(uid));
+            boolean isSystemAppWithPermission = hasGlobalSoundQualityServicePermission(uid, pid)
+                    && fromDb.getProfileType() == PictureProfile.TYPE_SYSTEM;
+            return fromDb.getProfileType() == toUpdate.getProfileType()
+                    && fromDb.getName().equals(toUpdate.getName())
+                    && fromDb.getPackageName().equals(toUpdate.getPackageName())
+                    && (isPackageOwner || isSystemAppWithPermission);
         }
 
         @GuardedBy("mSoundProfileLock")
@@ -1257,13 +1261,6 @@ public class MediaQualityService extends SystemService {
             return incomingPackage.equalsIgnoreCase(getPackageOfUid(uid));
         }
 
-        private boolean hasGlobalSoundQualityServicePermission(int uid, int pid) {
-            return mContext.checkPermission(
-                           android.Manifest.permission.MANAGE_GLOBAL_SOUND_QUALITY_SERVICE, pid,
-                           uid)
-                    == PackageManager.PERMISSION_GRANTED;
-        }
-
         private boolean hasReadColorZonesPermission(int uid, int pid) {
             return mContext.checkPermission(android.Manifest.permission.READ_COLOR_ZONES, pid, uid)
                     == PackageManager.PERMISSION_GRANTED;
@@ -1310,6 +1307,7 @@ public class MediaQualityService extends SystemService {
             String packageName = getPackageOfUid(callingUid);
             userState.mActiveProcessingPictureListenerMap.put(l,
                     new ActiveProcessingPictureListenerInfo(callingUid, callingPid, packageName));
+            userState.mActiveProcessingPictureCallbacks.register(l);
         }
 
         @Override
@@ -1850,7 +1848,7 @@ public class MediaQualityService extends SystemService {
         private final MediaQualityManagerSoundProfileCallbackList mSoundProfileCallbacks =
                 new MediaQualityManagerSoundProfileCallbackList();
 
-        private final ActiveProcessingPictureCallbackList mActiveProcessingPictureCallbackList =
+        private final ActiveProcessingPictureCallbackList mActiveProcessingPictureCallbacks =
                 new ActiveProcessingPictureCallbackList();
 
         private final Map<IPictureProfileCallback, Pair<Integer, Integer>>
@@ -2127,7 +2125,10 @@ public class MediaQualityService extends SystemService {
                     Pair<Integer, Integer> pidUid = userState.mSoundProfileCallbackPidUidMap
                             .get(callback);
 
-                    if (pidUid.first == pid && pidUid.second == uid) {
+                    if ((pidUid.first == pid && pidUid.second == uid)
+                            || (hasGlobalSoundQualityServicePermission(pidUid.second, pidUid.first)
+                                    && profile != null
+                                    && profile.getProfileType() == PictureProfile.TYPE_SYSTEM)) {
                         if (mode == ProfileModes.ADD) {
                             userState.mSoundProfileCallbacks.getBroadcastItem(i)
                                     .onSoundProfileAdded(profileId, profile);
@@ -2878,6 +2879,12 @@ public class MediaQualityService extends SystemService {
         return mContext.checkPermission(
                 android.Manifest.permission.MANAGE_GLOBAL_PICTURE_QUALITY_SERVICE, pid,
                 uid)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean hasGlobalSoundQualityServicePermission(int uid, int pid) {
+        return mContext.checkPermission(
+                       android.Manifest.permission.MANAGE_GLOBAL_SOUND_QUALITY_SERVICE, pid, uid)
                 == PackageManager.PERMISSION_GRANTED;
     }
 

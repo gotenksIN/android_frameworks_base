@@ -25,10 +25,10 @@ import com.android.systemui.media.remedia.ui.viewmodel.factory.mediaViewModelFac
 import com.android.systemui.qs.footerActionsController
 import com.android.systemui.qs.footerActionsViewModelFactory
 import com.android.systemui.qs.panels.domain.interactor.tileSquishinessInteractor
+import com.android.systemui.qs.panels.ui.viewmodel.mediaInRowInLandscapeViewModelFactory
 import com.android.systemui.qs.panels.ui.viewmodel.quickQuickSettingsViewModelFactory
-import com.android.systemui.qs.ui.adapter.qsSceneAdapter
+import com.android.systemui.qs.ui.viewmodel.quickSettingsContainerViewModelFactory
 import com.android.systemui.scene.domain.interactor.sceneInteractor
-import com.android.systemui.settings.brightness.ui.viewmodel.brightnessMirrorViewModelFactory
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.statusbar.disableflags.domain.interactor.disableFlagsInteractor
 import com.android.systemui.unfold.domain.interactor.unfoldTransitionInteractor
@@ -38,9 +38,8 @@ val Kosmos.shadeSceneContentViewModel: ShadeSceneContentViewModel by Fixture {
     ShadeSceneContentViewModel(
         mainDispatcher = testDispatcher,
         shadeHeaderViewModelFactory = shadeHeaderViewModelFactory,
+        qsContainerViewModelFactory = quickSettingsContainerViewModelFactory,
         quickQuickSettingsViewModel = quickQuickSettingsViewModelFactory,
-        qsSceneAdapter = qsSceneAdapter,
-        brightnessMirrorViewModelFactory = brightnessMirrorViewModelFactory,
         mediaCarouselInteractor = mediaCarouselInteractor,
         shadeModeInteractor = shadeModeInteractor,
         disableFlagsInteractor = disableFlagsInteractor,
@@ -52,6 +51,7 @@ val Kosmos.shadeSceneContentViewModel: ShadeSceneContentViewModel by Fixture {
         tileSquishinessInteractor = tileSquishinessInteractor,
         mediaViewModelFactory = mediaViewModelFactory,
         windowRootViewBlurInteractor = windowRootViewBlurInteractor,
+        mediaInRowInLandscapeViewModelFactory = mediaInRowInLandscapeViewModelFactory,
     )
 }
 

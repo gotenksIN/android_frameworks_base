@@ -16,10 +16,13 @@
 
 package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 
+import android.annotation.SuppressLint
 import android.graphics.RectF
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dump.DumpManager
+import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
+import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeStatusBarComponentsInteractor
@@ -39,8 +42,8 @@ import com.android.systemui.util.kotlin.sample
 import com.android.systemui.util.ui.AnimatableEvent
 import com.android.systemui.util.ui.AnimatedValue
 import com.android.systemui.util.ui.toAnimatedValueFlow
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -49,11 +52,13 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
+import javax.inject.Inject
 
 /**
  * ViewModel for the list of notifications, including child elements like the Clear all/Manage
  * button at the bottom (the footer) and the "No notifications" text (the empty shade).
  */
+@SuppressLint("FlowExposedFromViewModel") // because all flows from this class are bound to a View
 class NotificationListViewModel
 @Inject
 constructor(
@@ -65,6 +70,7 @@ constructor(
     val bundleOnboarding: BundleOnboardingViewModel,
     val summarizationOnboarding: SummarizationOnboardingViewModel,
     val logger: NotificationLoggerViewModel,
+    val sceneInteractor: SceneInteractor,
     activeNotificationsInteractor: ActiveNotificationsInteractor,
     notificationStackInteractor: NotificationStackInteractor,
     private val headsUpNotificationInteractor: HeadsUpNotificationInteractor,
@@ -92,13 +98,26 @@ constructor(
             .dumpWhileCollecting("isImportantForAccessibility")
             .flowOn(bgDispatcher)
 
+    /** Emits true when the QS overlay is visible. */
+    val isQsOverlayVisible: Flow<Boolean> =
+        if (SceneContainerFlag.isEnabled) {
+            sceneInteractor.currentOverlays
+                .map { Overlays.QuickSettingsShade in it }
+                .distinctUntilChanged()
+        } else {
+            flowOf(false)
+        }
+
     val shouldShowEmptyShadeView: Flow<AnimatedValue<Boolean>> by lazy {
         combine(
                 activeNotificationsInteractor.areAnyNotificationsPresent,
                 shadeInteractor.qsExpansion
                     .map { it >= QS_EXPANSION_THRESHOLD }
                     .distinctUntilChanged(),
-                shadeModeInteractor.shadeMode.map { it == ShadeMode.Split },
+                shadeModeInteractor.shadeMode.map {
+                    @Suppress("DEPRECATION") // to handle split shade
+                    it == ShadeMode.Split
+                },
                 notificationStackInteractor.isShowingOnLockscreen,
             ) { hasNotifications, qsExpandedEnough, splitShade, isShowingOnLockscreen ->
                 when {
@@ -239,15 +258,13 @@ constructor(
                     notificationStackInteractor.isShowingOnLockscreen,
                     shadeInteractor.isQsFullscreen,
                     remoteInputInteractor.isRemoteInputActive,
-                    shadeInteractor.shadeExpansion.map { it < 0.5f }.distinctUntilChanged(),
                 ) {
                     shadeMode,
                     hasNotifications,
                     isUserSetUp,
                     isShowingOnLockscreen,
                     qsFullScreen,
-                    isRemoteInputActive,
-                    shadeLessThanHalfwayExpanded ->
+                    isRemoteInputActive ->
                     when {
                         // Hide the footer when there are no notifications, unless it's Dual Shade.
                         shadeMode != ShadeMode.Dual && !hasNotifications ->
@@ -266,8 +283,6 @@ constructor(
                         // Hide the footer if remote input is active (i.e. user is replying to a
                         // notification). See b/75984847.
                         isRemoteInputActive -> VisibilityChange.DISAPPEAR_WITH_ANIMATION
-                        // If the shade is not expanded enough, the footer shouldn't be visible.
-                        shadeLessThanHalfwayExpanded -> VisibilityChange.DISAPPEAR_WITH_ANIMATION
                         else -> VisibilityChange.APPEAR_WITH_ANIMATION
                     }
                 }
@@ -367,6 +382,7 @@ constructor(
      * Note that this list can contain both notification keys, as well as keys for other types of
      * chips like screen recording.
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     val visibleStatusBarChips: Flow<Map<String, RectF>> =
         shadeStatusBarComponentsInteractor.ongoingActivityChipsViewModel.flatMapLatest {
             it.visibleChipsWithBounds

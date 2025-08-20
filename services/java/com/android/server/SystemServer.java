@@ -471,6 +471,8 @@ public final class SystemServer implements Dumpable {
             "android.os.profiling.ProfilingService$Lifecycle";
     private static final String PROFILING_SERVICE_JAR_PATH =
             "/apex/com.android.profiling/javalib/service-profiling.jar";
+    private static final String ANOMALY_DETECTOR_SERVICE_CLASS =
+            "com.android.os.profiling.anomaly.AnomalyDetectorService";
 
     private static final String RANGING_APEX_SERVICE_JAR_PATH =
             "/apex/com.android.uwb/javalib/service-ranging.jar";
@@ -3048,10 +3050,15 @@ public final class SystemServer implements Dumpable {
         }
 
         // Profiling
-        if (android.server.Flags.telemetryApisService()) {
-            t.traceBegin("StartProfilingCompanion");
-            mSystemServiceManager.startServiceFromJar(PROFILING_SERVICE_LIFECYCLE_CLASS,
-                    PROFILING_SERVICE_JAR_PATH);
+        t.traceBegin("StartProfilingCompanion");
+        mSystemServiceManager.startServiceFromJar(PROFILING_SERVICE_LIFECYCLE_CLASS,
+                PROFILING_SERVICE_JAR_PATH);
+        t.traceEnd();
+
+        // Anomaly Detector
+        if (android.os.profiling.anomaly.flags.Flags.anomalyDetectorCore()) {
+            t.traceBegin("StartAnomalyDetectorService");
+            mSystemServiceManager.startService(ANOMALY_DETECTOR_SERVICE_CLASS);
             t.traceEnd();
         }
 

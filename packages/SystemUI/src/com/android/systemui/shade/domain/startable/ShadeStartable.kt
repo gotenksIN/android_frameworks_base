@@ -26,6 +26,7 @@ import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.dagger.ShadeTouchLog
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
+import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.ShadeExpansionStateManager
 import com.android.systemui.shade.TouchLogger.Companion.logTouchesTo
@@ -33,7 +34,6 @@ import com.android.systemui.shade.data.repository.ShadeRepository
 import com.android.systemui.shade.domain.interactor.ShadeDisplayStateInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
-import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.shade.transition.ScrimShadeTransitionController
 import com.android.systemui.statusbar.NotificationShadeDepthController
 import com.android.systemui.statusbar.PulseExpansionHandler
@@ -46,8 +46,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -91,10 +89,13 @@ constructor(
             combine(
                     shadeInteractor.shadeExpansion,
                     sceneInteractorProvider.get().isTransitionUserInputOngoing,
-                ) { panelExpansion, tracking ->
+                    sceneInteractorProvider.get().transitionState,
+                ) { panelExpansion, tracking, transitionState ->
+                    val fraction =
+                        if (transitionState.isIdle(Scenes.Lockscreen)) 1f else panelExpansion
                     shadeExpansionStateManager.onPanelExpansionChanged(
-                        fraction = panelExpansion,
-                        expanded = panelExpansion > 0f,
+                        fraction = fraction,
+                        expanded = fraction > 0f,
                         tracking = tracking,
                     )
                 }
@@ -122,25 +123,15 @@ constructor(
         }
 
         applicationScope.launch {
-            val shadeModeInteractor = shadeModeInteractorProvider.get()
-            shadeModeInteractor.shadeMode
-                .flatMapLatest { shadeMode ->
-                    if (shadeMode is ShadeMode.Dual) {
-                        flowOf(false)
-                    } else {
-                        configurationRepository.onAnyConfigurationChange
-                            // Force initial collection.
-                            .onStart { emit(Unit) }
-                            .map {
-                                // The configuration for 'shouldUseSplitNotificationShade' dictates
-                                // the width of the shade in single/split shade modes.
-                                splitShadeStateController.shouldUseSplitNotificationShade(
-                                    context.resources
-                                )
-                            }
-                            .distinctUntilChanged()
-                    }
+            configurationRepository.onAnyConfigurationChange
+                // Force initial collection.
+                .onStart { emit(Unit) }
+                .map {
+                    // The configuration for 'shouldUseSplitNotificationShade' dictates the width of
+                    // the shade in single/split shade modes.
+                    splitShadeStateController.shouldUseSplitNotificationShade(context.resources)
                 }
+                .distinctUntilChanged()
                 .collect { shadeRepository.legacyUseSplitShade.value = it }
         }
     }
@@ -149,12 +140,10 @@ constructor(
         if (SceneContainerFlag.isEnabled) {
             val shadeModeInteractor = shadeModeInteractorProvider.get()
             applicationScope.launch {
-                shadeModeInteractor.isShadeLayoutWide
-                    .map { !it }
-                    .collect { isFullWidth ->
-                        nsslc.setIsFullWidth(isFullWidth)
-                        scrimController.setClipsQsScrim(isFullWidth)
-                    }
+                shadeModeInteractor.isFullWidthShade.collect { isFullWidth ->
+                    nsslc.setIsFullWidth(isFullWidth)
+                    scrimController.setClipsQsScrim(isFullWidth)
+                }
             }
         }
     }

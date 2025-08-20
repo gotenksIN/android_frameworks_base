@@ -230,6 +230,7 @@ import android.app.ApplicationExitInfo;
 import android.app.ApplicationStartInfo;
 import android.app.ApplicationThreadConstants;
 import android.app.BackgroundStartPrivileges;
+import android.app.BindUpdateInfo;
 import android.app.BroadcastOptions;
 import android.app.ContentProviderHolder;
 import android.app.ForegroundServiceDelegationOptions;
@@ -3575,7 +3576,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mProcessList.noteAppKill(app, ApplicationExitInfo.REASON_OTHER,
                         ApplicationExitInfo.SUBREASON_UNKNOWN, reason);
             }
-            app.killProcessGroupIfNecessaryLocked(true);
+            app.killProcessGroupIfNecessaryLocked(true, reason);
             synchronized (mProcLock) {
                 app.setKilled(true);
             }
@@ -5207,7 +5208,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             Binder.restoreCallingIdentity(origId);
         }
 
-        if (android.app.Flags.appStartInfoTimestamps() && timestampApplicationOnCreateNs > 0) {
+        if (timestampApplicationOnCreateNs > 0) {
             addStartInfoTimestampInternal(ApplicationStartInfo.START_TIMESTAMP_APPLICATION_ONCREATE,
                     timestampApplicationOnCreateNs, UserHandle.getUserId(uid), uid);
         }
@@ -13920,6 +13921,22 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
     }
 
+    @Nullable
+    @Override
+    public List<ActivityManager.ConnectionInfo> getRunningServiceConnections(ComponentName name) {
+        enforceNotIsolatedCaller("getRunningServiceConnections");
+        enforceCallingPermission(permission.DUMP, "getRunningServiceConnections()");
+        final int callingUid = Binder.getCallingUid();
+        final int callingUserId = UserHandle.getUserId(callingUid);
+        if (name == null || getPackageManagerInternal()
+                .filterAppAccess(name.getPackageName(), callingUid, callingUserId)) {
+            return null;
+        }
+        synchronized (this) {
+            return mServices.getRunningServiceConnectionsLocked(name);
+        }
+    }
+
     @Override
     public void logFgsApiBegin(@ForegroundServiceApiType int apiType,
             int uid, int pid) {
@@ -14252,6 +14269,28 @@ public class ActivityManagerService extends IActivityManager.Stub
     public void updateServiceGroup(IServiceConnection connection, int group, int importance) {
         synchronized (this) {
             mServices.updateServiceGroupLocked(connection, group, importance);
+        }
+    }
+
+    /**
+     * Batch update existing bindings by either rebinding or unbinding them.
+     */
+    @Override
+    public void updateServiceBindings(List<BindUpdateInfo> updates) {
+        if (!android.content.flags.Flags.enableUpdateServiceBindings()) {
+            throw new UnsupportedOperationException(
+                    "aconfig flag android.content.flags.enable_batch_update_bindings not enabled");
+        }
+
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "updateServiceBindings");
+        }
+        try {
+            synchronized (this) {
+                mServices.updateServiceBindingsLocked(updates);
+            }
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         }
     }
 

@@ -5869,8 +5869,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         tda.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FREEFORM
 
         val focusedFullscreenTask = setUpFullscreenTask()
-        whenever(focusTransitionObserver.getFocusedTaskOnDisplay(any()))
-            .thenReturn(focusedFullscreenTask)
+        whenever(focusTransitionObserver.getFocusedTaskIdOnDisplay(any()))
+            .thenReturn(focusedFullscreenTask.taskId)
 
         val fullscreenTask = createFullscreenTask()
 
@@ -6267,8 +6267,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         tda.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FREEFORM
 
         val focusedFullscreenTask = setUpFullscreenTask()
-        whenever(focusTransitionObserver.getFocusedTaskOnDisplay(any()))
-            .thenReturn(focusedFullscreenTask)
+        whenever(focusTransitionObserver.getFocusedTaskIdOnDisplay(any()))
+            .thenReturn(focusedFullscreenTask.taskId)
 
         val freeformTask = createFreeformTask(displayId = DEFAULT_DISPLAY)
 
@@ -10030,7 +10030,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         testOnUnhandledDrag(
             DesktopModeVisualIndicator.IndicatorType.TO_DESKTOP_INDICATOR,
             PointF(1200f, 700f),
-            Rect(100, 100, 300, 300),
+            Rect(1100, 700, 1300, 900),
             tabTearingMinimizeAnimationFlagEnabled = true,
             tabTearingLaunchAnimationFlagEnabled = true,
         )
@@ -10046,7 +10046,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         testOnUnhandledDrag(
             DesktopModeVisualIndicator.IndicatorType.TO_DESKTOP_INDICATOR,
             PointF(1200f, 700f),
-            Rect(100, 100, 300, 300),
+            Rect(1100, 700, 1300, 900),
             tabTearingMinimizeAnimationFlagEnabled = true,
             tabTearingLaunchAnimationFlagEnabled = false,
         )
@@ -10062,7 +10062,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         testOnUnhandledDrag(
             DesktopModeVisualIndicator.IndicatorType.TO_DESKTOP_INDICATOR,
             PointF(1200f, 700f),
-            Rect(100, 100, 300, 300),
+            Rect(1100, 700, 1300, 900),
             tabTearingMinimizeAnimationFlagEnabled = false,
             tabTearingLaunchAnimationFlagEnabled = true,
         )
@@ -10078,7 +10078,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         testOnUnhandledDrag(
             DesktopModeVisualIndicator.IndicatorType.TO_DESKTOP_INDICATOR,
             PointF(1200f, 700f),
-            Rect(100, 100, 300, 300),
+            Rect(1100, 700, 1300, 900),
             tabTearingMinimizeAnimationFlagEnabled = false,
             tabTearingLaunchAnimationFlagEnabled = false,
         )

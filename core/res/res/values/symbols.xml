@@ -850,6 +850,9 @@
   <java-symbol type="string" name="lockscreen_emergency_call" />
   <java-symbol type="string" name="lockscreen_return_to_call" />
   <java-symbol type="string" name="long_press_power_to_turn_off_tv_toast" />
+  <java-symbol type="string" name="tv_watchdog_notification_channel_name" />
+  <java-symbol type="string" name="tv_watchdog_notification_title" />
+  <java-symbol type="string" name="tv_watchdog_notification_content" />
   <java-symbol type="integer" name="config_turnOffTvToastSuppressionDelayMs" />
   <java-symbol type="integer" name="config_turnOffTvToastPostDelayMs" />
   <java-symbol type="string" name="low_memory" />
@@ -1599,6 +1602,7 @@
   <java-symbol type="drawable" name="ic_feedback_downrank" />
 
   <java-symbol type="drawable" name="ic_account_circle" />
+  <java-symbol type="drawable" name="material_ic_account_circle" />
   <java-symbol type="drawable" name="ic_dual_screen" />
   <java-symbol type="drawable" name="ic_thermostat" />
   <java-symbol type="drawable" name="ic_security_privacy_notification_badge" />
@@ -3606,7 +3610,9 @@
   <java-symbol type="string" name="notification_messaging_title_template" />
 
   <!-- Notifications: MetricStyle -->
-  <java-symbol type="string" name="notification_metric_label_template" />
+  <java-symbol type="string" name="notification_metric_label_unit" />
+  <java-symbol type="string" name="notification_metric_label_unit_separator" />
+  <java-symbol type="string" name="notification_metric_label_separator" />
 
   <!-- Notifications: CallStyle -->
   <java-symbol type="layout" name="notification_template_material_call" />
@@ -4223,6 +4229,9 @@
   <java-symbol type="bool" name="config_enableCredentialFactoryResetProtection" />
   <java-symbol type="bool" name="config_disableWeaverOnUnsecuredUsers" />
   <java-symbol type="bool" name="config_softwareLskfRateLimiterEnforcing" />
+
+  <java-symbol type="bool" name="config_lockPinEnhancedPrivacyDefault" />
+  <java-symbol type="bool" name="config_lockPatternVisibleDefault" />
 
   <!-- ETWS primary messages -->
   <java-symbol type="string" name="etws_primary_default_message_earthquake" />
@@ -6285,21 +6294,20 @@
   <!-- Advanced Protection Service USB feature -->
 
   <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_app_title" />
-  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_title" />
+
   <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" />
+  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_title" />
 
-  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_text" />
   <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" />
-
-  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_low_power_charge_notification_text" />
-  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_low_power_charge_replug_notification_text" />
-
-  <java-symbol type="string" name="usb_apm_usb_plugged_in_for_power_brick_notification_text" />
-  <java-symbol type="string" name="usb_apm_usb_plugged_in_for_power_brick_replug_notification_text" />
+  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_data_notification_text" />
+  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" />
+  <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" />
 
   <java-symbol type="string" name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" />
+
   <java-symbol type="string" name="usb_apm_usb_notification_silenced_title" />
   <java-symbol type="string" name="usb_apm_usb_notification_silenced_text" />
+
   <java-symbol type="string" name="usb_apm_usb_suspicious_activity_notification_title" />
   <java-symbol type="string" name="usb_apm_usb_suspicious_activity_notification_text" />
 

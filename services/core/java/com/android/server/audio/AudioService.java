@@ -493,7 +493,6 @@ public class AudioService extends IAudioService.Stub
     private static final int MSG_UPDATE_A11Y_SERVICE_UIDS = 35;
     private static final int MSG_UPDATE_AUDIO_MODE = 36;
     private static final int MSG_RECORDING_CONFIG_CHANGE = 37;
-    private static final int MSG_BT_DEV_CHANGED = 38;
     private static final int MSG_UPDATE_AUDIO_MODE_SIGNAL = 39;
     private static final int MSG_DISPATCH_AUDIO_MODE = 40;
     private static final int MSG_ROUTING_UPDATED = 41;
@@ -9274,11 +9273,8 @@ public class AudioService extends IAudioService.Stub
         sDeviceLogger.enqueue(new EventLogger.StringEvent("BluetoothActiveDeviceChanged for "
                 + BluetoothProfile.getProfileName(profile) + ", device update " + previousDevice
                 + " -> " + newDevice).printLog(TAG));
-        AudioDeviceBroker.BtDeviceChangedData data =
-                new AudioDeviceBroker.BtDeviceChangedData(newDevice, previousDevice, info,
-                        "AudioService");
-        sendMsg(mAudioHandler, MSG_BT_DEV_CHANGED, SENDMSG_QUEUE, 0, 0,
-                /*obj*/ data, /*delay*/ 0);
+        mDeviceBroker.queueOnBluetoothActiveDeviceChanged(new AudioDeviceBroker.BtDeviceChangedData(
+                newDevice, previousDevice, info, "AudioService"));
     }
 
     /** only public for mocking/spying, do not call outside of AudioService */
@@ -10186,19 +10182,28 @@ public class AudioService extends IAudioService.Stub
                         mIndexStepFactor = 1.f;
                     } else if ((equalScoLeaVcIndexRange() || equalScoHaVcIndexRange())
                             && isStreamBluetoothComm(mStreamType)) {
+                        final int btCommActiveDevice = mBtCommDeviceActive.get();
+
                         // For non SCO devices the stream state does not change the min index
-                        if (mBtCommDeviceActive.get() == BT_COMM_DEVICE_ACTIVE_SCO) {
+                        if (btCommActiveDevice == BT_COMM_DEVICE_ACTIVE_SCO) {
                             mIndexMin = MIN_STREAM_VOLUME[AudioSystem.STREAM_BLUETOOTH_SCO] * 10;
                             indexMinVolCurve = MIN_STREAM_VOLUME[AudioSystem.STREAM_BLUETOOTH_SCO];
                             indexMaxVolCurve = MAX_STREAM_VOLUME[AudioSystem.STREAM_BLUETOOTH_SCO];
-                        } else if (equalScoHaVcIndexRange()
-                                && mBtCommDeviceActive.get() == BT_COMM_DEVICE_ACTIVE_HA) {
+                            mIndexStepFactor = 1.f;
+                        } else if ((equalScoHaVcIndexRange()
+                                && btCommActiveDevice == BT_COMM_DEVICE_ACTIVE_HA) || (
+                                equalScoLeaVcIndexRange() && (btCommActiveDevice
+                                        == BT_COMM_DEVICE_ACTIVE_BLE_HEADSET
+                                        || btCommActiveDevice
+                                        == BT_COMM_DEVICE_ACTIVE_BLE_SPEAKER))) {
                             mIndexMin = MIN_STREAM_VOLUME[mStreamType] * 10;
                             indexMaxVolCurve = MAX_STREAM_VOLUME[AudioSystem.STREAM_BLUETOOTH_SCO];
+                            mIndexStepFactor = 1.f;
                         } else {
+                            Slog.wtf(TAG, "Index factor not supported for BT comm device "
+                                    + btCommActiveDevice);
                             mIndexMin = MIN_STREAM_VOLUME[mStreamType] * 10;
                         }
-                        mIndexStepFactor = 1.f;
                     } else {
                         mIndexMin = MIN_STREAM_VOLUME[AudioSystem.STREAM_VOICE_CALL] * 10;
                         mIndexStepFactor = (float) (mIndexMax - mIndexMin) / (float) (
@@ -11410,11 +11415,6 @@ public class AudioService extends IAudioService.Stub
                         onUpdateAudioMode(info.getMode(), info.getPid(), info.getPackageName(),
                                 info.getForce(), msg.what == MSG_UPDATE_AUDIO_MODE_SIGNAL);
                     }
-                    break;
-
-                case MSG_BT_DEV_CHANGED:
-                    mDeviceBroker.queueOnBluetoothActiveDeviceChanged(
-                            (AudioDeviceBroker.BtDeviceChangedData) msg.obj);
                     break;
 
                 case MSG_DISPATCH_AUDIO_MODE:

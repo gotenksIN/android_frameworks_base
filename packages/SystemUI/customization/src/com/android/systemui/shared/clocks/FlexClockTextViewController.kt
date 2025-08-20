@@ -22,24 +22,24 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.RelativeLayout
 import com.android.systemui.customization.clocks.ClockContext
+import com.android.systemui.customization.clocks.ClockLogger
 import com.android.systemui.customization.clocks.DigitalTimeFormatter
 import com.android.systemui.customization.clocks.DigitalTimespec
 import com.android.systemui.customization.clocks.DigitalTimespecHandler
 import com.android.systemui.customization.clocks.FontTextStyle
 import com.android.systemui.customization.clocks.view.DigitalAlignment
-import com.android.systemui.log.core.Logger
-import com.android.systemui.plugins.clocks.AlarmData
-import com.android.systemui.plugins.clocks.ClockAnimations
-import com.android.systemui.plugins.clocks.ClockAxisStyle
-import com.android.systemui.plugins.clocks.ClockEvents
-import com.android.systemui.plugins.clocks.ClockFaceConfig
-import com.android.systemui.plugins.clocks.ClockFaceEvents
-import com.android.systemui.plugins.clocks.ClockPositionAnimationArgs
-import com.android.systemui.plugins.clocks.ClockViewIds
-import com.android.systemui.plugins.clocks.ThemeConfig
-import com.android.systemui.plugins.clocks.TimeFormatKind
-import com.android.systemui.plugins.clocks.WeatherData
-import com.android.systemui.plugins.clocks.ZenData
+import com.android.systemui.plugins.keyguard.data.model.AlarmData
+import com.android.systemui.plugins.keyguard.data.model.WeatherData
+import com.android.systemui.plugins.keyguard.data.model.ZenData
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockAnimations
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockAxisStyle
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockEvents
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockFaceConfig
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockFaceEvents
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockPositionAnimationArgs
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockViewIds
+import com.android.systemui.plugins.keyguard.ui.clocks.ThemeConfig
+import com.android.systemui.plugins.keyguard.ui.clocks.TimeFormatKind
 import com.android.systemui.shared.clocks.view.FlexClockTextView
 import java.util.Locale
 
@@ -57,7 +57,7 @@ open class FlexClockTextViewController(
     isLargeClock: Boolean,
 ) : FlexClockViewController {
     override val view = FlexClockTextView(clockCtx, isLargeClock)
-    private val logger = Logger(clockCtx.messageBuffer, TAG)
+    private val logger = ClockLogger(null, clockCtx.messageBuffer, TAG)
     private val timespec = DigitalTimespecHandler(layerCfg.timespec, layerCfg.timeFormatter!!)
     override var onViewBoundsChanged by view::onViewBoundsChanged
     override var onViewMaxSizeChanged by view::onViewMaxSizeChanged

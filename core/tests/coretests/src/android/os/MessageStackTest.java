@@ -16,6 +16,8 @@
 
 package android.os;
 
+import static android.os.Message.*;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -100,7 +102,7 @@ public final class MessageStackTest {
      * removal.
      */
     @Test
-    public void testUpdateFreelistAndDrainFreelist() {
+    public void testmoveMatchingToFreelistAndDrainFreelist() {
         MessageStack stack = new MessageStack();
         Handler h = new Handler(Looper.getMainLooper());
         int removeWhat = 1;
@@ -113,11 +115,11 @@ public final class MessageStackTest {
             stack.pushMessage(Message.obtain(h, keepWhat));
         }
         stack.heapSweep();
-        assertTrue(stack.updateFreelist(new MessageQueue.MatchHandlerWhatAndObject(),
+        assertTrue(stack.moveMatchingToFreelist(new MatchHandlerWhatAndObject(),
                 h, removeWhat, null, null, 0));
 
         // Try deleting a message we never pushed
-        assertFalse(stack.updateFreelist(new MessageQueue.MatchHandlerWhatAndObject(),
+        assertFalse(stack.moveMatchingToFreelist(new MatchHandlerWhatAndObject(),
                 h, neverPushedWhat, null, null, 0));
 
         assertEquals(5, stack.freelistSizeForTest());
@@ -153,16 +155,16 @@ public final class MessageStackTest {
             stack.pushMessage(Message.obtain(h, findWhat));
         }
 
-        assertTrue(stack.hasMessages(new MessageQueue.MatchHandlerWhatAndObject(),
+        assertTrue(stack.hasMessages(new MatchHandlerWhatAndObject(),
                 h, findWhat, null, null, 0));
 
-        assertFalse(stack.hasMessages(new MessageQueue.MatchHandlerWhatAndObject(),
+        assertFalse(stack.hasMessages(new MatchHandlerWhatAndObject(),
                 h, 3, null, null, 0));
 
-        stack.updateFreelist(new MessageQueue.MatchHandlerWhatAndObject(),
+        stack.moveMatchingToFreelist(new MatchHandlerWhatAndObject(),
                 h, findWhat, null, null, 0);
 
-        assertFalse(stack.hasMessages(new MessageQueue.MatchHandlerWhatAndObject(),
+        assertFalse(stack.hasMessages(new MatchHandlerWhatAndObject(),
                 h, findWhat, null, null, 0));
     }
 
@@ -259,7 +261,7 @@ public final class MessageStackTest {
             stack.pushMessage(Message.obtain(h, removeWhat));
         }
         stack.heapSweep();
-        stack.updateFreelist(new MessageQueue.MatchHandlerWhatAndObject(),
+        stack.moveMatchingToFreelist(new MatchHandlerWhatAndObject(),
                 h, removeWhat, null, null, 0);
 
         assertNull(stack.peek(false));
@@ -281,7 +283,7 @@ public final class MessageStackTest {
         assertEquals(10, stack.sizeForTest());
         assertEquals(10, stack.combinedHeapSizesForTest());
 
-        stack.updateFreelist(new MessageQueue.MatchHandlerWhatAndObject(),
+        stack.moveMatchingToFreelist(new MatchHandlerWhatAndObject(),
                 h, removeWhat, null, null, 0);
         assertEquals(0, stack.sizeForTest());
         assertEquals(10, stack.freelistSizeForTest());

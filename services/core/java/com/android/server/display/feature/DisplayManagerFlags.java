@@ -81,10 +81,6 @@ public class DisplayManagerFlags {
             Flags.FLAG_RESOLUTION_BACKUP_RESTORE,
             Flags::resolutionBackupRestore);
 
-    private final FlagState mVsyncLowPowerVote = new FlagState(
-            Flags.FLAG_ENABLE_VSYNC_LOW_POWER_VOTE,
-            Flags::enableVsyncLowPowerVote);
-
     private final FlagState mBrightnessWearBedtimeModeClamperFlagState = new FlagState(
             Flags.FLAG_BRIGHTNESS_WEAR_BEDTIME_MODE_CLAMPER,
             Flags::brightnessWearBedtimeModeClamper);
@@ -258,6 +254,16 @@ public class DisplayManagerFlags {
             Flags::enableLoggingForDisplayEvents
     );
 
+    private final FlagState mIsMinmodeCapBrightnessEnabled = new FlagState(
+            Flags.FLAG_MINMODE_CAP_BRIGHTNESS_ENABLED,
+            Flags::minmodeCapBrightnessEnabled
+    );
+
+    private final FlagState mIsSingleAppEventForModeAndFrameRateOverrideEnabled = new FlagState(
+            Flags.FLAG_ENABLE_SINGLE_APP_EVENT_FOR_MODE_AND_FRAME_RATE_OVERRIDE,
+            Flags::enableSingleAppEventForModeAndFrameRateOverride
+    );
+
     /** Returns whether power throttling clamper is enabled on not. */
     public boolean isPowerThrottlingClamperEnabled() {
         return mPowerThrottlingClamperFlagState.isEnabled();
@@ -297,10 +303,6 @@ public class DisplayManagerFlags {
 
     public boolean isResolutionBackupRestoreEnabled() {
         return mResolutionBackupRestore.isEnabled();
-    }
-
-    public boolean isVsyncLowPowerVoteEnabled() {
-        return mVsyncLowPowerVote.isEnabled();
     }
 
     public boolean isBrightnessWearBedtimeModeClamperEnabled() {
@@ -505,6 +507,14 @@ public class DisplayManagerFlags {
         return mIsLoggingForDisplayEventsEnabled.isEnabled();
     }
 
+    public boolean isMinmodeCapBrightnessEnabled() {
+        return mIsMinmodeCapBrightnessEnabled.isEnabled();
+    }
+
+    public boolean isSingleAppEventForModeAndFrameRateOverrideEnabled() {
+        return mIsSingleAppEventForModeAndFrameRateOverrideEnabled.isEnabled();
+    }
+
     /**
      * dumps all flagstates
      * @param pw printWriter
@@ -557,6 +567,8 @@ public class DisplayManagerFlags {
         pw.println(" " + mIsOnDisplayAddedInObserverEnabled);
         pw.println(" " + mEnableUpdatedDisplayConnectionDialogFlagState);
         pw.println(" " + mIsLoggingForDisplayEventsEnabled);
+        pw.println(" " + mIsMinmodeCapBrightnessEnabled);
+        pw.println(" " + mIsSingleAppEventForModeAndFrameRateOverrideEnabled);
     }
 
     private static class FlagState {

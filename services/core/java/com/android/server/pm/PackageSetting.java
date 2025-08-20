@@ -1617,12 +1617,6 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
         return pkgState.isHiddenUntilInstalled();
     }
 
-    @NonNull
-    @Override
-    public long[] getLastPackageUsageTime() {
-        return pkgState.getLastPackageUsageTimeInMills();
-    }
-
     @Override
     public boolean isUpdatedSystemApp() {
         return pkgState.isUpdatedSystemApp();
@@ -1647,6 +1641,16 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
 
     public PackageSetting setCategoryOverride(int categoryHint) {
         this.categoryOverride = categoryHint;
+        onChanged();
+        return this;
+    }
+
+
+    /**
+     * Clear the page size app compat flags.
+     */
+    public PackageSetting clearPageSizeAppCompatFlags() {
+        this.mPageSizeAppCompatFlags = ApplicationInfo.PAGE_SIZE_APP_COMPAT_FLAG_UNDEFINED;
         onChanged();
         return this;
     }

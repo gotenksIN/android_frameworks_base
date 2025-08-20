@@ -2704,6 +2704,30 @@ public final class Settings {
             "android.settings.MANAGE_SUPERVISOR_RESTRICTED_SETTING";
 
     /**
+     * Activity action: Launch UI to bypass the user restrictions set by the SupervisionService
+     * system entity.
+     *
+     * <p>Input: {@link #EXTRA_SUPERVISION_RESTRICTION} specifies the restriction to bypass.
+     *
+     * <p>Output: Nothing.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_BYPASS_SUPERVISION_RESTRICTION =
+            "android.settings.BYPASS_SUPERVISION_RESTRICTION";
+
+    /**
+     * Intent extra: supervision restriction that we are trying to pybass.
+     *
+     * <p>This should be used when launching {@link #ACTION_BYPASS_SUPERVISION_RESTRICTION} .
+     *
+     * @hide
+     */
+    public static final String EXTRA_SUPERVISION_RESTRICTION =
+            "android.settings.EXTRA_SUPERVISION_RESTRICTION";
+
+    /**
      * Activity Action: Show a dialog for remote bugreport flow.
      * <p>
      * Input: Nothing.
@@ -8904,17 +8928,13 @@ public final class Settings {
                 "suggested_theme_feature_enabled";
 
         /**
-         * Setting to indicate whether the AppFunction agent allowlist should be enabled.
-         *
-         * <ul>
-         *   <li>0 = Off
-         *   <li>1 = Enabled (Default)
-         * </ul>
-         *
+         * String property which is a comma separated list of package names. These package names
+         * will be added to the existing agent allowlist. Since this contains package names, it must
+         * NOT be marked @Readable.
          * @hide
          */
-        public static final String APP_FUNCTION_AGENT_ALLOWLIST_ENABLED =
-                "app_function_agent_allowlist_enabled";
+        public static final String APP_FUNCTION_ADDITIONAL_AGENT_ALLOWLIST =
+                "app_function_additional_agent_allowlist";
 
         /**
          * Set by the system to track if the user needs to see the call to action for
@@ -13400,6 +13420,8 @@ public final class Settings {
         public static final int ACTION_CORNER_ACTION_NOTIFICATIONS = 3;
         /** @hide */
         public static final int ACTION_CORNER_ACTION_QUICK_SETTINGS = 4;
+        /** @hide */
+        public static final int ACTION_CORNER_ACTION_LOCKSCREEN = 5;
 
         /**
          * The different actions that can be used for action corners
@@ -13411,6 +13433,7 @@ public final class Settings {
                 ACTION_CORNER_ACTION_OVERVIEW,
                 ACTION_CORNER_ACTION_NOTIFICATIONS,
                 ACTION_CORNER_ACTION_QUICK_SETTINGS,
+                ACTION_CORNER_ACTION_LOCKSCREEN,
         })
         @Retention(RetentionPolicy.SOURCE)
         public @interface ActionCornerActionType {
@@ -13793,12 +13816,20 @@ public final class Settings {
 
         /**
          * Tracks if the user has seen the promo card for Identity Check.
-         * The promo card should only appear once per device via Safety Center.
+         * The promo card should only appear once per user via Safety Center.
          *
          * @hide
          */
         public static final String IDENTITY_CHECK_PROMO_CARD_SHOWN =
                 "identity_check_promo_card_shown";
+
+        /**
+         * Tracks if the user has interacted with the Identity Check promo notification.
+         * The notification should only appear once per user via Safety Center.
+         * @hide
+         */
+        public static final String IDENTITY_CHECK_NOTIFICATION_VIEW_DETAILS_CLICKED =
+                "identity_check_notification_view_details_clicked";
     }
 
     /**
@@ -20385,6 +20416,21 @@ public final class Settings {
          */
         public static final String WATCH_RANGING_SUPPORTED_BY_PRIMARY_DEVICE =
                 "watch_ranging_supported_by_primary_device";
+
+        /**
+         * Indicates whether the device is in minmode.
+         *
+         * @hide
+         */
+        public static final String MINMODE_ACTIVE = "minmode_active";
+
+        /**
+          * Indicates if watch ranging is available for the device.
+         *
+         * @hide
+         */
+        public static final String WATCH_RANGING_AVAILABLE =
+                "watch_ranging_available";
 
         /**
          * Settings migrated from Wear OS settings provider.

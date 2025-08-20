@@ -130,16 +130,6 @@ flag {
 }
 
 flag {
-    name: "app_start_info_isolated_process"
-    namespace: "system_performance"
-    description: "Adjust handling of isolated process records to be discarded."
-    bug: "374032823"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "perceptible_tasks"
     namespace: "system_performance"
     description: "Boost the oom_score_adj of activities in perceptible tasks"
@@ -258,6 +248,16 @@ flag {
     namespace: "backstage_power"
     description: "Automatically trigger OomAdjuster updates from ProcessStateController on state change."
     bug: "399666866"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "psc_batch_update"
+    namespace: "backstage_power"
+    description: "Batch ProcessStateController updates triggered while a BatchSession is active."
+    bug: "399680824"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

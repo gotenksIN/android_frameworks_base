@@ -71,6 +71,7 @@ import kotlinx.coroutines.flow.combineTransform
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -256,6 +257,24 @@ constructor(
                 .dumpWhileCollecting("zoomOutFromGlanceableHub")
         }
 
+    private fun dozingToLockscreenAlpha(viewState: ViewStateAccessor) =
+        alphaOnShadeExpansion
+            .map { it < 1f }
+            .distinctUntilChanged()
+            .onStart { emit(false) }.flatMapLatest { isExpanding ->
+                if (Flags.deferDozeTransitionOnShadeDrag() && isExpanding) {
+                    // If shade is expanding, switch to a flow that never emits.
+                    emptyFlow()
+                } else {
+                    // Otherwise, use the original flow.
+                    if (Flags.newDozingKeyguardStates()) {
+                        dozingToLockscreenTransitionViewModel.lockscreenAlpha(viewState)
+                    } else {
+                        dozingToLockscreenTransitionViewModel.lockscreenAlpha
+                    }
+                }
+            }
+
     /** Last point that the root view was tapped */
     val lastRootViewTapPosition: Flow<Point?> =
         keyguardInteractor.lastRootViewTapPosition.dumpWhileCollecting("lastRootViewTapPosition")
@@ -314,11 +333,7 @@ constructor(
                         aodToGlanceableHubTransitionViewModel.lockscreenAlpha(viewState),
                         dozingToDreamingTransitionViewModel.lockscreenAlpha,
                         dozingToGoneTransitionViewModel.lockscreenAlpha(viewState),
-                        if (Flags.newDozingKeyguardStates()) {
-                            dozingToLockscreenTransitionViewModel.lockscreenAlpha(viewState)
-                        } else {
-                            dozingToLockscreenTransitionViewModel.lockscreenAlpha
-                        },
+                        dozingToLockscreenAlpha(viewState),
                         dozingToOccludedTransitionViewModel.lockscreenAlpha(viewState),
                         dozingToPrimaryBouncerTransitionViewModel.lockscreenAlpha,
                         dreamingToAodTransitionViewModel.lockscreenAlpha,
@@ -419,26 +434,19 @@ constructor(
     val isNotifIconContainerVisible: StateFlow<AnimatedValue<Boolean>> =
         combine(
                 goneToAodTransitionRunning,
-                keyguardTransitionInteractor
-                    .transitionValue(LOCKSCREEN)
-                    .map { it > 0f }
-                    .onStart { emit(false) },
                 keyguardTransitionInteractor.isFinishedIn(
                     content = Scenes.Gone,
                     stateWithoutSceneContainer = GONE,
                 ),
-                deviceEntryBypassInteractor.isBypassEnabled,
                 areNotifsFullyHiddenAnimated(),
                 isPulseExpandingAnimated(),
                 aodNotificationIconViewModel.icons.map { it.visibleIcons.isNotEmpty() },
             ) { flows ->
                 val goneToAodTransitionRunning = flows[0] as Boolean
-                val isOnLockscreen = flows[1] as Boolean
-                val isOnGone = flows[2] as Boolean
-                val isBypassEnabled = flows[3] as Boolean
-                val notifsFullyHidden = flows[4] as AnimatedValue<Boolean>
-                val pulseExpanding = flows[5] as AnimatedValue<Boolean>
-                val hasAodIcons = flows[6] as Boolean
+                val isOnGone = flows[1] as Boolean
+                val notifsFullyHidden = flows[2] as AnimatedValue<Boolean>
+                val pulseExpanding = flows[3] as AnimatedValue<Boolean>
+                val hasAodIcons = flows[4] as Boolean
 
                 when {
                     // Hide the AOD icons if we're not in the KEYGUARD state unless the screen off

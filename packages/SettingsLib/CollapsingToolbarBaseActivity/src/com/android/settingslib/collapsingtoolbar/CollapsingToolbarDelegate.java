@@ -342,10 +342,8 @@ public class CollapsingToolbarDelegate {
             return;
         }
 
-        if (!SettingsThemeHelper.isExpressiveTheme(inflater.getContext())) {
-            mCollapsingToolbarLayout.removeAllViews();
-            inflater.inflate(R.layout.support_toolbar, mCollapsingToolbarLayout);
-        }
+        mCollapsingToolbarLayout.removeAllViews();
+        inflater.inflate(R.layout.support_toolbar, mCollapsingToolbarLayout);
 
         final androidx.appcompat.widget.Toolbar supportToolbar =
                 mCollapsingToolbarLayout.findViewById(R.id.support_action_bar);
@@ -519,7 +517,9 @@ public class CollapsingToolbarDelegate {
                     @Override
                     public boolean canDrag(@NonNull AppBarLayout appBarLayout) {
                         // Header can be scrolling while device in landscape mode and SDK > 33
-                        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.TIRAMISU) {
+                        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.TIRAMISU
+                                || SettingsThemeHelper.isExpressiveTheme(
+                                appBarLayout.getContext())) {
                             return false;
                         } else {
                             return appBarLayout.getResources().getConfiguration().orientation

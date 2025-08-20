@@ -3629,6 +3629,8 @@ public final class DisplayManagerService extends SystemService {
         viewport.displayId = displayId;
         viewport.isActive = Display.isActiveState(info.state);
         viewport.densityDpi = info.densityDpi;
+        viewport.xDpi = info.xDpi;
+        viewport.yDpi = info.yDpi;
     }
 
     private void updateViewportPowerStateLocked(LogicalDisplay display) {
@@ -3965,6 +3967,10 @@ public final class DisplayManagerService extends SystemService {
     }
 
     void enableConnectedDisplay(int displayId, boolean enabled) {
+        if (!enabled && displayId == Display.DEFAULT_DISPLAY) {
+            Slog.w(TAG, "enableConnectedDisplay: Cannot disable default display");
+            return;
+        }
         synchronized (mSyncRoot) {
             final var logicalDisplay = mLogicalDisplayMapper.getDisplayLocked(displayId);
             if (logicalDisplay == null) {

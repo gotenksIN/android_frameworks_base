@@ -245,6 +245,8 @@ import android.text.format.DateUtils;
 import android.tracing.TracingUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+import android.util.AtomicFile;
+import android.util.AtomicFileOutputStream;
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
@@ -385,6 +387,7 @@ import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -1265,7 +1268,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 ActivityThread.currentActivityThread().getSystemUiContext());
 
         final WindowManagerService wms = main(context, im, showBootMsgs, policy, atm,
-                new DisplayWindowSettingsProvider(), SurfaceControl.Transaction::new,
+                new DisplayWindowSettingsProvider(context), SurfaceControl.Transaction::new,
                 SurfaceControl.Builder::new, appCompat);
         WindowManagerGlobal.setWindowManagerServiceForSystemProcess(wms);
         return wms;
@@ -8513,6 +8516,40 @@ public class WindowManagerService extends IWindowManager.Stub
             }
         }
 
+
+        @Override
+        public byte[] backupDisplayWindowSettings(int userId) {
+            final AtomicFile file =
+                    DisplayWindowSettingsProvider.getOverrideSettingsFileForUser(userId);
+            final byte[] payload;
+            try (InputStream inputStream = file.openRead()) {
+                payload = DisplayWindowSettingsXmlHelper.readAndFilterSettings(inputStream);
+            } catch (FileNotFoundException e) {
+                Slog.w(TAG, "No display settings file found; skipping backup.");
+                return null; // Nothing to back up
+            } catch (IOException e) {
+                if (DEBUG) Slog.d(TAG, "Skip display window settings backup", e);
+                return null;
+            }
+            return payload;
+        }
+
+        @Override
+        public void restoreDisplayWindowSettings(int userId, byte[] payload) {
+            final AtomicFile file =
+                    DisplayWindowSettingsProvider.getOverrideSettingsFileForUser(userId);
+            try (var oStream = new AtomicFileOutputStream(file)) {
+                oStream.write(payload);
+                oStream.markSuccess();
+            } catch (IOException e) {
+                Slog.e(TAG, "restoreDisplayWindowSettings failed", e);
+                throw new RuntimeException(e);
+            }
+            synchronized (mGlobalLock) {
+                mDisplayWindowSettingsProvider.setOverrideSettingsForUser(userId);
+            }
+        }
+
         @Override
         @ImeClientFocusResult
         public int hasInputMethodClientFocus(IBinder windowToken, int uid, int pid, int displayId) {
@@ -9072,7 +9109,7 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
-        public ScreenshotHardwareBuffer takeContextualSearchScreenshot(int uid) {
+        public ScreenshotHardwareBuffer takeContextualSearchScreenshot(int uid, int displayId) {
             // WMS.takeAssistScreenshot takes care of the locking.
             return WindowManagerService.this.takeAssistScreenshot(win -> {
                 switch (win.getWindowType()) {
@@ -9086,7 +9123,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     default:
                         return true;
                 }
-            }, DEFAULT_DISPLAY);
+            }, displayId);
         }
 
         @Override

@@ -18,6 +18,7 @@ package com.android.server.am;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_ACTIVITY;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_BACKUP;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_SERVICE_BINDER_CALL;
+import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UI_VISIBILITY;
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER;
 
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_OOM_ADJ;
@@ -464,6 +465,11 @@ public class ProcessStateController {
                     + " for pid=" + proc.getPid());
         }
         proc.setIsRunningRemoteAnimation(runningRemoteAnimation);
+
+        if (Flags.autoTriggerOomadjUpdates()) {
+            enqueueUpdateTarget(proc);
+            runPendingUpdate(OOM_ADJ_REASON_UI_VISIBILITY);
+        }
         return true;
     }
 
@@ -801,8 +807,8 @@ public class ProcessStateController {
      */
     @GuardedBy("mLock")
     public void noteBroadcastDeliveryStarted(@NonNull ProcessRecord proc, int schedGroup) {
-        proc.mReceivers.setIsReceivingBroadcast(true);
-        proc.mReceivers.setBroadcastReceiverSchedGroup(schedGroup);
+        proc.getReceivers().setIsReceivingBroadcast(true);
+        proc.getReceivers().setBroadcastReceiverSchedGroup(schedGroup);
 
         if (Flags.pushBroadcastStateToOomadjuster()) {
             proc.mProfile.addHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
@@ -814,8 +820,8 @@ public class ProcessStateController {
      */
     @GuardedBy("mLock")
     public void noteBroadcastDeliveryEnded(@NonNull ProcessRecord proc) {
-        proc.mReceivers.setIsReceivingBroadcast(false);
-        proc.mReceivers.setBroadcastReceiverSchedGroup(ProcessList.SCHED_GROUP_UNDEFINED);
+        proc.getReceivers().setIsReceivingBroadcast(false);
+        proc.getReceivers().setBroadcastReceiverSchedGroup(ProcessList.SCHED_GROUP_UNDEFINED);
 
         if (Flags.pushBroadcastStateToOomadjuster()) {
             proc.mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);

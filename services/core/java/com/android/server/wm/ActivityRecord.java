@@ -246,6 +246,7 @@ import android.annotation.Size;
 import android.app.Activity;
 import android.app.ActivityManager.TaskDescription;
 import android.app.ActivityOptions;
+import android.app.HandoffActivityData;
 import android.app.IApplicationThread;
 import android.app.IScreenCaptureObserver;
 import android.app.PendingIntent;
@@ -525,6 +526,7 @@ public final class ActivityRecord extends WindowToken {
     WindowProcessController app;      // if non-null, hosting application
     private State mState;    // current state we are in
     private Bundle mIcicle;         // last saved activity state
+    private HandoffActivityData mHandoffActivityData; // last saved handoff activity data
     private boolean mHandoffEnabled = false; // if Handoff is enabled for this activity
     private boolean mAllowFullTaskRecreation = false; // if the entire task stack can be recreated
                                                       // during handoff of this activity.
@@ -970,7 +972,8 @@ public final class ActivityRecord extends WindowToken {
                 Slog.w(TAG, "Activity stop timeout for " + ActivityRecord.this);
                 if (isInHistory()) {
                     activityStopped(
-                            null /*icicle*/, null /*persistentState*/, null /*description*/);
+                            null /*icicle*/, null /*persistentState*/, null /*handoffActivityData*/,
+                            null /*description*/);
                 }
             }
         }
@@ -1320,6 +1323,9 @@ public final class ActivityRecord extends WindowToken {
     void setHandoffEnabled(boolean handoffEnabled, boolean allowFullTaskRecreation) {
         mHandoffEnabled = handoffEnabled;
         mAllowFullTaskRecreation = allowFullTaskRecreation;
+        if (!mHandoffEnabled) {
+            mHandoffActivityData = null;
+        }
     }
 
     /**
@@ -1343,6 +1349,27 @@ public final class ActivityRecord extends WindowToken {
         }
 
         return mAllowFullTaskRecreation;
+    }
+
+    /**
+     * Set the handoff activity data for this activity. If Handoff is disabled for this activity,
+     * this will be ignored.
+     * @param handoffActivityData The handoff activity data.
+     */
+    void setHandoffActivityData(@Nullable HandoffActivityData handoffActivityData) {
+        if (!isHandoffEnabled()) {
+            return;
+        }
+
+        mHandoffActivityData = handoffActivityData;
+    }
+
+    /**
+     * Get the handoff activity data for this activity.
+     * @return the handoff activity data.
+     */
+    @Nullable HandoffActivityData getHandoffActivityData() {
+        return mHandoffActivityData;
     }
 
     /** Update the saved state of an activity. */
@@ -3572,6 +3599,7 @@ public final class ActivityRecord extends WindowToken {
         pendingResults = null;
         newIntents = null;
         setSavedState(null /* savedState */);
+        setHandoffActivityData(null);
     }
 
     /** Activity finish request was not executed. */
@@ -4654,6 +4682,11 @@ public final class ActivityRecord extends WindowToken {
                     firstWindowDrawn = true;
                 }
                 if (fromActivity.isVisible()) {
+                    // Collect this activity in case it isn't yet visible from resume.
+                    if (Flags.transferStartingWindowToNextWhenInvisible()
+                            && !isVisibleRequested()) {
+                        mTransitionController.collect(this);
+                    }
                     setVisible(true);
                     setVisibleRequested(true);
                     mWmService.mAnimator.addSurfaceVisibilityUpdate(this);
@@ -4743,6 +4776,46 @@ public final class ActivityRecord extends WindowToken {
             }
             return !fromActivity.isVisibleRequested() && transferStartingWindow(fromActivity);
         });
+    }
+
+    /**
+     * Tries to transfer the starting window from this activity in the task but will not visible
+     * anymore. This is a common scenario apps use: A trampoline activity is started on top of an
+     * existing Task, the starting windowing should transfer to the activity below once the
+     * trampoline activity finishes.
+     */
+    void transferStartingWindowToNextRunningIfNeeded() {
+        if (mStartingData == null) {
+            return;
+        }
+        final ActivityRecord next = task.topRunningActivity();
+        if (next == null || next == this) {
+            return;
+        }
+        final WindowState mainWin = next.findMainWindow(false);
+        if (mainWin != null && mainWin.mWinAnimator.getShown()) {
+            // Next activity already has a visible window, so doesn't need to transfer the starting
+            // window from this activity to here. The starting window will be removed with this
+            // activity.
+            return;
+        }
+        final StartingData tmpStartingData = mStartingData;
+        if (tmpStartingData != null && tmpStartingData.mAssociatedTask == null
+                && mTransitionController.isCollecting(this)
+                && tmpStartingData instanceof SnapshotStartingData) {
+            final Rect myBounds = getBounds();
+            final Rect nextBounds = next.getBounds();
+            if (!myBounds.equals(nextBounds)) {
+                // Mark as no animation, so these changes won't merge into playing transition.
+                if (mTransitionController.inPlayingTransition(this)) {
+                    mTransitionController.setNoAnimation(next);
+                    mTransitionController.setNoAnimation(this);
+                }
+                removeStartingWindow();
+                return;
+            }
+        }
+        next.transferStartingWindow(this);
     }
 
     boolean isKeyguardLocked() {
@@ -5500,6 +5573,9 @@ public final class ActivityRecord extends WindowToken {
         setVisibleRequested(visible);
 
         if (!visible) {
+            if (Flags.transferStartingWindowToNextWhenInvisible()) {
+                transferStartingWindowToNextRunningIfNeeded();
+            }
             // Because starting window was transferred, this activity may be a trampoline which has
             // been occluded by next activity. If it has added windows, set client visibility
             // immediately to avoid the client getting RELAYOUT_RES_FIRST_TIME from relayout and
@@ -5524,7 +5600,9 @@ public final class ActivityRecord extends WindowToken {
             ProtoLog.v(WM_DEBUG_ADD_REMOVE, "No longer Stopped: %s", this);
             mAppStopped = false;
 
-            transferStartingWindowFromHiddenAboveTokenIfNeeded();
+            if (!Flags.transferStartingWindowToNextWhenInvisible()) {
+                transferStartingWindowFromHiddenAboveTokenIfNeeded();
+            }
         }
         requestUpdateWallpaperIfNeeded();
 
@@ -6306,6 +6384,7 @@ public final class ActivityRecord extends WindowToken {
         }
         r.setCustomizeSplashScreenExitAnimation(handleSplashScreenExit);
         r.setSavedState(null /* savedState */);
+        r.setHandoffActivityData(null /* handoffActivityData */);
 
         r.mDisplayContent.handleActivitySizeCompatModeIfNeeded(r);
         r.mDisplayContent.mUnknownAppVisibilityController.notifyAppResumedFinished(r);
@@ -6518,8 +6597,11 @@ public final class ActivityRecord extends WindowToken {
      * Notifies that the activity has stopped, and it is okay to destroy any surfaces which were
      * keeping alive in case they were still being used.
      */
-    void activityStopped(Bundle newIcicle, PersistableBundle newPersistentState,
-            CharSequence description) {
+    void activityStopped(
+        Bundle newIcicle,
+        PersistableBundle newPersistentState,
+        HandoffActivityData newHandoffActivityData,
+        CharSequence description) {
         removeStopTimeout();
         final boolean isStopping = mState == STOPPING;
         if (!isStopping && mState != RESTARTING_PROCESS) {
@@ -6537,6 +6619,9 @@ public final class ActivityRecord extends WindowToken {
             setSavedState(newIcicle);
             launchCount = 0;
             updateTaskDescription(description);
+        }
+        if (newHandoffActivityData != null) {
+            setHandoffActivityData(newHandoffActivityData);
         }
         ProtoLog.i(WM_DEBUG_STATES, "Saving icicle of %s: %s", this, mIcicle);
 

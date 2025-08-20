@@ -486,6 +486,7 @@ abstract class MobileConnectionsRepositoryTest<T : MobileConnectionsRepository> 
             WifiRepositoryImpl(
                 mContext,
                 userRepository,
+                connectivityRepository,
                 testScope.backgroundScope,
                 mainExecutor,
                 testDispatcher,

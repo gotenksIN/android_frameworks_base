@@ -30,7 +30,6 @@ import com.android.wm.shell.flicker.bubbles.utils.ApplyPerParameterRule
 import com.android.wm.shell.flicker.bubbles.utils.BubbleFlickerTestHelper.dismissBubbleAppViaBubbleView
 import com.android.wm.shell.flicker.bubbles.utils.BubbleFlickerTestHelper.launchBubbleViaBubbleMenu
 import com.android.wm.shell.flicker.bubbles.utils.BubbleFlickerTestHelper.launchBubbleViaOverflow
-import com.android.wm.shell.flicker.bubbles.utils.FlickerPropertyInitializer
 import com.android.wm.shell.flicker.bubbles.utils.RecordTraceWithTransitionRule
 import org.junit.FixMethodOrder
 import org.junit.Rule
@@ -67,14 +66,14 @@ import org.junit.runners.Parameterized
 class EnterBubbleViaOverflowMenuTest(navBar: NavBar) : BubbleFlickerTestBase(),
     MultipleBubbleExpandBubbleAppTestCases {
 
-    companion object : FlickerPropertyInitializer() {
+    companion object {
         private val messageApp = MessagingAppHelper()
 
         private val recordTraceWithTransitionRule = RecordTraceWithTransitionRule(
             setUpBeforeTransition = {
                 // Launch and dismiss a bubble app to make it show in overflow.
                 launchBubbleViaBubbleMenu(testApp, tapl, wmHelper)
-                dismissBubbleAppViaBubbleView(wmHelper)
+                dismissBubbleAppViaBubbleView(testApp, wmHelper)
                 // Launch message app to bubble to make overflow show.
                 launchBubbleViaBubbleMenu(messageApp, tapl, wmHelper)
             },
@@ -93,7 +92,7 @@ class EnterBubbleViaOverflowMenuTest(navBar: NavBar) : BubbleFlickerTestBase(),
     @get:Rule
     val setUpRule = ApplyPerParameterRule(
         Utils.testSetupRule(navBar).around(recordTraceWithTransitionRule),
-        params = arrayOf(navBar)
+        params = arrayOf(navBar),
     )
 
     override val traceDataReader

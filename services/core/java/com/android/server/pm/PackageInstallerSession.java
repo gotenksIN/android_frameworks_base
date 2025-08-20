@@ -370,14 +370,14 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private static final int INCREMENTAL_STORAGE_UNHEALTHY_MONITORING_MS = 60000;
 
     /**
-     * If an app being installed targets {@link Build.VERSION_CODES#TIRAMISU API 33} and above,
-     * the app can be installed without user action.
+     * If an app being installed targets {@link Build.VERSION_CODES#UPSIDE_DOWN_CAKE API 34} and
+     * above, the app can be installed without user action.
      * See {@link PackageInstaller.SessionParams#setRequireUserAction} for other conditions required
      * to be satisfied for a silent install.
      */
     @ChangeId
-    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.TIRAMISU)
-    private static final long SILENT_INSTALL_ALLOWED = 325888262L;
+    @EnabledSince(targetSdkVersion = VERSION_CODES.UPSIDE_DOWN_CAKE)
+    private static final long SILENT_INSTALL_ALLOWED = 420996962L;
 
     /**
      * The system supports pre-approval and update ownership features from
@@ -1107,16 +1107,24 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             return false;
         }
         // Only system installers can have an emergency installer
-        if (PackageManager.PERMISSION_GRANTED
-                != snapshot.checkUidPermission(Manifest.permission.INSTALL_PACKAGES, uid)
-                && PackageManager.PERMISSION_GRANTED
-                != snapshot.checkUidPermission(Manifest.permission.INSTALL_PACKAGE_UPDATES, uid)
-                && PackageManager.PERMISSION_GRANTED
-                != snapshot.checkUidPermission(Manifest.permission.INSTALL_SELF_UPDATES, uid)) {
+        if (!hasSystemInstallerPermissions(snapshot, uid)) {
             return false;
         }
-        return (snapshot.checkUidPermission(Manifest.permission.EMERGENCY_INSTALL_PACKAGES,
-                installerUid) == PackageManager.PERMISSION_GRANTED);
+        return hasEmergencyInstallerPermission(snapshot, installerUid);
+    }
+
+    private static boolean hasSystemInstallerPermissions(Computer snapshot, int uid) {
+        return (PackageManager.PERMISSION_GRANTED
+                == snapshot.checkUidPermission(Manifest.permission.INSTALL_PACKAGES, uid)
+                || PackageManager.PERMISSION_GRANTED
+                == snapshot.checkUidPermission(Manifest.permission.INSTALL_PACKAGE_UPDATES, uid)
+                || PackageManager.PERMISSION_GRANTED
+                == snapshot.checkUidPermission(Manifest.permission.INSTALL_SELF_UPDATES, uid));
+    }
+
+    private static boolean hasEmergencyInstallerPermission(Computer snapshot, int installerUid) {
+        return snapshot.checkUidPermission(Manifest.permission.EMERGENCY_INSTALL_PACKAGES,
+                installerUid) == PackageManager.PERMISSION_GRANTED;
     }
 
     private static final int USER_ACTION_NOT_NEEDED = 0;
@@ -1301,7 +1309,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             @NonNull DeveloperVerifierController developerVerifierController,
             @PackageInstaller.DeveloperVerificationPolicy int initialVerificationPolicy,
             @PackageInstaller.DeveloperVerificationPolicy int currentVerificationPolicy,
-            InstallDependencyHelper installDependencyHelper) {
+            InstallDependencyHelper installDependencyHelper, boolean restoredOnReboot) {
         mCallback = callback;
         mContext = context;
         mPm = pm;
@@ -1403,12 +1411,12 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 createdMillis, committedMillis, committed, childSessionIds, parentSessionId,
                 sessionErrorCode, mInitialVerificationPolicy);
 
-        if (shouldUseVerificationService()) {
-            // Start binding to the verification service, if not bound already.
+        // Proactively bind to the verification service if it's not already bound, for newly
+        // created sessions. Notify verifier about package name if it has been set in the session.
+        if (!restoredOnReboot && shouldUseVerificationService()) {
             mDeveloperVerifierController.bindToVerifierServiceIfNeeded(mPm::snapshotComputer,
                     userId, mDeveloperVerifierCallback);
             if (!TextUtils.isEmpty(params.appPackageName)) {
-                // Opportunistically notify verifier about package name so no need to check results.
                 mDeveloperVerifierController.notifyPackageNameAvailable(params.appPackageName,
                         userId);
             }
@@ -3158,40 +3166,75 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             // the emergency bypass.
             return false;
         }
-        // Check if app being installed is the verifier itself.
-        if (TextUtils.equals(verifierPackageName, packageName)) {
-            Slog.d(TAG, "Bypassing developer verification because the verifier is being updated");
-            return true;
-        }
-        // Check if app being installed is the sysconfig-specified update-owner of the verifier.
         final String updateOwnerPackageName = mPm.getSystemAppUpdateOwnerPackageName(
                 verifierPackageName);
         if (updateOwnerPackageName == null) {
-            // No sysconfig-specified update-owner for the verifier. No need to check further.
+            // The verifier has not specified an update-owner in sysconfig.
             return false;
         }
-        if (TextUtils.equals(updateOwnerPackageName, packageName)) {
-            Slog.d(TAG, "Bypassing verification service because the sysconfig-specified "
-                    + "update owner of the verifier is being updated");
+        final String installerPackageName = getInstallerPackageName();
+        if (installerPackageName == null) {
+            return false;
+        }
+        final PackageStateInternal psUpdateOwner = snapshot.getPackageStateInternal(
+                updateOwnerPackageName, Process.SYSTEM_UID);
+        if (psUpdateOwner == null || psUpdateOwner.getPkg() == null) {
+                return false;
+        }
+        // Validate the permissions of the sysconfig-specified update-owner
+        if (!hasSystemInstallerPermissions(snapshot, psUpdateOwner.getAppId())) {
+            return false;
+        }
+        // Check if the verifier is being updated, and the installer is the verifier's
+        // sysconfig-specified update-owner.
+        if (TextUtils.equals(verifierPackageName, packageName)
+                && TextUtils.equals(updateOwnerPackageName, installerPackageName)) {
+            Slog.d(TAG, "Bypassing developer verification because the verifier is being updated.");
             return true;
         }
-        // Check if app being installed is the emergency installer of the sysconfig-specified
-        // update-owner of the verifier.
-        if (isEmergencyInstallerEnabled(updateOwnerPackageName, snapshot, userId, ps.getAppId())) {
-            final PackageStateInternal psUpdateOwner = snapshot.getPackageStateInternal(
-                    updateOwnerPackageName, Process.SYSTEM_UID);
-            if (psUpdateOwner == null || psUpdateOwner.getPkg() == null) {
-                // Impossible condition, because the if clause above already checked this.
-                // Added to prevent lint warnings.
-                return false;
-            }
-            String emergencyInstallerPackageName = psUpdateOwner.getPkg().getEmergencyInstaller();
-            if (emergencyInstallerPackageName != null
-                    && TextUtils.equals(emergencyInstallerPackageName, packageName)) {
-                Slog.d(TAG, "Bypassing verification service because the "
-                        + "emergency installer of the verifier's update owner is being updated");
-                return true;
-            }
+        // Check if the verifier's sysconfig-specified update-owner is being updated, and the
+        // installer is the verifier's sysconfig-specified update-owner.
+        if (TextUtils.equals(updateOwnerPackageName, packageName)
+                && TextUtils.equals(updateOwnerPackageName, installerPackageName)) {
+            Slog.d(TAG, "Bypassing developer verification because the update-owner of the"
+                    + " verifier which is specified in the sysconfig is being updated.");
+            return true;
+        }
+        String emergencyInstallerOfUpdateOwner = psUpdateOwner.getPkg().getEmergencyInstaller();
+        if (emergencyInstallerOfUpdateOwner == null) {
+            // The rest of the bypass checks involve the emergency installer of the update-owner.
+            // If this is no such emergency installer, no need to check further.
+            return false;
+        }
+        final PackageStateInternal psEmergencyInstallerOfUpdateOwner =
+                snapshot.getPackageStateInternal(emergencyInstallerOfUpdateOwner,
+                        Process.SYSTEM_UID);
+        if (psEmergencyInstallerOfUpdateOwner == null
+                || psEmergencyInstallerOfUpdateOwner.getPkg() == null) {
+            return false;
+        }
+        // Check the permission of the emergency installer
+        if (!hasEmergencyInstallerPermission(
+                snapshot, psEmergencyInstallerOfUpdateOwner.getAppId())) {
+            return false;
+        }
+        // Check if the emergency installer of the verifier's sysconfig-specified update-owner is
+        // being updated, and the installer is the verifier's sysconfig-specified update-owner.
+        if (TextUtils.equals(emergencyInstallerOfUpdateOwner, packageName)
+                && TextUtils.equals(updateOwnerPackageName, installerPackageName)) {
+            Slog.d(TAG, "Bypassing developer verification because the emergency installer of"
+                    + " the update-owner of the verifier which is specified in the sysconfig is"
+                    + " being updated.");
+            return true;
+        }
+        // If the app being installed is the sysconfig-specified update-owner, also allow bypassing
+        // if the installer is the app's emergency-installer.
+        if (TextUtils.equals(updateOwnerPackageName, packageName)
+                && TextUtils.equals(emergencyInstallerOfUpdateOwner, installerPackageName)) {
+            Slog.d(TAG, "Bypassing developer verification because the update-owner of the"
+                    + " verifier which is specified in the sysconfig is being updated by its"
+                    + " emergency installer.");
+            return true;
         }
         return false;
     }
@@ -3495,6 +3538,17 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                     resumeVerify();
                     return;
                 }
+                if (shouldAllowDeveloperVerificationEmergencyBypass(
+                        getPackageName(), mPm.snapshotComputer())) {
+                    // Bypass verification when critical package is being updated and the
+                    // verification result is not verified.
+                    synchronized (mMetrics) {
+                        mMetrics.onDeveloperVerificationBypassed(
+                                DEVELOPER_VERIFICATION_BYPASSED_REASON_EMERGENCY);
+                    }
+                    resumeVerify();
+                    return;
+                }
 
                 // Package is blocked.
                 mVerificationUserActionNeededReason =
@@ -3527,6 +3581,17 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 }
                 if (mCurrentVerificationPolicy.get() == DEVELOPER_VERIFICATION_POLICY_NONE) {
                     // Continue with the rest of the verification and installation.
+                    resumeVerify();
+                    return;
+                }
+                if (shouldAllowDeveloperVerificationEmergencyBypass(
+                        getPackageName(), mPm.snapshotComputer())) {
+                    // Bypass verification when critical package is being updated and the
+                    // verification is incomplete.
+                    synchronized (mMetrics) {
+                        mMetrics.onDeveloperVerificationBypassed(
+                                DEVELOPER_VERIFICATION_BYPASSED_REASON_EMERGENCY);
+                    }
                     resumeVerify();
                     return;
                 }
@@ -7034,6 +7099,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 childSessionIdsArray, parentSessionId, isReady, isFailed, isApplied,
                 sessionErrorCode, sessionErrorMessage, preVerifiedDomains,
                 developerVerifierController,
-                initialVerificationPolicy, currentVerificationPolicy, installDependencyHelper);
+                initialVerificationPolicy, currentVerificationPolicy, installDependencyHelper,
+                /* restoredOnReboot= */ true);
     }
 }

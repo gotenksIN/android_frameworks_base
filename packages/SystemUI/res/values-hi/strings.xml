@@ -146,15 +146,11 @@
     <string name="screen_record_retake" msgid="3846643688365398450">"फिर से शुरू करें"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"बदलाव करें"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"मिटाएं"</string>
-    <!-- no translation found for screen_capture_fullscreen_screenshot_button (3173749413928507877) -->
-    <skip />
-    <!-- no translation found for screen_capture_region_selection_button (515608875142444130) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_screenshot_button (5676585348709494125) -->
-    <skip />
+    <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"पूरी स्क्रीन का स्क्रीनशॉट लें"</string>
+    <string name="screen_capture_region_selection_button" msgid="515608875142444130">"चुने गए हिस्से का स्क्रीनशॉट लें"</string>
+    <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"स्क्रीनशॉट"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"रिकॉर्डिंग टाइप चुनें"</string>
-    <!-- no translation found for screen_share_toolbar_share_button (9182050596136815833) -->
-    <skip />
+    <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"शेयर करें"</string>
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> x <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"स्क्रीन शेयर की जा रही है"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"कॉन्टेंट शेयर करें"</string>
@@ -202,10 +198,8 @@
     <string name="accessibility_qr_code_scanner_button" msgid="7521277927692910795">"क्यूआर कोड स्कैनर"</string>
     <string name="accessibility_unlock_button" msgid="3613812140816244310">"अनलॉक है"</string>
     <string name="accessibility_lock_icon" msgid="661492842417875775">"डिवाइस लॉक है"</string>
-    <!-- no translation found for accessibility_confirm_biometric_auth_to_unlock (1600162805010332470) -->
-    <skip />
-    <!-- no translation found for accessibility_retry_face_auth (3018310877303150273) -->
-    <skip />
+    <string name="accessibility_confirm_biometric_auth_to_unlock" msgid="1600162805010332470">"पुष्टि करें और डिवाइस अनलॉक करें"</string>
+    <string name="accessibility_retry_face_auth" msgid="3018310877303150273">"फ़ेस अनलॉक को फिर से आज़माएं"</string>
     <string name="accessibility_scanning_face" msgid="3093828357921541387">"डिवाइस अनलॉक करने के लिए चेहरा स्कैन किया जाता है"</string>
     <string name="accessibility_send_smart_reply" msgid="8885032190442015141">"भेजें"</string>
     <string name="cancel" msgid="1089011503403416730">"रद्द करें"</string>
@@ -226,13 +220,16 @@
     <string name="biometric_dialog_authenticated" msgid="7337147327545272484">"पुष्टि हो गई"</string>
     <string name="biometric_dialog_cancel_authentication" msgid="981316588773442637">"पुष्टि करने की प्रोसेस को रद्द करें"</string>
     <string name="biometric_dialog_content_view_more_options_button" msgid="2663810393874865475">"ज़्यादा विकल्प"</string>
-    <string name="biometric_dialog_fallback_title" msgid="3643117146844541556">"ज़्यादा विकल्प"</string>
+    <!-- no translation found for biometric_dialog_fallback_title (2337887849267443214) -->
+    <skip />
     <string name="biometric_dialog_fallback_button" msgid="7808939083554391449">"अन्य तरीके से पुष्टि करें"</string>
     <string name="biometric_dialog_manage_identity_check" msgid="6283423571297422689">"पहचान की पुष्टि करने की सुविधा मैनेज करें"</string>
-    <string name="biometric_dialog_identity_check_pin_footer" msgid="2943916725380489626">"पुष्टि करने के लिए पिन का इस्तेमाल नहीं किया जा सकता, क्योंकि पहचान की पुष्टि करने की सुविधा चालू है. इसके लिए, आपको बायोमेट्रिक ऑथेंटिकेशन की ज़रूरत होगी. पहचान की पुष्टि करने की सुविधा के बारे में ज़्यादा जानें"</string>
-    <string name="biometric_dialog_identity_check_pattern_footer" msgid="8695014155334581855">"पुष्टि करने के लिए पैटर्न का इस्तेमाल नहीं किया जा सकता, क्योंकि पहचान की पुष्टि करने की सुविधा चालू है. इसके लिए, आपको बायोमेट्रिक ऑथेंटिकेशन की ज़रूरत होगी. पहचान की पुष्टि करने की सुविधा के बारे में ज़्यादा जानें"</string>
-    <string name="biometric_dialog_identity_check_password_footer" msgid="6818380955155542018">"पुष्टि करने के लिए पासवर्ड का इस्तेमाल नहीं किया जा सकता, क्योंकि पहचान की पुष्टि करने की सुविधा चालू है. इसके लिए, आपको बायोमेट्रिक ऑथेंटिकेशन की ज़रूरत होगी. पहचान की पुष्टि करने की सुविधा के बारे में ज़्यादा जानें"</string>
-    <string name="biometric_dialog_identity_check_watch_ranging" msgid="4600194412220409723">"जोखिम का आकलन किया जा रहा है..."</string>
+    <!-- no translation found for biometric_dialog_identity_check_footer_link_text (5445804502968287214) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_identity_check_footer (4176895548458429932) -->
+    <skip />
+    <!-- no translation found for biometric_dialog_identity_check_watch_ranging (2994378079915744485) -->
+    <skip />
     <string name="biometric_dialog_unavailable" msgid="8242160331783709764">"उपलब्ध नहीं है"</string>
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"पिन का इस्तेमाल करें"</string>
     <string name="biometric_dialog_use_pattern" msgid="2315593393167211194">"पैटर्न इस्तेमाल करें"</string>
@@ -402,6 +399,8 @@
     <string name="quick_settings_cast_device_default_name" msgid="6988469571141331700">"अनाम डिवाइस"</string>
     <string name="quick_settings_cast_detail_empty_text" msgid="2846282280014617785">"कोई डिवाइस उपलब्ध नहीं"</string>
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"वाई-फ़ाई या ईथरनेट कनेक्शन उपलब्ध नहीं है"</string>
+    <!-- no translation found for quick_settings_cast_disconnect (4836025217838730930) -->
+    <skip />
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"स्क्रीन की रोशनी"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"रंग बदलने की सुविधा"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"रंग में सुधार करने की सुविधा"</string>
@@ -411,6 +410,8 @@
     <string name="quick_settings_close_user_panel" msgid="5599724542275896849">"रद्द करें"</string>
     <string name="quick_settings_connected" msgid="3873605509184830379">"कनेक्ट है"</string>
     <string name="quick_settings_connecting" msgid="2381969772953268809">"कनेक्ट हो रहा है..."</string>
+    <!-- no translation found for quick_settings_scanning_for_wifi (5875402701266073463) -->
+    <skip />
     <string name="quick_settings_hotspot_label" msgid="1199196300038363424">"हॉटस्पॉट"</string>
     <string name="quick_settings_hotspot_secondary_label_transient" msgid="7585604088079160564">"हॉटस्पॉट चालू हो रहा है…"</string>
     <string name="quick_settings_hotspot_secondary_label_data_saver_enabled" msgid="1280433136266439372">"डेटा बचाया जा रहा है"</string>
@@ -541,8 +542,7 @@
     <string name="keyguard_unlock" msgid="8031975796351361601">"खोलने के लिए ऊपर की ओर स्वाइप करें"</string>
     <string name="keyguard_unlock_press" msgid="9140109453735019209">"डिवाइस अनलॉक करने के लिए, अनलॉक आइकॉन को दबाएं"</string>
     <string name="keyguard_face_successful_unlock_swipe" msgid="6180997591385846073">"चेहरे से अनलॉक किया गया. खोलने के लिए ऊपर की ओर स्वाइप करें."</string>
-    <!-- no translation found for keyguard_face_successful_unlock_confirm_button (3862344771780817393) -->
-    <skip />
+    <string name="keyguard_face_successful_unlock_confirm_button" msgid="3862344771780817393">"चेहरे से अनलॉक किया. जारी रखने के लिए \'पुष्टि करें\' दबाएं."</string>
     <string name="keyguard_face_successful_unlock_press" msgid="25520941264602588">"चेहरे से अनलॉक किया. डिवाइस अनलॉक करने के लिए, अनलॉक आइकॉन को दबाएं."</string>
     <string name="keyguard_face_successful_unlock_press_alt_1" msgid="5715461103913071474">"चेहरे से अनलॉक किया गया. डिवाइस खोलने के लिए टैप करें."</string>
     <string name="keyguard_face_successful_unlock_press_alt_2" msgid="8310787946357120406">"चेहरे की पहचान हो गई. डिवाइस खोलने के लिए टैप करें."</string>
@@ -994,16 +994,16 @@
     <string name="system_multitasking_rhs" msgid="8779289852395243004">"इस ऐप्लिकेशन को दाईं ओर रखकर, स्प्लिट स्क्रीन का इस्तेमाल करने के लिए"</string>
     <string name="system_multitasking_lhs" msgid="7348595296208696452">"इस ऐप्लिकेशन को बाईं ओर रखकर, स्प्लिट स्क्रीन का इस्तेमाल करने के लिए"</string>
     <string name="system_multitasking_full_screen" msgid="4221409316059910349">"फ़ुल स्क्रीन मोड का इस्तेमाल करने के लिए"</string>
-    <string name="system_multitasking_desktop_view" msgid="8871367687089347180">"डेस्कटॉप विंडोविंग का इस्तेमाल करें"</string>
+    <string name="system_multitasking_desktop_view" msgid="8871367687089347180">"डेस्कटॉप विंडोविंग का इस्तेमाल करने के लिए"</string>
     <string name="system_multitasking_splitscreen_focus_rhs" msgid="3838578650313318508">"स्प्लिट स्क्रीन पर, दाईं ओर या नीचे के ऐप पर स्विच करने के लिए"</string>
     <string name="system_multitasking_splitscreen_focus_lhs" msgid="3164261844398662518">"स्प्लिट स्क्रीन पर, बाईं ओर या ऊपर के ऐप पर स्विच करने के लिए"</string>
     <string name="system_multitasking_replace" msgid="7410071959803642125">"स्प्लिट स्क्रीन के दौरान: एक ऐप्लिकेशन को दूसरे ऐप्लिकेशन से बदलें"</string>
-    <string name="system_multitasking_move_to_next_display" msgid="6169737557526976997">"ऐक्टिव विंडो को एक से दूसरे डिसप्ले पर स्विच करें"</string>
-    <string name="system_desktop_mode_snap_left_window" msgid="8636204689945162298">"विंडो को बाईं ओर ले जाएं"</string>
-    <string name="system_desktop_mode_snap_right_window" msgid="2162560187639411929">"विंडो को दाईं ओर ले जाएं"</string>
-    <string name="system_desktop_mode_toggle_maximize_window" msgid="4084100093691768239">"विंडो को बड़ा करें"</string>
-    <string name="system_desktop_mode_minimize_window" msgid="1248714536732927092">"विंडो को छोटा करें"</string>
-    <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"अलग-अलग डेस्कटॉप के बीच स्विच करें"</string>
+    <string name="system_multitasking_move_to_next_display" msgid="6169737557526976997">"ऐक्टिव विंडो को एक से दूसरे डिसप्ले पर स्विच करने के लिए"</string>
+    <string name="system_desktop_mode_snap_left_window" msgid="8636204689945162298">"विंडो को बाईं ओर ले जाने के लिए"</string>
+    <string name="system_desktop_mode_snap_right_window" msgid="2162560187639411929">"विंडो को दाईं ओर ले जाने के लिए"</string>
+    <string name="system_desktop_mode_toggle_maximize_window" msgid="4084100093691768239">"विंडो को बड़ा करने के लिए"</string>
+    <string name="system_desktop_mode_minimize_window" msgid="1248714536732927092">"विंडो को छोटा करने के लिए"</string>
+    <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"अलग-अलग डेस्कटॉप के बीच स्विच करने के लिए"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"इनपुट"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"अगली भाषा पर स्विच करने के लिए"</string>
     <string name="input_switch_input_language_previous" msgid="6043341362202336623">"पिछली भाषा पर स्विच करने के लिए"</string>
@@ -1023,10 +1023,10 @@
     <string name="group_accessibility_toggle_mouse_keys" msgid="534757719357514361">"कीबोर्ड पर माउस के बटन को टॉगल करने के लिए"</string>
     <string name="group_accessibility_toggle_sticky_keys" msgid="7722214637652104184">"स्टिकी बटन को टॉगल करने के लिए"</string>
     <string name="group_accessibility_toggle_slow_keys" msgid="8569881436531795062">"स्लो बटन को टॉगल करने के लिए"</string>
-    <string name="group_accessibility_toggle_voice_access" msgid="5436708239015479017">"Voice Access को टॉगल करें"</string>
-    <string name="group_accessibility_toggle_talkback" msgid="5017967056006325713">"TalkBack को टॉगल करें"</string>
-    <string name="group_accessibility_toggle_magnification" msgid="3892267763383743128">"ज़ूम करने की सुविधा टॉगल करें"</string>
-    <string name="group_accessibility_activate_select_to_speak" msgid="9157775915495428592">"\'चुनें और सुनें\' सुविधा चालू करें"</string>
+    <string name="group_accessibility_toggle_voice_access" msgid="5436708239015479017">"Voice Access को टॉगल करने के लिए"</string>
+    <string name="group_accessibility_toggle_talkback" msgid="5017967056006325713">"TalkBack को टॉगल करने के लिए"</string>
+    <string name="group_accessibility_toggle_magnification" msgid="3892267763383743128">"ज़ूम करने की सुविधा को टॉगल करने के लिए"</string>
+    <string name="group_accessibility_activate_select_to_speak" msgid="9157775915495428592">"\'चुनें और सुनें\' सुविधा को चालू करने के लिए"</string>
     <string name="volume_and_do_not_disturb" msgid="502044092739382832">"परेशान न करें"</string>
     <string name="volume_dnd_silent" msgid="4154597281458298093">"वॉल्यूम बटन का शॉर्टकट"</string>
     <string name="battery" msgid="769686279459897127">"बैटरी"</string>
@@ -1175,6 +1175,12 @@
     <string name="running_foreground_services_title" msgid="5137313173431186685">"बैकग्राउंड में चल रहे ऐप्लिकेशन"</string>
     <string name="running_foreground_services_msg" msgid="3009459259222695385">"बैटरी और डेटा खर्च की जानकारी के लिए छूएं"</string>
     <string name="mobile_data_disable_title" msgid="5366476131671617790">"मोबाइल डेटा बंद करना चाहते हैं?"</string>
+    <!-- no translation found for mobile_data_enable_title (8259903353761259200) -->
+    <skip />
+    <!-- no translation found for mobile_data_enable_message (2013861580086078913) -->
+    <skip />
+    <!-- no translation found for mobile_data_enable_turn_on (5577732543207882533) -->
+    <skip />
     <string name="mobile_data_disable_message" msgid="8604966027899770415">"आप <xliff:g id="CARRIER">%s</xliff:g> से डेटा या इंटरनेट का इस्तेमाल नहीं कर पाएंगे. इंटरनेट सिर्फ़ वाई-फ़ाई से चलेगा."</string>
     <string name="mobile_data_disable_message_default_carrier" msgid="6496033312431658238">"आपको मोबाइल और इंटरनेट सेवा देने वाली कंपनी"</string>
     <string name="auto_data_switch_disable_title" msgid="5146527155665190652">"क्या आपको मोबाइल डेटा, <xliff:g id="CARRIER">%s</xliff:g> पर वापस से स्विच करना है?"</string>
@@ -1230,7 +1236,7 @@
     <string name="magnification_close_settings_click_label" msgid="4642477260651704517">"ज़ूम करने की सुविधा वाली सेटिंग को बंद करें"</string>
     <string name="magnification_exit_edit_mode_click_label" msgid="1664818325144887117">"बदलाव मोड से बाहर निकलें"</string>
     <string name="magnification_drag_corner_to_resize" msgid="1249766311052418130">"साइज़ बदलने के लिए, कोने को खींचें और छोड़ें"</string>
-    <string name="accessibility_allow_diagonal_scrolling" msgid="3258050349191496398">"तिरछी दिशा में स्क्रोल करने की अनुमति दें"</string>
+    <string name="accessibility_allow_diagonal_scrolling" msgid="3258050349191496398">"तिरछे स्क्रोल करने की अनुमति दें"</string>
     <string name="accessibility_magnify_typing" msgid="4450037184548427852">"टाइप किए जा रहे टेक्स्ट को ज़ूम करें"</string>
     <string name="accessibility_magnify_keyboard" msgid="3083531635742744841">"कीबोर्ड को ज़ूम करें"</string>
     <string name="accessibility_resize" msgid="5733759136600611551">"साइज़ बदलें"</string>

@@ -1057,9 +1057,12 @@ class DesktopTasksController(
             "addRestoreTaskToDeskChanges: taskId=$taskId; deskId=$deskId; userId=$userId; " +
                 "taskBounds=$taskBounds; uniqueDisplayId=$uniqueDisplayId"
         )
+
         val repository = userRepositories.getProfile(userId)
         val minimized = repository.isPreservedTaskMinimized(uniqueDisplayId, taskId)
-        val task = shellTaskOrganizer.getRunningTaskInfo(taskId)
+        val task =
+            shellTaskOrganizer.getRunningTaskInfo(taskId)
+                ?: recentTasksController?.findTaskInBackground(taskId)
         if (task == null) {
             logE("restoreDisplay: Could not find running task info for taskId=$taskId.")
             return null
@@ -1516,7 +1519,7 @@ class DesktopTasksController(
      *
      * @param taskInfo task entering split that requires a bounds update
      */
-    fun onDesktopSplitSelectAnimComplete(taskInfo: RunningTaskInfo) {
+    fun onDesktopSplitSelectChoice(taskInfo: RunningTaskInfo) {
         val wct = WindowContainerTransaction()
         wct.setBounds(taskInfo.token, Rect())
         if (!DesktopModeFlags.ENABLE_INPUT_LAYER_TRANSITION_FIX.isTrue) {
@@ -2599,7 +2602,7 @@ class DesktopTasksController(
         }
 
         val shouldRestoreToSnap =
-            isMaximized && isTaskSnappedToHalfScreen(taskInfo, destinationBounds)
+            isMaximized && isTaskSnappedToHalfScreen(taskInfo.displayId, destinationBounds)
 
         logD("willMaximize = %s", willMaximize)
         logD("shouldRestoreToSnap = %s", shouldRestoreToSnap)
@@ -2663,21 +2666,42 @@ class DesktopTasksController(
         )
     }
 
-    private fun isMaximizedToStableBoundsEdges(
-        taskInfo: RunningTaskInfo,
-        stableBounds: Rect,
-    ): Boolean {
-        val currentTaskBounds = taskInfo.configuration.windowConfiguration.bounds
-        return isTaskBoundsEqual(currentTaskBounds, stableBounds)
+    private fun isMaximizedToStableBoundsEdges(displayId: Int, taskBounds: Rect): Boolean {
+        val displayLayout = displayController.getDisplayLayout(displayId) ?: return false
+        val stableBounds = Rect().also { displayLayout.getStableBounds(it) }
+        return isTaskBoundsEqual(taskBounds, stableBounds)
     }
 
     /** Returns if current task bound is snapped to half screen */
-    private fun isTaskSnappedToHalfScreen(
-        taskInfo: RunningTaskInfo,
-        taskBounds: Rect = taskInfo.configuration.windowConfiguration.bounds,
-    ): Boolean =
-        getSnapBounds(taskInfo.displayId, SnapPosition.LEFT) == taskBounds ||
-            getSnapBounds(taskInfo.displayId, SnapPosition.RIGHT) == taskBounds
+    private fun isTaskSnappedToHalfScreen(displayId: Int, taskBounds: Rect): Boolean =
+        getSnapBounds(displayId, SnapPosition.LEFT) == taskBounds ||
+            getSnapBounds(displayId, SnapPosition.RIGHT) == taskBounds
+
+    /**
+     * Update the rounding state of the taskbar on the given display, based on the task with ID
+     * [taskId] having bounds [newBounds].
+     */
+    fun updateTaskbarRoundingOnTaskResize(displayId: Int, taskId: Int, newBounds: Rect) {
+        val otherTasksRequireTaskbarRounding =
+            doesAnyTaskRequireTaskbarRounding(
+                displayId,
+                shellController.currentUserId,
+                excludeTaskId = taskId,
+            )
+        val resizedTaskRequiresTaskbarRounding =
+            doesTaskRequireTaskbarRounding(displayId, newBounds)
+        taskbarDesktopTaskListener?.onTaskbarCornerRoundingUpdate(
+            otherTasksRequireTaskbarRounding || resizedTaskRequiresTaskbarRounding
+        )
+    }
+
+    private fun doesTaskRequireTaskbarRounding(displayId: Int, taskBounds: Rect): Boolean {
+        val isSnappedToHalfScreen = isTaskSnappedToHalfScreen(displayId, taskBounds)
+        val isMaximizedToBothEdges = isMaximizedToStableBoundsEdges(displayId, taskBounds)
+        logD("isTaskSnappedToHalfScreen(taskInfo) = %s", isSnappedToHalfScreen)
+        logD("isMaximizedToStableBoundsEdges(taskInfo, stableBounds) = %s", isMaximizedToBothEdges)
+        return isSnappedToHalfScreen || isMaximizedToBothEdges
+    }
 
     @VisibleForTesting
     fun doesAnyTaskRequireTaskbarRounding(
@@ -2693,21 +2717,10 @@ class DesktopTasksController(
                 .filterNot { taskId -> taskId == excludeTaskId }
                 .any { taskId ->
                     val taskInfo = shellTaskOrganizer.getRunningTaskInfo(taskId) ?: return false
-                    val displayLayout = displayController.getDisplayLayout(taskInfo.displayId)
-                    val stableBounds = Rect().also { displayLayout?.getStableBounds(it) }
                     logD("taskInfo = %s", taskInfo)
-                    logD(
-                        "isTaskSnappedToHalfScreen(taskInfo) = %s",
-                        isTaskSnappedToHalfScreen(taskInfo),
-                    )
-                    logD(
-                        "isMaximizedToStableBoundsEdges(taskInfo, stableBounds) = %s",
-                        isMaximizedToStableBoundsEdges(taskInfo, stableBounds),
-                    )
-                    isTaskSnappedToHalfScreen(taskInfo) ||
-                        isMaximizedToStableBoundsEdges(taskInfo, stableBounds)
+                    val taskBounds = taskInfo.configuration.windowConfiguration.bounds
+                    doesTaskRequireTaskbarRounding(displayId, taskBounds)
                 }
-
         logD("doesAnyTaskRequireTaskbarRounding = %s", doesAnyTaskRequireTaskbarRounding)
         return doesAnyTaskRequireTaskbarRounding
     }
@@ -2969,7 +2982,10 @@ class DesktopTasksController(
                 } else if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_PERSISTENCE.isTrue()) {
                     // Task is not running, start it
                     val startDesk = repository.getDefaultDeskId(displayId) ?: INVALID_DESK_ID
-                    wct.startTask(taskId, createActivityOptionsForStartTask(startDesk).toBundle())
+                    wct.startTask(
+                        taskId,
+                        createActivityOptionsForStartTask(startDesk, desksOrganizer).toBundle(),
+                    )
                 }
             }
 
@@ -4152,11 +4168,10 @@ class DesktopTasksController(
 
         if (DesktopExperienceFlags.ENABLE_DESKTOP_FIRST_TOP_FULLSCREEN_BUGFIX.isTrue) {
             val anyDeskActive = repository.isAnyDeskActive(targetDisplayId)
-            // TODO(b/436462692) - Make `getFocusedTaskOnDisplay` always returns the latest TaskInfo
             val focusedTask =
-                focusTransitionObserver.getFocusedTaskOnDisplay(targetDisplayId)?.let {
-                    shellTaskOrganizer.getRunningTaskInfo(it.taskId)
-                }
+                shellTaskOrganizer.getRunningTaskInfo(
+                    focusTransitionObserver.getFocusedTaskIdOnDisplay(targetDisplayId)
+                )
             val isFullscreenFocused = focusedTask?.isFullscreen == true
             val isNonHomeFocused = focusedTask?.activityType != ACTIVITY_TYPE_HOME
             logV(
@@ -4599,7 +4614,7 @@ class DesktopTasksController(
 
     /**
      * Adds split screen changes to a transaction. Note that bounds are not reset here due to
-     * animation; see {@link onDesktopSplitSelectAnimComplete}
+     * animation; see {@link onDesktopSplitSelectChoice}
      */
     private fun addMoveToSplitChanges(wct: WindowContainerTransaction, taskInfo: RunningTaskInfo) {
         if (!DesktopModeFlags.ENABLE_INPUT_LAYER_TRANSITION_FIX.isTrue) {
@@ -4806,7 +4821,10 @@ class DesktopTasksController(
                 .forEach { taskId ->
                     val runningTaskInfo = shellTaskOrganizer.getRunningTaskInfo(taskId)
                     if (runningTaskInfo == null) {
-                        wct.startTask(taskId, createActivityOptionsForStartTask(deskId).toBundle())
+                        wct.startTask(
+                            taskId,
+                            createActivityOptionsForStartTask(deskId, desksOrganizer).toBundle(),
+                        )
                     } else {
                         desksOrganizer.reorderTaskToFront(wct, deskId, runningTaskInfo)
                     }
@@ -5011,7 +5029,7 @@ class DesktopTasksController(
                     // Task is not running, start it.
                     wct.startTask(
                         taskIdToReorderToFront,
-                        createActivityOptionsForStartTask(deskId).toBundle(),
+                        createActivityOptionsForStartTask(deskId, desksOrganizer).toBundle(),
                     )
                 }
                 else -> {
@@ -5515,15 +5533,27 @@ class DesktopTasksController(
                         displayAreaInfo != null
 
                 if (isCrossDisplayDrag) {
+                    val prevCaptionInsets =
+                        taskInfo.configuration.windowConfiguration.appBounds?.let {
+                            it.top - taskInfo.configuration.windowConfiguration.bounds.top
+                        } ?: 0
+                    val captionInsetsDp =
+                        displayController
+                            .getDisplayLayout(taskInfo.getDisplayId())
+                            ?.pxToDp(prevCaptionInsets)
+                            ?.toInt() ?: 0
+                    val destDisplayLayout = displayController.getDisplayLayout(newDisplayId)
+                    val captionInsets = destDisplayLayout?.dpToPx(captionInsetsDp)?.toInt() ?: 0
                     val constrainedBounds =
                         if (
                             DesktopExperienceFlags.ENABLE_SHRINK_WINDOW_BOUNDS_AFTER_DRAG.isTrue()
                         ) {
                             MultiDisplayDragMoveBoundsCalculator.constrainBoundsForDisplay(
                                 destinationBounds,
-                                displayController.getDisplayLayout(newDisplayId),
+                                destDisplayLayout,
                                 taskInfo.isResizeable,
                                 inputCoordinate.x,
+                                captionInsets,
                             )
                         } else {
                             Rect(destinationBounds)
@@ -5751,15 +5781,14 @@ class DesktopTasksController(
                 ) {
                     // Inherit parent's bounds.
                     newWindowBounds.set(taskInfo.configuration.windowConfiguration.bounds)
-                    // TODO: (b/436504714) - Implement the new positioning logic here.
                 } else {
-                    // Use default bounds, but with the top-center at the drop point.
                     newWindowBounds.set(calculateDefaultDesktopTaskBounds(displayLayout))
-                    newWindowBounds.offsetTo(
+                }
+                // Create the new window from the top-center at the drop point.
+                newWindowBounds.offsetTo(
                         dragEvent.x.toInt() - (newWindowBounds.width() / 2),
                         dragEvent.y.toInt(),
                     )
-                }
             }
             IndicatorType.TO_SPLIT_RIGHT_INDICATOR -> {
                 newWindowBounds.set(getSnapBounds(destinationDisplay, SnapPosition.RIGHT))
@@ -5855,18 +5884,6 @@ class DesktopTasksController(
                 DesktopImmersiveController.ExitReason.APP_NOT_IMMERSIVE,
             )
         }
-    }
-
-    private fun createActivityOptionsForStartTask(deskId: Int = INVALID_DESK_ID): ActivityOptions {
-        val activityOptions =
-            ActivityOptions.makeBasic().apply {
-                launchWindowingMode = WINDOWING_MODE_FREEFORM
-                splashScreenStyle = SPLASH_SCREEN_STYLE_ICON
-            }
-        if (deskId != INVALID_DESK_ID) {
-            desksOrganizer.addLaunchDeskToActivityOptions(activityOptions, deskId)
-        }
-        return activityOptions
     }
 
     private fun dump(pw: PrintWriter, prefix: String) {
@@ -6219,10 +6236,9 @@ class DesktopTasksController(
             )
         }
 
-        override fun onDesktopSplitSelectAnimComplete(taskInfo: RunningTaskInfo) {
-            executeRemoteCallWithTaskPermission(controller, "onDesktopSplitSelectAnimComplete") { c
-                ->
-                c.onDesktopSplitSelectAnimComplete(taskInfo)
+        override fun onDesktopSplitSelectChoice(taskInfo: RunningTaskInfo) {
+            executeRemoteCallWithTaskPermission(controller, "onDesktopSplitSelectChoice") { c ->
+                c.onDesktopSplitSelectChoice(taskInfo)
             }
         }
 

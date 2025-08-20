@@ -60,13 +60,6 @@ flag {
 }
 
 flag {
-   name: "notification_row_content_binder_refactor"
-   namespace: "systemui"
-   description: "Convert the NotificationContentInflater to Kotlin and restructure it to support modern views"
-   bug: "343942780"
-}
-
-flag {
    name: "notification_row_is_removed_fix"
    namespace: "systemui"
    description: "Fix incorrect isRemoved value in ExpandableNotificationRow"
@@ -454,16 +447,6 @@ flag {
 }
 
 flag {
-    name: "status_bar_window_no_custom_touch"
-    namespace: "systemui"
-    description: "Don't have any custom touch handling in StatusBarWindowView"
-    bug: "391894499"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "status_bar_app_handle_tracking"
     namespace: "systemui"
     description: "Have status bar track the location of app handles so that tappable status bar "
@@ -506,6 +489,16 @@ flag {
     namespace: "systemui"
     description: "Fix DarkIconInteractor#toIsAreaDark result for mixed status bar lightness, for icons that do not overlap with the dark icon area."
     bug: "423390143"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "status_bar_battery_no_conflation"
+    namespace: "systemui"
+    description: "Use callbackFlow instead of conflatedCallbackFlow in BatteryRepository"
+    bug: "433239990"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -730,6 +723,16 @@ flag {
     namespace: "systemui"
     description: "Fix clipboard overlay for secondary users"
     bug: "217922018"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_shade_header_wrong_icon_size"
+    namespace: "lse_desktop_experience"
+    description: "Fix system icon size in shade header on connected displays"
+    bug: "412409667"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -1304,6 +1307,16 @@ flag {
     namespace: "systemui"
     description: "Show arrow buttons to page the media carousel"
     bug: "383974508"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name:"media_frame_dimensions_fix"
+    namespace: "systemui"
+    description: "measure and layout media frame when the desired location of media carousel changes"
+    bug: "417204970"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -2157,6 +2170,7 @@ flag {
       purpose: PURPOSE_BUGFIX
     }
 }
+
 flag {
     name: "dialog_anim_end_state_update"
     namespace: "systemui"
@@ -2175,4 +2189,23 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+
+    name: "qs_split_internet_tile"
+    namespace: "systemui"
+    description: "Splits the Internet tile into Wifi (with internet info) + Mobile Data."
+    bug: "201143076"
+    is_fixed_read_only: true
+}
+
+flag {
+   name: "defer_doze_transition_on_shade_drag"
+   namespace: "systemui"
+   description: "Defer doze-to-lockscreen transition animation during notification shade drag"
+   bug: "419763981"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
 }

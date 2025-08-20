@@ -60,6 +60,7 @@ import com.android.systemui.clock.ui.viewmodel.AmPmStyle
 import com.android.systemui.clock.ui.viewmodel.ClockViewModel
 import com.android.systemui.compose.modifiers.sysUiResTagContainer
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.DisplayAware
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.PerDisplaySingleton
 import com.android.systemui.lifecycle.WindowLifecycleState
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.lifecycle.repeatWhenAttached
@@ -70,6 +71,7 @@ import com.android.systemui.media.controls.ui.view.MediaHostState
 import com.android.systemui.media.dagger.MediaModule.POPUP
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.res.R
+import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.shade.ui.composable.VariableDayDate
 import com.android.systemui.statusbar.StatusBarAlwaysUseRegionSampling
 import com.android.systemui.statusbar.chips.ui.compose.OngoingActivityChips
@@ -115,6 +117,7 @@ import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.awaitCancellation
 
 /** Factory to simplify the dependency management for [StatusBarRoot] */
+@PerDisplaySingleton
 class StatusBarRootFactory
 @Inject
 constructor(
@@ -301,7 +304,11 @@ fun StatusBarRoot(
                                 )
 
                             setViewCompositionStrategy(
-                                ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+                                if (SceneContainerFlag.isEnabled) {
+                                    ViewCompositionStrategy.Default
+                                } else {
+                                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+                                }
                             )
 
                             setContent {

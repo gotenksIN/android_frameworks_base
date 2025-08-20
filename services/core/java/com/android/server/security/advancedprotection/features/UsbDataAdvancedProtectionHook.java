@@ -17,8 +17,7 @@
 package com.android.server.security.advancedprotection.features;
 
 import static android.app.Notification.EXTRA_SUBSTITUTE_APP_NAME;
-import static android.content.Intent.ACTION_SCREEN_OFF;
-import static android.content.Intent.ACTION_USER_PRESENT;
+import static android.content.Intent.ACTION_LOCKED_BOOT_COMPLETED;
 import static android.hardware.usb.UsbManager.ACTION_USB_PORT_CHANGED;
 import static android.security.advancedprotection.AdvancedProtectionManager.FEATURE_ID_DISALLOW_USB;
 import static android.hardware.usb.UsbPortStatus.DATA_STATUS_DISABLED_FORCE;
@@ -32,6 +31,7 @@ import static android.hardware.usb.InternalUsbDataSignalDisableReason.USB_DISABL
 import android.annotation.IntDef;
 import android.app.ActivityManager;
 import android.app.KeyguardManager;
+import android.app.KeyguardManager.KeyguardLockedStateListener;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationChannelGroup;
@@ -62,7 +62,6 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.SystemClock;
 
-import android.provider.Settings;
 import android.security.Flags;
 import android.util.Slog;
 import android.content.pm.PackageManager;
@@ -82,6 +81,8 @@ import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.Objects;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -116,17 +117,11 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
     private static final int NOTIFICATION_CHARGE_DATA = 1;
     private static final int NOTIFICATION_DATA = 2;
 
+    // For connection recovery, in case of Android Auto or unreliable cables
     private static final int DELAY_DISABLE_MILLIS = 15000;
     private static final int USB_DATA_CHANGE_MAX_RETRY_ATTEMPTS = 3;
     private static final long USB_PORT_POWER_BRICK_CONNECTION_CHECK_TIMEOUT_DEFAULT_MILLIS = 3000;
     private static final long USB_PD_COMPLIANCE_CHECK_TIMEOUT_DEFAULT_MILLIS = 1000;
-
-    // To partially avoid race conditions between SCREEN_OFF and Keyguard actions, we wait a bit
-    // before updating the keyguard lock state. Ideally we should have a callback for keyguard
-    // state changes, but none exist today.
-    // TODO(b/436659963):  Determine a reasonable delay time value
-    private static final long KEYGUARD_LOCK_UPDATE_DELAY_MILLIS = 1000;
-    private static final long LOCK_SCREEN_LOCK_AFTER_TIMEOUT_DEFAULT_MILLIS = 5000;
 
     @IntDef({NOTIFICATION_CHARGE, NOTIFICATION_CHARGE_DATA, NOTIFICATION_DATA})
     private @interface NotificationType {}
@@ -151,25 +146,24 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
     private static final Map<Integer, Integer> NOTIFICATION_TYPE_TO_TEXT =
             Map.of(
                     NOTIFICATION_CHARGE,
-                    R.string.usb_apm_usb_plugged_in_for_power_brick_notification_text,
+                    R.string.usb_apm_usb_plugged_in_when_locked_charge_notification_text,
                     NOTIFICATION_CHARGE_DATA,
-                    R.string.usb_apm_usb_plugged_in_when_locked_low_power_charge_notification_text,
+                    R.string.usb_apm_usb_plugged_in_when_locked_charge_data_notification_text,
                     NOTIFICATION_DATA,
-                    R.string.usb_apm_usb_plugged_in_when_locked_notification_text);
+                    R.string.usb_apm_usb_plugged_in_when_locked_data_notification_text);
     private static final Map<Integer, Integer> NOTIFICATION_TYPE_TO_TEXT_WITH_REPLUG =
             Map.of(
                     NOTIFICATION_CHARGE,
-                    R.string.usb_apm_usb_plugged_in_for_power_brick_replug_notification_text,
+                    R.string.usb_apm_usb_plugged_in_when_locked_replug_notification_text,
                     NOTIFICATION_CHARGE_DATA,
-                    R.string
-                            .usb_apm_usb_plugged_in_when_locked_low_power_charge_replug_notification_text,
+                    R.string.usb_apm_usb_plugged_in_when_locked_charge_data_notification_text,
                     NOTIFICATION_DATA,
-                    R.string.usb_apm_usb_plugged_in_when_locked_replug_notification_text);
+                    R.string.usb_apm_usb_plugged_in_when_locked_data_notification_text);
 
     private final ReentrantLock mDisableLock = new ReentrantLock();
     private final Context mContext;
 
-    private AtomicBoolean mApmRequestedUsbDisable = new AtomicBoolean(false);
+    private AtomicBoolean mApmRequestedUsbDataStatus = new AtomicBoolean(false);
 
     // We use handlers for tasks that may need to be updated by broadcasts events.
     private Handler mDelayedDisableHandler = new Handler(Looper.getMainLooper());
@@ -186,7 +180,8 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
     private NotificationManager mNotificationManager;
     private NotificationChannel mNotificationChannel;
     private AdvancedProtectionService mAdvancedProtectionService;
-
+    private ExecutorService mUsbDataSignalUpdateExecutor = Executors.newSingleThreadExecutor();
+    private KeyguardLockedStateListener mKeyguardLockedStateListener;
     private UsbPortStatus mLastUsbPortStatus;
 
     // TODO(b/418846176):  Move these to a system property
@@ -233,7 +228,7 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
             UserManager userManager,
             Handler delayDisableHandler,
             Handler delayedNotificationHandler,
-            AtomicBoolean apmRequestedUsbDisable,
+            AtomicBoolean apmRequestedUsbDataStatus,
             boolean canSetUsbDataSignal,
             boolean afterFirstUnlock) {
         super(context, false);
@@ -248,7 +243,7 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
         mCanSetUsbDataSignal = canSetUsbDataSignal;
         mIsAfterFirstUnlock = afterFirstUnlock;
         mUserManager = userManager;
-        mApmRequestedUsbDisable = apmRequestedUsbDisable;
+        mApmRequestedUsbDataStatus = apmRequestedUsbDataStatus;
     }
 
     @Override
@@ -285,6 +280,7 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
             }
             if (!mBroadcastReceiverIsRegistered) {
                 registerReceiver();
+                registerKeyguardLockListener();
             }
             if (mKeyguardManager.isKeyguardLocked()) {
                 setUsbDataSignalIfPossible(false);
@@ -319,23 +315,7 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
                     @Override
                     public void onReceive(Context context, Intent intent) {
                         try {
-                            if (ACTION_USER_PRESENT.equals(intent.getAction())
-                                    && !mKeyguardManager.isKeyguardLocked()) {
-                                mDelayedDisableHandler.removeCallbacksAndMessages(null);
-                                cleanUpNotificationHandlerTasks();
-                                if (!currentUserIsGuest()) {
-                                    mIsAfterFirstUnlock = true;
-                                    setUsbDataSignalIfPossible(true);
-                                }
-                            } else if (ACTION_SCREEN_OFF.equals(intent.getAction())) {
-                                if (mKeyguardManager.isKeyguardLocked()) {
-                                    setUsbDataSignalIfPossible(false);
-                                } else {
-                                    // If a race condition occurs, or is a lockScreenTimeout, we
-                                    // retry a check again after a set time
-                                    setRetryAndLockScreenTimeoutDisableTask();
-                                }
-                            } else if (ACTION_USB_PORT_CHANGED.equals(intent.getAction())) {
+                            if (ACTION_USB_PORT_CHANGED.equals(intent.getAction())) {
                                 UsbPortStatus portStatus =
                                         intent.getParcelableExtra(
                                                 UsbManager.EXTRA_PORT_STATUS, UsbPortStatus.class);
@@ -365,7 +345,7 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
                                     /*
                                      * Due to limitations of current APIs, we cannot cannot fully
                                      * rely on power brick and pd compliance check to be accurate
-                                     * until it's passed the check timeouts unless the value is
+                                     * until it's passed the check timeouts or the value is
                                      * POWER_BRICK_STATUS_CONNECTED or isCompliant=true
                                      * respectively.
                                      */
@@ -391,16 +371,17 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
                                     createAndSendNotificationIfDeviceIsLocked(
                                             portStatus, NOTIFICATION_DATA);
                                 }
+
+                            }
+                            // Any earlier call to USBService during bootup have a risk of
+                            // having
+                            // request dropped due to USB stack not being ready.
+                            else if (ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction())) {
+                                setUsbDataSignalIfPossible(false);
                             }
                         } catch (Exception e) {
                             Slog.e(TAG, "USB Data protection failed with: " + e.getMessage());
                         }
-                    }
-
-                    private boolean currentUserIsGuest() {
-                        UserInfo currentUserInfo =
-                                mUserManager.getUserInfo(ActivityManager.getCurrentUser());
-                        return currentUserInfo != null && currentUserInfo.isGuest();
                     }
 
                     private void updateDelayedNotificationTask(long delayTimeMillis) {
@@ -438,61 +419,6 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
                         }
                     }
 
-                    // Used for fallback on race condition between keyguard and screen off event and
-                    // lockScreenTimeout
-                    private void setRetryAndLockScreenTimeoutDisableTask() {
-                        if (!mDelayedDisableHandler.hasMessagesOrCallbacks()) {
-                            long lockscreenTimeoutDelayMillis =
-                                    Math.max(
-                                            KEYGUARD_LOCK_UPDATE_DELAY_MILLIS,
-                                            getLockAfterScreenTimeoutSetting());
-                            boolean taskPosted =
-                                    mDelayedDisableHandler.postDelayed(
-                                            () -> {
-                                                Slog.d(TAG, "Delayed Retry Task: Running");
-                                                if (mKeyguardManager.isKeyguardLocked()) {
-                                                    setUsbDataSignalIfPossible(false);
-                                                } else {
-                                                    // If it fails, it's likely a
-                                                    // lockScreenTimeoutEvent, so we will recheck
-                                                    // after the set lock screen timeout
-                                                    // If lock screen timeout is turned off = 0, we
-                                                    // check again with retry delay for redundancy
-                                                    if (!mDelayedDisableHandler.postDelayed(
-                                                            () -> {
-                                                                Slog.d(
-                                                                        TAG,
-                                                                        "Delayed LockscreenTimeout"
-                                                                                + " Task: Running");
-                                                                if (mKeyguardManager
-                                                                        .isKeyguardLocked()) {
-                                                                    setUsbDataSignalIfPossible(
-                                                                            false);
-                                                                }
-                                                            },
-                                                            lockscreenTimeoutDelayMillis)) {
-                                                        Slog.w(
-                                                                TAG,
-                                                                "Delayed LockScreenTimeout Task:"
-                                                                        + " Failed to post task");
-                                                    }
-                                                }
-                                            },
-                                            KEYGUARD_LOCK_UPDATE_DELAY_MILLIS);
-                            if (!taskPosted) {
-                                Slog.w(TAG, "Delayed ScreenOff Retry Task: Failed to post task");
-                            }
-                        }
-                    }
-
-                    private long getLockAfterScreenTimeoutSetting() {
-                        return Settings.Secure.getLongForUser(
-                                mContext.getContentResolver(),
-                                Settings.Secure.LOCK_SCREEN_LOCK_AFTER_TIMEOUT,
-                                LOCK_SCREEN_LOCK_AFTER_TIMEOUT_DEFAULT_MILLIS,
-                                ActivityManager.getCurrentUser());
-                    }
-
                     private void determineUsbChargeStateAndSendNotification(
                             UsbPortStatus portStatus) {
                         clearExistingNotification();
@@ -520,10 +446,6 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
                         }
                     }
 
-                    private void cleanUpNotificationHandlerTasks() {
-                        mDelayedNotificationHandler.removeCallbacksAndMessages(null);
-                    }
-
                     // TODO:(b/401540215) Remove this as part of pre-release cleanup
                     private void dumpUsbDevices(UsbPortStatus portStatus) {
                         Map<String, UsbDevice> portStatusMap = mUsbManager.getDeviceList();
@@ -549,6 +471,10 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
                             NotificationManager.IMPORTANCE_HIGH);
             mNotificationManager.createNotificationChannel(mNotificationChannel);
         }
+    }
+
+    private void cleanUpNotificationHandlerTasks() {
+        mDelayedNotificationHandler.removeCallbacksAndMessages(null);
     }
 
     private void createAndSendNotificationIfDeviceIsLocked(
@@ -669,7 +595,7 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
             // to framework. So we can only assume that disable request is honored.
             // The atomic boolean check is to make sure it requested by us and not by other reasons
             // ie. Enterprise policy.
-            boolean isDataEnabled = isRequestedDisabled && mApmRequestedUsbDisable.get();
+            boolean isDataEnabled = isRequestedDisabled && mApmRequestedUsbDataStatus.get();
             int usbHalVersion = mUsbManager.getUsbHalVersion();
             // For AIDL implementation, DATA_STATUS_ENABLED is fed back to framework from the HAL
             if (usbHalVersion > UsbManager.USB_HAL_V1_3) {
@@ -703,9 +629,11 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
             int usbChangeStateReattempts = 0;
             while (usbChangeStateReattempts < USB_DATA_CHANGE_MAX_RETRY_ATTEMPTS) {
                 try {
+                    Slog.d(TAG, "Setting USB data: " + status);
                     if (mUsbManagerInternal.enableUsbDataSignal(status, USB_DISABLE_REASON_APM)) {
-                        mApmRequestedUsbDisable.set(status);
+                        mApmRequestedUsbDataStatus.set(status);
                         successfullySetUsbDataSignal = true;
+                        Slog.d(TAG, "Successfully set USB data");
                         break;
                     } else {
                         Slog.e(TAG, "USB Data protection toggle to " + status + " attempt failed");
@@ -755,8 +683,7 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
     private void registerReceiver() {
         final IntentFilter filter = new IntentFilter();
         filter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
-        filter.addAction(ACTION_USER_PRESENT);
-        filter.addAction(ACTION_SCREEN_OFF);
+        filter.addAction(ACTION_LOCKED_BOOT_COMPLETED);
         filter.addAction(UsbManager.ACTION_USB_PORT_CHANGED);
 
         mContext.registerReceiverAsUser(
@@ -771,6 +698,32 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
                 Context.RECEIVER_NOT_EXPORTED);
 
         mBroadcastReceiverIsRegistered = true;
+    }
+
+    private void registerKeyguardLockListener() {
+        KeyguardLockedStateListener keyguardListener =
+                new KeyguardLockedStateListener() {
+                    @Override
+                    public void onKeyguardLockedStateChanged(boolean isKeyguardLocked) {
+                        Slog.d(TAG, "onKeyguardLockedStateChanged: " + isKeyguardLocked);
+                        if (!isKeyguardLocked) {
+                            mDelayedDisableHandler.removeCallbacksAndMessages(null);
+                            cleanUpNotificationHandlerTasks();
+                            if (!currentUserIsGuest()) {
+                                setUsbDataSignalIfPossible(true);
+                                mIsAfterFirstUnlock = true;
+                            }
+                        } else {
+                            setUsbDataSignalIfPossible(false);
+                        }
+                    }
+                };
+        mKeyguardManager.addKeyguardLockedStateListener(
+                mUsbDataSignalUpdateExecutor, keyguardListener);
+    }
+
+    private void unregisterKeyguardLockListener() {
+        mKeyguardManager.removeKeyguardLockedStateListener(mKeyguardLockedStateListener);
     }
 
     private void unregisterReceiver() {
@@ -807,6 +760,11 @@ public class UsbDataAdvancedProtectionHook extends AdvancedProtectionHook {
         }
 
         return null;
+    }
+
+    private boolean currentUserIsGuest() {
+        UserInfo currentUserInfo = mUserManager.getUserInfo(ActivityManager.getCurrentUser());
+        return currentUserInfo != null && currentUserInfo.isGuest();
     }
 
     private boolean canSetUsbDataSignal() {

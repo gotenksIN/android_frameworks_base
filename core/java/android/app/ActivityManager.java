@@ -1106,6 +1106,47 @@ public class ActivityManager {
         return sb.toString();
     }
 
+    // NOTE: If a new PROCESS_CAPABILITY is added, then new fields must be added
+    // to frameworks/base/core/proto/android/app/enums.proto and the following method must
+    // be updated to correctly map between them.
+    // However, if the current ActivityManager values are merely modified, no update should be made
+    // to enums.proto, to which values can only be added but never modified. Note that the proto
+    // versions do NOT have the ordering restrictions of the ActivityManager process capabilities.
+    /**
+     * Maps ActivityManager.PROCESS_CAPABILITY_ values to enums.proto ProcessCapabilityEnum value.
+     *
+     * @param amInt a process capability of the form ActivityManager.PROCESS_CAPABILITY_
+     * @return the value of the corresponding enums.proto ProcessCapabilityEnum value.
+     * @hide
+     */
+    @android.ravenwood.annotation.RavenwoodKeep
+    public static final int processCapabilityAmToProto(int amInt) {
+        switch (amInt) {
+            case PROCESS_CAPABILITY_FOREGROUND_LOCATION:
+                return AppProtoEnums.PROCESS_CAPABILITY_FOREGROUND_LOCATION;
+            case PROCESS_CAPABILITY_FOREGROUND_CAMERA:
+                return AppProtoEnums.PROCESS_CAPABILITY_FOREGROUND_CAMERA;
+            case PROCESS_CAPABILITY_FOREGROUND_MICROPHONE:
+                return AppProtoEnums.PROCESS_CAPABILITY_FOREGROUND_MICROPHONE;
+            case PROCESS_CAPABILITY_POWER_RESTRICTED_NETWORK:
+                return AppProtoEnums.PROCESS_CAPABILITY_POWER_RESTRICTED_NETWORK;
+            case PROCESS_CAPABILITY_BFSL:
+                return AppProtoEnums.PROCESS_CAPABILITY_BFSL;
+            case PROCESS_CAPABILITY_USER_RESTRICTED_NETWORK:
+                return AppProtoEnums.PROCESS_CAPABILITY_USER_RESTRICTED_NETWORK;
+            case PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL:
+                return AppProtoEnums.PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL;
+            case PROCESS_CAPABILITY_CPU_TIME:
+                return AppProtoEnums.PROCESS_CAPABILITY_CPU_TIME;
+            case PROCESS_CAPABILITY_IMPLICIT_CPU_TIME:
+                return AppProtoEnums.PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
+            default:
+                // ActivityManager capabilities
+                // could not be mapped to an AppProtoEnums ProcessCapability capability.
+                return AppProtoEnums.PROCESS_CAPABILITY_UNKNOWN;
+        }
+    }
+
     // NOTE: If PROCESS_STATEs are added, then new fields must be added
     // to frameworks/base/core/proto/android/app/enums.proto and the following method must
     // be updated to correctly map between them.
@@ -3403,6 +3444,91 @@ public class ActivityManager {
         }
     }
 
+    /** @hide */
+    @TestApi
+    @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+    public static final class ConnectionInfo implements Parcelable {
+        /**
+         * Bind service flags.
+         */
+        private final long mFlags;
+
+        /**
+         * Client process name.
+         */
+        private final @NonNull String mProcessName;
+
+        /**
+         * Client package name.
+         */
+        private final @NonNull String mPackageName;
+
+        @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+        /** @hide */
+        public ConnectionInfo(long flags,
+                @NonNull String processName,
+                @NonNull String packageName) {
+            mFlags = flags;
+            mProcessName = processName;
+            mPackageName = packageName;
+        }
+
+        @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+        /** @hide */
+        private ConnectionInfo(@NonNull Parcel source) {
+            mFlags = source.readLong();
+            mProcessName = source.readString8();
+            mPackageName = source.readString8();
+        }
+
+        @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+        /** @hide */
+        public static final @NonNull Creator<ConnectionInfo> CREATOR =
+                new Creator<ConnectionInfo>() {
+                    public ConnectionInfo createFromParcel(Parcel source) {
+                        return new ConnectionInfo(source);
+                    }
+                    public ConnectionInfo[] newArray(int size) {
+                        return new ConnectionInfo[size];
+                    }
+                };
+
+        /**
+         * Write parcel.
+         * @hide
+         */
+        @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+        public void writeToParcel(@NonNull Parcel dest, int flags) {
+            dest.writeLong(mFlags);
+            dest.writeString8(mProcessName);
+            dest.writeString8(mPackageName);
+        }
+
+        /**
+         * Describe contents.
+         * @hide
+         */
+        @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+        public int describeContents() {
+            return 0;
+        }
+
+        @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+        public long getFlags() {
+            return mFlags;
+        }
+
+        @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+        public @NonNull String getProcessName() {
+            return mProcessName;
+        }
+
+        @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+        public @NonNull String getPackageName() {
+            return mPackageName;
+        }
+    }
+
     /**
      * Returns a PendingIntent you can start to show a control panel for the
      * given running service.  If the service does not have a control panel,
@@ -3413,6 +3539,22 @@ public class ActivityManager {
         try {
             return getService()
                     .getRunningServiceControlPanel(service);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns a list of ConnectionInfo for connections bound to a given service.
+     * @hide
+     */
+    @TestApi
+    @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+    public @NonNull List<ConnectionInfo> getRunningServiceConnections(
+            @NonNull ComponentName service) {
+        Objects.requireNonNull(service);
+        try {
+            return getService().getRunningServiceConnections(service);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

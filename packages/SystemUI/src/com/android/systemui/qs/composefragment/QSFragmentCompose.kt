@@ -149,11 +149,14 @@ import com.android.systemui.qs.panels.shared.model.QSFragmentComposeClippingTabl
 import com.android.systemui.qs.panels.ui.compose.EditMode
 import com.android.systemui.qs.panels.ui.compose.QuickQuickSettings
 import com.android.systemui.qs.panels.ui.compose.TileGrid
-import com.android.systemui.qs.shared.ui.ElementKeys
+import com.android.systemui.qs.shared.ui.QuickSettings.Elements
 import com.android.systemui.qs.ui.composable.QuickSettingsShade
 import com.android.systemui.qs.ui.composable.QuickSettingsShade.systemGestureExclusionInShade
 import com.android.systemui.qs.ui.composable.QuickSettingsTheme
 import com.android.systemui.res.R
+import com.android.systemui.shade.ShadeDisplayAware
+import com.android.systemui.statusbar.policy.ConfigurationController
+import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener
 import com.android.systemui.util.LifecycleFragment
 import com.android.systemui.util.animation.MeasurementInput
 import com.android.systemui.util.animation.UniqueObjectHostView
@@ -185,6 +188,7 @@ constructor(
     private val dumpManager: DumpManager,
     @Background private val backgroundDispatcher: CoroutineDispatcher,
     private val mediaLogger: MediaViewLogger,
+    @ShadeDisplayAware private val configurationController: ConfigurationController,
 ) : LifecycleFragment(), QS, Dumpable {
 
     private val scrollListener = MutableStateFlow<QS.ScrollListener?>(null)
@@ -273,11 +277,6 @@ constructor(
             FrameLayout.LayoutParams.MATCH_PARENT,
         )
         return frame
-    }
-
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        view?.dispatchConfigurationChanged(newConfig)
     }
 
     @Composable
@@ -650,6 +649,13 @@ constructor(
         bottomContentPadding = padding
     }
 
+    private val configurationListener =
+        object : ConfigurationListener {
+            override fun onConfigChanged(newConfig: Configuration) {
+                view?.dispatchConfigurationChanged(newConfig)
+            }
+        }
+
     private fun setListenerCollections() {
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -676,6 +682,14 @@ constructor(
                         viewModel.containerViewModel.editModeViewModel.isEditing,
                     ) {
                         setCustomizerShowing(it, EDIT_MODE_TIME_MILLIS.toLong())
+                    }
+                }
+                launch {
+                    try {
+                        configurationController.addCallback(configurationListener)
+                        awaitCancellation()
+                    } finally {
+                        configurationController.removeCallback(configurationListener)
                     }
                 }
             }
@@ -804,7 +818,7 @@ constructor(
                 )
         ) {
             if (viewModel.isQsEnabled) {
-                Element(ElementKeys.QuickSettingsContent, modifier = Modifier.weight(1f)) {
+                Element(Elements.QuickSettingsContent, modifier = Modifier.weight(1f)) {
                     if (alwaysCompose) {
                         // scrollState never changes
                         LaunchedEffect(Unit) {
@@ -957,7 +971,7 @@ constructor(
                 }
                 QuickSettingsTheme {
                     Element(
-                        ElementKeys.FooterActions,
+                        Elements.FooterActions,
                         Modifier.sysuiResTag(ResIdTags.qsFooterActions),
                     ) {
                         FooterActions(
@@ -1095,7 +1109,7 @@ object SceneKeys {
         object : ElementMatcher {
             override fun matches(key: ElementKey, content: ContentKey): Boolean {
                 return content == SceneKeys.QuickQuickSettings &&
-                    ElementKeys.TileElementMatcher.matches(key, content)
+                    Elements.TileElementMatcher.matches(key, content)
             }
         }
 }
@@ -1446,23 +1460,26 @@ private fun ContentScope.MediaObject(
                 },
                 update = { view ->
                     view.update()
-                    // Update layout params if host view bounds are higher than its child.
-                    val height = mediaHost.hostView.height
-                    val width = mediaHost.hostView.width
-                    var measure = false
-                    mediaHost.hostView.children.forEach { child ->
-                        if (
-                            child is FrameLayout && (height > child.height || width > child.width)
-                        ) {
-                            measure = true
-                            child.layoutParams = FrameLayout.LayoutParams(width, height)
+                    if (!Flags.mediaFrameDimensionsFix()) {
+                        // Update layout params if host view bounds are higher than its child.
+                        val height = mediaHost.hostView.height
+                        val width = mediaHost.hostView.width
+                        var measure = false
+                        mediaHost.hostView.children.forEach { child ->
+                            if (
+                                child is FrameLayout &&
+                                    (height > child.height || width > child.width)
+                            ) {
+                                measure = true
+                                child.layoutParams = FrameLayout.LayoutParams(width, height)
+                            }
                         }
-                    }
-                    if (measure) {
-                        mediaHost.hostView.measurementManager.onMeasure(
-                            MeasurementInput(width, height)
-                        )
-                        mediaLogger.logMediaSize("update size in compose", width, height)
+                        if (measure) {
+                            mediaHost.hostView.measurementManager.onMeasure(
+                                MeasurementInput(width, height)
+                            )
+                            mediaLogger.logMediaSize("update size in compose", width, height)
+                        }
                     }
                 },
                 onReset = {},

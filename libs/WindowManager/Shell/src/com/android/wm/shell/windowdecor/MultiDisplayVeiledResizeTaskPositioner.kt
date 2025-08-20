@@ -35,6 +35,7 @@ import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.MultiDisplayDragMoveBoundsCalculator
 import com.android.wm.shell.common.MultiDisplayDragMoveIndicatorController
+import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.transition.Transitions
@@ -57,6 +58,7 @@ class MultiDisplayVeiledResizeTaskPositioner(
     @ShellMainThread private val handler: Handler,
     private val multiDisplayDragMoveIndicatorController: MultiDisplayDragMoveIndicatorController,
     private val desktopState: DesktopState,
+    private val desktopTasksController: DesktopTasksController,
 ) : TaskPositioner, Transitions.TransitionHandler, DisplayController.OnDisplaysChangedListener {
 
     private val dragEventListeners =
@@ -76,7 +78,9 @@ class MultiDisplayVeiledResizeTaskPositioner(
     private var isResizingOrAnimatingResize = false
     @Surface.Rotation private var rotation = 0
     private var startDisplayId = 0
+    private var hasMoved = false
     private val displayIds = mutableSetOf<Int>()
+    private var hasMovedTaskSurfaceOffScreen = false
 
     constructor(
         taskOrganizer: ShellTaskOrganizer,
@@ -87,6 +91,7 @@ class MultiDisplayVeiledResizeTaskPositioner(
         @ShellMainThread handler: Handler,
         multiDisplayDragMoveIndicatorController: MultiDisplayDragMoveIndicatorController,
         desktopState: DesktopState,
+        desktopTasksController: DesktopTasksController,
     ) : this(
         taskOrganizer,
         windowDecoration,
@@ -97,6 +102,7 @@ class MultiDisplayVeiledResizeTaskPositioner(
         handler,
         multiDisplayDragMoveIndicatorController,
         desktopState,
+        desktopTasksController,
     )
 
     init {
@@ -106,10 +112,12 @@ class MultiDisplayVeiledResizeTaskPositioner(
     override fun onDragPositioningStart(ctrlType: Int, displayId: Int, x: Float, y: Float): Rect {
         this.ctrlType = ctrlType
         startDisplayId = displayId
+        hasMovedTaskSurfaceOffScreen = false
         taskBoundsAtDragStart.set(
             windowDecoration.taskInfo.configuration.windowConfiguration.bounds
         )
         repositionStartPoint[x] = y
+        hasMoved = false
         if (isResizing) {
             // Capture CUJ for re-sizing window in DW mode.
             interactionJankMonitor.begin(
@@ -201,23 +209,49 @@ class MultiDisplayVeiledResizeTaskPositioner(
                     displayIds,
                     transactionSupplier,
                 )
-
-                t.setPosition(
-                    windowDecoration.taskSurface,
-                    repositionTaskBounds.left.toFloat(),
-                    repositionTaskBounds.top.toFloat(),
-                )
-                // Make the window translucent in the case when the cursor moves to another display.
-                val alpha =
-                    if (startDisplayId == displayId) {
-                        ALPHA_FOR_WINDOW_ON_DISPLAY_WITH_CURSOR
-                    } else {
-                        ALPHA_FOR_WINDOW_ON_NON_CURSOR_DISPLAY
+                if (DesktopExperienceFlags.ENABLE_WINDOW_DROP_SMOOTH_TRANSITION.isTrue) {
+                    // Move the original task surface off-screen to hide it. A mirrored surface is
+                    // used for the drag indicator on all displays, including the start display.
+                    // This is necessary for independent opacity control, as a mirror's alpha is
+                    // capped by its source.
+                    if (!hasMovedTaskSurfaceOffScreen) {
+                        hasMovedTaskSurfaceOffScreen = true
+                        t.setPosition(
+                            windowDecoration.taskSurface,
+                            startDisplayLayout.width().toFloat(),
+                            startDisplayLayout.height().toFloat(),
+                        )
                     }
-                t.setAlpha(windowDecoration.taskSurface, alpha)
+                } else {
+                    t.setPosition(
+                        windowDecoration.taskSurface,
+                        repositionTaskBounds.left.toFloat(),
+                        repositionTaskBounds.top.toFloat(),
+                    )
+                    // Make the window translucent in the case when the cursor moves to another
+                    // display.
+                    val alpha =
+                        if (startDisplayId == displayId) {
+                            ALPHA_FOR_WINDOW_ON_DISPLAY_WITH_CURSOR
+                        } else {
+                            ALPHA_FOR_WINDOW_ON_NON_CURSOR_DISPLAY
+                        }
+                    t.setAlpha(windowDecoration.taskSurface, alpha)
+                }
             }
             t.setFrameTimeline(Choreographer.getInstance().vsyncId)
             t.apply()
+        }
+        if (!hasMoved) {
+            // Update taskbar rounding once the drag/resize has registered a move event - in case
+            // the moved task is no longer maximized. Only call this once per resize/drag so we
+            // don't call into Launcher with each drag/resize frame to try to update the taskbar.
+            desktopTasksController.updateTaskbarRoundingOnTaskResize(
+                displayId,
+                windowDecoration.taskInfo.taskId,
+                Rect(repositionTaskBounds),
+            )
+            hasMoved = true
         }
         return Rect(repositionTaskBounds)
     }
@@ -307,6 +341,7 @@ class MultiDisplayVeiledResizeTaskPositioner(
         ctrlType = DragPositioningCallback.CTRL_TYPE_UNDEFINED
         taskBoundsAtDragStart.setEmpty()
         repositionStartPoint[0f] = 0f
+        hasMovedTaskSurfaceOffScreen = false
         return Rect(repositionTaskBounds)
     }
 

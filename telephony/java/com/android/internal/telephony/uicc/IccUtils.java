@@ -27,12 +27,16 @@ import android.telephony.UiccPortInfo;
 import android.text.TextUtils;
 
 import com.android.internal.annotations.VisibleForTesting;
+// QTI_BEGIN: 2018-04-12: Telephony: Use proper coded alphabet when a contact is written into EF_ADN of USIM.
 import com.android.internal.telephony.EncodeException;
+// QTI_END: 2018-04-12: Telephony: Use proper coded alphabet when a contact is written into EF_ADN of USIM.
 import com.android.internal.telephony.GsmAlphabet;
 import com.android.telephony.Rlog;
 
 import java.io.UnsupportedEncodingException;
+// QTI_BEGIN: 2018-04-12: Telephony: Use proper coded alphabet when a contact is written into EF_ADN of USIM.
 import java.nio.charset.Charset;
+// QTI_END: 2018-04-12: Telephony: Use proper coded alphabet when a contact is written into EF_ADN of USIM.
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 

@@ -259,7 +259,9 @@ class DemoMobileConnectionRepository(
 // QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
     override val imsRegistrationTech = MutableStateFlow(REGISTRATION_TECH_NONE)
 // QTI_END: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2023-06-26: Data: Separate exclamation mark display for mobile network
     override val isConnectionFailed = MutableStateFlow(false)
+// QTI_END: 2023-06-26: Data: Separate exclamation mark display for mobile network
 // QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     override val ciwlanAvailable = MutableStateFlow(false)
 // QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature

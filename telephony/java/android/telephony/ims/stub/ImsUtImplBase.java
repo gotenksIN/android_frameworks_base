@@ -150,13 +150,19 @@ public class ImsUtImplBase {
                     condition, number), "queryCallForward");
         }
 
+// QTI_BEGIN: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
         @Override
         public int queryCFForServiceClass(int condition, String number, int serviceClass) throws
                 RemoteException {
+// QTI_END: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
+// QTI_BEGIN: 2022-11-15: Telephony: [Thread-safety] Update API to use Executor pattern
              return executeMethodAsyncForResult(() -> ImsUtImplBase.this.queryCFForServiceClass(
                     condition, number, serviceClass), "queryCFForServiceClass");
+// QTI_END: 2022-11-15: Telephony: [Thread-safety] Update API to use Executor pattern
+// QTI_BEGIN: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
         }
 
+// QTI_END: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
         @Override
         public int queryCallWaiting() throws RemoteException {
             return executeMethodAsyncForResult(() -> ImsUtImplBase.this.queryCallWaiting(),
@@ -342,15 +348,19 @@ public class ImsUtImplBase {
         return -1;
     }
 
+// QTI_BEGIN: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
     /**
      * Retrieves the configuration of the call forward for specified service class.
      */
+// QTI_END: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
     @SuppressLint({"AcronymName", "UnflaggedApi"})
+// QTI_BEGIN: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
     public int queryCFForServiceClass(int condition, String number,
             int serviceClass) {
         return -1;
     }
 
+// QTI_END: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
     /**
      * Retrieves the configuration of the call waiting.
      */

@@ -223,18 +223,24 @@ public class TelephonyIcons {
     // in QSCarrier#hasValidTypeContentDescription
     //
     public static final MobileIconGroup FIVE_G = new MobileIconGroup(
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Use same URI format for SSSS and DSDS
             "5G",
             R.string.data_connection_5g,
+// QTI_END: 2018-12-18: Telephony: SystemUI: Use same URI format for SSSS and DSDS
             TelephonyIcons.ICON_5G);
 
     public static final MobileIconGroup FIVE_G_BASIC = new MobileIconGroup(
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             "5GBasic",
             R.string.data_connection_5g_basic,
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             TelephonyIcons.ICON_5G_BASIC);
 
     public static final MobileIconGroup FIVE_G_UWB = new MobileIconGroup(
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             "5GUWB",
             R.string.data_connection_5g_uwb,
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             TelephonyIcons.ICON_5G_UWB);
 
     public static final MobileIconGroup FIVE_G_A = new MobileIconGroup(
@@ -248,39 +254,51 @@ public class TelephonyIcons {
             TelephonyIcons.ICON_5G_PLUS_PLUS);
 
     public static final MobileIconGroup FIVE_G_SA = new MobileIconGroup(
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Use same URI format for SSSS and DSDS
             "5GSA",
             R.string.data_connection_5g_sa,
+// QTI_END: 2018-12-18: Telephony: SystemUI: Use same URI format for SSSS and DSDS
             TelephonyIcons.ICON_5G_SA);
 
     public static final MobileIconGroup VOWIFI = new MobileIconGroup(
+// QTI_BEGIN: 2020-06-01: Telephony: SystemUI: support VoWIFI icons
             "VoWIFI",
             0,
+// QTI_END: 2020-06-01: Telephony: SystemUI: support VoWIFI icons
             TelephonyIcons.ICON_VOWIFI);
 
     public static final MobileIconGroup VOWIFI_CALLING = new MobileIconGroup(
+// QTI_BEGIN: 2020-06-01: Telephony: SystemUI: support VoWIFI icons
             "VoWIFICall",
             0,
+// QTI_END: 2020-06-01: Telephony: SystemUI: support VoWIFI icons
             TelephonyIcons.ICON_VOWIFI_CALLING);
 
 // QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
     public static final MobileIconGroup FIVE_G_BASIC_6RX = new MobileIconGroup(
             "5GBasic_6Rx",
 // QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description
             R.string.data_connection_5g_basic,
+// QTI_END: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description
 // QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             TelephonyIcons.ICON_5G_BASIC_6RX);
 
     public static final MobileIconGroup FIVE_G_UWB_6RX = new MobileIconGroup(
             "5GUWB_6Rx",
 // QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description
             R.string.data_connection_5g_uwb,
+// QTI_END: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description
 // QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             TelephonyIcons.ICON_5G_UWB_6RX);
 
     public static final MobileIconGroup FIVE_G_PLUS_PLUS_6RX = new MobileIconGroup(
             "5G_PLUS_PLUS_6Rx",
 // QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description
             R.string.data_connection_5g_plus_plus,
+// QTI_END: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description
 // QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             TelephonyIcons.ICON_5G_PLUS_PLUS_6RX);
 
@@ -307,7 +325,9 @@ public class TelephonyIcons {
         ICON_NAME_TO_ICON.put("lte+", LTE_PLUS);
         ICON_NAME_TO_ICON.put("5g", NR_5G);
         ICON_NAME_TO_ICON.put("5g_plus", NR_5G_PLUS);
+// QTI_BEGIN: 2019-07-19: Telephony: Show 5GUWB icon for mmWave using AOSP interface
         ICON_NAME_TO_ICON.put("5guwb", FIVE_G_UWB);
+// QTI_END: 2019-07-19: Telephony: Show 5GUWB icon for mmWave using AOSP interface
         ICON_NAME_TO_ICON.put("5g_plus_plus", FIVE_G_PLUS_PLUS);
         ICON_NAME_TO_ICON.put("datadisable", DATA_DISABLED);
         ICON_NAME_TO_ICON.put("notdefaultdata", NOT_DEFAULT_DATA);

@@ -371,7 +371,11 @@
         <item>LDAC</item>
         <item>LC3</item>
         <item>Opus</item>
+<!-- QTI_BEGIN: 2018-07-17: Bluetooth: BT: Adding aptX-Adaptive codec entry to Framework-->
+<!-- QTI_END: 2018-07-17: Bluetooth: BT: Adding aptX-Adaptive codec entry to Framework-->
         <item><xliff:g id="qualcomm">Qualcomm®</xliff:g> <xliff:g id="aptx_adaptive">aptX™ Adaptive</xliff:g> audio</item>
+<!-- QTI_BEGIN: 2019-04-04: Bluetooth: TWS-A2DP: Add TWS+ codec to DevUI support-->
+<!-- QTI_END: 2019-04-04: Bluetooth: TWS-A2DP: Add TWS+ codec to DevUI support-->
         <item><xliff:g id="qualcomm">Qualcomm®</xliff:g> <xliff:g id="aptx_twsp">aptX™ TWS+</xliff:g> audio</item>
     </string-array>
 
@@ -385,7 +389,11 @@
         <item>LDAC</item>
         <item>LC3</item>
         <item>Opus</item>
+<!-- QTI_BEGIN: 2018-07-17: Bluetooth: BT: Adding aptX-Adaptive codec entry to Framework-->
+<!-- QTI_END: 2018-07-17: Bluetooth: BT: Adding aptX-Adaptive codec entry to Framework-->
         <item><xliff:g id="qualcomm">Qualcomm®</xliff:g> <xliff:g id="aptx_adaptive">aptX™ Adaptive</xliff:g> audio</item>
+<!-- QTI_BEGIN: 2019-04-04: Bluetooth: TWS-A2DP: Add TWS+ codec to DevUI support-->
+<!-- QTI_END: 2019-04-04: Bluetooth: TWS-A2DP: Add TWS+ codec to DevUI support-->
         <item><xliff:g id="qualcomm">Qualcomm®</xliff:g> <xliff:g id="aptx_twsp">aptX™ TWS+</xliff:g> audio</item>
     </string-array>
 

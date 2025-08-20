@@ -230,7 +230,9 @@ public class MobileMappings {
         public boolean enableRatIconEnhancement = false;
         public boolean showVowifiIcon = false;
         public boolean enableDdsRatIconEnhancement = false;
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
         public boolean crossSimdisplaySingnalLevel = false;
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
 // QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         public boolean show6RxIcon = true;
 // QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
@@ -266,8 +268,10 @@ public class MobileMappings {
                         CarrierConfigManager.KEY_SHOW_4G_FOR_3G_DATA_ICON_BOOL);
                 config.hideLtePlus = b.getBoolean(
                         CarrierConfigManager.KEY_HIDE_LTE_PLUS_DATA_ICON_BOOL);
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
                 config.crossSimdisplaySingnalLevel = b.getBoolean(
                         CarrierConfigManager.KEY_CARRIER_CROSS_SIM_DISPLAY_SIGNAL_STRENGTH_BOOL);
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
             }
 
             config.alwaysShowNetworkTypeIcon = res.getBoolean(R.bool.config_alwaysShowTypeIcon);

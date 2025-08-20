@@ -32,7 +32,9 @@ import com.android.settingslib.flags.Flags;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
+// QTI_BEGIN: 2023-05-27: Bluetooth: CSIP: Fix abnormal behaviour during unpair
 import java.util.HashSet;
+// QTI_END: 2023-05-27: Bluetooth: CSIP: Fix abnormal behaviour during unpair
 import java.util.List;
 import java.util.Set;
 
@@ -98,8 +100,10 @@ public class CachedBluetoothDeviceManager {
                 return cachedDevice;
             }
             // Check the member devices for the coordinated set if it exists
+// QTI_BEGIN: 2023-05-27: Bluetooth: CSIP: Fix abnormal behaviour during unpair
             final Set<CachedBluetoothDevice> memberDevices =
                     new HashSet<CachedBluetoothDevice>(cachedDevice.getMemberDevice());
+// QTI_END: 2023-05-27: Bluetooth: CSIP: Fix abnormal behaviour during unpair
             if (!memberDevices.isEmpty()) {
                 for (CachedBluetoothDevice memberDevice : memberDevices) {
                     if (memberDevice.getDevice().equals(device)) {

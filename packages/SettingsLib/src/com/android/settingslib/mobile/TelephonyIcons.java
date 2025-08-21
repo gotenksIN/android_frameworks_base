@@ -69,8 +69,8 @@ public class TelephonyIcons {
             flagged(R.drawable.ic_5g_plus_mobiledata, R.drawable.ic_5g_plus_mobiledata_updated);
     public static final int ICON_CWF =
             flagged(R.drawable.ic_carrier_wifi, R.drawable.ic_carrier_wifi_updated);
-    public static final int ICON_5G_SA = R.drawable.ic_5g_mobiledata;
-    public static final int ICON_5G_BASIC = R.drawable.ic_5g_mobiledata;
+    public static final int ICON_5G_SA = R.drawable.ic_5g_mobiledata_updated;
+    public static final int ICON_5G_BASIC = R.drawable.ic_5g_mobiledata_updated;
     public static final int ICON_5G_UWB = R.drawable.ic_5g_uwb_mobiledata;
     public static final int ICON_5G_PLUS_PLUS = R.drawable.ic_5g_plus_plus_mobiledata;
     public static final int ICON_5G_A = R.drawable.ic_5g_a_mobiledata;

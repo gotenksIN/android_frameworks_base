@@ -38,6 +38,7 @@ import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobile
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModelKairos
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.ModernStatusBarViewBinding
 import com.android.systemui.statusbar.pipeline.shared.ui.composable.StackedMobileIcon
+import com.android.systemui.statusbar.pipeline.shared.ui.composable.CustomStackedMobileIcon
 import com.android.systemui.statusbar.pipeline.shared.ui.view.SingleBindableStatusBarComposeIconView
 import com.android.systemui.util.composable.kairos.rememberKairosActivatable
 
@@ -81,7 +82,7 @@ object StackedMobileIconBinder {
                             val tint by tintFlow.collectAsStateWithLifecycle()
                             if (viewModel.isIconVisible) {
                                 CompositionLocalProvider(LocalContentColor provides Color(tint)) {
-                                    StackedMobileIcon(
+                                    CustomStackedMobileIcon(
                                         viewModel,
                                         modifier = Modifier.onSizeChanged { view.requestLayout() },
                                     )

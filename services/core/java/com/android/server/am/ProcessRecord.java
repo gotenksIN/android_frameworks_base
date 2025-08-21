@@ -98,8 +98,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     volatile ApplicationInfo info; // all about the first app in the process
     final ProcessInfo processInfo; // if non-null, process-specific manifest info
     final boolean appZygote;    // true if this is forked from the app zygote
-    final int userId;           // user of process.
-    final String processName;   // name of the process
     final String sdkSandboxClientAppPackage; // if this is an sdk sandbox process, name of the
                                              // app package for which it is running
     final String sdkSandboxClientAppVolumeUuid; // uuid of the app for which the sandbox is running
@@ -281,18 +279,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
      */
     @CompositeRWLock({"mService", "mProcLock"})
     private ActiveInstrumentation mInstr;
-
-    /**
-     * True when proc has been killed by activity manager, not for RAM.
-     */
-    @CompositeRWLock({"mService", "mProcLock"})
-    private boolean mKilledByAm;
-
-    /**
-     * True once we know the process has been killed.
-     */
-    @CompositeRWLock({"mService", "mProcLock"})
-    private boolean mKilled;
 
     /**
      * The timestamp in uptime when this process was killed.
@@ -533,9 +519,9 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         pw.print(prefix); pw.print("startSeq="); pw.println(mStartSeq);
         pw.print(prefix); pw.print("mountMode="); pw.println(
                 DebugUtils.valueToString(Zygote.class, "MOUNT_EXTERNAL_", mMountMode));
-        if (mKilled || mKilledByAm || mWaitingToKill != null) {
-            pw.print(prefix); pw.print("killed="); pw.print(mKilled);
-            pw.print(" killedByAm="); pw.print(mKilledByAm);
+        if (isKilled() || isKilledByAm() || mWaitingToKill != null) {
+            pw.print(prefix); pw.print("killed="); pw.print(isKilled());
+            pw.print(" killedByAm="); pw.print(isKilledByAm());
             pw.print(" waitingToKill="); pw.println(mWaitingToKill);
         }
         if (mIsolatedEntryPoint != null || mIsolatedEntryPointArgs != null) {
@@ -596,8 +582,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         processInfo = procInfo;
         appZygote = (UserHandle.getAppId(_uid) >= Process.FIRST_APP_ZYGOTE_ISOLATED_UID
                 && UserHandle.getAppId(_uid) <= Process.LAST_APP_ZYGOTE_ISOLATED_UID);
-        userId = UserHandle.getUserId(_uid);
-        processName = _processName;
         sdkSandboxClientAppPackage = _sdkSandboxClientAppPackage;
         if (isSdkSandbox) {
             final ApplicationInfo clientInfo = getClientInfoForSdkSandbox();
@@ -680,8 +664,9 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         mPkgDeps = pkgDeps;
     }
 
+    @Override
     @GuardedBy(anyOf = {"mService", "mProcLock"})
-    int getPid() {
+    public int getPid() {
         return mPid;
     }
 
@@ -704,6 +689,25 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     @GuardedBy(anyOf = {"mService", "mProcLock"})
     IApplicationThread getThread() {
         return mThread;
+    }
+
+    @Override
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
+    public boolean isProcessRunning() {
+        return mThread != null;
+    }
+
+    @Override
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
+    public void setProcessStateToThread(int state) {
+        if (mThread == null) {
+            return;
+        }
+
+        try {
+            mThread.setProcessState(state);
+        } catch (RemoteException ignored) {
+        }
     }
 
     @GuardedBy(anyOf = {"mService", "mProcLock"})
@@ -776,11 +780,19 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         mProfile.onProcessInactive(tracker);
     }
 
+    @Override
     @GuardedBy(anyOf = {"mService", "mProcLock"})
-    boolean useFifoUiScheduling() {
+    public boolean useFifoUiScheduling() {
+        // TODO: b/439611239 - Migrate control of mAllowSpecifiedFifoScheduling to
+        //  ProcessStateController.
         return mService.mUseFifoUiScheduling
                 || (mService.mAllowSpecifiedFifoScheduling
                         && mWindowProcessController.useFifoUiScheduling());
+    }
+
+    @Override
+    public void notifyTopProcChanged() {
+        mWindowProcessController.onTopProcChanged();
     }
 
     @GuardedBy("mService")
@@ -934,7 +946,8 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     }
 
     @GuardedBy("mProcLock")
-    int getRenderThreadTid() {
+    @Override
+    public int getRenderThreadTid() {
         return mRenderThreadTid;
     }
 
@@ -1020,32 +1033,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     @GuardedBy(anyOf = {"mService", "mProcLock"})
     public boolean hasActiveInstrumentation() {
         return mInstr != null;
-    }
-
-    @GuardedBy(anyOf = {"mService", "mProcLock"})
-    boolean isKilledByAm() {
-        return mKilledByAm;
-    }
-
-    @GuardedBy({"mService", "mProcLock"})
-    void setKilledByAm(boolean killedByAm) {
-        mKilledByAm = killedByAm;
-    }
-
-    @GuardedBy(anyOf = {"mService", "mProcLock"})
-    boolean isKilled() {
-        return mKilled;
-    }
-
-    @GuardedBy({"mService", "mProcLock"})
-    void setKilled(boolean killed) {
-        mKilled = killed;
-        if (killed && processName.equals(info.packageName)) {
-            if (mService.mUxPerf != null) {
-                mService.mUxPerf.perfHint(
-                    BoostFramework.VENDOR_HINT_UNPIN_FILE, info.packageName, 0, 0);
-            }
-        }
     }
 
     @GuardedBy(anyOf = {"mService", "mProcLock"})
@@ -1203,6 +1190,22 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     }
 
     @Override
+    public boolean isShowingUiWhileDozing() {
+        return mWindowProcessController.isShowingUiWhileDozing();
+    }
+
+    @Override
+    public int getActivityStateFlagsLegacy() {
+        return mWindowProcessController.getActivityStateFlags();
+    }
+
+    @Override
+    public long getPerceptibleTaskStoppedTimeMillisLegacy() {
+        return mWindowProcessController.getPerceptibleTaskStoppedTimeMillis();
+    }
+
+
+    @Override
     public boolean isReceivingBroadcast(int[] outSchedGroup) {
         return mService.isReceivingBroadcastLocked(this, outSchedGroup);
     }
@@ -1229,6 +1232,21 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     }
 
     @Override
+    public boolean isFrozen() {
+        return mOptRecord.isFrozen();
+    }
+
+    @Override
+    public boolean isPendingFreeze() {
+        return mOptRecord.isPendingFreeze();
+    }
+
+    @Override
+    public boolean isFreezeExempt() {
+        return mOptRecord.isFreezeExempt();
+    }
+
+    @Override
     public boolean shouldNotFreeze() {
         return mOptRecord.shouldNotFreeze();
     }
@@ -1245,8 +1263,23 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     }
 
     @Override
+    public int shouldNotFreezeAdjSeq() {
+        return mOptRecord.shouldNotFreezeAdjSeq();
+    }
+
+    @Override
     public int getApplicationUid() {
         return info.uid;
+    }
+
+    @Override
+    public long getLastPss() {
+        return mProfile.getLastPss();
+    }
+
+    @Override
+    public long getLastRss() {
+        return mProfile.getLastRss();
     }
 
     boolean hasActivitiesOrRecentTasks() {
@@ -1304,7 +1337,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     void scheduleCrashLocked(String message, int exceptionTypeId, @Nullable Bundle extras) {
         // Checking killedbyAm should keep it from showing the crash dialog if the process
         // was already dead for a good / normal reason.
-        if (!mKilledByAm) {
+        if (!isKilledByAm()) {
             if (mThread != null) {
                 if (mPid == Process.myPid()) {
                     Slog.w(TAG, "scheduleCrash: trying to crash system process!");
@@ -1356,7 +1389,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     @GuardedBy("mService")
     void killLocked(String reason, String description, @Reason int reasonCode,
             @SubReason int subReason, boolean noisy, boolean asyncKPG) {
-        if (!mKilledByAm) {
+        if (!isKilledByAm()) {
             if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                 Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
                         "kill/" + processName + "/" + reasonCode + "/" + subReason);
@@ -1386,8 +1419,8 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
             }
             if (!mPersistent) {
                 synchronized (mProcLock) {
-                    mKilled = true;
-                    mKilledByAm = true;
+                    setKilled(true);
+                    setKilledByAm(true);
                     mKillTime = SystemClock.uptimeMillis();
                 }
             }

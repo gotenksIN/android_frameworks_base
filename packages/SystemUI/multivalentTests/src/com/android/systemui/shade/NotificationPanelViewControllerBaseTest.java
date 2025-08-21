@@ -362,7 +362,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                         mTestScope.getBackgroundScope(),
                         mFakeKeyguardRepository,
                         mShadeRepository
-                ));
+                ),
+                mKosmos.getSceneInteractor());
         SystemClock systemClock = new FakeSystemClock();
         mStatusBarStateController = new StatusBarStateControllerImpl(
                 mUiEventLogger,

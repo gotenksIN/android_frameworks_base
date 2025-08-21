@@ -47,6 +47,7 @@ import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_FLEX_HYBRID
 import static com.android.wm.shell.common.split.SplitLayout.RESTING_DIM_LAYER;
 import static com.android.wm.shell.common.split.SplitScreenUtils.reverseSplitPosition;
 import static com.android.wm.shell.common.split.SplitScreenUtils.splitFailureMessage;
+import static com.android.wm.shell.common.split.SplitScreenUtils.getNewParentTokenForStage;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN;
 import static com.android.wm.shell.shared.TransitionUtil.isClosingType;
 import static com.android.wm.shell.shared.TransitionUtil.isOpeningMode;
@@ -148,6 +149,7 @@ import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.bubbles.BubbleController;
 import com.android.wm.shell.common.ComponentUtils;
+import com.android.wm.shell.common.DisplayChangeController;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayImeController;
 import com.android.wm.shell.common.DisplayInsetsController;
@@ -207,7 +209,8 @@ import java.util.function.Predicate;
  * - Both stages are put under a single-top root task.
  */
 public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
-        DisplayController.OnDisplaysChangedListener, Transitions.TransitionHandler,
+        DisplayController.OnDisplaysChangedListener,
+        DisplayChangeController.OnDisplayChangingListener, Transitions.TransitionHandler,
         ShellTaskOrganizer.TaskListener, StageTaskListener.StageListenerCallbacks,
         SplitMultiDisplayProvider {
 
@@ -330,15 +333,12 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
 
         // Find the current split-screen root task info.
-        RunningTaskInfo currentRootTaskInfo = null;
-        for (int id : mSplitMultiDisplayHelper.getCachedOrSystemDisplayIds()) {
-            final RunningTaskInfo rootTaskInfo =
-                    mSplitMultiDisplayHelper.getDisplayRootTaskInfo(id);
-            if (rootTaskInfo != null) {
-                currentRootTaskInfo = rootTaskInfo;
-                break;
-            }
-        }
+        RunningTaskInfo currentRootTaskInfo = mSplitMultiDisplayHelper.getCachedOrSystemDisplayIds()
+                .stream()
+                .map(id -> mSplitMultiDisplayHelper.getDisplayRootTaskInfo(id))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
 
         if (currentRootTaskInfo == null) {
             throw new IllegalStateException("Failed to find current split screen root task info.");
@@ -522,6 +522,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mSplitTransitions = new SplitScreenTransitions(transactionPool, transitions,
                 this::onTransitionAnimationComplete, this);
         mDisplayController.addDisplayWindowListener(this);
+        mDisplayController.addDisplayChangingController(this);
         transitions.addHandler(this);
         mSplitUnsupportedToast = Toast.makeText(mContext,
                 R.string.dock_non_resizeble_failed_to_dock_text, Toast.LENGTH_SHORT);
@@ -663,16 +664,19 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     .filter(stage -> stage.getId() == stageToTop)
                     .findFirst().orElse(null);
             if (stageToDeactivate != null) {
-                stageToDeactivate.deactivate(wct, true /*toTop*/);
+                stageToDeactivate.deactivate(wct, true /*reparentTasksToTop*/,
+                        getNewParentTokenForStage(stageToDeactivate, mRootTDAOrganizer));
             } else {
                 // If no one stage is meant to go to the top, deactivate all stages to move any
                 // child tasks out from under their respective stage root tasks.
                 mStageOrderOperator.getAllStages().forEach(stage ->
-                        stage.deactivate(wct, false /*reparentTasksToTop*/));
+                        stage.deactivate(wct, false /*reparentTasksToTop*/, null));
             }
             mStageOrderOperator.onExitingSplit();
         } else {
-            mMainStage.deactivate(wct, stageToTop == STAGE_TYPE_MAIN);
+            mMainStage.deactivate(
+                    wct, stageToTop == STAGE_TYPE_MAIN,
+                    getNewParentTokenForStage(mMainStage, mRootTDAOrganizer));
         }
     }
 
@@ -1791,8 +1795,11 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         // TODO: b/393217881 - replace DEFAULT DISPLAY with the current display id
         RunningTaskInfo rootTaskInfo =
                 mSplitMultiDisplayHelper.getDisplayRootTaskInfo(DEFAULT_DISPLAY);
+
         if (childrenToTop == null || childrenToTop.getTopVisibleChildTaskId() == INVALID_TASK_ID) {
-            mSideStage.removeAllTasks(wct, false /* toTop */);
+            mSideStage.removeAllTasks(
+                    wct, false /* toTop */,
+                    getNewParentTokenForStage(mSideStage, mRootTDAOrganizer));
             deactivateSplit(wct, STAGE_TYPE_UNDEFINED);
             wct.reorder(rootTaskInfo.token, false /* onTop */);
             setRootForceTranslucent(true, wct);
@@ -1823,7 +1830,9 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     WindowContainerTransaction finishedWCT = new WindowContainerTransaction();
                     mIsExiting = false;
                     deactivateSplit(finishedWCT, childrenToTop.getId());
-                    mSideStage.removeAllTasks(finishedWCT, childrenToTop == mSideStage /* toTop */);
+                    mSideStage.removeAllTasks(
+                            finishedWCT, childrenToTop == mSideStage /* toTop */,
+                            getNewParentTokenForStage(mSideStage, mRootTDAOrganizer));
                     finishedWCT.reorder(rootTaskInfo.token, false /* toTop */);
                     setRootForceTranslucent(true, finishedWCT);
                     finishedWCT.setBounds(mSideStage.mRootTaskInfo.token, mTempRect1);
@@ -1982,9 +1991,12 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         if (enableFlexibleSplit()) {
             mStageOrderOperator.getActiveStages().stream()
                     .filter(stage -> stage.getId() != stageToTop)
-                    .forEach(stage -> stage.removeAllTasks(wct, false /*toTop*/));
+                    .forEach(stage ->
+                            stage.removeAllTasks(wct, false /*toTop*/,
+                                    getNewParentTokenForStage(stage, mRootTDAOrganizer)));
         } else {
-            mSideStage.removeAllTasks(wct, stageToTop == STAGE_TYPE_SIDE);
+            mSideStage.removeAllTasks(wct, stageToTop == STAGE_TYPE_SIDE,
+                    getNewParentTokenForStage(mSideStage, mRootTDAOrganizer));
         }
 
         if (exitReason != EXIT_REASON_DESKTOP_MODE) {
@@ -3042,14 +3054,6 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mTaskOrganizer.applyTransaction(wct);
     }
 
-    public void onDisplayAdded(int displayId) {
-        if (displayId != DEFAULT_DISPLAY) {
-            return;
-        }
-        ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "onDisplayAdded: display=%d", displayId);
-        mDisplayController.addDisplayChangingController(this::onDisplayChange);
-    }
-
     /**
      * Update surfaces of the split screen layout based on the current state
      * @param transaction to write the updates to
@@ -3059,7 +3063,15 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mSplitLayout.update(transaction, true /* resetImePosition */);
     }
 
-    private void onDisplayChange(int displayId, int fromRotation, int toRotation,
+    /**
+     *
+     * @param displayId display id of the display that is under the change
+     * @param fromRotation rotation before the change
+     * @param toRotation rotation after the change
+     * @param newDisplayAreaInfo display area info after applying the update
+     * @param wct A task transaction to populate.
+     */
+    public void onDisplayChange(int displayId, int fromRotation, int toRotation,
             @Nullable DisplayAreaInfo newDisplayAreaInfo, WindowContainerTransaction wct) {
         if (displayId != DEFAULT_DISPLAY || !isSplitActive()) {
             return;
@@ -3069,9 +3081,10 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 "onDisplayChange: display=%d fromRot=%d toRot=%d config=%s",
                 displayId, fromRotation, toRotation,
                 newDisplayAreaInfo != null ? newDisplayAreaInfo.configuration : null);
-        mSplitLayout.rotateTo(toRotation);
         if (newDisplayAreaInfo != null) {
             mSplitLayout.updateConfiguration(newDisplayAreaInfo.configuration);
+        } else {
+            mSplitLayout.rotateTo(toRotation);
         }
         updateWindowBounds(mSplitLayout, wct);
         sendOnBoundsChanged();

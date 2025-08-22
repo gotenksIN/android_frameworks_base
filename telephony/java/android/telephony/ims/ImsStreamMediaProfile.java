@@ -183,7 +183,9 @@ public final class ImsStreamMediaProfile implements Parcelable {
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public ImsStreamMediaProfile() {
+// QTI_BEGIN: 2015-06-29: Telephony: IMS: Initialize audio quality with NONE instead of AMR_WB.
         mAudioQuality = AUDIO_QUALITY_NONE;
+// QTI_END: 2015-06-29: Telephony: IMS: Initialize audio quality with NONE instead of AMR_WB.
         mAudioDirection = DIRECTION_SEND_RECEIVE;
         mVideoQuality = VIDEO_QUALITY_NONE;
         mVideoDirection = DIRECTION_INVALID;

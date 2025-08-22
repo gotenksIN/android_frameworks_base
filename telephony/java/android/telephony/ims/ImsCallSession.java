@@ -450,6 +450,7 @@ public class ImsCallSession {
         public void callSessionSuppServiceReceived(ImsCallSession session,
                 ImsSuppServiceNotification suppServiceInfo) {
         }
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
 
         /**
          * Received RTT modify request from Remote Party
@@ -472,6 +473,7 @@ public class ImsCallSession {
         public void callSessionRttMessageReceived(String rttMessage) {
             // no-op
         }
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
 
         /**
          * While in call, there has been a change in RTT audio indicator.
@@ -1165,6 +1167,7 @@ public class ImsCallSession {
         }
     }
 
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
     /**
      * Sends Rtt Message
      *
@@ -1182,9 +1185,13 @@ public class ImsCallSession {
     }
 
     /**
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
      * Sends RTT Upgrade or downgrade request
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
      *
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
      * @param to Profile with the RTT flag set to the desired value
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
      */
     public void sendRttModifyRequest(ImsCallProfile to) {
         if (mClosed) {
@@ -1213,6 +1220,7 @@ public class ImsCallSession {
         }
     }
 
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
     /**
      * Requests that {@code rtpHeaderExtensions} are sent as a header extension with the next
      * RTP packet sent by the IMS stack.
@@ -1648,10 +1656,12 @@ public class ImsCallSession {
             }, mListenerExecutor);
         }
 
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
         /**
          * Received RTT modify request from remote party
          */
         @Override
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
         public void callSessionRttModifyRequestReceived(ImsCallProfile callProfile) {
             TelephonyUtils.runWithCleanCallingIdentity(()-> {
                 if (mListener != null) {
@@ -1659,6 +1669,7 @@ public class ImsCallSession {
                             callProfile);
                 }
             }, mListenerExecutor);
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
         }
 
         /**
@@ -1666,11 +1677,13 @@ public class ImsCallSession {
          */
         @Override
         public void callSessionRttModifyResponseReceived(int status) {
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
             TelephonyUtils.runWithCleanCallingIdentity(()-> {
                 if (mListener != null) {
                     mListener.callSessionRttModifyResponseReceived(status);
                 }
             }, mListenerExecutor);
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
         }
 
         /**
@@ -1678,12 +1691,15 @@ public class ImsCallSession {
          */
         @Override
         public void callSessionRttMessageReceived(String rttMessage) {
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
             TelephonyUtils.runWithCleanCallingIdentity(()-> {
                 if (mListener != null) {
                     mListener.callSessionRttMessageReceived(rttMessage);
                 }
             }, mListenerExecutor);
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
         }
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
 
         /**
          * While in call, there has been a change in RTT audio indicator.

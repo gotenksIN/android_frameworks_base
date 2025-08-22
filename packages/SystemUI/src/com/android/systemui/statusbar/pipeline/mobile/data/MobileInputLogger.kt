@@ -284,6 +284,7 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
             { "Lost prioritized network (nedId=$int1)" },
         )
     }
+// QTI_BEGIN: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
 
     fun logImsStateCallbackRegistered(registered: Boolean, subId: Int) {
         buffer.log(
@@ -312,6 +313,7 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
     fun logException(ex: Exception, logMsg: String) {
         buffer.log(TAG, LogLevel.ERROR, {}, { logMsg }, exception = ex)
     }
+// QTI_END: 2024-04-17: Data: SystemUI: Fix ImsStateCallback registration failure issue
 }
 
 private const val TAG = "MobileInputLog"

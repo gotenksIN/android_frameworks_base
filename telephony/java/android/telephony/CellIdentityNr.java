@@ -188,6 +188,7 @@ public final class CellIdentityNr extends CellIdentity {
 // QTI_BEGIN: 2022-09-11: Telephony: CAG and SNPN feature
                 && mAdditionalPlmns.equals(o.mAdditionalPlmns)
 // QTI_END: 2022-09-11: Telephony: CAG and SNPN feature
+// QTI_BEGIN: 2022-10-06: Telephony: CAG and SNPN feature
                 && equalsHandlesNulls(mSnpnInfo, o.mSnpnInfo)
                 && equalsHandlesNulls(mCagInfo, o.mCagInfo);
     }
@@ -201,6 +202,7 @@ public final class CellIdentityNr extends CellIdentity {
      */
     private static boolean equalsHandlesNulls (Object a, Object b) {
         return (a == null) ? (b == null) : a.equals (b);
+// QTI_END: 2022-10-06: Telephony: CAG and SNPN feature
     }
 
     /**

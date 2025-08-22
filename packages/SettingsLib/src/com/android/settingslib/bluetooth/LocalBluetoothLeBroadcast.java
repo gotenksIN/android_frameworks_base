@@ -151,7 +151,9 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     private BluetoothLeBroadcastMetadata mBluetoothLeBroadcastMetadata;
     private BluetoothLeAudioContentMetadata.Builder mBuilder;
     private int mBroadcastId = UNKNOWN_VALUE_PLACEHOLDER;
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     private final Object mBroadcastIdLock = new Object();
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     private String mAppSourceName = "";
     private String mNewAppSourceName = "";
     private boolean mIsBroadcastProfileReady = false;
@@ -720,15 +722,19 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
 
     private void setLatestBroadcastId(int broadcastId) {
         Log.d(TAG, "setLatestBroadcastId: mBroadcastId is " + broadcastId);
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             mBroadcastId = broadcastId;
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     public int getLatestBroadcastId() {
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             return mBroadcastId;
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     private void setAppSourceName(String appSourceName, boolean updateContentResolver) {
@@ -759,12 +765,14 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
 
     private void setLatestBluetoothLeBroadcastMetadata(
             BluetoothLeBroadcastMetadata bluetoothLeBroadcastMetadata) {
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             if (bluetoothLeBroadcastMetadata != null
                     && bluetoothLeBroadcastMetadata.getBroadcastId() == mBroadcastId) {
                 mBluetoothLeBroadcastMetadata = bluetoothLeBroadcastMetadata;
                 updateBroadcastInfoFromBroadcastMetadata(bluetoothLeBroadcastMetadata);
             }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         }
     }
 
@@ -779,6 +787,7 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                 || mBluetoothLeBroadcastMetadata.getBroadcastId() != mBroadcastId) {
             final List<BluetoothLeBroadcastMetadata> metadataList =
                     mServiceBroadcast.getAllBroadcastMetadata();
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
             synchronized (mBroadcastIdLock) {
                 Log.d(TAG, "mBroadcastId: " + mBroadcastId);
                 mBluetoothLeBroadcastMetadata =
@@ -787,6 +796,7 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                                 .findFirst()
                                 .orElse(null);
             }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
             Log.d(TAG, "getLatestBluetoothLeBroadcastMetadata for broadcast id " + mBroadcastId);
         }
         return mBluetoothLeBroadcastMetadata;
@@ -861,9 +871,11 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
      * the corresponding callback {@link BluetoothLeBroadcast.Callback}.
      */
     public void stopLatestBroadcast() {
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             stopBroadcast(mBroadcastId);
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     /**
@@ -898,9 +910,11 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
         }
         mNewAppSourceName = appSourceName;
         mBluetoothLeAudioContentMetadata = mBuilder.setProgramInfo(programInfo).build();
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             mServiceBroadcast.updateBroadcast(mBroadcastId, mBluetoothLeAudioContentMetadata);
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     /**
@@ -934,9 +948,11 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                             + " programInfo = "
                             + programInfo);
         }
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             mServiceBroadcast.updateBroadcast(mBroadcastId, settings);
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     /**
@@ -1132,13 +1148,17 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     private String getDefaultValueOfBroadcastName() {
         // set the default value;
         int postfix = ThreadLocalRandom.current().nextInt(DEFAULT_CODE_MIN, DEFAULT_CODE_MAX);
+// QTI_BEGIN: 2025-04-03: Bluetooth: Revert "To keep broadcast name to be under 32 char, limit the phone name prefix to at most 27 char."
         return BluetoothAdapter.getDefaultAdapter().getName() + UNDERLINE + postfix;
+// QTI_END: 2025-04-03: Bluetooth: Revert "To keep broadcast name to be under 32 char, limit the phone name prefix to at most 27 char."
     }
 
     private String getDefaultValueOfProgramInfo() {
         // set the default value;
         int postfix = ThreadLocalRandom.current().nextInt(DEFAULT_CODE_MIN, DEFAULT_CODE_MAX);
+// QTI_BEGIN: 2025-04-03: Bluetooth: Revert "To keep broadcast name to be under 32 char, limit the phone name prefix to at most 27 char."
         return BluetoothAdapter.getDefaultAdapter().getName() + UNDERLINE + postfix;
+// QTI_END: 2025-04-03: Bluetooth: Revert "To keep broadcast name to be under 32 char, limit the phone name prefix to at most 27 char."
     }
 
     private byte[] getDefaultValueOfBroadcastCode() {
@@ -1152,9 +1172,11 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
         }
         setAppSourceName("", /* updateContentResolver= */ true);
         mBluetoothLeBroadcastMetadata = null;
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             mBroadcastId = UNKNOWN_VALUE_PLACEHOLDER;
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     private static String generateRandomPassword() {
@@ -1278,12 +1300,14 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                         device -> {
                             List<BluetoothLeBroadcastReceiveState> sourceList =
                                     mServiceBroadcastAssistant.getAllSources(device);
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
                             synchronized (mBroadcastIdLock) {
                                 return !sourceList.isEmpty() && sourceList.stream().anyMatch(
                                         source -> hysteresisModeFixEnabled
                                                 ? BluetoothUtils.isSourceMatched(source, mBroadcastId)
                                                 : BluetoothUtils.isConnected(source));
                             }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
                         })
                 .collect(Collectors.groupingBy(
                         device -> BluetoothUtils.getGroupId(mDeviceManager.findDevice(device))));

@@ -658,6 +658,7 @@ public class TelephonyManager {
         }
     }
 
+// QTI_BEGIN: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
     /**
      * The allowed values for multi sim voice capability
      *
@@ -674,10 +675,16 @@ public class TelephonyManager {
         static final int PSEUDO_DSDA = 2;
         /** Concurrent calls on both subscriptions are possible */
         static final int DSDA = 3;
+// QTI_END: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
+// QTI_BEGIN: 2025-01-22: Telephony: Introduce new MultiSimVoiceCapability value
         /** MultiSimVoiceCapability is unsupported/deprecated */
         static final int UNSUPPORTED = 4;
+// QTI_END: 2025-01-22: Telephony: Introduce new MultiSimVoiceCapability value
+// QTI_BEGIN: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
     }
 
+// QTI_END: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
+// QTI_BEGIN: 2023-03-16: Telephony: DSDA: Add APIs to support DSDA -> DSDS transition use cases
     /**
      * Returns true if on multisim devices, DSDA features are supported in non-DSDA modes
      * Returns false otherwise
@@ -687,6 +694,7 @@ public class TelephonyManager {
         return TelephonyProperties.dsds_transition_supported().orElse(false);
     }
 
+// QTI_END: 2023-03-16: Telephony: DSDA: Add APIs to support DSDA -> DSDS transition use cases
 
     /**
      * Returns the number of phones available.

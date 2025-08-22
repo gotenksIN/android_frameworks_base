@@ -47,7 +47,9 @@ import android.util.LruCache;
 import android.util.Pair;
 import android.view.InputDevice;
 
+// QTI_BEGIN: 2018-05-17: Bluetooth: Unpair both earbuds on unpair.
 import android.os.SystemProperties;
+// QTI_END: 2018-05-17: Bluetooth: Unpair both earbuds on unpair.
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -177,9 +179,11 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
     @VisibleForTesting
     LruCache<String, BitmapDrawable> mDrawableCache;
 
+// QTI_BEGIN: 2022-04-23: Bluetooth: Csip: Add below enhancements
     private int mGroupId;
 
     private int mQGroupId;
+// QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
 // QTI_BEGIN: 2020-12-18: Audio: Group-UI: UI frameworks changes
 
     private boolean mIsGroupDevice = false;
@@ -191,8 +195,10 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
     static final int PRIVATE_ADDR = 101;
 
 // QTI_END: 2020-12-18: Audio: Group-UI: UI frameworks changes
+// QTI_BEGIN: 2022-10-07: Bluetooth: CSIP: Use Updated API for csip ICON.
     private boolean mIsLeAudioEnabled = false;
 
+// QTI_END: 2022-10-07: Bluetooth: CSIP: Use Updated API for csip ICON.
 
     private final Handler mHandler = new Handler(Looper.getMainLooper()) {
         @Override
@@ -227,7 +233,9 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mDevice = device;
         fillData();
         mGroupId = BluetoothCsipSetCoordinator.GROUP_ID_INVALID;
+// QTI_BEGIN: 2022-04-23: Bluetooth: Csip: Add below enhancements
         mQGroupId = BluetoothCsipSetCoordinator.GROUP_ID_INVALID;
+// QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
         initDrawableCache();
         mTwspBatteryState = -1;
         mTwspBatteryLevel = -1;
@@ -561,6 +569,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         return mGroupId;
     }
 
+// QTI_BEGIN: 2022-04-23: Bluetooth: Csip: Add below enhancements
     /**
     * Get the coordinated set QC group id.
     *
@@ -570,6 +579,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         return mQGroupId;
     }
 
+// QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
     /**
     * Set the coordinated set group id.
     *
@@ -725,7 +735,9 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         fetchActiveDevices();
         migratePhonebookPermissionChoice();
         migrateMessagePermissionChoice();
+// QTI_BEGIN: 2022-10-07: Bluetooth: CSIP: Use Updated API for csip ICON.
         setLeAudioEnabled();
+// QTI_END: 2022-10-07: Bluetooth: CSIP: Use Updated API for csip ICON.
         dispatchAttributesChanged();
     }
 
@@ -1165,8 +1177,10 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
 
         if (bondState == BluetoothDevice.BOND_BONDED) {
             mBondTimestamp = new Timestamp(System.currentTimeMillis());
+// QTI_BEGIN: 2019-06-26: Bluetooth: GAP: Reset bondingInitiatedLocally flag(1/3)
             boolean mIsBondingInitiatedLocally = mDevice.isBondingInitiatedLocally();
             Log.w(TAG, "mIsBondingInitiatedLocally" + mIsBondingInitiatedLocally);
+// QTI_END: 2019-06-26: Bluetooth: GAP: Reset bondingInitiatedLocally flag(1/3)
             if (mIsBondingInitiatedLocally) {
                  connect();
             }
@@ -2287,6 +2301,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
      * @return {@code true} if {@code cachedBluetoothDevice} is a2dp device
      */
     public boolean isConnectedA2dpDevice() {
+// QTI_BEGIN: 2018-05-30: Bluetooth: BT-A2dpSink: Prevent force close during pairing
         A2dpProfile a2dpProfile = mProfileManager.getA2dpProfile();
         A2dpSinkProfile a2dpSinkProfile = mProfileManager.getA2dpSinkProfile();
         Log.i(TAG, "a2dpProfile :" + a2dpProfile + " a2dpSinkProfile :" + a2dpSinkProfile);
@@ -2295,9 +2310,12 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                 BluetoothProfile.STATE_CONNECTED;
         } else if (a2dpSinkProfile != null) {
             return a2dpSinkProfile.getConnectionStatus(mDevice) ==
+// QTI_END: 2018-05-30: Bluetooth: BT-A2dpSink: Prevent force close during pairing
                 BluetoothProfile.STATE_CONNECTED;
+// QTI_BEGIN: 2018-05-30: Bluetooth: BT-A2dpSink: Prevent force close during pairing
         }
         return false;
+// QTI_END: 2018-05-30: Bluetooth: BT-A2dpSink: Prevent force close during pairing
     }
 
     /**
@@ -2515,6 +2533,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mBluetoothManager = bluetoothManager;
     }
 
+// QTI_BEGIN: 2022-10-07: Bluetooth: CSIP: Use Updated API for csip ICON.
     void setLeAudioEnabled(){
         mIsLeAudioEnabled =  (mProfileManager.getLeAudioProfile() != null );
     }
@@ -2522,6 +2541,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
     boolean isLeAudioEnabled(){
         return mIsLeAudioEnabled;
     }
+// QTI_END: 2022-10-07: Bluetooth: CSIP: Use Updated API for csip ICON.
 
     @VisibleForTesting
     void setIsDeviceStylus(Boolean isDeviceStylus) {

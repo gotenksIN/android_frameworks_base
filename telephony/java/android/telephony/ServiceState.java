@@ -1037,13 +1037,9 @@ public class ServiceState implements Parcelable {
             case RIL_RADIO_TECHNOLOGY_LTE_CA:
                 rtString = "LTE_CA";
                 break;
-// QTI_BEGIN: 2019-06-21: Telephony: Add NR data RAT support
             case RIL_RADIO_TECHNOLOGY_NR:
-// QTI_END: 2019-06-21: Telephony: Add NR data RAT support
                 rtString = "NR_SA";
-// QTI_BEGIN: 2019-06-21: Telephony: Add NR data RAT support
                 break;
-// QTI_END: 2019-06-21: Telephony: Add NR data RAT support
             default:
                 rtString = "Unexpected";
                 Rlog.w(LOG_TAG, "Unexpected radioTechnology=" + rt);
@@ -1650,9 +1646,7 @@ public class ServiceState implements Parcelable {
                 return RIL_RADIO_TECHNOLOGY_IWLAN;
             case TelephonyManager.NETWORK_TYPE_LTE_CA:
                 return RIL_RADIO_TECHNOLOGY_LTE_CA;
-// QTI_BEGIN: 2019-06-21: Telephony: Add NR data RAT support
             case TelephonyManager.NETWORK_TYPE_NR:
-// QTI_END: 2019-06-21: Telephony: Add NR data RAT support
                 return RIL_RADIO_TECHNOLOGY_NR;
             default:
                 return RIL_RADIO_TECHNOLOGY_UNKNOWN;

@@ -34,15 +34,21 @@ package android.util;
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.content.Context;
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 import android.database.ContentObserver;
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 // QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
 import android.graphics.BLASTBufferQueue;
 // QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 import android.net.Uri;
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 // QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
 import android.os.SystemProperties;
 // QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 import android.provider.Settings;
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 import android.util.Log;
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
@@ -81,6 +87,7 @@ public class BoostFramework {
     public final int board_first_api_lvl = SystemProperties.getInt("ro.board.first_api_level", 0);
     public final int board_api_lvl = SystemProperties.getInt("ro.board.api_level", 0);
 // QTI_END: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
     //key in privider settings global
     public static final String KEY_LEGACY_UI_PERF_PKGS = "LEGACY_UI_PERF_PROCS";
     public static final String KEY_GPU_PREFER = "UI_PERF_GPU_PREFER";
@@ -100,6 +107,7 @@ public class BoostFramework {
     private String[] mUIPerfCpuAggressive = null;
     private UiPerfProcsObserver mContentObserver = null;
     private boolean mUiPerfInited = false;
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 /** @hide */
@@ -193,10 +201,12 @@ public class BoostFramework {
 // QTI_BEGIN: 2023-12-10: Core: Send top-app pid and renderthread tid to perf-hal
     public static final int VENDOR_HINT_PASS_PID = 0x0000109C;
 // QTI_END: 2023-12-10: Core: Send top-app pid and renderthread tid to perf-hal
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
     public static final int VENDOR_HINT_SCENARIO_GPU = 0x000010AA;
     public static final int VENDOR_HINT_SCENARIO_CPU = 0x000010AB;
     public static final int VENDOR_HINT_SCENARIO_CPU_GPU = 0x000010AC;
     public static final int VENDOR_HINT_SCENARIO_CPU_AGGRESSIVE = 0x000010AD;
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     //perf events
     public static final int VENDOR_HINT_FIRST_DRAW = 0x00001042;
@@ -1222,6 +1232,7 @@ public class BoostFramework {
         }
     }
 // QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 
     public boolean isUiPerfEnabled(Context context, String pkgName) {
         if (pkgName == null || pkgName.isEmpty()) {
@@ -1373,6 +1384,7 @@ public class BoostFramework {
             }
         }
     }
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 };
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.

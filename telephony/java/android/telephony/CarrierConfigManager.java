@@ -977,7 +977,6 @@ public class CarrierConfigManager {
     public static final String KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL =
             "carrier_wfc_supports_wifi_only_bool";
 
-// QTI_BEGIN: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
     /**
      * Flag specifying whether WFC over IMS supports the "ims preferred" option.  If false, the wifi
      * calling settings will not include an option for "ims preferred".  If true, the wifi calling
@@ -990,7 +989,6 @@ public class CarrierConfigManager {
             "carrier_wfc_supports_ims_preferred_bool";
 
 
-// QTI_END: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
     /**
      * Default mode for WFC over IMS on home network:
      * <ul>
@@ -2275,9 +2273,7 @@ public class CarrierConfigManager {
             "show_precise_failed_cause_bool";
 
 
-// QTI_BEGIN: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
     /**
-// QTI_END: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
      * A list of carrier nr availability is used to determine whether the carrier enable the
      * non-standalone (NSA) mode of 5G NR, standalone (SA) mode of 5G NR
      *
@@ -2289,9 +2285,7 @@ public class CarrierConfigManager {
      * If the carrier doesn't support 5G NR, the value is the empty array.
      * If the key is invalid or not configured, the default value {
      * {@link #CARRIER_NR_AVAILABILITY_NSA},{@link #CARRIER_NR_AVAILABILITY_SA}} will apply.
-// QTI_BEGIN: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
      */
-// QTI_END: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
     public static final String KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY =
             "carrier_nr_availabilities_int_array";
 
@@ -2800,16 +2794,12 @@ public class CarrierConfigManager {
     public static final String KEY_ALLOW_ADD_CALL_DURING_VIDEO_CALL_BOOL =
             "allow_add_call_during_video_call";
 
-// QTI_BEGIN: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
     /**
-// QTI_END: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
      * When {@code true}, indicates that video calls can be put on hold in order to swap to another
      * call (e.g. a new outgoing call).
      * <p>
      * This is {@code true} by default.
-// QTI_BEGIN: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
      */
-// QTI_END: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
     public static final String KEY_ALLOW_HOLD_VIDEO_CALL_BOOL = "allow_hold_video_call_bool";
 
     /**
@@ -10873,7 +10863,6 @@ public class CarrierConfigManager {
             "carrier_supports_multianchor_conference";
 
 // QTI_END: 2020-03-01: Telephony: IMS: Add new Carrier Config.
-// QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /**
      * String array of APN configurations of same MVNO type GID.
      * The entries should be of form "GID data:all supported apn types:devicecapability:apnname".
@@ -10891,8 +10880,7 @@ public class CarrierConfigManager {
     public static final String KEY_REQUIRE_APN_FILTERING_WITH_RADIO_CAPABILITY =
             "require_apn_filtering_with_radio_capability_bool";
 
-// QTI_END: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
-// QTI_BEGIN: 2021-03-02: AndroidCore: IMS: Add new carrier config.
+// QTI_BEGIN: 2021-03-02: Telephony: IMS: Add new carrier config.
     /**
      * Determines whether carrier supports Sms Callback Mode.
      * When {@code true}, modem can enter/exit SMS callback mode (SCBM) after sending e911 SMS.
@@ -10905,7 +10893,7 @@ public class CarrierConfigManager {
     public static final String KEY_USE_SMS_CALLBACK_MODE_BOOL =
             "use_sms_callback_mode_bool";
 
-// QTI_END: 2021-03-02: AndroidCore: IMS: Add new carrier config.
+// QTI_END: 2021-03-02: Telephony: IMS: Add new carrier config.
 // QTI_BEGIN: 2022-09-09: Telephony: Add 5G Ultra Wideband icon carrier config keys
     /**
      * Determines the SIB2 value for showing the 5G Ultra Wideband icon.
@@ -11262,9 +11250,7 @@ public class CarrierConfigManager {
 // QTI_END: 2024-01-11: Telephony: Add config to show signal strength for MSIM CIWLAN
         sDefaults.putBoolean(KEY_ENABLE_CROSS_SIM_CALLING_ON_OPPORTUNISTIC_DATA_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL, false);
-// QTI_BEGIN: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_IMS_PREFERRED_BOOL, false);
-// QTI_END: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ROAMING_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_PROMOTE_WFC_ON_CALL_FAIL_BOOL, false);
@@ -12010,9 +11996,7 @@ public class CarrierConfigManager {
         sDefaults.putString(KEY_CALL_COMPOSER_PICTURE_SERVER_URL_STRING, "");
         sDefaults.putBoolean(KEY_USE_ACS_FOR_RCS_BOOL, false);
         sDefaults.putBoolean(KEY_NETWORK_TEMP_NOT_METERED_SUPPORTED_BOOL, true);
-// QTI_BEGIN: 2020-03-23: Telephony: IMS: Add new carrier config.
         sDefaults.putInt(KEY_DEFAULT_RTT_MODE_INT, 0);
-// QTI_END: 2020-03-23: Telephony: IMS: Add new carrier config.
         sDefaults.putBoolean(KEY_STORE_SIM_PIN_FOR_UNATTENDED_REBOOT_BOOL, true);
         sDefaults.putBoolean(KEY_HIDE_ENABLE_2G, false);
         sDefaults.putStringArray(KEY_ALLOWED_INITIAL_ATTACH_APN_TYPES_STRING_ARRAY,
@@ -12024,7 +12008,6 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_DISPLAY_NO_DATA_NOTIFICATION_ON_PERMANENT_FAILURE_BOOL, false);
         sDefaults.putBoolean(KEY_UNTHROTTLE_DATA_RETRY_WHEN_TAC_CHANGES_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_SUPPORTS_MULTIANCHOR_CONFERENCE, false);
-// QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
         sDefaults.putStringArray(KEY_MULTI_APN_ARRAY_FOR_SAME_GID, new String[] {
                 "52FF:mms,supl,hipri,default,fota:SA:nrphone",
                 "52FF:mms,supl,hipri,default,fota:NSA:nxtgenphone",
@@ -12044,10 +12027,9 @@ public class CarrierConfigManager {
                 "53FF:mms,supl,hipri,default,fota:1xRTT:nxtgenphone",
         });
         sDefaults.putBoolean(KEY_REQUIRE_APN_FILTERING_WITH_RADIO_CAPABILITY, false);
-// QTI_END: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
-// QTI_BEGIN: 2021-03-02: AndroidCore: IMS: Add new carrier config.
+// QTI_BEGIN: 2021-03-02: Telephony: IMS: Add new carrier config.
         sDefaults.putBoolean(KEY_USE_SMS_CALLBACK_MODE_BOOL, false);
-// QTI_END: 2021-03-02: AndroidCore: IMS: Add new carrier config.
+// QTI_END: 2021-03-02: Telephony: IMS: Add new carrier config.
         sDefaults.putBoolean(KEY_VONR_SETTING_VISIBILITY_BOOL, true);
         sDefaults.putBoolean(KEY_VONR_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_VONR_ON_BY_DEFAULT_BOOL, true);

@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 
 package android.database.sqlite;
 
@@ -26,8 +28,10 @@ import android.content.res.Resources;
 import android.os.StatFs;
 import android.os.SystemProperties;
 
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 import android.os.Process;
 
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 /**
  * Provides access to SQLite functions that affect all database connection,
  * such as memory management.
@@ -61,9 +65,11 @@ public final class SQLiteGlobal {
     /** @hide */
     public static volatile String sDefaultSyncMode;
 
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
     private static final String UI_PERF_PROP = "debug.ui.perfmode.enable";
     private static final String UI_PERF_PROC_PROP = "debug.ui.perfmode.process";
 
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
     private SQLiteGlobal() {
     }
 
@@ -95,10 +101,12 @@ public final class SQLiteGlobal {
      * Gets the default journal mode when WAL is not in use.
      */
     public static @SQLiteDatabase.JournalMode String getDefaultJournalMode() {
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
         if (SystemProperties.getBoolean(UI_PERF_PROP, false) &&
                 SystemProperties.get(UI_PERF_PROC_PROP, "").equals(Process.myProcessName())) {
             return SystemProperties.get("debug.sqlite.journalmode", "PERSIST");
         }
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
         return SystemProperties.get("debug.sqlite.journalmode",
                 Resources.getSystem().getString(
                 com.android.internal.R.string.db_default_journal_mode));
@@ -122,10 +130,12 @@ public final class SQLiteGlobal {
         if (defaultMode != null) {
             return defaultMode;
         }
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
         if (SystemProperties.getBoolean(UI_PERF_PROP, false) &&
                 SystemProperties.get(UI_PERF_PROC_PROP, "").equals(Process.myProcessName())) {
             return SystemProperties.get("debug.sqlite.syncmode", "OFF");
         }
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
         return SystemProperties.get("debug.sqlite.syncmode",
                 Resources.getSystem().getString(
                 com.android.internal.R.string.db_default_sync_mode));

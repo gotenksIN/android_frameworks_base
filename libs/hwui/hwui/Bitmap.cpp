@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 #include "Bitmap.h"
 
 #include <android-base/file.h>
@@ -80,11 +82,13 @@ constexpr bool bitmap_ashmem_long_name() { return false; }
 }
 #endif
 
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 #include <cutils/properties.h>
 extern const char* __progname;
 #define UI_PERFMODE "debug.ui.perfmode.enable"
 #define UI_PERFMODE_PROCESS "debug.ui.perfmode.process"
 
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 namespace android {
 
 #ifdef __ANDROID__
@@ -680,6 +684,7 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
         return false;
     }
 
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
     bool ui_perf_enabled = false;
     char value[PROPERTY_VALUE_MAX];
     memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
@@ -692,12 +697,14 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
         }
     }
 
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
     switch (format) {
         case JavaCompressFormat::Jpeg: {
             SkJpegEncoder::Options options;
             options.fQuality = quality;
             return SkJpegEncoder::Encode(stream, bitmap.pixmap(), options);
         }
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
         case JavaCompressFormat::Png: {
             if (ui_perf_enabled) {
                 SkPngEncoder::Options options;
@@ -705,8 +712,11 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
                 options.fFilterFlags = SkPngEncoder::FilterFlag::kNone;
                 return SkPngEncoder::Encode(stream, bitmap.pixmap(), options);
             }
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
             return SkPngEncoder::Encode(stream, bitmap.pixmap(), {});
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
             }
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
         case JavaCompressFormat::Webp: {
             SkWebpEncoder::Options options;
             if (quality >= 100) {
@@ -724,9 +734,11 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
             options.fQuality = quality;
             options.fCompression = format == JavaCompressFormat::WebpLossy ?
                     SkWebpEncoder::Compression::kLossy : SkWebpEncoder::Compression::kLossless;
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
             if (ui_perf_enabled) {
                 options.fCompression = SkWebpEncoder::Compression::kLossless;
             }
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
             return SkWebpEncoder::Encode(stream, bitmap.pixmap(), options);
         }
     }

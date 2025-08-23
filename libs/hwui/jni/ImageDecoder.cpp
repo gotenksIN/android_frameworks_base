@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 
 #include "ImageDecoder.h"
 
@@ -53,11 +55,13 @@
 #include "NinePatchPeeker.h"
 #include "Utils.h"
 
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 #include <cutils/properties.h>
 extern const char* __progname;
 #define UI_PERFMODE "debug.ui.perfmode.enable"
 #define UI_PERFMODE_PROCESS "debug.ui.perfmode.process"
 
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 using namespace android;
 
 jclass gImageDecoder_class;
@@ -301,6 +305,7 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
         colorType = decoder->mCodec->computeOutputColorType(colorType);
     }
 
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
     bool should_use_sw = false;
     if (decoder->mCodec->getEncodedFormat() == SkEncodedImageFormat::kHEIF) {
         char value[PROPERTY_VALUE_MAX];
@@ -315,8 +320,11 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
         }
     }
 
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
     const bool isHardware = !requireMutable
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
         && ((allocator == kDefault_Allocator && !should_use_sw) ||
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
             allocator == kHardware_Allocator)
         && colorType != kGray_8_SkColorType;
 

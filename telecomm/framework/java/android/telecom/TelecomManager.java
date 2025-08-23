@@ -202,7 +202,6 @@ public class TelecomManager {
     public static final String ACTION_DEFAULT_DIALER_CHANGED =
             "android.telecom.action.DEFAULT_DIALER_CHANGED";
 
-// QTI_BEGIN: 2018-06-13: Bluetooth: BT: Send info if call is CS type from telecomm service to BT apps.
     /**
      *@hide Broadcast intent action indicating the call type(CS call or Non-CS call).
      * The string extra {@link #EXTRA_CALL_TYPE_CS} will contain the
@@ -214,7 +213,6 @@ public class TelecomManager {
             "codeaurora.telecom.action.CALL_TYPE";
 
 
-// QTI_END: 2018-06-13: Bluetooth: BT: Send info if call is CS type from telecomm service to BT apps.
     /**
      * Activity action: Triggers the calling UI and initiates a call back to a previous call
      * made by the application. The specific call to be re-called is identified by the UUID,
@@ -581,7 +579,6 @@ public class TelecomManager {
     public static final String EXTRA_CALL_NETWORK_TYPE =
             "android.telecom.extra.CALL_NETWORK_TYPE";
 
-// QTI_BEGIN: 2018-06-13: Bluetooth: BT: Send info if call is CS type from telecomm service to BT apps.
     /**
      *@hide  Extra value used to provide the call type for {@link #ACTION_CALL_TYPE}.
      */
@@ -589,7 +586,6 @@ public class TelecomManager {
             "codeaurora.telecom.extra.CALL_TYPE_CS";
 
 
-// QTI_END: 2018-06-13: Bluetooth: BT: Send info if call is CS type from telecomm service to BT apps.
     /**
      * An optional {@link android.content.Intent#ACTION_CALL} intent extra denoting the
      * package name of the app specifying an alternative gateway for the call.

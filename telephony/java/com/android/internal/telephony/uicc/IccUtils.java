@@ -152,11 +152,9 @@ public class IccUtils {
         trans[2] = (byte) ((data[2 + offset] & 0xF0) | ((data[1 + offset] >> 4) & 0xF));
         String ret = bytesToHexString(trans);
 
-// QTI_BEGIN: 2018-03-13: Telephony: Change to "F" to match the upper case PLMN
         // For a valid plmn we trim all character 'F'
         if (ret.contains("F")) {
             ret = ret.replaceAll("F", "");
-// QTI_END: 2018-03-13: Telephony: Change to "F" to match the upper case PLMN
         }
         return ret;
     }

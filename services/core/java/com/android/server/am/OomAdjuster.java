@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 
 package com.android.server.am;
 
@@ -397,7 +399,9 @@ public abstract class OomAdjuster {
 
     public static BoostFramework mPerf = new BoostFramework();
 // QTI_END: 2019-06-26: Core: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
     private int mLegacyUiPerfHandler = -1;
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 
     private final int mNumSlots;
     protected final ArrayList<ProcessRecordInternal> mTmpProcessList = new ArrayList<>();
@@ -2461,6 +2465,7 @@ public abstract class OomAdjuster {
             try {
                 final int renderThreadTid = app.getRenderThreadTid();
                 if (curSchedGroup == SCHED_GROUP_TOP_APP) {
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
                     if (mLegacyUiPerfHandler == -1) {
                         int hint = mPerf.getLegacyUiPerfHint(mService.mContext,
                                                              app.info.packageName);
@@ -2476,6 +2481,7 @@ public abstract class OomAdjuster {
                             mLegacyUiPerfHandler = -1;
                         }
                     }
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
                     // do nothing if we already switched to RT
                     if (oldSchedGroup != SCHED_GROUP_TOP_APP) {
                         app.notifyTopProcChanged();

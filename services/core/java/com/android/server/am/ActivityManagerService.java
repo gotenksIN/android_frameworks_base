@@ -3615,8 +3615,6 @@ public class ActivityManagerService extends IActivityManager.Stub
 // QTI_BEGIN: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
                 mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_KILL, app.processName, 2, 0, pid);
 // QTI_END: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
-// QTI_BEGIN: 2025-08-06: Core: base: pin/unpin files based on launch and exit for vendor pinner service
-// QTI_END: 2025-08-06: Core: base: pin/unpin files based on launch and exit for vendor pinner service
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
 
@@ -4800,8 +4798,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                     pid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
             }
 // QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2025-08-06: Core: base: pin/unpin files based on launch and exit for vendor pinner service
-// QTI_END: 2025-08-06: Core: base: pin/unpin files based on launch and exit for vendor pinner service
         }
 
         synchronized (mProcLock) {

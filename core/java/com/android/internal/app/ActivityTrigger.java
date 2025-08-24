@@ -52,14 +52,22 @@ public class ActivityTrigger
 
     /** @hide */
 // QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2019-06-26: Core: Add start support for Activity Trigger
     public void activityStartTrigger(ApplicationInfo appInfo, int pid) {
+// QTI_END: 2019-06-26: Core: Add start support for Activity Trigger
+// QTI_BEGIN: 2018-11-12: Core: Removed activity trigger whitelist related support
         int reserved =0;
+// QTI_END: 2018-11-12: Core: Removed activity trigger whitelist related support
 // QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
         String activity = null;
 // QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2019-06-26: Core: Add start support for Activity Trigger
         activity = appInfo.packageName + "/" + appInfo.processName + "/" +
                appInfo.longVersionCode + "/" + pid;
+// QTI_END: 2019-06-26: Core: Add start support for Activity Trigger
+// QTI_BEGIN: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
         native_at_startApp(activity, reserved);
+// QTI_END: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
 // QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     }
 
@@ -98,7 +106,9 @@ public class ActivityTrigger
 
     private native int native_at_startActivity(String activity, int flags);
 // QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
     private native int native_at_startApp(String activity, int flags);
+// QTI_END: 2019-09-24: Core: Revert "Add a filter to recieve app start info."
 // QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
     private native void native_at_resumeActivity(String activity);
     private native void native_at_pauseActivity(String activity);

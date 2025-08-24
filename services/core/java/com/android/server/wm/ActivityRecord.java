@@ -194,7 +194,9 @@ import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_SWITCH;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_TRANSITION;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_USER_LEAVING;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_VISIBILITY;
+// QTI_BEGIN: 2020-10-14: Core: Add Compile-time Flag to Enable/Disable Servicetracker Logs
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_SERVICETRACKER;
+// QTI_END: 2020-10-14: Core: Add Compile-time Flag to Enable/Disable Servicetracker Logs
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_ADD_REMOVE;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_APP;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_CONFIGURATION;
@@ -558,7 +560,9 @@ public final class ActivityRecord extends WindowToken {
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     public boolean launching;      // is activity launch in progress?
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2021-03-11: Core: DSR: Fix broken DSR
     public boolean translucentWindowLaunch; // a translucent window launch?
+// QTI_END: 2021-03-11: Core: DSR: Fix broken DSR
     boolean nowVisible;     // is this activity's window visible?
     boolean mClientVisibilityDeferred;// was the visibility change message to client deferred?
     boolean idle;           // has the activity gone idle?
@@ -2001,8 +2005,10 @@ public final class ActivityRecord extends WindowToken {
         super.setClientVisible(true);
         idle = false;
         hasBeenLaunched = false;
+// QTI_BEGIN: 2021-03-11: Core: DSR: Fix broken DSR
         launching = false;
         translucentWindowLaunch = false;
+// QTI_END: 2021-03-11: Core: DSR: Fix broken DSR
         mTaskSupervisor = supervisor;
 
         info.taskAffinity = computeTaskAffinity(info.taskAffinity, info.applicationInfo.uid);
@@ -3910,7 +3916,9 @@ public final class ActivityRecord extends WindowToken {
         }
         makeFinishingLocked();
 
+// QTI_BEGIN: 2021-02-05: Core: Update ActivityPluginDelegate notifications for S
         getRootTask().onARStopTriggered(this);
+// QTI_END: 2021-02-05: Core: Update ActivityPluginDelegate notifications for S
         final boolean activityRemoved = destroyImmediately("finish-imm:" + reason);
 
         // If the display does not have running activity, the configuration may need to be
@@ -6210,7 +6218,9 @@ public final class ActivityRecord extends WindowToken {
             callServiceTrackeronActivityStatechange(STARTED, true);
 // QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             setState(STARTED, "makeActiveIfNeeded");
+// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
             acquireActivityBoost();
+// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
 
             final StartActivityItem item = new StartActivityItem(token, takeSceneTransitionInfo());
             try {
@@ -6218,7 +6228,9 @@ public final class ActivityRecord extends WindowToken {
             } catch (RemoteException e) {
                 // TODO(b/323801078): remove Exception when cleanup
                 Slog.w(TAG, "Exception thrown sending start: " + intent.getComponent(), e);
+// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
                 releaseActivityBoost();
+// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
             }
             // The activity may be waiting for stop, but that is no longer appropriate if we are
             // starting the activity again
@@ -6381,9 +6393,11 @@ public final class ActivityRecord extends WindowToken {
 
         mTaskSupervisor.updateHomeProcessIfNeeded(this);
         try {
+// QTI_BEGIN: 2024-07-31: Core: Launch preferred apps only for home activity
             if (isActivityTypeHome()) {
                 mTaskSupervisor.new PreferredAppsTask().execute();
             }
+// QTI_END: 2024-07-31: Core: Launch preferred apps only for home activity
         } catch (Exception e) {
             Slog.v (TAG, "Exception: " + e);
         }
@@ -6733,11 +6747,14 @@ public final class ActivityRecord extends WindowToken {
     }
 
 // QTI_END: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
     protected void acquireActivityBoost() {
         if (mPerf != null) {
+// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
             if (mPerf.shouldUseUiPerf(mWmService.mContext, packageName)) {
                 return;
             }
+// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
             if (mPerf.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
                 int pkgType = mPerf.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                         packageName);
@@ -6770,6 +6787,7 @@ public final class ActivityRecord extends WindowToken {
         }
     }
 
+// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
 // QTI_BEGIN: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
     /** Called when the windows associated app window container are drawn. */
     private void onWindowsDrawn() {

@@ -3872,6 +3872,7 @@ public class AudioManager {
      *
      */
     public void setParameters(String keyValuePairs) {
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
         List swbKeys = Arrays.asList("bt_lc3_swb","bt_swb");
         boolean hasSwbParams= false;
         String[] kvpairs = keyValuePairs.split(";");
@@ -3880,7 +3881,11 @@ public class AudioManager {
             hasSwbParams = swbKeys.contains(kv[0]);
             break;
         }
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
+// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
         final IAudioService service = getService();
+// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
         if (hasSwbParams) {
             try {
                 service.setSwbParameters(keyValuePairs);
@@ -3894,7 +3899,10 @@ public class AudioManager {
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
+// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
         }
+// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     }
 
     /**
@@ -3931,12 +3939,14 @@ public class AudioManager {
     @RequiresPermission(Manifest.permission.BLUETOOTH_STACK)
     public void setBluetoothHeadsetProperties(@NonNull String name, boolean hasNrecEnabled,
             boolean hasWbsEnabled) {
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
         final IAudioService service = getService();
         try {
             service.setScoParameters(name, hasNrecEnabled, hasWbsEnabled);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     }
 
     /**
@@ -6941,6 +6951,7 @@ public class AudioManager {
         }
     }
 
+// QTI_BEGIN: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
      /**
      * Indicate A2DP source or sink active device change and eventually suppress
      * the {@link AudioManager.ACTION_AUDIO_BECOMING_NOISY} intent.
@@ -6973,6 +6984,7 @@ public class AudioManager {
          }
     }
 
+// QTI_END: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
     /** {@hide} */
     public IRingtonePlayer getRingtonePlayer() {
         try {

@@ -187,8 +187,10 @@ class SystemGesturesPointerEventListener implements PointerEventListener {
             case MotionEvent.ACTION_DOWN:
                 mSwipeFireable = true;
                 mDebugFireable = true;
+// QTI_BEGIN: 2025-07-04: Core: Releasing prv boost when Action down event occurs
                 if (mScrollFired)
                   mCallbacks.onScroll(false);
+// QTI_END: 2025-07-04: Core: Releasing prv boost when Action down event occurs
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                 mScrollFired = false;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"

@@ -1338,8 +1338,6 @@ class ProcessRecord implements WindowProcessListener {
                     && mErrorState.getAnrAnnotation() != null) {
                 description = description + ": " + mErrorState.getAnrAnnotation();
             }
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             if (mService != null && (noisy || info.uid == mService.mCurOomAdjUid)) {
                 mService.reportUidInfoMessageLocked(TAG,
                         "Killing " + toShortString() + " (adj " + mState.getSetAdj()
@@ -1371,21 +1369,19 @@ class ProcessRecord implements WindowProcessListener {
                     mService.mUxPerf.perfUXEngine_events(
                         BoostFramework.UXE_EVENT_KILL, 0, this.processName, 0);
                 }
-// QTI_BEGIN: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
                 mService.mUxPerf.perfEvent(
                     BoostFramework.VENDOR_HINT_KILL,this.processName, 2, 0,getPid());
-// QTI_END: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
 // QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
             } else {
                 mService.mForceStopKill = false;
 // QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             if (mService.mUxPerf != null && processName.equals(info.packageName)) {
                 mService.mUxPerf.perfHint(
                     BoostFramework.VENDOR_HINT_UNPIN_FILE, info.packageName, 0, 0);
             }
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         }
     }

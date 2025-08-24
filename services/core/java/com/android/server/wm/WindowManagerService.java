@@ -9087,6 +9087,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
         @Override
         public boolean moveFocusToAdjacentEmbeddedActivityIfNeeded() {
+            boolean focusMoved = false;
             synchronized (mGlobalLock) {
                 final WindowState focusedWindow = getFocusedWindow();
                 if (focusedWindow == null) {
@@ -9095,12 +9096,14 @@ public class WindowManagerService extends IWindowManager.Stub
 
                 if (moveFocusToAdjacentEmbeddedWindow(focusedWindow)) {
                     // Sync the input transactions to ensure the input focus updates as well.
-                    syncInputTransactions(false);
-                    return true;
+                    focusMoved = true;
                 }
-
-                return false;
             }
+
+            if (focusMoved) {
+                syncInputTransactions(false);
+            }
+            return focusMoved;
         }
 
         @Override
@@ -9797,7 +9800,7 @@ public class WindowManagerService extends IWindowManager.Stub
      */
     boolean moveFocusToAdjacentEmbeddedWindow(@NonNull WindowState focusedWindow) {
         final ActivityRecord activity = focusedWindow.getActivityRecord();
-        if (activity == null) {
+        if (activity == null || !activity.isVisible()) {
             return false;
         }
 

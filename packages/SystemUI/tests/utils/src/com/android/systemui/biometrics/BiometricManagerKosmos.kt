@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package com.android.systemui.screencapture.record.largescreen.domain.interactor
+package com.android.systemui.biometrics
 
+import android.hardware.biometrics.BiometricManager
 import com.android.systemui.kosmos.Kosmos
-import com.android.systemui.kosmos.Kosmos.Fixture
+import org.mockito.kotlin.mock
 
-val Kosmos.screenCaptureRecordLargeScreenFeaturesInteractor by Fixture {
-    ScreenCaptureRecordLargeScreenFeaturesInteractor()
-}
+var Kosmos.biometricManager by Kosmos.Fixture { mock<BiometricManager>() }

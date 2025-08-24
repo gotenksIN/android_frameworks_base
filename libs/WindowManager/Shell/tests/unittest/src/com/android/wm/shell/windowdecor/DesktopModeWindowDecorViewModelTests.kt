@@ -320,6 +320,36 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
+    fun testCloseTask_notInSplitScreen_closesTask() {
+        desktopModeWindowDecorViewModel.setFreeformTaskTransitionStarter(
+            mockFreeformTaskTransitionStarter
+        )
+        val decor = createOpenTaskDecoration(windowingMode = WINDOWING_MODE_FREEFORM)
+        val taskInfo = decor.taskInfo
+        whenever(mockSplitScreenController.isTaskInSplitScreen(eq(taskInfo.taskId)))
+            .thenReturn(false)
+        whenever(mockDesktopTasksController.getNextFocusedTask(eq(taskInfo))).thenReturn(-1)
+        whenever(mockDesktopTasksController.onDesktopWindowClose(any(), any(), any())).thenReturn {
+            binder: IBinder ->
+        }
+
+        desktopModeWindowDecorViewModel.closeTask(decor.taskInfo)
+
+        verify(mockFreeformTaskTransitionStarter).startRemoveTransition(any())
+    }
+
+    @Test
+    fun testCloseTask_noDecoration_doesNothing() {
+        val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
+        // No decoration is created for this task.
+
+        desktopModeWindowDecorViewModel.closeTask(task)
+
+        verify(mockSplitScreenController, never()).isTaskInSplitScreen(any())
+        verify(mockFreeformTaskTransitionStarter, never()).startRemoveTransition(any())
+    }
+
+    @Test
     @EnableFlags(Flags.FLAG_ENABLE_MINIMIZE_BUTTON)
     @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_APP_HEADER_STATE_CHANGE_ANNOUNCEMENTS)
     fun testMinimizeButtonInFreeform_minimizeWindow() {
@@ -1022,7 +1052,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             )
 
         mockTaskPositioner.stub {
-            on { onDragPositioningStart(any(), any(), any(), any()) } doReturn INITIAL_BOUNDS
+            on { onDragPositioningStart(any(), any(), any(), any(), any()) } doReturn INITIAL_BOUNDS
             on { onDragPositioningMove(any(), any(), any()) } doReturn INITIAL_BOUNDS
             on { onDragPositioningEnd(any(), any(), any()) } doReturn INITIAL_BOUNDS
         }
@@ -1457,7 +1487,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             )
 
         val touchListener = onTouchListenerCaptor.firstValue
-        if (touchListener is DesktopModeWindowDecorViewModel.DesktopModeTouchEventListener) {
+        if (touchListener is DesktopModeTouchEventListener) {
             val taskInfo = decor.taskInfo
             shellDesktopState.overrideWindowDropTargetEligibility[DEFAULT_DISPLAY] = true
             shellDesktopState.overrideWindowDropTargetEligibility[SECOND_DISPLAY] = true
@@ -1465,7 +1495,8 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             val mockViewRootImpl = mock<ViewRootImpl> { on { inputToken } doReturn mockInputToken }
             val view = mock<View> { on { getViewRootImpl() } doReturn mockViewRootImpl }
             mockTaskPositioner.stub {
-                on { onDragPositioningStart(any(), any(), any(), any()) } doReturn INITIAL_BOUNDS
+                on { onDragPositioningStart(any(), any(), any(), any(), any()) } doReturn
+                    INITIAL_BOUNDS
                 on { onDragPositioningMove(any(), any(), any()) } doReturn BOUNDS_AFTER_FIRST_MOVE
                 on { onDragPositioningEnd(any(), any(), any()) } doReturn
                     BOUNDS_ON_DRAG_END_DESKTOP_ACCEPTED
@@ -1587,7 +1618,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             )
 
         val touchListener = onTouchListenerCaptor.firstValue
-        if (touchListener is DesktopModeWindowDecorViewModel.DesktopModeTouchEventListener) {
+        if (touchListener is DesktopModeTouchEventListener) {
             val taskInfo = decor.taskInfo
             shellDesktopState.overrideWindowDropTargetEligibility[DEFAULT_DISPLAY] = true
             shellDesktopState.overrideWindowDropTargetEligibility[SECOND_DISPLAY] = false
@@ -1595,7 +1626,8 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             val mockViewRootImpl = mock<ViewRootImpl> { on { inputToken } doReturn mockInputToken }
             val view = mock<View> { on { getViewRootImpl() } doReturn mockViewRootImpl }
             mockTaskPositioner.stub {
-                on { onDragPositioningStart(any(), any(), any(), any()) } doReturn INITIAL_BOUNDS
+                on { onDragPositioningStart(any(), any(), any(), any(), any()) } doReturn
+                    INITIAL_BOUNDS
                 on { onDragPositioningMove(any(), any(), any()) } doReturn BOUNDS_AFTER_FIRST_MOVE
                 on { onDragPositioningEnd(any(), any(), any()) } doReturn
                     BOUNDS_IGNORED_ON_NON_DESKTOP

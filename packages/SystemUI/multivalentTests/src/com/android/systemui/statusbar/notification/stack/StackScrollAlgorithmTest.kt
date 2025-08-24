@@ -141,8 +141,7 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         hostView.addView(notificationRow)
 
         headsUpAnimator = HeadsUpAnimator(context, kosmos.fakeSystemBarUtilsProxy)
-        stackScrollAlgorithm =
-            StackScrollAlgorithm(context, hostView, headsUpAnimator)
+        stackScrollAlgorithm = StackScrollAlgorithm(context, hostView, headsUpAnimator)
     }
 
     private fun isTv(): Boolean {
@@ -982,6 +981,19 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
     }
 
     @Test
+    @EnableSceneContainer
+    fun resetViewStates_shadeCollapsed_footerViewBecomesTransparent() {
+        ambientState.expansionFraction = 0f
+        stackScrollAlgorithm.initView(context)
+        hostView.removeAllViews()
+        hostView.addView(footerView)
+
+        stackScrollAlgorithm.resetViewStates(ambientState, /* speedBumpIndex= */ 0)
+
+        assertThat(footerView.viewState.alpha).isEqualTo(0f)
+    }
+
+    @Test
     fun resetViewStates_isOnKeyguard_emptyShadeViewBecomesTransparent() {
         ambientState.setStatusBarState(StatusBarState.KEYGUARD)
         ambientState.fractionToShade = 0.25f
@@ -1108,6 +1120,21 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         stackScrollAlgorithm.resetViewStates(ambientState, 0)
 
         assertThat((footerView.viewState as FooterViewState).hideContent).isTrue()
+    }
+
+    @Test
+    @EnableSceneContainer
+    fun resetViewStates_noSpaceForFooterDuringExpansion_footerShown_withSceneContainer() {
+        ambientState.isShadeExpanded = true
+        ambientState.isExpansionChanging = true
+        ambientState.stackTop = 0f
+        ambientState.drawBounds = RectF(0f, 0f, 400f, 100f)
+        val footerView = mockFooterView(height = 200) // no space for the footer in the stack
+        hostView.addView(footerView)
+
+        stackScrollAlgorithm.resetViewStates(ambientState, 0)
+
+        assertThat((footerView.viewState as FooterViewState).hideContent).isFalse()
     }
 
     @Test

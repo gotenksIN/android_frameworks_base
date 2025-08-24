@@ -200,9 +200,10 @@ public class StackScrollAlgorithm {
 
             // On the final call to {@link #resetViewState}, the alpha is set back to 1f but
             // ambientState.isExpansionChanging() is now false. This causes a flicker on the
-            // EmptyShadeView after the shade is collapsed. Make sure the empty shade view
-            // isn't visible unless the shade is expanded.
-            if (view instanceof EmptyShadeView && ambientState.getExpansionFraction() == 0f) {
+            // EmptyShadeView or the FooterView after the shade is collapsed. Make sure these views
+            // aren't visible unless the shade is expanded.
+            if (ambientState.getExpansionFraction() == 0f && ((view instanceof EmptyShadeView) || (
+                    SceneContainerFlag.isEnabled() && view instanceof FooterView))) {
                 viewState.setAlpha(0f);
             }
 
@@ -714,12 +715,14 @@ public class StackScrollAlgorithm {
         );
         if (view instanceof FooterView) {
             if (SceneContainerFlag.isEnabled()) {
-                final float footerEnd =
-                        stackTop + viewState.getYTranslation() + view.getIntrinsicHeight();
-                final boolean noSpaceForFooter = footerEnd > ambientState.getStackCutoff();
-                ((FooterView.FooterViewState) viewState).hideContent =
-                        noSpaceForFooter || (ambientState.isClearAllInProgress()
-                                && !hasNonClearableNotifs(algorithmState));
+                if (!ambientState.isExpansionChanging()) {
+                    final float footerEnd =
+                            stackTop + viewState.getYTranslation() + view.getIntrinsicHeight();
+                    final boolean noSpaceForFooter = footerEnd > ambientState.getStackCutoff();
+                    ((FooterView.FooterViewState) viewState).hideContent =
+                            noSpaceForFooter || (ambientState.isClearAllInProgress()
+                                    && !hasNonClearableNotifs(algorithmState));
+                }
             } else {
                 // TODO(b/333445519): shouldBeHidden should reflect whether the shade is closed
                 //  already, so we shouldn't need to use ambientState here. However,

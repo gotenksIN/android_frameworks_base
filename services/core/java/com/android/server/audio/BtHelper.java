@@ -52,6 +52,7 @@ import android.media.BluetoothProfileConnectionInfo;
 import android.telecom.TelecomManager;
 import android.os.Binder;
 import android.os.Bundle;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -1288,11 +1289,18 @@ public class BtHelper {
                         break;
                     }
                     if (mBluetoothHeadsetDevice == null) {
-                        Log.w(TAG, "requestScoState: no active device while connecting,"
-                                + " mScoAudioMode=" + mScoAudioMode);
-                        broadcastScoConnectionState(
-                                AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
-                        return false;
+                        boolean mVoipLeaWarEnabled =
+                                SystemProperties.getBoolean("persist.enable.bluetooth.voipleawar", false);
+                        if (mVoipLeaWarEnabled && mBluetoothHeadsetDummyDevice != null) {
+                            Log.w(TAG, "requestScoState: dummy device is active while connecting,"
+                                    + " mScoAudioMode=" + mScoAudioMode);
+                        } else {
+                            Log.w(TAG, "requestScoState: no active device while connecting,"
+                                    + " mScoAudioMode=" + mScoAudioMode);
+                            broadcastScoConnectionState(
+                                    AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
+                            return false;
+                        }
                     }
                     if (connectBluetoothScoAudioHelper(mBluetoothHeadset,
                             mBluetoothHeadsetDevice, mScoAudioMode)) {

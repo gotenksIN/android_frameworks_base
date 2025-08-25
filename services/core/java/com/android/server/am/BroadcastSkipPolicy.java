@@ -16,7 +16,9 @@
 
 package com.android.server.am;
 
+// QTI_BEGIN: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_BACKGROUND_CHECK;
+// QTI_END: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_PERMISSIONS_REVIEW;
 import static com.android.server.am.ActivityManagerService.checkComponentPermission;
 import static com.android.server.am.BroadcastQueue.TAG;
@@ -42,15 +44,21 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.permission.IPermissionManager;
 import android.permission.PermissionManager;
+// QTI_BEGIN: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
 import android.util.ArrayMap;
 import android.util.ArraySet;
+// QTI_END: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
 import android.util.Slog;
 
 import com.android.internal.util.ArrayUtils;
+// QTI_BEGIN: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
 import com.android.server.SystemConfig;
+// QTI_END: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
 
 import java.util.Objects;
+// QTI_BEGIN: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
 import java.util.Set;
+// QTI_END: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
 
 /**
  * Policy logic that decides if delivery of a particular {@link BroadcastRecord}
@@ -64,16 +72,19 @@ public class BroadcastSkipPolicy {
     @Nullable
     private PermissionManager mPermissionManager;
 
+// QTI_BEGIN: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
     /**
     * Map of Restricted Implicit Broadcast actions to list of packages
     * which can receive broadcast
     */
     private ArrayMap<String, Set<String>> mQtiBackgroundLaunchBroadcasts;
 
+// QTI_END: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
     public BroadcastSkipPolicy(@NonNull ActivityManagerService service) {
         mService = Objects.requireNonNull(service);
     }
 
+// QTI_BEGIN: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
     private ArrayMap<String, Set<String>> getQtiBackgroundLaunchBroadcasts() {
         if (mQtiBackgroundLaunchBroadcasts == null) {
             mQtiBackgroundLaunchBroadcasts = SystemConfig.getInstance().getQtiAllowImplicitBroadcasts();
@@ -81,6 +92,7 @@ public class BroadcastSkipPolicy {
         return mQtiBackgroundLaunchBroadcasts;
     }
 
+// QTI_END: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
     /**
      * Determine if the given {@link BroadcastRecord} is eligible to be sent to
      * the given {@link BroadcastFilter} or {@link ResolveInfo}.
@@ -248,6 +260,7 @@ public class BroadcastSkipPolicy {
                 info.activityInfo.applicationInfo.uid, info.activityInfo.packageName,
                 info.activityInfo.applicationInfo.targetSdkVersion, -1, true, false, false);
         if (allowed != ActivityManager.APP_START_MODE_NORMAL) {
+// QTI_BEGIN: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
             // Allow this broadcast receiver to be launched only if the intent action is
             // defined in the qti_broadcast_whitelist.xml configuration. This XML maps
             // restricted implicit broadcast intent actions to a set of package names that
@@ -274,6 +287,7 @@ public class BroadcastSkipPolicy {
                 }
             }
 
+// QTI_END: 2025-07-21: Core: Add support for whitelisting broadcast-receivers for background execution
             // We won't allow this receiver to be launched if the app has been
             // completely disabled from launches, or it was not explicitly sent
             // to it and the app is in a state that should not receive it

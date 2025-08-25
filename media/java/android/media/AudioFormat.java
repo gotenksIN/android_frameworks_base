@@ -1190,9 +1190,11 @@ public final class AudioFormat implements Parcelable {
             case ENCODING_IAMF_SIMPLE_PROFILE_FLAC:
             case ENCODING_IAMF_SIMPLE_PROFILE_OPUS:
             case ENCODING_IAMF_SIMPLE_PROFILE_PCM:
+// QTI_BEGIN: 2023-05-30: Audio: AudioFormat: add AAC ADTS formats as public encodings
             case ENCODING_AAC_ADTS_LC:
             case ENCODING_AAC_ADTS_HE_V1:
             case ENCODING_AAC_ADTS_HE_V2:
+// QTI_END: 2023-05-30: Audio: AudioFormat: add AAC ADTS formats as public encodings
                 return true;
             default:
                 return false;

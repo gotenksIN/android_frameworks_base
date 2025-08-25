@@ -656,7 +656,9 @@ public class ActivityManagerService extends IActivityManager.Stub
     /* UX perf event object */
     public static BoostFramework mUxPerf = new BoostFramework();
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
     public static boolean mForceStopKill = false;
+// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
 
     private static final DateTimeFormatter DROPBOX_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSZ");
@@ -1000,10 +1002,14 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int pid = app.getPid();
         synchronized (mPidsSelfLocked) {
             mPidsSelfLocked.doAddInternal(pid, app);
+// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
             ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
+// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
             if (freezer != null && freezer.useFreezerManager()) {
                 freezer.addPidLocked(app);
             }
+// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
         }
         synchronized (sActiveProcessInfoSelfLocked) {
             if (app.processInfo != null) {
@@ -1029,11 +1035,15 @@ public class ActivityManagerService extends IActivityManager.Stub
         final boolean removed;
         synchronized (mPidsSelfLocked) {
             removed = mPidsSelfLocked.doRemoveInternal(pid, app);
+// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
             ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
+// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
             if (freezer != null && freezer.useFreezerManager()) {
                 freezer.removePidLocked(pid, app);
                 freezer.startUnfreeze(app.processName, ProcessFreezerManager.REMOVE_PROCESS_UNFREEZE);
             }
+// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
         }
         if (removed) {
             synchronized (sActiveProcessInfoSelfLocked) {
@@ -2597,7 +2607,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                     Process.THREAD_GROUP_SYSTEM);
             Process.setThreadGroupAndCpuset(
                     mOomAdjuster.mCachedAppOptimizer.mCachedAppOptimizerThread.getThreadId(),
+// QTI_BEGIN: 2021-07-06: Core: appcompaction: Enable system compaction at bootup
                     mOomAdjuster.mCachedAppOptimizer.mCompactionPriority);
+// QTI_END: 2021-07-06: Core: appcompaction: Enable system compaction at bootup
         } catch (Exception e) {
             Slog.w(TAG, "Setting background thread cpuset failed");
         }
@@ -3565,9 +3577,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                     mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                     mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_KILL, 0, app.processName, 0);
                 }
+// QTI_BEGIN: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
                 mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_KILL, app.processName, 2, 0, pid);
-// QTI_BEGIN: 2025-08-05: Core: base: pin/unpin files based on launch and exit for vendor pinner service
-// QTI_END: 2025-08-05: Core: base: pin/unpin files based on launch and exit for vendor pinner service
+// QTI_END: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
 
@@ -4452,7 +4464,9 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             mAppErrors.resetProcessCrashTime(packageName == null, appId, userId);
         }
+// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
         mForceStopKill = true;
+// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
 
         synchronized (mProcLock) {
             // Notify first that the package is stopped, so its process won't be restarted
@@ -4720,6 +4734,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         EventLogTags.writeAmProcBound(app.userId, pid, app.processName);
 
         if (mUxPerf != null && app.getHostingRecord() != null && app.getHostingRecord().isTopApp()) {
+// QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
             if (mUxPerf.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
                 int pkgType = mUxPerf.perfGetFeedback(
                                     BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE, app.processName);
@@ -4730,8 +4745,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mUxPerf.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName,
                     pid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
             }
-// QTI_BEGIN: 2025-08-05: Core: base: pin/unpin files based on launch and exit for vendor pinner service
-// QTI_END: 2025-08-05: Core: base: pin/unpin files based on launch and exit for vendor pinner service
+// QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
         }
 
         synchronized (mProcLock) {
@@ -9815,6 +9829,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             final VolatileDropboxEntryStates volatileStates, final StringBuilder sb) {
         sb.append("SystemUptimeMs: ").append(SystemClock.uptimeMillis()).append("\n");
 
+// QTI_BEGIN: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
         // Watchdog thread ends up invoking this function (with
         // a null ProcessRecord) to add the stack file to dropbox.
         // Do not acquire a lock on this (am) in such cases, as it
@@ -9822,9 +9837,12 @@ public class ActivityManagerService extends IActivityManager.Stub
         // is invoked due to unavailability of lock on am and it
         // would prevent watchdog from killing system_server.
         if (process == null) {
+// QTI_END: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
             sb.append("Process: ").append(processName).append("\n");
+// QTI_BEGIN: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
             return;
         }
+// QTI_END: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
         // Note: ProcessRecord 'process' is guarded by the service
         // instance.  (notably process.pkgList, which could otherwise change
         // concurrently during execution of this method)
@@ -13762,12 +13780,15 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             app.setPid(0);
         }
+// QTI_BEGIN: 2020-04-14: Core: IOP Preferred App Fix
 
         // Call Preferred App
         if (app != null) {
             ArrayList<ApplicationExitInfo> results = new ArrayList<ApplicationExitInfo>();
             mProcessList.mAppExitInfoTracker.getExitInfo(
+// QTI_END: 2020-04-14: Core: IOP Preferred App Fix
                     app.processName, app.uid, app.getPid(), 0, results);
+// QTI_BEGIN: 2020-04-14: Core: IOP Preferred App Fix
             if (results != null) {
                 boolean recentAppClose = false;
                 for (int i=0; i<results.size();i++) {
@@ -13780,10 +13801,13 @@ public class ActivityManagerService extends IActivityManager.Stub
                     }
                 }
                 if (recentAppClose) {
+// QTI_END: 2020-04-14: Core: IOP Preferred App Fix
                     mTaskSupervisor.startPreferredApps();
+// QTI_BEGIN: 2020-04-14: Core: IOP Preferred App Fix
                 }
             }
         }
+// QTI_END: 2020-04-14: Core: IOP Preferred App Fix
         return false;
     }
 

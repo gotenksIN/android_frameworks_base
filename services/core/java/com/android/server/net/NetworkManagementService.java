@@ -318,8 +318,10 @@ public class NetworkManagementService extends INetworkManagementService.Stub {
         void sendCallback(INetworkManagementEventObserver o) throws RemoteException;
     }
 
+// QTI_BEGIN: 2025-04-11: Core: Adding a separate synchronized block for invokeForAllObservers
     private void invokeForAllObservers(NetworkManagementEventCallback eventCallback) {
         synchronized(this){
+// QTI_END: 2025-04-11: Core: Adding a separate synchronized block for invokeForAllObservers
         final int length = mObservers.beginBroadcast();
         try {
             for (int i = 0; i < length; i++) {
@@ -331,7 +333,9 @@ public class NetworkManagementService extends INetworkManagementService.Stub {
         } finally {
             mObservers.finishBroadcast();
         }
+// QTI_BEGIN: 2025-04-11: Core: Adding a separate synchronized block for invokeForAllObservers
         }
+// QTI_END: 2025-04-11: Core: Adding a separate synchronized block for invokeForAllObservers
     }
     /**
      * Notify our observers of an interface status change

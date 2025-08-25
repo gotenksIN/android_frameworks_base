@@ -295,7 +295,9 @@ public final class ActiveServices {
             "vendor.qti.hardware.servicetrackeraidl.IServicetracker/default";
 
 // QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2024-09-23: Core: Assign mIsAIDLSupported default value to false
     private static boolean mIsAIDLSupported = false;
+// QTI_END: 2024-09-23: Core: Assign mIsAIDLSupported default value to false
     // Foreground service types that always get immediate notification display,
     // expressed in the same bitmask format that ServiceRecord.foregroundServiceType
     // uses.
@@ -837,6 +839,7 @@ public final class ActiveServices {
         this.mServiceFGAnrTimer = new ServiceAnrTimer(service,
                 ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_MSG,
                 "SERVICE_FOREGROUND_TIMEOUT", new AnrTimer.Args().extend(true));
+// QTI_BEGIN: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
         try {
             if (ServiceManager.isDeclared(AIDL_SERVICE)){
                 if (DEBUG_SERVICE) Slog.w(TAG, "AIDL is supported");
@@ -846,6 +849,7 @@ public final class ActiveServices {
             if (DEBUG_SERVICE) Slog.w(TAG, "AIDL not Supported");
             mIsAIDLSupported = false;
         }
+// QTI_END: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
     }
 
     void systemServicesReady() {
@@ -899,16 +903,20 @@ public final class ActiveServices {
 // QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     private boolean getAIDLServicetrackerInstance() {
 // QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
 
         if (!mIsAIDLSupported) return false;
 
+// QTI_END: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
 // QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         if (mServicetracker_aidl == null ) {
             try {
 // QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
                 IBinder mBinder = ServiceManager.getService(AIDL_SERVICE);
                 mServicetracker_aidl =
                     vendor.qti.hardware.servicetrackeraidl.IServicetracker.Stub.asInterface(mBinder);
+// QTI_END: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
 // QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             } catch (java.util.NoSuchElementException e) {
                 // Service doesn't exist or cannot be opened logged below
@@ -5931,21 +5939,29 @@ public final class ActiveServices {
             if(SERVICE_RESCHEDULE) {
                 boolean shouldDelay = false;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 boolean isVisible = false;
+// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 ActivityRecord top_rc = mAm.mTaskSupervisor.getTopResumedActivity();
+// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 ProcessRecord pRec = mAm.getProcessRecordLocked(r.serviceInfo.applicationInfo.processName,r.serviceInfo.applicationInfo.uid);
+// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
                 boolean isPersistent
                         = !((r.serviceInfo.applicationInfo.flags&ApplicationInfo.FLAG_PERSISTENT) == 0);
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 if (pRec != null)
                     isVisible = ((pRec.mProfile.getCurRawAdj()) ==  ProcessList.VISIBLE_APP_ADJ);
+// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                 if(top_rc != null) {
                     if(top_rc.launching && !r.shortInstanceName.contains(top_rc.packageName)
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                         && !isPersistent && r.isForeground == false && !isVisible) {
+// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         shouldDelay = true;
                     }

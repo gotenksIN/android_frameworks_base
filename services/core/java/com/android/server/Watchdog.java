@@ -32,7 +32,9 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Debug;
+// QTI_BEGIN: 2018-03-25: Core: Create a new WD trace file for ease of debugging
 import android.os.FileUtils;
+// QTI_END: 2018-03-25: Core: Create a new WD trace file for ease of debugging
 import android.os.Handler;
 import android.os.IPowerManager;
 import android.os.Looper;
@@ -69,9 +71,13 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
+// QTI_BEGIN: 2018-03-25: Core: Create a new WD trace file for ease of debugging
 import java.io.FileReader;
+// QTI_END: 2018-03-25: Core: Create a new WD trace file for ease of debugging
 import java.io.IOException;
+// QTI_BEGIN: 2018-03-25: Core: Create a new WD trace file for ease of debugging
 import java.io.BufferedReader;
+// QTI_END: 2018-03-25: Core: Create a new WD trace file for ease of debugging
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Clock;
@@ -85,8 +91,10 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+// QTI_BEGIN: 2018-03-25: Core: Create a new WD trace file for ease of debugging
 import java.util.Date;
 import java.text.SimpleDateFormat;
+// QTI_END: 2018-03-25: Core: Create a new WD trace file for ease of debugging
 
 /**
  * This class calls its monitor every minute. Killing this process if they don't return
@@ -133,7 +141,9 @@ public class Watchdog implements Dumpable {
         "/system/bin/keystore2",
         "/system/bin/mediadrmserver",
         "/system/bin/mediaserver",
+// QTI_BEGIN: 2021-08-24: Core: Add /system/bin/mediaserver64 to native stack dump list
         "/system/bin/mediaserver64",
+// QTI_END: 2021-08-24: Core: Add /system/bin/mediaserver64 to native stack dump list
         "/system/bin/netd",
         "/system/bin/sdcard",
         "/system/bin/servicemanager",
@@ -219,7 +229,9 @@ public class Watchdog implements Dumpable {
     // We start with DEFAULT_TIMEOUT. This will then be update with the timeout values from Settings
     // once the settings provider is initialized.
     private volatile long mWatchdogTimeoutMillis = DEFAULT_TIMEOUT;
+// QTI_BEGIN: 2019-03-12: Core: Use MM instead of MMM in SimpleDateFormat in trace filename
     SimpleDateFormat mTraceDateFormat = new SimpleDateFormat("dd_MM_HH_mm_ss.SSS");
+// QTI_END: 2019-03-12: Core: Use MM instead of MMM in SimpleDateFormat in trace filename
     private final List<Integer> mInterestingJavaPids = new ArrayList<>();
     private final TraceErrorLogger mTraceErrorLogger;
 
@@ -821,7 +833,9 @@ public class Watchdog implements Dumpable {
         }
     }
 
+// QTI_BEGIN: 2019-10-15: Core: base: Dump traces of HAL_INTERFACES_OF_INTEREST as well when app receives ANR
     public static ArrayList<Integer> getInterestingNativePids() {
+// QTI_END: 2019-10-15: Core: base: Dump traces of HAL_INTERFACES_OF_INTEREST as well when app receives ANR
         HashSet<Integer> pids = new HashSet<>();
         addInterestingAidlPids(pids);
         addInterestingHidlPids(pids);
@@ -929,15 +943,19 @@ public class Watchdog implements Dumpable {
                 SmartTraceUtils.traceStart();
                 //delay 30s to make sure perfetto trace dumped completely
                 dueTime = SystemClock.uptimeMillis() + 30000;
+// QTI_BEGIN: 2018-03-25: Core: Create a new WD trace file for ease of debugging
             }
+// QTI_END: 2018-03-25: Core: Create a new WD trace file for ease of debugging
             logWatchog(doWaitedPreDump, subject, pids);
 
             if (doWaitedPreDump) {
                 // We have waited for only pre-watchdog timeout, we continue to wait for the
                 // duration of the full timeout before killing the process.
                 continue;
+// QTI_BEGIN: 2018-03-25: Core: Create a new WD trace file for ease of debugging
             }
 
+// QTI_END: 2018-03-25: Core: Create a new WD trace file for ease of debugging
             IActivityController controller;
             synchronized (mLock) {
                 controller = mController;
@@ -1270,6 +1288,7 @@ public class Watchdog implements Dumpable {
         pw.println(mWatchdogTimeoutMillis);
     }
 
+// QTI_BEGIN: 2018-03-25: Core: Create a new WD trace file for ease of debugging
     private void appendFile (File writeTo, File copyFrom) {
         try {
             BufferedReader in = new BufferedReader(new FileReader(copyFrom));
@@ -1291,9 +1310,15 @@ public class Watchdog implements Dumpable {
 
     private void binderStateRead() {
         try {
+// QTI_END: 2018-03-25: Core: Create a new WD trace file for ease of debugging
+// QTI_BEGIN: 2021-03-04: Core: Collect binder stat info from binderfs else from debugfs
             boolean binderfsNodePresent = false;
             BufferedReader in = null;
+// QTI_END: 2021-03-04: Core: Collect binder stat info from binderfs else from debugfs
+// QTI_BEGIN: 2018-03-25: Core: Create a new WD trace file for ease of debugging
             Slog.i(TAG,"Collecting Binder Transaction Status Information");
+// QTI_END: 2018-03-25: Core: Create a new WD trace file for ease of debugging
+// QTI_BEGIN: 2021-03-04: Core: Collect binder stat info from binderfs else from debugfs
             try {
                 in = new BufferedReader(new FileReader("/dev/binderfs/binder_logs/state"));
                 Slog.i(TAG, "Collecting Binder state file from binderfs");
@@ -1309,6 +1334,8 @@ public class Watchdog implements Dumpable {
             } catch(IOException e) {
                 Slog.i(TAG, "Debugfs node not found", e);
             }
+// QTI_END: 2021-03-04: Core: Collect binder stat info from binderfs else from debugfs
+// QTI_BEGIN: 2018-03-25: Core: Create a new WD trace file for ease of debugging
             FileWriter out = new FileWriter("/data/anr/BinderTraces_pid" +
                     String.valueOf(Process.myPid()) + ".txt");
             String line = null;
@@ -1324,4 +1351,5 @@ public class Watchdog implements Dumpable {
             Slog.w(TAG, "Failed to collect state file", e);
         }
     }
+// QTI_END: 2018-03-25: Core: Create a new WD trace file for ease of debugging
 }

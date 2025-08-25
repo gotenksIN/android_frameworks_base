@@ -2210,30 +2210,39 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     void acquireAppLaunchPerfLock(ActivityRecord r) {
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2019-05-29: Core: IOP: Fix null object de-referencing.
         /* Acquire perf lock during new app launch */
         if (mPerfBoost != null) {
+// QTI_END: 2019-05-29: Core: IOP: Fix null object de-referencing.
 // QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
 
             int pkgType = mPerfBoost.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                                                      r.packageName);
             int wpcPid = -1;
 // QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2020-09-09: Core: Do attach application boost when it have been auto started as favorite
             if (mService != null && r != null && r.info != null && r.info.applicationInfo !=null) {
                 final WindowProcessController wpc =
                         mService.getProcessController(r.processName, r.info.applicationInfo.uid);
                 if (wpc != null && wpc.hasThread()) {
                    //If target process didn't start yet, this operation will be done when app call attach
+// QTI_END: 2020-09-09: Core: Do attach application boost when it have been auto started as favorite
 // QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
                    wpcPid = wpc.getPid();
 // QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2020-09-09: Core: Do attach application boost when it have been auto started as favorite
                 }
             }
+// QTI_END: 2020-09-09: Core: Do attach application boost when it have been auto started as favorite
+// QTI_BEGIN: 2025-06-30: Core: Binder call reduction while launch
             if (mPerfBoost.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
                              mPerfBoost.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
                if (mPerfBoost.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
+// QTI_END: 2025-06-30: Core: Binder call reduction while launch
 // QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
                    mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
 // QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2025-06-30: Core: Binder call reduction while launch
                            r.packageName, -1, BoostFramework.Launch.BOOST_V1, 2, pkgType, wpcPid);
                    mPerfSendTapHint = true;
                    mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
@@ -2253,7 +2262,9 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                            mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                                r.packageName, -1, BoostFramework.Launch.BOOST_V3, 2, pkgType, wpcPid);
                    }
+// QTI_END: 2025-06-30: Core: Binder call reduction while launch
 
+// QTI_BEGIN: 2025-06-30: Core: Binder call reduction while launch
                } else {
                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
                                        -1, BoostFramework.Launch.BOOST_V1);
@@ -2284,23 +2295,30 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                   wpcPid, BoostFramework.Launch.BOOST_V1);
            }
        }
+// QTI_END: 2025-06-30: Core: Binder call reduction while launch
+// QTI_BEGIN: 2019-05-29: Core: IOP: Fix null object de-referencing.
             if (mPerfHandle > 0)
                 mIsPerfBoostAcquired = true;
             // Start IOP
+// QTI_END: 2019-05-29: Core: IOP: Fix null object de-referencing.
             if (r.info.applicationInfo != null && r.info.applicationInfo.sourceDir != null) {
                 if (mPerfBoost.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                     mPerfBoost.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                         mPerfBoost.perfIOPrefetchStart(-1,r.packageName,
                            r.info.applicationInfo.sourceDir.substring(0, r.info.applicationInfo.sourceDir.lastIndexOf('/')));
                 }
+// QTI_BEGIN: 2019-05-29: Core: IOP: Fix null object de-referencing.
             }
         }
     }
+// QTI_END: 2019-05-29: Core: IOP: Fix null object de-referencing.
 
+// QTI_BEGIN: 2020-06-03: Core: perf: Refactor DSR
     public ActivityRecord getTopResumedActivity() {
         return mTopResumedActivity;
     }
 
+// QTI_END: 2020-06-03: Core: perf: Refactor DSR
     void comeOutOfSleepIfNeededLocked() {
         removeSleepTimeouts();
         if (mGoingToSleepWakeLock.isHeld()) {

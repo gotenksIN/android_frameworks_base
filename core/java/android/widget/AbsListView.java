@@ -4253,11 +4253,13 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                                     }
                                     mSelector.setHotspot(x, ev.getY());
                                 }
+// QTI_BEGIN: 2023-05-30: Core: Optimize AbsListView to reduce click operation latency
                                 /* QTI_OPT: Move performClick from delayed runnable */
                                 if (!mDataChanged && !mIsDetaching
                                         && isAttachedToWindow()) {
                                     performClick.run();
                                 }
+// QTI_END: 2023-05-30: Core: Optimize AbsListView to reduce click operation latency
                                 if (mTouchModeReset != null) {
                                     removeCallbacks(mTouchModeReset);
                                 }

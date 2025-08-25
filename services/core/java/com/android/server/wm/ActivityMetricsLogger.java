@@ -1,6 +1,8 @@
 package com.android.server.wm;
 
+// QTI_BEGIN: 2020-01-20: Core: Changing app classification logic from manifest-based to WLC-based
 import android.app.ActivityManager;
+// QTI_END: 2020-01-20: Core: Changing app classification logic from manifest-based to WLC-based
 import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
 import static android.app.ActivityManager.START_SUCCESS;
 import static android.app.ActivityManager.START_TASK_TO_FRONT;
@@ -193,7 +195,9 @@ class ActivityMetricsLogger {
 // QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
     public static BoostFramework mUxPerf = new BoostFramework();
 // QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2021-06-14: Core: BoostFramework: Fix the broken Displayed activity hint.
     public static BoostFramework mPerfBoost = new BoostFramework();
+// QTI_END: 2021-06-14: Core: BoostFramework: Fix the broken Displayed activity hint.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     private static ActivityRecord mLaunchedActivity;
 
@@ -1300,13 +1304,21 @@ class ActivityMetricsLogger {
         sb.append(": ");
         TimeUtils.formatDuration(info.windowsDrawnDelayMs, sb);
 
+// QTI_BEGIN: 2021-06-14: Core: BoostFramework: Fix the broken Displayed activity hint.
         if (mPerfBoost != null) {
+// QTI_END: 2021-06-14: Core: BoostFramework: Fix the broken Displayed activity hint.
+// QTI_BEGIN: 2021-07-29: Core: Address Null pointer exception
             if (info.processRecord != null) {
                 mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_DRAW, info.packageName,
+// QTI_END: 2021-07-29: Core: Address Null pointer exception
                     info.processRecord.getPid(), info.windowsDrawnDelayMs);
+// QTI_BEGIN: 2021-07-29: Core: Address Null pointer exception
             }
+// QTI_END: 2021-07-29: Core: Address Null pointer exception
+// QTI_BEGIN: 2021-06-14: Core: BoostFramework: Fix the broken Displayed activity hint.
         }
 
+// QTI_END: 2021-06-14: Core: BoostFramework: Fix the broken Displayed activity hint.
 // QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
         if (mUxPerf != null) {
 // QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
@@ -1323,6 +1335,7 @@ class ActivityMetricsLogger {
 // QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
         if (mUxPerf !=  null) {
 // QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2020-01-20: Core: Changing app classification logic from manifest-based to WLC-based
             int isGame;
 
             if (ActivityManager.isLowRamDeviceStatic()) {
@@ -1331,11 +1344,14 @@ class ActivityMetricsLogger {
                 isGame = (mUxPerf.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                                         mLaunchedActivity.packageName) == BoostFramework.WorkloadType.GAME) ? 1 : 0;
             }
+// QTI_END: 2020-01-20: Core: Changing app classification logic from manifest-based to WLC-based
+// QTI_BEGIN: 2020-08-13: Core: Fix app crashes due to PApps.
             if (mLaunchedActivity.processName != null) {
                 if (!mLaunchedActivity.processName.equals(info.packageName)) {
                     isGame = 1;
                 }
             }
+// QTI_END: 2020-08-13: Core: Fix app crashes due to PApps.
             if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                 mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                 mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_GAME, 0, info.packageName, isGame);

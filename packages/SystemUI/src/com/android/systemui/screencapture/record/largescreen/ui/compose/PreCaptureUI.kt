@@ -52,9 +52,15 @@ fun PreCaptureUI(viewModel: PreCaptureViewModel) {
             PreCaptureToolbar(
                 viewModel = viewModel,
                 expanded = true,
-                onCloseClick = { viewModel.closeUI() },
+                onCloseClick = { viewModel.closeUi() },
             )
         }
+
+        val iconResourceId =
+            when (viewModel.captureType) {
+                ScreenCaptureType.SCREENSHOT -> R.drawable.ic_screen_capture_camera
+                ScreenCaptureType.SCREEN_RECORD -> R.drawable.ic_screenrecord
+            }
 
         when (viewModel.captureRegion) {
             ScreenCaptureRegion.FULLSCREEN -> {
@@ -70,7 +76,7 @@ fun PreCaptureUI(viewModel: PreCaptureViewModel) {
                         icon =
                             loadIcon(
                                     viewModel = viewModel,
-                                    resId = R.drawable.ic_screen_capture_camera,
+                                    resId = iconResourceId,
                                     contentDescription = null,
                                 )
                                 .value,
@@ -83,7 +89,7 @@ fun PreCaptureUI(viewModel: PreCaptureViewModel) {
                                         R.string.screen_capture_fullscreen_record_button
                                 }
                             ),
-                        onClick = { viewModel.takeFullscreenScreenshot() },
+                        onClick = viewModel::beginCapture,
                     )
                 }
             }
@@ -94,7 +100,7 @@ fun PreCaptureUI(viewModel: PreCaptureViewModel) {
                 val icon by
                     loadIcon(
                         viewModel = viewModel,
-                        resId = R.drawable.ic_screen_capture_camera,
+                        resId = iconResourceId,
                         contentDescription = null,
                     )
                 RegionBox(
@@ -110,7 +116,7 @@ fun PreCaptureUI(viewModel: PreCaptureViewModel) {
                         ),
                     buttonIcon = icon,
                     onRegionSelected = { rect: Rect -> viewModel.updateRegionBox(rect) },
-                    onCaptureClick = { viewModel.takePartialScreenshot() },
+                    onCaptureClick = viewModel::beginCapture,
                 )
             }
 

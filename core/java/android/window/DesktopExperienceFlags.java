@@ -101,6 +101,8 @@ public enum DesktopExperienceFlags {
             android.app.Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WALLPAPER),
     ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG(Flags::enableConnectedDisplaysWindowDrag, true,
             Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG),
+    ENABLE_CROSS_DISPLAYS_PIP_TASK_LAUNCH(Flags::enableCrossDisplaysPipTaskLaunch, false,
+            Flags.FLAG_ENABLE_CROSS_DISPLAYS_PIP_TASK_LAUNCH),
     ENABLE_DEFAULT_DESK_WITHOUT_WARMUP_MIGRATION(Flags::defaultDeskWithoutWarmupMigration, false,
             Flags.FLAG_DEFAULT_DESK_WITHOUT_WARMUP_MIGRATION),
     ENABLE_DEFAULT_DISPLAY_IN_TOPOLOGY_SWITCH(
@@ -151,6 +153,8 @@ public enum DesktopExperienceFlags {
     ENABLE_DESKTOP_WINDOWING_PIP_IN_OVERVIEW_BUGFIX(
             Flags::enableDesktopWindowingPipInOverviewBugfix, false,
             Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PIP_IN_OVERVIEW_BUGFIX),
+    ENABLE_DIALOG_DISPLAY_FIXES(Flags::enableDialogDisplayFixes, true,
+            Flags.FLAG_ENABLE_DIALOG_DISPLAY_FIXES),
     ENABLE_DISPLAY_COMPAT_MODE(Flags::enableDisplayCompatMode, false,
             Flags.FLAG_ENABLE_DISPLAY_COMPAT_MODE),
     ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT(

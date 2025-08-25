@@ -2448,7 +2448,7 @@ public class LockSettingsService extends ILockSettings.Stub {
                     case SoftwareRateLimiterResult.CONTINUE_TO_HARDWARE:
                         break;
                     case SoftwareRateLimiterResult.RATE_LIMITED:
-                        return VerifyCredentialResponse.fromTimeout(res.remainingDelay);
+                        return VerifyCredentialResponse.fromTimeout(res.timeout);
                     case SoftwareRateLimiterResult.CREDENTIAL_TOO_SHORT:
                         return VerifyCredentialResponse.credTooShort();
                     case SoftwareRateLimiterResult.DUPLICATE_WRONG_GUESS:

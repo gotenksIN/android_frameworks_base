@@ -544,6 +544,9 @@ public final class DisplayManagerService extends SystemService {
     // Receives notifications about changes to Settings.
     private SettingsObserver mSettingsObserver;
 
+    // Receives notifications about changes to task stack.
+    private TaskStackListener mTaskStackListener;
+
     // Keeps note of what state the device is in, used for idle screen brightness mode.
     private boolean mIsDocked;
     private boolean mIsDreaming;
@@ -984,6 +987,11 @@ public final class DisplayManagerService extends SystemService {
     @VisibleForTesting
     ContentObserver getSettingsObserver() {
         return mSettingsObserver;
+    }
+
+    @VisibleForTesting
+    TaskStackListener getTaskStackListener() {
+        return mTaskStackListener;
     }
 
     @VisibleForTesting
@@ -3824,7 +3832,7 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private void setupTaskStackListener() {
-        final TaskStackListener taskStackListener = new TaskStackListener() {
+        mTaskStackListener = new TaskStackListener() {
             @Override
             public void onLockTaskModeChanged(int mode) {
                 updateMirrorBuiltInDisplaySettingLocked(/*shouldSendDisplayChangeEvent=*/ true);
@@ -3832,7 +3840,7 @@ public final class DisplayManagerService extends SystemService {
         };
 
         try {
-            mActivityTaskManagerInternal.registerTaskStackListener(taskStackListener);
+            mActivityTaskManagerInternal.registerTaskStackListener(mTaskStackListener);
         } catch (Exception e) {
             Slog.w(TAG, "Failed to call registerTaskStackListener", e);
         }

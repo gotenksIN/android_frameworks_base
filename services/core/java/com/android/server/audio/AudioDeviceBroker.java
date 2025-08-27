@@ -2752,7 +2752,7 @@ public class AudioDeviceBroker {
             // what has been communicated to audio policy manager. The device
             // returned by requestedCommunicationDevice() can be a placeholder SCO device if legacy
             // APIs are used to start SCO audio.
-            AudioDeviceAttributes device = mBtHelper.getHeadsetAudioDummyDevice();
+            AudioDeviceAttributes device = mBtHelper.getHeadsetAudioDevice();
             if (device != null) {
                 return device;
             }

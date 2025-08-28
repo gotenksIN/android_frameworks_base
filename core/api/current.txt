@@ -7054,8 +7054,7 @@ package android.app {
     method public boolean isStopwatch();
     method public boolean isTimer();
     field public static final int FORMAT_ADAPTIVE = 1; // 0x1
-    field public static final int FORMAT_AUTOMATIC = 0; // 0x0
-    field public static final int FORMAT_CHRONOMETER = 3; // 0x3
+    field public static final int FORMAT_CHRONOMETER = 2; // 0x2
   }
 
   @FlaggedApi("android.app.api_metric_style") public static final class Notification.MetricStyle extends android.app.Notification.Style {
@@ -11817,6 +11816,7 @@ package android.content {
     field @Deprecated public static final String ACTION_NEW_OUTGOING_CALL = "android.intent.action.NEW_OUTGOING_CALL";
     field public static final String ACTION_OPEN_DOCUMENT = "android.intent.action.OPEN_DOCUMENT";
     field public static final String ACTION_OPEN_DOCUMENT_TREE = "android.intent.action.OPEN_DOCUMENT_TREE";
+    field @FlaggedApi("com.android.eyedropper.enable_eye_dropper_api") public static final String ACTION_OPEN_EYE_DROPPER = "android.intent.action.OPEN_EYE_DROPPER";
     field public static final String ACTION_PACKAGES_SUSPENDED = "android.intent.action.PACKAGES_SUSPENDED";
     field public static final String ACTION_PACKAGES_UNSUSPENDED = "android.intent.action.PACKAGES_UNSUSPENDED";
     field public static final String ACTION_PACKAGE_ADDED = "android.intent.action.PACKAGE_ADDED";
@@ -11964,6 +11964,7 @@ package android.content {
     field public static final String EXTRA_CHOOSER_TARGETS = "android.intent.extra.CHOOSER_TARGETS";
     field public static final String EXTRA_CHOSEN_COMPONENT = "android.intent.extra.CHOSEN_COMPONENT";
     field public static final String EXTRA_CHOSEN_COMPONENT_INTENT_SENDER = "android.intent.extra.CHOSEN_COMPONENT_INTENT_SENDER";
+    field @FlaggedApi("com.android.eyedropper.enable_eye_dropper_api") public static final String EXTRA_COLOR = "android.intent.extra.COLOR";
     field public static final String EXTRA_COMPONENT_NAME = "android.intent.extra.COMPONENT_NAME";
     field public static final String EXTRA_CONTENT_ANNOTATIONS = "android.intent.extra.CONTENT_ANNOTATIONS";
     field public static final String EXTRA_CONTENT_QUERY = "android.intent.extra.CONTENT_QUERY";

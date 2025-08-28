@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package com.android.systemui.media.controls.ui.viewmodel
+package com.android.systemui.statusbar.notification.stack.domain.interactor
 
-import com.android.systemui.common.shared.model.Icon
+import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.kosmos.Kosmos.Fixture
+import com.android.systemui.shade.domain.interactor.shadeInteractor
+import com.android.systemui.statusbar.notification.domain.interactor.NotificationContainerInteractor
 
-/** Models UI state of device suggestion chip. */
-data class MediaSuggestionViewModel(
-    val isValidSuggestion: Boolean,
-    val onClicked: (() -> Unit)? = null,
-    val buttonText: String? = null,
-    val isConnecting: Boolean = false,
-    val icon: Icon.Loaded? = null,
-)
+val Kosmos.notificationContainerInteractor by Fixture {
+    NotificationContainerInteractor(
+        shadeInteractor = shadeInteractor,
+        headsUpNotificationInteractor = headsUpNotificationInteractor,
+    )
+}

@@ -131,7 +131,6 @@ import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.app.ActivityManagerInternal.OomAdjReason;
-import android.app.ActivityThread;
 import android.app.ApplicationExitInfo;
 import android.app.usage.UsageEvents;
 import android.content.BroadcastReceiver;
@@ -313,12 +312,6 @@ public abstract class OomAdjuster {
      * Service for optimizing resource usage from background apps.
      */
     CachedAppOptimizer mCachedAppOptimizer;
-
-    /**
-     * Re-rank apps getting a cache oom adjustment from lru to weighted order
-     * based on weighted scores for LRU, PSS and cache use count.
-     */
-    CacheOomRanker mCacheOomRanker;
 
     ActivityManagerConstants mConstants;
 
@@ -568,7 +561,6 @@ public abstract class OomAdjuster {
 
         mConstants = mService.mConstants;
         mCachedAppOptimizer = cachedAppOptimizer;
-        mCacheOomRanker = new CacheOomRanker(service);
 
         mLogger = new OomAdjusterDebugLogger(this, mService.mConstants);
 // QTI_BEGIN: 2019-06-26: Core: perf: Use get API for perf Properties.
@@ -634,7 +626,6 @@ public abstract class OomAdjuster {
 
     void initSettings() {
         mCachedAppOptimizer.init();
-        mCacheOomRanker.init(ActivityThread.currentApplication().getMainExecutor());
         if (mService.mConstants.KEEP_WARMING_SERVICES.size() > 0) {
             final IntentFilter filter = new IntentFilter(Intent.ACTION_USER_SWITCHED);
             mService.mContext.registerReceiverForAllUsers(new BroadcastReceiver() {
@@ -1068,10 +1059,7 @@ public abstract class OomAdjuster {
                     final ProcessServiceRecord psr = app.mServices;
                     int targetAdj = CACHED_APP_MIN_ADJ;
 
-                    if (app.isFreezeExempt()) {
-                        // BIND_WAIVE_PRIORITY and the like get oom_adj 900
-                        targetAdj += 0;
-                    } else if (state.getHasShownUi() && uiTargetAdj < uiTierMaxAdj) {
+                    if (state.getHasShownUi() && uiTargetAdj < uiTierMaxAdj) {
                         // The most recent UI-showing apps get [910, 910 + ui tier size).
                         targetAdj += uiTargetAdj++;
                     } else if ((state.getSetAdj() >= CACHED_APP_MIN_ADJ)
@@ -2896,11 +2884,6 @@ public abstract class OomAdjuster {
         mCachedAppOptimizer.dump(pw);
     }
 
-    @GuardedBy("mService")
-    void dumpCacheOomRankerSettings(PrintWriter pw) {
-        mCacheOomRanker.dump(pw);
-    }
-
     /**
      * Return whether or not a process should be frozen.
      */
@@ -2913,20 +2896,12 @@ public abstract class OomAdjuster {
                 return false;
             }
 
-            if (proc.isFreezeExempt()) {
-                return false;
-            }
-
             // Default, freeze a process.
             return true;
         } else {
             // The CPU capability handling covers all setShouldNotFreeze paths. Must check
             // shouldNotFreeze, if the CPU capability is not being used.
             if (proc.shouldNotFreeze()) {
-                return false;
-            }
-
-            if (proc.isFreezeExempt()) {
                 return false;
             }
 
@@ -2977,7 +2952,7 @@ public abstract class OomAdjuster {
                         "FreezeLite",
                         (app.isFrozen() ? "F" : "-")
                         + (app.isPendingFreeze() ? "P" : "-")
-                        + (app.isFreezeExempt() ? "E" : "-")
+                        + (/* Keeping for app.isFreezeExempt() */ "-")
                         + (app.shouldNotFreeze() ? "N" : "-")
                         + (hasCpuCapability ? "T" : "-")
                         + (hasImplicitCpuCapability ? "X" : "-")
@@ -2995,7 +2970,7 @@ public abstract class OomAdjuster {
                         CachedAppOptimizer.ATRACE_FREEZER_TRACK,
                         "updateAppFreezeStateLSP " + app.processName
                         + " pid: " + app.getPid()
-                        + " isFreezeExempt: " + app.isFreezeExempt()
+                        + " isFreezeExempt: " + false
                         + " isFrozen: " + app.isFrozen()
                         + " shouldNotFreeze: " + app.shouldNotFreeze()
                         + " shouldNotFreezeReason: " + app.shouldNotFreezeReason()

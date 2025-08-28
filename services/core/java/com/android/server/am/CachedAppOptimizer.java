@@ -737,15 +737,6 @@ public class CachedAppOptimizer {
         }
     }
 
-    /**
-     * Returns whether freezer exempts INSTALL_PACKAGES.
-     */
-    public boolean freezerExemptInstPkg() {
-        synchronized (mPhenotypeFlagLock) {
-            return mUseFreezer && mFreezerExemptInstPkg;
-        }
-    }
-
     @NeverCompile
     void dump(PrintWriter pw) {
         dumpCompact(pw);

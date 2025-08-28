@@ -10617,7 +10617,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         synchronized(this) {
             mConstants.dump(pw);
             mOomAdjuster.dumpCachedAppOptimizerSettings(pw);
-            mOomAdjuster.dumpCacheOomRankerSettings(pw);
             pw.println();
             if (dumpAll) {
                 pw.println(
@@ -11131,9 +11130,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             } else if ("settings".equals(cmd)) {
                 synchronized (this) {
                     mConstants.dump(pw);
-                }
-                synchronized (mProcLock) {
-                    mOomAdjuster.dumpCacheOomRankerSettings(pw);
                 }
             } else if ("cao".equals(cmd)) {
                 mOomAdjuster.dumpCachedAppOptimizerSettings(pw);
@@ -19588,10 +19584,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     @Override
     public boolean isAppFreezerEnabled() {
         return mOomAdjuster.mCachedAppOptimizer.useFreezer();
-    }
-
-    public boolean isAppFreezerExemptInstPkg() {
-        return mOomAdjuster.mCachedAppOptimizer.freezerExemptInstPkg();
     }
 
     /**

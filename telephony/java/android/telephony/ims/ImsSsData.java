@@ -44,7 +44,7 @@ import java.util.List;
  * Provides STK Call Control Supplementary Service information.
 // QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
  *
- * {@hide}
+ * @hide
  */
 // QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
 @SystemApi

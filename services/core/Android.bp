@@ -232,6 +232,7 @@ java_library_static {
 // QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         "apache-commons-math",
         "apache-commons-compress",
+        "adb_flags_lib",
         "battery_saver_flag_lib",
         "notification_flags_lib",
         "power_hint_flags_lib",

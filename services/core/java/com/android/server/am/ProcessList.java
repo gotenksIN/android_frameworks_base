@@ -66,7 +66,6 @@ import static com.android.server.am.ActivityManagerService.TAG_UID_OBSERVERS;
 import static com.android.server.wm.WindowProcessController.STOPPED_STATE_FIRST_LAUNCH;
 import static com.android.server.wm.WindowProcessController.STOPPED_STATE_FORCE_STOPPED;
 
-import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SpecialUsers.CanBeALL;
@@ -1581,7 +1580,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
      * @param uid The uid of the app
      * @param amt Adjustment value -- lmkd allows -1000 to +1000
      *
-     * {@hide}
+     * @hide
      */
     public static void setOomAdj(int pid, int uid, int amt) {
         // This indicates that the process is not started yet and so no need to proceed further.
@@ -1655,7 +1654,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
      *
      * @param apps App list to adjust their respective oom score.
      *
-     * {@hide}
+     * @hide
      */
     public static void batchSetOomAdj(ArrayList<ProcessRecord> apps) {
         final int totalApps = apps.size();
@@ -1742,7 +1741,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
     }
 
     /*
-     * {@hide}
+     * @hide
      */
     public static final void remove(int pid) {
         // This indicates that the process is not started yet and so no need to proceed further.
@@ -1756,7 +1755,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
     }
 
     /*
-     * {@hide}
+     * @hide
      */
     public static final Integer getLmkdKillCount(int min_oom_adj, int max_oom_adj) {
         ByteBuffer buf = ByteBuffer.allocate(4 * 3);
@@ -1807,7 +1806,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
     }
 
     /**
-     * {@hide}
+     * @hide
      */
     public static void startPsiMonitoringAfterBoot() {
         ByteBuffer buf = ByteBuffer.allocate(4);
@@ -2026,13 +2025,6 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
                             app.info.packageName);
                     externalStorageAccess = storageManagerInternal.hasExternalStorageAccess(uid,
                             app.info.packageName);
-                    if (mService.isAppFreezerExemptInstPkg()
-                            && pm.checkPermission(Manifest.permission.INSTALL_PACKAGES,
-                            app.info.packageName, userId)
-                            == PackageManager.PERMISSION_GRANTED) {
-                        Slog.i(TAG, app.info.packageName + " is exempt from freezer");
-                        app.mOptRecord.setFreezeExempt(true);
-                    }
                 } catch (RemoteException e) {
                     throw e.rethrowAsRuntimeException();
                 }
@@ -2652,14 +2644,16 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
             }
 
             boolean bindOverrideSysprops = false;
-            String[] syspropOverridePkgNames = DeviceConfig.getString(
-                    DeviceConfig.NAMESPACE_APP_COMPAT,
-                            "appcompat_sysprop_override_pkgs", "").split(",");
-            String[] pkgs = app.getPackageList();
-            for (int i = 0; i < pkgs.length; i++) {
-                if (ArrayUtils.contains(syspropOverridePkgNames, pkgs[i])) {
-                    bindOverrideSysprops = true;
-                    break;
+            if (Build.IS_USERDEBUG || Build.IS_ENG) {
+                String[] syspropOverridePkgNames = DeviceConfig.getString(
+                        DeviceConfig.NAMESPACE_APP_COMPAT,
+                                "appcompat_sysprop_override_pkgs", "").split(",");
+                String[] pkgs = app.getPackageList();
+                for (int i = 0; i < pkgs.length; i++) {
+                    if (ArrayUtils.contains(syspropOverridePkgNames, pkgs[i])) {
+                        bindOverrideSysprops = true;
+                        break;
+                    }
                 }
             }
 
@@ -4442,20 +4436,6 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
     @GuardedBy({"mService", "mProcLock"})
     ArrayList<ProcessRecord> getLruProcessesLSP() {
         return mLruProcesses;
-    }
-
-    /**
-     * For test only
-     */
-    @VisibleForTesting
-    @GuardedBy({"mService", "mProcLock"})
-    void setLruProcessServiceStartLSP(int pos) {
-        mLruProcessServiceStart = pos;
-    }
-
-    @GuardedBy(anyOf = {"mService", "mProcLock"})
-    int getLruProcessServiceStartLOSP() {
-        return mLruProcessServiceStart;
     }
 
     /**

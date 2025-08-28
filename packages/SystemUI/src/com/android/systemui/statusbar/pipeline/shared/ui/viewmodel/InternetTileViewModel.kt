@@ -73,7 +73,7 @@ constructor(
                 flowOf(
                     InternetTileModel.Active(
                         secondaryTitle = secondary,
-                        icon = ResourceIcon.get(wifiIcon.icon.res),
+                        icon = ResourceIcon.get(wifiIcon.icon.resId),
                         stateDescription = wifiIcon.contentDescription,
                         contentDescription = ContentDescription.Loaded("$internetLabel,$secondary"),
                     )
@@ -133,7 +133,7 @@ constructor(
                                 signalIcon.icon.contentDescription.loadContentDescription(context)
                             InternetTileModel.Active(
                                 secondaryTitle = secondary,
-                                iconId = signalIcon.icon.res,
+                                iconId = signalIcon.icon.resId,
                                 stateDescription = ContentDescription.Loaded(secondary),
                                 contentDescription = ContentDescription.Loaded(internetLabel),
                             )
@@ -177,7 +177,7 @@ constructor(
                 flowOf(
                     InternetTileModel.Active(
                         secondaryLabel = secondary?.toText(),
-                        iconId = it.res,
+                        iconId = it.resId,
                         stateDescription = null,
                         contentDescription = secondary,
                     )

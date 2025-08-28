@@ -3404,16 +3404,6 @@ class Task extends TaskFragment {
     }
 
     @Override
-    void prepareSurfaces() {
-        mDimmer.resetDimStates();
-        super.prepareSurfaces();
-
-        if (mDimmer.hasDimState() && mDimmer.updateDims(getSyncTransaction())) {
-            scheduleAnimation();
-        }
-    }
-
-    @Override
     void updateSurfaceVisibility(SurfaceControl.Transaction t) {
         t.setVisibility(mSurfaceControl, isVisible());
     }

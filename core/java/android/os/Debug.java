@@ -2672,7 +2672,7 @@ public final class Debug
      * These properties are only set during platform debugging, and are not
      * meant to be used as a general-purpose properties store.
      *
-     * {@hide}
+     * @hide
      *
      * @param cl The class to (possibly) modify
      * @param partial If false, sets all static fields, otherwise, only set
@@ -2796,7 +2796,7 @@ public final class Debug
      * Return a string consisting of methods and locations at multiple call stack levels.
      * @param depth the number of levels to return, starting with the immediate caller.
      * @return a string describing the call stack.
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     public static String getCallers(final int depth) {
@@ -2812,7 +2812,7 @@ public final class Debug
      * Return a string consisting of methods and locations at multiple call stack levels.
      * @param depth the number of levels to return, starting with the immediate caller.
      * @return a string describing the call stack.
-     * {@hide}
+     * @hide
      */
     public static String getCallers(final int start, int depth) {
         final StackTraceElement[] callStack = Thread.currentThread().getStackTrace();
@@ -2830,7 +2830,7 @@ public final class Debug
      * @param depth the number of levels to return, starting with the immediate caller.
      * @param linePrefix prefix to put in front of each location.
      * @return a string describing the call stack.
-     * {@hide}
+     * @hide
      */
     public static String getCallers(final int depth, String linePrefix) {
         final StackTraceElement[] callStack = Thread.currentThread().getStackTrace();
@@ -2843,7 +2843,7 @@ public final class Debug
 
     /**
      * @return a String describing the immediate caller of the calling method.
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     public static String getCaller() {

@@ -1700,10 +1700,6 @@ public final class CameraManager {
     @TestApi
     public static int getRotationOverride(@Nullable Context context,
             @Nullable PackageManager packageManager, @Nullable String packageName) {
-        if (!CameraManagerGlobal.sLandscapeToPortrait) {
-            return ICameraService.ROTATION_OVERRIDE_NONE;
-        }
-
         if (com.android.window.flags.Flags
                 .enableCameraCompatCompatibilityInfoRotateAndCropBugfix()) {
             if (isCameraCompatModeRequested()) {
@@ -1732,6 +1728,11 @@ public final class CameraManager {
                     }
                 }
             }
+        }
+
+        if (!CameraManagerGlobal.sLandscapeToPortrait) {
+            // No override and crop, and no change to sensor orientation.
+            return ICameraService.ROTATION_OVERRIDE_NONE;
         }
 
         if (packageManager != null && packageName != null) {

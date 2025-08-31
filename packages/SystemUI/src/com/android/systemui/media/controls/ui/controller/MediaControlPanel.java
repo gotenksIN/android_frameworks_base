@@ -20,8 +20,6 @@ import static android.provider.Settings.ACTION_MEDIA_CONTROLS_SETTINGS;
 
 import static com.android.systemui.Flags.communalHub;
 import static com.android.systemui.media.controls.domain.pipeline.MediaActionsKt.getNotificationActions;
-import static com.android.systemui.media.controls.ui.viewmodel.MediaControlViewModel.MEDIA_PLAYER_SCRIM_END_ALPHA;
-import static com.android.systemui.media.controls.ui.viewmodel.MediaControlViewModel.MEDIA_PLAYER_SCRIM_START_ALPHA;
 
 import android.animation.Animator;
 import android.animation.AnimatorInflater;
@@ -177,6 +175,8 @@ public class MediaControlPanel {
     // Time in millis for playing turbulence noise that is played after a touch ripple.
     @VisibleForTesting
     static final long TURBULENCE_NOISE_PLAY_DURATION = 7500L;
+    public static final float MEDIA_PLAYER_SCRIM_START_ALPHA = 0.65f;
+    public static final float MEDIA_PLAYER_SCRIM_END_ALPHA = 0.75f;
 
     private final SeekBarViewModel mSeekBarViewModel;
     private final CommunalSceneInteractor mCommunalSceneInteractor;
@@ -205,6 +205,7 @@ public class MediaControlPanel {
     private boolean mIsArtworkBound = false;
     private int mArtworkBoundId = 0;
     private int mArtworkNextBindRequestId = 0;
+    private boolean mPageArrowsVisible = false;
 
     private final KeyguardStateController mKeyguardStateController;
     private final ActivityIntentHelper mActivityIntentHelper;
@@ -606,9 +607,9 @@ public class MediaControlPanel {
     }
 
     /**
-     * Should be called when the space that holds device suggestions becomes visible to the user.
+     * Called when the panel becomes fully visible.
      */
-    public void onSuggestionSpaceVisible() {
+    public void onPanelFullyVisible() {
         if (!Flags.enableSuggestedDeviceUi()) {
             return;
         }
@@ -623,6 +624,7 @@ public class MediaControlPanel {
             return;
         }
         View deviceSuggestionButton = mMediaViewHolder.getDeviceSuggestionButton();
+        View deviceSuggestionContainer = mMediaViewHolder.getDeviceSuggestionContainer();
         TextView deviceText = mMediaViewHolder.getSeamlessText();
         @Nullable SuggestionData suggestionData = data.getSuggestionData();
         if (suggestionData != null) {
@@ -639,10 +641,16 @@ public class MediaControlPanel {
                 setSuggestionText(suggestionDeviceData);
                 setSuggestionIcon(suggestionDeviceData);
                 deviceSuggestionButton.setVisibility(View.VISIBLE);
+                deviceSuggestionContainer.setImportantForAccessibility(
+                        View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
                 return;
             }
         }
         deviceSuggestionButton.setVisibility(View.GONE);
+        // Change the importantForAccessibility attribute instead of visibility since the latter
+        // is manipulated by the TransitionLayout and the Guts animation logic.
+        deviceSuggestionContainer.setImportantForAccessibility(
+                View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         deviceText.setVisibility(View.VISIBLE);
         return;
     }
@@ -1095,7 +1103,8 @@ public class MediaControlPanel {
     }
 
     void setPageArrowsVisible(boolean visible) {
-        if (!Flags.mediaCarouselArrows()) return;
+        if (!Flags.mediaCarouselArrows() || mPageArrowsVisible == visible) return;
+        mPageArrowsVisible = visible;
 
         ConstraintSet expandedSet = mMediaViewController.getExpandedLayout();
         setVisibleAndAlpha(expandedSet, R.id.page_left, visible);

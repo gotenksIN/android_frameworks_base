@@ -1139,7 +1139,7 @@ public class Camera {
      * @see #takePicture(Camera.ShutterCallback,
      * Camera.PictureCallback, Camera.PictureCallback, Camera.PictureCallback)}.
      *
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     public final void addRawImageCallbackBuffer(byte[] callbackBuffer)

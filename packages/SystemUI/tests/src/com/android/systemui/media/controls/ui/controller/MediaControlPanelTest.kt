@@ -118,6 +118,7 @@ import org.mockito.Mockito.`when` as whenever
 import org.mockito.junit.MockitoJUnit
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.clearInvocations
 import org.mockito.kotlin.eq
 
 private const val KEY = "TEST_KEY"
@@ -1217,6 +1218,8 @@ public class MediaControlPanelTest : SysuiTestCase() {
 
         assertThat(seamlessText.visibility).isEqualTo(View.GONE)
         assertThat(deviceSuggestionButton.visibility).isEqualTo(View.VISIBLE)
+        assertThat(deviceSuggestionContainer.importantForAccessibility)
+            .isEqualTo(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO)
         assertThat(deviceSuggestionText.text)
             .isEqualTo(mContext.getString(R.string.media_suggestion_disconnected_text, DEVICE_NAME))
         assertThat(deviceSuggestionIcon.visibility).isEqualTo(View.VISIBLE)
@@ -1239,6 +1242,8 @@ public class MediaControlPanelTest : SysuiTestCase() {
 
         assertThat(seamlessText.visibility).isEqualTo(View.GONE)
         assertThat(deviceSuggestionButton.visibility).isEqualTo(View.VISIBLE)
+        assertThat(deviceSuggestionContainer.importantForAccessibility)
+            .isEqualTo(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO)
         assertThat(deviceSuggestionText.text)
             .isEqualTo(mContext.getString(R.string.media_suggestion_disconnected_text, DEVICE_NAME))
         assertThat(deviceSuggestionIcon.visibility).isEqualTo(View.GONE)
@@ -1261,6 +1266,8 @@ public class MediaControlPanelTest : SysuiTestCase() {
 
         assertThat(seamlessText.visibility).isEqualTo(View.GONE)
         assertThat(deviceSuggestionButton.visibility).isEqualTo(View.VISIBLE)
+        assertThat(deviceSuggestionContainer.importantForAccessibility)
+            .isEqualTo(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO)
         assertThat(deviceSuggestionText.text)
             .isEqualTo(mContext.getString(R.string.media_suggestion_failure_text))
         assertThat(deviceSuggestionIcon.visibility).isEqualTo(View.VISIBLE)
@@ -1282,6 +1289,8 @@ public class MediaControlPanelTest : SysuiTestCase() {
 
         assertThat(seamlessText.visibility).isEqualTo(View.VISIBLE)
         assertThat(deviceSuggestionButton.visibility).isEqualTo(View.GONE)
+        assertThat(deviceSuggestionContainer.importantForAccessibility)
+            .isEqualTo(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS)
     }
 
     @Test
@@ -1293,6 +1302,8 @@ public class MediaControlPanelTest : SysuiTestCase() {
 
         assertThat(seamlessText.visibility).isEqualTo(View.VISIBLE)
         assertThat(deviceSuggestionButton.visibility).isEqualTo(View.GONE)
+        assertThat(deviceSuggestionContainer.importantForAccessibility)
+            .isEqualTo(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS)
     }
 
     @Test
@@ -1311,6 +1322,8 @@ public class MediaControlPanelTest : SysuiTestCase() {
 
         assertThat(seamlessText.visibility).isEqualTo(View.VISIBLE)
         assertThat(deviceSuggestionButton.visibility).isEqualTo(View.GONE)
+        assertThat(deviceSuggestionContainer.importantForAccessibility)
+            .isEqualTo(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS)
     }
 
     /* ***** Guts tests for the player ***** */
@@ -1925,12 +1938,29 @@ public class MediaControlPanelTest : SysuiTestCase() {
 
     @RequiresFlagsEnabled(Flags.FLAG_MEDIA_CAROUSEL_ARROWS)
     @Test
+    fun setArrowsVisible_alreadyVisible_noOp() {
+        setArrowsVisible()
+
+        // If same visibility is set again, does not update the constraints again
+        player.setPageArrowsVisible(true)
+        verify(expandedSet).setVisibility(R.id.page_left, ConstraintSet.VISIBLE)
+        verify(expandedSet).setVisibility(R.id.page_right, ConstraintSet.VISIBLE)
+
+        verify(collapsedSet).setVisibility(R.id.page_left, ConstraintSet.VISIBLE)
+        verify(collapsedSet).setVisibility(R.id.page_right, ConstraintSet.VISIBLE)
+    }
+
+    @RequiresFlagsEnabled(Flags.FLAG_MEDIA_CAROUSEL_ARROWS)
+    @Test
     fun setArrowsNotVisible() {
         val guidePx =
             context.resources.getDimensionPixelSize(R.dimen.qs_media_session_collapsed_guideline)
 
         player.attachPlayer(viewHolder)
         player.bindPlayer(mediaData, PACKAGE)
+        player.setPageArrowsVisible(true)
+        clearInvocations(expandedSet)
+        clearInvocations(collapsedSet)
 
         player.setPageArrowsVisible(false)
 

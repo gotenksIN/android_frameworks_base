@@ -281,7 +281,7 @@ public class Process {
      */
     public static final int INET_GID = 3003;
 
-    /** {@hide} */
+    /** @hide */
     public static final int NOBODY_UID = 9999;
 
     /**
@@ -374,9 +374,9 @@ public class Process {
      */
     public static final int LAST_SHARED_APPLICATION_GID = 59999;
 
-    /** {@hide} */
+    /** @hide */
     public static final int FIRST_APPLICATION_CACHE_GID = 20000;
-    /** {@hide} */
+    /** @hide */
     public static final int LAST_APPLICATION_CACHE_GID = 29999;
 
     /**
@@ -728,7 +728,7 @@ public class Process {
      * @return An object that describes the result of the attempt to start the process.
      * @throws RuntimeException on fatal start failure
      *
-     * {@hide}
+     * @hide
      */
     public static ProcessStartResult start(@NonNull final String processClass,
                                            @Nullable final String niceName,
@@ -934,7 +934,7 @@ public class Process {
 
     /**
      * @deprecated Use {@link #isIsolatedUid(int)} instead.
-     * {@hide}
+     * @hide
      */
     @Deprecated
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.TIRAMISU,
@@ -1083,20 +1083,41 @@ public class Process {
     }
 
     /**
-     * Set the priority of a thread, based on Linux priorities.
+     * Set the OS priority of a thread, using Linux niceness priorities. Does not affect the value
+     * cached for use by {@code java.lang.Thread.getPriority()}. If this is used with a
+     * non-negative priority (Linux niceness), the priority may, on rare occasion, be reset
+     * by the runtime to its cached value, especially when setting the priority of another thread.
+     *
+     * The new priority is not inherited by Java-created child threads. It may or may not
+     * be inherited by threads created from native code. Use {@code
+     * java/lang/Thread.setPriority()} to allow child threads to inherit the new priority.
      *
      * @param tid The identifier of the thread/process to change.
-     * @param priority A Linux priority level, from -20 for highest scheduling
+     * @param priority A Linux priority a.k.a. "niceness" level, from -20 for highest scheduling
      * priority to 19 for lowest scheduling priority.
      *
      * @throws IllegalArgumentException Throws IllegalArgumentException if
-     * <var>tid</var> does not exist.
+     * <var>tid</var> does not exist, or <var>priority</var> is out of range.
      * @throws SecurityException Throws SecurityException if your process does
      * not have permission to modify the given thread, or to use the given
      * priority.
      */
     @RavenwoodRedirect
-    public static final native void setThreadPriority(int tid,
+    public static final void setThreadPriority(int tid,
+            @IntRange(from = -20, to = THREAD_PRIORITY_LOWEST) int priority)
+            throws IllegalArgumentException, SecurityException {
+        if (com.android.libcore.Flags.nicenessApis() && Process.myTid() == tid) {
+            // Prefer the same thread version that informs ART of the priority change.
+            setThreadPriority(priority);
+        } else {
+            if (priority < -20 || priority > THREAD_PRIORITY_LOWEST) {
+                throw new IllegalArgumentException("Priority/niceness " + priority + " is invalid");
+            }
+            setThreadPriorityNative(tid, priority);
+        }
+    }
+
+    private static native void setThreadPriorityNative(int tid,
             @IntRange(from = -20, to = THREAD_PRIORITY_LOWEST) int priority)
             throws IllegalArgumentException, SecurityException;
 
@@ -1104,11 +1125,16 @@ public class Process {
      * Call with 'false' to cause future calls to {@link #setThreadPriority(int)} to
      * throw an exception if passed a background-level thread priority.  This is only
      * effective if the JNI layer is built with GUARD_THREAD_PRIORITY defined to 1.
+     * This does not prevent a thread from backgrounding itself via other means, such
+     * as a call to Thread.setPriority() or a native setpriority() call.
      *
      * @hide
      */
     @RavenwoodRedirect
     public static final native void setCanSelfBackground(boolean backgroundOk);
+
+    @RavenwoodRedirect
+    private static native boolean getCanSelfBackground();
 
     /**
      * Sets the scheduling group for a thread.
@@ -1276,31 +1302,47 @@ public class Process {
     public static final native long[] getSchedAffinity(int tid);
 
     /**
-     * Set the priority of the calling thread, based on Linux priorities.  See
-     * {@link #setThreadPriority(int, int)} for more information.
+     * Set the priority of the calling thread, based on Linux niceness priorities.  See
+     * {@link #setThreadPriority(int, int)} for more information. This is preferred over
+     * the two argument version when possible. The new priority is not inherited by Java
+     * child threads.
      *
      * @param priority A Linux priority level, from -20 for highest scheduling
      * priority to 19 for lowest scheduling priority.
      *
      * @throws IllegalArgumentException Throws IllegalArgumentException if
-     * <var>tid</var> does not exist.
+     * <var>priority</var> is out of range.
      * @throws SecurityException Throws SecurityException if your process does
      * not have permission to modify the given thread, or to use the given
      * priority.
-     *
-     * @see #setThreadPriority(int, int)
      */
-    @RavenwoodReplace
-    public static final native void setThreadPriority(
+    @RavenwoodRedirect
+    public static final void setThreadPriority(
             @IntRange(from = -20, to = THREAD_PRIORITY_LOWEST) int priority)
-            throws IllegalArgumentException, SecurityException;
-
-    private static void setThreadPriority$ravenwood(int priority) {
-        setThreadPriority(myTid(), priority);
+            throws IllegalArgumentException, SecurityException {
+        if (!com.android.libcore.Flags.nicenessApis()) {
+            // Fall back to not updating the cached priority if we don't have libcore support.
+            setThreadPriority(myTid(), priority);
+            return;
+        }
+        if (priority >= THREAD_PRIORITY_BACKGROUND && !getCanSelfBackground()) {
+            throw new IllegalArgumentException(
+                "Priority " + priority + " blocked by setCanSelfBackground()");
+        }
+        boolean succ = VMRuntime.getRuntime().setThreadNiceness(Thread.currentThread(), priority);
+        // VMRuntime.setThreadNiceness() just returns false for out-of-range priority.
+        if (!succ) {
+            if (priority < -20 || priority > THREAD_PRIORITY_LOWEST) {
+                throw new IllegalArgumentException("Priority/niceness " + priority + " is invalid");
+            }
+            throw new SecurityException("Cannot set priority to " + priority);
+        }
     }
 
     /**
      * Return the current priority of a thread, based on Linux priorities.
+     * Ignores the {@code java.lang.Thread.getPriority()} cached priority, which is used
+     * to set the priority of newly created child Java threads.
      *
      * @param tid The identifier of the thread/process. If tid equals zero, the priority of the
      * calling process/thread will be returned.
@@ -1328,7 +1370,7 @@ public class Process {
      * not have permission to modify the given thread, or to use the given
      * scheduling policy or priority.
      *
-     * {@hide}
+     * @hide
      */
 
     @TestApi
@@ -1348,7 +1390,7 @@ public class Process {
      * not have permission to modify the given thread, or to use the given
      * scheduling policy or priority.
      *
-     * {@hide}
+     * @hide
      */
 
     public static final native void setThreadScheduler(int tid, int policy, int priority)
@@ -1373,7 +1415,7 @@ public class Process {
      *
      * @param text The new name of this process.
      *
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage(maxTargetSdk = VERSION_CODES.S, publicAlternatives = "Do not try to "
             + "change the process name. (If you must, you could use {@code pthread_setname_np(3)}, "

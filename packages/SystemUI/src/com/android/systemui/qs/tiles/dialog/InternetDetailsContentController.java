@@ -331,7 +331,11 @@ public class InternetDetailsContentController implements AccessPointController.A
                 }
             };
 
-    protected List<SubscriptionInfo> getSubscriptionInfo() {
+    protected List<SubscriptionInfo> getActiveSubscriptionInfoList() {
+        return mSubscriptionManager.getActiveSubscriptionInfoList();
+    }
+
+    protected List<SubscriptionInfo> getFilteredSubscriptionInfo() {
         return mKeyguardUpdateMonitor.getFilteredSubscriptionInfo();
     }
 
@@ -719,7 +723,12 @@ public class InternetDetailsContentController implements AccessPointController.A
 
     private CharSequence getUniqueSubscriptionDisplayName(int subscriptionId, Context context) {
         final Map<Integer, CharSequence> displayNames = getUniqueSubscriptionDisplayNames(context);
-        return displayNames.getOrDefault(subscriptionId, "");
+        CharSequence displayName =  displayNames.getOrDefault(subscriptionId, "");
+        if (DEBUG) {
+            Log.d(TAG, "getUniqueSubscriptionDisplayName(), subscriptionId: " + subscriptionId
+                    + ", displayName:" + displayName);
+        }
+        return displayName;
     }
 
     private Map<Integer, CharSequence> getUniqueSubscriptionDisplayNames(Context context) {
@@ -736,7 +745,7 @@ public class InternetDetailsContentController implements AccessPointController.A
 
         // Map of SubscriptionId to DisplayName
         final Supplier<Stream<DisplayInfo>> originalInfos =
-                () -> getSubscriptionInfo().stream().filter(i -> {
+                () -> getActiveSubscriptionInfoList().stream().filter(i -> {
                     // Filter out null values.
                     return (i != null && i.getDisplayName() != null);
                 }).map(i -> new DisplayInfo(i, i.getDisplayName().toString().trim()));
@@ -806,8 +815,7 @@ public class InternetDetailsContentController implements AccessPointController.A
             return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         }
 
-        SubscriptionInfo subInfo = mSubscriptionManager.getActiveSubscriptionInfo(
-                SubscriptionManager.getActiveDataSubscriptionId());
+        SubscriptionInfo subInfo = mSubscriptionManager.getActiveSubscriptionInfo(activeDataSubId);
         if (subInfo != null && subInfo.getSubscriptionId() != mDefaultDataSubId
                 && !subInfo.isOpportunistic()) {
             int subId = subInfo.getSubscriptionId();
@@ -820,7 +828,40 @@ public class InternetDetailsContentController implements AccessPointController.A
             return subId;
         }
         return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+    }
 
+    /**
+     * @return the subId of the visible ActiveDataSubId, otherwise
+     * return {@link SubscriptionManager#INVALID_SUBSCRIPTION_ID}.
+     */
+    int getActiveDataSubId() {
+        // TODO(b/440352380): refactor and reduce the times of API calls
+        int activeDataSubId = SubscriptionManager.getActiveDataSubscriptionId();
+        if (activeDataSubId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+            return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+        }
+        SubscriptionInfo defaultDataSubInfo = mSubscriptionManager.getActiveSubscriptionInfo(
+                mDefaultDataSubId);
+        // get the visible Active SubscriptionInfo List from
+        // KeyguardUpdateMonitor.getFilteredSubscriptionInfo() which is controlled by
+        // CarrierConfigManager.KEY_ALWAYS_SHOW_PRIMARY_SIGNAL_BAR_IN_OPPORTUNISTIC_NETWORK_BOOLEAN.
+        SubscriptionInfo subInfo = getFilteredSubscriptionInfo().stream()
+                .filter(it -> it.getSubscriptionId() == activeDataSubId)
+                .findFirst().orElse(defaultDataSubInfo);
+        if (subInfo != null) {
+            if (DEBUG) {
+                Log.d(TAG, "getActiveDataSubId(), subInfo:" + subInfo);
+            }
+            // register the listen
+            int subId = subInfo.getSubscriptionId();
+            if (mSubIdTelephonyManagerMap.get(subId) == null) {
+                TelephonyManager secondaryTm = mTelephonyManager.createForSubscriptionId(subId);
+                registerInternetTelephonyCallback(secondaryTm, subId);
+                mSubIdTelephonyManagerMap.put(subId, secondaryTm);
+            }
+            return subId;
+        }
+        return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
     }
 
     CharSequence getMobileNetworkTitle(int subId) {
@@ -833,17 +874,21 @@ public class InternetDetailsContentController implements AccessPointController.A
     }
 
     String getMobileNetworkSummary(int subId) {
-        String description = "";
+        String networkTypeDescription = "";
         if (mCarrierNameCustomization.show5GAIcon()) {
             final FiveGServiceState fiveGState = getFiveGServiceState(subId);
             if (fiveGState.getNrIconType() == NrIconType.TYPE_5G_UWB) {
-                description = mCarrierNameCustomization.getNetworkTypeDescription(subId);
+                networkTypeDescription = mCarrierNameCustomization.getNetworkTypeDescription(subId);
             }
         }
-        if (TextUtils.isEmpty(description)) {
-            description = getNetworkTypeDescription(mContext, mConfig, subId);
+        if (TextUtils.isEmpty(networkTypeDescription)) {
+            networkTypeDescription = getNetworkTypeDescription(mContext, mConfig, subId);
         }
-        return getMobileSummary(mContext, description, subId);
+        if (DEBUG) {
+            Log.d(TAG,
+                    "getMobileNetworkSummary(), NetworkTypeDescription:" + networkTypeDescription);
+        }
+        return getMobileSummary(mContext, networkTypeDescription, subId);
     }
 
     /**
@@ -853,6 +898,10 @@ public class InternetDetailsContentController implements AccessPointController.A
             int subId) {
         TelephonyDisplayInfo telephonyDisplayInfo = mSubIdTelephonyDisplayInfoMap.getOrDefault(
                 subId, DEFAULT_TELEPHONY_DISPLAY_INFO);
+        if (DEBUG) {
+            Log.d(TAG, "getNetworkTypeDescription(), subId:" + subId
+                    + ",telephonyDisplayInfo:" + telephonyDisplayInfo);
+        }
         String iconKey = null;
         if (isNsa(telephonyDisplayInfo)) {
             final FiveGServiceState fiveGState = getFiveGServiceState(subId);
@@ -900,11 +949,14 @@ public class InternetDetailsContentController implements AccessPointController.A
             return context.getString(R.string.mobile_data_off_summary);
         }
         String summary = networkTypeDescription;
+        
         boolean isSmartDdsEnabled = Settings.Global.getInt(context.getContentResolver(),
                 Settings.Global.SMART_DDS_SWITCH, 0) == 1;
-        boolean isForDds = subId == mDefaultDataSubId;
-        int activeSubId = getActiveAutoSwitchNonDdsSubId();
-        boolean isOnNonDds = activeSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+        int activeDataSubId = getActiveDataSubId();
+        boolean isForVisibleDds = subId == activeDataSubId;
+        int activeAutoSwitchNonDdsSubId = getActiveAutoSwitchNonDdsSubId();
+        boolean isOnNonDds =
+                activeAutoSwitchNonDdsSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         // Set network description for the carrier network when connecting to the carrier network
         // under the airplane mode ON.
         if (activeNetworkIsCellular() || isCarrierNetworkActive()) {
@@ -912,7 +964,7 @@ public class InternetDetailsContentController implements AccessPointController.A
                     com.android.settingslib.R.string.preference_summary_default_combination,
                     context.getString(
                             // if nonDds is active, explains Dds status as poor connection
-                            isForDds || isSmartDdsEnabled
+                            isForVisibleDds || isSmartDdsEnabled
                                     ? (isOnNonDds && !isSmartDdsEnabled
                                     ? R.string.mobile_data_poor_connection
                                     : R.string.mobile_data_connection_active)
@@ -1197,8 +1249,7 @@ public class InternetDetailsContentController implements AccessPointController.A
         mTelephonyManager.createForSubscriptionId(subId).setDataEnabledForReason(
                 TelephonyManager.DATA_ENABLED_REASON_USER, enabled);
         if (disableOtherSubscriptions) {
-            final List<SubscriptionInfo> subInfoList =
-                    mSubscriptionManager.getActiveSubscriptionInfoList();
+            final List<SubscriptionInfo> subInfoList = getActiveSubscriptionInfoList();
             if (subInfoList != null) {
                 for (SubscriptionInfo subInfo : subInfoList) {
                     // We never disable mobile data for opportunistic subscriptions.

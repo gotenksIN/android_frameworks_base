@@ -289,7 +289,7 @@ public class LauncherProxyService implements CallbackController<LauncherProxyLis
 
         @VisibleForTesting
         public void moveShadeWindowIfNeeded(MotionEvent event) {
-            if (ShadeWindowGoesAround.isEnabled() && SceneContainerFlag.isEnabled()) {
+            if (ShadeWindowGoesAround.isEnabled()) {
                 Trace.beginSection("LauncherProxyService#moveShadeWindowIfNeeded");
                 // TODO: b/407496148 - Refactor to use DisplayMetricsRepository instead
                 final DisplayInfo displayInfo = new DisplayInfo();
@@ -305,9 +305,7 @@ public class LauncherProxyService implements CallbackController<LauncherProxyLis
             if (ShadeWindowGoesAround.isEnabled() && !SceneContainerFlag.isEnabled()) {
                 // For legacy shade case, don't attempt to handle touch events on display that
                 // doesn't have the shade. They're handled with SceneContainerFlag enabled.
-                boolean touchingDisplayWithoutShade =
-                        event.getDisplayId() != mShadeDisplayPolicy.getDisplayId().getValue();
-                return touchingDisplayWithoutShade;
+                return event.getDisplayId() != mShadeDisplayPolicy.getDisplayId().getValue();
             }
             return false;
         }
@@ -514,6 +512,7 @@ public class LauncherProxyService implements CallbackController<LauncherProxyLis
             }
             if (!mShadeModeInteractor.get().isDualShade()) {
                 mShadeInteractor.get().expandNotificationsShade(reason, null);
+                return;
             }
 
             final DisplayInfo displayInfo = new DisplayInfo();

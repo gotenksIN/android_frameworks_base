@@ -112,7 +112,7 @@ fun StackedMobileIcon(viewModel: StackedMobileIconViewModel, modifier: Modifier 
                 val height = with(LocalDensity.current) { IconHeightSp.toDp() }
                 val paddingEnd = with(LocalDensity.current) { RatIndicatorPaddingSp.toDp() }
                 Image(
-                    painter = painterResource(it.res),
+                    painter = painterResource(it.resId),
                     contentDescription = it.contentDescription?.load(),
                     modifier = Modifier.height(height).padding(end = paddingEnd),
                     colorFilter = ColorFilter.tint(contentColor, BlendMode.SrcIn),
@@ -224,7 +224,7 @@ private fun CustomMobileGroupIcon(viewModel: MobileIconViewModelCommon) {
 
     networkTypeIcon?.let {
         Image(
-            painter = painterResource(it.res),
+            painter = painterResource(it.resId),
             contentDescription = it.contentDescription?.load(),
             modifier = Modifier.height(height),
             colorFilter = ColorFilter.tint(contentColor, BlendMode.SrcIn),

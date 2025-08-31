@@ -183,8 +183,7 @@ class ScreenRotationAnimation {
                 }
                 hardwareBuffer.close();
             }
-            if ((flags & FLAG_HAS_WALLPAPER) != 0
-                    && !com.android.window.flags.Flags.noAlphaRotationEnterAnimation()) {
+            if ((flags & FLAG_HAS_WALLPAPER) != 0) {
                 mBackEffectSurface = new SurfaceControl.Builder()
                         .setCallsite("ShellRotationAnimation").setParent(rootLeash)
                         .setEffectLayer().setOpaque(true).setName("BackEffect").build();
@@ -358,15 +357,18 @@ class ScreenRotationAnimation {
 
     private void startDisplayRotation(@NonNull ArrayList<Animator> animations,
             @NonNull Runnable finishCallback, @NonNull ShellExecutor mainExecutor) {
+        final Rect clipRect = com.android.window.flags.Flags.noAlphaRotationEnterAnimation()
+                ? new Rect(0, 0, mEndWidth, mEndHeight) : null;
         buildSurfaceAnimation(animations, mRotateEnterAnimation, getEnterSurface(), finishCallback,
                 mTransactionPool, mainExecutor, null /* position */, 0 /* cornerRadius */,
-                null /* clipRect */, null);
+                clipRect, null);
     }
 
     private void startScreenshotRotationAnimation(@NonNull ArrayList<Animator> animations,
             @NonNull Runnable finishCallback, @NonNull ShellExecutor mainExecutor) {
         final Rect clipRect = com.android.window.flags.Flags.noAlphaRotationEnterAnimation()
-                ? new Rect(0, 0, mEndWidth, mEndHeight) : null;
+                // Inverse size because the screenshot layer has rotated transformation.
+                ? new Rect(0, 0, mStartHeight, mStartWidth) : null;
         buildSurfaceAnimation(animations, mRotateExitAnimation, mAnimLeash, finishCallback,
                 mTransactionPool, mainExecutor, null /* position */, 0 /* cornerRadius */,
                 clipRect, null);
@@ -374,12 +376,9 @@ class ScreenRotationAnimation {
 
     private void buildScreenshotAlphaAnimation(@NonNull ArrayList<Animator> animations,
             @NonNull Runnable finishCallback, @NonNull ShellExecutor mainExecutor) {
-        final Rect clipRect = com.android.window.flags.Flags.noAlphaRotationEnterAnimation()
-                // Inverse size because the screenshot layer has rotated transformation.
-                ? new Rect(0, 0, mStartHeight, mStartWidth) : null;
         buildSurfaceAnimation(animations, mRotateAlphaAnimation, mAnimLeash, finishCallback,
                 mTransactionPool, mainExecutor, null /* position */, 0 /* cornerRadius */,
-                clipRect, null);
+                null /* clipRect */, null);
     }
 
     private void buildLumaAnimation(@NonNull ArrayList<Animator> animations,

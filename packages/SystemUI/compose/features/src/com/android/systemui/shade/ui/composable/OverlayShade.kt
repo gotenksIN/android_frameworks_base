@@ -51,10 +51,13 @@ import androidx.compose.ui.unit.dp
 import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.LowestZIndexContentPicker
+import com.android.compose.animation.scene.mechanics.TileRevealFlag
+import com.android.compose.animation.scene.mechanics.rememberGestureContext
 import com.android.compose.modifiers.thenIf
 import com.android.compose.windowsizeclass.LocalWindowSizeClass
 import com.android.mechanics.behavior.VerticalExpandContainerSpec
 import com.android.mechanics.behavior.verticalExpandContainerBackground
+import com.android.mechanics.compose.modifier.motionDriver
 import com.android.systemui.res.R
 import com.android.systemui.shade.ui.ShadeColors.shadePanel
 import com.android.systemui.shade.ui.ShadeColors.shadePanelScrimBehind
@@ -86,13 +89,17 @@ fun ContentScope.OverlayShade(
                 Modifier.fillMaxSize().panelContainerPadding(isFullWidth, alignmentOnWideScreens),
             contentAlignment = if (isFullWidth) Alignment.TopCenter else alignmentOnWideScreens,
         ) {
+            val gestureContext = rememberGestureContext()
             Panel(
                 enableTransparency = enableTransparency,
                 spec = panelSpec,
                 modifier =
                     Modifier.overscroll(verticalOverscrollEffect)
                         .element(panelElement)
+                        .thenIf(TileRevealFlag.isEnabled) { Modifier.motionDriver(gestureContext) }
                         .panelWidth(isFullWidth)
+                        // TODO(440566878): Investigate if this can be optimized by replacing with
+                        // onLayoutRectChanged.
                         .onPlaced { coordinates ->
                             val bounds = coordinates.boundsInWindow()
                             val isTopRounded = panelSpec.isFloating

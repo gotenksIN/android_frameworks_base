@@ -620,7 +620,7 @@ public final class AutofillManager {
 
     /**
      * There is currently no session running.
-     * {@hide}
+     * @hide
      */
     public static final int NO_SESSION = Integer.MAX_VALUE;
 
@@ -1331,7 +1331,7 @@ public final class AutofillManager {
      *
      * @param savedInstanceState The state to be restored
      *
-     * {@hide}
+     * @hide
      */
     public void onCreate(Bundle savedInstanceState) {
         if (!hasAutofillFeature()) {
@@ -1392,7 +1392,7 @@ public final class AutofillManager {
      *
      * @see AutofillClient#autofillClientIsVisibleForAutofill()
      *
-     * {@hide}
+     * @hide
      */
     public void onVisibleForAutofill() {
         // This gets called when the client just got visible at which point the visibility
@@ -1416,7 +1416,7 @@ public final class AutofillManager {
      *
      * @param isExpiredResponse The response has expired or not
      *
-     * {@hide}
+     * @hide
      */
     public void onInvisibleForAutofill(boolean isExpiredResponse) {
         synchronized (mLock) {
@@ -1449,7 +1449,7 @@ public final class AutofillManager {
      *
      * @param outState Place to store the state
      *
-     * {@hide}
+     * @hide
      */
     public void onSaveInstanceState(Bundle outState) {
         if (!hasAutofillFeature()) {

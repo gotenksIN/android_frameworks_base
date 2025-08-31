@@ -545,6 +545,8 @@ public class InternetDialogDelegateLegacy implements
         internetContent.mIsWifiScanEnabled = mInternetDetailsContentController.isWifiScanEnabled();
         internetContent.mActiveAutoSwitchNonDdsSubId =
                 mInternetDetailsContentController.getActiveAutoSwitchNonDdsSubId();
+        internetContent.mActiveDataSubId =
+                mInternetDetailsContentController.getActiveDataSubId();
         internetContent.mCurrentSatelliteState =
                 mInternetDetailsContentController.getCurrentSatelliteState();
         internetContent.mDefaultSubSignalStrengthIcon =
@@ -700,16 +702,25 @@ public class InternetDialogDelegateLegacy implements
                 mMobileDataToggle.setChecked(
                         mInternetDetailsContentController.isMobileDataEnabled());
                 mMobileTitleText.setText(getMobileNetworkTitle(mDefaultDataSubId));
-                String summary = getMobileNetworkSummary(mDefaultDataSubId);
-                if (!TextUtils.isEmpty(summary)) {
-                    mMobileSummaryText.setText(
-                            Html.fromHtml(summary, Html.FROM_HTML_MODE_LEGACY));
-                    mMobileSummaryText.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
-                    mMobileSummaryText.setVisibility(View.VISIBLE);
-                } else {
-                    mMobileSummaryText.setVisibility(View.GONE);
-                }
-
+                int activeDataSubId = internetContent.mActiveDataSubId;
+                Log.d(TAG, "setMobileDataLayout(), activeDataSubId: " + activeDataSubId
+                        + ", mDefaultDataSubId:" + mDefaultDataSubId);
+                boolean validDataSubId =
+                        activeDataSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+                mBackgroundExecutor.execute(() -> {
+                    String summary = getMobileNetworkSummary(
+                            validDataSubId ? activeDataSubId : mDefaultDataSubId);
+                    mHandler.post(() -> {
+                        if (!TextUtils.isEmpty(summary)) {
+                            mMobileSummaryText.setText(
+                                    Html.fromHtml(summary, Html.FROM_HTML_MODE_LEGACY));
+                            mMobileSummaryText.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
+                            mMobileSummaryText.setVisibility(View.VISIBLE);
+                        } else {
+                            mMobileSummaryText.setVisibility(View.GONE);
+                        }
+                    });
+                });
                 mSignalIcon.setImageDrawable(internetContent.mDefaultSubSignalStrengthIcon);
 
                 mMobileDataToggle.setVisibility(
@@ -819,15 +830,19 @@ public class InternetDialogDelegateLegacy implements
 
                     TextView mSecondaryMobileSummaryText =
                             mDialogView.requireViewById(R.id.secondary_mobile_summary);
-                    summary = getMobileNetworkSummary(autoSwitchNonDdsSubId);
-                    if (!TextUtils.isEmpty(summary)) {
-                        mSecondaryMobileSummaryText.setText(
-                                Html.fromHtml(summary, Html.FROM_HTML_MODE_LEGACY));
-                        mSecondaryMobileSummaryText.setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE);
-                        mSecondaryMobileSummaryText.setTextAppearance(
-                                R.style.TextAppearance_InternetDialog_Active);
-                    }
-
+                    mBackgroundExecutor.execute(() -> {
+                        String summary = getMobileNetworkSummary(autoSwitchNonDdsSubId);
+                        mHandler.post(() -> {
+                            if (!TextUtils.isEmpty(summary)) {
+                                mSecondaryMobileSummaryText.setText(
+                                        Html.fromHtml(summary, Html.FROM_HTML_MODE_LEGACY));
+                                mSecondaryMobileSummaryText.setBreakStrategy(
+                                        Layout.BREAK_STRATEGY_SIMPLE);
+                                mSecondaryMobileSummaryText.setTextAppearance(
+                                        R.style.TextAppearance_InternetDialog_Active);
+                            }
+                        });
+                    });
                     ImageView mSecondarySignalIcon =
                             mDialogView.requireViewById(R.id.secondary_signal_icon);
                     mBackgroundExecutor.execute(() -> {
@@ -1468,6 +1483,7 @@ public class InternetDialogDelegateLegacy implements
         boolean mIsDeviceLocked = false;
         boolean mIsWifiScanEnabled = false;
         int mActiveAutoSwitchNonDdsSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+        int mActiveDataSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         int mCurrentSatelliteState = SATELLITE_NOT_STARTED;
 
         Drawable mDefaultSubSignalStrengthIcon = null;

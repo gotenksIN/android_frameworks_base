@@ -1950,6 +1950,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 activityOrientation = r.getOverrideOrientation();
             }
         }
+        if (activityOrientation == SCREEN_ORIENTATION_UNSPECIFIED && !r.providesOrientation()) {
+            return ROTATION_UNDEFINED;
+        }
         if (r.inMultiWindowMode() || r.getRequestedConfigurationOrientation(true /* forDisplay */,
                 activityOrientation) == getConfiguration().orientation) {
             return ROTATION_UNDEFINED;
@@ -4283,7 +4286,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 && mImeLayeringTarget != null
                 && mImeLayeringTarget.mActivityRecord != null
                 && mImeLayeringTarget.getWindowingMode() == WINDOWING_MODE_FULLSCREEN
-                && mImeLayeringTarget.getBounds().equals(mImeWindowsContainer.getBounds())
                 // IME is attached to app windows that fill display area. This excludes
                 // letterboxed windows.
                 && mImeLayeringTarget.matchesDisplayAreaBounds();

@@ -1397,25 +1397,6 @@ public class DisplayContentTests extends WindowTestsBase {
         assertEquals(mAppWindow, mDisplayContent.computeImeControlTarget());
     }
 
-    @SetupWindows(addWindows = W_ACTIVITY)
-    @Test
-    public void testShouldImeAttachedToApp_targetBoundsDifferentFromImeContainer_returnsFalse() {
-        Rect imeContainerBounds = new Rect(0, 0, 100, 100);
-        Rect imeTargetBounds = new Rect(0, 0, 100, 200);
-        spyOn(mAppWindow);
-        spyOn(mAppWindow.mActivityRecord);
-        doReturn(imeTargetBounds).when(mAppWindow).getBounds();
-        doReturn(true).when(mAppWindow.mActivityRecord).matchParentBounds();
-        mDisplayContent.setRemoteInsetsController(createDisplayWindowInsetsController());
-        mDisplayContent.setImeInputTarget(mAppWindow);
-        mDisplayContent.setImeLayeringTarget(mAppWindow);
-        final DisplayArea.Tokens imeContainer = mDisplayContent.getImeContainer();
-        spyOn(imeContainer);
-        doReturn(imeContainerBounds).when(imeContainer).getBounds();
-
-        assertFalse(mDisplayContent.shouldImeAttachedToApp());
-    }
-
     @Test
     public void testUpdateSystemGestureExclusion() {
         final DisplayContent dc = createNewDisplay();
@@ -1757,10 +1738,31 @@ public class DisplayContentTests extends WindowTestsBase {
     }
 
     @Test
+    public void testRotationForActivityInDifferentOrientation() {
+        mDisplayContent.setIgnoreOrientationRequest(false);
+        final ActivityRecord app = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        final DisplayRotation displayRotation = mDisplayContent.getDisplayRotation();
+        final int rotation = displayRotation.getRotation();
+        spyOn(displayRotation);
+        doReturn((rotation + 1) % 4).when(displayRotation).rotationForOrientation(
+                anyInt() /* orientation */, anyInt() /* lastRotation */);
+
+        assertTrue(app.providesOrientation());
+        assertNotEquals(WindowConfiguration.ROTATION_UNDEFINED,
+                mDisplayContent.rotationForActivityInDifferentOrientation(app));
+
+        doReturn(false).when(app).providesOrientation();
+
+        assertEquals(WindowConfiguration.ROTATION_UNDEFINED,
+                mDisplayContent.rotationForActivityInDifferentOrientation(app));
+    }
+
+    @Test
     public void testRespectNonTopVisibleFixedOrientation() {
         spyOn(mWm.mAppCompatConfiguration);
         doReturn(false).when(mWm.mAppCompatConfiguration).isTranslucentLetterboxingEnabled();
         makeDisplayPortrait(mDisplayContent);
+        mDisplayContent.setIgnoreOrientationRequest(false);
         final ActivityRecord nonTopVisible = new ActivityBuilder(mAtm)
                 .setScreenOrientation(SCREEN_ORIENTATION_PORTRAIT)
                 .setCreateTask(true).build();
@@ -1808,6 +1810,7 @@ public class DisplayContentTests extends WindowTestsBase {
         doReturn(false).when(mWm.mAppCompatConfiguration).isTranslucentLetterboxingEnabled();
         setReverseDefaultRotation(mDisplayContent, false);
         makeDisplayPortrait(mDisplayContent);
+        mDisplayContent.setIgnoreOrientationRequest(false);
         final ActivityRecord nonTopVisible = new ActivityBuilder(mAtm).setCreateTask(true)
                 .setScreenOrientation(SCREEN_ORIENTATION_LANDSCAPE).setVisible(false).build();
         new ActivityBuilder(mAtm).setCreateTask(true)

@@ -38,7 +38,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -61,6 +60,8 @@ import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.compose.lifecycle.DisposableEffectWithLifecycle
+import com.android.compose.animation.scene.mechanics.TileRevealFlag
 import com.android.compose.lifecycle.LaunchedEffectWithLifecycle
 import com.android.compose.modifiers.thenIf
 import com.android.systemui.brightness.ui.compose.BrightnessSliderContainer
@@ -152,7 +153,12 @@ constructor(
             animateFloatAsState(if (showBrightnessMirror) 0f else 1f)
 
         // Set the bounds to null when the QuickSettings overlay disappears.
-        DisposableEffect(Unit) { onDispose { contentViewModel.onPanelShapeInWindowChanged(null) } }
+        DisposableEffectWithLifecycle(Unit) {
+            onDispose {
+                contentViewModel.onPanelShapeInWindowChanged(null)
+                contentViewModel.onShadeOverlayBoundsChanged(null)
+            }
+        }
 
         LaunchedEffectWithLifecycle(key1 = Unit) { contentViewModel.detectShadeModeChanges() }
 
@@ -163,6 +169,7 @@ constructor(
                 enableTransparency = contentViewModel.isTransparencyEnabled,
                 onScrimClicked = contentViewModel::onScrimClicked,
                 onBackgroundPlaced = { bounds, topCornerRadius, bottomCornerRadius ->
+                    contentViewModel.onShadeOverlayBoundsChanged(bounds)
                     contentViewModel.onPanelShapeInWindowChanged(
                         ShadeScrimShape(
                             bounds = ShadeScrimBounds(bounds),
@@ -281,13 +288,15 @@ private fun ContentScope.QuickSettingsLayout(
             ),
     ) {
         if (isFullWidthShade()) {
-            VerticalSeparator()
+            VerticalSeparator(QuickSettingsShade.Dimensions.ShortPadding)
             QuickSettingsOverlayHeader(
                 viewModel = qsContainerViewModel.shadeHeaderViewModel,
                 modifier = Modifier.element(QuickSettingsShade.Elements.Header),
             )
 
-            VerticalSeparator()
+            VerticalSeparator(QuickSettingsShade.Dimensions.ShortPadding)
+        } else {
+            VerticalSeparator(QuickSettingsShade.Dimensions.Padding)
         }
 
         val toolbarViewModel =
@@ -297,10 +306,10 @@ private fun ContentScope.QuickSettingsLayout(
             modifier =
                 Modifier.fillMaxWidth().requiredHeight(QuickSettingsShade.Dimensions.ToolbarHeight),
             viewModel = toolbarViewModel,
+            isFullyVisible = { layoutState.isIdle(contentKey) },
         )
 
-        // TODO(b/428805936): Double check this padding.
-        VerticalSeparator()
+        VerticalSeparator(QuickSettingsShade.Dimensions.ShortPadding)
 
         Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             Media(
@@ -312,7 +321,7 @@ private fun ContentScope.QuickSettingsLayout(
             )
 
             if (qsContainerViewModel.showMedia) {
-                VerticalSeparator()
+                VerticalSeparator(QuickSettingsShade.Dimensions.Padding)
             }
 
             Box(
@@ -331,11 +340,10 @@ private fun ContentScope.QuickSettingsLayout(
                 )
             }
 
-            VerticalSeparator()
-
             if (volumeSliderViewModel != null) {
                 val volumeSliderState by volumeSliderViewModel.slider.collectAsStateWithLifecycle()
 
+                VerticalSeparator(QuickSettingsShade.Dimensions.Padding)
                 Box(
                     Modifier.systemGestureExclusionInShade(
                         enabled = { layoutState.transitionState is TransitionState.Idle }
@@ -380,28 +388,24 @@ private fun ContentScope.QuickSettingsLayout(
                         }
                     }
                 }
-
-                VerticalSeparator()
             }
 
-            GridAnchor()
-
-            // TODO(b/428805936): Double check this padding.
             VerticalSeparator(QuickSettingsShade.Dimensions.Padding)
 
+            GridAnchor()
             TileGrid(
                 viewModel = qsContainerViewModel.tileGridViewModel,
                 modifier = Modifier.fillMaxWidth(),
+                enableRevealEffect = TileRevealFlag.isEnabled,
             )
 
-            // TODO(b/428805936): Double check this padding.
-            VerticalSeparator(QuickSettingsShade.Dimensions.Padding * 2)
+            VerticalSeparator(QuickSettingsShade.Dimensions.Padding)
         }
     }
 }
 
 @Composable
-private fun VerticalSeparator(height: Dp = QuickSettingsShade.Dimensions.Padding) {
+private fun VerticalSeparator(height: Dp) {
     Spacer(Modifier.height(height = height))
 }
 
@@ -413,6 +417,8 @@ object QuickSettingsShade {
     }
 
     object Dimensions {
+        // This is used around the header and toolbar
+        val ShortPadding = 8.dp
         val Padding = 16.dp
         val ToolbarHeight = 48.dp
     }

@@ -135,6 +135,8 @@ public class BoostFramework {
     public static final int VENDOR_HINT_TAP_EVENT = 0x00001043;
     public static final int VENDOR_HINT_DRAG_START = 0x00001051;
     public static final int VENDOR_HINT_DRAG_END = 0x00001052;
+    public static final int VENDOR_HINT_PIN_FILE = 0x0000105E;
+    public static final int VENDOR_HINT_UNPIN_FILE = 0x0000105F;
     //Ime Launch Boost Hint
     public static final int VENDOR_HINT_IME_LAUNCH_EVENT = 0x0000109F;
     //App exit animation boost

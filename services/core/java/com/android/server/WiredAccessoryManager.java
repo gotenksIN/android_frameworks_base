@@ -352,7 +352,7 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             mHandler.sendMessage(msg);
 // QTI_BEGIN: 2019-08-06: Audio: WiredAccessoryManager: support for multiple display ports
 
-            if ((headsetState == 0) && (mDpCount != 0)) {
+            if (mDpCount != 0) {
                 // Atleast one DP is connected, so keep mHeadsetState's DP bit set.
                 headsetState = headsetState | BIT_HDMI_AUDIO;
             }

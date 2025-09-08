@@ -366,6 +366,7 @@ import com.android.server.uri.NeededUriGrants;
 import com.android.server.uri.UriPermissionOwner;
 import com.android.server.wm.ActivityMetricsLogger.TransitionInfoSnapshot;
 import com.android.server.wm.WindowManagerService.H;
+import com.android.server.wm.utils.RegionUtils;
 import com.android.window.flags.Flags;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -1438,8 +1439,8 @@ public final class ActivityRecord extends WindowToken {
         ProtoLog.v(WM_DEBUG_CONFIGURATION, "Sending new config to %s, "
                 + "config: %s", this, config);
 
-        final ActivityConfigurationChangeItem item =
-                new ActivityConfigurationChangeItem(token, config, activityWindowInfo);
+        final ActivityConfigurationChangeItem item = new ActivityConfigurationChangeItem(token,
+                config, activityWindowInfo, getDisplayId());
         mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(), item);
     }
 
@@ -2756,7 +2757,7 @@ public final class ActivityRecord extends WindowToken {
                 || mStartingData.mAssociatedTask != null) {
             return;
         }
-        if (task.isVisible() && !task.inTransition()) {
+        if (task.isVisible() && !task.inTransition() && !task.getBounds().equals(getBounds())) {
             // Don't associated with task if the task is visible especially when the activity is
             // embedded. We just need to show splash screen on the activity in case the first frame
             // is not ready.
@@ -4616,7 +4617,11 @@ public final class ActivityRecord extends WindowToken {
             }
             // Do not transfer if the orientation doesn't match, redraw starting window while it is
             // on top will cause flicker.
-            if (!isStartingOrientationCompatible(fromActivity)) {
+            if (!isStartingOrientationCompatible(fromActivity)
+                    // Also, do not transfer if the sizes of the activities are different and the
+                    // starting window is not attached to the task.
+                    || (fromActivity.mStartingData.mAssociatedTask == null
+                    && !RegionUtils.sizeEquals(fromActivity.getBounds(), getBounds()))) {
                 return false;
             }
 
@@ -7881,20 +7886,29 @@ public final class ActivityRecord extends WindowToken {
             requestedOverrideConfig.assetsSeq = ASSETS_SEQ_UNDEFINED;
         }
 
-        // Retain the following configs for PiP so that the activity doesn't get destroyed and
-        // recreated on display transfer.
-        if (ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS.isTrue() && inPinnedWindowingMode()) {
-            final Configuration lastReportedMergedConfig =
-                    mLastReportedConfiguration.getMergedConfiguration();
-            int configChanges = info.getRealConfigChanged();
-            if ((configChanges & ActivityInfo.CONFIG_COLOR_MODE) == 0) {
-                requestedOverrideConfig.colorMode = lastReportedMergedConfig.colorMode;
-            }
-            if ((configChanges & ActivityInfo.CONFIG_TOUCHSCREEN) == 0) {
-                requestedOverrideConfig.touchscreen = lastReportedMergedConfig.touchscreen;
-            }
-            if ((configChanges & ActivityInfo.CONFIG_DENSITY) == 0) {
-                requestedOverrideConfig.densityDpi = lastReportedMergedConfig.densityDpi;
+        if (ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS.isTrue() && mLastReportedPictureInPictureMode) {
+            // If the previously resolved full config of the activity is in PiP, retain the
+            // following configs so that the activity doesn't get destroyed and recreated on display
+            // transfer while still remaining in PiP mode.
+            if (newParentConfiguration.windowConfiguration.getWindowingMode()
+                    == WINDOWING_MODE_PINNED) {
+                final Configuration lastReportedMergedConfig =
+                        mLastReportedConfiguration.getMergedConfiguration();
+                int configChanges = info.getRealConfigChanged();
+                if ((configChanges & ActivityInfo.CONFIG_COLOR_MODE) == 0) {
+                    requestedOverrideConfig.colorMode = lastReportedMergedConfig.colorMode;
+                }
+                if ((configChanges & ActivityInfo.CONFIG_TOUCHSCREEN) == 0) {
+                    requestedOverrideConfig.touchscreen = lastReportedMergedConfig.touchscreen;
+                }
+                if ((configChanges & ActivityInfo.CONFIG_DENSITY) == 0) {
+                    requestedOverrideConfig.densityDpi = lastReportedMergedConfig.densityDpi;
+                }
+            } else {
+                // Update the configs if we're exiting PiP mode.
+                requestedOverrideConfig.colorMode = newParentConfiguration.colorMode;
+                requestedOverrideConfig.touchscreen = newParentConfiguration.touchscreen;
+                requestedOverrideConfig.densityDpi = newParentConfiguration.densityDpi;
             }
         }
 
@@ -9107,7 +9121,7 @@ public final class ActivityRecord extends WindowToken {
                 pendingResults, pendingNewIntents, configChangeFlags,
                 new MergedConfiguration(getProcessGlobalConfiguration(),
                         getMergedOverrideConfiguration()),
-                preserveWindow, getActivityWindowInfo());
+                preserveWindow, getActivityWindowInfo(), getDisplayId());
         final ActivityLifecycleItem lifecycleItem;
         if (andResume) {
             lifecycleItem = new ResumeActivityItem(token, isTransitionForward(),

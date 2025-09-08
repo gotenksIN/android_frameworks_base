@@ -2580,6 +2580,16 @@
                 android:label="@string/permlab_nearby_wifi_devices"
                 android:protectionLevel="dangerous" />
 
+    <!-- Required to be able to advertise and connect to local network devices.
+         @FlaggedApi(android.permission.flags.Flags.FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
+         <p>Protection level: dangerous -->
+    <permission android:name="android.permission.ACCESS_LOCAL_NETWORK"
+        android:permissionGroup="android.permission-group.UNDEFINED"
+        android:description="@string/permdesc_access_local_network"
+        android:label="@string/permlab_access_local_network"
+        android:protectionLevel="dangerous"
+        android:featureFlag="android.permission.flags.access_local_network_permission_enabled" />
+
     <!-- Required to be able to range to devices using generic ranging module.
          @FlaggedApi("android.permission.flags.ranging_permission_enabled")
          <p>Protection level: dangerous -->
@@ -8893,9 +8903,22 @@
 
     <!--
         @FlaggedApi(com.android.hardware.input.Flags.FLAG_REQUEST_KEY_CAPTURE_API)
-        Allows an application to be able to capture keys before Android system get chance to
-        process system keys and shortcuts.
+        Allows the currently focused application to be able to consume keys before Android system
+        get chance to process system keys and shortcuts.
+
+        <p> The keys are always sent to the currently focussed application, this permission allows
+        the focussed application to receive the keys that are normally consumed by the system for
+        shortcuts, allowing it to have custom shortcut behavior primarily for use cases like virtual
+        machine apps where the host OS wants to handle the shortcuts differently.
+
+        <p> Certain shortcuts and system keys like Home, Overview, Power, etc are never sent to the
+        currently focused application and are always consumed by the system.
+
+        <p> User can escape out of the capture mode by long pressing the Escape key or simply
+        navigating out of the application.
+
         <p> Protection level: normal
+        {@see android.view.WindowManager.LayoutParams#setKeyboardCaptureEnabled}
     -->
     <permission android:name="android.permission.CAPTURE_KEYBOARD"
         android:protectionLevel="normal"
@@ -9329,11 +9352,12 @@
 
     <!-- Allows an application to programmatically move and resize its tasks when the system is in
         a state that allows such operations, e.g. in a desktop-like environment. It is only
-        extended to the {@link android.app.role.RoleManager#ROLE_BROWSER default browser}.
-        <p>Protection level: internal|role
+        extended to the {@link android.app.role.RoleManager#ROLE_BROWSER default browser} and OEM
+        specific signature apps.
+        <p>Protection level: signature|role
         @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API) -->
     <permission android:name="android.permission.REPOSITION_SELF_WINDOWS"
-        android:protectionLevel="internal|role"
+        android:protectionLevel="signature|role"
         android:featureFlag="com.android.window.flags.enable_window_repositioning_api" />
 
     <!-- @SystemApi

@@ -20,10 +20,9 @@ import static android.Manifest.permission.INTERACT_ACROSS_USERS_FULL;
 import static android.Manifest.permission.MANAGE_EXTERNAL_STORAGE;
 import static android.Manifest.permission.READ_WALLPAPER_INTERNAL;
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND;
-import static android.app.Flags.fixGetBitmapCrops;
+import static android.app.Flags.alwaysRebindUserSetWallpaper;
 import static android.app.Flags.notifyKeyguardEvents;
 import static android.app.Flags.updateRecentsFromSystem;
-import static android.app.Flags.alwaysRebindUserSetWallpaper;
 import static android.app.WallpaperManager.COMMAND_REAPPLY;
 import static android.app.WallpaperManager.FLAG_LOCK;
 import static android.app.WallpaperManager.FLAG_SYSTEM;
@@ -152,6 +151,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -467,8 +467,10 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
 
     private void notifyWallpaperColorsChangedOnDisplay(@NonNull WallpaperData wallpaper,
             int displayId) {
-
+        final Map<WallpaperManagerInternal.ColorsChangedCallbackInternal, Handler>
+                internalListeners;
         WallpaperColors wallpaperColors = getAdjustedWallpaperColorsOnDimming(wallpaper);
+
         if (DEBUG) {
             Slog.v(TAG, "notifyWallpaperColorsChangedOnDisplay, displayId = " + displayId
                     + ", which = " + wallpaper.mWhich);
@@ -476,6 +478,8 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
 
         final ArrayList<IWallpaperManagerCallback> colorListeners = new ArrayList<>();
         synchronized (mLock) {
+            internalListeners = new HashMap<>(mColorsChangedListenersInternal);
+
             final RemoteCallbackList<IWallpaperManagerCallback> currentUserColorListeners =
                     getWallpaperCallbacks(wallpaper.userId, displayId);
             final RemoteCallbackList<IWallpaperManagerCallback> userAllColorListeners =
@@ -496,6 +500,16 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                 }
                 userAllColorListeners.finishBroadcast();
             }
+        }
+
+        // notifies server listeners of colors changes from all users / displays
+        for (Map.Entry<WallpaperManagerInternal.ColorsChangedCallbackInternal, Handler> entry :
+                internalListeners.entrySet()) {
+            WallpaperManagerInternal.ColorsChangedCallbackInternal cb = entry.getKey();
+            Handler handler = entry.getValue();
+
+            handler.post(() -> cb.onColorsChanged(wallpaperColors, wallpaper.mWhich, displayId,
+                    wallpaper.userId, wallpaper.fromForegroundApp));
         }
 
         final int count = colorListeners.size();
@@ -545,6 +559,11 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
      */
     private final SparseArray<SparseArray<RemoteCallbackList<IWallpaperManagerCallback>>>
             mColorsChangedListeners;
+
+    /** Map od color server listeners. */
+    private final Map<WallpaperManagerInternal.ColorsChangedCallbackInternal, Handler>
+            mColorsChangedListenersInternal;
+
     // The currently bound home or home+lock wallpaper
     protected WallpaperData mLastWallpaper;
     // The currently bound lock screen only wallpaper, or null if none
@@ -1542,6 +1561,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
 
         mMonitor = new MyPackageMonitor();
         mColorsChangedListeners = new SparseArray<>();
+        mColorsChangedListenersInternal = new HashMap<>();
         mWallpaperDataParser = new WallpaperDataParser(mContext, mWallpaperDisplayHelper,
                 mWallpaperCropper);
         LocalServices.addService(WallpaperManagerInternal.class, new LocalService());
@@ -1592,6 +1612,24 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
         @Override
         public void onScreenTurningOn(int displayId) {
             notifyScreenTurningOn(displayId);
+        }
+
+        @Override
+        public void addOnColorsChangedListener(ColorsChangedCallbackInternal listener,
+                Handler handler) {
+            synchronized (mLock) {
+                mColorsChangedListenersInternal.put(listener, handler);
+            }
+        }
+
+        @Override
+        public WallpaperColors getWallpaperColors(int which, int userId) {
+            try {
+                return WallpaperManagerService.this.getWallpaperColors(which, userId,
+                        DEFAULT_DISPLAY);
+            } catch (RemoteException e) {
+                throw new IllegalArgumentException(e.getMessage());
+            }
         }
     }
 
@@ -2282,8 +2320,8 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
             }
 
             SparseArray<Rect> relativeCropHints = WallpaperCropper.getRelativeCropHints(
-                    wallpaper, fixGetBitmapCrops() && originalBitmap);
-            Point relativeCropSize = (fixGetBitmapCrops() && originalBitmap)
+                    wallpaper, /* ignoreSampleSize= */ originalBitmap);
+            Point relativeCropSize = originalBitmap
                     ? new Point(wallpaper.cropHint.width(), wallpaper.cropHint.height())
                     : new Point(
                             (int) Math.ceil(wallpaper.cropHint.width() / wallpaper.mSampleSize),
@@ -2308,20 +2346,13 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                     == View.LAYOUT_DIRECTION_RTL;
             WallpaperDefaultDisplayInfo defaultDisplayInfo =
                     mWallpaperDisplayHelper.getDefaultDisplayInfo();
-            SparseArray<Rect> cropHints = fixGetBitmapCrops()
-                    ? relativeCropHints
-                    : adjustedRelativeSuggestedCrops;
             for (Point displaySize : displaySizes) {
                 result.add(WallpaperCropper.getCrop(displaySize, defaultDisplayInfo,
-                        relativeCropSize, cropHints, rtl));
+                        relativeCropSize, relativeCropHints, rtl));
             }
             if (originalBitmap) {
-                if (fixGetBitmapCrops()) {
-                    result.forEach(crop ->
-                            crop.offset(wallpaper.cropHint.left, wallpaper.cropHint.top));
-                } else {
-                    result = WallpaperCropper.getOriginalCropHints(wallpaper, result);
-                }
+                result.forEach(crop ->
+                        crop.offset(wallpaper.cropHint.left, wallpaper.cropHint.top));
             }
             return result;
         }

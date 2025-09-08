@@ -205,30 +205,10 @@ flag {
 }
 
 flag {
-  name: "skip_policy_access_nls_check"
-  namespace: "systemui"
-  description: "When querying whether a caller has Notification Policy Access, don't explicitly look in the NLSes list. All NLSes are also ConditionProviders so this is unnecessary."
-  bug: "390441924"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "random_conversation_ids"
   namespace: "systemui"
   description: "Use random ids for new conversation channels, instead of concatenating parent id and conversation id"
   bug: "432250872"
-}
-
-flag {
-  name: "preferences_throws_on_invalid_uid"
-  namespace: "systemui"
-  description: "Throw IAE when calling getOrCreatePackagePreferences() with INVALID_UID."
-  bug: "430250142"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {

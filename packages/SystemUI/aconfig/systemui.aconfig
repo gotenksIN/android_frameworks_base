@@ -60,6 +60,13 @@ flag {
 }
 
 flag {
+  name: "show_icon_in_empty_shade"
+  namespace: "systemui"
+  description: "Show a representative icon when there are no notifications in the shade."
+  bug: "388472403"
+}
+
+flag {
    name: "notification_row_is_removed_fix"
    namespace: "systemui"
    description: "Fix incorrect isRemoved value in ExpandableNotificationRow"
@@ -441,6 +448,16 @@ flag {
     namespace: "systemui"
     description: "Update the status bar share-to-app chip dialog to include the app name more often"
     bug: "432665824"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "status_bar_always_schedule_auto_hide"
+    namespace: "systemui"
+    description: "Schedule the status bar auto-hide functionality more often for fullscreen mode"
+    bug: "428659575"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -917,16 +934,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-   name: "register_new_wallet_card_in_background"
-   namespace: "systemui"
-   description: "Decide whether the call to registerNewWalletCards method should be issued on background thread."
-   bug: "322506838"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -2205,6 +2212,16 @@ flag {
 }
 
 flag {
+    name: "no_shade_blur_on_dream_start"
+    namespace: "systemui"
+    description: "Suppress shade blur when starting dream"
+    bug: "440661063"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
 
     name: "qs_split_internet_tile"
     namespace: "systemui"
@@ -2231,4 +2248,11 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "ambient_cue_plugin"
+    namespace: "ailabs"
+    description: "Enable plugin for ambient cue project"
+    bug: "439907833"
 }

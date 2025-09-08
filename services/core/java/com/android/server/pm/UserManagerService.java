@@ -82,6 +82,7 @@ import android.app.StatsManager;
 import android.app.admin.DevicePolicyEventLogger;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.IIntentReceiver;
 import android.content.Intent;
@@ -368,16 +369,20 @@ public class UserManagerService extends IUserManager.Stub {
 
     // The boot user strategy for HSUM.
     @VisibleForTesting
-    static final int BOOT_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER = 0;
+    static final int BOOT_STRATEGY_DO_NOT_OVERRIDE = -1;
     @VisibleForTesting
-    static final int BOOT_TO_HSU_FOR_PROVISIONED_DEVICE = 1;
+    static final int BOOT_STRATEGY_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER = 0;
+    @VisibleForTesting
+    static final int BOOT_STRATEGY_TO_HSU_FOR_PROVISIONED_DEVICE = 1;
 
     @Retention(RetentionPolicy.SOURCE)
-    @IntDef(flag = false, prefix = { "BOOT_TO_" }, value = {
-            BOOT_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER,
-            BOOT_TO_HSU_FOR_PROVISIONED_DEVICE})
+    @IntDef(flag = false, prefix = { "BOOT_STRATEGY_" }, value = {
+            BOOT_STRATEGY_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER,
+            BOOT_STRATEGY_TO_HSU_FOR_PROVISIONED_DEVICE})
     @VisibleForTesting
     @interface BootStrategy {}
+
+    private static final String BOOT_STRATEGY_PROPERTY = "persist.user.hsum_boot_strategy";
 
     private final Context mContext;
     private final PackageManagerService mPm;
@@ -1419,13 +1424,7 @@ public class UserManagerService extends IUserManager.Stub {
         if (dpmi == null) {
             return UserHandle.USER_NULL;
         }
-        // TODO(b/435271558): change dpmi.getDeviceOwnerUserId() so it doesn't check for permissions
-        long ident = Binder.clearCallingIdentity();
-        try {
-            return dpmi.getDeviceOwnerUserId();
-        } finally {
-            Binder.restoreCallingIdentity(ident);
-        }
+        return dpmi.getDeviceOwnerUserId();
     }
 
     @Override
@@ -1453,6 +1452,19 @@ public class UserManagerService extends IUserManager.Stub {
         }
     }
 
+    private @BootStrategy int getHsumBootStrategy() {
+        int bootStrategyOverride = SystemProperties.getInt(BOOT_STRATEGY_PROPERTY,
+                BOOT_STRATEGY_DO_NOT_OVERRIDE);
+        int bootStrategy = getContextResources()
+                .getInteger(com.android.internal.R.integer.config_hsumBootStrategy);
+        if (bootStrategyOverride != BOOT_STRATEGY_DO_NOT_OVERRIDE) {
+            Slogf.d(LOG_TAG, "%s overriding HSUM boot strategy to %d", BOOT_STRATEGY_PROPERTY,
+                    bootStrategyOverride);
+            bootStrategy = bootStrategyOverride;
+        }
+        return bootStrategy;
+    }
+
     private @UserIdInt int getBootUserUnchecked() throws UserManager.CheckedUserOperationException {
         synchronized (mUsersLock) {
             if (mBootUser != UserHandle.USER_NULL) {
@@ -1468,12 +1480,11 @@ public class UserManagerService extends IUserManager.Stub {
         }
 
         if (isHeadlessSystemUserMode()) {
-            final int bootStrategy = getContextResources()
-                    .getInteger(com.android.internal.R.integer.config_hsumBootStrategy);
+            int bootStrategy = getHsumBootStrategy();
             switch (bootStrategy) {
-                case BOOT_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER:
+                case BOOT_STRATEGY_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER:
                     return getPreviousOrFirstSwitchableUser();
-                case BOOT_TO_HSU_FOR_PROVISIONED_DEVICE:
+                case BOOT_STRATEGY_TO_HSU_FOR_PROVISIONED_DEVICE:
                     return getBootUserBasedOnProvisioning();
                 default:
                     Slogf.w(LOG_TAG, "Unknown HSUM boot strategy: %d", bootStrategy);
@@ -2373,6 +2384,11 @@ public class UserManagerService extends IUserManager.Stub {
 
     @Override
     public void setUserAdmin(@UserIdInt int userId) {
+        setUserAdminInternal(userId);
+    }
+
+    // NOTE: split in 2 methods because cmd user needs a boolean but the AIDL one doesn't
+    boolean setUserAdminInternal(@UserIdInt int userId) {
         checkManageUserAndAcrossUsersFullPermission("set user admin");
         if (Flags.unicornModeRefactoringForHsumReadOnly()) {
             checkAdminStatusChangeAllowed(userId);
@@ -2388,30 +2404,41 @@ public class UserManagerService extends IUserManager.Stub {
                     // Exit if no user found with that id,
                     mUserJourneyLogger.logNullUserJourneyError(USER_JOURNEY_GRANT_ADMIN,
                             currentUserId, userId, /* userType */ "", /* userFlags */ -1);
-                    return;
+                    Slogf.w(LOG_TAG, "setUserAdmin(%d) failed: user not found", userId);
+                    return false;
                 } else if (user.info.isAdmin()) {
                     // Exit if the user is already an admin.
                     mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId,
                         user.info, USER_JOURNEY_GRANT_ADMIN,
                         ERROR_CODE_USER_ALREADY_AN_ADMIN);
-                    return;
+                    Slogf.w(LOG_TAG, "setUserAdmin(%d): not changed, already admin", userId);
+                    return true;
                 } else if (user.info.isProfile() || user.info.isGuest()
                         || user.info.isRestricted()) {
                     // Profiles, guest users or restricted profiles cannot become an admin.
                     mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId,
                             user.info, USER_JOURNEY_GRANT_ADMIN, ERROR_CODE_INVALID_USER_TYPE);
-                    return;
+                    Slogf.w(LOG_TAG, "setUserAdmin(%d) failed: profile, guest, and restricted users"
+                            + " cannot be admins (user: %s) ", userId, user.info.toFullString());
+                    return false;
                 }
                 user.info.flags ^= UserInfo.FLAG_ADMIN;
                 writeUserLP(user);
             }
         }
+        Slogf.i(LOG_TAG, "setUserAdmin(%d): succeeded", userId);
         mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId, user.info,
                 USER_JOURNEY_GRANT_ADMIN, ERROR_CODE_UNSPECIFIED);
+        return true;
     }
 
     @Override
     public void revokeUserAdmin(@UserIdInt int userId) {
+        revokeUserAdminInternal(userId);
+    }
+
+    // NOTE: split in 2 methods because cmd user needs a boolean but the AIDL one doesn't
+    boolean revokeUserAdminInternal(@UserIdInt int userId) {
         checkManageUserAndAcrossUsersFullPermission("revoke admin privileges");
         if (Flags.unicornModeRefactoringForHsumReadOnly()) {
             checkAdminStatusChangeAllowed(userId);
@@ -2427,23 +2454,27 @@ public class UserManagerService extends IUserManager.Stub {
                     // Exit if no user found with that id
                     mUserJourneyLogger.logNullUserJourneyError(
                             USER_JOURNEY_REVOKE_ADMIN, currentUserId, userId, "", -1);
-                    return;
+                    Slogf.w(LOG_TAG, "revokeUserAdmin(%d) failed: user not found", userId);
+                    return false;
                 } else if (!user.info.isAdmin()) {
                     // Exit if user is not an admin.
                     mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId, user.info,
                             USER_JOURNEY_REVOKE_ADMIN, ERROR_CODE_USER_IS_NOT_AN_ADMIN);
-                    return;
+                    Slogf.w(LOG_TAG, "revokeUserAdmin(%d): not changed, already not admin", userId);
+                    return true;
                 } else if ((user.info.flags & UserInfo.FLAG_SYSTEM) != 0) {
-                    // System user cannot lose its admin status.
+                      // System user cannot lose its admin status.
+                    Slogf.w(LOG_TAG, "revokeUserAdmin(%d) failed: system user", userId);
                     mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId, user.info,
                             USER_JOURNEY_REVOKE_ADMIN, ERROR_CODE_INVALID_USER_TYPE);
-                    return;
+                    return false;
                 } else if (isNonRemovableLastAdminUserLU(user.info)) {
                     // This is the last admin user and this device requires that it not lose its
                     // admin status.
+                    Slogf.w(LOG_TAG, "revokeUserAdmin(%d) failed: user is last admin", userId);
                     mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId, user.info,
                             USER_JOURNEY_REVOKE_ADMIN, ERROR_CODE_USER_IS_LAST_ADMIN);
-                    return;
+                    return false;
                 }
                 user.info.flags ^= UserInfo.FLAG_ADMIN;
                 writeUserLP(user);
@@ -2451,6 +2482,8 @@ public class UserManagerService extends IUserManager.Stub {
         }
         mUserJourneyLogger.logUserJourneyFinishWithError(currentUserId, user.info,
                 USER_JOURNEY_REVOKE_ADMIN, ERROR_CODE_UNSPECIFIED);
+        Slogf.i(LOG_TAG, "revokeUserAdmin(%d): succeeded", userId);
+        return true;
     }
 
     /**
@@ -5272,18 +5305,19 @@ public class UserManagerService extends IUserManager.Stub {
         // 2025Q4 userVersion pathway.
         // TODO(b/419105275): Because trunk stable flags need to be reversible, and because the
         //  upgrades here actually are reversible, we temporarily "cheat" by triggering the upgrade
-        //  path on every reboot.
-        //  Once the flags have fully progressed, we can do this properly:
+        //  path even if we don't increment the version (by temporarily introducing forceWrite).
+        //  Once the flags have fully progressed, we can do this properly instead:
         //  check for userVersion < 11, set userVersion = 12, and set USER_VERSION = 12.
         // if (userVersion < 12) {
         Slog.i(LOG_TAG, "Forcing an upgrade due to flagged changes");
-        final boolean forceWrite = true; // treat as an upgrade no matter what to handle flagging
+        boolean forceWrite = false; // treat as an upgrade no matter what to handle flagging?
         if (android.multiuser.Flags.userRestrictionConfigWifiSharedPrivate()) {
             // DISALLOW_CONFIG_WIFI_SHARED replaced DISALLOW_CONFIG_WIFI as the guest restriction.
             if (mGuestRestrictions.getBoolean(UserManager.DISALLOW_CONFIG_WIFI) &&
                     !mGuestRestrictions.getBoolean(UserManager.DISALLOW_CONFIG_WIFI_SHARED)) {
                 mGuestRestrictions.remove(UserManager.DISALLOW_CONFIG_WIFI);
                 mGuestRestrictions.putBoolean(UserManager.DISALLOW_CONFIG_WIFI_SHARED, true);
+                forceWrite = true;
             }
             final List<UserInfo> guestUsers = getGuestUsers();
             for (int i = 0; i < guestUsers.size(); i++) {
@@ -5293,6 +5327,7 @@ public class UserManagerService extends IUserManager.Stub {
                         && !hasUserRestriction(UserManager.DISALLOW_CONFIG_WIFI_SHARED, guest.id)) {
                     setUserRestriction(UserManager.DISALLOW_CONFIG_WIFI, false, guest.id);
                     setUserRestriction(UserManager.DISALLOW_CONFIG_WIFI_SHARED, true, guest.id);
+                    forceWrite = true;
                 }
             }
         } else {
@@ -5301,6 +5336,7 @@ public class UserManagerService extends IUserManager.Stub {
                     mGuestRestrictions.getBoolean(UserManager.DISALLOW_CONFIG_WIFI_SHARED)) {
                 mGuestRestrictions.putBoolean(UserManager.DISALLOW_CONFIG_WIFI, true);
                 mGuestRestrictions.remove(UserManager.DISALLOW_CONFIG_WIFI_SHARED);
+                forceWrite = true;
             }
             final List<UserInfo> guestUsers = getGuestUsers();
             for (int i = 0; i < guestUsers.size(); i++) {
@@ -5310,6 +5346,7 @@ public class UserManagerService extends IUserManager.Stub {
                         && hasUserRestriction(UserManager.DISALLOW_CONFIG_WIFI_SHARED, guest.id)) {
                     setUserRestriction(UserManager.DISALLOW_CONFIG_WIFI, true, guest.id);
                     setUserRestriction(UserManager.DISALLOW_CONFIG_WIFI_SHARED, false, guest.id);
+                    forceWrite = true;
                 }
             }
         }
@@ -5321,6 +5358,7 @@ public class UserManagerService extends IUserManager.Stub {
                         && (sysData.info.flags & UserInfo.FLAG_ADMIN) != 0) {
                     sysData.info.flags &= ~UserInfo.FLAG_ADMIN;
                     userIdsToWrite.add(sysData.info.id);
+                    forceWrite = true;
                 }
             }
         } else {
@@ -5331,6 +5369,7 @@ public class UserManagerService extends IUserManager.Stub {
                         && (sysData.info.flags & UserInfo.FLAG_ADMIN) == 0) {
                     sysData.info.flags ^= UserInfo.FLAG_ADMIN;
                     userIdsToWrite.add(sysData.info.id);
+                    forceWrite = true;
                 }
             }
         }
@@ -8088,6 +8127,7 @@ public class UserManagerService extends IUserManager.Stub {
                 case "--visibility-mediator":
                     mUserVisibilityMediator.dump(pw, args);
                     return;
+                // TODO(b/414326600): use a different arg for HSU SysUI actions
                 case "--deprecated-calls":
                     if (args.length > 1 && args[1].equals("reset")) {
                         mDeprecationReporter.reset(pw);
@@ -8198,6 +8238,7 @@ public class UserManagerService extends IUserManager.Stub {
         if (isHeadlessSystemUserMode) {
             pw.println("  Can switch to headless system user: " + getContextResources()
                     .getBoolean(com.android.internal.R.bool.config_canSwitchToHeadlessSystemUser));
+            pw.println("  HSUM Boot Strategy: " + getHsumBootStrategy());
         }
 
         pw.println("  Is main user permanent admin: " + isMainUserPermanentAdmin());
@@ -8916,6 +8957,17 @@ public class UserManagerService extends IUserManager.Stub {
                 }
             }
         }
+
+        @Override
+        public boolean isHeadlessSystemUserMode() {
+            return UserManagerService.this.isHeadlessSystemUserMode();
+        }
+
+        @Override
+        public void logLaunchedHsuActivity(ComponentName activity) {
+            mDeprecationReporter.logLaunchedHsuActivity(activity);
+        }
+
     } // class LocalService
 
     /**
@@ -9187,7 +9239,10 @@ public class UserManagerService extends IUserManager.Stub {
      * @return whether it succeeded.
      */
     boolean setMainUser(@UserIdInt int userId) {
-        if (!android.multiuser.Flags.demoteMainUser()) {
+        // NOTE: ideally it should check just for demoteMainUser(), but then it wouldn't allow the
+        // main user to be promoted when it's needed while rolling back this flag
+        if (!android.multiuser.Flags.demoteMainUser()
+                && !android.multiuser.Flags.createInitialUser()) {
             Slogf.d(LOG_TAG, "setMainUser(%d): ignoring because flag is disabled", userId);
             return false;
         }

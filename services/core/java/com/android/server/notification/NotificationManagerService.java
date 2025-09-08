@@ -123,7 +123,6 @@ import static android.service.notification.Adjustment.KEY_UNCLASSIFY;
 import static android.service.notification.Adjustment.TYPE_CONTENT_RECOMMENDATION;
 import static android.service.notification.Adjustment.TYPE_NEWS;
 import static android.service.notification.Adjustment.TYPE_PROMOTION;
-import static android.service.notification.Adjustment.TYPE_SOCIAL_MEDIA;
 import static android.service.notification.Flags.FLAG_NOTIFICATION_CONVERSATION_CHANNEL_MANAGEMENT;
 import static android.service.notification.Flags.callstyleCallbackApi;
 import static android.service.notification.Flags.notificationBitmapOffloading;
@@ -367,7 +366,6 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.compat.IPlatformCompat;
 import com.android.internal.config.sysui.SystemUiSystemPropertiesFlags;
-import com.android.internal.config.sysui.SystemUiSystemPropertiesFlags.NotificationFlags;
 import com.android.internal.logging.InstanceId;
 import com.android.internal.logging.InstanceIdSequence;
 import com.android.internal.logging.MetricsLogger;
@@ -6844,20 +6842,11 @@ public class NotificationManagerService extends SystemService {
             } catch (NameNotFoundException e) {
                 return false;
             }
-            if (managedServicesConcurrentMultiuser()) {
-                return mConditionProviders.isPackageOrComponentAllowed(pkg, userId)
-                        || (!Flags.skipPolicyAccessNlsCheck()
-                            && mListeners.isComponentEnabledForPackage(pkg, userId))
-                        || (mDpm != null
-                            && (mDpm.isActiveProfileOwner(uid) || mDpm.isActiveDeviceOwner(uid)));
-            } else {
-                // TODO(b/169395065) Figure out if this flow makes sense in Device Owner mode.
-                return mConditionProviders.isPackageOrComponentAllowed(pkg, userId)
-                        || (!Flags.skipPolicyAccessNlsCheck()
-                            && mListeners.isComponentEnabledForPackage(pkg))
-                        || (mDpm != null
-                            && (mDpm.isActiveProfileOwner(uid) || mDpm.isActiveDeviceOwner(uid)));
-            }
+
+            // TODO(b/169395065) Figure out if this flow makes sense in Device Owner mode.
+            return mConditionProviders.isPackageOrComponentAllowed(pkg, userId)
+                    || (mDpm != null
+                        && (mDpm.isActiveProfileOwner(uid) || mDpm.isActiveDeviceOwner(uid)));
         }
 
         @Override
@@ -7003,7 +6992,16 @@ public class NotificationManagerService extends SystemService {
         @Override
         public void setNotificationPolicyAccessGrantedForUser(
                 String pkg, int userId, boolean granted) {
-            checkCallerIsSystemOrShell();
+            if (UserHandle.getCallingUserId() != userId) {
+                getContext().enforceCallingOrSelfPermission(
+                        android.Manifest.permission.INTERACT_ACROSS_USERS,
+                        "setNotificationPolicyAccessGrantedForUser for user " + userId);
+            }
+            if (!isCallerSystemOrSystemUiOrShell()) {
+                getContext().enforceCallingPermission(
+                        android.Manifest.permission.MANAGE_NOTIFICATIONS,
+                        "setNotificationPolicyAccessGrantedForUser");
+            }
             final long identity = Binder.clearCallingIdentity();
             try {
                 if (mAllowedManagedServicePackages.test(

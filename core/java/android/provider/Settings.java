@@ -2543,7 +2543,6 @@ public final class Settings {
      *
      * @hide
      */
-    @FlaggedApi(com.android.internal.telephony.flags.Flags.FLAG_ACTION_SIM_PREFERENCE_SETTINGS)
     @SystemApi
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_SIM_PREFERENCE_SETTINGS =
@@ -9679,10 +9678,15 @@ public final class Settings {
          * Whether or not larger size icons are used for the pointer of mouse/trackpad for
          * accessibility.
          * (0 = false, 1 = true)
+         *
+         * @deprecated This setting is no longer in use, as the size of pointer icons is now
+         *             controlled by the {@link #POINTER_SCALE} setting. The value of this setting
+         *             is ignored.
          * @hide
          */
         @UnsupportedAppUsage
         @Readable
+        @Deprecated
         public static final String ACCESSIBILITY_LARGE_POINTER_ICON =
                 "accessibility_large_pointer_icon";
 

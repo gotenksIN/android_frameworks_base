@@ -1260,11 +1260,6 @@ public abstract class ProcessRecordInternal {
     }
 
     @GuardedBy("mServiceLock")
-    public int getCacheOomRankerUseCount() {
-        return mCacheOomRankerUseCount;
-    }
-
-    @GuardedBy("mServiceLock")
     public void setSystemNoUi(boolean systemNoUi) {
         mSystemNoUi = systemNoUi;
     }
@@ -1718,27 +1713,6 @@ public abstract class ProcessRecordInternal {
     @GuardedBy("mServiceLock")
     public long getLastCachedTime() {
         return mLastCachedTime;
-    }
-
-    /**
-     * Sets the process memory usage (RSS) and the time it was updated for CacheOomRanker.
-     *
-     * @param rss The RSS memory usage in bytes.
-     * @param rssTimeMs The time in milliseconds since boot when RSS was updated.
-     */
-    public void setCacheOomRankerRss(long rss, long rssTimeMs) {
-        mCacheOomRankerRss = rss;
-        mCacheOomRankerRssTimeMs = rssTimeMs;
-    }
-
-    @GuardedBy("mServiceLock")
-    public long getCacheOomRankerRss() {
-        return mCacheOomRankerRss;
-    }
-
-    @GuardedBy("mServiceLock")
-    public long getCacheOomRankerRssTimeMs() {
-        return mCacheOomRankerRssTimeMs;
     }
 
     /**

@@ -409,7 +409,7 @@
     <string name="show_hw_layers_updates" msgid="5268370750002509767">"显示硬件层更新"</string>
     <string name="show_hw_layers_updates_summary" msgid="5850955890493054618">"硬件层更新时闪烁绿色"</string>
     <string name="debug_hw_overdraw" msgid="8944851091008756796">"调试 GPU 过度绘制"</string>
-    <string name="disable_overlays" msgid="4206590799671557143">"停用 HW 叠加层"</string>
+    <string name="disable_overlays" msgid="4206590799671557143">"停用硬件叠加层"</string>
     <string name="disable_overlays_summary" msgid="1954852414363338166">"始终使用 GPU 进行屏幕合成"</string>
     <string name="simulate_color_space" msgid="1206503300335835151">"模拟颜色空间"</string>
     <string name="enable_opengl_traces_title" msgid="4638773318659125196">"启用 OpenGL 跟踪"</string>
@@ -612,7 +612,7 @@
     <string name="zen_mode_starred_contacts_empty_name" msgid="933552939706125937">"（无姓名）"</string>
     <string name="time_unit_just_now" msgid="3006134267292728099">"刚刚"</string>
     <string name="media_transfer_this_device_name" msgid="2357329267148436433">"本机"</string>
-    <string name="media_transfer_this_device_name_tablet" msgid="2975593806278422086">"这部平板电脑"</string>
+    <string name="media_transfer_this_device_name_tablet" msgid="2975593806278422086">"本机"</string>
     <string name="media_transfer_this_device_name_desktop" msgid="7912386128141470452">"此计算机（内部）"</string>
     <string name="media_transfer_this_device_name_tv" msgid="8508713779441163887">"此电视"</string>
     <string name="media_transfer_dock_speaker_device_name" msgid="2856219597113881950">"基座音箱"</string>
@@ -665,7 +665,7 @@
     <string name="user_grant_admin_message" msgid="1673791931033486709">"管理员拥有其他用户没有的特殊权限。管理员可以管理所有用户、更新或重置此设备、修改设置、查看所有已安装的应用，以及授予或撤消其他用户的管理员权限。"</string>
     <string name="user_grant_admin_button" msgid="5441486731331725756">"设为管理员"</string>
     <string name="user_setup_dialog_title" msgid="8037342066381939995">"要现在设置该用户吗？"</string>
-    <string name="user_setup_dialog_message" msgid="269931619868102841">"请确保对方现在可以使用该设备设置自己的空间。"</string>
+    <string name="user_setup_dialog_message" msgid="269931619868102841">"请确保对方现在可以使用该设备设置自己的空间"</string>
     <string name="user_setup_profile_dialog_message" msgid="4788197052296962620">"要立即设置个人资料吗？"</string>
     <string name="user_setup_button_setup_now" msgid="1708269547187760639">"立即设置"</string>
     <string name="user_setup_button_setup_later" msgid="8712980133555493516">"以后再说"</string>
@@ -676,7 +676,7 @@
     <string name="profile_info_settings_title" msgid="105699672534365099">"个人资料信息"</string>
     <string name="user_need_lock_message" msgid="4311424336209509301">"您需要先设置锁定屏幕来保护您的应用和个人数据，然后才可以创建受限个人资料。"</string>
     <string name="user_set_lock_button" msgid="1427128184982594856">"设置屏幕锁定方式"</string>
-    <string name="user_switch_to_user" msgid="6975428297154968543">"切换到“<xliff:g id="USER_NAME">%s</xliff:g>”"</string>
+    <string name="user_switch_to_user" msgid="6975428297154968543">"切换到<xliff:g id="USER_NAME">%s</xliff:g>"</string>
     <string name="creating_new_user_dialog_message" msgid="7232880257538970375">"正在创建新用户…"</string>
     <string name="creating_new_guest_dialog_message" msgid="1114905602181350690">"正在创建新的访客…"</string>
     <string name="add_user_failed" msgid="4809887794313944872">"无法创建新用户"</string>
@@ -717,7 +717,7 @@
     <string name="cached_apps_freezer_device_default" msgid="2616594131750144342">"设备默认设置"</string>
     <string name="cached_apps_freezer_disabled" msgid="4816382260660472042">"已停用"</string>
     <string name="cached_apps_freezer_enabled" msgid="8866703500183051546">"已启用"</string>
-    <string name="cached_apps_freezer_reboot_dialog_text" msgid="695330563489230096">"设备必须重新启动才能应用此更改。您可以立即重新启动或取消。"</string>
+    <string name="cached_apps_freezer_reboot_dialog_text" msgid="695330563489230096">"必须重启设备才能应用此更改。请立即重启或取消更改。"</string>
     <string name="media_transfer_wired_headphone_name" msgid="8698668536022665254">"有线耳机"</string>
     <string name="media_transfer_headphone_name" msgid="1157798825650178478">"有线音频"</string>
     <string name="media_transfer_usb_audio_name" msgid="1789292056757821355">"USB 音频"</string>

@@ -405,7 +405,7 @@
     <string name="show_screen_updates" msgid="2078782895825535494">"பரப்புநிலை புதுப்பிப்புகளைக் காட்டு"</string>
     <string name="show_screen_updates_summary" msgid="2126932969682087406">"சாளரத்தின் பரப்புநிலைகள் புதுப்பிக்கப்படும்போது, அவற்றை முழுவதுமாகக் காட்டும்"</string>
     <string name="show_hw_screen_updates" msgid="2021286231267747506">"வியூ அப்டேட்ஸைக் காட்டு"</string>
-    <string name="show_hw_screen_updates_summary" msgid="3539770072741435691">"வரையும்போது, சாளரங்களில் காட்சிகளைக் காட்டும்"</string>
+    <string name="show_hw_screen_updates_summary" msgid="3539770072741435691">"சாளரம் திறக்கும்போது உள்ளே ஃப்ளாஷ் ஆகும்"</string>
     <string name="show_hw_layers_updates" msgid="5268370750002509767">"வன்பொருள் லேயர்களின் புதுப்பிப்புகளைக் காட்டு"</string>
     <string name="show_hw_layers_updates_summary" msgid="5850955890493054618">"வன்பொருள் லேயர்களைப் புதுப்பிக்கும்போது, அவற்றைப் பச்சை நிறத்தில் காட்டும்"</string>
     <string name="debug_hw_overdraw" msgid="8944851091008756796">"GPU ஓவர்டிரா பிழைதிருத்து"</string>
@@ -448,7 +448,7 @@
     <string name="show_all_anrs" msgid="9160563836616468726">"பின்புல ANRகளைக் காட்டு"</string>
     <string name="show_all_anrs_summary" msgid="8562788834431971392">"பின்புல ஆப்ஸுக்கு, ஆப்ஸ் பதிலளிக்கவில்லை என்ற செய்தியைக் காட்டும்"</string>
     <string name="show_notification_channel_warnings" msgid="3448282400127597331">"அறிவிப்புச் சேனல் எச்சரிக்கைகளைக் காட்டு"</string>
-    <string name="show_notification_channel_warnings_summary" msgid="68031143745094339">"ஆப்ஸானது சரியான சேனல் இல்லாமல் அறிவிப்பை இடுகையிடும் போது, திரையில் எச்சரிக்கையைக் காட்டும்"</string>
+    <string name="show_notification_channel_warnings_summary" msgid="68031143745094339">"ஆப்ஸானது சரியான சேனல் இல்லாமல் அறிவிப்பைப் பதிவிடும்போது, திரையில் எச்சரிக்கையைக் காட்டும்"</string>
     <string name="force_allow_on_external" msgid="9187902444231637880">"ஆப்ஸை வெளிப்புறச் சேமிப்பிடத்தில் அனுமதி"</string>
     <string name="force_allow_on_external_summary" msgid="8525425782530728238">"மேனிஃபெஸ்ட் மதிப்புகளைப் பொருட்படுத்தாமல், எல்லா ஆப்ஸையும் வெளிப்புறச் சேமிப்பிடத்தில் எழுத அனுமதிக்கும்"</string>
     <string name="force_resizable_activities" msgid="7143612144399959606">"செயல்பாடுகளை அளவுமாறக்கூடியதாக அமை"</string>

@@ -355,10 +355,18 @@
     <!-- Button to stop a screen recording [CHAR LIMIT=35] -->
     <string name="screenrecord_stop_dialog_button">Stop recording</string>
 
+    <!-- Screen recording should record entire screen [CHAR LIMIT=35] -->
+    <string name="screen_record_entire_screen">Entire screen</string>
+    <!-- Screen recording should record a single app [CHAR LIMIT=35] -->
+    <string name="screen_record_single_app">Single app</string>
+    <!-- Screen recording should record a single app but there are no apps open [CHAR LIMIT=35] -->
+    <string name="screen_record_single_app_no_recents">Single app (Open an app to choose)</string>
     <!-- Screen recording should record device audio setting [CHAR LIMIT=35] -->
     <string name="screen_record_record_device_audio_label">Record device audio</string>
     <!-- Screen recording should record microphone setting [CHAR LIMIT=35] -->
     <string name="screen_record_record_microphone_label">Record microphone</string>
+    <!-- Screen recording should show selfie camera [CHAR LIMIT=35] -->
+    <string name="screen_record_should_show_camera_label">Show selfie camera</string>
     <!-- Screen recording should show touches setting [CHAR LIMIT=35] -->
     <string name="screen_record_should_show_touches_label">Show touches</string>
     <!-- Header for the carousel to choose an app for screen recording. [CHAR LIMIT=50] -->
@@ -1716,9 +1724,6 @@
     <!-- Content description for accessibility: Tapping this button will open notifications settings [CHAR LIMIT=NONE] -->
     <string name="accessibility_notification_section_header_open_settings">Open notifications settings</string>
 
-    <!-- The text to show in the notifications shade when dnd is suppressing notifications. [CHAR LIMIT=100] -->
-    <string name="dnd_suppressing_shade_text">Notifications paused by Do Not Disturb</string>
-
     <!-- The text to show in the notifications shade when a mode is suppressing notifications. [CHAR LIMIT=100] -->
     <string name="modes_suppressing_shade_text">
         {count, plural, offset:1
@@ -1728,6 +1733,9 @@
             other {Notifications paused by {mode} and # other modes}
         }
     </string>
+
+    <!-- The text to show in the notifications shade when there are no notifications [CHAR LIMIT=100] -->
+    <string name="caught_up_shade_text">You\'re all caught up</string>
 
     <!-- Media projection permission dialog action text. [CHAR LIMIT=60] -->
     <string name="media_projection_action_text">Start now</string>
@@ -2550,6 +2558,8 @@
     <string name="group_system_access_quick_settings_panel">View quick settings</string>
     <!-- User visible title for the keyboard shortcut that takes a full screenshot. [CHAR LIMIT=70] -->
     <string name="group_system_full_screenshot">Take screenshot</string>
+    <!-- User visible title for the keyboard shortcut that begins a partial screenshot. [CHAR LIMIT=70] -->
+    <string name="group_system_partial_screenshot">Take partial screenshot</string>
     <!-- User visible title for the keyboard shortcut that access list of system / apps shortcuts. [CHAR LIMIT=70] -->
     <string name="group_system_access_system_app_shortcuts">Show shortcuts</string>
     <!-- User visible title for the keyboard shortcut that goes back to previous state. [CHAR LIMIT=70] -->

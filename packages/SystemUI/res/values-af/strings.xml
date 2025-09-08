@@ -146,37 +146,24 @@
     <string name="screen_record_retake" msgid="3846643688365398450">"Neem weer"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"Wysig"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"Vee uit"</string>
-    <!-- no translation found for screen_record_play (4732544724679889445) -->
-    <skip />
-    <!-- no translation found for screen_record_pause (1715012292444967776) -->
-    <skip />
-    <!-- no translation found for screen_record_mute (8111682249858638168) -->
-    <skip />
-    <!-- no translation found for screen_record_unmute (2207912659365156472) -->
-    <skip />
+    <string name="screen_record_play" msgid="4732544724679889445">"Speel"</string>
+    <string name="screen_record_pause" msgid="1715012292444967776">"Onderbreek"</string>
+    <string name="screen_record_mute" msgid="8111682249858638168">"Demp"</string>
+    <string name="screen_record_unmute" msgid="2207912659365156472">"Ontdemp"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"Neem ’n skermskoot van die hele skerm"</string>
-    <!-- no translation found for screen_capture_fullscreen_record_button (5697594296042198690) -->
-    <skip />
+    <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"Neem hele skerm op"</string>
     <string name="screen_capture_region_selection_button" msgid="515608875142444130">"Neem ’n skermskoot van die geselekteerde area"</string>
-    <!-- no translation found for screen_capture_record_region_selection_button (3699353194755563053) -->
-    <skip />
+    <string name="screen_capture_record_region_selection_button" msgid="3699353194755563053">"Neem geselekteerde area op"</string>
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"Skermskoot"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Neem op"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Deel"</string>
-    <!-- no translation found for screen_capture_toolbar_app_window_button_screenshot_a11y (1357560392667941303) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_app_window_button_record_a11y (8984966592912823394) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_region_button_screenshot_a11y (2102262602357521192) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_region_button_record_a11y (6829009792885846867) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_fullscreen_button_screenshot_a11y (8699983355979869210) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_fullscreen_button_record_a11y (852148867883959158) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_settings_button_a11y (8014446956996739704) -->
-    <skip />
+    <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Neem skermskoot van venster"</string>
+    <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Neem venster op"</string>
+    <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Neem ’n skermskoot van die geselekteerde area"</string>
+    <string name="screen_capture_toolbar_region_button_record_a11y" msgid="6829009792885846867">"Neem geselekteerde area op"</string>
+    <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"Neem ’n skermskoot van die hele skerm"</string>
+    <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"Neem die hele skerm op"</string>
+    <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"Skermskootinstellings"</string>
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> x <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"Deel tans skerm"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"Inhoud word gedeel"</string>
@@ -697,8 +684,9 @@
     <string name="notification_section_header_conversations" msgid="821834744538345661">"Gesprekke"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"Vee alle stil kennisgewings uit"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"Maak kennisgewinginstellings oop"</string>
-    <string name="dnd_suppressing_shade_text" msgid="5588252250634464042">"Kennisgewings onderbreek deur Moenie Steur Nie"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{Geen kennisgewings nie}=1{Kennisgewings is deur {mode} onderbreek}=2{Kennisgewings is deur {mode} en een ander modus onderbreek}other{Kennisgewings is deur {mode} en # ander modusse onderbreek}}"</string>
+    <!-- no translation found for caught_up_shade_text (8166221989384139659) -->
+    <skip />
     <string name="media_projection_action_text" msgid="3634906766918186440">"Begin nou"</string>
     <string name="empty_shade_text" msgid="8935967157319717412">"Geen kennisgewings nie"</string>
     <string name="no_unseen_notif_text" msgid="395512586119868682">"Geen nuwe kennisgewings nie"</string>
@@ -998,6 +986,8 @@
     <string name="group_system_access_notification_shade" msgid="1619028907006553677">"Bekyk kennisgewings"</string>
     <string name="group_system_access_quick_settings_panel" msgid="1844771096582064926">"Bekyk kitsinstellings"</string>
     <string name="group_system_full_screenshot" msgid="5742204844232667785">"Neem skermskoot"</string>
+    <!-- no translation found for group_system_partial_screenshot (2114314797127648010) -->
+    <skip />
     <string name="group_system_access_system_app_shortcuts" msgid="8562482996626694026">"Wys kortpaaie"</string>
     <string name="group_system_go_back" msgid="2730322046244918816">"Gaan terug"</string>
     <string name="group_system_access_home_screen" msgid="4130366993484706483">"Gaan na tuisskerm"</string>
@@ -1009,7 +999,6 @@
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"Maak digitale assistent oop"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"Sluit skerm"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"Maak ’n nota"</string>
-    <string name="group_system_close_window" msgid="1506354809787837043">"Maak huidige venster toe"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"Verrigting van veelvuldige take"</string>
     <string name="system_multitasking_rhs" msgid="8779289852395243004">"Gebruik verdeelde skerm met app aan die regterkant"</string>
     <string name="system_multitasking_lhs" msgid="7348595296208696452">"Gebruik verdeelde skerm met app aan die linkerkant"</string>
@@ -1023,6 +1012,7 @@
     <string name="system_desktop_mode_snap_right_window" msgid="2162560187639411929">"Skuif venster na regs"</string>
     <string name="system_desktop_mode_toggle_maximize_window" msgid="4084100093691768239">"Maak venster groot"</string>
     <string name="system_desktop_mode_minimize_window" msgid="1248714536732927092">"Maak venster klein"</string>
+    <string name="system_desktop_mode_close_window" msgid="3072490692608682536">"Maak huidige venster toe"</string>
     <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"Beweeg tussen rekenaars"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"Invoer"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"Skakel oor na volgende taal"</string>
@@ -1144,15 +1134,18 @@
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"Skakel <xliff:g id="ID_1">%1$s</xliff:g> aan?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794"><annotation id="action_key_icon">"Handelingikoon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> is die kortpadsleutel om <xliff:g id="ID_3">^3</xliff:g> te gebruik. <xliff:g id="ID_4">^4</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_talkback_intro" msgid="1617808784388544741">"<xliff:g id="ID_1">%1$s</xliff:g> is ’n skermleser wat jou toelaat om items hardop te hoor. Dit kan nuttig wees vir mense wat sukkel om die skerm te sien."</string>
-    <string name="accessibility_key_gesture_dialog_va_intro" msgid="4709198503441288289">"Met <xliff:g id="ID_1">%1$s</xliff:g> kan jy jou toestel handvry beheer."</string>
     <string name="accessibility_key_gesture_dialog_positive_button_text" msgid="3670746017523589293">"Skakel aan"</string>
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_title (5770691510738701250) -->
+    <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"<xliff:g id="ID_1">%1$s</xliff:g>-kortpadsleutel is aangeskakel"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="7575802369763469379"><annotation id="action_key_icon">"Handelingikoon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> is die kortpadsleutel om <xliff:g id="ID_3">^3</xliff:g> te gebruik. Jy kan daarmee vinnig op die skerm inzoem om inhoud groter te maak. Druk "<annotation id="action_key_icon">"Handelingikoon"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> en “+” of “-” om zoem te verstel."</string>
+    <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Skakel kortpad af"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Hou aan"</string>
+    <!-- no translation found for accessibility_key_gesture_voice_access_dialog_title (7828090789777023683) -->
     <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_content (7575802369763469379) -->
+    <!-- no translation found for accessibility_key_gesture_voice_access_dialog_content (7934170819801013870) -->
     <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_negative_button_text (8393469413785600834) -->
+    <!-- no translation found for accessibility_key_gesture_voice_access_dialog_negative_button_text (3573570279554465078) -->
     <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_positive_button_text (895076240681888057) -->
+    <!-- no translation found for accessibility_key_gesture_voice_access_dialog_positive_button_text (2306321856544446858) -->
     <skip />
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Sluitskerm"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Sit tans af …"</string>

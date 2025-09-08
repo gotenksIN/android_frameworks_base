@@ -487,12 +487,13 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
     }
 
     /**
-     * See {@link #setTaskViewVisible(TaskViewTaskController, boolean, boolean, boolean, boolean)}.
+     * See {@link #setTaskViewVisible(TaskViewTaskController, boolean, boolean, boolean, boolean,
+     * WindowContainerTransaction)}.
      */
     public void setTaskViewVisible(TaskViewTaskController taskView, boolean visible,
             boolean reorder, boolean syncHiddenWithVisibilityOnReorder) {
         setTaskViewVisible(taskView, visible, reorder, syncHiddenWithVisibilityOnReorder,
-                false /* nonBlockingIfPossible */);
+                false /* nonBlockingIfPossible */, null /* overrideTransaction */);
     }
 
     /**
@@ -511,12 +512,15 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
      *                              possible. It is possible if {@link #mShellExecutor} is an
      *                              instance of {@link ShellExecutor} that supports posting a
      *                              Runnable after the current execution.
+     * @param overrideTransaction The transaction that already contains a set of task hierarchy
+     *                            operations. If this is non-null, this method won't apply any
+     *                            hierarchy related operations to avoid conflicts.
      * @throws IllegalStateException If the flag {@link FLAG_ENABLE_CREATE_ANY_BUBBLE} is not
      *                               enabled.
      */
     public void setTaskViewVisible(TaskViewTaskController taskView, boolean visible,
             boolean reorder, boolean syncHiddenWithVisibilityOnReorder,
-            boolean nonBlockingIfPossible) {
+            boolean nonBlockingIfPossible, WindowContainerTransaction overrideTransaction) {
         final TaskViewRepository.TaskViewState state = useRepo()
                 ? mTaskViewRepo.byTaskView(taskView)
                 : mTaskViews.get(taskView);
@@ -528,19 +532,24 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         }
         state.mVisible = visible;
 
-        final WindowContainerTransaction wct = new WindowContainerTransaction();
-        wct.setBounds(taskView.getTaskInfo().token, state.mBounds);
-        if (reorder && !syncHiddenWithVisibilityOnReorder) {
-            // Reset hidden state to fix corner case where surface was destroyed before task
-            // appeared in #prepareOpenAnimation.
-            wct.setHidden(taskView.getTaskInfo().token, false /* hidden */);
-            // Order of setAlwaysOnTop() and reorder() matters; hierarchy ops apply sequentially.
-            wct.setAlwaysOnTop(taskView.getTaskInfo().token, visible /* alwaysOnTop */);
+        final WindowContainerTransaction wct;
+        if (overrideTransaction != null) {
+            wct = overrideTransaction;
         } else {
-            wct.setHidden(taskView.getTaskInfo().token, !visible /* hidden */);
-        }
-        if (reorder) {
-            wct.reorder(taskView.getTaskInfo().token, visible /* onTop */);
+            wct = new WindowContainerTransaction();
+            wct.setBounds(taskView.getTaskInfo().token, state.mBounds);
+            if (reorder && !syncHiddenWithVisibilityOnReorder) {
+                // Reset hidden state to fix corner case where surface was destroyed before task
+                // appeared in #prepareOpenAnimation.
+                wct.setHidden(taskView.getTaskInfo().token, false /* hidden */);
+                // Order of #setAlwaysOnTop and #reorder matters; hierarchy ops apply sequentially.
+                wct.setAlwaysOnTop(taskView.getTaskInfo().token, visible /* alwaysOnTop */);
+            } else {
+                wct.setHidden(taskView.getTaskInfo().token, !visible /* hidden */);
+            }
+            if (reorder) {
+                wct.reorder(taskView.getTaskInfo().token, visible /* onTop */);
+            }
         }
 
         ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.setTaskViewVisible(): taskView=%d "
@@ -835,18 +844,16 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
                             startTransaction, finishTransaction, taskInfo, leash, wct);
                     break;
                 case TRANSIT_TO_FRONT:
-                    boolean isNewInTaskView = false;
                     if (wct == null) wct = new WindowContainerTransaction();
                     if (infoTv == null && pending != null && isTaskToTaskView(task, pending)) {
                         // The task is being moved into taskView, so it is still "new" from
                         // TaskView's perspective (e.g. task being moved into a bubble)
                         stillNeedsMatchingLaunch = false;
-                        isNewInTaskView = true;
-                        prepareOpenAnimation(pending.mTaskView, isNewInTaskView, startTransaction,
-                                finishTransaction, taskInfo, leash, wct);
+                        prepareOpenAnimation(pending.mTaskView, true /* isNewInTaskView */,
+                                startTransaction, finishTransaction, taskInfo, leash, wct);
                     } else {
-                        prepareOpenAnimation(infoTv, isNewInTaskView, startTransaction,
-                                finishTransaction, taskInfo, leash, wct);
+                        prepareOpenAnimation(infoTv, false /* isNewInTaskView */,
+                                startTransaction, finishTransaction, taskInfo, leash, wct);
                     }
                     break;
                 case TRANSIT_CHANGE:

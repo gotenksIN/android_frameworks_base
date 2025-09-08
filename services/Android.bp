@@ -367,6 +367,9 @@ java_library {
     ] + select(release_flag("RELEASE_MOVE_VCN_TO_MAINLINE"), {
         true: [],
         default: ["service-connectivity-b-platform"],
+    }) + select(release_flag("RELEASE_ANOMALY_DETECTOR"), {
+        true: ["services.signal-collectors"],
+        default: [],
     }),
 
     libs: [
@@ -437,6 +440,7 @@ system_java_library {
     required: [
         "libukey2_jni_shared",
         "core.protolog.pb",
+        "libusb4_policies_jni",
     ],
     lint: {
         baseline_filename: "lint-baseline.xml",

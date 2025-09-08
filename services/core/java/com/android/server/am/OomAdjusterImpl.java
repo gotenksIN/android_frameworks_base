@@ -671,9 +671,8 @@ public class OomAdjusterImpl extends OomAdjuster {
 
     OomAdjusterImpl(ActivityManagerService service, ProcessList processList,
             ActiveUids activeUids, ServiceThread adjusterThread, GlobalState globalState,
-            CachedAppOptimizer cachedAppOptimizer, Injector injector) {
-        super(service, processList, activeUids, adjusterThread, globalState, cachedAppOptimizer,
-                injector);
+            Injector injector) {
+        super(service, processList, activeUids, adjusterThread, globalState, injector);
 // QTI_BEGIN: 2025-04-20: Core: perf: Bring-back QC-VA's based on new code refactoring.
 
         if(mPerfBoost != null) {

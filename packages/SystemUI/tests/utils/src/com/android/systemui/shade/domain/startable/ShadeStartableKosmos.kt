@@ -33,7 +33,6 @@ import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.shade.transition.ScrimShadeTransitionController
 import com.android.systemui.statusbar.notification.stack.notificationStackScrollLayoutController
 import com.android.systemui.statusbar.notificationShadeDepthController
-import com.android.systemui.statusbar.phone.scrimController
 import com.android.systemui.statusbar.policy.splitShadeStateController
 import com.android.systemui.statusbar.pulseExpansionHandler
 import com.android.systemui.util.mockito.mock
@@ -57,7 +56,6 @@ val Kosmos.shadeStartable by Fixture {
         shadeExpansionStateManager = shadeExpansionStateManager,
         pulseExpansionHandler = pulseExpansionHandler,
         nsslc = notificationStackScrollLayoutController,
-        scrimController = scrimController,
         depthController = notificationShadeDepthController,
         shadeDisplayStateInteractor = shadeDisplayStateInteractor,
     )

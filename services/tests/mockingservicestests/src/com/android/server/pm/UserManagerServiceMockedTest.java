@@ -24,6 +24,7 @@ import static android.content.pm.UserInfo.FLAG_ADMIN;
 import static android.content.pm.UserInfo.FLAG_FULL;
 import static android.content.pm.UserInfo.flagsToString;
 import static android.multiuser.Flags.FLAG_BLOCK_PRIVATE_SPACE_CREATION;
+import static android.multiuser.Flags.FLAG_CREATE_INITIAL_USER;
 import static android.multiuser.Flags.FLAG_DEMOTE_MAIN_USER;
 import static android.multiuser.Flags.FLAG_DISALLOW_REMOVING_LAST_ADMIN_USER;
 import static android.multiuser.Flags.FLAG_ENABLE_PRIVATE_SPACE_FEATURES;
@@ -54,8 +55,8 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.verify;
 import static com.android.server.pm.UserJourneyLogger.USER_JOURNEY_DEMOTE_MAIN_USER;
 import static com.android.server.pm.UserJourneyLogger.USER_JOURNEY_PROMOTE_MAIN_USER;
-import static com.android.server.pm.UserManagerService.BOOT_TO_HSU_FOR_PROVISIONED_DEVICE;
-import static com.android.server.pm.UserManagerService.BOOT_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER;
+import static com.android.server.pm.UserManagerService.BOOT_STRATEGY_TO_HSU_FOR_PROVISIONED_DEVICE;
+import static com.android.server.pm.UserManagerService.BOOT_STRATEGY_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -258,7 +259,7 @@ public final class UserManagerServiceMockedTest {
 
         mSpyResources = spy(mSpiedContext.getResources());
         when(mSpiedContext.getResources()).thenReturn(mSpyResources);
-        mockHsumBootStrategy(BOOT_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER);
+        mockHsumBootStrategy(BOOT_STRATEGY_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER);
         mockDisallowRemovingLastAdminUser(false);
 
         doReturn(mSpyResources).when(Resources::getSystem);
@@ -949,7 +950,7 @@ public final class UserManagerServiceMockedTest {
         addSecondaryUser(USER_ID);
         addSecondaryUser(USER_ID2);
         mockProvisionedDevice(true);
-        mockHsumBootStrategy(BOOT_TO_HSU_FOR_PROVISIONED_DEVICE);
+        mockHsumBootStrategy(BOOT_STRATEGY_TO_HSU_FOR_PROVISIONED_DEVICE);
 
         assertThat(mUms.getBootUser()).isEqualTo(USER_SYSTEM);
     }
@@ -960,7 +961,7 @@ public final class UserManagerServiceMockedTest {
         addSecondaryUser(USER_ID);
         addSecondaryUser(USER_ID2);
         mockProvisionedDevice(false);
-        mockHsumBootStrategy(BOOT_TO_HSU_FOR_PROVISIONED_DEVICE);
+        mockHsumBootStrategy(BOOT_STRATEGY_TO_HSU_FOR_PROVISIONED_DEVICE);
         // Even if the headless system user switchable flag is true, the boot user should be the
         // first switchable full user.
         mockCanSwitchToHeadlessSystemUser(true);
@@ -974,7 +975,7 @@ public final class UserManagerServiceMockedTest {
         setSystemUserHeadless(true);
         removeNonSystemUsers();
         mockProvisionedDevice(false);
-        mockHsumBootStrategy(BOOT_TO_HSU_FOR_PROVISIONED_DEVICE);
+        mockHsumBootStrategy(BOOT_STRATEGY_TO_HSU_FOR_PROVISIONED_DEVICE);
 
         assertThrows(ServiceSpecificException.class,
                 () -> mUms.getBootUser());
@@ -1547,6 +1548,14 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
+    @DisableFlags(FLAG_DEMOTE_MAIN_USER)
+    @EnableFlags(FLAG_CREATE_INITIAL_USER)
+    public void testSetMainUser_secondaryFlag() {
+        // Should behave the same as when the "primary" flag is enabled
+        testSetMainUser();
+    }
+
+    @Test
     @EnableFlags(FLAG_DEMOTE_MAIN_USER)
     public void testSetMainUser_hasMainUser() {
         var mainUserId = assumeHasMainUser();
@@ -1596,8 +1605,8 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @DisableFlags(FLAG_DEMOTE_MAIN_USER)
-    public void testSetMainUser_flagDisabled() {
+    @DisableFlags({FLAG_DEMOTE_MAIN_USER, FLAG_CREATE_INITIAL_USER})
+    public void testSetMainUser_flagDemoteMainUserDisabled() {
         assumeDoesntHaveMainUser();
         var adminUser = createAdminUser();
         int userId = adminUser.id;
@@ -1780,9 +1789,9 @@ public final class UserManagerServiceMockedTest {
     public void testSetUserAdmin() {
         addSecondaryUser(USER_ID);
 
-        mUms.setUserAdmin(USER_ID);
+        expect.that(mUms.setUserAdminInternal(USER_ID)).isTrue();
 
-        assertThat(mUsers.get(USER_ID).info.isAdmin()).isTrue();
+        expect.that(mUsers.get(USER_ID).info.isAdmin()).isTrue();
     }
 
     @Test
@@ -1806,9 +1815,9 @@ public final class UserManagerServiceMockedTest {
     public void testSetUserAdminFailsForGuest() {
         addGuestUser(USER_ID);
 
-        mUms.setUserAdmin(USER_ID);
+        expect.that(mUms.setUserAdminInternal(USER_ID)).isFalse();
 
-        assertThat(mUsers.get(USER_ID).info.isAdmin()).isFalse();
+        expect.that(mUsers.get(USER_ID).info.isAdmin()).isFalse();
     }
 
     @Test
@@ -1816,34 +1825,34 @@ public final class UserManagerServiceMockedTest {
         addSecondaryUser(PARENT_USER_ID);
         addProfile(PROFILE_USER_ID, PARENT_USER_ID, USER_TYPE_PROFILE_MANAGED);
 
-        mUms.setUserAdmin(PROFILE_USER_ID);
+        expect.that(mUms.setUserAdminInternal(PROFILE_USER_ID)).isFalse();
 
-        assertThat(mUsers.get(PROFILE_USER_ID).info.isAdmin()).isFalse();
+        expect.that(mUsers.get(PROFILE_USER_ID).info.isAdmin()).isFalse();
     }
 
     @Test
     public void testSetUserAdminFailsForRestrictedProfile() {
         addRestrictedProfile(USER_ID);
 
-        mUms.setUserAdmin(USER_ID);
+        expect.that(mUms.setUserAdminInternal(USER_ID)).isFalse();
 
-        assertThat(mUsers.get(USER_ID).info.isAdmin()).isFalse();
+        expect.that(mUsers.get(USER_ID).info.isAdmin()).isFalse();
     }
 
     @Test
     public void testRevokeUserAdmin() {
         addAdminUser(USER_ID);
 
-        mUms.revokeUserAdmin(USER_ID);
+        expect.that(mUms.revokeUserAdminInternal(USER_ID)).isTrue();
 
-        assertThat(mUsers.get(USER_ID).info.isAdmin()).isFalse();
+        expect.that(mUsers.get(USER_ID).info.isAdmin()).isFalse();
     }
 
     @Test
     public void testRevokeUserAdminFromNonAdmin() {
         addSecondaryUser(USER_ID);
 
-        mUms.revokeUserAdmin(USER_ID);
+        expect.that(mUms.revokeUserAdminInternal(USER_ID)).isTrue();
 
         assertThat(mUsers.get(USER_ID).info.isAdmin()).isFalse();
     }
@@ -1868,16 +1877,41 @@ public final class UserManagerServiceMockedTest {
     @Test
     @EnableFlags(FLAG_HSU_NOT_ADMIN)
     public void testRevokeUserAdminFailsForSystemUser_nonHsum_hsuNotAdmin() {
-        testRevokeUserAdminFailsForSystemUser_nonHsum();
+        setSystemUserHeadless(false);
+        testRevokeAdminFromSystemUser(/* allowed= */ false);
     }
 
     @Test
     @DisableFlags(FLAG_HSU_NOT_ADMIN)
     public void testRevokeUserAdminFailsForSystemUser_nonHsum() {
         setSystemUserHeadless(false);
-        mUms.revokeUserAdmin(UserHandle.USER_SYSTEM);
+        testRevokeAdminFromSystemUser(/* allowed= */ false);
+    }
 
-        assertThat(mUsers.get(UserHandle.USER_SYSTEM).info.isAdmin()).isTrue();
+    @Test
+    @EnableFlags(FLAG_HSU_NOT_ADMIN)
+    public void testRevokeUserAdminSucceedsForSystemUser_hsum_hsuNotAdmin() {
+        setSystemUserHeadless(true);
+        testRevokeAdminFromSystemUser(/* allowed= */ true);
+    }
+
+    @Test
+    @DisableFlags(FLAG_HSU_NOT_ADMIN)
+    public void testRevokeUserAdminFailsForSystemUser_hsum() {
+        setSystemUserHeadless(true);
+        testRevokeAdminFromSystemUser(/* allowed= */ false);
+    }
+
+    private void testRevokeAdminFromSystemUser(boolean allowed) {
+        UserInfo info = mUsers.get(UserHandle.USER_SYSTEM).info;
+        // Whether or not it's and admin depends on FLAG_HSU_NOT_ADMIN
+        boolean isAdminBefore = info.isAdmin();
+
+        boolean result = mUms.revokeUserAdminInternal(UserHandle.USER_SYSTEM);
+
+        expect.withMessage("revokeUserAdmin(USER_SYSTEM)").that(result).isEqualTo(allowed);
+        expect.withMessage("USER_SYSTEM.isAdmin() after revokeUserAdmin(...)")
+                .that(info.isAdmin()).isEqualTo(isAdminBefore);
     }
 
     @Test

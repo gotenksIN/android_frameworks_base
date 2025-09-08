@@ -301,6 +301,7 @@ import java.util.TimeZone;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * This manages the execution of the main thread in an
@@ -1171,6 +1172,39 @@ public final class ActivityThread extends ClientTransactionHandler
         ApplicationThread() {
         }
 
+        @Override
+        public boolean onTransact(int code, Parcel data, Parcel reply, int flags)
+                throws RemoteException {
+            if (Build.IS_DEBUGGABLE) {
+                int callingUid = Binder.getCallingUid();
+                if (callingUid != Process.SYSTEM_UID) {
+                    String packageName;
+                    if (callingUid == Process.ROOT_UID) {
+                        packageName = "root";
+                    } else {
+                        String[] packagesForUid =
+                                getSystemContext().getPackageManager().getPackagesForUid(
+                                        callingUid);
+                        if (packagesForUid == null || packagesForUid.length == 0) {
+                            packageName = "unknown";
+                        } else if (packagesForUid.length == 1) {
+                            packageName = packagesForUid[0];
+                        } else {
+                            packageName = Arrays.asList(packagesForUid).stream().sorted().collect(
+                                    Collectors.joining(", "));
+                        }
+                    }
+                    Slog.wtf(TAG, "ApplicationThread called by non-system process"
+                            + " (callingUid: " + callingUid
+                            + "; packageName: " + packageName
+                            + "; code: " + code
+                            + "; flags: " + flags
+                            + ")");
+                }
+            }
+            return super.onTransact(code, data, reply, flags);
+        }
+
         private static final String DB_CONNECTION_INFO_HEADER = "  %8s %8s %14s %5s %5s %5s  %s";
         private static final String DB_CONNECTION_INFO_FORMAT = "  %8s %8s %14s %5d %5d %5d  %s";
         private static final String DB_POOL_INFO_HEADER = "  %13s %13s %13s  %s";
@@ -1460,10 +1494,10 @@ public final class ActivityThread extends ClientTransactionHandler
         private void updateCompatOverrideScale(CompatibilityInfo info) {
             if (info.hasOverrideScaling()) {
                 CompatibilityInfo.setOverrideInvertedScale(info.applicationInvertedScale,
-                        info.applicationDensityInvertedScale);
+                        info.applicationDensityInvertedScale, info.overrideDensityDisplayIds);
             } else {
                 CompatibilityInfo.setOverrideInvertedScale(/* invertScale */ 1f,
-                        /* densityInvertScale */1f);
+                        /* densityInvertScale */1f, /* densityDisplayIds */ null);
             }
         }
 
@@ -6782,7 +6816,7 @@ public final class ActivityThread extends ClientTransactionHandler
         final ActivityRelaunchItem activityRelaunchItem = new ActivityRelaunchItem(
                 r.token, null /* pendingResults */, null /* pendingIntents */,
                 0 /* configChanges */, mergedConfiguration, r.mPreserveWindow,
-                r.getActivityWindowInfo());
+                r.getActivityWindowInfo(), r.activity.getDisplayId());
         // Make sure to match the existing lifecycle state in the end of the transaction.
         final ActivityLifecycleItem lifecycleRequest =
                 TransactionExecutorHelper.getLifecycleRequestForCurrentState(r);

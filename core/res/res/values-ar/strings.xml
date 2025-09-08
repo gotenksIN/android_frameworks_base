@@ -340,8 +340,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"التبديل إلى ملف العمل"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"التبديل إلى تطبيق \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" في الملف الشخصي"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"التبديل إلى تطبيق \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" في ملف العمل"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"جهات الاتصال"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"الوصول إلى جهات اتصالك"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"جهات الاتصال والحسابات"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"الوصول إلى جهات الاتصال والاطّلاع على قائمة حساباتك التي يمكنها حفظ جهات الاتصال على هذا الجهاز"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"الموقع الجغرافي"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"الوصول إلى موقع هذا الجهاز"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"‏تقويم Google"</string>
@@ -643,6 +643,10 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"يسمح هذا الإذن للتطبيق بتحديد الموضع النسبي بين الأجهزة المجاورة التي تستخدم النطاق الواسع جدًا."</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"‏التفاعل مع أجهزة Wi‑Fi المجاورة"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"‏للسماح للتطبيق بعرض الإعلانات والاتصال بالأجهزة الأخرى وتحديد الموقع النسبي لأجهزة Wi-Fi المجاورة."</string>
+    <!-- no translation found for permlab_access_local_network (3420360767259066877) -->
+    <skip />
+    <!-- no translation found for permdesc_access_local_network (6364679803386822638) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"تحديد الموضع النسبي بين الأجهزة المجاورة"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"يسمح هذا الإذن للتطبيق بتحديد الموضع النسبي بين الأجهزة المجاورة"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"‏معلومات الخدمات المدفوعة باستخدام الاتصال قصير المدى NFC المفضّل"</string>
@@ -2473,7 +2477,7 @@
     <string name="vdm_camera_access_denied" product="tablet" msgid="6895968310395249076">"يتعذّر الوصول إلى كاميرا الجهاز اللوحي من على جهاز <xliff:g id="DEVICE">%1$s</xliff:g>."</string>
     <string name="vdm_secure_window" msgid="161700398158812314">"لا يمكن الوصول إلى هذا المحتوى أثناء البث. بدلاً من ذلك، جرِّب استخدام هاتفك."</string>
     <string name="vdm_pip_blocked" msgid="4036107522497281397">"لا يمكن عرض نافذة ضمن النافذة أثناء البث."</string>
-    <string name="system_locale_title" msgid="711882686834677268">"الإعداد التلقائي للنظام"</string>
+    <string name="system_locale_title" msgid="711882686834677268">"اللغة التلقائية للنظام"</string>
     <string name="default_card_name" msgid="9198284935962911468">"‏رقم البطاقة ‎<xliff:g id="CARDNUMBER">%d</xliff:g>"</string>
     <string name="permlab_companionProfileWatch" msgid="2457738382085872542">"‏إذن الملف الشخصي في Companion Watch لإدارة الساعات"</string>
     <string name="permdesc_companionProfileWatch" msgid="5655698581110449397">"يسمح هذا الإذن للتطبيق المصاحب بإدارة الساعات."</string>

@@ -336,15 +336,15 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"ប្តូរ​ទៅ​កម្រង​ព័ត៌មាន​ការងារ"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"ប្ដូរទៅ <xliff:g id="APP_NAME">%1$s</xliff:g> ផ្ទាល់ខ្លួន"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"ប្ដូរទៅ <xliff:g id="APP_NAME">%1$s</xliff:g> ការងារ"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"ទំនាក់ទំនង"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"ចូលប្រើទំនាក់ទំនងរបស់អ្នក"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"ទំនាក់ទំនង និងគណនី"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"ចូលប្រើទំនាក់ទំនងរបស់អ្នក និងមើលឃើញបញ្ជីគណនីរបស់អ្នកដែលអាចរក្សាទុកទំនាក់ទំនងនៅលើឧបករណ៍នេះ"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"ទីតាំង"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"ចូលដំណើរការទីតាំងរបស់ឧបករណ៍នេះ"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"ប្រតិទិន"</string>
     <string name="permgroupdesc_calendar" msgid="6762751063361489379">"ចូលប្រើប្រិតិទិនរបស់អ្នក"</string>
     <string name="permgrouplab_sms" msgid="795737735126084874">"សារ SMS"</string>
     <string name="permgroupdesc_sms" msgid="5726462398070064542">"ផ្ញើ និងមើលសារ SMS"</string>
-    <string name="permgrouplab_storage" msgid="17339216290379241">"ឯកសារ"</string>
+    <string name="permgrouplab_storage" msgid="17339216290379241">"Files"</string>
     <string name="permgroupdesc_storage" msgid="5378659041354582769">"ចូលប្រើ​ប្រាស់ឯកសារ​នៅលើ​ឧបករណ៍​របស់អ្នក"</string>
     <string name="permgrouplab_readMediaAural" msgid="1858331312624942053">"តន្រ្តី និងសំឡេង"</string>
     <string name="permgroupdesc_readMediaAural" msgid="7565467343667089595">"ចូលប្រើតន្ត្រី និងសំឡេងនៅលើឧបករណ៍របស់អ្នក"</string>
@@ -639,6 +639,10 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"អនុញ្ញាតឱ្យ​កម្មវិធី​កំណត់ចម្ងាយ​ពាក់ព័ន្ធ​រវាងឧបករណ៍ Ultra-Wideband ដែលនៅជិត"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"ធ្វើអន្តរកម្ម​ជាមួយឧបករណ៍ Wi‑Fi ដែលនៅជិត"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"អនុញ្ញាតឱ្យ​កម្មវិធី​ផ្សាយពាណិជ្ជកម្ម ភ្ជាប់ និងកំណត់ទីតាំង​ពាក់ព័ន្ធរបស់​ឧបករណ៍ Wi‑Fi ដែលនៅជិត"</string>
+    <!-- no translation found for permlab_access_local_network (3420360767259066877) -->
+    <skip />
+    <!-- no translation found for permdesc_access_local_network (6364679803386822638) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"កំណត់ទីតាំងធៀបរវាងឧបករណ៍នៅជិត"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"អនុញ្ញាតឱ្យកម្មវិធីកំណត់ទីតាំងធៀបរវាងឧបករណ៍នៅជិត"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ព័ត៌មានអំពី​សេវាបង់ប្រាក់តាម NFC ជាអាទិភាព"</string>
@@ -2573,7 +2577,7 @@
     <string name="keyboard_shortcut_group_applications_calendar" msgid="3571770335653387606">"ប្រតិទិន"</string>
     <string name="keyboard_shortcut_group_applications_calculator" msgid="6753209559716091507">"ម៉ាស៊ីនគិតលេខ"</string>
     <string name="keyboard_shortcut_group_applications_maps" msgid="7950000659522589471">"ផែនទី"</string>
-    <string name="keyboard_shortcut_group_applications_files" msgid="863938400765838051">"ឯកសារ"</string>
+    <string name="keyboard_shortcut_group_applications_files" msgid="863938400765838051">"Files"</string>
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"កម្មវិធី"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"លែងអាចសម្គាល់ស្នាមម្រាមដៃរបស់អ្នកបានទៀតហើយ។ សូមរៀបចំការដោះសោ​ដោយស្កេន​ស្នាមម្រាមដៃម្ដងទៀត។"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"សុវត្ថិភាព និងឯកជនភាព"</string>

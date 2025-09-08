@@ -1074,7 +1074,7 @@ public final class TvInputManagerService extends SystemService {
         if (serviceState != null) {
             serviceState.sessionTokens.remove(sessionToken);
         }
-        if (!serviceState.isHardware) {
+        if (!serviceState.isHardware || serviceState.reconnecting) {
             updateServiceConnectionLocked(sessionState.componentName, userId);
         } else {
             updateHardwareServiceConnectionDelayed(userId);
@@ -3296,7 +3296,7 @@ public final class TvInputManagerService extends SystemService {
                             : TunedInfo.APP_TYPE_NON_SYSTEM;
                 }
                 channelInfos.add(new TunedInfo(
-                        state.inputId,
+                        state.isRecordingSession ? state.inputId : mOnScreenInputId,
                         watchedProgramsAccess ? state.currentChannel : null,
                         state.isRecordingSession,
                         state.isVisible,

@@ -65,9 +65,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.approachLayout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onLayoutRectChanged
@@ -105,6 +102,7 @@ import com.android.compose.animation.scene.SceneTransitionLayout
 import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.transitions
+import com.android.compose.gesture.gesturesDisabled
 import com.android.compose.modifiers.height
 import com.android.compose.modifiers.padding
 import com.android.compose.modifiers.thenIf
@@ -155,6 +153,7 @@ import com.android.systemui.qs.ui.composable.QuickSettingsShade.systemGestureExc
 import com.android.systemui.qs.ui.composable.QuickSettingsTheme
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
+import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener
 import com.android.systemui.util.LifecycleFragment
@@ -313,7 +312,7 @@ constructor(
                                 // showing. While the mirror is showing, an ancestor of the
                                 // ComposeView is made alpha 0, but touches are still being captured
                                 // by the composables.
-                                .gesturesDisabled(viewModel.showingMirror)
+                                .thenIf(viewModel.showingMirror) { Modifier.gesturesDisabled() }
                     ) {
                         CollapsableQuickSettingsSTL()
                     }
@@ -660,9 +659,21 @@ constructor(
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 var lastQqsHeight = -1
+                var lastQqsMediaVisible: Boolean? = null
                 this@QSFragmentCompose.view?.setSnapshotBinding {
                     scrollListener.value?.onQsPanelScrollChanged(scrollState.value)
-                    collapsedMediaVisibilityChangedListener.value?.accept(viewModel.qqsMediaVisible)
+                    if (ShadeWindowGoesAround.isEnabled) {
+                        if (lastQqsMediaVisible != viewModel.qqsMediaVisible) {
+                            lastQqsMediaVisible = viewModel.qqsMediaVisible
+                            collapsedMediaVisibilityChangedListener.value?.accept(
+                                viewModel.qqsMediaVisible
+                            )
+                        }
+                    } else {
+                        collapsedMediaVisibilityChangedListener.value?.accept(
+                            viewModel.qqsMediaVisible
+                        )
+                    }
                     if (lastQqsHeight != viewModel.qqsHeight) {
                         lastQqsHeight = viewModel.qqsHeight
                         qqsHeightListener.value?.onQqsHeightChanged()
@@ -1407,22 +1418,6 @@ private interface CanScrollQs {
 
     fun backward(): Boolean
 }
-
-private fun Modifier.gesturesDisabled(disabled: Boolean) =
-    if (disabled) {
-        pointerInput(Unit) {
-            awaitPointerEventScope {
-                // we should wait for all new pointer events
-                while (true) {
-                    awaitPointerEvent(pass = PointerEventPass.Initial)
-                        .changes
-                        .forEach(PointerInputChange::consume)
-                }
-            }
-        }
-    } else {
-        this
-    }
 
 @Composable
 private fun ContentScope.MediaObject(

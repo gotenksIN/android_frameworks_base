@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Lumipat sa profile sa trabaho"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Lumipat sa personal na <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Lumipat sa <xliff:g id="APP_NAME">%1$s</xliff:g> para sa trabaho"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Mga Contact"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"i-access ang iyong mga contact"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Mga contact at account"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"i-access ang iyong mga contact at tingnan ang listahan ng mga account mo na makakapag-save ng mga contact sa device na ito"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Lokasyon"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"i-access ang lokasyon ng device na ito"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Kalendaryo"</string>
@@ -639,6 +639,10 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Payagan ang app na tukuyin ang relatibong posisyon sa pagitan ng mga kalapit na Ultra-Wideband device"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"makipag-ugnayan sa mga kalapit na Wi‑Fi device"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Nagbibigay-daan sa app na i-advertise ang, kumonekta sa, at tukuyin ang nauugnay na posisyon ng mga kalapit na Wi‑Fi device"</string>
+    <!-- no translation found for permlab_access_local_network (3420360767259066877) -->
+    <skip />
+    <!-- no translation found for permdesc_access_local_network (6364679803386822638) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"alamin ang relative position sa kalapit na device"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Payagan ang app na alamin ang relatibong posisyon sa pagitan ng mga kalapit na device"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Impormasyon sa Gustong NFC na Serbisyo sa Pagbabayad"</string>
@@ -2585,17 +2589,14 @@
     <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"Para sa mas mabilis na pag-charge o para masimulan ang koneksyon sa USB, nire-require ng Advanced na Proteksyon na ma-unlock ang iyong screen"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"I-mute"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Na-mute ang mga notification"</string>
-    <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Hindi ka makakatanggap ng mga notification sa USB ng Advanced na Proteksyon hanggang sa i-restart mo ang iyong device"</string>
+    <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Hindi ka makakatanggap ng mga notification sa USB ng Advanced na Proteksyon hangga\'t hindi mo nire-restart ang iyong device"</string>
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"Kahina-hinalang aktibidad sa USB"</string>
     <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="5772698072220844779">"Na-disable ang data signal ng USB"</string>
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Nagkakaproblema ka ba sa Pag-unlock Gamit ang Fingerprint?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"I-tap para suriin ang mga tip para mapaganda ang iyong experience sa pag-unlock"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Huwag mag-blink"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Pindutin nang matagal ang Power button para i-off ang TV"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Mga Alerto sa Resource ng System"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Sobrang Paggamit ng Resource"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Gumagamit ang app na <xliff:g id="APP_NAME">%1$s</xliff:g> ng masyadong maraming resource.\""</string>
 </resources>

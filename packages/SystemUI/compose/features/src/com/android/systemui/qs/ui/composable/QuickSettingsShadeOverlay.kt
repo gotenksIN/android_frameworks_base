@@ -39,15 +39,21 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toAndroidRectF
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
@@ -60,18 +66,22 @@ import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.content.state.TransitionState
-import com.android.compose.lifecycle.DisposableEffectWithLifecycle
 import com.android.compose.animation.scene.mechanics.TileRevealFlag
+import com.android.compose.gesture.gesturesDisabled
+import com.android.compose.lifecycle.DisposableEffectWithLifecycle
 import com.android.compose.lifecycle.LaunchedEffectWithLifecycle
 import com.android.compose.modifiers.thenIf
 import com.android.systemui.brightness.ui.compose.BrightnessSliderContainer
 import com.android.systemui.brightness.ui.compose.ContainerColors
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.development.ui.compose.BuildNumber
+import com.android.systemui.development.ui.viewmodel.BuildNumberViewModel
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.media.remedia.ui.compose.Media
 import com.android.systemui.media.remedia.ui.compose.MediaPresentationStyle
 import com.android.systemui.notifications.ui.composable.SnoozeableHeadsUpNotificationSpace
+import com.android.systemui.notifications.ui.composable.headsUpTopInset
 import com.android.systemui.qs.composefragment.ui.GridAnchor
 import com.android.systemui.qs.flags.QsDetailedView
 import com.android.systemui.qs.panels.ui.compose.EditMode
@@ -86,6 +96,7 @@ import com.android.systemui.qs.ui.viewmodel.QuickSettingsShadeOverlayActionsView
 import com.android.systemui.qs.ui.viewmodel.QuickSettingsShadeOverlayContentViewModel
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.model.Overlays
+import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.composable.Overlay
 import com.android.systemui.shade.ui.composable.ChipHighlightModel
 import com.android.systemui.shade.ui.composable.OverlayShade
@@ -151,6 +162,16 @@ constructor(
             quickSettingsContainerViewModel.brightnessSliderViewModel.showMirror
         val contentAlphaFromBrightnessMirror by
             animateFloatAsState(if (showBrightnessMirror) 0f else 1f)
+        val headsUpInset = with(LocalDensity.current) { headsUpTopInset().toPx() }
+
+        val targetBlurRadiusPx: Float by
+            remember(layoutState) {
+                derivedStateOf {
+                    contentViewModel.calculateTargetBlurRadius(layoutState.transitionState)
+                }
+            }
+        val animatedBlurRadiusPx: Float by
+            animateFloatAsState(targetValue = targetBlurRadiusPx, label = "NSOverlay-blurRadius")
 
         // Set the bounds to null when the QuickSettings overlay disappears.
         DisposableEffectWithLifecycle(Unit) {
@@ -162,7 +183,13 @@ constructor(
 
         LaunchedEffectWithLifecycle(key1 = Unit) { contentViewModel.detectShadeModeChanges() }
 
-        Box(modifier = modifier.graphicsLayer { alpha = contentAlphaFromBrightnessMirror }) {
+        Box(
+            modifier =
+                modifier
+                    .graphicsLayer { alpha = contentAlphaFromBrightnessMirror }
+                    .blur(with(LocalDensity.current) { animatedBlurRadiusPx.toDp() })
+                    .thenIf(showBrightnessMirror) { Modifier.gesturesDisabled() }
+        ) {
             OverlayShade(
                 panelElement = QuickSettingsShade.Elements.Panel,
                 alignmentOnWideScreens = Alignment.TopEnd,
@@ -197,8 +224,24 @@ constructor(
                 )
             }
             SnoozeableHeadsUpNotificationSpace(
+                useDrawBounds = {
+                    with(layoutState.transitionState) {
+                        // When overlaid on top of the lock screen, drawBounds updates are already
+                        // being sent.
+                        isIdle(key) && !isIdle(Scenes.Lockscreen)
+                    }
+                },
                 stackScrollView = notificationStackScrollView.get(),
                 viewModel = hunPlaceholderViewModel,
+                modifier = Modifier.onGloballyPositioned { layoutCoordinates ->
+                    val bounds = layoutCoordinates.boundsInWindow().toAndroidRectF()
+                    if (bounds.height() > 0) {
+                        // HUN gesture area must extend from the top of the screen for animations
+                        bounds.top = 0f
+                        bounds.bottom += headsUpInset
+                        notificationStackScrollView.get().updateDrawBounds(bounds)
+                    }
+                }
             )
         }
     }
@@ -259,6 +302,7 @@ private fun ContentScope.QuickSettingsContainer(
                 QuickSettingsLayout(
                     qsContainerViewModel = containerViewModel,
                     toolbarViewModelFactory = contentViewModel.toolbarViewModelFactory,
+                    buildNumberViewModelFactory = contentViewModel.buildNumberViewModelFactory,
                     isTransparencyEnabled = contentViewModel.isTransparencyEnabled,
                     volumeSliderViewModel = contentViewModel.volumeSliderViewModel,
                     audioDetailsViewModelFactory = contentViewModel.audioDetailsViewModelFactory,
@@ -274,6 +318,7 @@ private fun ContentScope.QuickSettingsContainer(
 private fun ContentScope.QuickSettingsLayout(
     qsContainerViewModel: QuickSettingsContainerViewModel,
     toolbarViewModelFactory: ToolbarViewModel.Factory,
+    buildNumberViewModelFactory: BuildNumberViewModel.Factory,
     isTransparencyEnabled: Boolean,
     volumeSliderViewModel: AudioStreamSliderViewModel?,
     audioDetailsViewModelFactory: AudioDetailsViewModel.Factory,
@@ -398,6 +443,21 @@ private fun ContentScope.QuickSettingsLayout(
                 modifier = Modifier.fillMaxWidth(),
                 enableRevealEffect = TileRevealFlag.isEnabled,
             )
+
+            val buildNumberViewModel =
+                rememberViewModel("QuickSettingsShadeOverlay.BuildNumber") {
+                    buildNumberViewModelFactory.create()
+                }
+
+            if (buildNumberViewModel.buildNumber != null) {
+                VerticalSeparator(QuickSettingsShade.Dimensions.ShortPadding)
+                BuildNumber(
+                    viewModel = buildNumberViewModel,
+                    modifier =
+                        Modifier.align(Alignment.Start)
+                            .padding(start = QuickSettingsShade.Dimensions.Padding),
+                )
+            }
 
             VerticalSeparator(QuickSettingsShade.Dimensions.Padding)
         }

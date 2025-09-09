@@ -118,16 +118,6 @@ flag {
 }
 
 flag {
-    name: "enable_recents_bookend_transition"
-    namespace: "multitasking"
-    description: "Use a finish-transition to clean up recents instead of the finish-WCT"
-    bug: "346588978"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
    name: "enable_bubble_to_fullscreen"
    namespace: "multitasking"
    description: "Enable an option to move bubbles to fullscreen"
@@ -328,6 +318,16 @@ flag {
     namespace: "multitasking"
     description: "Fixes a bug where split screen remains active if one of the tasks moves to bubble via a trampoline task."
     bug: "440647718"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_shell_restart_bubble_cleanup"
+    namespace: "multitasking"
+    description: "Convert bubbled tasks back to fullscreen when WMShell restarts."
+    bug: "425496840"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

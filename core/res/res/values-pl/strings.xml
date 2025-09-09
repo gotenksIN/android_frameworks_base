@@ -338,8 +338,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Przełącz na profil służbowy"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Przełącz na osobistą aplikację <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Przełącz na służbową aplikację <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Kontakty"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"dostęp do kontaktów"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Kontakty i konta"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"uzyskiwanie dostępu do kontaktów i wyświetlanie listy kont, na których można zapisywać kontakty na tym urządzeniu"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Lokalizacja"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"dostęp do informacji o lokalizacji tego urządzenia"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Kalendarz"</string>
@@ -641,6 +641,10 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Zezwól na określanie przez aplikację względnego położenia urządzeń ultraszerokopasmowych w pobliżu"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"interakcje z urządzeniami Wi-Fi w pobliżu"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Zezwala aplikacji na przesyłanie informacji o sobie, łączenie się z urządzeniami Wi‑Fi w pobliżu i określanie ich względnego położenia"</string>
+    <!-- no translation found for permlab_access_local_network (3420360767259066877) -->
+    <skip />
+    <!-- no translation found for permdesc_access_local_network (6364679803386822638) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"określanie względnego położenia urządzeń w pobliżu"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Zezwól na określanie przez aplikację względnego położenia urządzeń w pobliżu"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informacje o preferowanych usługach płatniczych NFC"</string>

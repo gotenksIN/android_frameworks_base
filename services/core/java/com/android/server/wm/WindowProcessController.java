@@ -93,7 +93,7 @@ import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.Watchdog;
 import com.android.server.am.Flags;
-import com.android.server.am.ProcessStateController;
+import com.android.server.am.psc.AsyncBatchSession;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.art.ReasonMapping;
 import com.android.server.grammaticalinflection.GrammaticalInflectionManagerInternal;
@@ -1286,7 +1286,9 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
                 // this process, we'd find out the one with the minimal layer, thus it'll
                 // get a higher adj score.
             } else if (!visible && bestInvisibleState != PAUSING) {
-                if (state == PAUSING) {
+                // Also check RESUMED in case the activity is pending to be stopped by
+                // ActivityRecord#makeInvisible.
+                if (state == PAUSING || state == RESUMED) {
                     bestInvisibleState = PAUSING;
                     // Treat PAUSING as visible in case the next activity in the same process has
                     // not yet been set as visible-requested.
@@ -1453,8 +1455,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
 
         // Multiple OomAdjuster affecting state changes can occur, wrap those state changes in a
         // BatchSession.
-        try (ProcessStateController.AsyncBatchSession batchSession =
-                     mAtm.mActivityStateUpdater.startBatchSession()) {
+        try (AsyncBatchSession batchSession = mAtm.mActivityStateUpdater.startBatchSession()) {
             if (updateOomAdj) {
                 prepareOomAdjustment();
             }
@@ -1544,8 +1545,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
 
         // Multiple OomAdjuster affecting state changes can occur, wrap those state changes in a
         // BatchSession.
-        try (ProcessStateController.AsyncBatchSession batchSession =
-                     mAtm.mActivityStateUpdater.startBatchSession()) {
+        try (AsyncBatchSession batchSession = mAtm.mActivityStateUpdater.startBatchSession()) {
             prepareOomAdjustment();
             // Posting the message at the front of queue so WM lock isn't held when we call into AM,
             // and the process state of starting activity can be updated quicker which will give it

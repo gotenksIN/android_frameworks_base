@@ -195,16 +195,6 @@ flag {
 }
 
 flag {
-    name: "cache_content_capture_service"
-    namespace: "system_performance"
-    description: "Seed ContentCaptureManager into the bound application's initial service cache"
-    bug: "414380203"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "push_activity_state_to_oomadjuster"
     namespace: "backstage_power"
     description: "Migrate OomAdjuster pulled activity state to a push model"
@@ -257,6 +247,26 @@ flag {
     name: "psc_batch_update"
     namespace: "backstage_power"
     description: "Batch ProcessStateController updates triggered while a BatchSession is active."
+    bug: "399680824"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "rollout_computer_control"
+    namespace: "core_experiments_team_internal"
+    description: "Rolls out the computer_control namespace."
+    bug: "436480687"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "psc_batch_service_updates"
+    namespace: "backstage_power"
+    description: "Batch Service related ProcessStateController updates and auto trigger the update on state changes."
     bug: "399680824"
     metadata {
         purpose: PURPOSE_BUGFIX

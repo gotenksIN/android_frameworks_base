@@ -20,6 +20,7 @@ import android.content.applicationContext
 import com.android.systemui.bouncer.domain.interactor.bouncerInteractor
 import com.android.systemui.common.ui.domain.interactor.configurationInteractor
 import com.android.systemui.communal.domain.interactor.communalSceneInteractor
+import com.android.systemui.desktop.domain.interactor.desktopInteractor
 import com.android.systemui.dump.dumpManager
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
@@ -57,7 +58,7 @@ import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
 import com.android.systemui.kosmos.applicationCoroutineScope
 import com.android.systemui.media.controls.domain.pipeline.legacyMediaDataManagerImpl
-import com.android.systemui.media.controls.domain.pipeline.mediaDataManager
+import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.shade.largeScreenHeaderHelper
@@ -78,6 +79,7 @@ val Kosmos.sharedNotificationContainerViewModel by Fixture {
         keyguardInteractor = keyguardInteractor,
         keyguardTransitionInteractor = keyguardTransitionInteractor,
         shadeInteractor = shadeInteractor,
+        sceneInteractor = sceneInteractor,
         bouncerInteractor = bouncerInteractor,
         shadeModeInteractor = shadeModeInteractor,
         notificationStackAppearanceInteractor = notificationStackAppearanceInteractor,
@@ -114,6 +116,7 @@ val Kosmos.sharedNotificationContainerViewModel by Fixture {
         primaryBouncerTransitions = fakeBouncerTransitions,
         aodBurnInViewModel = aodBurnInViewModel,
         communalSceneInteractor = communalSceneInteractor,
+        desktopInteractor = desktopInteractor,
         headsUpNotificationInteractor = { headsUpNotificationInteractor },
         largeScreenHeaderHelperLazy = { largeScreenHeaderHelper },
         unfoldTransitionInteractor = unfoldTransitionInteractor,

@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Beralih ke profil kerja"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Beralih kepada <xliff:g id="APP_NAME">%1$s</xliff:g> peribadi"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Beralih kepada <xliff:g id="APP_NAME">%1$s</xliff:g> kerja"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Kenalan"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"mengakses kenalan anda"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Kenalan dan akaun"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"akses kenalan anda dan lihat senarai akaun anda yang boleh menyimpan kenalan pada peranti ini"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Lokasi"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"mengakses lokasi peranti ini"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Calendar"</string>
@@ -639,6 +639,10 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Benarkan apl menentukan kedudukan relatif antara peranti Ultrajalur Lebar berdekatan"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"berinteraksi dengan peranti Wi-Fi berdekatan"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Membenarkan apl mengiklankan, menyambung dan menentukan kedudukan relatif peranti Wi-Fi berdekatan"</string>
+    <!-- no translation found for permlab_access_local_network (3420360767259066877) -->
+    <skip />
+    <!-- no translation found for permdesc_access_local_network (6364679803386822638) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"tentukan kedudukan relatif antara peranti berdekatan"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Benarkan apl menentukan kedudukan relatif antara peranti berdekatan"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Maklumat Perkhidmatan Pembayaran NFC Pilihan"</string>
@@ -2087,7 +2091,7 @@
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Kecemasan"</string>
     <string name="set_up_screen_lock_title" msgid="8346083801616474030">"Tetapkan kunci skrin"</string>
     <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"Tetapkan kunci skrin"</string>
-    <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Tetapkan kunci skrin pada peranti untuk menggunakan ruang privasi"</string>
+    <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Tetapkan kunci skrin pada peranti untuk menggunakan ruang persendirian"</string>
     <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"Untuk memadamkan ruang peribadi, tetapkan kunci skrin pada peranti ini"</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"Apl tidak tersedia"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"<xliff:g id="APP_NAME">%1$s</xliff:g> tidak tersedia sekarang."</string>

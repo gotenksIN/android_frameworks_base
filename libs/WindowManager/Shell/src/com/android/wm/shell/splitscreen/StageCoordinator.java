@@ -45,9 +45,10 @@ import static com.android.wm.shell.Flags.splitDisableChildTaskBounds;
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_ALIGN_CENTER;
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_FLEX_HYBRID;
 import static com.android.wm.shell.common.split.SplitLayout.RESTING_DIM_LAYER;
+import static com.android.wm.shell.common.split.SplitScreenUtils.getNewParentTokenForStage;
 import static com.android.wm.shell.common.split.SplitScreenUtils.reverseSplitPosition;
 import static com.android.wm.shell.common.split.SplitScreenUtils.splitFailureMessage;
-import static com.android.wm.shell.common.split.SplitScreenUtils.getNewParentTokenForStage;
+import static com.android.wm.shell.common.split.SplitScreenUtils.updateSplitLayoutConfig;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN;
 import static com.android.wm.shell.shared.TransitionUtil.isClosingType;
 import static com.android.wm.shell.shared.TransitionUtil.isOpeningMode;
@@ -491,7 +492,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     this /*stageListenerCallbacks*/,
                     mSyncQueue,
                     iconProvider,
-                    mWindowDecorViewModel);
+                    mWindowDecorViewModel,
+                    mBubbleController);
         } else {
             mMainStage = new StageTaskListener(
                     mContext,
@@ -500,7 +502,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     this /*stageListenerCallbacks*/,
                     mSyncQueue,
                     iconProvider,
-                    mWindowDecorViewModel, STAGE_TYPE_MAIN);
+                    mWindowDecorViewModel, STAGE_TYPE_MAIN,
+                    bubbleController);
             mSideStage = new StageTaskListener(
                     mContext,
                     mTaskOrganizer,
@@ -508,7 +511,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     this /*stageListenerCallbacks*/,
                     mSyncQueue,
                     iconProvider,
-                    mWindowDecorViewModel, STAGE_TYPE_SIDE);
+                    mWindowDecorViewModel, STAGE_TYPE_SIDE,
+                    mBubbleController);
         }
         mTransitions = transitions;
         mDisplayController = displayController;
@@ -1028,6 +1032,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             final RunningTaskInfo taskInfo = mTaskOrganizer.getRunningTaskInfo(taskId);
 
             if (taskInfo != null) {
+                updateSplitLayoutConfig(mRootTDAOrganizer, taskInfo.displayId, mSplitLayout);
                 prepareMovingSplitScreenRoot(wct, taskInfo.displayId);
             }
         }
@@ -1746,7 +1751,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     /**
      * Starts a new transition to dismiss split.
      */
-    private void dismissSplit(@StageType int stageToTop, @ExitReason int exitReason) {
+    @VisibleForTesting
+    void dismissSplit(@StageType int stageToTop, @ExitReason int exitReason) {
         if (!isSplitActive()) {
             return;
         }
@@ -2360,6 +2366,37 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
     }
 
+    @Override
+    public void onChildTaskMovedToBubble(StageTaskListener stage, int taskId) {
+        if (stage.getChildCount() != 0) {
+            ProtoLog.d(WM_SHELL_SPLIT_SCREEN,
+                    "onChildTaskMovedToBubble: task=%d in stage=%s moved to bubble, ignore, "
+                            + "childCount=%d",
+                    taskId, stageTypeToString(stage.getId()), stage.getChildCount());
+            return;
+        }
+        int stageToTop = STAGE_TYPE_UNDEFINED;
+        if (enableFlexibleSplit()) {
+            for (StageTaskListener activeStage : mStageOrderOperator.getActiveStages()) {
+                // See if any other stage still has children
+                if (activeStage.getChildCount() > 0) {
+                    stageToTop = activeStage.getId();
+                    break;
+                }
+            }
+        } else {
+            final StageTaskListener remainingStage = stage == mMainStage ? mSideStage : mMainStage;
+            if (remainingStage.getChildCount() > 0) {
+                stageToTop = remainingStage.getId();
+            }
+        }
+        ProtoLog.d(WM_SHELL_SPLIT_SCREEN,
+                "onChildTaskMovedToBubble: taskId=%d in stage=%s moved to bubble exit split "
+                        + "stageToTop=%s",
+                taskId, stageTypeToString(stage.getId()), stageTypeToString(stageToTop));
+        dismissSplit(stageToTop, EXIT_REASON_CHILD_TASK_ENTER_BUBBLE);
+    }
+
     private void updateRecentTasksSplitPair() {
         // Preventing from single task update while processing recents.
         if (!mShouldUpdateRecents || !mPausingTasks.isEmpty()) {
@@ -2522,7 +2559,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mSplitMultiDisplayHelper.setDisplayRootTaskInfo(taskInfo.displayId, taskInfo);
 
         if (mSplitLayout != null
-                && mSplitLayout.updateConfiguration(taskInfo.configuration)
+                && mSplitLayout.updateConfiguration(taskInfo.configuration, taskInfo.displayId)
                 && isSplitActive()) {
             ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "onTaskInfoChanged: task=%d updating",
                     taskInfo.taskId);
@@ -3090,7 +3127,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 displayId, fromRotation, toRotation,
                 newDisplayAreaInfo != null ? newDisplayAreaInfo.configuration : null);
         if (newDisplayAreaInfo != null) {
-            mSplitLayout.updateConfiguration(newDisplayAreaInfo.configuration);
+            mSplitLayout.updateConfiguration(newDisplayAreaInfo.configuration, displayId);
         } else {
             mSplitLayout.rotateTo(toRotation);
         }

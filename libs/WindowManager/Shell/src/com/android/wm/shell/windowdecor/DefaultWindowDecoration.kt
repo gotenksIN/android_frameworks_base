@@ -49,9 +49,7 @@ import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
-import com.android.wm.shell.apptoweb.AppToWebGenericLinksParser
 import com.android.wm.shell.apptoweb.AppToWebRepository
-import com.android.wm.shell.apptoweb.AssistContentRequester
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.LockTaskChangeListener
 import com.android.wm.shell.common.MultiInstanceHelper
@@ -98,8 +96,6 @@ class DefaultWindowDecoration
 constructor(
     taskInfo: RunningTaskInfo,
     taskSurface: SurfaceControl,
-    genericLinksParser: AppToWebGenericLinksParser,
-    assistContentRequester: AssistContentRequester,
     val context: Context,
     private val userContext: Context,
     private val displayController: DisplayController,
@@ -125,6 +121,7 @@ constructor(
     private val desktopState: DesktopState,
     private val desktopConfig: DesktopConfig,
     private val windowDecorationActions: WindowDecorationActions,
+    private val appToWebRepository: AppToWebRepository,
     private val windowManagerWrapper: WindowManagerWrapper =
         WindowManagerWrapper(context.getSystemService(WindowManager::class.java)),
     private val surfaceControlBuilderSupplier: () -> SurfaceControl.Builder = {
@@ -150,9 +147,6 @@ constructor(
         mainScope,
         transitions,
     ) {
-    private var appToWebRepository =
-        AppToWebRepository(userContext, taskInfo.taskId, assistContentRequester, genericLinksParser)
-
     private lateinit var onClickListener: OnClickListener
     private lateinit var onTouchListener: OnTouchListener
     private lateinit var onLongClickListener: OnLongClickListener
@@ -331,7 +325,11 @@ constructor(
         traceSection("DefaultWindowDecoration#relayout") {
             if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB.isTrue) {
                 taskInfo.capturedLink?.let {
-                    appToWebRepository.setCapturedLink(it, taskInfo.capturedLinkTimestamp)
+                    appToWebRepository.setCapturedLink(
+                        taskInfo.taskId,
+                        it,
+                        taskInfo.capturedLinkTimestamp,
+                    )
                 }
             }
 
@@ -360,6 +358,7 @@ constructor(
                 )
 
             val wct = windowContainerTransactionSupplier.invoke()
+            val oldDecorationSurface = decorationContainerSurface
             relayout(relayoutParams, startT, finishT, wct, taskSurface)
 
             // After this line, [WindowDecoration2.taskInfo] is up-to-date and should be
@@ -389,7 +388,9 @@ constructor(
                 Trace.endSection()
             }
 
-            decorationContainerSurface?.let { updateDragResizeListenerIfNeeded(it) }
+            decorationContainerSurface?.let {
+                updateDragResizeListenerIfNeeded(oldDecorationSurface)
+            }
         }
 
     private fun getRelayoutParams(
@@ -453,6 +454,8 @@ constructor(
                     insetSourceFlags = insetSourceFlags or FLAG_FORCE_CONSUMING_OPAQUE_CAPTION_BAR
                 }
             }
+            inputFeatures =
+                inputFeatures or WindowManager.LayoutParams.INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE
         }
 
         // The configuration used to layout the window decoration. A copy is made instead of using
@@ -653,7 +656,7 @@ constructor(
         return showCaption
     }
 
-    private fun updateDragResizeListenerIfNeeded(containerSurface: SurfaceControl) {
+    private fun updateDragResizeListenerIfNeeded(containerSurface: SurfaceControl?) {
         val taskPositionChanged = !taskInfo.positionInParent.equals(taskPositionInParent)
         if (!taskInfo.isDragResizable(inFullImmersive)) {
             if (taskPositionChanged) {
@@ -671,7 +674,7 @@ constructor(
     }
 
     private fun updateDragResizeListener(
-        containerSurface: SurfaceControl,
+        containerSurface: SurfaceControl?,
         onUpdateFinished: (Boolean) -> Unit,
     ) {
         val containerSurfaceChanged = containerSurface != decorationContainerSurface
@@ -693,7 +696,7 @@ constructor(
                     handler,
                     choreographer,
                     checkNotNull(display?.displayId) { "expected non-null display" },
-                    decorationContainerSurface,
+                    checkNotNull(decorationContainerSurface),
                     dragPositioningCallback,
                     surfaceControlBuilderSupplier,
                     surfaceControlTransactionSupplier,

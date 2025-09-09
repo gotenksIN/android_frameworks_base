@@ -1592,6 +1592,14 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             return false;
         }
 
+        if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()
+                && DesktopExperienceFlags.ENABLE_MIRROR_DISPLAY_NO_ACTIVITY.isTrue()) {
+            if (!display.mDisplay.canHostTasks()) {
+                // Can't launch home on display that cannot host tasks.
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -3324,6 +3332,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (candidateRoot != null && canLaunchOnDisplay(r, candidateRoot)) {
                 return candidateRoot;
             }
+        }
+
+        final Task candidateRoot = launchParams != null ? launchParams.mPreferredRootTask : null;
+        if (candidateRoot != null && canLaunchOnDisplay(r, candidateRoot)) {
+            return candidateRoot;
         }
 
         // Next preference goes to the task id set in the activity options.

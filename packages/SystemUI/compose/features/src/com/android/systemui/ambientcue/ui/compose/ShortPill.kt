@@ -55,6 +55,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -95,7 +97,6 @@ fun ShortPill(
     onCloseClick: () -> Unit = {},
     onAnimationStateChange: (Int, AmbientCueAnimationState) -> Unit = { _, _ -> },
 ) {
-    val outlineColor = if (isSystemInDarkTheme()) Color.White else Color.Black
     val backgroundColor = if (isSystemInDarkTheme()) Color.Black else Color.White
     val scrimColor = MaterialTheme.colorScheme.primaryFixedDim
     val minSize = 48.dp
@@ -268,44 +269,57 @@ fun ShortPill(
                                 pillContentPosition = coordinates.positionInParent()
                             },
                 ) {
-                    Row(
-                        horizontalArrangement =
-                            Arrangement.spacedBy(-4.dp, Alignment.CenterHorizontally),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = pillModifier.defaultMinSize(minWidth = minSize),
-                    ) {
-                        filteredActions.take(3).fastForEach { action ->
-                            Icon(action, backgroundColor)
-                            if (actions.size == 1) {
-                                Text(
-                                    text = action.label,
-                                    color = outlineColor,
-                                    style = actionTextStyle,
-                                    overflow = TextOverflow.Ellipsis,
-                                    maxLines = 1,
-                                    modifier = Modifier.padding(horizontal = 8.dp),
-                                )
-                            } else if (
-                                filteredActions.size == 1 &&
-                                    action.actionType == ActionType.MR &&
-                                    action.icon.repeatCount > 0
-                            ) {
-                                Text(
-                                    text = action.label,
-                                    color = outlineColor,
-                                    style = actionTextStyle,
-                                    overflow = TextOverflow.Ellipsis,
-                                    maxLines = 1,
-                                    modifier = Modifier.padding(start = 8.dp).weight(1f),
-                                )
-                                Text(
-                                    text = "+${action.icon.repeatCount}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(start = 6.dp, end = 3.dp),
-                                )
+                    Box {
+                        Row(
+                            horizontalArrangement =
+                                Arrangement.spacedBy(-4.dp, Alignment.CenterHorizontally),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = pillModifier.defaultMinSize(minWidth = minSize),
+                        ) {
+                            filteredActions.take(3).fastForEach { action ->
+                                Icon(action, backgroundColor)
+                                if (actions.size == 1) {
+                                    Text(
+                                        text = action.label,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        style = actionTextStyle,
+                                        overflow = TextOverflow.Ellipsis,
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(horizontal = 8.dp),
+                                    )
+                                } else if (
+                                    filteredActions.size == 1 &&
+                                        action.actionType == ActionType.MR &&
+                                        action.icon.repeatCount > 0
+                                ) {
+                                    Text(
+                                        text = action.label,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        style = actionTextStyle,
+                                        overflow = TextOverflow.Ellipsis,
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(start = 8.dp).weight(1f),
+                                    )
+                                    Text(
+                                        text = "+${action.icon.repeatCount}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(start = 6.dp, end = 3.dp),
+                                    )
+                                }
                             }
                         }
+
+                        Box(
+                            Modifier.matchParentSize()
+                                .padding(1.dp)
+                                .blur(4.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                                .animatedActionBorder(
+                                    strokeWidth = 1.dp,
+                                    cornerRadius = 16.dp,
+                                    visible = visible,
+                                )
+                        )
                     }
                 }
 
@@ -404,13 +418,14 @@ private fun Icon(action: ActionViewModel, backgroundColor: Color, modifier: Modi
         contentDescription = stringResource(id = R.string.ambient_cue_icon_content_description),
         modifier =
             modifier
+                .padding(2.dp)
                 .then(
                     if (action.actionType == ActionType.MR) {
-                        Modifier.size(20.dp)
+                        Modifier.size(16.dp)
                     } else {
-                        Modifier.size(19.25.dp)
+                        Modifier.size(16.dp)
                             .border(
-                                width = 0.75.dp,
+                                width = 0.5.dp,
                                 color = MaterialTheme.colorScheme.outline,
                                 shape = CircleShape,
                             )

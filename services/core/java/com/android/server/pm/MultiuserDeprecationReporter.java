@@ -16,35 +16,47 @@
 package com.android.server.pm;
 
 import android.annotation.Nullable;
+import android.content.ComponentName;
 import android.content.pm.PackageManagerInternal;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Process;
+import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.util.ArraySet;
 import android.util.SparseIntArray;
 
 import com.android.server.LocalServices;
 
 import java.io.PrintWriter;
 
-// TODO(b/414326600): rename (and add unit tests) once it's used to log blocked HSU actions
+// TODO(b/414326600): rename (and add unit tests) once the final design is ready (notice that it's
+// also used to log UI actions on HSU
 /**
  * Class used to report deprecated calls.
  */
 final class MultiuserDeprecationReporter {
 
+    private static final String PROP_ENABLE_IT = "fw.user.log_deprecation";
+    private static final int PROP_ENABLED = 1;
+    private static final int PROP_DEFAULT = -1;
+
     private final Handler mHandler;
 
-    // TODO(b/414326600): merge arrays below and/or use the proper proto / structure
+    // TODO(b/414326600): merge collections below and/or use the proper proto / structure
 
     // Key is "absolute" uid  / app id (i.e., stripping out the user id part), value is count.
-    @Nullable // Only set on debuggable builds
+    @Nullable
     private final SparseIntArray mGetMainUserCalls;
 
     // Key is "absolute" uid  / app id (i.e., stripping out the user id part), value is count.
-    @Nullable // Only set on debuggable builds
+    @Nullable
     private final SparseIntArray mIsMainUserCalls;
+
+    // Activities launched while the current user is the headless system user.
+    @Nullable // Only set on debuggable builds
+    private final ArraySet<ComponentName> mLaunchedHsuActivities;
 
     // Set on demand, Should not be used directly (but through getPackageManagerInternal() instead).
     @Nullable
@@ -52,12 +64,15 @@ final class MultiuserDeprecationReporter {
 
     MultiuserDeprecationReporter(Handler handler) {
         mHandler = handler;
-        if (Build.isDebuggable()) {
+        if (Build.isDebuggable()
+                || SystemProperties.getInt(PROP_ENABLE_IT, PROP_DEFAULT) == PROP_ENABLED) {
             mGetMainUserCalls = new SparseIntArray();
             mIsMainUserCalls = new SparseIntArray();
+            mLaunchedHsuActivities = new ArraySet<>();
         } else {
             mGetMainUserCalls = null;
             mIsMainUserCalls = null;
+            mLaunchedHsuActivities = null;
         }
     }
 
@@ -86,6 +101,14 @@ final class MultiuserDeprecationReporter {
         });
     }
 
+    // TODO(b/414326600): add unit tests (once the proper formats are determined).
+    void logLaunchedHsuActivity(ComponentName activity) {
+        if (mLaunchedHsuActivities == null) {
+            return;
+        }
+        mHandler.post(() -> mLaunchedHsuActivities.add(activity));
+    }
+
     // NOTE: output format might changed, so it should not be used for automated testing purposes
     // (a proto version will be provided when it's ready)
     void dump(PrintWriter pw) {
@@ -93,6 +116,8 @@ final class MultiuserDeprecationReporter {
         dump(pw, "getMainUser", mGetMainUserCalls);
         pw.println();
         dump(pw, "isMainUser", mIsMainUserCalls);
+        pw.println();
+        dumpLaunchedHsuActivities(pw);
     }
 
     private void dump(PrintWriter pw, String method, @Nullable SparseIntArray calls) {
@@ -102,7 +127,7 @@ final class MultiuserDeprecationReporter {
         }
 
         // TODO(b/414326600): should dump in the mHandler thread (as its state is written in that
-        // thread) , but it would require blocking the caller until it's done
+        // thread), but it would require blocking the caller until it's done
 
 
         // TODO(b/414326600): should also dump on proto, but we need to wait until the format is
@@ -125,6 +150,26 @@ final class MultiuserDeprecationReporter {
         }
     }
 
+    private void dumpLaunchedHsuActivities(PrintWriter pw) {
+        if (mLaunchedHsuActivities == null) {
+            pw.println("Not logging launched HSU activities");
+            return;
+        }
+        // TODO(b/414326600): should dump in the mHandler thread (as its state is written in that
+        // thread), but it would require blocking the caller until it's done
+        int size = mLaunchedHsuActivities.size();
+        if (size == 0) {
+            pw.println("Good News, Everyone!: no activity launched on HSU!");
+            return;
+        }
+        // TODO(b/414326600): for now they're always launched, but once the allowlist mechanism is
+        // implemented, it should print the real action
+        pw.printf("%d activities launched on HSU:\n", size);
+        for (int i = 0; i < size; i++) {
+            pw.printf("  %s\n", mLaunchedHsuActivities.valueAt(i).flattenToShortString());
+        }
+    }
+
     // TODO(b/414326600): add unit tests
     void reset(PrintWriter pw) {
         // TODO(b/414326600): should reset in the mHandler thread (as its state is written in that
@@ -136,7 +181,9 @@ final class MultiuserDeprecationReporter {
         if (mIsMainUserCalls != null) {
             mIsMainUserCalls.clear();
         }
-
+        if (mLaunchedHsuActivities != null) {
+            mLaunchedHsuActivities.clear();
+        }
         pw.println("Reset");
     }
 

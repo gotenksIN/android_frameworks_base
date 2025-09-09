@@ -481,7 +481,7 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             // The trigger Task is no longer in Bubble (Case 1/2/4)
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " No bubbling task found");
 
-            if (bubbleTransitions.containsNonBubbledExpandedTaskInStack(info)) {
+            if (bubbleTransitions.containsExpandedBubbledTaskNoLongerBubbled(info)) {
                 // The expanded Bubbled Task is no longer Bubbled (Case 2)
                 ProtoLog.w(ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
                         " An activity launch converted the expanded Bubbled Task to non-Bubbled");
@@ -500,13 +500,14 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
                     transition, info, startTransaction, finishTransaction, finishCallback);
         };
 
-        if (closingBubble != null && isOpeningType(enterBubbleTask.getMode())) {
+        if (com.android.window.flags.Flags.fixBubbleTrampolineAnimation()
+                && closingBubble != null && isOpeningType(enterBubbleTask.getMode())) {
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animating a mixed transition for "
                     + "opening bubble from another closing bubbled task");
             // Task Trampoline (Case 5)
-            // TODO(b/417848405): Update the trampoline transition to jumpcut.
-            bubbleTransitions.startBubbleToBubbleLaunchOrExistingBubbleConvert(
-                    transition, enterBubbleTask.getTaskInfo(), onInflatedCallback);
+            bubbleTransitions.startTaskTrampolineBubbleLaunch(
+                    transition, enterBubbleTask.getTaskInfo(),
+                    closingBubble.getTaskInfo(), onInflatedCallback);
         } else {
             // Opening a Bubble Task (Case 3/6)
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animating a mixed transition for "

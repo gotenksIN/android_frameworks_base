@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import com.android.compose.PlatformIconButton
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.res.R
-import com.android.systemui.screencapture.common.ScreenCaptureScope
+import com.android.systemui.screencapture.common.ScreenCaptureUiScope
 import com.android.systemui.screencapture.common.ui.compose.PrimaryButton
 import com.android.systemui.screencapture.common.ui.compose.ScreenCaptureContent
 import com.android.systemui.screencapture.common.ui.compose.loadIcon
@@ -60,7 +60,7 @@ import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.Record
 import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.SmallScreenCaptureRecordViewModel
 import javax.inject.Inject
 
-@ScreenCaptureScope
+@ScreenCaptureUiScope
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 class SmallScreenCaptureRecordContent
 @Inject
@@ -143,7 +143,8 @@ constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Fact
                         }
                         RecordDetailsPopupType.Settings ->
                             RecordDetailsSettings(
-                                viewModel = viewModel.recordDetailsParametersViewModel,
+                                parametersViewModel = viewModel.recordDetailsParametersViewModel,
+                                targetViewModel = viewModel.recordDetailsTargetViewModel,
                                 drawableLoaderViewModel = viewModel,
                                 modifier = contentModifier,
                             )

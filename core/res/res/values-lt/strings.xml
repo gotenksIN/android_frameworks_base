@@ -338,8 +338,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Perjungti į darbo profilį"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Perjungti į asmeninę programą „<xliff:g id="APP_NAME">%1$s</xliff:g>“"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Perjungti į darbo programą „<xliff:g id="APP_NAME">%1$s</xliff:g>“"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Kontaktai"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"pasiekti kontaktus"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Kontaktai ir paskyros"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"pasiekti jūsų kontaktus ir peržiūrėti paskyrų, kuriose galima išsaugoti kontaktus šiame įrenginyje, sąrašą"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Vietovė"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"pasiekti įrenginio vietovės informaciją"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Kalendorius"</string>
@@ -641,6 +641,10 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Leisti programai nustatyti apytikslę netoliese esančių itin plataus dažnio juostos įrenginių poziciją"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"sąveikauti su „Wi‑Fi“ įrenginiais netoliese"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Leidžiama programai reklamuoti, prisijungti ir nustatyti apytikslę netoliese esančių „Wi-Fi“ įrenginių poziciją"</string>
+    <!-- no translation found for permlab_access_local_network (3420360767259066877) -->
+    <skip />
+    <!-- no translation found for permdesc_access_local_network (6364679803386822638) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"nustatyti apytikslę netoliese esančių įrenginių poziciją"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Leisti programai nustatyti apytikslę netoliese esančių įrenginių poziciją"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Pageidaujama ARL mokėjimo paslaugos informacija"</string>

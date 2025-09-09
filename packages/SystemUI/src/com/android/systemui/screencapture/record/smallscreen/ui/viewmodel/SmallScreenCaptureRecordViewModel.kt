@@ -21,7 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.android.app.tracing.coroutines.launchTraced
 import com.android.systemui.lifecycle.HydratedActivatable
-import com.android.systemui.screencapture.common.ScreenCaptureScope
+import com.android.systemui.screencapture.common.ScreenCaptureUiScope
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
 import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModel
 import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModelImpl
@@ -38,7 +38,8 @@ class SmallScreenCaptureRecordViewModel
 constructor(
     private val screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
     recordDetailsAppSelectorViewModelFactory: RecordDetailsAppSelectorViewModel.Factory,
-    screenCaptureRecordParametersViewModel: ScreenCaptureRecordParametersViewModel.Factory,
+    screenCaptureRecordParametersViewModelFactory: ScreenCaptureRecordParametersViewModel.Factory,
+    recordDetailsTargetViewModelFactory: RecordDetailsTargetViewModel.Factory,
     private val drawableLoaderViewModelImpl: DrawableLoaderViewModelImpl,
     private val screenCaptureUiInteractor: ScreenCaptureUiInteractor,
 ) : HydratedActivatable(), DrawableLoaderViewModel by drawableLoaderViewModelImpl {
@@ -46,7 +47,9 @@ constructor(
     val recordDetailsAppSelectorViewModel: RecordDetailsAppSelectorViewModel =
         recordDetailsAppSelectorViewModelFactory.create()
     val recordDetailsParametersViewModel: ScreenCaptureRecordParametersViewModel =
-        screenCaptureRecordParametersViewModel.create()
+        screenCaptureRecordParametersViewModelFactory.create()
+    val recordDetailsTargetViewModel: RecordDetailsTargetViewModel =
+        recordDetailsTargetViewModelFactory.create()
 
     var detailsPopup: RecordDetailsPopupType by mutableStateOf(RecordDetailsPopupType.Settings)
         private set
@@ -60,6 +63,9 @@ constructor(
                 "ScreenCaptureRecordSmallScreenViewModel#recordDetailsParametersViewModel"
             ) {
                 recordDetailsParametersViewModel.activate()
+            }
+            launchTraced("ScreenCaptureRecordSmallScreenViewModel#recordDetailsTargetViewModel") {
+                recordDetailsTargetViewModel.activate()
             }
         }
     }
@@ -96,7 +102,7 @@ constructor(
     }
 
     @AssistedFactory
-    @ScreenCaptureScope
+    @ScreenCaptureUiScope
     interface Factory {
         fun create(): SmallScreenCaptureRecordViewModel
     }

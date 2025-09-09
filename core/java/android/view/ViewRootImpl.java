@@ -779,6 +779,16 @@ public final class ViewRootImpl implements ViewParent,
     int mSyncSeqId = 0;
     int mLastSyncSeqId = 0;
 
+    /**
+     * Specific optimization where a sync relayout (WM) has determined that the results of a
+     * relayout are likely-valid despite this client providing parameters based on an out-dated
+     * configuration. In this case, relayout will provide a (later) seqId (this one) which it
+     * believes doesn't require another sync relayout and then will NOT cancel. This allows the
+     * VRI to assume the frames are already correct, layout/draw immediately, and then skip the
+     * next sync relayout.
+     */
+    int mNonSyncEarlySeqId = 0;
+
     /** @hide */
     public static final class NoPreloadHolder {
         public static final boolean sAlwaysSeqId;
@@ -874,8 +884,6 @@ public final class ViewRootImpl implements ViewParent,
     final Rect mWinFrame; // frame given by window manager.
     private final Rect mLastLayoutFrame;
     Rect mOverrideInsetsFrame;
-
-    final Rect mPendingBackDropFrame = new Rect();
 
     private int mRelayoutSeq;
     private final Rect mWinFrameInScreen = new Rect();
@@ -1219,6 +1227,9 @@ public final class ViewRootImpl implements ViewParent,
             new BLASTBufferQueue.CornerRadiiCallback() {
                 @Override
                 public void onCornerRadiiChanged(float[] cornerRadii) {
+                    if (!setClientDrawnCornerRadii()) {
+                        return;
+                    }
                     if (cornerRadii != null && cornerRadii.length == 4) {
                         CornerRadii newCornerRadii = new CornerRadii();
                         newCornerRadii.topLeft = cornerRadii[0];
@@ -2322,7 +2333,7 @@ public final class ViewRootImpl implements ViewParent,
 
         onClientWindowFramesChanged(frames);
 
-        CompatibilityInfo.applyOverrideIfNeeded(mergedConfiguration);
+        CompatibilityInfo.applyOverrideIfNeeded(mergedConfiguration, displayId);
         final Rect frame = frames.frame;
         final Rect displayFrame = frames.displayFrame;
         final Rect attachedFrame = frames.attachedFrame;
@@ -2381,14 +2392,6 @@ public final class ViewRootImpl implements ViewParent,
         mTmpFrames.displayFrame.set(displayFrame);
         if (mTmpFrames.attachedFrame != null && attachedFrame != null) {
             mTmpFrames.attachedFrame.set(attachedFrame);
-        }
-
-        if (mDragResizing && mUseMTRenderer) {
-            boolean fullscreen = frame.equals(mPendingBackDropFrame);
-            for (int i = mWindowCallbacks.size() - 1; i >= 0; i--) {
-                mWindowCallbacks.get(i).onWindowSizeIsChanging(mPendingBackDropFrame, fullscreen,
-                        mAttachInfo.mVisibleInsets, mAttachInfo.mStableInsets);
-            }
         }
 
         mForceNextWindowRelayout |= forceLayout;
@@ -4089,12 +4092,7 @@ public final class ViewRootImpl implements ViewParent,
 
                 if (mDragResizing != dragResizing) {
                     if (dragResizing) {
-                        final boolean backdropSizeMatchesFrame =
-                                mWinFrame.width() == mPendingBackDropFrame.width()
-                                        && mWinFrame.height() == mPendingBackDropFrame.height();
-                        // TODO: Need cutout?
-                        startDragResizing(mPendingBackDropFrame, !backdropSizeMatchesFrame,
-                                mAttachInfo.mContentInsets, mAttachInfo.mStableInsets);
+                        startDragResizing();
                     } else {
                         // We shouldn't come here, but if we come we should end the resize.
                         endDragResizing();
@@ -9627,7 +9625,9 @@ public final class ViewRootImpl implements ViewParent,
         if ((mViewFrameInfo.flags & FrameInfo.FLAG_WINDOW_VISIBILITY_CHANGED) == 0
                 && mWindowAttributes.type != TYPE_APPLICATION_STARTING
                 && mSyncSeqId <= mLastSyncSeqId
-                && (mSeqId <= mLastSeqId || !NoPreloadHolder.sAlwaysSeqId)
+                && (!NoPreloadHolder.sAlwaysSeqId
+                    || mSeqId <= mLastSeqId
+                    || mSeqId <= mNonSyncEarlySeqId)
                 && winConfigFromAm.diff(winConfigFromWm, false /* compareUndefined */) == 0) {
             final InsetsState state = mInsetsController.getState();
             final Rect displayCutoutSafe = mTempRect;
@@ -9718,9 +9718,13 @@ public final class ViewRootImpl implements ViewParent,
                     mPendingActivityWindowInfo.set(outInfo);
                 }
             }
-            final int maybeSyncSeqId = mRelayoutResult.syncSeqId;
-            if (maybeSyncSeqId > (NoPreloadHolder.sAlwaysSeqId ? mSyncSeqId : 0)) {
-                mSyncSeqId = maybeSyncSeqId;
+            if (NoPreloadHolder.sAlwaysSeqId) {
+                // mRelayoutResult.syncSeqId is a legacy name. In practice, with sAlwaysSeqId, it
+                // has been repurposed to be "the highest (non-sync) seqId that this relayout
+                // result is valid for". See docstring on mNonSyncEarlySeqId for more info.
+                mNonSyncEarlySeqId = Math.max(mRelayoutResult.syncSeqId, mNonSyncEarlySeqId);
+            } else if (mRelayoutResult.syncSeqId > 0) {
+                mSyncSeqId = mRelayoutResult.syncSeqId;
             }
 
             mWinFrameInScreen.set(mTmpFrames.frame);
@@ -9730,7 +9734,7 @@ public final class ViewRootImpl implements ViewParent,
                 mTranslator.translateRectInScreenToAppWindow(mTmpFrames.attachedFrame);
             }
             mInvCompatScale = 1f / mTmpFrames.compatScale;
-            CompatibilityInfo.applyOverrideIfNeeded(mPendingMergedConfiguration);
+            CompatibilityInfo.applyOverrideIfNeeded(mPendingMergedConfiguration, getDisplayId());
             handleInsetsControlChanged(mTempInsets, mTempControls);
         }
 
@@ -9846,15 +9850,6 @@ public final class ViewRootImpl implements ViewParent,
         if (withinRelayout) {
             mLastLayoutFrame.set(frame);
         }
-
-        final WindowConfiguration winConfig = getCompatWindowConfiguration();
-        mPendingBackDropFrame.set(mPendingDragResizing && !winConfig.useWindowFrameForBackdrop()
-                ? winConfig.getMaxBounds()
-                : frame);
-        // Surface position is now inherited from parent, and BackdropFrameRenderer uses backdrop
-        // frame to position content. Thus, we just keep the size of backdrop frame, and remove the
-        // offset to avoid double offset from display origin.
-        mPendingBackDropFrame.offsetTo(0, 0);
 
         mInsetsController.onFrameChanged(mOverrideInsetsFrame != null ?
                 mOverrideInsetsFrame : frame);
@@ -12145,14 +12140,12 @@ public final class ViewRootImpl implements ViewParent,
     /**
      * Start a drag resizing which will inform all listeners that a window resize is taking place.
      */
-    private void startDragResizing(Rect initialBounds, boolean fullscreen, Rect systemInsets,
-            Rect stableInsets) {
+    private void startDragResizing() {
         if (!mDragResizing) {
             mDragResizing = true;
             if (mUseMTRenderer) {
                 for (int i = mWindowCallbacks.size() - 1; i >= 0; i--) {
-                    mWindowCallbacks.get(i).onWindowDragResizeStart(
-                            initialBounds, fullscreen, systemInsets, stableInsets);
+                    mWindowCallbacks.get(i).onWindowDragResizeStart();
                 }
             }
             mFullRedrawNeeded = true;

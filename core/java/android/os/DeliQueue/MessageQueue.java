@@ -134,6 +134,9 @@ public final class MessageQueue {
     private static final VarHandle sMptrRefCount;
     private volatile long mMptrRefCountValue = 0;
 
+    private static final VarHandle sSyncBarrier;
+    private volatile Message mSyncBarrier = null;
+
     static {
         try {
             // We need to use VarHandle rather than java.util.concurrent.atomic.*
@@ -147,6 +150,8 @@ public final class MessageQueue {
                     long.class);
             sMptrRefCount = l.findVarHandle(MessageQueue.class, "mMptrRefCountValue",
                     long.class);
+            sSyncBarrier = l.findVarHandle(MessageQueue.class, "mSyncBarrier",
+                    Message.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -303,29 +308,37 @@ public final class MessageQueue {
                     + " now: " + SystemClock.uptimeMillis());
         }
 
-        /* If we are running on the looper thread we can add directly to the priority queue */
-        if (Thread.currentThread() == mLooperThread) {
-            //TODO
-        }
-
         while (true) {
             long waitState = mWaitState;
             long newWaitState;
             boolean needWake = false;
+            Message barrier = msg.isAsynchronous() ? null :
+                    (Message) sSyncBarrier.getVolatile(this);
+            boolean reCheckBarrier = false;
 
             if (WaitState.isCounter(waitState)) {
                 newWaitState = WaitState.incrementCounter(waitState);
             } else {
                 final long TSmillis = WaitState.getTSMillis(waitState);
-                if (msg.when < TSmillis
-                        && (!WaitState.hasSyncBarrier(waitState) || msg.isAsynchronous())) {
+                boolean weComeBeforeBarrier = barrier != null && msg.when <= barrier.when;
+                if (weComeBeforeBarrier || (msg.when < TSmillis
+                        && (!WaitState.hasSyncBarrier(waitState) || msg.isAsynchronous()))) {
                     newWaitState = WaitState.initCounter();
                     needWake = true;
                 } else {
                     newWaitState = WaitState.incrementDeadline(waitState);
+                    reCheckBarrier = true;
                 }
             }
             if (sWaitState.compareAndSet(this, waitState, newWaitState)) {
+                if (reCheckBarrier && barrier != (Message) sSyncBarrier.getVolatile(this)) {
+                    /*
+                     * If barrier state changed underneath us and we chose not to wake the
+                     * looper thread, we have to recheck to ensure that the barrier we saw was
+                     * actually in place while we did the CAS.
+                     */
+                    continue;
+                }
                 if (needWake) {
                     concurrentWake();
                 }
@@ -415,8 +428,7 @@ public final class MessageQueue {
             * the message.
             */
             Message next = null;
-
-            boolean waitingOnSyncBarrier = false;
+            Message syncBarrier = null;
             /*
             * If we have a barrier we should return the async node (if it exists and is ready)
             */
@@ -424,7 +436,7 @@ public final class MessageQueue {
                 if (asyncMsg != null && (returnEarliest || now >= asyncMsg.when)) {
                     found = asyncMsg;
                 } else {
-                    waitingOnSyncBarrier = true;
+                    syncBarrier = msg;
                     next = asyncMsg;
                 }
             } else { /* No barrier. */
@@ -512,12 +524,13 @@ public final class MessageQueue {
                 }
             }
 
+            sSyncBarrier.setVolatile(this, syncBarrier);
             /*
              * Try to swap waitstate back from a counter to a deadline. If we can't then that means
              * the counter was incremented and we need to loop back to pick up any new items.
              */
             if (!sWaitState.compareAndSet(this, oldWaitState,
-                    WaitState.composeDeadline(nextDeadline, waitingOnSyncBarrier))) {
+                    WaitState.composeDeadline(nextDeadline, syncBarrier != null))) {
                 continue;
             }
             if (found != null || nextDeadline != 0) {
@@ -647,6 +660,56 @@ public final class MessageQueue {
         return false;
     }
 
+    /**
+     * Returns the message with the latest scheduled execution time.
+     *
+     *
+     * Caller must ensure that this doesn't race 'next' from the Looper thread.
+     * @hide
+     */
+    public @Nullable Message peekLastMessageForTest() {
+        ActivityThread.throwIfNotInstrumenting();
+        return mStack.peekLastMessageForTest();
+    }
+
+    /**
+     * Resets this queue's state.
+     *
+     * @hide
+     */
+    public void resetForTest() {
+        ActivityThread.throwIfNotInstrumenting();
+        // This queue is already quitting, so we can't reset its state and continue using it.
+        if (mWorkerShouldQuit) {
+            return;
+        }
+        synchronized (mIdleHandlersLock) {
+            mIdleHandlers.clear();
+        }
+        synchronized (mFileDescriptorRecordsLock) {
+            removeAllFdRecords();
+        }
+        removeAllMessages();
+        mStack.drainFreelist();
+
+        // We reset the sync barrier tokens to reflect the queue's state reset. This helps ensure
+        // that the queue's behavior is deterministic in both individual tests and in a test suite.
+        resetSyncBarrierTokens();
+    }
+
+    private void removeAllFdRecords() {
+        if (mFileDescriptorRecords != null) {
+            while (mFileDescriptorRecords.size() > 0) {
+                removeOnFileDescriptorEventListener(mFileDescriptorRecords.valueAt(0).mDescriptor);
+            }
+        }
+    }
+
+    private void resetSyncBarrierTokens() {
+        mNextBarrierTokenAtomic.set(1);
+        mNextBarrierToken = 0;
+    }
+
     void quit(boolean safe) {
         if (!mQuitAllowed) {
             throw new IllegalStateException("Main thread not allowed to quit.");
@@ -744,6 +807,7 @@ public final class MessageQueue {
             throw new IllegalStateException("The specified message queue synchronization "
                     + " barrier token has not been posted or has already been removed.");
         }
+        maybeDrainFreelist();
 
         boolean needWake;
         while (true) {
@@ -811,6 +875,12 @@ public final class MessageQueue {
         throw new UnsupportedOperationException("Not implemented");
     }
 
+    void maybeDrainFreelist() {
+        if (Thread.currentThread() == mLooperThread) {
+            mStack.drainFreelist();
+        }
+    }
+
     boolean hasMessages(Handler h, int what, Object object) {
         if (h == null) {
             return false;
@@ -845,6 +915,7 @@ public final class MessageQueue {
             return;
         }
         mStack.moveMatchingToFreelist(sMatchHandlerWhatAndObject, h, what, object, null, 0);
+        maybeDrainFreelist();
     }
 
     void removeEqualMessages(Handler h, int what, Object object) {
@@ -852,6 +923,7 @@ public final class MessageQueue {
             return;
         }
         mStack.moveMatchingToFreelist(sMatchHandlerWhatAndObjectEquals, h, what, object, null, 0);
+        maybeDrainFreelist();
     }
 
     void removeMessages(Handler h, Runnable r, Object object) {
@@ -859,6 +931,7 @@ public final class MessageQueue {
             return;
         }
         mStack.moveMatchingToFreelist(sMatchHandlerRunnableAndObject, h, -1, object, r, 0);
+        maybeDrainFreelist();
     }
 
     void removeEqualMessages(Handler h, Runnable r, Object object) {
@@ -866,6 +939,7 @@ public final class MessageQueue {
             return;
         }
         mStack.moveMatchingToFreelist(sMatchHandlerRunnableAndObjectEquals, h, -1, object, r, 0);
+        maybeDrainFreelist();
     }
 
     void removeCallbacksAndMessages(Handler h, Object object) {
@@ -873,6 +947,7 @@ public final class MessageQueue {
             return;
         }
         mStack.moveMatchingToFreelist(sMatchHandlerAndObject, h, -1, object, null, 0);
+        maybeDrainFreelist();
     }
 
     void removeCallbacksAndEqualMessages(Handler h, Object object) {
@@ -880,14 +955,17 @@ public final class MessageQueue {
             return;
         }
         mStack.moveMatchingToFreelist(sMatchHandlerAndObjectEquals, h, -1, object, null, 0);
+        maybeDrainFreelist();
     }
 
     private void removeAllMessages() {
         mStack.moveMatchingToFreelist(sMatchAllMessages, null, -1, null, null, 0);
+        maybeDrainFreelist();
     }
 
     private void removeAllFutureMessages(long when) {
         mStack.moveMatchingToFreelist(sMatchAllFutureMessages, null, -1, null, null, when);
+        maybeDrainFreelist();
     }
 
     /**

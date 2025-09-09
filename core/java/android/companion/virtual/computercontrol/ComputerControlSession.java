@@ -38,6 +38,7 @@ import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.Surface;
 
+import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 
 import java.lang.annotation.ElementType;
@@ -96,9 +97,11 @@ public final class ComputerControlSession implements AutoCloseable {
 
     @NonNull
     private final IComputerControlSession mSession;
-    // TODO(b/439774796): Make this non-nullable.
+    private final Object mLock = new Object();
+    @GuardedBy("mLock")
     @Nullable
-    private final ImageReader mImageReader;
+    private ImageReader mImageReader;
+
 
     /** @hide */
     public ComputerControlSession(int displayId, @NonNull IVirtualDisplayCallback displayToken,
@@ -130,6 +133,22 @@ public final class ComputerControlSession implements AutoCloseable {
     }
 
     /**
+     * Launches an application's launcher activity in the computer control session.
+     *
+     * <p>The application with the given package name must have a launcher activity and the
+     * package name must have been declared during the session creation.</p>
+     *
+     * @see ComputerControlSessionParams#getTargetPackageNames()
+     */
+    public void launchApplication(@NonNull String packageName) {
+        try {
+            mSession.launchApplication(packageName);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Screenshot the current display content.
      *
      * <p>The behavior is similar to {@link ImageReader#acquireLatestImage}, meaning that any
@@ -140,7 +159,49 @@ public final class ComputerControlSession implements AutoCloseable {
      */
     @Nullable
     public Image getScreenshot() {
-        return mImageReader == null ? null : mImageReader.acquireLatestImage();
+        synchronized (mLock) {
+            return mImageReader == null ? null : mImageReader.acquireLatestImage();
+        }
+    }
+
+    /**
+     * Sends a tap event to the computer control session at the given location.
+     *
+     * <p>The coordinates are in relative display space, e.g. (0.5, 0.5) is the center of the
+     * display.</p>
+     */
+    public void tap(@IntRange(from = 0) int x, @IntRange(from = 0) int y) {
+        if (x < 0 || y < 0) {
+            throw new IllegalArgumentException("Tap coordinates must be non-negative");
+        }
+        try {
+            mSession.tap(x, y);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Sends a swipe event to the computer control session for the given coordinates.
+     *
+     * <p>To avoid misinterpreting the swipe as a fling, the individual touches are throttled, so
+     * the entire action will take ~500ms. However, this is done in the background and this method
+     * returns immediately. Any ongoing swipe will be canceled if a new swipe is requested.</p>
+     *
+     * <p>The coordinates are in relative display space, e.g. (0.5, 0.5) is the center of the
+     * display.</p>
+     */
+    public void swipe(
+            @IntRange(from = 0) int fromX, @IntRange(from = 0) int fromY,
+            @IntRange(from = 0) int toX, @IntRange(from = 0) int toY) {
+        if (fromX < 0 || fromY < 0 || toX < 0 || toY < 0) {
+            throw new IllegalArgumentException("Swipe coordinates must be non-negative");
+        }
+        try {
+            mSession.swipe(fromX, fromY, toX, toY);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
     }
 
     /** Returns the ID of the single trusted virtual display for this session. */
@@ -200,6 +261,15 @@ public final class ComputerControlSession implements AutoCloseable {
         }
     }
 
+    private void closeImageReader() {
+        synchronized (mLock) {
+            if (mImageReader != null) {
+                mImageReader.close();
+                mImageReader = null;
+            }
+        }
+    }
+
     /** Callback for computer control session events. */
     public interface Callback {
 
@@ -238,6 +308,7 @@ public final class ComputerControlSession implements AutoCloseable {
 
         private final Callback mCallback;
         private final Executor mExecutor;
+        private ComputerControlSession mSession;
 
         public CallbackProxy(@NonNull Executor executor, @NonNull Callback callback) {
             mExecutor = executor;
@@ -254,9 +325,9 @@ public final class ComputerControlSession implements AutoCloseable {
         @Override
         public void onSessionCreated(int displayId, IVirtualDisplayCallback displayToken,
                 IComputerControlSession session) {
+            mSession = new ComputerControlSession(displayId, displayToken, session);
             Binder.withCleanCallingIdentity(() ->
-                    mExecutor.execute(() -> mCallback.onSessionCreated(
-                            new ComputerControlSession(displayId, displayToken, session))));
+                    mExecutor.execute(() -> mCallback.onSessionCreated(mSession)));
         }
 
         @Override
@@ -267,6 +338,7 @@ public final class ComputerControlSession implements AutoCloseable {
 
         @Override
         public void onSessionClosed() {
+            mSession.closeImageReader();
             Binder.withCleanCallingIdentity(() ->
                     mExecutor.execute(() -> mCallback.onSessionClosed()));
         }

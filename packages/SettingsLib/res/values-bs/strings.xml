@@ -177,7 +177,7 @@
     <string name="bluetooth_pairing_decline" msgid="6483118841204885890">"Otkaži"</string>
     <string name="bluetooth_pairing_will_share_phonebook" msgid="3064334458659165176">"Uparivanje odobrava pristup kontaktima i historiji poziva kada je uspostavljeno."</string>
     <string name="bluetooth_pairing_error_message" msgid="6626399020672335565">"Nije moguće upariti s uređajem <xliff:g id="DEVICE_NAME">%1$s</xliff:g>."</string>
-    <string name="bluetooth_pairing_pin_error_message" msgid="264422127613704940">"Nije moguće upariti s uređajem <xliff:g id="DEVICE_NAME">%1$s</xliff:g> zbog pogrešnog PIN-a ili pristupnog koda."</string>
+    <string name="bluetooth_pairing_pin_error_message" msgid="264422127613704940">"Nije moguće upariti s uređajem <xliff:g id="DEVICE_NAME">%1$s</xliff:g> zbog pogrešnog PIN-a ili pristupnog ključa."</string>
     <string name="bluetooth_pairing_device_down_error_message" msgid="2554424863101358857">"Nije moguće komunicirati s uređajem <xliff:g id="DEVICE_NAME">%1$s</xliff:g>."</string>
     <string name="bluetooth_pairing_rejected_error_message" msgid="5943444352777314442">"Uređaj <xliff:g id="DEVICE_NAME">%1$s</xliff:g> je odbio uparivanje."</string>
     <string name="bluetooth_talkback_computer" msgid="3736623135703893773">"Računar"</string>
@@ -408,7 +408,7 @@
     <string name="show_hw_screen_updates_summary" msgid="3539770072741435691">"Osvjetljava prikaze u prozorima prilikom iscrtavanja"</string>
     <string name="show_hw_layers_updates" msgid="5268370750002509767">"Prikaži ažuriranja hardverskih slojeva"</string>
     <string name="show_hw_layers_updates_summary" msgid="5850955890493054618">"Hardverski slojevi trepere zeleno pri ažuriranju"</string>
-    <string name="debug_hw_overdraw" msgid="8944851091008756796">"Otkl. greške GPU preklapanja"</string>
+    <string name="debug_hw_overdraw" msgid="8944851091008756796">"Otkloni greške GPU preklapanja"</string>
     <string name="disable_overlays" msgid="4206590799671557143">"Onemog. hardverska prekl."</string>
     <string name="disable_overlays_summary" msgid="1954852414363338166">"Uvijek se koristi GPU za slaganje ekrana"</string>
     <string name="simulate_color_space" msgid="1206503300335835151">"Simuliraj prostor boje"</string>

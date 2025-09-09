@@ -21,6 +21,7 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import android.app.PictureInPictureParams;
 import android.app.TaskInfo;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.SystemProperties;
@@ -132,6 +133,7 @@ public class PipScheduler implements PipTransitionState.PipTransitionStateChange
         // final expanded bounds to be inherited from the parent
         wct.setBounds(pipTaskToken, null);
         wct.setWindowingMode(pipTaskToken, mPipDesktopState.getOutPipWindowingMode());
+        wct.setDensityDpi(pipTaskToken, Configuration.DENSITY_DPI_UNDEFINED);
 
         final TaskInfo pipTaskInfo = mPipTransitionState.getPipTaskInfo();
         mDesktopPipTransitionController.ifPresent(c -> {
@@ -143,6 +145,26 @@ public class PipScheduler implements PipTransitionState.PipTransitionStateChange
             c.maybeReparentTaskToDesk(wct, pipTaskInfo.taskId);
         });
 
+        return wct;
+    }
+
+    /**
+     * Returns a wct for exiting PiP and expanding on a different display.
+     */
+    @Nullable
+    public WindowContainerTransaction getExitPipViaExpandIntoDisplayTransaction(int displayId) {
+        WindowContainerToken pipToken = mPipTransitionState.getPipTaskToken();
+        WindowContainerTransaction wct = getExitPipViaExpandTransaction();
+        DisplayAreaInfo displayAreaInfo =
+                mPipDesktopState.getRootTaskDisplayAreaOrganizer().getDisplayAreaInfo(
+                        displayId);
+
+        if (pipToken == null || wct == null || displayAreaInfo == null) {
+            return null;
+        }
+
+        wct.reparent(pipToken, displayAreaInfo.token, true);
+        wct.setDensityDpi(pipToken, Configuration.DENSITY_DPI_UNDEFINED);
         return wct;
     }
 

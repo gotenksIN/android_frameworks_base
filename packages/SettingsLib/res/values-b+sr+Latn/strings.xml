@@ -282,7 +282,7 @@
     <string name="adb_wireless_connection_failed_title" msgid="664211177427438438">"Povezivanje nije uspelo"</string>
     <string name="adb_wireless_connection_failed_message" msgid="9213896700171602073">"Uverite se da je <xliff:g id="DEVICE_NAME">%1$s</xliff:g> povezan sa odgovarajućom mrežom"</string>
     <string name="adb_pairing_device_dialog_title" msgid="7141739231018530210">"Uparite sa uređajem"</string>
-    <string name="adb_pairing_device_dialog_pairing_code_label" msgid="3639239786669722731">"Kôd za uparivanje preko Wi‑Fi-ja"</string>
+    <string name="adb_pairing_device_dialog_pairing_code_label" msgid="3639239786669722731">"Kôd za uparivanje preko WiFi-ja"</string>
     <string name="adb_pairing_device_dialog_failed_title" msgid="3426758947882091735">"Uparivanje nije uspelo"</string>
     <string name="adb_pairing_device_dialog_failed_msg" msgid="6611097519661997148">"Uverite se da je uređaj povezan na istu mrežu."</string>
     <string name="adb_wireless_qrcode_summary" msgid="8051414549011801917">"Uparite uređaj pomoću Wi‑Fi mreže ili tako što ćete skenirati QR kôd"</string>
@@ -340,7 +340,7 @@
     <string name="private_dns_mode_provider_hostname_hint" msgid="6564868953748514595">"Unesite ime hosta dobavljača usluge DNS-a"</string>
     <string name="private_dns_mode_provider_failure" msgid="8356259467861515108">"Povezivanje nije uspelo"</string>
     <string name="wifi_display_certification_summary" msgid="8111151348106907513">"Prikazuje opcije za sertifikaciju bežičnog ekrana"</string>
-    <string name="wifi_verbose_logging_summary" msgid="4993823188807767892">"Povećava nivo evidentiranja za Wi‑Fi. Prikaz po SSID RSSI-u u biraču WiFi mreže"</string>
+    <string name="wifi_verbose_logging_summary" msgid="4993823188807767892">"Povećava nivo evidentiranja za WiFi. Prikaz po SSID RSSI-u u biraču WiFi mreže"</string>
     <string name="wifi_scan_throttling_summary" msgid="2577105472017362814">"Smanjuje potrošnju baterije i poboljšava učinak mreže"</string>
     <string name="wifi_non_persistent_mac_randomization_summary" msgid="2159794543105053930">"Kada je ovaj režim omogućen, MAC adresa ovog uređaja može da se promeni svaki put kada se poveže sa mrežom na kojoj je omogućeno nasumično razvrstavanje MAC adresa."</string>
     <string name="wifi_metered_label" msgid="8737187690304098638">"Sa ograničenjem"</string>
@@ -411,7 +411,7 @@
     <string name="debug_hw_overdraw" msgid="8944851091008756796">"Otkloni greške GPU preklapanja"</string>
     <string name="disable_overlays" msgid="4206590799671557143">"Onemogući HW postavljene elemente"</string>
     <string name="disable_overlays_summary" msgid="1954852414363338166">"Uvek se koristi GPU za komponovanje ekrana"</string>
-    <string name="simulate_color_space" msgid="1206503300335835151">"Simuliraj prostor boje"</string>
+    <string name="simulate_color_space" msgid="1206503300335835151">"Simulacija prostora boje"</string>
     <string name="enable_opengl_traces_title" msgid="4638773318659125196">"Omogući OpenGL tragove"</string>
     <string name="usb_audio_disable_routing" msgid="3367656923544254975">"Onemogući USB preusm. zvuka"</string>
     <string name="usb_audio_disable_routing_summary" msgid="8768242894849534699">"Onemogućava automatsko preusmeravanje na USB audio periferne uređaje"</string>
@@ -425,7 +425,7 @@
     <string name="force_msaa" msgid="4081288296137775550">"Nametni 4x MSAA"</string>
     <string name="force_msaa_summary" msgid="9070437493586769500">"Omogućava 4x MSAA u OpenGL ES 2.0 aplikacijama"</string>
     <string name="show_non_rect_clip" msgid="7499758654867881817">"Otkloni greške isecanja oblasti nepravougaonog oblika"</string>
-    <string name="track_frame_time" msgid="522674651937771106">"Renderuj pomoću HWUI-a"</string>
+    <string name="track_frame_time" msgid="522674651937771106">"Renderovanje pomoću HWUI-a"</string>
     <string name="enable_gpu_debug_layers" msgid="4986675516188740397">"Omogući slojeve za otklanjanje grešaka GPU-a"</string>
     <string name="enable_gpu_debug_layers_summary" msgid="4921521407377170481">"Omogućite učitavanje slojeva za otklanjanje grešaka GPU-a u aplikacijama za otklanjanje grešaka"</string>
     <string name="enable_verbose_vendor_logging" msgid="1196698788267682072">"Opširne evidencije prodavca"</string>

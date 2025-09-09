@@ -31,6 +31,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -67,6 +68,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toAndroidRectF
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -120,11 +122,11 @@ import com.android.systemui.statusbar.notification.stack.ui.view.NotificationScr
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationTransitionThresholds.EXPANSION_FOR_MAX_CORNER_RADIUS
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationTransitionThresholds.EXPANSION_FOR_MAX_SCRIM_ALPHA
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationsPlaceholderViewModel
+import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlin.math.max
-import kotlin.math.roundToInt
 
 object Notifications {
     object Elements {
@@ -180,14 +182,18 @@ fun ContentScope.HeadsUpNotificationSpace(
 /**
  * A version of [HeadsUpNotificationSpace] that can be swiped up off the top edge of the screen by
  * the user. When swiped up, the heads up notification is snoozed.
+ *
+ * @param useDrawBounds Whether to communicate drawBounds updated to the [stackScrollView]. This
+ *   should be `true` when content rendering the regular stack is not setting draw bounds anymore,
+ *   but HUNs can still appear.
  */
 @Composable
 fun ContentScope.SnoozeableHeadsUpNotificationSpace(
+    useDrawBounds: () -> Boolean,
     stackScrollView: NotificationScrollView,
     viewModel: NotificationsPlaceholderViewModel,
     modifier: Modifier = Modifier,
 ) {
-
     val isSnoozable by viewModel.isHeadsUpOrAnimatingAway.collectAsStateWithLifecycle(false)
 
     var scrollOffset by remember { mutableFloatStateOf(0f) }
@@ -228,11 +234,38 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
         }
     }
 
+    // Wait for being Idle on this content, otherwise LaunchedEffect would fire too soon, and
+    // another transition could override the NSSL stack bounds.
+    val updateDrawBounds = layoutState.transitionState.isIdle() && useDrawBounds()
+
+    LaunchedEffect(updateDrawBounds) {
+        if (updateDrawBounds) {
+            // Reset the stack bounds to avoid caching these values from the previous Scenes, and
+            // not to confuse the StackScrollAlgorithm when it displays a HUN over GONE.
+            stackScrollView.apply {
+                // use -headsUpInset to allow HUN translation outside bounds for snoozing
+                setStackTop(-headsUpInset)
+            }
+        }
+    }
+
     HeadsUpNotificationSpace(
         stackScrollView = stackScrollView,
         viewModel = viewModel,
         modifier =
             modifier
+                .onGloballyPositioned {
+                    if (updateDrawBounds) {
+                        stackScrollView.updateDrawBounds(
+                            it.boundsInWindow().toAndroidRectF().apply {
+                                // extend bounds to the screen top to avoid cutting off HUN
+                                // transitions
+                                top = 0f
+                                bottom += headsUpInset
+                            }
+                        )
+                    }
+                }
                 .absoluteOffset {
                     IntOffset(
                         x = 0,
@@ -570,6 +603,8 @@ fun ContentScope.NotificationScrollingStack(
         }
     }
 
+    val interactionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier =
             modifier
@@ -644,7 +679,11 @@ fun ContentScope.NotificationScrollingStack(
                     )
                 }
                 .thenIf(onEmptySpaceClick != null) {
-                    Modifier.clickable(onClick = { onEmptySpaceClick?.invoke() })
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = null, // Prevent flicker on transition
+                        onClick = { onEmptySpaceClick?.invoke() },
+                    )
                 }
     ) {
         Spacer(
@@ -834,10 +873,10 @@ private fun shouldUseLockscreenStackBounds(state: TransitionState): Boolean {
     return when (state) {
         is TransitionState.Idle -> state.isOnLockscreen()
         is TransitionState.Transition ->
-            // Keep using the lockscreen stack bounds when transitioning from lockscreen
-            // to other states for visual consistency, eg. the smart space should be visible.
-            state.isTransitioning(from = Scenes.Lockscreen)
-                    || state.isTransitioningBetween(content = Scenes.Lockscreen, other = Overlays.Bouncer)
+            // Keep using the lockscreen stack bounds when there is no placeholder on the next
+            // content
+            state.fromContent == Scenes.Lockscreen && state.toContent != Scenes.Shade ||
+                state.isTransitioningBetween(content = Scenes.Lockscreen, other = Overlays.Bouncer)
     }
 }
 

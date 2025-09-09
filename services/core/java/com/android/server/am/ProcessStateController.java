@@ -40,12 +40,14 @@ import android.util.SparseArray;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
+import com.android.server.am.psc.AsyncBatchSession;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.am.psc.ServiceRecordInternal;
+import com.android.server.am.psc.SyncBatchSession;
+import com.android.server.am.psc.annotation.RequiresEnclosingBatchSession;
 import com.android.server.wm.WindowProcessController;
 
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -71,6 +73,8 @@ public class ProcessStateController {
 
     private final GlobalState mGlobalState = new GlobalState();
 
+    private SyncBatchSession mBatchSession;
+
     /**
      * Queue for staging asynchronous events. The queue will be drained before each update.
      */
@@ -78,11 +82,10 @@ public class ProcessStateController {
 
     private ProcessStateController(ActivityManagerService ams, ProcessList processList,
             ActiveUids activeUids, ServiceThread handlerThread,
-            CachedAppOptimizer cachedAppOptimizer, Object lock, Object procLock,
-            Consumer<ProcessRecord> topChangeCallback, ProcessLruUpdater lruUpdater,
-            OomAdjuster.Injector oomAdjInjector) {
+            Object lock, Object procLock, Consumer<ProcessRecord> topChangeCallback,
+            ProcessLruUpdater lruUpdater, OomAdjuster.Injector oomAdjInjector) {
         mOomAdjuster = new OomAdjusterImpl(ams, processList, activeUids, handlerThread,
-                mGlobalState, cachedAppOptimizer, oomAdjInjector);
+                mGlobalState, oomAdjInjector);
 
         mLock = lock;
         mProcLock = procLock;
@@ -96,12 +99,47 @@ public class ProcessStateController {
                 }
             }
         });
+
+    }
+
+    /**
+     * Start a batch session for specifically service state changes. ProcessStateController updates
+     * will not be triggered until until the returned SyncBatchSession is closed.
+     */
+    public SyncBatchSession startServiceBatchSession(@OomAdjReason int reason) {
+        if (!Flags.pscBatchServiceUpdates()) return null;
+
+        final SyncBatchSession batchSession = getBatchSession();
+        batchSession.start(reason);
+        return batchSession;
+    }
+
+    /**
+     * Start a batch session. ProcessStateController updates will not be triggered until the
+     * returned SyncBatchSession is closed.
+     */
+    @GuardedBy("mLock")
+    public SyncBatchSession startBatchSession(@OomAdjReason int reason) {
+        if (!Flags.pscBatchUpdate()) return null;
+
+        final SyncBatchSession batchSession = getBatchSession();
+        batchSession.start(reason);
+        return batchSession;
+    }
+
+    private SyncBatchSession getBatchSession() {
+        if (mBatchSession == null) {
+            mBatchSession = new SyncBatchSession(this::runFullUpdateImpl,
+                    this::runPendingUpdateImpl);
+        }
+        return mBatchSession;
     }
 
     /**
      * Get the instance of OomAdjuster that ProcessStateController is using.
      * Must only be interacted with while holding the ActivityManagerService lock.
      */
+    @GuardedBy("mLock")
     public OomAdjuster getOomAdjuster() {
         return mOomAdjuster;
     }
@@ -128,6 +166,17 @@ public class ProcessStateController {
      */
     @GuardedBy("mLock")
     public boolean runUpdate(@NonNull ProcessRecord proc, @OomAdjReason int oomAdjReason) {
+        if (mBatchSession != null && mBatchSession.isActive()) {
+            // BatchSession is active, just enqueue the proc for now. The update will happen
+            // at the end of the session.
+            enqueueUpdateTarget(proc);
+            return false;
+        }
+        return runUpdateimpl(proc, oomAdjReason);
+    }
+
+    @GuardedBy("mLock")
+    private boolean runUpdateimpl(@NonNull ProcessRecord proc, @OomAdjReason int oomAdjReason) {
         commitStagedEvents();
         return mOomAdjuster.updateOomAdjLocked(proc, oomAdjReason);
     }
@@ -137,6 +186,16 @@ public class ProcessStateController {
      */
     @GuardedBy("mLock")
     public void runPendingUpdate(@OomAdjReason int oomAdjReason) {
+        if (mBatchSession != null && mBatchSession.isActive()) {
+            // BatchSession is active, don't trigger the update, it will happen at the end of the
+            // session.
+            return;
+        }
+        runPendingUpdateImpl(oomAdjReason);
+    }
+
+    @GuardedBy("mLock")
+    private void runPendingUpdateImpl(@OomAdjReason int oomAdjReason) {
         commitStagedEvents();
         mOomAdjuster.updateOomAdjPendingTargetsLocked(oomAdjReason);
     }
@@ -146,6 +205,16 @@ public class ProcessStateController {
      */
     @GuardedBy("mLock")
     public void runFullUpdate(@OomAdjReason int oomAdjReason) {
+        if (mBatchSession != null && mBatchSession.isActive()) {
+            // BatchSession is active, just mark the session to run a full update at the end of
+            // the session.
+            getBatchSession().setFullUpdate();
+            return;
+        }
+        runFullUpdateImpl(oomAdjReason);
+    }
+
+    private void runFullUpdateImpl(@OomAdjReason int oomAdjReason) {
         commitStagedEvents();
         mOomAdjuster.updateOomAdjLocked(oomAdjReason);
     }
@@ -585,6 +654,7 @@ public class ProcessStateController {
      * Note that a process has started hosting a service.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public boolean startService(@NonNull ProcessServiceRecord psr, ServiceRecord sr) {
         return psr.startService(sr);
     }
@@ -593,6 +663,7 @@ public class ProcessStateController {
      * Note that a process has stopped hosting a service.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public boolean stopService(@NonNull ProcessServiceRecord psr, ServiceRecord sr) {
         return psr.stopService(sr);
     }
@@ -601,6 +672,7 @@ public class ProcessStateController {
      * Remove all services that the process is hosting.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void stopAllServices(@NonNull ProcessServiceRecord psr) {
         psr.stopAllServices();
     }
@@ -609,6 +681,7 @@ public class ProcessStateController {
      * Note that a process's service has started executing.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void startExecutingService(@NonNull ProcessServiceRecord psr, ServiceRecord sr) {
         psr.startExecutingService(sr);
     }
@@ -617,6 +690,7 @@ public class ProcessStateController {
      * Note that a process's service has stopped executing.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void stopExecutingService(@NonNull ProcessServiceRecord psr, ServiceRecord sr) {
         psr.stopExecutingService(sr);
     }
@@ -625,6 +699,7 @@ public class ProcessStateController {
      * Note all executing services a process has has stopped.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void stopAllExecutingServices(@NonNull ProcessServiceRecord psr) {
         psr.stopAllExecutingServices();
     }
@@ -633,6 +708,7 @@ public class ProcessStateController {
      * Note that process has bound to a service.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void addConnection(@NonNull ProcessServiceRecord psr, ConnectionRecord cr) {
         psr.addConnection(cr);
     }
@@ -641,6 +717,7 @@ public class ProcessStateController {
      * Note that process has unbound from a service.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void removeConnection(@NonNull ProcessServiceRecord psr, ConnectionRecord cr) {
         psr.removeConnection(cr);
     }
@@ -649,6 +726,7 @@ public class ProcessStateController {
      * Remove all bindings a process has to services.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void removeAllConnections(@NonNull ProcessServiceRecord psr) {
         psr.removeAllConnections();
         psr.removeAllSdkSandboxConnections();
@@ -658,6 +736,7 @@ public class ProcessStateController {
      * Note whether an executing service should be considered in the foreground or not.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void setExecServicesFg(@NonNull ProcessServiceRecord psr, boolean execServicesFg) {
         psr.setExecServicesFg(execServicesFg);
     }
@@ -666,6 +745,7 @@ public class ProcessStateController {
      * Note whether a service is in the foreground or not and what type of FGS, if so.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void setHasForegroundServices(@NonNull ProcessServiceRecord psr,
             boolean hasForegroundServices,
             int fgServiceTypes, boolean hasTypeNoneFgs) {
@@ -676,6 +756,7 @@ public class ProcessStateController {
      * Note whether a service has a client activity or not.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void setHasClientActivities(@NonNull ProcessServiceRecord psr,
             boolean hasClientActivities) {
         psr.setHasClientActivities(hasClientActivities);
@@ -685,6 +766,7 @@ public class ProcessStateController {
      * Note whether a service should be treated like an activity or not.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void setTreatLikeActivity(@NonNull ProcessServiceRecord psr, boolean treatLikeActivity) {
         psr.setTreatLikeActivity(treatLikeActivity);
     }
@@ -701,6 +783,7 @@ public class ProcessStateController {
      * {@link android.content.Context.BIND_ABOVE_CLIENT} or not.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void setHasAboveClient(@NonNull ProcessServiceRecord psr, boolean hasAboveClient) {
         psr.setHasAboveClient(hasAboveClient);
     }
@@ -710,6 +793,7 @@ public class ProcessStateController {
      * {@link android.content.Context.BIND_ABOVE_CLIENT} or not.
      */
     @GuardedBy("mLock")
+    @RequiresEnclosingBatchSession
     public void updateHasAboveClientLocked(@NonNull ProcessServiceRecord psr) {
         psr.updateHasAboveClientLocked();
     }
@@ -871,7 +955,7 @@ public class ProcessStateController {
             if (!Flags.pushActivityStateToOomadjuster()) return null;
 
             final AsyncBatchSession session = getBatchSession();
-            session.start();
+            session.start(OOM_ADJ_REASON_ACTIVITY);
             return session;
         }
 
@@ -1017,141 +1101,6 @@ public class ProcessStateController {
         }
     }
 
-    public static class AsyncBatchSession implements AutoCloseable {
-        final Handler mHandler;
-        final Object mLock;
-        final ConcurrentLinkedQueue<Runnable> mStagingQueue;
-        private final Runnable mUpdateRunnable;
-        private final Runnable mLockedUpdateRunnable;
-        private boolean mRunUpdate = false;
-        private boolean mBoostPriority = false;
-        private int mNestedStartCount = 0;
-
-        private ArrayList<Runnable> mBatchList = new ArrayList<>();
-
-        AsyncBatchSession(Handler handler, Object lock,
-                ConcurrentLinkedQueue<Runnable> stagingQueue, Runnable updateRunnable) {
-            mHandler = handler;
-            mLock = lock;
-            mStagingQueue = stagingQueue;
-            mUpdateRunnable = updateRunnable;
-            mLockedUpdateRunnable = () -> {
-                synchronized (lock) {
-                    updateRunnable.run();
-                }
-            };
-        }
-
-        /**
-         * If the BatchSession is currently active, posting the batched work to the front of the
-         * Handler queue when the session is closed.
-         */
-        public void postToHead() {
-            if (isActive()) {
-                mBoostPriority = true;
-            }
-        }
-
-        /**
-         * Stage the runnable to be run on the next ProcessStateController update. The work may be
-         * opportunistically run if an update triggers before the WindowManager posted update is
-         * handled.
-         */
-        public void stage(Runnable runnable) {
-            mStagingQueue.add(runnable);
-        }
-
-        /**
-         * Enqueue the work to be run asynchronously done on a Handler thread.
-         * If batch session is currently active, queue up the work to be run when the session ends.
-         * Otherwise, the work will be immediately enqueued on to the Handler thread.
-         */
-        public void enqueue(Runnable runnable) {
-            if (isActive()) {
-                mBatchList.add(runnable);
-            } else {
-                // Not in session, just post to the handler immediately.
-                mHandler.post(() -> {
-                    synchronized (mLock) {
-                        runnable.run();
-                    }
-                });
-            }
-        }
-
-        /**
-         * Trigger an update to be asynchronously done on a Handler thread.
-         * If batch session is currently active, the update will be run at the end of the batched
-         * work.
-         * Otherwise, the update will be immediately enqueued on to the Handler thread (and any
-         * previously posted update will be removed in favor of this most recent trigger).
-         */
-        public void runUpdate() {
-            if (isActive()) {
-                // Mark that an update should be done after the batched work is done.
-                mRunUpdate = true;
-            } else {
-                // Not in session, just post to the handler immediately (and clear any existing
-                // posted update).
-                mHandler.removeCallbacks(mLockedUpdateRunnable);
-                mHandler.post(mLockedUpdateRunnable);
-            }
-        }
-
-        void start() {
-            mNestedStartCount++;
-        }
-
-        private boolean isActive() {
-            return mNestedStartCount > 0;
-        }
-
-        @Override
-        public void close() {
-            if (mNestedStartCount == 0) {
-                Slog.wtfStack(TAG, "close() called on an unstarted BatchSession!");
-                return;
-            }
-
-            mNestedStartCount--;
-
-            if (isActive()) {
-                // Still in an active batch session.
-                return;
-            }
-
-            final ArrayList<Runnable> list = new ArrayList<>(mBatchList);
-            final boolean runUpdate = mRunUpdate;
-
-            // Return if there is nothing to do.
-            if (list.isEmpty() && !runUpdate) return;
-
-            mBatchList.clear();
-            mRunUpdate = false;
-
-            // offload all of the queued up work to the ActivityStateHandler thread.
-            final Runnable batchedWorkload = () -> {
-                synchronized (mLock) {
-                    for (int i = 0, size = list.size(); i < size; i++) {
-                        list.get(i).run();
-                    }
-                    if (runUpdate) {
-                        mUpdateRunnable.run();
-                    }
-                }
-            };
-
-            if (mBoostPriority) {
-                // The priority of this BatchSession has been boosted. Post to the front of the
-                // Handler queue.
-                mBoostPriority = false;
-                mHandler.postAtFrontOfQueue(batchedWorkload);
-            } else {
-                mHandler.post(batchedWorkload);
-            }
-        }
-    }
-
     /**
      * Interface for injecting LRU management into ProcessStateController
      * TODO(b/430385382): This should be remove when LRU is managed entirely within
@@ -1174,7 +1123,6 @@ public class ProcessStateController {
         private final ActiveUids mActiveUids;
 
         private ServiceThread mHandlerThread = null;
-        private CachedAppOptimizer mCachedAppOptimizer = null;
         private Object mLock = null;
         private Consumer<ProcessRecord> mTopChangeCallback = null;
         private ProcessLruUpdater mProcessLruUpdater = null;
@@ -1192,9 +1140,6 @@ public class ProcessStateController {
         public ProcessStateController build() {
             if (mHandlerThread == null) {
                 mHandlerThread = OomAdjuster.createAdjusterThread();
-            }
-            if (mCachedAppOptimizer == null) {
-                mCachedAppOptimizer = new CachedAppOptimizer(mAms);
             }
             if (mLock == null) {
                 mLock = new Object();
@@ -1214,8 +1159,7 @@ public class ProcessStateController {
                 mOomAdjInjector = new OomAdjuster.Injector();
             }
             return new ProcessStateController(mAms, mProcessList, mActiveUids, mHandlerThread,
-                    mCachedAppOptimizer, mLock, mAms.mProcLock, mTopChangeCallback,
-                    mProcessLruUpdater, mOomAdjInjector);
+                    mLock, mAms.mProcLock, mTopChangeCallback, mProcessLruUpdater, mOomAdjInjector);
         }
 
         /**
@@ -1224,15 +1168,6 @@ public class ProcessStateController {
         @VisibleForTesting
         public Builder setHandlerThread(ServiceThread handlerThread) {
             mHandlerThread = handlerThread;
-            return this;
-        }
-
-        /**
-         * For Testing Purposes. Set the CachedAppOptimzer used by OomAdjuster.
-         */
-        @VisibleForTesting
-        public Builder setCachedAppOptimizer(CachedAppOptimizer cachedAppOptimizer) {
-            mCachedAppOptimizer = cachedAppOptimizer;
             return this;
         }
 

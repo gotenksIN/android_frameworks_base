@@ -309,7 +309,7 @@
     <string name="notification_channel_car_mode" msgid="2123919247040988436">"حالت خودرو"</string>
     <string name="notification_channel_account" msgid="6436294521740148173">"وضعیت حساب"</string>
     <string name="notification_channel_developer" msgid="1691059964407549150">"پیام‌های برنامه‌نویس"</string>
-    <string name="notification_channel_developer_important" msgid="7197281908918789589">"پیام‌های مهم برنامه‌نویس"</string>
+    <string name="notification_channel_developer_important" msgid="7197281908918789589">"پیام‌های مهم توسعه‌دهنده"</string>
     <string name="notification_channel_updates" msgid="7907863984825495278">"به‌روزرسانی‌ها"</string>
     <string name="notification_channel_network_status" msgid="2127687368725272809">"وضعیت شبکه"</string>
     <string name="notification_channel_network_alerts" msgid="6312366315654526528">"هشدارهای شبکه"</string>
@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"رفتن به نمایه کاری"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"رفتن به نمایه شخصی <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"رفتن به نمایه کاری <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"مخاطبین"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"دسترسی به مخاطبین شما"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"مخاطبین و حساب‌ها"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"به مخاطبین شما دسترسی پیدا کند و فهرست حساب‌های شما را که می‌توانند مخاطبین را در این دستگاه ذخیره کنند، مشاهده کند."</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"مکان"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"دسترسی به موقعیت مکانی این دستگاه"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"تقویم"</string>
@@ -639,6 +639,10 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"به برنامه اجازه داده می‌شود موقعیت نسبی بین دستگاه‌های «فراپهن‌باند» اطراف را مشخص کند"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"‏برقراری تعامل با دستگاه‌های Wi-Fi اطراف"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"‏به برنامه اجازه می‌دهد در دستگاه‌های Wi-Fi اطراف تبلیغ کند، به آن‌ها متصل شود، و موقعیت نسبی آن‌ها را تشخیص دهد"</string>
+    <!-- no translation found for permlab_access_local_network (3420360767259066877) -->
+    <skip />
+    <!-- no translation found for permdesc_access_local_network (6364679803386822638) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"تعیین موقعیت نسبی بین دستگاه‌های اطراف"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"به برنامه اجازه داده می‌شود موقعیت نسبی بین دستگاه‌های اطراف را تعیین کند"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"‏اطلاعات ترجیحی سرویس پرداخت NFC"</string>
@@ -2592,10 +2596,7 @@
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"برای بازبینی نکات مربوط به بهبود تجربه قفل‌گشایی، تک‌ضرب بزنید"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"چشمک نزدن"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"«دکمه روشن/خاموش» را طولانی فشار دهید تا تلویزیون خاموش شود"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"هشدار منابع سیستم"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"مصرف بیش از حد منابع"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"برنامه‌ی \'<xliff:g id="APP_NAME">%1$s</xliff:g>\' از منابع زیادی استفاده می‌کند."</string>
 </resources>

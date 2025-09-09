@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Жумуш профилине которулуу"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Жеке <xliff:g id="APP_NAME">%1$s</xliff:g> колдонмосуна которулуу"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Жумушка тиешелүү <xliff:g id="APP_NAME">%1$s</xliff:g> колдонмосуна которулуу"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Байланыштар"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"байланыштарыңызды көрүүгө"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Байланыштар жана аккаунттар"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"байланыштарыңызга кирип, бул түзмөктө байланыштарды сактай ала турган аккаунттардын тизмесин көрүңүз"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Жайгашкан жер"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"түзмөктүн жайгашкан жерин аныктоого"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Жылнаама"</string>
@@ -639,6 +639,10 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Колдонмо кең тилкелүү тармак аркылуу туташа турган жакын жердеги түзмөктөрдү аныктай алат"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"Жакын жердеги Wi‑Fi түзмөктөрүнө байланышуу"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Колдонмо жакын жердеги Wi-Fi түзмөктөргө туташып, алардын жайгашкан жерин аныктап, ар кандай нерселерди өткөрө алат."</string>
+    <!-- no translation found for permlab_access_local_network (3420360767259066877) -->
+    <skip />
+    <!-- no translation found for permdesc_access_local_network (6364679803386822638) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"жакын жердеги түзмөктөр арасындагы салыштырмалуу абалды аныктоо"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Колдонмого жакын жердеги түзмөктөр ортосундагы салыштырмалуу абалды аныктоого уруксат берүү"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Тандалган NFC төлөм кызматы жөнүндө маалымат"</string>
@@ -2592,10 +2596,7 @@
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Кулпуну ачуу боюнча кеңештерди көрүү үчүн таптап коюңуз"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Бүлбүлдөбөсүн"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Сыналгыны өчүрүү үчүн Кубат баскычын кое бербей басып туруңуз"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Системанын ресурстары тууралуу эскертүүлөр"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Ресурстарды ашыкча колдонуу"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"<xliff:g id="APP_NAME">%1$s</xliff:g> колдонмосу өтө көп ресурстарды колдонуп жатат."</string>
 </resources>

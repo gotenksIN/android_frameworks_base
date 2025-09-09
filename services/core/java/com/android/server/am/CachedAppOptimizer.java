@@ -104,6 +104,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -894,6 +895,7 @@ public class CachedAppOptimizer {
     private static native void compactProcess(int pid, int compactionFlags);
     private static native void performNativeMemcgCompaction(int uid, int pid, int compactionFlags);
     private static native void compactNativeProcess(int pid, int compactionFlags);
+    private static native boolean compactionFlagsValidForMemcg(int compactionFlags);
 
     static private native void cancelCompaction();
 
@@ -1706,6 +1708,17 @@ public class CachedAppOptimizer {
         }
     }
 
+    private static int getCompactionFlags(CompactProfile profile) {
+        if (profile == CompactProfile.FULL) {
+            return COMPACT_ACTION_FILE_FLAG | COMPACT_ACTION_ANON_FLAG;
+        } else if (profile == CompactProfile.SOME) {
+            return COMPACT_ACTION_FILE_FLAG;
+        } else if (profile == CompactProfile.ANON) {
+            return COMPACT_ACTION_ANON_FLAG;
+        }
+        return 0;
+    }
+
     private final class MemCompactionHandler extends Handler {
         private MemCompactionHandler() {
             super(mCachedAppOptimizerThread.getLooper());
@@ -1859,6 +1872,21 @@ public class CachedAppOptimizer {
             return false;
         }
 
+        private EnumMap<CompactProfile, Boolean> mProfileValidForMemcgMap =
+                new EnumMap<>(CompactProfile.class);
+
+        private boolean profileValidForMemcg(CompactProfile profile) {
+            Boolean valid = mProfileValidForMemcgMap.get(profile);
+
+            if (valid == null) {
+                // Use JNI only once
+                valid = new Boolean(compactionFlagsValidForMemcg(getCompactionFlags(profile)));
+                mProfileValidForMemcgMap.put(profile, valid);
+            }
+
+            return valid.booleanValue();
+        }
+
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
@@ -1970,7 +1998,8 @@ public class CachedAppOptimizer {
                         long zramUsedKbBefore = getUsedZramMemory();
                         long startCpuTime = threadCpuTimeNs();
 
-                        if (Flags.useMemcgForCompaction()) {
+                        if (Flags.useMemcgForCompaction() &&
+                                profileValidForMemcg(resolvedProfile)) {
                             mProcessDependencies.performMemcgCompaction(resolvedProfile, uid, pid);
                         } else {
                             mProcessDependencies.performCompaction(resolvedProfile, pid);
@@ -2218,7 +2247,7 @@ public class CachedAppOptimizer {
          */
         @GuardedBy({"mAm"})
         private void freezeProcess(final ProcessRecord proc) {
-            int pid = proc.getPid(); // Unlocked intentionally
+            final int pid;
             final String name = proc.processName;
             final long unfrozenDuration;
             final boolean frozen;
@@ -2240,7 +2269,7 @@ public class CachedAppOptimizer {
                     return;
                 }
 
-                if (opt.shouldNotFreeze()) {
+                if (opt.shouldNotFreeze() && !Flags.cpuTimeCapabilityBasedFreezePolicy()) {
                     if (DEBUG_FREEZER) {
                         Slog.d(TAG_AM, "Skipping freeze because process is marked "
                                 + "should not be frozen");
@@ -2445,17 +2474,6 @@ public class CachedAppOptimizer {
             mPidCompacting = pid;
             compactNativeProcess(pid, compactionFlags);
             mPidCompacting = -1;
-        }
-
-        private static int getCompactionFlags(CompactProfile profile) {
-            if (profile == CompactProfile.FULL) {
-                return COMPACT_ACTION_FILE_FLAG | COMPACT_ACTION_ANON_FLAG;
-            } else if (profile == CompactProfile.SOME) {
-                return COMPACT_ACTION_FILE_FLAG;
-            } else if (profile == CompactProfile.ANON) {
-                return COMPACT_ACTION_ANON_FLAG;
-            }
-            return 0;
         }
     }
 

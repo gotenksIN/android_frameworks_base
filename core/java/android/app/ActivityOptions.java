@@ -2506,6 +2506,7 @@ public class ActivityOptions extends ComponentOptions {
         mSpecsFuture = otherOptions.mSpecsFuture;
         mRemoteAnimationAdapter = otherOptions.mRemoteAnimationAdapter;
         mLaunchIntoPipParams = otherOptions.mLaunchIntoPipParams;
+        mLaunchDisplayId = otherOptions.mLaunchDisplayId;
         mIsEligibleForLegacyPermissionPrompt = otherOptions.mIsEligibleForLegacyPermissionPrompt;
 
         sendResultIgnoreErrors(mAnimationAbortListener, null);

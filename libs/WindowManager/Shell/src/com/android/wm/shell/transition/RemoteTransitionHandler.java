@@ -38,6 +38,7 @@ import android.window.WindowContainerTransaction;
 import androidx.annotation.BinderThread;
 
 import com.android.internal.protolog.ProtoLog;
+import com.android.window.flags.Flags;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.shared.TransitionUtil;
@@ -59,7 +60,7 @@ public class RemoteTransitionHandler implements Transitions.TransitionHandler {
     private final ArrayMap<IBinder, RemoteTransition> mRequestedRemotes = new ArrayMap<>();
 
     /** Ordered by specificity. Last filters will be checked first */
-    private final ArrayList<Pair<TransitionFilter, RemoteTransition>> mFilters =
+    final ArrayList<Pair<TransitionFilter, RemoteTransition>> mFilters =
             new ArrayList<>();
     private final ArrayList<Pair<TransitionFilter, RemoteTransition>> mTakeoverFilters =
             new ArrayList<>();
@@ -117,7 +118,13 @@ public class RemoteTransitionHandler implements Transitions.TransitionHandler {
             @NonNull SurfaceControl.Transaction startTransaction,
             @NonNull SurfaceControl.Transaction finishTransaction,
             @NonNull Transitions.TransitionFinishCallback finishCallback) {
-        if (!Transitions.SHELL_TRANSITIONS_ROTATION && TransitionUtil.hasDisplayChange(info)) {
+        // Ignore the remote transition if the display changes size or rotation, since Launcher
+        // doesn't have the necessary permission to deal with such changes.
+        final boolean ignoreTransition = !Transitions.SHELL_TRANSITIONS_ROTATION
+                && (Flags.enableCrossDisplaysAppLaunchTransition()
+                        ? TransitionUtil.hasNonOrderOnlyDisplayChange(info) :
+                        TransitionUtil.hasDisplayChange(info));
+        if (ignoreTransition) {
             // Note that if the remote doesn't have permission ACCESS_SURFACE_FLINGER, some
             // operations of the start transaction may be ignored.
             mRequestedRemotes.remove(transition);

@@ -326,7 +326,7 @@ public class StageCoordinatorTests extends ShellTestCase {
         mStageCoordinator.onTaskInfoChanged(mSplitMultiDisplayHelper.getDisplayRootTaskInfo(
                 DEFAULT_DISPLAY));
 
-        verify(mSplitLayout).updateConfiguration(any(Configuration.class));
+        verify(mSplitLayout).updateConfiguration(any(Configuration.class), eq(DEFAULT_DISPLAY));
     }
 
     @Test
@@ -773,6 +773,36 @@ public class StageCoordinatorTests extends ShellTestCase {
         mStageCoordinator.prepareMovingSplitScreenRoot(mWct, targetDisplayId);
 
         verify(mWct, never()).reparent(any(), any(), anyBoolean());
+    }
+
+    @Test
+    public void testOnChildTaskMovedToBubble_mainStageHasTask_dismissesSplitWithMainOnTop() {
+        when(mMainStage.isActive()).thenReturn(true);
+        when(mMainStage.getChildCount()).thenReturn(1);
+        when(mSideStage.getChildCount()).thenReturn(0);
+        mStageCoordinator.onChildTaskMovedToBubble(mSideStage, /* taskId= */ 8);
+        verify(mSplitScreenTransitions).startDismissTransition(any(), any(), eq(STAGE_TYPE_MAIN),
+                eq(SplitScreenController.EXIT_REASON_CHILD_TASK_ENTER_BUBBLE));
+    }
+
+    @Test
+    public void testOnChildTaskMovedToBubble_noTasksInSplit_dismissesSplit() {
+        when(mMainStage.isActive()).thenReturn(true);
+        when(mMainStage.getChildCount()).thenReturn(0);
+        when(mSideStage.getChildCount()).thenReturn(0);
+        mStageCoordinator.onChildTaskMovedToBubble(mSideStage, /* taskId= */ 8);
+        verify(mSplitScreenTransitions).startDismissTransition(any(), any(),
+                eq(STAGE_TYPE_UNDEFINED),
+                eq(SplitScreenController.EXIT_REASON_CHILD_TASK_ENTER_BUBBLE));
+    }
+
+    @Test
+    public void testOnChildTaskMovedToBubble_stageHasMoreTasks_doesNothing() {
+        when(mMainStage.isActive()).thenReturn(true);
+        when(mSideStage.getChildCount()).thenReturn(1);
+        mStageCoordinator.onChildTaskMovedToBubble(mSideStage, /* taskId= */ 8);
+        verify(mSplitScreenTransitions, never()).startDismissTransition(any(), any(), anyInt(),
+                anyInt());
     }
 
     private Transitions createTestTransitions() {

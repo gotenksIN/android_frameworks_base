@@ -337,8 +337,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Passer au profil pro"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Passer à l\'application <xliff:g id="APP_NAME">%1$s</xliff:g> personnelle"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Passer à l\'application <xliff:g id="APP_NAME">%1$s</xliff:g> professionnelle"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Contacts"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"accéder à vos contacts"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Contacts et comptes"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"accéder à vos contacts et voir la liste de vos comptes pouvant enregistrer des contacts sur cet appareil"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Position"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"accéder à la position de l\'appareil"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Agenda"</string>
@@ -640,6 +640,10 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Autoriser l\'appli à déterminer la position relative entre des appareils ultra-wideband à proximité"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"interagir avec les appareils Wi-Fi à proximité"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Permet à l\'appli de déterminer la position approximative des appareils Wi‑Fi à proximité, de les afficher et de s\'y connecter"</string>
+    <!-- no translation found for permlab_access_local_network (3420360767259066877) -->
+    <skip />
+    <!-- no translation found for permdesc_access_local_network (6364679803386822638) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"déterminer l\'emplacement relatif entre des appareils à proximité"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Autorisez l\'appli à déterminer l\'emplacement relatif entre des appareils à proximité"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informations sur le service de paiement NFC préféré"</string>
@@ -2593,10 +2597,7 @@
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Appuyez pour consulter des conseils afin d\'améliorer votre expérience de déverrouillage"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Ne pas faire clignoter"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Appuyez de manière prolongée sur le bouton Marche/Arrêt pour éteindre le téléviseur"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Alertes sur les ressources système"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Utilisation excessive des ressources"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"L\'appli \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" utilise trop de ressources."</string>
 </resources>

@@ -80,7 +80,7 @@
     <string name="message_uninstall_work_profile" msgid="224587253086750763">"האפליקציה הזו תוסר מהמכשיר ולא תופיע יותר בפרופיל העבודה שלך"</string>
     <string name="message_uninstall_private_space" msgid="2815872500665141251">"האפליקציה הזו תוסר מהמכשיר ולא תופיע יותר במרחב הפרטי שלך"</string>
     <string name="message_uninstall_app_not_found" msgid="1228396155188846293">"האפליקציה הזו לא נמצאה ברשימת האפליקציות המותקנות, או שהיא כבר הוסרה"</string>
-    <string name="message_uninstall_user_not_allowed" msgid="4812707444447008148">"המשתמש הנוכחי לא מורשה להסיר את האפליקציה הזו."</string>
+    <string name="message_uninstall_user_not_allowed" msgid="4812707444447008148">"המשתמש הנוכחי לא רשאי להסיר את האפליקציה הזו."</string>
     <string name="message_uninstall_failed" msgid="4678598986902459187">"הסרת האפליקציה נכשלה"</string>
     <string name="message_uninstall_keep_data" msgid="3955153594868206983">"אני רוצה לשמור את נתוני האפליקציה"</string>
     <string name="message_archive" msgid="943853731737315850">"נתוני האפליקציה שלך יישמרו"</string>
@@ -88,22 +88,30 @@
     <string name="message_archive_other_user" msgid="6465828676043191175">"נתוני האפליקציה יישמרו"</string>
     <string name="message_archive_work_profile" msgid="7601504268820630858">"האפליקציה הזו תועבר מפרופיל העבודה שלך לארכיון. נתוני האפליקציה שלך יישמרו."</string>
     <string name="message_archive_private_space" msgid="4873651645762576624">"האפליקציה הזו תועבר מהמרחב הפרטי לארכיון. נתוני האפליקציה שלך יישמרו."</string>
-    <string name="message_restore" msgid="8402726798623569969">"האפליקציה הזו תרד ברקע דרך <xliff:g id="INSTALLER_NAME">%1$s</xliff:g>"</string>
+    <string name="message_restore" msgid="8402726798623569969">"הורדת האפליקציה הזו מ-<xliff:g id="INSTALLER_NAME">%1$s</xliff:g> תתבצע ברקע"</string>
     <string name="message_restore_error_user_action_needed" msgid="2206904734076205208">"כדי לשחזר את האפליקציה הזו, <xliff:g id="INSTALLER_NAME">%1$s</xliff:g> צריכה לקבל מידע נוסף"</string>
     <string name="message_restore_error_less_storage" msgid="4945507738776981462">"‏כדי לשחזר את האפליקציה הזו, צריך לפנות &lt;b&gt;<xliff:g id="BYTES">%1$s</xliff:g>&lt;/b&gt; ולנסות שוב"</string>
     <string name="message_restore_error_offline" msgid="4212551781323276126">"כדי לשחזר את האפליקציה הזו, מומלץ לבדוק את החיבור לאינטרנט ולנסות שוב."</string>
     <string name="message_restore_error_installer_disabled" msgid="1089791898782445342">"כדי לשחזר את האפליקציה הזו, צריך להפעיל את <xliff:g id="INSTALLERNAME">%1$s</xliff:g> בהגדרות"</string>
     <string name="message_restore_error_installer_absent" msgid="8492838251989389724">"כדי לשחזר את האפליקציה הזו, צריך להתקין את <xliff:g id="INSTALLER_NAME">%1$s</xliff:g>"</string>
-    <string name="message_restore_error_generic" msgid="5903850636679929406">"הניסיון לשחזר את האפליקציה השתבש"</string>
+    <string name="message_restore_error_generic" msgid="5903850636679929406">"לא הצלחנו לשחזר את האפליקציה"</string>
     <string name="message_uninstall_activity" msgid="3263352475743590167">"הפעילות <xliff:g id="ACTIVITY_NAME">%1$s</xliff:g> היא חלק מהאפליקציה הבאה: <xliff:g id="APP_NAME">%2$s</xliff:g>"</string>
-    <string name="cannot_install_app_blocked_summary" msgid="2712509801474290273">"‏‫&lt;p&gt;האפליקציה הזו נחסמה. כדי לשמור על אבטחת המכשיר והנתונים, אפשר להתקין רק אפליקציות של מפתחים מאומתים.&lt;/p&gt; &lt;a href=&gt;מידע נוסף על אימות מפתחים&lt;/a&gt;"</string>
-    <string name="cannot_update_app_blocked_summary" msgid="3440450480752915265">"‏‫&lt;p&gt;האפליקציה הזו לא עודכנה. כדי לשמור על אבטחת המכשיר והנתונים שלך, אפשר להתקין רק עדכונים של מפתחים מאומתים.&lt;/p&gt; &lt;a href=&gt;מידע נוסף על אימות מפתחים&lt;/a&gt;"</string>
-    <string name="cannot_install_verification_no_internet_summary" msgid="7724830883028720846">"‏‫&lt;p&gt;האפליקציה הזו לא הותקנה. אפליקציות ממפתחים לא מאומתים עלולות להיות לא בטוחות.&lt;/p&gt; &lt;p&gt;כדי לאמת את מפתח האפליקציה, נדרש חיבור לאינטרנט. צריך לבדוק את החיבור ואז לנסות להתקין את האפליקציה שוב. ‫&lt;/p&gt; &lt;a href=&gt;מידע נוסף על אימות מפתחים&lt;/a&gt;"</string>
-    <string name="cannot_update_verification_no_internet_summary" msgid="1204784740944424893">"‏‫&lt;p&gt;האפליקציה הזו לא עודכנה. עדכונים לאפליקציות ממפתחים לא מאומתים עלולים להיות לא בטוחים.&lt;/p&gt; &lt;p&gt;כדי לאמת את מפתח האפליקציה, נדרש חיבור לאינטרנט. צריך לבדוק את החיבור ואז לנסות לעדכן את האפליקציה שוב. ‫&lt;/p&gt; &lt;a href=&gt;מידע נוסף על אימות מפתחים&lt;/a&gt;"</string>
-    <string name="cannot_install_verification_unavailable_summary" msgid="2484702041510825332">"‏‫&lt;p&gt;הייתה בעיה באימות המפתח של האפליקציה הזו. אפליקציות של מפתחים לא מאומתים עלולות להיות לא בטוחות, ולכן האפליקציה לא הותקנה.&lt;/p&gt; &lt;a href=&gt;מידע נוסף על אימות מפתחים&lt;/a&gt;"</string>
-    <string name="cannot_update_verification_unavailable_summary" msgid="314354415455227761">"‏‫&lt;p&gt;הייתה בעיה באימות המפתח של האפליקציה הזו. עדכונים ממפתחים לא מאומתים עלולים להיות לא בטוחים, ולכן האפליקציה לא עודכנה.&lt;/p&gt; &lt;a href=&gt;מידע נוסף על אימות מפתחים&lt;/a&gt;"</string>
-    <string name="cannot_install_verification_unavailable_fail_closed_summary" msgid="757425632344179567">"‏‫&lt;p&gt;האפליקציה הזו נחסמה כי הייתה בעיה באימות המפתח. כדי לשמור על אבטחת המכשיר והנתונים, אפשר להתקין רק אפליקציות של מפתחים מאומתים.&lt;/p&gt; &lt;a href=&gt;מידע נוסף על אימות מפתחים&lt;/a&gt;"</string>
-    <string name="cannot_update_verification_unavailable_fail_closed_summary" msgid="7020007697606511471">"‏‫&lt;p&gt;האפליקציה הזו לא עודכנה כי הייתה בעיה באימות המפתח. כדי לשמור על אבטחת המכשיר והנתונים שלך, אפשר להתקין רק עדכונים של מפתחים מאומתים.&lt;/p&gt; &lt;a href=&gt;מידע נוסף על אימות מפתחים&lt;/a&gt;"</string>
+    <!-- no translation found for cannot_install_app_blocked_summary (5439893912308217959) -->
+    <skip />
+    <!-- no translation found for cannot_update_app_blocked_summary (7817560122951640605) -->
+    <skip />
+    <!-- no translation found for cannot_install_verification_no_internet_summary (236829543597389666) -->
+    <skip />
+    <!-- no translation found for cannot_update_verification_no_internet_summary (28024736898646891) -->
+    <skip />
+    <!-- no translation found for cannot_install_verification_unavailable_summary (6208343652461257248) -->
+    <skip />
+    <!-- no translation found for cannot_update_verification_unavailable_summary (367099122142054088) -->
+    <skip />
+    <!-- no translation found for cannot_install_verification_unavailable_fail_closed_summary (3798407602770929670) -->
+    <skip />
+    <!-- no translation found for cannot_update_verification_unavailable_fail_closed_summary (2871425967967934618) -->
+    <skip />
     <string name="more_details_expanded_install_summary" msgid="3545896392881608712">"אם בחרת להתקין בלי לבצע אימות, חשוב לזכור שאפליקציות ממפתחים לא מאומתים עלולות לסכן את המכשיר ואת הנתונים שלך."</string>
     <string name="more_details_expanded_update_summary" msgid="2239162864839036480">"אם מתבצע עדכון בלי אימות, חשוב לזכור שעדכונים ממפתחים לא מאומתים עלולים לסכן את המכשיר ואת הנתונים שלך."</string>
     <string name="cannot_install_app_blocked_title" msgid="6372444121824751694">"מפַתח האפליקציה לא אומת"</string>

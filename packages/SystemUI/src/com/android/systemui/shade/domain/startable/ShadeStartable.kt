@@ -38,7 +38,6 @@ import com.android.systemui.shade.transition.ScrimShadeTransitionController
 import com.android.systemui.statusbar.NotificationShadeDepthController
 import com.android.systemui.statusbar.PulseExpansionHandler
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
-import com.android.systemui.statusbar.phone.ScrimController
 import com.android.systemui.statusbar.policy.SplitShadeStateController
 import javax.inject.Inject
 import javax.inject.Provider
@@ -68,7 +67,6 @@ constructor(
     private val shadeExpansionStateManager: ShadeExpansionStateManager,
     private val pulseExpansionHandler: PulseExpansionHandler,
     private val nsslc: NotificationStackScrollLayoutController,
-    private val scrimController: ScrimController,
     private val depthController: NotificationShadeDepthController,
     private val shadeDisplayStateInteractor: ShadeDisplayStateInteractor,
 ) : CoreStartable {
@@ -142,7 +140,6 @@ constructor(
             applicationScope.launch {
                 shadeModeInteractor.isFullWidthShade.collect { isFullWidth ->
                     nsslc.setIsFullWidth(isFullWidth)
-                    scrimController.setClipsQsScrim(isFullWidth)
                 }
             }
         }

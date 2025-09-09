@@ -19,6 +19,7 @@ package com.android.server.adb;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 
 import static com.android.internal.util.dump.DumpUtils.writeStringIfNotNull;
+import static com.android.server.adb.AdbDebuggingManager.AdbDebuggingHandler.MSG_START_ADB_WIFI;
 import static com.android.server.adb.AdbService.ADBD;
 
 import android.annotation.NonNull;
@@ -71,6 +72,7 @@ import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.dump.DualDumpOutputStream;
 import com.android.server.FgThread;
+import com.android.server.adb.AdbDebuggingManager.AdbDebuggingThread.OnConnectionCallback;
 
 import java.io.File;
 import java.io.IOException;
@@ -218,6 +220,11 @@ public class AdbDebuggingManager {
 
     @VisibleForTesting
     static class AdbDebuggingThread extends Thread {
+        interface OnConnectionCallback {
+            void onConnected(AdbDebuggingThread thread);
+        }
+
+        private final OnConnectionCallback mOnConnectionCallback;
         private LocalSocket mSocket;
         private OutputStream mOutputStream;
         private InputStream mInputStream;
@@ -226,8 +233,9 @@ public class AdbDebuggingManager {
         private boolean mConnected = false;
 
         @VisibleForTesting
-        AdbDebuggingThread() {
+        AdbDebuggingThread(OnConnectionCallback onConnectionCallback) {
             super(TAG);
+            mOnConnectionCallback = onConnectionCallback;
         }
 
         @VisibleForTesting
@@ -244,6 +252,7 @@ public class AdbDebuggingManager {
                         mConnected = false;
                         openSocketLocked();
                         mConnected = true;
+                        mOnConnectionCallback.onConnected(this);
                     }
 
                     listenToSocket();
@@ -571,7 +580,9 @@ public class AdbDebuggingManager {
         static final String MSG_START_ADB_WIFI = "W1";
         static final String MSG_STOP_ADB_WIFI = "W0";
 
-        @Nullable @VisibleForTesting AdbKeyStore mAdbKeyStore;
+        @NonNull @VisibleForTesting
+        final AdbKeyStore mAdbKeyStore =
+                new AdbKeyStore(mContext, mTempKeysFile, mUserKeyFile, mTicker);
 
         private final AdbDebuggingThread mThread;
 
@@ -593,7 +604,7 @@ public class AdbDebuggingManager {
         AdbDebuggingHandler(Looper looper, AdbDebuggingThread thread) {
             super(looper);
             if (thread == null) {
-                thread = new AdbDebuggingThread();
+                thread = new AdbDebuggingThread(new StartAdbWifiConnectionCallback());
                 thread.setHandler(this);
             }
             mThread = thread;
@@ -602,20 +613,6 @@ public class AdbDebuggingManager {
                         new AdbWifiNetworkMonitor(mContext, mAdbKeyStore::isTrustedNetwork);
             } else {
                 mAdbNetworkMonitor = new AdbBroadcastReceiver(mContext, mAdbConnectionInfo);
-            }
-        }
-
-        /** Initialize the AdbKeyStore so tests can grab mAdbKeyStore immediately. */
-        @VisibleForTesting
-        void initKeyStore() {
-            if (mAdbKeyStore == null) {
-                mAdbKeyStore =
-                        new AdbKeyStore(
-                                mContext,
-                                mTempKeysFile,
-                                mUserKeyFile,
-                                mTicker,
-                                () -> sendPersistKeyStoreMessage());
             }
         }
 
@@ -666,7 +663,6 @@ public class AdbDebuggingManager {
         }
 
         public void handleMessage(Message msg) {
-            initKeyStore();
 
             switch (msg.what) {
                 case MESSAGE_ADB_ENABLED -> {
@@ -727,9 +723,6 @@ public class AdbDebuggingManager {
                 case MESSAGE_ADB_CLEAR -> {
                     Slog.d(TAG, "Received a request to clear the adb authorizations");
                     mConnectedKeys.clear();
-                    // If the key store has not yet been instantiated then do so now; this avoids
-                    // the unnecessary creation of the key store when adb is not enabled.
-                    initKeyStore();
                     mWifiConnectedKeys.clear();
                     mAdbKeyStore.deleteKeyStore();
                     cancelJobToUpdateAdbKeyStore();
@@ -1453,13 +1446,7 @@ public class AdbDebuggingManager {
 
     /** Returns the list of paired devices. */
     public Map<String, PairDevice> getPairedDevices() {
-        AdbKeyStore keystore =
-                new AdbKeyStore(
-                        mContext,
-                        mTempKeysFile,
-                        mUserKeyFile,
-                        mTicker,
-                        () -> sendPersistKeyStoreMessage());
+        AdbKeyStore keystore = new AdbKeyStore(mContext, mTempKeysFile, mUserKeyFile, mTicker);
         return getPairedDevicesForKeys(keystore.getKeys());
     }
 
@@ -1580,5 +1567,14 @@ public class AdbDebuggingManager {
     @VisibleForTesting
     interface Ticker {
         long currentTimeMillis();
+    }
+
+    private class StartAdbWifiConnectionCallback implements OnConnectionCallback {
+        @Override
+        public void onConnected(AdbDebuggingThread thread) {
+            if (isAdbWifiEnabled() && wifiLifeCycleOverAdbdauthSupported()) {
+                thread.sendResponse(MSG_START_ADB_WIFI);
+            }
+        }
     }
 }

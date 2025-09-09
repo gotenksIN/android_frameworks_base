@@ -31,6 +31,7 @@ import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor
 import com.android.systemui.communal.domain.interactor.CommunalSceneInteractor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.desktop.domain.interactor.DesktopInteractor
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
@@ -81,6 +82,7 @@ import com.android.systemui.keyguard.ui.viewmodel.ViewStateAccessor
 import com.android.systemui.media.controls.domain.pipeline.MediaDataManager
 import com.android.systemui.media.controls.shared.model.MediaData
 import com.android.systemui.res.R
+import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
@@ -143,6 +145,7 @@ constructor(
     private val keyguardInteractor: KeyguardInteractor,
     private val keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val shadeInteractor: ShadeInteractor,
+    private val sceneInteractor: SceneInteractor,
     private val bouncerInteractor: BouncerInteractor,
     shadeModeInteractor: ShadeModeInteractor,
     notificationStackAppearanceInteractor: NotificationStackAppearanceInteractor,
@@ -185,6 +188,7 @@ constructor(
     private val primaryBouncerTransitions: Set<@JvmSuppressWildcards PrimaryBouncerTransition>,
     aodBurnInViewModel: AodBurnInViewModel,
     private val communalSceneInteractor: CommunalSceneInteractor,
+    private val desktopInteractor: DesktopInteractor,
     // Lazy because it's only used in the SceneContainer + Dual Shade configuration.
     headsUpNotificationInteractor: Lazy<HeadsUpNotificationInteractor>,
     private val largeScreenHeaderHelperLazy: Lazy<LargeScreenHeaderHelper>,
@@ -280,6 +284,8 @@ constructor(
                                 Dual ->
                                     if (isFullWidthShade) {
                                         0 to 0
+                                    } else if (desktopInteractor.isNotificationShadeOnTopEnd) {
+                                        0 to marginHorizontal
                                     } else {
                                         // all insets types combined, except the IME
                                         val insets = getInsetsOf(context, defaultVisible()).toRect()
@@ -295,6 +301,12 @@ constructor(
                                 Dual ->
                                     if (isFullWidthShade) {
                                         HorizontalPosition.EdgeToEdge
+                                    } else if (desktopInteractor.isNotificationShadeOnTopEnd) {
+                                        HorizontalPosition.MiddleToEdge(
+                                            ratio = 0.5f,
+                                            maxWidth =
+                                                getDimensionPixelSize(R.dimen.shade_panel_width),
+                                        )
                                     } else {
                                         HorizontalPosition.EdgeToMiddle(
                                             ratio = 0.5f,
@@ -704,15 +716,12 @@ constructor(
     }
 
     fun keyguardAlpha(viewState: ViewStateAccessor, scope: CoroutineScope): Flow<Float> {
-        val isKeyguardOccluded =
-            keyguardTransitionInteractor.transitionValue(OCCLUDED).map { it == 1f }
-
         val isKeyguardNotVisibleInState =
             if (SceneContainerFlag.isEnabled) {
-                isKeyguardOccluded
+                sceneInteractor.currentScene.map { it == Scenes.Occluded }
             } else {
                 anyOf(
-                    isKeyguardOccluded,
+                    keyguardTransitionInteractor.transitionValue(OCCLUDED).map { it == 1f },
                     keyguardTransitionInteractor
                         .transitionValue(content = Scenes.Gone, stateWithoutSceneContainer = GONE)
                         .map { it == 1f },
@@ -1002,7 +1011,11 @@ constructor(
          */
         data class EdgeToMiddle(val ratio: Float = 0.5f, val maxWidth: Int) : HorizontalPosition
 
-        /** The container is laid out from the given [ratio] of the screen width to the end edge. */
-        data class MiddleToEdge(val ratio: Float = 0.5f) : HorizontalPosition
+        /**
+         * The container is laid out from the given [ratio] of the screen width to the end edge, or
+         * to [maxWidth], whichever dimension is smaller.
+         */
+        data class MiddleToEdge(val ratio: Float = 0.5f, val maxWidth: Int = Int.MAX_VALUE) :
+            HorizontalPosition
     }
 }

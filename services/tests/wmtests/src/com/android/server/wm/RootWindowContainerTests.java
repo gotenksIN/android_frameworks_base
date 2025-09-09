@@ -1085,6 +1085,23 @@ public class RootWindowContainerTests extends WindowTestsBase {
     }
 
     /**
+     * Tests that secondary home activity should not be resolved if display cannot host tasks.
+     */
+    @Test
+    public void testStartSecondaryHomeOnDisplayCannotHostTasks() {
+        // Create secondary displays.
+        final TestDisplayContent secondDisplay =
+                new TestDisplayContent.Builder(mAtm, 1000, 1500).build();
+        spyOn(secondDisplay.mDisplay);
+        doReturn(false).when(secondDisplay.mDisplay).canHostTasks();
+
+        mRootWindowContainer.startHomeOnDisplay(0 /* userId */, "testStartSecondaryHome",
+                secondDisplay.mDisplayId, true /* allowInstrumenting */, true /* fromHomeKey */);
+
+        verify(mRootWindowContainer, never()).resolveSecondaryHomeActivity(anyInt(), any());
+    }
+
+    /**
      * Tests that when starting {@link ResolverActivity} for home, it should use the standard
      * activity type (in a new root task) so the order of back stack won't be broken.
      */
@@ -1287,6 +1304,30 @@ public class RootWindowContainerTests extends WindowTestsBase {
                 activity, null /* options */, task, null /* sourceTask */, null /* launchParams */,
                 0 /* launchFlags */, ACTIVITY_TYPE_STANDARD, true /* onTop */);
         assertEquals(task, rootTask);
+    }
+
+    @Test
+    public void testGetOrCreateRootTask_withPreferredRootTask_returnsPreferredRootTask() {
+        // Arrange: Create a preferred root task and set it in the launch parameters.
+        final Task preferredRootTask = new TaskBuilder(mSupervisor).build();
+        final ActivityRecord activity = new ActivityBuilder(mAtm).build();
+
+        final LaunchParamsController.LaunchParams launchParams =
+                new LaunchParamsController.LaunchParams();
+        launchParams.mPreferredRootTask = preferredRootTask;
+
+        // Act: Call the method under test.
+        final Task resultTask = mRootWindowContainer.getOrCreateRootTask(
+                activity,
+                null /* options */,
+                null /* candidateTask */,
+                null /* sourceTask */,
+                true /* onTop */,
+                launchParams,
+                0 /* launchFlags */);
+
+        // Assert: Verify that the returned task is the preferred one.
+        assertEquals(preferredRootTask, resultTask);
     }
 
     @Test

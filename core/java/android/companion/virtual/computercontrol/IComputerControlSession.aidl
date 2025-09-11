@@ -50,6 +50,19 @@ interface IComputerControlSession {
     IInteractiveMirrorDisplay createInteractiveMirrorDisplay(
             int width, int height, in Surface surface);
 
+    /**
+     * Inserts text into the current active input connection (if available).
+     *
+     * @param text to be inserted
+     * @param replaceExisting whether the existing text in the input field should be replaced. If
+     *                        {@code false}, we will insert the text the current cursor position.
+     * @param commit whether the text should be submitted after insertion
+     */
+    void insertText(in String text, boolean replaceExisting, boolean commit);
+
+    /** Performs computer control action on the computer control display. */
+    void performAction(int actionCode);
+
     /** Closes this session. */
     void close();
 }

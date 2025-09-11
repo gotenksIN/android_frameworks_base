@@ -789,6 +789,7 @@ package android.app.admin {
 package android.app.appfunctions {
 
   @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public final class AppFunctionManager {
+    method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @RequiresPermission(android.Manifest.permission.MANAGE_APP_FUNCTION_ACCESS) public void clearAccessHistory();
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_APP_FUNCTION_ACCESS) public java.util.List<android.content.pm.SignedPackage> getAgentAllowlist();
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @NonNull public java.util.Set<java.lang.String> getDeviceSettingPackages();
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @RequiresPermission(android.Manifest.permission.MANAGE_APP_FUNCTION_ACCESS) public boolean isAgentAllowlistEnabled();
@@ -1131,7 +1132,7 @@ package android.content.pm {
     field public static final long NEVER_SANDBOX_DISPLAY_APIS = 184838306L; // 0xb0468a2L
     field public static final long OVERRIDE_CAMERA_COMPAT_DISABLE_FORCE_ROTATION = 263959004L; // 0xfbbb1dcL
     field public static final long OVERRIDE_CAMERA_COMPAT_DISABLE_REFRESH = 264304459L; // 0xfc0f74bL
-    field @FlaggedApi("com.android.window.flags.enable_camera_compat_for_desktop_windowing_opt_out_api") public static final long OVERRIDE_CAMERA_COMPAT_DISABLE_SIMULATE_REQUESTED_ORIENTATION = 398195815L; // 0x17bbfc67L
+    field public static final long OVERRIDE_CAMERA_COMPAT_DISABLE_SIMULATE_REQUESTED_ORIENTATION = 398195815L; // 0x17bbfc67L
     field public static final long OVERRIDE_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE = 264301586L; // 0xfc0ec12L
     field public static final long OVERRIDE_ENABLE_COMPAT_FAKE_FOCUS = 263259275L; // 0xfb1048bL
     field @FlaggedApi("com.android.window.flags.app_compat_properties_api") public static final long OVERRIDE_ENABLE_COMPAT_IGNORE_ORIENTATION_REQUEST_WHEN_LOOP_DETECTED = 273509367L; // 0x104d6bf7L
@@ -1328,19 +1329,21 @@ package android.content.res {
     method public int getDisplayRotationSandbox();
     method public int getRotateAndCropRotation();
     method public static boolean isCameraCompatModeActive(@NonNull android.content.res.CameraCompatibilityInfo);
+    method public boolean shouldAllowTransformInverseDisplay();
     method public boolean shouldLetterboxForCameraCompat();
     method public boolean shouldOverrideSensorOrientation();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field public static final android.os.Parcelable.Creator<android.content.res.CameraCompatibilityInfo> CREATOR;
+    field @NonNull public static final android.os.Parcelable.Creator<android.content.res.CameraCompatibilityInfo> CREATOR;
   }
 
   public static final class CameraCompatibilityInfo.Builder {
     ctor public CameraCompatibilityInfo.Builder();
-    method public android.content.res.CameraCompatibilityInfo build();
-    method public android.content.res.CameraCompatibilityInfo.Builder setDisplayRotationSandbox(int);
-    method public android.content.res.CameraCompatibilityInfo.Builder setRotateAndCropRotation(int);
-    method public android.content.res.CameraCompatibilityInfo.Builder setShouldLetterboxForCameraCompat(boolean);
-    method public android.content.res.CameraCompatibilityInfo.Builder setShouldOverrideSensorOrientation(boolean);
+    method @NonNull public android.content.res.CameraCompatibilityInfo build();
+    method @NonNull public android.content.res.CameraCompatibilityInfo.Builder setDisplayRotationSandbox(int);
+    method @NonNull public android.content.res.CameraCompatibilityInfo.Builder setRotateAndCropRotation(int);
+    method @NonNull public android.content.res.CameraCompatibilityInfo.Builder setShouldAllowTransformInverseDisplay(boolean);
+    method @NonNull public android.content.res.CameraCompatibilityInfo.Builder setShouldLetterboxForCameraCompat(boolean);
+    method @NonNull public android.content.res.CameraCompatibilityInfo.Builder setShouldOverrideSensorOrientation(boolean);
   }
 
   public final class Configuration implements java.lang.Comparable<android.content.res.Configuration> android.os.Parcelable {
@@ -1357,6 +1360,27 @@ package android.content.rollback {
     method @RequiresPermission(android.Manifest.permission.TEST_MANAGE_ROLLBACKS) public void expireRollbackForPackage(@NonNull String);
     method @RequiresPermission(android.Manifest.permission.TEST_MANAGE_ROLLBACKS) public void reloadPersistedData();
     field public static final String PROPERTY_ROLLBACK_LIFETIME_MILLIS = "rollback_lifetime_in_millis";
+  }
+
+}
+
+package android.content.theming {
+
+  @FlaggedApi("android.server.enable_theme_service") public final class ThemeStyle {
+    method @NonNull public static String name(int);
+    method @NonNull public static String toString(int);
+    method public static int valueOf(@NonNull String);
+    method @NonNull public static int[] values();
+    field public static final int CLOCK = 8; // 0x8
+    field public static final int CLOCK_VIBRANT = 9; // 0x9
+    field public static final int CONTENT = 6; // 0x6
+    field public static final int EXPRESSIVE = 3; // 0x3
+    field public static final int FRUIT_SALAD = 5; // 0x5
+    field public static final int MONOCHROMATIC = 7; // 0x7
+    field public static final int RAINBOW = 4; // 0x4
+    field public static final int SPRITZ = 0; // 0x0
+    field public static final int TONAL_SPOT = 1; // 0x1
+    field public static final int VIBRANT = 2; // 0x2
   }
 
 }

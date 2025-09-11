@@ -138,8 +138,12 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"Қазір бүкіл экранды жазып жатырсыз."</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"Қазір қолданбадағы (<xliff:g id="APP_NAME">%1$s</xliff:g>) контентті жазып жатырсыз."</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"Жазуды тоқтату"</string>
+    <string name="screen_record_entire_screen" msgid="66944996337928170">"Бүкіл экран"</string>
+    <string name="screen_record_single_app" msgid="7355880948574569290">"Бір қолданба"</string>
+    <string name="screen_record_single_app_no_recents" msgid="1023249803854209330">"Бір қолданба (қолданбаны ашыңыз)"</string>
     <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"Құрылғы аудиосын жазу"</string>
     <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"Микрофон параметрін жазу"</string>
+    <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"Селфи камерасын көрсету"</string>
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"Түрту параметрін көрсету"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"Жазу үшін қолданба таңдаңыз"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"Бейне сақталды."</string>
@@ -157,6 +161,10 @@
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"Скриншот"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Жазу"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Бөлісу"</string>
+    <!-- no translation found for screen_share_no_select_app_thumbnail (1630012401570567430) -->
+    <skip />
+    <!-- no translation found for screen_share_app_audio_sharing (7201172218924898712) -->
+    <skip />
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Терезенің скриншотын жасау"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Терезені жазу"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Таңдалған аймақтың скриншотын жасау"</string>
@@ -537,7 +545,7 @@
     <string name="zen_mode_set_up" msgid="8231201163894922821">"Орнатылмаған"</string>
     <string name="zen_mode_no_manual_invocation" msgid="1769975741344633672">"\"Параметрлер\" бөлімінде реттеу"</string>
     <string name="zen_mode_active_modes" msgid="1625850411578488856">"{count,plural, =0{Қосулы режим жоқ}=1{{mode} қосулы}other{# режим қосулы}}"</string>
-    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"<xliff:g id="NUMBER">%s</xliff:g> режим"</string>
+    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"<xliff:g id="NUMBER">%d</xliff:g> режим"</string>
     <string name="zen_modes_multiple_on_status" msgid="8120633422509269588">"Қосулы"</string>
     <string name="zen_priority_introduction" msgid="3159291973383796646">"Оятқыш, еске салғыш, іс-шара мен өзіңіз көрсеткен контактілердің қоңырауларынан басқа дыбыстар мен дірілдер мазаламайтын болады. Музыка, бейне және ойын сияқты медиафайлдарды қоссаңыз, оларды естисіз."</string>
     <string name="zen_alarms_introduction" msgid="3987266042682300470">"Дабылдардан басқа ешқандай дыбыстар мен дірілдер мазаламайтын болады. Музыка, бейне және ойындар сияқты ойнатылатын контентті ести алатын боласыз."</string>
@@ -685,8 +693,7 @@
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"Барлық үнсіз хабарландыруларды өшіру"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"Хабарландыру параметрлерін ашу"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{Хабарландырулар жоқ.}=1{Хабарландыруларды {mode} режимі кідіртті.}=2{Хабарландыруларды {mode} және тағы бір режим кідіртті.}other{Хабарландыруларды {mode} және тағы # режим кідіртті.}}"</string>
-    <!-- no translation found for caught_up_shade_text (8166221989384139659) -->
-    <skip />
+    <string name="caught_up_shade_text" msgid="8166221989384139659">"Жаңа хабарландыру жоқ"</string>
     <string name="media_projection_action_text" msgid="3634906766918186440">"Қазір бастау"</string>
     <string name="empty_shade_text" msgid="8935967157319717412">"Хабарландырулар жоқ"</string>
     <string name="no_unseen_notif_text" msgid="395512586119868682">"Жаңа хабарландырулар жоқ"</string>
@@ -986,8 +993,7 @@
     <string name="group_system_access_notification_shade" msgid="1619028907006553677">"Хабарландыру­ларды көру"</string>
     <string name="group_system_access_quick_settings_panel" msgid="1844771096582064926">"Жылдам параметрлерді көру"</string>
     <string name="group_system_full_screenshot" msgid="5742204844232667785">"Скриншот жасау"</string>
-    <!-- no translation found for group_system_partial_screenshot (2114314797127648010) -->
-    <skip />
+    <string name="group_system_partial_screenshot" msgid="2114314797127648010">"Экранның бір бөлігін түсіру"</string>
     <string name="group_system_access_system_app_shortcuts" msgid="8562482996626694026">"Пернелер тіркесімдерін көрсету"</string>
     <string name="group_system_go_back" msgid="2730322046244918816">"Артқа"</string>
     <string name="group_system_access_home_screen" msgid="4130366993484706483">"Негізгі экранға өту"</string>
@@ -1012,8 +1018,7 @@
     <string name="system_desktop_mode_snap_right_window" msgid="2162560187639411929">"Терезені оң жаққа жылжыту"</string>
     <string name="system_desktop_mode_toggle_maximize_window" msgid="4084100093691768239">"Терезені ұлғайту"</string>
     <string name="system_desktop_mode_minimize_window" msgid="1248714536732927092">"Терезені кішірейту"</string>
-    <!-- no translation found for system_desktop_mode_close_window (3072490692608682536) -->
-    <skip />
+    <string name="system_desktop_mode_close_window" msgid="3072490692608682536">"Ағымдағы терезені жабу"</string>
     <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"Жұмыс үстелдері арасында ауысу"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"Енгізу"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"Келесі тілге ауысу"</string>
@@ -1140,14 +1145,10 @@
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="7575802369763469379">"Әрекет "<annotation id="action_key_icon">"белгішесі"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> – <xliff:g id="ID_3">^3</xliff:g> функциясын пайдалануға арналған пернелер тіркесімі. Бұл функция экрандағы контентті жылдам ұлғайтуға мүмкіндік береді. Масштабты түзету үшін \"Әрекет\" "<annotation id="action_key_icon">"белгішесін"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> және \"+\" немесе \"-\" таңбасын басыңыз."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Пернелер тіркесімін өшіру"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Қосулы қалдыру"</string>
-    <!-- no translation found for accessibility_key_gesture_voice_access_dialog_title (7828090789777023683) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_voice_access_dialog_content (7934170819801013870) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_voice_access_dialog_negative_button_text (3573570279554465078) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_voice_access_dialog_positive_button_text (2306321856544446858) -->
-    <skip />
+    <string name="accessibility_key_gesture_voice_access_dialog_title" msgid="7828090789777023683">"<xliff:g id="ID_1">%1$s</xliff:g> пернелер тіркесімін қосу қажет пе?"</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"\"Әрекет\" "<annotation id="action_key_icon">"белгішесі"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> басылса, <xliff:g id="ID_3">^3</xliff:g> арнайы мүмкіндігі қосылады. Ол құрылғыны дауыспен басқаруға арналған."</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_negative_button_text" msgid="3573570279554465078">"Қоспау"</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_positive_button_text" msgid="2306321856544446858">"Пернелер тіркесімін қосу"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Құлыптаулы экран"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Өшіріліп жатыр…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Пайдалану нұсқаулығын қараңыз"</string>

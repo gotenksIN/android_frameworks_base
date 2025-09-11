@@ -163,16 +163,6 @@ flag {
 }
 
 flag {
-    name: "enable_bubble_task_view_listener"
-    namespace: "multitasking"
-    description: "Use the same taskview listener for bubble bar and floating"
-    bug: "272102927"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_gsf"
     namespace: "multitasking"
     description: "Applies GSF font styles to multitasking."
@@ -331,4 +321,31 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "fix_bubble_stack_view_expanded_when_added"
+    namespace: "multitasking"
+    description: "Set BubbleStackView as collapsed if it's expanded when trying to be added"
+    bug: "417447385"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_bubble_event_history_logs"
+    namespace: "multitasking"
+    description: "Enable bubble event history logs"
+    bug: "436320481"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+     name: "enable_2x1_split"
+     namespace: "multitasking"
+     description: "Enables the 2x1 split implementation"
+     bug: "439992109"
 }

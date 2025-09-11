@@ -387,29 +387,6 @@ public class OomAdjusterImpl extends OomAdjuster {
             node.unlink();
         }
 
-        void append(@NonNull ProcessRecordInternal app) {
-            append(app, getCurrentSlot(app));
-        }
-
-        void append(@NonNull ProcessRecordInternal app, int targetSlot) {
-            append(app.mLinkedNodes[mType], targetSlot);
-        }
-
-        void append(@NonNull ProcessRecordNode node, int targetSlot) {
-            node.unlink();
-            mProcessRecordNodes[targetSlot].append(node);
-        }
-
-        private int getCurrentSlot(@NonNull ProcessRecordInternal app) {
-            switch (mType) {
-                case ProcessRecordNode.NODE_TYPE_PROC_STATE:
-                    return processStateToSlot(app.getCurProcState());
-                case ProcessRecordNode.NODE_TYPE_ADJ:
-                    return adjToSlot(app.getCurRawAdj());
-            }
-            return ADJ_SLOT_INVALID;
-        }
-
         /**
          * A simple version of {@link java.util.LinkedList}, as here we don't allocate new node
          * while adding an object to it.
@@ -449,13 +426,6 @@ public class OomAdjusterImpl extends OomAdjuster {
                 curNode.mNext = node;
             }
 
-            void append(@NonNull ProcessRecordNode node) {
-                node.mNext = TAIL;
-                node.mPrev = TAIL.mPrev;
-                TAIL.mPrev.mNext = node;
-                TAIL.mPrev = node;
-            }
-
             @VisibleForTesting
             void reset() {
                 if (HEAD.mNext != TAIL) {
@@ -463,26 +433,6 @@ public class OomAdjusterImpl extends OomAdjuster {
                 }
                 HEAD.mNext = TAIL;
                 TAIL.mPrev = HEAD;
-            }
-
-            String toString(int logUid) {
-                final StringBuilder sb = new StringBuilder();
-                sb.append("LinkedProcessRecordList{");
-                sb.append(HEAD);
-                sb.append(' ');
-                sb.append(TAIL);
-                sb.append('[');
-                ProcessRecordNode node = HEAD.mNext;
-                while (node != TAIL) {
-                    if (node.mApp != null && node.mApp.uid == logUid) {
-                        sb.append(node);
-                        sb.append(',');
-                    }
-                    node = node.mNext;
-                }
-                sb.append(']');
-                sb.append('}');
-                return sb.toString();
             }
         }
     }
@@ -671,8 +621,8 @@ public class OomAdjusterImpl extends OomAdjuster {
 
     OomAdjusterImpl(ActivityManagerService service, ProcessList processList,
             ActiveUids activeUids, ServiceThread adjusterThread, GlobalState globalState,
-            Injector injector) {
-        super(service, processList, activeUids, adjusterThread, globalState, injector);
+            Injector injector, Callback callback) {
+        super(service, processList, activeUids, adjusterThread, globalState, injector, callback);
 // QTI_BEGIN: 2025-04-20: Core: perf: Bring-back QC-VA's based on new code refactoring.
 
         if(mPerfBoost != null) {
@@ -686,11 +636,6 @@ public class OomAdjusterImpl extends OomAdjuster {
     private final ProcessRecordNodes mProcessRecordAdjNodes = new ProcessRecordNodes(
             ProcessRecordNode.NODE_TYPE_ADJ, ADJ_SLOT_VALUES.length);
     private final OomAdjusterArgs mTmpOomAdjusterArgs = new OomAdjusterArgs();
-
-    void linkProcessRecordToList(@NonNull ProcessRecordInternal app) {
-        mProcessRecordProcStateNodes.append(app);
-        mProcessRecordAdjNodes.append(app);
-    }
 
     void unlinkProcessRecordFromList(@NonNull ProcessRecordInternal app) {
         mProcessRecordProcStateNodes.unlink(app);
@@ -730,18 +675,10 @@ public class OomAdjusterImpl extends OomAdjuster {
         }
     }
 
-    private void updateAdjSlot(ProcessRecordInternal app) {
-        mProcessRecordAdjNodes.offer(app);
-    }
-
     private void updateProcStateSlotIfNecessary(ProcessRecordInternal app, int prevProcState) {
         if (app.getCurProcState() != prevProcState) {
             mProcessRecordProcStateNodes.offer(app);
         }
-    }
-
-    private void updateProcStateSlot(ProcessRecordInternal app) {
-        mProcessRecordProcStateNodes.offer(app);
     }
 
     @Override
@@ -981,8 +918,8 @@ public class OomAdjusterImpl extends OomAdjuster {
             initReachables |= selfImportanceLoweredLSP(target, prevProcState, prevAdj,
                     prevCapability, prevShouldNotFreeze);
 
-            updateProcStateSlot(target);
-            updateAdjSlot(target);
+            mProcessRecordProcStateNodes.offer(target);
+            mProcessRecordAdjNodes.offer(target);
         }
 
         if (!initReachables) {

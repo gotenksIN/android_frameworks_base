@@ -25,11 +25,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,7 +43,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.android.systemui.res.R
+import com.android.systemui.screencapture.common.ui.compose.LoadingIcon
+import com.android.systemui.screencapture.common.ui.compose.loadIcon
 import com.android.systemui.screencapture.common.ui.viewmodel.RecentTaskViewModel
 import com.android.systemui.screencapture.sharescreen.largescreen.ui.viewmodel.AudioSwitchViewModel
 import com.android.systemui.screencapture.sharescreen.largescreen.ui.viewmodel.ShareContentListViewModel
@@ -50,6 +59,7 @@ fun ShareContentSelector(
     recentTaskViewModelFactory: RecentTaskViewModel.Factory,
 ) {
     val selectedRecentTaskViewModel = shareContentListViewModel.selectedRecentTaskViewModel
+    val itemSelected = selectedRecentTaskViewModel != null
 
     Surface(color = MaterialTheme.colorScheme.surfaceBright, shape = RoundedCornerShape(20.dp)) {
         Column(
@@ -75,7 +85,8 @@ fun ShareContentSelector(
                 )
                 ItemPreview(
                     preview = selectedRecentTaskViewModel?.thumbnail?.getOrNull()?.asImageBitmap(),
-                    modifier = Modifier.weight(1f).height(140.dp),
+                    modifier = Modifier.weight(1f).height(140.dp).width(230.dp),
+                    itemSelected = itemSelected,
                 )
             }
             DisclaimerText()
@@ -85,7 +96,11 @@ fun ShareContentSelector(
 }
 
 @Composable
-private fun ItemPreview(preview: ImageBitmap?, modifier: Modifier = Modifier) {
+private fun ItemPreview(
+    preview: ImageBitmap?,
+    modifier: Modifier = Modifier,
+    itemSelected: Boolean,
+) {
     Box(
         modifier =
             modifier
@@ -93,12 +108,20 @@ private fun ItemPreview(preview: ImageBitmap?, modifier: Modifier = Modifier) {
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
-        if (preview != null) {
-            Image(
-                bitmap = preview,
-                contentDescription = "preview",
-                modifier = Modifier.matchParentSize(),
-                contentScale = ContentScale.Fit,
+        if (itemSelected) {
+            if (preview != null) {
+                Image(
+                    bitmap = preview,
+                    contentDescription = null,
+                    modifier = Modifier.matchParentSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+        } else {
+            Text(
+                text = stringResource(R.string.screen_share_no_select_app_thumbnail),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                style = MaterialTheme.typography.labelMedium,
             )
         }
     }
@@ -121,18 +144,46 @@ private fun AudioSwitch(
     audioSwitchViewModel: AudioSwitchViewModel,
     selectedRecentTaskViewModel: RecentTaskViewModel?,
 ) {
+    val checked = audioSwitchViewModel.audioSwitchChecked
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
         modifier = Modifier.padding(4.dp, bottom = 12.dp).height(24.dp).fillMaxWidth(),
     ) {
-        Text(text = "Share audio", style = MaterialTheme.typography.labelMedium)
+        LoadingIcon(
+            icon =
+                loadIcon(
+                        viewModel = audioSwitchViewModel,
+                        resId = R.drawable.ic_speaker_on,
+                        contentDescription = null,
+                    )
+                    .value,
+            modifier = Modifier.size(20.dp).padding(2.dp),
+        )
+        Text(
+            text = stringResource(R.string.screen_share_app_audio_sharing),
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.width(452.dp),
+        )
         Switch(
-            checked = audioSwitchViewModel.audioSwitchChecked,
+            checked = checked,
             onCheckedChange = {
                 audioSwitchViewModel.audioSwitchChecked = !audioSwitchViewModel.audioSwitchChecked
             },
             enabled = selectedRecentTaskViewModel != null,
+            thumbContent =
+                if (checked) {
+                    {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(SwitchDefaults.IconSize),
+                        )
+                    }
+                } else {
+                    null
+                },
         )
     }
 }

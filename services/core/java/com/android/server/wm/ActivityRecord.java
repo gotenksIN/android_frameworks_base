@@ -5490,8 +5490,7 @@ public final class ActivityRecord extends WindowToken {
                     && mDisplayContent.mInputMethodWindow != null
                     && mDisplayContent.mInputMethodWindow.isVisible();
             finishOrAbortReplacingWindow();
-            if (Flags.ensureStartingWindowRemoveFromTask() && !firstWindowDrawn && task != null
-                    && task.mSharedStartingData != null) {
+            if (!firstWindowDrawn && task != null && task.mSharedStartingData != null) {
                 final ActivityRecord r = getSharedStartingWindowOwnerIfTaskDrawn();
                 if (r != null) {
                     r.removeStartingWindow();
@@ -6486,6 +6485,10 @@ public final class ActivityRecord extends WindowToken {
                 mAtmService.deferWindowLayout();
                 try {
                     taskFragment.completePause(true /* resumeNext */, null /* resumingActivity */);
+                    if (com.android.window.flags.Flags.fixRapidTopResumedSwitch()) {
+                        mTaskSupervisor.handleTopResumedStateReleasedIfNeeded(this,
+                                false /* timeout */);
+                    }
                 } finally {
                     mAtmService.continueWindowLayout();
                 }
@@ -6720,19 +6723,9 @@ public final class ActivityRecord extends WindowToken {
         if (associatedTask == null) {
             removeStartingWindow();
         } else {
-            if (Flags.ensureStartingWindowRemoveFromTask()) {
-                final ActivityRecord r = getSharedStartingWindowOwnerIfTaskDrawn();
-                if (r != null) {
-                    r.removeStartingWindow();
-                }
-            } else if (associatedTask.getActivity(
-                    r -> r.isVisibleRequested() && !r.firstWindowDrawn) == null) {
-                // The last drawn activity may not be the one that owns the starting window.
-                final ActivityRecord r = associatedTask.getActivity(
-                        ar -> ar.mStartingData != null);
-                if (r != null) {
-                    r.removeStartingWindow();
-                }
+            final ActivityRecord r = getSharedStartingWindowOwnerIfTaskDrawn();
+            if (r != null) {
+                r.removeStartingWindow();
             }
         }
         updateReportedVisibilityLocked();
@@ -7905,10 +7898,10 @@ public final class ActivityRecord extends WindowToken {
                     requestedOverrideConfig.densityDpi = lastReportedMergedConfig.densityDpi;
                 }
             } else {
-                // Update the configs if we're exiting PiP mode.
-                requestedOverrideConfig.colorMode = newParentConfiguration.colorMode;
-                requestedOverrideConfig.touchscreen = newParentConfiguration.touchscreen;
-                requestedOverrideConfig.densityDpi = newParentConfiguration.densityDpi;
+                // Reset the configs if we're exiting PiP mode.
+                requestedOverrideConfig.colorMode = Configuration.COLOR_MODE_UNDEFINED;
+                requestedOverrideConfig.touchscreen = Configuration.TOUCHSCREEN_UNDEFINED;
+                requestedOverrideConfig.densityDpi = Configuration.DENSITY_DPI_UNDEFINED;
             }
         }
 
@@ -9082,6 +9075,14 @@ public final class ActivityRecord extends WindowToken {
         if (mAtmService.mSuppressResizeConfigChanges && preserveWindow) {
             return;
         }
+
+        // Notify that the activity is already relaunching, therefore there's no need to refresh
+        // the activity if it was requested. Activity refresher will track activity lifecycle
+        // if needed.
+        if (Flags.enableCameraCompatSandboxDisplayRotationOnExternalDisplaysBugfix()) {
+            AppCompatCameraPolicy.onActivityRelaunching(this);
+        }
+
         if (!preserveWindow) {
             // If the activity is the IME input target, ensure storing the last IME shown state
             // before relaunching it for restoring the IME visibility once its new window focused.

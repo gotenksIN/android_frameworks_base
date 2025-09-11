@@ -1455,6 +1455,7 @@ package android {
     field @Deprecated public static final int rowEdgeFlags = 16843329; // 0x1010241
     field public static final int rowHeight = 16843058; // 0x1010132
     field public static final int rowOrderPreserved = 16843638; // 0x1010376
+    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final int runInPccSandbox;
     field public static final int saveEnabled = 16842983; // 0x10100e7
     field public static final int scaleGravity = 16843262; // 0x10101fe
     field public static final int scaleHeight = 16843261; // 0x10101fd
@@ -6994,8 +6995,8 @@ package android.app {
   }
 
   @FlaggedApi("android.app.api_metric_style") public static final class Notification.Metric {
-    ctor public Notification.Metric(@NonNull android.app.Notification.Metric.MetricValue, @NonNull String);
-    method @NonNull public String getLabel();
+    ctor public Notification.Metric(@NonNull android.app.Notification.Metric.MetricValue, @NonNull CharSequence);
+    method @NonNull public CharSequence getLabel();
     method @NonNull public android.app.Notification.Metric.MetricValue getValue();
   }
 
@@ -7011,26 +7012,26 @@ package android.app {
 
   public static final class Notification.Metric.FixedFloat extends android.app.Notification.Metric.MetricValue {
     ctor public Notification.Metric.FixedFloat(float);
-    ctor public Notification.Metric.FixedFloat(float, @Nullable String);
-    ctor public Notification.Metric.FixedFloat(float, @Nullable String, @IntRange(from=0x0, to=0x6) int, @IntRange(from=0x0, to=0x6) int);
+    ctor public Notification.Metric.FixedFloat(float, @Nullable CharSequence);
+    ctor public Notification.Metric.FixedFloat(float, @Nullable CharSequence, @IntRange(from=0x0, to=0x6) int, @IntRange(from=0x0, to=0x6) int);
     method @IntRange(from=0x0, to=0x6) public int getMaxFractionDigits();
     method @IntRange(from=0x0, to=0x6) public int getMinFractionDigits();
-    method @Nullable public String getUnit();
+    method @Nullable public CharSequence getUnit();
     method public float getValue();
   }
 
   public static final class Notification.Metric.FixedInt extends android.app.Notification.Metric.MetricValue {
     ctor public Notification.Metric.FixedInt(int);
-    ctor public Notification.Metric.FixedInt(int, @Nullable String);
-    method @Nullable public String getUnit();
+    ctor public Notification.Metric.FixedInt(int, @Nullable CharSequence);
+    method @Nullable public CharSequence getUnit();
     method public int getValue();
   }
 
   public static final class Notification.Metric.FixedString extends android.app.Notification.Metric.MetricValue {
-    ctor public Notification.Metric.FixedString(@NonNull String);
-    ctor public Notification.Metric.FixedString(@NonNull String, @Nullable String);
-    method @Nullable public String getUnit();
-    method @NonNull public String getValue();
+    ctor public Notification.Metric.FixedString(@NonNull CharSequence);
+    ctor public Notification.Metric.FixedString(@NonNull CharSequence, @Nullable CharSequence);
+    method @Nullable public CharSequence getUnit();
+    method @NonNull public CharSequence getValue();
   }
 
   public static final class Notification.Metric.FixedTime extends android.app.Notification.Metric.MetricValue {
@@ -10012,7 +10013,7 @@ package android.app.usage {
     method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.Map<java.lang.String,android.app.usage.UsageStats> queryAndAggregateUsageStats(long, long);
     method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.List<android.app.usage.ConfigurationStats> queryConfigurations(int, long, long);
     method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.List<android.app.usage.EventStats> queryEventStats(int, long, long);
-    method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public android.app.usage.UsageEvents queryEvents(long, long);
+    method @Deprecated @FlaggedApi("android.app.usage.deprecate_old_query_events_api") @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public android.app.usage.UsageEvents queryEvents(long, long);
     method @FlaggedApi("android.app.usage.filter_based_event_query_api") @Nullable @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public android.app.usage.UsageEvents queryEvents(@NonNull android.app.usage.UsageEventsQuery);
     method public android.app.usage.UsageEvents queryEventsForSelf(long, long);
     method @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public java.util.List<android.app.usage.UsageStats> queryUsageStats(int, long, long);
@@ -10286,6 +10287,7 @@ package android.companion {
     field @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_APP_STREAMING) public static final String DEVICE_PROFILE_APP_STREAMING = "android.app.role.COMPANION_DEVICE_APP_STREAMING";
     field @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_AUTOMOTIVE_PROJECTION) public static final String DEVICE_PROFILE_AUTOMOTIVE_PROJECTION = "android.app.role.SYSTEM_AUTOMOTIVE_PROJECTION";
     field @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_COMPUTER) public static final String DEVICE_PROFILE_COMPUTER = "android.app.role.COMPANION_DEVICE_COMPUTER";
+    field @FlaggedApi("android.companion.band_device_profile") @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_WATCH) public static final String DEVICE_PROFILE_FITNESS_TRACKER = "android.app.role.COMPANION_DEVICE_FITNESS_TRACKER";
     field @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_GLASSES) public static final String DEVICE_PROFILE_GLASSES = "android.app.role.COMPANION_DEVICE_GLASSES";
     field @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_NEARBY_DEVICE_STREAMING) public static final String DEVICE_PROFILE_NEARBY_DEVICE_STREAMING = "android.app.role.COMPANION_DEVICE_NEARBY_DEVICE_STREAMING";
     field @FlaggedApi("android.companion.virtualdevice.flags.enable_limited_vdm_role") @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_VIRTUAL_DEVICE) public static final String DEVICE_PROFILE_VIRTUAL_DEVICE = "android.app.role.COMPANION_DEVICE_VIRTUAL_DEVICE";
@@ -13756,7 +13758,6 @@ package android.content.pm {
     field public static final String FEATURE_FINGERPRINT = "android.hardware.fingerprint";
     field public static final String FEATURE_FREEFORM_WINDOW_MANAGEMENT = "android.software.freeform_window_management";
     field public static final String FEATURE_GAMEPAD = "android.hardware.gamepad";
-    field @FlaggedApi("com.android.microxr.xr_glasses_feature") public static final String FEATURE_GLASSES = "android.hardware.type.glasses";
     field public static final String FEATURE_HARDWARE_KEYSTORE = "android.hardware.hardware_keystore";
     field public static final String FEATURE_HIFI_SENSORS = "android.hardware.sensor.hifi_sensors";
     field public static final String FEATURE_HOME_SCREEN = "android.software.home_screen";
@@ -13867,6 +13868,7 @@ package android.content.pm {
     field @FlaggedApi("android.xr.xr_manifest_entries") public static final String FEATURE_XR_INPUT_CONTROLLER = "android.hardware.xr.input.controller";
     field @FlaggedApi("android.xr.xr_manifest_entries") public static final String FEATURE_XR_INPUT_EYE_TRACKING = "android.hardware.xr.input.eye_tracking";
     field @FlaggedApi("android.xr.xr_manifest_entries") public static final String FEATURE_XR_INPUT_HAND_TRACKING = "android.hardware.xr.input.hand_tracking";
+    field @FlaggedApi("com.android.microxr.xr_glasses_feature") public static final String FEATURE_XR_PERIPHERAL = "android.hardware.type.xr_peripheral";
     field public static final int FLAG_PERMISSION_WHITELIST_INSTALLER = 2; // 0x2
     field public static final int FLAG_PERMISSION_WHITELIST_SYSTEM = 1; // 0x1
     field public static final int FLAG_PERMISSION_WHITELIST_UPGRADE = 4; // 0x4
@@ -30454,7 +30456,7 @@ package android.net.http {
   public class X509TrustManagerExtensions {
     ctor public X509TrustManagerExtensions(javax.net.ssl.X509TrustManager) throws java.lang.IllegalArgumentException;
     method public java.util.List<java.security.cert.X509Certificate> checkServerTrusted(java.security.cert.X509Certificate[], String, String) throws java.security.cert.CertificateException;
-    method @FlaggedApi("android.security.certificate_transparency_configuration") @NonNull public java.util.List<java.security.cert.X509Certificate> checkServerTrusted(@NonNull java.security.cert.X509Certificate[], @Nullable byte[], @Nullable byte[], @NonNull String, @NonNull String) throws java.security.cert.CertificateException;
+    method @NonNull public java.util.List<java.security.cert.X509Certificate> checkServerTrusted(@NonNull java.security.cert.X509Certificate[], @Nullable byte[], @Nullable byte[], @NonNull String, @NonNull String) throws java.security.cert.CertificateException;
     method public boolean isSameTrustConfiguration(String, String);
     method public boolean isUserAddedCertificate(java.security.cert.X509Certificate);
   }
@@ -40940,7 +40942,7 @@ package android.security {
 
   public class NetworkSecurityPolicy {
     method public static android.security.NetworkSecurityPolicy getInstance();
-    method @FlaggedApi("android.security.certificate_transparency_configuration") public boolean isCertificateTransparencyVerificationRequired(@NonNull String);
+    method public boolean isCertificateTransparencyVerificationRequired(@NonNull String);
     method public boolean isCleartextTrafficPermitted();
     method public boolean isCleartextTrafficPermitted(String);
   }
@@ -45448,6 +45450,7 @@ package android.telephony {
     field public static final String KEY_APN_EXPAND_BOOL = "apn_expand_bool";
     field public static final String KEY_APN_SETTINGS_DEFAULT_APN_TYPES_STRING_ARRAY = "apn_settings_default_apn_types_string_array";
     field public static final String KEY_AUTO_RETRY_ENABLED_BOOL = "auto_retry_enabled_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.support_auto_unhold") public static final String KEY_AUTO_UNHOLD_ON_REMOTE_DISCONNECT_BOOL = "auto_unhold_on_remote_disconnect_bool";
     field @FlaggedApi("android.net.platform.flags.avoid_bad_wifi_from_carrier_config") public static final String KEY_AVOID_BAD_WIFI_BOOL = "avoid_bad_wifi_bool";
     field public static final String KEY_CALL_BARRING_DEFAULT_SERVICE_CLASS_INT = "call_barring_default_service_class_int";
     field public static final String KEY_CALL_BARRING_SUPPORTS_DEACTIVATE_ALL_BOOL = "call_barring_supports_deactivate_all_bool";
@@ -55231,6 +55234,7 @@ package android.view {
     field public static final int OVER_SCROLL_IF_CONTENT_SCROLLS = 1; // 0x1
     field public static final int OVER_SCROLL_NEVER = 2; // 0x2
     field @FlaggedApi("com.android.hardware.input.pointer_capture_modes") public static final int POINTER_CAPTURE_MODE_ABSOLUTE = 1; // 0x1
+    field @FlaggedApi("com.android.hardware.input.pointer_capture_modes") public static final int POINTER_CAPTURE_MODE_RELATIVE = 2; // 0x2
     field @FlaggedApi("com.android.hardware.input.pointer_capture_modes") public static final int POINTER_CAPTURE_MODE_UNCAPTURED = 0; // 0x0
     field protected static final int[] PRESSED_ENABLED_FOCUSED_SELECTED_STATE_SET;
     field protected static final int[] PRESSED_ENABLED_FOCUSED_SELECTED_WINDOW_FOCUSED_STATE_SET;
@@ -56455,7 +56459,7 @@ package android.view {
     field public static final String PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED = "android.window.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED";
     field public static final String PROPERTY_CAMERA_COMPAT_ALLOW_FORCE_ROTATION = "android.window.PROPERTY_CAMERA_COMPAT_ALLOW_FORCE_ROTATION";
     field public static final String PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH = "android.window.PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH";
-    field @FlaggedApi("com.android.window.flags.enable_camera_compat_for_desktop_windowing_opt_out_api") public static final String PROPERTY_CAMERA_COMPAT_ALLOW_SIMULATE_REQUESTED_ORIENTATION = "android.window.PROPERTY_CAMERA_COMPAT_ALLOW_SIMULATE_REQUESTED_ORIENTATION";
+    field public static final String PROPERTY_CAMERA_COMPAT_ALLOW_SIMULATE_REQUESTED_ORIENTATION = "android.window.PROPERTY_CAMERA_COMPAT_ALLOW_SIMULATE_REQUESTED_ORIENTATION";
     field public static final String PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE = "android.window.PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE";
     field public static final String PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE";
     field @FlaggedApi("com.android.window.flags.app_compat_properties_api") public static final String PROPERTY_COMPAT_ALLOW_IGNORING_ORIENTATION_REQUEST_WHEN_LOOP_DETECTED = "android.window.PROPERTY_COMPAT_ALLOW_IGNORING_ORIENTATION_REQUEST_WHEN_LOOP_DETECTED";

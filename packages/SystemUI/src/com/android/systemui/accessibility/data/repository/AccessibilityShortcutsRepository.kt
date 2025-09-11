@@ -26,6 +26,7 @@ import android.text.BidiFormatter
 import android.text.TextUtils
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityManager
+import com.android.hardware.input.Flags
 import com.android.internal.accessibility.common.ShortcutConstants
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
@@ -48,7 +49,9 @@ interface AccessibilityShortcutsRepository {
 
     fun getActionKeyIconResId(): Int
 
-    fun enableShortcutsForTargets(targetName: String)
+    fun enableShortcutsForTargets(enable: Boolean, targetName: String)
+
+    fun enableMagnificationAndZoomIn(displayId: Int)
 }
 
 @SysUISingleton
@@ -88,9 +91,9 @@ constructor(
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION,
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS -> {
                 val featureName = getFeatureName(keyGestureType, targetName) ?: return null
-                val title = getFeatureTitle(keyGestureType, featureName) ?: return null
+                val title = getDialogTitle(keyGestureType, featureName) ?: return null
                 val content =
-                    getFeatureContent(
+                    getDialogContent(
                         keyGestureType,
                         secondaryModifierLabel.invoke(context),
                         keyCodeLabel,
@@ -127,13 +130,18 @@ constructor(
     }
 
     @SuppressLint("MissingPermission") // android.permission.MANAGE_ACCESSIBILITY
-    override fun enableShortcutsForTargets(targetName: String) {
+    override fun enableShortcutsForTargets(enable: Boolean, targetName: String) {
         accessibilityManager.enableShortcutsForTargets(
-            /* enable= */ true,
+            /* enable= */ enable,
             ShortcutConstants.UserShortcutType.KEY_GESTURE,
             setOf(targetName),
             userTracker.userId,
         )
+    }
+
+    @SuppressLint("MissingPermission") // android.permission.MANAGE_ACCESSIBILITY
+    override fun enableMagnificationAndZoomIn(displayId: Int) {
+        accessibilityManager.enableMagnificationAndZoomIn(displayId)
     }
 
     private suspend fun getFeatureName(keyGestureType: Int, targetName: String): CharSequence? {
@@ -156,17 +164,24 @@ constructor(
         }
     }
 
-    private suspend fun getFeatureTitle(keyGestureType: Int, featureName: CharSequence): String? {
+    private suspend fun getDialogTitle(keyGestureType: Int, featureName: CharSequence): String? {
         return when (keyGestureType) {
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION -> {
-                resources.getString(
-                    R.string.accessibility_key_gesture_magnification_dialog_title,
-                    featureName,
-                )
+                if (Flags.enableMagnifyMagnificationKeyGestureDialog()) {
+                    resources.getString(
+                        R.string.accessibility_key_gesture_magnification_dialog_title,
+                        featureName,
+                    )
+                } else {
+                    resources.getString(
+                        R.string.accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title,
+                        featureName,
+                    )
+                }
             }
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS -> {
                 resources.getString(
-                    R.string.accessibility_key_gesture_voice_access_dialog_title,
+                    R.string.accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title,
                     featureName,
                 )
             }
@@ -174,7 +189,7 @@ constructor(
         }
     }
 
-    private fun getFeatureContent(
+    private fun getDialogContent(
         keyGestureType: Int,
         secondaryModifierLabel: String,
         keyCodeLabel: String,

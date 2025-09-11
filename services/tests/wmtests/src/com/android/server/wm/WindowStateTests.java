@@ -22,6 +22,7 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.permission.flags.Flags.FLAG_SENSITIVE_NOTIFICATION_APP_PROTECTION;
 import static android.view.Display.DEFAULT_DISPLAY;
+import static android.view.InsetsFrameProvider.SOURCE_ATTACHED_CONTAINER_BOUNDS;
 import static android.view.InsetsSource.ID_IME;
 import static android.view.WindowInsets.Type.ime;
 import static android.view.WindowInsets.Type.navigationBars;
@@ -89,12 +90,16 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import android.app.AppOpsManager;
+import android.app.servertransaction.ClientTransaction;
+import android.app.servertransaction.WindowStateResizeItem;
 import android.content.ContentResolver;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
+import android.graphics.Insets;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.Region;
+import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.InputConfig;
@@ -111,6 +116,7 @@ import android.view.Gravity;
 import android.view.IWindow;
 import android.view.InputDevice;
 import android.view.InputWindowHandle;
+import android.view.InsetsFrameProvider;
 import android.view.InsetsSource;
 import android.view.InsetsSourceControl;
 import android.view.InsetsState;
@@ -1141,6 +1147,39 @@ public class WindowStateTests extends WindowTestsBase {
     }
 
     @Test
+    public void testSyncMethodBlastOverride() {
+        assumeTrue(mWm.mAlwaysSeqId);
+        final WindowState win = newWindowBuilder("window", TYPE_APPLICATION).build();
+        win.mSession.onWindowAdded(win);
+        makeWindowVisible(win);
+        makeLastConfigReportedToClient(win, true /* visible */);
+        win.mLayoutSeq = win.getDisplayContent().mLayoutSeq;
+        win.reportResized();
+        win.updateResizingWindowIfNeeded();
+        assertThat(mWm.mResizingWindows).doesNotContain(win);
+
+        // Hack so that lifecyclemanager holds onto pending for us to inspect
+        mWm.mWindowPlacerLocked.deferLayout();
+
+        // Start a non-BLAST sync (pretend like the config changed)
+        final BLASTSyncEngine.SyncGroup syncGroup = mock(BLASTSyncEngine.SyncGroup.class);
+        win.mSyncGroup = syncGroup;
+        win.prepareSync();
+        assertEquals(SYNC_STATE_WAITING_FOR_DRAW, win.mSyncState);
+        win.setLastConfigReportedToClientForTest(false);
+        win.updateResizingWindowIfNeeded();
+        assertThat(mWm.mResizingWindows).contains(win);
+        // Override this window to BLAST (seamless rotation does this)
+        win.useBlastForNextSync();
+        win.reportResized();
+
+        final ClientTransaction ct = mAtm.getLifecycleManager().mPendingTransactions.get(
+                win.getProcess().getThread().asBinder());
+        WindowStateResizeItem ri = (WindowStateResizeItem) ct.getTransactionItems().getLast();
+        assertTrue(ri.getSyncWithBuffersForTest());
+    }
+
+    @Test
     public void testEmbeddedActivityResizing_clearAllDrawn() {
         final TaskFragmentOrganizer organizer = new TaskFragmentOrganizer(Runnable::run);
         registerTaskFragmentOrganizer(
@@ -1580,6 +1619,38 @@ public class WindowStateTests extends WindowTestsBase {
         // target has changed.
         verify(app.getDisplayContent()).updateImeControlTarget(eq(true) /* forceUpdateImeParent */);
         assertEquals(mAppWindow, mDisplayContent.getImeControlTarget().getWindow());
+    }
+
+    @SetupWindows(addWindows = { W_ACTIVITY, W_INPUT_METHOD })
+    @Test
+    public void testLocalInsetsDoesNotCopyToIme() {
+        WindowState app = newWindowBuilder("app", TYPE_BASE_APPLICATION).setWindowToken(
+                mAppWindow.mToken).build();
+
+        Binder owner = new Binder();
+        final Insets attachedInsets = Insets.of(0, 10, 0, 0);
+        app.addLocalInsetsFrameProvider(
+                new InsetsFrameProvider(owner, 0, WindowInsets.Type.captionBar())
+                        .setSource(SOURCE_ATTACHED_CONTAINER_BOUNDS)
+                        .setInsetsSize(attachedInsets),
+                owner);
+
+        mDisplayContent.setRemoteInsetsController(createDisplayWindowInsetsController());
+        mDisplayContent.setImeInputTarget(mAppWindow);
+        mDisplayContent.setImeLayeringTarget(mAppWindow);
+
+        mDisplayContent.getInsetsStateController().updateAboveInsetsState(
+                false /*notifyInsetsChange*/);
+        // Verify the app is having the correct local insets result.
+        assertEquals(1, app.mMergedLocalInsetsSources.size());
+        InsetsSource appLocalSource = app.mMergedLocalInsetsSources.valueAt(0);
+        InsetsSource expectedLocalSource = new InsetsSource(appLocalSource.getId(),
+                WindowInsets.Type.captionBar());
+        expectedLocalSource.setAttachedInsets(attachedInsets).updateSideHint(new Rect());
+        assertEquals(expectedLocalSource, appLocalSource);
+
+        // Verify the IME should not receive any local insets from the target app.
+        assertNull(mImeWindow.mMergedLocalInsetsSources);
     }
 
     @SetupWindows(addWindows = { W_ACTIVITY, W_INPUT_METHOD, W_NOTIFICATION_SHADE })

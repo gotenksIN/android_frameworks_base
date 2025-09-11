@@ -208,6 +208,7 @@ public class MockingOomAdjusterTests {
     private ActivityManagerService mService;
     private TestCachedAppOptimizer mTestCachedAppOptimizer;
     private OomAdjusterInjector mInjector = new OomAdjusterInjector();
+    private ActivityManagerService.OomAdjusterCallback mCallback;
 
     private HandlerThread mActivityStateHandlerThread;
     private Handler mActivityStateHandler;
@@ -301,8 +302,9 @@ public class MockingOomAdjusterTests {
         mTestCachedAppOptimizer = new TestCachedAppOptimizer(mService);
         mService.setCachedAppOptimizer(mTestCachedAppOptimizer);
 
+        mCallback = spy(mService.new OomAdjusterCallback());
         mProcessStateController = new ProcessStateController.Builder(mService,
-                mService.mProcessList, mActiveUids)
+                mService.mProcessList, mActiveUids, mCallback)
                 .setProcessLruUpdater(lruUpdater)
                 .setOomAdjusterInjector(mInjector)
                 .build();
@@ -1666,6 +1668,24 @@ public class MockingOomAdjusterTests {
 
         assertTrue(CACHED_APP_MIN_ADJ <= app.getSetAdj());
         assertTrue(CACHED_APP_MAX_ADJ >= app.getSetAdj());
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    public void testUpdateOomAdj_DoOne_CallbackOnOomAdjustChanged() {
+        ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
+                MOCKAPP_PACKAGENAME, false);
+        final int oldAdj = CACHED_APP_MIN_ADJ;
+        app.setCurRawAdj(oldAdj);
+        app.setCurAdj(oldAdj);
+        app.setSetAdj(oldAdj);
+
+        setTopProcess(app);
+        updateOomAdj(app);
+        final int newAdj = app.getSetAdj();
+
+        assertTrue(oldAdj != newAdj);
+        verify(mCallback).onOomAdjustChanged(oldAdj, newAdj, app);
     }
 
     @SuppressWarnings("GuardedBy")
@@ -3696,7 +3716,7 @@ public class MockingOomAdjusterTests {
         assertThatProcess(app2).notHasImplicitCpuTimeCapability();
 
         doReturn(userOther).when(mService.mUserController).getCurrentUserId();
-        mService.mOomAdjuster.handleUserSwitchedLocked();
+        mService.mOomAdjuster.prewarmServicesIfNecessary();
 
         updateOomAdj();
         assertProcStates(app, PROCESS_STATE_SERVICE, cachedAdj1,
@@ -4564,6 +4584,9 @@ public class MockingOomAdjusterTests {
         doCallRealMethod().when(record).setForegroundServiceType(any(int.class));
         doCallRealMethod().when(record).getHostProcess();
         doCallRealMethod().when(record).getIsolationHostProcess();
+        doCallRealMethod().when(record).getLastTopAlmostPerceptibleBindRequestUptimeMs();
+        doCallRealMethod().when(record).setLastTopAlmostPerceptibleBindRequestUptimeMs(
+                any(long.class));
 
         setFieldValue(ServiceRecord.class, record, "connections",
                 new ArrayMap<IBinder, ArrayList<ConnectionRecord>>());
@@ -5102,8 +5125,8 @@ public class MockingOomAdjusterTests {
         }
 
         @Override
-        void batchSetOomAdj(ArrayList<ProcessRecord> procsToOomAdj) {
-            for (ProcessRecord proc : procsToOomAdj) {
+        void batchSetOomAdj(ArrayList<ProcessRecordInternal> procsToOomAdj) {
+            for (ProcessRecordInternal proc : procsToOomAdj) {
                 final int pid = proc.getPid();
                 if (pid <= 0) continue;
                 mLastSetOomAdj.put(pid, proc.getCurAdj());

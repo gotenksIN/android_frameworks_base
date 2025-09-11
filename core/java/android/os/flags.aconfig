@@ -371,10 +371,10 @@ flag {
 }
 
 flag {
-    name: "query_angle_choice_flag"
-    namespace: "gpu"
-    description: "Unconditionally querying ANGLE choice to fix a driver load malfunction"
-    bug: "408439360"
+    name: "parcel_string_cache_enabled"
+    namespace: "system_performance"
+    description: "Enable JNIStringCache in Parcel"
+    bug: "442140362"
 }
 
 flag {
@@ -431,6 +431,13 @@ flag {
      namespace: "system_performance"
      description: "Whether MessageQueue can use the new concurrent implementation in any process"
      bug: "418770969"
+}
+
+flag {
+    name: "use_query_angle_choice"
+    namespace: "gpu"
+    description: "Use new query for ANGLE choice"
+    bug: "408439360"
 }
 
 flag {

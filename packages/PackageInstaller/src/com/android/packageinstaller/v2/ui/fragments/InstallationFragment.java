@@ -30,8 +30,10 @@ import android.content.pm.ResolveInfo;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.text.Html;
+import android.text.method.LinkMovementMethod;
 import android.util.Log;
 import android.view.View;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -203,6 +205,9 @@ public class InstallationFragment extends DialogFragment {
         mCustomViewPanel.setPadding(paddingHorizontal, paddingTop,
                 paddingHorizontal, paddingBottom);
 
+        // Reset the movement method to avoid unexpected issue
+        mCustomMessageTextView.setMovementMethod(null);
+
         switch (installStage.getStageCode()) {
             case InstallStage.STAGE_ABORTED -> {
                 updateInstallAbortedUI(mDialog, (InstallAborted) installStage);
@@ -277,6 +282,11 @@ public class InstallationFragment extends DialogFragment {
         // Set the app icon and label
         mAppIcon.setImageDrawable(installStage.getAppIcon());
         mAppLabelTextView.setText(installStage.getAppLabel());
+
+        // Sometimes the A11y focus is on the button E.g. ADI. We should align the other cases.
+        // Request the A11y focus on the app label.
+        mAppLabelTextView.post(() -> mAppLabelTextView.performAccessibilityAction(
+                    AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null));
 
         int titleResId = R.string.title_install_failed_not_installed;
         String positiveButtonText = null;
@@ -613,15 +623,18 @@ public class InstallationFragment extends DialogFragment {
         int positiveBtnTextRes = 0;
         boolean isUpdateOwnerShip = false;
         if (installStage.isAppUpdating()) {
-            if (installStage.getExistingUpdateOwnerLabel() != null
-                    && installStage.getRequestedUpdateOwnerLabel() != null) {
+            final String existingUpdateOwnerLabel =
+                    installStage.getExistingUpdateOwnerLabel(requireContext());
+            final String requestedUpdateOwnerLabel =
+                    installStage.getRequestedUpdateOwnerLabel(requireContext());
+            if (existingUpdateOwnerLabel != null && requestedUpdateOwnerLabel != null) {
                 isUpdateOwnerShip = true;
                 title = getString(R.string.title_update_ownership_change,
-                        installStage.getRequestedUpdateOwnerLabel());
+                        requestedUpdateOwnerLabel);
                 positiveBtnTextRes = R.string.button_update_anyway;
                 mCustomMessageTextView.setVisibility(View.VISIBLE);
                 String updateOwnerString = getString(R.string.message_update_owner_change,
-                        installStage.getExistingUpdateOwnerLabel());
+                        existingUpdateOwnerLabel);
                 mCustomMessageTextView.setText(
                         Html.fromHtml(updateOwnerString, Html.FROM_HTML_MODE_LEGACY));
             } else {
@@ -704,6 +717,7 @@ public class InstallationFragment extends DialogFragment {
         dialog.setTitle(titleResId);
         mCustomMessageTextView.setText(
                 Html.fromHtml(getString(msgResId), Html.FROM_HTML_MODE_LEGACY));
+        mCustomMessageTextView.setMovementMethod(LinkMovementMethod.getInstance());
 
         // Set negative button
         Button negativeButton = UiUtil.getAlertDialogNegativeButton(dialog);
@@ -754,6 +768,7 @@ public class InstallationFragment extends DialogFragment {
         dialog.setTitle(titleResId);
         mCustomMessageTextView.setText(
                 Html.fromHtml(getString(msgResId), Html.FROM_HTML_MODE_LEGACY));
+        mCustomMessageTextView.setMovementMethod(LinkMovementMethod.getInstance());
 
         // Set negative button
         Button negativeButton = UiUtil.getAlertDialogNegativeButton(dialog);

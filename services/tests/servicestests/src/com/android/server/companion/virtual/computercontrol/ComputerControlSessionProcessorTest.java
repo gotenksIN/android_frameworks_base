@@ -18,6 +18,7 @@ package com.android.server.companion.virtual.computercontrol;
 
 import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionProcessor.MAXIMUM_CONCURRENT_SESSIONS;
 
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -40,6 +41,7 @@ import android.content.AttributionSource;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.ResultReceiver;
 import android.platform.test.annotations.EnableFlags;
@@ -63,11 +65,14 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.List;
+
 @Presubmit
 @RunWith(AndroidJUnit4.class)
 public class ComputerControlSessionProcessorTest {
 
     private static final int CALLBACK_TIMEOUT_MS = 1_000;
+    private static final String PACKAGE_NAME_PERMISSION_CONTROLLER = "permission.controller";
 
     @Rule
     public SetFlagsRule mSetFlagsRule = new SetFlagsRule();
@@ -75,6 +80,8 @@ public class ComputerControlSessionProcessorTest {
     private KeyguardManager mKeyguardManager;
     @Mock
     private AppOpsManager mAppOpsManager;
+    @Mock
+    private PackageManager mPackageManager;
     @Mock
     private WindowManagerInternal mWindowManagerInternal;
     @Mock
@@ -115,9 +122,13 @@ public class ComputerControlSessionProcessorTest {
                 InstrumentationRegistry.getInstrumentation().getTargetContext()));
         when(mContext.getSystemService(Context.KEYGUARD_SERVICE)).thenReturn(mKeyguardManager);
         when(mContext.getSystemService(Context.APP_OPS_SERVICE)).thenReturn(mAppOpsManager);
+        when(mContext.getPackageManager()).thenReturn(mPackageManager);
 
         when(mAppOpsManager.noteOpNoThrow(eq(AppOpsManager.OP_COMPUTER_CONTROL), any(), any()))
                 .thenReturn(AppOpsManager.MODE_ALLOWED);
+
+        when(mPackageManager.getPermissionControllerPackageName())
+                .thenReturn("permission.controller");
 
         when(mVirtualDeviceFactory.createVirtualDevice(any(), any(), any(), any()))
                 .thenReturn(mVirtualDevice);
@@ -133,12 +144,12 @@ public class ComputerControlSessionProcessorTest {
 
     @Test
     public void keyguardLocked_sessionNotCreated() throws Exception {
-        when(mKeyguardManager.isKeyguardLocked()).thenReturn(true);
+        when(mKeyguardManager.isDeviceLocked()).thenReturn(true);
 
         mProcessor.processNewSessionRequest(AttributionSource.myAttributionSource(),
                 mParams, mComputerControlSessionCallback);
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
-                .onSessionCreationFailed(ComputerControlSession.ERROR_KEYGUARD_LOCKED);
+                .onSessionCreationFailed(ComputerControlSession.ERROR_DEVICE_LOCKED);
     }
 
     @Test
@@ -146,14 +157,14 @@ public class ComputerControlSessionProcessorTest {
         try {
             for (int i = 0; i < MAXIMUM_CONCURRENT_SESSIONS; ++i) {
                 mProcessor.processNewSessionRequest(AttributionSource.myAttributionSource(),
-                        mParams, mComputerControlSessionCallback);
+                        generateUniqueParams(i), mComputerControlSessionCallback);
             }
             verify(mComputerControlSessionCallback,
                     timeout(CALLBACK_TIMEOUT_MS).times(MAXIMUM_CONCURRENT_SESSIONS))
                     .onSessionCreated(anyInt(), any(), mSessionArgumentCaptor.capture());
 
             mProcessor.processNewSessionRequest(AttributionSource.myAttributionSource(),
-                    mParams, mComputerControlSessionCallback);
+                    generateUniqueParams(-1), mComputerControlSessionCallback);
             verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                     .onSessionCreationFailed(ComputerControlSession.ERROR_SESSION_LIMIT_REACHED);
 
@@ -164,7 +175,7 @@ public class ComputerControlSessionProcessorTest {
             verify(mComputerControlSessionCallback, times(1)).onSessionClosed();
 
             mProcessor.processNewSessionRequest(AttributionSource.myAttributionSource(),
-                    mParams, mComputerControlSessionCallback);
+                    generateUniqueParams(-1), mComputerControlSessionCallback);
             verify(mComputerControlSessionCallback,
                     timeout(CALLBACK_TIMEOUT_MS).times(MAXIMUM_CONCURRENT_SESSIONS + 1))
                     .onSessionCreated(anyInt(), any(), mSessionArgumentCaptor.capture());
@@ -211,5 +222,80 @@ public class ComputerControlSessionProcessorTest {
         resultReceiver.send(Activity.RESULT_CANCELED, null);
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                 .onSessionCreationFailed(ComputerControlSession.ERROR_PERMISSION_DENIED);
+    }
+
+    @Test
+    public void validateParams_sessionNameMustBeUnique() throws Exception {
+        mProcessor.processNewSessionRequest(AttributionSource.myAttributionSource(),
+                mParams, mComputerControlSessionCallback);
+        verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
+                .onSessionCreated(anyInt(), any(), any());
+        assertThrows(IllegalArgumentException.class,
+                () -> mProcessor.processNewSessionRequest(AttributionSource.myAttributionSource(),
+                mParams, mComputerControlSessionCallback));
+    }
+
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
+    @Test
+    public void validateParams_packageNamesAreValid() throws Exception {
+        String packageName = "package.name";
+        ComputerControlSessionParams params = new ComputerControlSessionParams.Builder()
+                .setName(ComputerControlSessionTest.class.getSimpleName())
+                .setTargetPackageNames(List.of(packageName))
+                .build();
+
+        when(mPackageManager.getLaunchIntentForPackage(packageName)).thenReturn(new Intent());
+
+        mProcessor.processNewSessionRequest(AttributionSource.myAttributionSource(),
+                params, mComputerControlSessionCallback);
+
+        verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
+                .onSessionCreated(anyInt(), any(), any());
+    }
+
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
+    @Test
+    public void validateParams_invalidPackageNames_permissionController() {
+        String packageName = PACKAGE_NAME_PERMISSION_CONTROLLER;
+        ComputerControlSessionParams params = new ComputerControlSessionParams.Builder()
+                .setName(ComputerControlSessionTest.class.getSimpleName())
+                .setTargetPackageNames(List.of(packageName))
+                .build();
+
+        when(mPackageManager.getPermissionControllerPackageName()).thenReturn(packageName);
+        when(mPackageManager.getLaunchIntentForPackage(packageName)).thenReturn(new Intent());
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            mProcessor.processNewSessionRequest(AttributionSource.myAttributionSource(),
+                    params, mComputerControlSessionCallback);
+        });
+    }
+
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
+    @Test
+    public void validateParams_invalidPackageNames_packageWithoutLauncherIntent() {
+        String packageName = "package.name";
+        ComputerControlSessionParams params = new ComputerControlSessionParams.Builder()
+                .setName(ComputerControlSessionTest.class.getSimpleName())
+                .setTargetPackageNames(List.of(packageName))
+                .build();
+
+        when(mPackageManager.getLaunchIntentForPackage(packageName)).thenReturn(null);
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            mProcessor.processNewSessionRequest(AttributionSource.myAttributionSource(),
+                    params, mComputerControlSessionCallback);
+        });
+    }
+
+    private ComputerControlSessionParams generateUniqueParams(int index) {
+        return new ComputerControlSessionParams.Builder()
+                .setName(mParams.getName() + index)
+                .setDisplayDpi(mParams.getDisplayDpi())
+                .setDisplayHeightPx(mParams.getDisplayHeightPx())
+                .setDisplayWidthPx(mParams.getDisplayWidthPx())
+                .setDisplaySurface(mParams.getDisplaySurface())
+                .setDisplayAlwaysUnlocked(mParams.isDisplayAlwaysUnlocked())
+                .build();
     }
 }

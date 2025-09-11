@@ -166,7 +166,7 @@
     <string name="cfTemplateForwardedTime" msgid="735042369233323609">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: <xliff:g id="DIALING_NUMBER">{1}</xliff:g> <xliff:g id="TIME_DELAY">{2}</xliff:g> sekunnin päästä"</string>
     <string name="cfTemplateRegistered" msgid="5619930473441550596">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: ei siirretty"</string>
     <string name="cfTemplateRegisteredTime" msgid="5222794399642525045">"<xliff:g id="BEARER_SERVICE_CODE">{0}</xliff:g>: ei siirretty"</string>
-    <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"Mobiiliverkkoa koskeva turvallisuus"</string>
+    <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"Mobiiliverkon turvallisuus"</string>
     <string name="scCellularNetworkSecuritySummary" msgid="7042036754550545005">"Salaus, ilmoitukset salaamattomista verkoista"</string>
     <string name="scIdentifierDisclosureIssueTitle" msgid="2898888825129970328">"Laitteen tunnus jaettu"</string>
     <string name="scIDIssueSummaryNotificationWithCellularID" msgid="8371590113242615316">"Klo <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> lähellä oleva verkko tallensi laitteesi yksilöllisen tunnuksen (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>), kun käytössä oli SIM-kortti, jonka <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> tarjoaa"</string>
@@ -639,10 +639,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Sallii sovelluksen määrittää UVB-taajuutta käyttävien laitteiden sijainnin suhteessa toisiinsa"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"käyttää lähellä olevia Wi-Fi-laitteita"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Sallii sovelluksen ilmoittaa ja määrittää lähellä olevien Wi-Fi-laitteiden suhteellisen sijainnin sekä yhdistää niihin"</string>
-    <!-- no translation found for permlab_access_local_network (3420360767259066877) -->
-    <skip />
-    <!-- no translation found for permdesc_access_local_network (6364679803386822638) -->
-    <skip />
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"pääsy lähiverkon laitteisiin"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Sallii sovelluksen käyttää paikallisen verkon laitteita"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"määrittää laitteiden suhteellisen sijainnin"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Sallii sovelluksen määrittää lähellä olevien laitteiden sijainnin suhteessa toisiinsa"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Ensisijaiset NFC-maksupalvelutiedot"</string>

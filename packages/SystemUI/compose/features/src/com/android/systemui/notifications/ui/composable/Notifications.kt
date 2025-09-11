@@ -37,14 +37,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imeAnimationTarget
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -82,6 +83,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -101,6 +103,7 @@ import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.gesture.effect.OffsetOverscrollEffect
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffect
 import com.android.compose.modifiers.thenIf
+import com.android.compose.modifiers.width
 import com.android.compose.nestedscroll.OnStopScope
 import com.android.compose.nestedscroll.PriorityNestedScrollConnection
 import com.android.compose.nestedscroll.ScrollController
@@ -225,6 +228,9 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
             }
         }
 
+    val horizontalAlignment = viewModel.horizontalAlignment
+    val halfScreenWidth = LocalWindowInfo.current.containerSize.width / 2
+
     LaunchedEffect(isSnoozable) { scrollOffset = 0f }
 
     LaunchedEffect(scrollableState.isScrollInProgress) {
@@ -254,6 +260,21 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
         viewModel = viewModel,
         modifier =
             modifier
+                // In side-aligned layouts, HUNs are limited to half the screen width.
+                .thenIf(horizontalAlignment != Alignment.CenterHorizontally) {
+                    Modifier.width { halfScreenWidth }
+                }
+                .offset {
+                    IntOffset(
+                        x = if (horizontalAlignment == Alignment.End) halfScreenWidth else 0,
+                        y =
+                            calculateHeadsUpPlaceholderYOffset(
+                                scrollOffset.roundToInt(),
+                                minScrollOffset.roundToInt(),
+                                stackScrollView.topHeadsUpHeight,
+                            ),
+                    )
+                }
                 .onGloballyPositioned {
                     if (updateDrawBounds) {
                         stackScrollView.updateDrawBounds(
@@ -265,17 +286,6 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
                             }
                         )
                     }
-                }
-                .absoluteOffset {
-                    IntOffset(
-                        x = 0,
-                        y =
-                            calculateHeadsUpPlaceholderYOffset(
-                                scrollOffset.roundToInt(),
-                                minScrollOffset.roundToInt(),
-                                stackScrollView.topHeadsUpHeight,
-                            ),
-                    )
                 }
                 .thenIf(isSnoozable) { Modifier.nestedScroll(snoozeScrollConnection) }
                 .scrollable(orientation = Orientation.Vertical, state = scrollableState),
@@ -531,21 +541,32 @@ fun ContentScope.NotificationScrollingStack(
     }
 
     val scrimNestedScrollConnection =
-        shadeSession.rememberSession(key = "ScrimConnection", scrimOffset, minScrimTop, density) {
-            val flingSpec: DecayAnimationSpec<Float> = splineBasedDecay(density)
-            val flingBehavior = NotificationScrimFlingBehavior(flingSpec)
-            NotificationScrimNestedScrollConnection(
-                scrimOffset = { scrimOffset.value },
-                snapScrimOffset = { value -> coroutineScope.launch { scrimOffset.snapTo(value) } },
-                animateScrimOffset = { value ->
-                    coroutineScope.launch { scrimOffset.animateTo(value) }
-                },
-                minScrimOffset = minScrimOffset,
-                maxScrimOffset = 0f,
-                contentHeight = { stackHeight.intValue.toFloat() },
-                minVisibleScrimHeight = minVisibleScrimHeight,
-                flingBehavior = flingBehavior,
-            )
+        if (supportNestedScrolling) {
+            shadeSession.rememberSession(
+                key = "ScrimConnection",
+                scrimOffset,
+                minScrimTop,
+                density,
+            ) {
+                val flingSpec: DecayAnimationSpec<Float> = splineBasedDecay(density)
+                val flingBehavior = NotificationScrimFlingBehavior(flingSpec)
+                NotificationScrimNestedScrollConnection(
+                    scrimOffset = { scrimOffset.value },
+                    snapScrimOffset = { value ->
+                        coroutineScope.launch { scrimOffset.snapTo(value) }
+                    },
+                    animateScrimOffset = { value ->
+                        coroutineScope.launch { scrimOffset.animateTo(value) }
+                    },
+                    minScrimOffset = minScrimOffset,
+                    maxScrimOffset = 0f,
+                    contentHeight = { stackHeight.intValue.toFloat() },
+                    minVisibleScrimHeight = minVisibleScrimHeight,
+                    flingBehavior = flingBehavior,
+                )
+            }
+        } else {
+            null
         }
 
     val swipeToExpandNotificationScrollConnection =
@@ -715,8 +736,8 @@ fun ContentScope.NotificationScrollingStack(
                 modifier =
                     Modifier.disableSwipesWhenScrolling()
                         .nestedScroll(swipeToExpandNotificationScrollConnection)
-                        .thenIf(supportNestedScrolling) {
-                            Modifier.nestedScroll(scrimNestedScrollConnection)
+                        .thenIf(supportNestedScrolling && scrimNestedScrollConnection != null) {
+                            Modifier.nestedScroll(scrimNestedScrollConnection!!)
                         }
                         .verticalScroll(scrollState, overscrollEffect = overScrollEffect)
                         .fillMaxWidth()

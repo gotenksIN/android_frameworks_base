@@ -36,6 +36,7 @@ import android.companion.virtualdevice.flags.Flags;
 import android.content.AttributionSource;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
@@ -52,6 +53,8 @@ import android.view.Display;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
+
+import java.util.Objects;
 
 /**
  * Handles creation and lifecycle of {@link ComputerControlSession}s.
@@ -70,11 +73,12 @@ public class ComputerControlSessionProcessor {
     private final Context mContext;
     private final KeyguardManager mKeyguardManager;
     private final AppOpsManager mAppOpsManager;
+    private final PackageManager mPackageManager;
     private final VirtualDeviceFactory mVirtualDeviceFactory;
     private final PendingIntentFactory mPendingIntentFactory;
 
     /** The binders of all currently active sessions. */
-    private final ArraySet<IBinder> mSessions = new ArraySet<>();
+    private final ArraySet<ComputerControlSessionImpl> mSessions = new ArraySet<>();
 
     private final Object mHandlerThreadLock = new Object();
     @GuardedBy("mHandlerThreadLock")
@@ -95,6 +99,7 @@ public class ComputerControlSessionProcessor {
         mPendingIntentFactory = pendingIntentFactory;
         mKeyguardManager = context.getSystemService(KeyguardManager.class);
         mAppOpsManager = context.getSystemService(AppOpsManager.class);
+        mPackageManager = context.getPackageManager();
     }
 
     /**
@@ -108,6 +113,7 @@ public class ComputerControlSessionProcessor {
             @NonNull AttributionSource attributionSource,
             @NonNull ComputerControlSessionParams params,
             @NonNull IComputerControlSessionCallback callback) {
+        validateParams(attributionSource, params);
         startHandlerThreadIfNeeded();
 
         final boolean canCreateWithoutConsent;
@@ -146,6 +152,44 @@ public class ComputerControlSessionProcessor {
         }
     }
 
+    private void validateParams(AttributionSource attributionSource,
+            ComputerControlSessionParams params) {
+        synchronized (mSessions) {
+            for (int i = 0; i < mSessions.size(); i++) {
+                ComputerControlSessionImpl session = mSessions.valueAt(i);
+                if (Objects.equals(attributionSource.getPackageName(),
+                        session.getOwnerPackageName())
+                        && Objects.equals(params.getName(), session.getName())) {
+                    throw new IllegalArgumentException("Session name must be unique");
+                }
+            }
+        }
+
+        if (!Flags.computerControlActivityPolicyStrict()) {
+            return;
+        }
+
+        // TODO(b/437849228): Should be non-null
+        if (params.getTargetPackageNames() == null || params.getTargetPackageNames().isEmpty()) {
+            return;
+        }
+
+        // Ensure all packages the ComputerControl session should be able to launch are:
+        // 1) Applications with a valid launcher Intent
+        // 2) NOT PermissionController
+        for (int i = 0; i < params.getTargetPackageNames().size(); i++) {
+            String packageName = params.getTargetPackageNames().get(i);
+
+            if (packageName == null
+                    || packageName.isEmpty()
+                    || mPackageManager.getPermissionControllerPackageName().equals(packageName)
+                    || mPackageManager.getLaunchIntentForPackage(packageName) == null) {
+                throw new IllegalArgumentException(
+                        "Invalid target package for ComputerControl: " + packageName);
+            }
+        }
+    }
+
     private void startHandlerThreadIfNeeded() {
         synchronized (mHandlerThreadLock) {
             if (mHandlerThread != null) {
@@ -177,7 +221,7 @@ public class ComputerControlSessionProcessor {
                     callback.asBinder(), params, attributionSource, mVirtualDeviceFactory,
                     new OnSessionClosedListener(params.getName(), callback),
                     new ComputerControlSessionImpl.Injector(mContext));
-            mSessions.add(session.asBinder());
+            mSessions.add(session);
         }
 
         // If the client provided a surface, disable the screenshot API.
@@ -197,9 +241,9 @@ public class ComputerControlSessionProcessor {
     private boolean checkSessionCreationPreconditionsLocked(
             @NonNull ComputerControlSessionParams params,
             @NonNull IComputerControlSessionCallback callback) {
-        if (mKeyguardManager.isKeyguardLocked()) {
+        if (mKeyguardManager.isDeviceLocked()) {
             dispatchSessionCreationFailed(callback, params,
-                    ComputerControlSession.ERROR_KEYGUARD_LOCKED);
+                    ComputerControlSession.ERROR_DEVICE_LOCKED);
             return false;
         }
         if (mSessions.size() >= MAXIMUM_CONCURRENT_SESSIONS) {
@@ -291,9 +335,9 @@ public class ComputerControlSessionProcessor {
         }
 
         @Override
-        public void onClosed(IBinder token) {
+        public void onClosed(ComputerControlSessionImpl session) {
             synchronized (mSessions) {
-                if (!mSessions.remove(token)) {
+                if (!mSessions.remove(session)) {
                     // The session was already removed, which can happen if close() is called
                     // multiple times.
                     return;

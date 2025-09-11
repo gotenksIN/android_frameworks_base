@@ -535,7 +535,7 @@ public class ContentProviderHelper {
                             if (mService.mProcessStateController.addPublishedProvider(proc,
                                     cpi.name, cpr)) {
                                 checkTime(startTime, "getContentProviderImpl: scheduling install");
-                                mService.mOomAdjuster.unfreezeTemporarily(proc,
+                                mService.unfreezeTemporarily(proc,
                                         CachedAppOptimizer.UNFREEZE_REASON_GET_PROVIDER);
                                 try {
                                     thread.scheduleInstallProvider(cpi);
@@ -1380,7 +1380,8 @@ public class ContentProviderHelper {
         mService.mActivityTaskManager.installSystemProviders();
         new DevelopmentSettingsObserver(); // init to observe developer settings enable/disable
         SettingsToPropertiesMapper.start(mService.mContext.getContentResolver());
-        mService.mOomAdjuster.initSettings();
+        mService.getCachedAppOptimizer().init();
+        mService.setupServicePrewarmingOnUserSwitch();
 
         // Now that the settings provider is published we can consider sending in a rescue party.
         CrashRecoveryAdaptor.rescuePartyOnSettingsProviderPublished(mService.mContext);

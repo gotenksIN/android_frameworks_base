@@ -37,6 +37,7 @@ import android.os.RemoteException;
 import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.Surface;
+import android.view.inputmethod.InputConnection;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
@@ -71,14 +72,14 @@ public final class ComputerControlSession implements AutoCloseable {
     public static final int ERROR_SESSION_LIMIT_REACHED = 1;
 
     /**
-     * Error code indicating that a new session cannot be created because the lock screen (also
-     * known as Keyguard) is showing.
+     * Error code indicating that a new session cannot be created because the device is currently
+     * locked.
      *
      * <p>This is a transient error and the session creation request can be retried later.</p>
      *
-     * @see android.app.KeyguardManager#isKeyguardLocked()
+     * @see android.app.KeyguardManager#isDeviceLocked()
      */
-    public static final int ERROR_KEYGUARD_LOCKED = 2;
+    public static final int ERROR_DEVICE_LOCKED = 2;
 
     /**
      * Error code indicating that the user did not approve the creation of a new session.
@@ -89,10 +90,24 @@ public final class ComputerControlSession implements AutoCloseable {
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "ERROR_", value = {
             ERROR_SESSION_LIMIT_REACHED,
-            ERROR_KEYGUARD_LOCKED,
+            ERROR_DEVICE_LOCKED,
             ERROR_PERMISSION_DENIED})
     @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
     public @interface SessionCreationError {
+    }
+
+    /**
+     * Computer control action that performs back navigation.
+     */
+    public static final int ACTION_GO_BACK = 1;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = "ACTION_", value = {
+            ACTION_GO_BACK,
+    })
+    @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
+    public @interface Action {
     }
 
     @NonNull
@@ -102,6 +117,14 @@ public final class ComputerControlSession implements AutoCloseable {
     @Nullable
     private ImageReader mImageReader;
 
+    /** Perform provided action on the trusted virtual display. */
+    public void performAction(@Action int actionCode) {
+        try {
+            mSession.performAction(actionCode);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
 
     /** @hide */
     public ComputerControlSession(int displayId, @NonNull IVirtualDisplayCallback displayToken,
@@ -213,10 +236,36 @@ public final class ComputerControlSession implements AutoCloseable {
         }
     }
 
-    /** Injects a key event into the trusted virtual display. */
+    /**
+     * Injects a key event into the trusted virtual display.
+     *
+     * @deprecated use {@link #insertText(String, boolean, boolean)} for injecting text into the
+     * text field and use {@link #performAction(int)} to perform actions like "back navigation".
+     */
+    @Deprecated
     public void sendKeyEvent(@NonNull VirtualKeyEvent event) {
         try {
             mSession.sendKeyEvent(Objects.requireNonNull(event));
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Inserts provided text into the currently active text field on the display associated with
+     * the {@link ComputerControlSession}.
+     *
+     * <p> This method expects a text field to be in focus with an active {@link InputConnection}.
+     * It inserts text at the current cursor position in the text field and moves the cursor to
+     * the end of inserted text. </p>
+     *
+     * @param text to be inserted
+     * @param replaceExisting whether the current text in the text field needs to be overwritten
+     * @param commit whether the text should be submitted after insertion
+     */
+    public void insertText(@NonNull String text, boolean replaceExisting, boolean commit) {
+        try {
+            mSession.insertText(text, replaceExisting, commit);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

@@ -1656,7 +1656,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
      *
      * @hide
      */
-    public static void batchSetOomAdj(ArrayList<ProcessRecord> apps) {
+    public static void batchSetOomAdj(ArrayList<ProcessRecordInternal> apps) {
         final int totalApps = apps.size();
         if (totalApps == 0) {
             return;
@@ -1694,7 +1694,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
      *
      * {@hide}
      */
-    public static void batchSetOomAdjExt(ArrayList<ProcessRecord> apps) {
+    public static void batchSetOomAdjExt(ArrayList<ProcessRecordInternal> apps) {
         final int totalApps = apps.size();
         if (totalApps == 0) {
             return;
@@ -1705,11 +1705,12 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
         int total_procs_in_buf = 0;
         buf.putInt(LMK_PROCS_PRIO);
         for (int i = 0; i < totalApps; i++) {
-            final int pid = apps.get(i).getPid();
+            final ProcessRecord app = (ProcessRecord) apps.get(i);
+            final int pid = app.getPid();
 // QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            final int amt = apps.get(i).getCurAdj();
+            final int amt = app.getCurAdj();
 // QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            final int uid = apps.get(i).uid;
+            final int uid = app.uid;
             if (pid <= 0 || amt == UNKNOWN_ADJ) continue;
             if (total_procs_in_buf >= MAX_PROCS_PRIO_PACKET_SIZE) {
                 writeLmkd(buf, null);
@@ -1718,14 +1719,14 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
                 buf.allocate(MAX_OOM_ADJ_BATCH_LENGTH);
                 buf.putInt(LMK_PROCS_PRIO);
             }
-            String packageName = apps.get(i).info.packageName;
-            String processName = apps.get(i).processName;
+            String packageName = app.info.packageName;
+            String processName = app.processName;
             int isMainProc = 0;
             int isSystemApp = 0;
             if (packageName.equals(processName)) {
                 isMainProc = 1;
             }
-            if (apps.get(i).info.isSystemApp()) {
+            if (app.info.isSystemApp()) {
                 isSystemApp = 1;
             }
             buf.putInt(pid);

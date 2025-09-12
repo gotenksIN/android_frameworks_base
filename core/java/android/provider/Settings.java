@@ -19645,32 +19645,6 @@ public final class Settings {
         @Readable
         public static final String MULTI_SIM_SMS_PROMPT = "multi_sim_sms_prompt";
 
-        /** User preferred subscriptions setting.
-          * This holds the details of the user selected subscription from the card and
-          * the activation status. Each settings string have the comma separated values
-          * iccId,appType,appId,activationStatus,3gppIndex,3gpp2Index
-          * @hide
-         */
-        @UnsupportedAppUsage
-        @Readable
-        public static final String[] MULTI_SIM_USER_PREFERRED_SUBS = {"user_preferred_sub1",
-                "user_preferred_sub2","user_preferred_sub3"};
-
-        /**
-         * Which subscription is enabled for a physical slot.
-         * @hide
-         */
-        @Readable
-        public static final String ENABLED_SUBSCRIPTION_FOR_SLOT = "enabled_subscription_for_slot";
-
-        /**
-         * Whether corresponding logical modem is enabled for a physical slot.
-         * The value 1 - enable, 0 - disable
-         * @hide
-         */
-        @Readable
-        public static final String MODEM_STACK_ENABLED_FOR_SLOT = "modem_stack_enabled_for_slot";
-
         /**
          * Whether to enable new contacts aggregator or not.
          * The value 1 - enable, 0 - disable
@@ -19848,30 +19822,6 @@ public final class Settings {
         public static final String NOTIFICATION_FEEDBACK_ENABLED = "notification_feedback_enabled";
 
         /**
-         * Settings key for the ratio of notification dismissals to notification views - one of the
-         * criteria for showing the notification blocking helper.
-         *
-         * <p>The value is a float ranging from 0.0 to 1.0 (the closer to 0.0, the more intrusive
-         * the blocking helper will be).
-         *
-         * @hide
-         */
-        @Readable
-        public static final String BLOCKING_HELPER_DISMISS_TO_VIEW_RATIO_LIMIT =
-                "blocking_helper_dismiss_to_view_ratio";
-
-        /**
-         * Settings key for the longest streak of dismissals  - one of the criteria for showing the
-         * notification blocking helper.
-         *
-         * <p>The value is an integer greater than 0.
-         *
-         * @hide
-         */
-        @Readable
-        public static final String BLOCKING_HELPER_STREAK_LIMIT = "blocking_helper_streak_limit";
-
-        /**
          * Configuration flags for SQLite Compatibility WAL. Encoded as a key-value list, separated
          * by commas. E.g.: compatibility_wal_supported=true, wal_syncmode=OFF
          *
@@ -19976,23 +19926,6 @@ public final class Settings {
         @Readable
         public static final String SMART_REPLIES_IN_NOTIFICATIONS_FLAGS =
                 "smart_replies_in_notifications_flags";
-
-        /**
-         * Configuration flags for the automatic generation of smart replies and smart actions in
-         * notifications. This is encoded as a key=value list, separated by commas. Ex:
-         * "generate_replies=false,generate_actions=true".
-         *
-         * The following keys are supported:
-         *
-         * <pre>
-         * generate_replies                 (boolean)
-         * generate_actions                 (boolean)
-         * </pre>
-         * @hide
-         */
-        @Readable
-        public static final String SMART_SUGGESTIONS_IN_NOTIFICATIONS_FLAGS =
-                "smart_suggestions_in_notifications_flags";
 
         /**
          * If nonzero, crashes in foreground processes will bring up a dialog.

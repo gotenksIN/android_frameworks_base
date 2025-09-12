@@ -2645,6 +2645,9 @@ public class WindowManagerService extends IWindowManager.Stub
             if ((attrChanges & WindowManager.LayoutParams.ALPHA_CHANGED) != 0) {
                 winAnimator.mAlpha = attrs.alpha;
             }
+            if ((attrChanges & WindowManager.LayoutParams.TITLE_CHANGED) != 0) {
+                win.mInputWindowHandle.setName(win.getName());
+            }
             win.setWindowScale(win.mRequestedWidth, win.mRequestedHeight);
 
             if (win.mAttrs.surfaceInsets.left != 0

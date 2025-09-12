@@ -105,7 +105,6 @@ import com.android.systemui.statusbar.connectivity.AccessPointController;
 import com.android.systemui.statusbar.policy.FiveGServiceClient;
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState;
 import com.android.systemui.statusbar.policy.FiveGServiceClient.IFiveGStateListener;
-import com.android.systemui.statusbar.pipeline.StatusBarInflateCarrierMerged;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.LocationController;
 import com.android.systemui.toast.SystemUIToast;
@@ -672,8 +671,7 @@ public class InternetDetailsContentController implements AccessPointController.A
         if (isCarrierNetworkActive) {
             level = getCarrierNetworkLevel();
             numLevels = WifiEntry.WIFI_LEVEL_MAX + 1;
-            if (StatusBarInflateCarrierMerged.isEnabled()
-                    && mCarrierConfigTracker.getInflateSignalStrengthBool(subId)) {
+            if (mCarrierConfigTracker.getInflateSignalStrengthBool(subId)) {
                 level += 1;
                 numLevels += 1;
             }

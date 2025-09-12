@@ -19,6 +19,7 @@ package com.android.extensions.computercontrol;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.annotation.IntRange;
 import android.app.ActivityOptions;
+import android.companion.virtual.computercontrol.ComputerControlSession.Action;
 import android.companion.virtual.computercontrol.InteractiveMirrorDisplay;
 import android.content.Context;
 import android.content.Intent;
@@ -32,6 +33,7 @@ import android.view.accessibility.AccessibilityDisplayProxy;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityWindowInfo;
+import android.view.inputmethod.InputConnection;
 
 import androidx.annotation.GuardedBy;
 import androidx.annotation.NonNull;
@@ -174,7 +176,11 @@ public final class ComputerControlSession implements AutoCloseable {
 
     /**
      * Injects a {@link KeyEvent} into the computer control session.
+     *
+     * @deprecated use {@link #insertText(String, boolean, boolean)} for injecting text into the
+     * text field and use {@link #performAction(int)} to perform actions like "back navigation".
      */
+    @Deprecated
     public void sendKeyEvent(KeyEvent keyEvent) {
         VirtualKeyEvent virtualKeyEvent = new VirtualKeyEvent.Builder()
                                                   .setKeyCode(keyEvent.getKeyCode())
@@ -183,6 +189,31 @@ public final class ComputerControlSession implements AutoCloseable {
                                                   .build();
         mSession.sendKeyEvent(virtualKeyEvent);
 
+        mAccessibilityProxy.resetStabilityState();
+    }
+
+    /**
+     * Inserts provided text into the currently active text field on the display associated with
+     * the {@link ComputerControlSession}.
+     *
+     * <p> This method expects a text field to be in focus with an active {@link InputConnection}.
+     * It inserts text at the current cursor position in the text field and moves the cursor to
+     * the end of inserted text. </p>
+     *
+     * @param text to be inserted
+     * @param replaceExisting whether the current text in the text field needs to be overwritten
+     * @param commit whether the text should be submitted after insertion
+     */
+    public void insertText(@NonNull String text, boolean replaceExisting, boolean commit) {
+        mSession.insertText(text, replaceExisting, commit);
+        mAccessibilityProxy.resetStabilityState();
+    }
+
+    /**
+     * Perform provided action on the display associated with the {@link ComputerControlSession}.
+     */
+    public void performAction(@Action int actionCode) {
+        mSession.performAction(actionCode);
         mAccessibilityProxy.resetStabilityState();
     }
 
@@ -397,8 +428,14 @@ public final class ComputerControlSession implements AutoCloseable {
                 return this;
             }
 
-           /**
-             * Set all application package names that may be automated during this session.
+            /**
+             * Set the package names of all applications that may be automated during this session.
+             *
+             * <p>All package names specified in the list must meet the following requirements:
+             * <ol>
+             *     <li>The package name has a valid launcher Intent.</li>
+             *     <li>The package name is not the device permission controller.</li>
+             * </ol>
              */
             @NonNull
             public Builder setTargetPackageNames(@NonNull List<String> targetPackageNames) {

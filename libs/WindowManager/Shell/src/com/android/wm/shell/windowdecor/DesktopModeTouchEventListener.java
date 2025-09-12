@@ -114,9 +114,6 @@ public class DesktopModeTouchEventListener
      * Whether to pilfer the next motion event to send cancellations to the windows below.
      * Useful when the caption window is spy and the gesture should be handled by the system
      * instead of by the app for their custom header content.
-     * Should not have any effect when
-     * {@link DesktopModeFlags#ENABLE_ACCESSIBLE_CUSTOM_HEADERS}, because a spy window is not
-     * used then.
      */
     private boolean mIsCustomHeaderGesture;
     private boolean mIsResizeGesture;
@@ -182,7 +179,6 @@ public class DesktopModeTouchEventListener
         final int id = view.getId();
         if (id == R.id.back_button) return "back_button";
         if (id == R.id.caption_handle) return "caption_handle";
-        if (id == R.id.caption_handle2) return "caption_handle2";
         if (id == R.id.close_window) return "close_window";
         if (id == R.id.desktop_mode_caption) return "desktop_mode_caption";
         if (id == R.id.maximize_window) return "maximize_window";
@@ -210,8 +206,7 @@ public class DesktopModeTouchEventListener
             mWindowDecorationActions.onClose(mTaskId);
         } else if (id == R.id.back_button) {
             mTaskOperations.injectBackKey(decoration.getTaskInfo().displayId);
-        } else if (id == R.id.caption_handle || id == R.id.caption_handle2
-                || id == R.id.open_menu_button) {
+        } else if (id == R.id.caption_handle || id == R.id.open_menu_button) {
             if (id == R.id.caption_handle && !decoration.getTaskInfo().isFreeform()) {
                 // Clicking the App Handle.
                 mDesktopModeUiEventLogger.log(decoration.getTaskInfo(),
@@ -281,8 +276,7 @@ public class DesktopModeTouchEventListener
 
         if (id != R.id.caption_handle && id != R.id.desktop_mode_caption
                 && id != R.id.open_menu_button && id != R.id.close_window
-                && id != R.id.maximize_window && id != R.id.minimize_window
-                && id != R.id.caption_handle2) {
+                && id != R.id.maximize_window && id != R.id.minimize_window) {
             debugLogD("onTouch(%s) unsupported view, ignoring", viewName);
             return false;
         }
@@ -337,8 +331,7 @@ public class DesktopModeTouchEventListener
                     viewName, mIsCustomHeaderGesture, mIsResizeGesture);
             return false;
         }
-        if (mInputManager != null
-                && !DesktopModeFlags.ENABLE_ACCESSIBLE_CUSTOM_HEADERS.isTrue()) {
+        if (mInputManager != null) {
             ViewRootImpl viewRootImpl = v.getViewRootImpl();
             if (viewRootImpl != null) {
                 // Pilfer so that windows below receive cancellations for this gesture.
@@ -463,7 +456,7 @@ public class DesktopModeTouchEventListener
         final int id = v.getId();
         final String viewName = getResourceName(v);
         debugLogD("handleNonFreeformMotionEvent(%s)", viewName);
-        if (id != R.id.caption_handle && id != R.id.caption_handle2) {
+        if (id != R.id.caption_handle) {
             debugLogD("handleNonFreeformMotionEvent(%s) unsupported view, ignoring",
                     viewName);
             return false;

@@ -21,6 +21,8 @@ import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAUL
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_ACTIVITY;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_RECENTS;
 
+import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionImpl.KEY_EVENT_DELAY_MS;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -36,6 +38,7 @@ import static org.testng.Assert.assertThrows;
 import android.companion.virtual.ActivityPolicyExemption;
 import android.companion.virtual.IVirtualDevice;
 import android.companion.virtual.VirtualDeviceParams;
+import android.companion.virtual.computercontrol.ComputerControlSession;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtualdevice.flags.Flags;
 import android.content.AttributionSource;
@@ -43,16 +46,19 @@ import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplayConfig;
 import android.hardware.input.IVirtualInputDevice;
 import android.hardware.input.VirtualDpadConfig;
+import android.hardware.input.VirtualKeyEvent;
 import android.hardware.input.VirtualKeyboardConfig;
 import android.hardware.input.VirtualTouchEvent;
 import android.hardware.input.VirtualTouchscreenConfig;
 import android.os.Binder;
 import android.os.IBinder;
+import android.os.RemoteException;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.view.DisplayInfo;
+import android.view.KeyEvent;
 import android.view.WindowManager;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -68,7 +74,6 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Presubmit
@@ -85,11 +90,8 @@ public class ComputerControlSessionTest {
     private static final int DISPLAY_DPI = 480;
     private static final String TARGET_PACKAGE_1 = "com.android.foo";
     private static final String TARGET_PACKAGE_2 = "com.android.bar";
-    private static final String TARGET_PACKAGE_3 = "com.android.foobar";
     private static final List<String> TARGET_PACKAGE_NAMES =
             List.of(TARGET_PACKAGE_1, TARGET_PACKAGE_2);
-    private static final List<String> PACKAGES_WITHOUT_LAUNCHER_ACTIVITY = List.of(
-            TARGET_PACKAGE_3);
     private static final String UNDECLARED_TARGET_PACKAGE = "com.android.baz";
 
     @Mock
@@ -101,11 +103,13 @@ public class ComputerControlSessionTest {
     @Mock
     private IVirtualDevice mVirtualDevice;
     @Mock
+    private IVirtualInputDevice mVirtualDpad;
+    @Mock
+    private IVirtualInputDevice mVirtualKeyboard;
+    @Mock
     private IVirtualInputDevice mVirtualTouchscreen;
     @Captor
     private ArgumentCaptor<VirtualDeviceParams> mVirtualDeviceParamsArgumentCaptor;
-    @Captor
-    private ArgumentCaptor<ActivityPolicyExemption> mActivityPolicyExemptionArgumentCaptor;
     @Captor
     private ArgumentCaptor<VirtualDisplayConfig> mVirtualDisplayConfigArgumentCaptor;
     @Captor
@@ -136,12 +140,12 @@ public class ComputerControlSessionTest {
 
         when(mInjector.getPermissionControllerPackageName())
                 .thenReturn(PERMISSION_CONTROLLER_PACKAGE);
-        when(mInjector.getAllApplicationsWithoutLauncherActivity())
-                .thenReturn(PACKAGES_WITHOUT_LAUNCHER_ACTIVITY);
         when(mVirtualDeviceFactory.createVirtualDevice(any(), any(), any(), any()))
                 .thenReturn(mVirtualDevice);
         when(mVirtualDevice.createVirtualDisplay(any(), any())).thenReturn(VIRTUAL_DISPLAY_ID);
         when(mVirtualDevice.createVirtualTouchscreen(any(), any())).thenReturn(mVirtualTouchscreen);
+        when(mVirtualDevice.createVirtualKeyboard(any(), any())).thenReturn(mVirtualKeyboard);
+        when(mVirtualDevice.createVirtualDpad(any(), any())).thenReturn(mVirtualDpad);
     }
 
     @After
@@ -159,7 +163,7 @@ public class ComputerControlSessionTest {
                 .isEqualTo(mDefaultParams.getName());
         assertThat(mVirtualDeviceParamsArgumentCaptor.getValue()
                 .getDevicePolicy(POLICY_TYPE_RECENTS))
-                .isEqualTo(DEVICE_POLICY_CUSTOM);
+                .isEqualTo(DEVICE_POLICY_DEFAULT);
 
         verify(mVirtualDevice).createVirtualDisplay(
                 mVirtualDisplayConfigArgumentCaptor.capture(), any());
@@ -204,8 +208,7 @@ public class ComputerControlSessionTest {
     }
 
     @Test
-    @DisableFlags(value = {Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_RELAXED,
-            Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT})
+    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
     public void createSession_noActivityPolicy() throws Exception {
         createComputerControlSession(mDefaultParams);
         verify(mVirtualDevice, never()).setDevicePolicy(eq(POLICY_TYPE_ACTIVITY), anyInt());
@@ -216,79 +219,7 @@ public class ComputerControlSessionTest {
 
     @Test
     @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
-    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_RELAXED)
     public void createSession_strictActivityPolicy() throws Exception {
-        createComputerControlSession(mDefaultParams);
-
-        verify(mVirtualDevice).setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM);
-
-        for (String expected : TARGET_PACKAGE_NAMES) {
-            verify(mVirtualDevice).addActivityPolicyExemption(
-                    argThat(new MatchesActivityPolicyExcemption(expected)));
-        }
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
-    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_RELAXED)
-    public void createSession_strictActivityPolicy_removesPermissionController() throws Exception {
-        List<String> targetPackageNames = List.of(TARGET_PACKAGE_1, PERMISSION_CONTROLLER_PACKAGE);
-        createComputerControlSession(new ComputerControlSessionParams.Builder()
-                .setTargetPackageNames(targetPackageNames)
-                .setName(ComputerControlSessionTest.class.getSimpleName())
-                .build());
-
-        verify(mVirtualDevice).setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM);
-
-        verify(mVirtualDevice).addActivityPolicyExemption(
-                argThat(new MatchesActivityPolicyExcemption(TARGET_PACKAGE_1)));
-        verify(mVirtualDevice, never()).addActivityPolicyExemption(
-                argThat(new MatchesActivityPolicyExcemption(PERMISSION_CONTROLLER_PACKAGE)));
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_RELAXED)
-    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
-    public void createSession_relaxedActivityPolicy() throws Exception {
-        createComputerControlSession(mDefaultParams);
-
-        verify(mVirtualDevice).setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM);
-
-        List<String> targetPackageNames = new ArrayList<>(mDefaultParams.getTargetPackageNames());
-        targetPackageNames.addAll(PACKAGES_WITHOUT_LAUNCHER_ACTIVITY);
-
-        for (String expected : targetPackageNames) {
-            verify(mVirtualDevice).addActivityPolicyExemption(
-                    argThat(new MatchesActivityPolicyExcemption(expected)));
-        }
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_RELAXED)
-    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
-    public void createSession_relaxedActivityPolicy_removesPermissionController() throws Exception {
-        createComputerControlSession(new ComputerControlSessionParams.Builder()
-                .setName(ComputerControlSessionTest.class.getSimpleName())
-                .setTargetPackageNames(List.of(TARGET_PACKAGE_1, PERMISSION_CONTROLLER_PACKAGE))
-                .build());
-
-        verify(mVirtualDevice).setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM);
-
-        List<String> targetPackageNames = new ArrayList<>();
-        targetPackageNames.add(TARGET_PACKAGE_1);
-        targetPackageNames.addAll(PACKAGES_WITHOUT_LAUNCHER_ACTIVITY);
-        for (String expected : targetPackageNames) {
-            verify(mVirtualDevice).addActivityPolicyExemption(
-                    argThat(new MatchesActivityPolicyExcemption(expected)));
-        }
-        verify(mVirtualDevice, never()).addActivityPolicyExemption(
-                argThat(new MatchesActivityPolicyExcemption(PERMISSION_CONTROLLER_PACKAGE)));
-    }
-
-    @Test
-    @EnableFlags(value = {Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_RELAXED,
-            Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT})
-    public void createSession_bothActivityPolicies() throws Exception {
         createComputerControlSession(mDefaultParams);
 
         verify(mVirtualDevice).setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM);
@@ -303,9 +234,8 @@ public class ComputerControlSessionTest {
     public void closeSession_closesVirtualDevice() throws Exception {
         createComputerControlSession(mDefaultParams);
         mSession.close();
-        verify(mVirtualDevice).setDevicePolicy(POLICY_TYPE_RECENTS, DEVICE_POLICY_DEFAULT);
         verify(mVirtualDevice).close();
-        verify(mOnClosedListener).onClosed(mSession.asBinder());
+        verify(mOnClosedListener).onClosed(mSession);
     }
 
     @Test
@@ -365,6 +295,73 @@ public class ComputerControlSessionTest {
                 new MatchesTouchEvent(180, 400, VirtualTouchEvent.ACTION_UP)));
     }
 
+    @Test
+    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_TYPING)
+    public void insertText_sendsCharacterKeysToVirtualKeyboard() throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+
+        mSession.insertText("t", false /* replaceExisting */, false /* commit */);
+        verify(mVirtualKeyboard, timeout(10 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                argThat(new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_T,
+                        VirtualKeyEvent.ACTION_DOWN)));
+        verify(mVirtualKeyboard, timeout(10 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                argThat(new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_T,
+                        VirtualKeyEvent.ACTION_UP)));
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_TYPING)
+    public void insertTextWithReplaceExisting_sendsDeleteTextSequenceToVirtualKeyboard()
+            throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+
+        mSession.insertText("text", true /* replaceExisting */, false /* commit */);
+        verify(mVirtualKeyboard, timeout(10 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                argThat(new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT,
+                        VirtualKeyEvent.ACTION_DOWN)));
+        verify(mVirtualKeyboard, timeout(10 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                argThat(new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_A,
+                        VirtualKeyEvent.ACTION_DOWN)));
+        verify(mVirtualKeyboard, timeout(10 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                argThat(new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_A,
+                        VirtualKeyEvent.ACTION_UP)));
+        verify(mVirtualKeyboard, timeout(10 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                argThat(new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT,
+                        VirtualKeyEvent.ACTION_UP)));
+        verify(mVirtualKeyboard, timeout(10 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                argThat(new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_DEL,
+                        VirtualKeyEvent.ACTION_DOWN)));
+        verify(mVirtualKeyboard, timeout(10 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                argThat(new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_DEL,
+                        VirtualKeyEvent.ACTION_UP)));
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_TYPING)
+    public void insertTextWithCommit_sendsEnterKeyToVirtualKeyboard() throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+
+        mSession.insertText("", false /* replaceExisting */, true /* commit */);
+        verify(mVirtualKeyboard, timeout(10 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                argThat(new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_ENTER,
+                        VirtualKeyEvent.ACTION_DOWN)));
+        verify(mVirtualKeyboard, timeout(10 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                argThat(new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_ENTER,
+                        VirtualKeyEvent.ACTION_UP)));
+    }
+
+    @Test
+    public void performActionBack_injectsBackKey()
+            throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+
+        mSession.performAction(ComputerControlSession.ACTION_GO_BACK);
+        verify(mVirtualDpad).sendKeyEvent(argThat(
+                new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_BACK, VirtualKeyEvent.ACTION_DOWN)));
+        verify(mVirtualDpad).sendKeyEvent(argThat(
+                new MatchesVirtualKeyEvent(KeyEvent.KEYCODE_BACK, VirtualKeyEvent.ACTION_UP)));
+    }
+
     private void createComputerControlSession(ComputerControlSessionParams params) {
         mSession = new ComputerControlSessionImpl(mAppToken, params,
                 AttributionSource.myAttributionSource(), mVirtualDeviceFactory, mOnClosedListener,
@@ -417,6 +414,22 @@ public class ComputerControlSessionTest {
                 return true;
             }
             return mX == event.getX() && mY == event.getY();
+        }
+    }
+
+    private static class MatchesVirtualKeyEvent implements ArgumentMatcher<VirtualKeyEvent> {
+
+        private final int mKeyCode;
+        private final int mAction;
+
+        MatchesVirtualKeyEvent(int keyCode, int action) {
+            mKeyCode = keyCode;
+            mAction = action;
+        }
+
+        @Override
+        public boolean matches(VirtualKeyEvent event) {
+            return event.getKeyCode() == mKeyCode && event.getAction() == mAction;
         }
     }
 }

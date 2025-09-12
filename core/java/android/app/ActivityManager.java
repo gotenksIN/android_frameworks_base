@@ -859,6 +859,8 @@ public class ActivityManager {
             PROCESS_CAPABILITY_BFSL,
             PROCESS_CAPABILITY_USER_RESTRICTED_NETWORK,
             PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL,
+            PROCESS_CAPABILITY_CPU_TIME,
+            PROCESS_CAPABILITY_IMPLICIT_CPU_TIME,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ProcessCapability {}
@@ -3444,7 +3446,11 @@ public class ActivityManager {
         }
     }
 
-    /** @hide */
+    /**
+     * Information you can retrieve about a particular connection to a
+     * Service that is currently running in the system.
+     * @hide
+     */
     @TestApi
     @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
     public static final class ConnectionInfo implements Parcelable {
@@ -3513,16 +3519,25 @@ public class ActivityManager {
             return 0;
         }
 
+        /**
+         * Get the bind service flags for the connection.
+         */
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
-        public long getFlags() {
+        public @Context.BindServiceFlagsLongBits long getFlags() {
             return mFlags;
         }
 
+        /**
+         * Get the process name of the client.
+         */
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
         public @NonNull String getProcessName() {
             return mProcessName;
         }
 
+        /**
+         * Get the package name of the client.
+         */
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
         public @NonNull String getPackageName() {
             return mPackageName;
@@ -3546,6 +3561,10 @@ public class ActivityManager {
 
     /**
      * Returns a list of ConnectionInfo for connections bound to a given service.
+     * @param service The component name of the service to return ConnectionInfo
+     * records for.
+     * @return Returns a list of ConnectionInfo records describing each of
+     * the service connections.
      * @hide
      */
     @TestApi

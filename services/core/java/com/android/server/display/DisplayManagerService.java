@@ -1273,7 +1273,7 @@ public final class DisplayManagerService extends SystemService {
                         if (updateMirrorBuiltInDisplaySettingLocked(
                                 /*shouldSendDisplayChangeEvent=*/ true)) {
                             mExternalDisplayPolicy.handleMirrorBuiltInDisplaySettingChangeLocked(
-                                /*enableDisplays=*/ true);
+                                /*enableDisplays=*/ false);
                         }
                     }
                 }
@@ -1706,10 +1706,11 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
-    private WifiDisplayStatus getWifiDisplayStatusInternal() {
+    private WifiDisplayStatus getWifiDisplayStatusInternal(boolean hasLocationPermission) {
         synchronized (mSyncRoot) {
             if (mWifiDisplayAdapter != null) {
-                return mWifiDisplayAdapter.getWifiDisplayStatusLocked();
+                // Device address is visible if the caller has location permission.
+                return mWifiDisplayAdapter.getWifiDisplayStatusLocked(hasLocationPermission);
             }
             return new WifiDisplayStatus();
         }
@@ -4176,6 +4177,12 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
+    @VisibleForTesting
+    @Nullable
+    WifiDisplayController.Listener getWifiDisplayListener() {
+        return mWifiDisplayAdapter != null ? mWifiDisplayAdapter.getWifiDisplayListener() : null;
+    }
+
     private void initializeDisplayPowerControllersLocked() {
         mLogicalDisplayMapper.forEachLocked(this::addDisplayPowerControllerLocked);
     }
@@ -5060,10 +5067,12 @@ public final class DisplayManagerService extends SystemService {
         public WifiDisplayStatus getWifiDisplayStatus() {
             // This request does not require special permissions.
             // Any app can get information about available wifi displays.
-
+            // Except for location permission, which is required to get the wifi display address.
+            final boolean hasLocationPermission = checkCallingPermission(
+                    android.Manifest.permission.ACCESS_FINE_LOCATION, "getWifiDisplayStatus()");
             final long token = Binder.clearCallingIdentity();
             try {
-                return getWifiDisplayStatusInternal();
+                return getWifiDisplayStatusInternal(hasLocationPermission);
             } finally {
                 Binder.restoreCallingIdentity(token);
             }
@@ -6480,7 +6489,7 @@ public final class DisplayManagerService extends SystemService {
                         .setDeviceStateLocked(deviceState);
             }
         }
-    };
+    }
 
     private static class BrightnessPair {
         public float brightness;

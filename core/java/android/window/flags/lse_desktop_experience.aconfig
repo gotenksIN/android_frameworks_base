@@ -23,6 +23,13 @@ flag {
 }
 
 flag {
+    name: "close_fullscreen_and_splitscreen_keyboard_shortcut"
+    namespace: "lse_desktop_experience"
+    description: "Enable keyboard shortcut to close fullscreen and split screen tasks"
+    bug: "441147192"
+}
+
+flag {
     name: "close_task_keyboard_shortcut"
     namespace: "lse_desktop_experience"
     description: "Enable keyboard shortcut to close a task"
@@ -37,6 +44,18 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Moves desk creation to coroutines to guarantee non-null default desk"
     bug: "406890311"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "defer_resume_focus_in_non_focused_window"
+    namespace: "lse_desktop_experience"
+    description: "Gates the logic that prevents the system from restoring focus to a view /n"
+                 "within a background window when a user exits touch mode, for instance, /n"
+                 "by pressing an arrow key on a physical keyboard."
+    bug: "438781414"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -341,16 +360,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables launching an app while it's in PiP on another display."
     bug: "424569682"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_defer_down_recents_animation_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enable defering start of recents animation by down to prevent showing unintentional animation"
-    bug: "432133436"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

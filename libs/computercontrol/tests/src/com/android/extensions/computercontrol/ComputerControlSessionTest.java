@@ -16,6 +16,8 @@
 
 package com.android.extensions.computercontrol;
 
+import static android.companion.virtual.computercontrol.ComputerControlSession.ACTION_GO_BACK;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -205,6 +207,24 @@ public class ComputerControlSessionTest {
 
         mSession.startActivity(mContext, intent);
         mVirtualDeviceRule.waitAndAssertActivityResumed(componentName, mVirtualDisplayId);
+
+        verify(mStabilityHintCallback, timeout(TIMEOUT_MS)).onStabilityHint(false);
+    }
+
+    @Test
+    public void insertText_insertsText() throws Exception {
+        mSession.insertText("test", true, true);
+
+        verify(mIComputerControlSession).insertText(eq("test"), eq(true), eq(true));
+
+        verify(mStabilityHintCallback, timeout(TIMEOUT_MS)).onStabilityHint(false);
+    }
+
+    @Test
+    public void performAction_performsAction() throws Exception {
+        mSession.performAction(ACTION_GO_BACK);
+
+        verify(mIComputerControlSession).performAction(eq(ACTION_GO_BACK));
 
         verify(mStabilityHintCallback, timeout(TIMEOUT_MS)).onStabilityHint(false);
     }

@@ -247,6 +247,12 @@ public abstract class ProcessRecordInternal {
      */
     public abstract int getApplicationUid();
 
+    /** Returns the package name of the application this process belongs to. */
+    public abstract String getPackageName();
+
+    /** Returns whether this process is for an instant app. */
+    public abstract boolean isInstantApp();
+
     /** Returns the {@link UidRecordInternal} associated with this process. */
     public abstract UidRecordInternal getUidRecord();
 
@@ -276,6 +282,9 @@ public abstract class ProcessRecordInternal {
 
     /** Notifies the window process controller about a change in top process status. */
     public abstract void notifyTopProcChanged();
+
+    /** Returns an array of package names associated with this process. */
+    public abstract String[] getPackageList();
 
     // Enable this to trace all OomAdjuster state transitions
     private static final boolean TRACE_OOM_ADJ = false;

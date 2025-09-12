@@ -662,7 +662,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         final WindowState top = dc.getDisplayPolicy().getTopFullscreenOpaqueWindow();
         if (top != null) {
             mIsSeamlessRotation = true;
-            top.mSyncMethodOverride = BLASTSyncEngine.METHOD_BLAST;
+            top.useBlastForNextSync();
             ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, "Override sync-method for %s "
                     + "because seamless rotating", top.getName());
         }
@@ -908,13 +908,13 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         recordDisplay(from.getDisplayContent());
     }
 
-    /** Adds the top visible non-alwaysOnTop tasks within `task` to `out`. */
+    /** Adds the top non-alwaysOnTop tasks within `task` to `out`. */
     private static void addOnTopTasks(Task task, ArrayList<Task> out) {
         for (int i = task.getChildCount() - 1; i >= 0; --i) {
             final Task child = task.getChildAt(i).asTask();
             if (child == null) return;
             if (child.getWindowConfiguration().isAlwaysOnTop()
-                    || (!com.android.window.flags.Flags.polishCloseWallpaperIncludesOpenChange()
+                    && (!com.android.window.flags.Flags.polishCloseWallpaperIncludesOpenChange()
                         || !child.isVisibleRequested())) {
                 continue;
             }
@@ -1782,9 +1782,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             } else {
                 // If there is an existing sync group for the commit-at-end activity,
                 // enforce BLAST sync method for its windows, before resuming config dispatch.
-                target.forAllWindows(windowState -> {
-                    windowState.mSyncMethodOverride = BLASTSyncEngine.METHOD_BLAST;
-                }, true /* traverseTopToBottom */);
+                target.forAllWindows(WindowState::useBlastForNextSync,
+                        true /* traverseTopToBottom */);
             }
             // Reset surface state here (since it was skipped in buildFinishTransaction). Since
             // we are resuming config to the "current" state, we have to calculate the matching

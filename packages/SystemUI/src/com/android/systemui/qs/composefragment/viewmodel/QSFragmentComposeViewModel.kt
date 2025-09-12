@@ -341,7 +341,9 @@ constructor(
 
     val qsMediaTranslationY by derivedStateOf {
         if (
-            qsExpansion > 0f &&
+            !MediaControlsInComposeFlag.isEnabled &&
+                !Flags.mediaControlsTranslationFix() &&
+                qsExpansion > 0f &&
                 !isKeyguardState &&
                 !qqsMediaVisible &&
                 !qsMediaInRow &&

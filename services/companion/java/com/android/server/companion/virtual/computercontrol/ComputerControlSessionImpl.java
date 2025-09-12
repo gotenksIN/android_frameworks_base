@@ -17,19 +17,19 @@
 package com.android.server.companion.virtual.computercontrol;
 
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM;
-import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_ACTIVITY;
-import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_RECENTS;
 
 import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityOptions;
 import android.companion.virtual.ActivityPolicyExemption;
 import android.companion.virtual.IVirtualDevice;
 import android.companion.virtual.IVirtualDeviceActivityListener;
 import android.companion.virtual.VirtualDeviceParams;
+import android.companion.virtual.computercontrol.ComputerControlSession;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IComputerControlSession;
 import android.companion.virtual.computercontrol.IInteractiveMirrorDisplay;
@@ -39,7 +39,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerGlobal;
@@ -56,8 +55,11 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.UserHandle;
+import android.util.Slog;
 import android.view.Display;
 import android.view.DisplayInfo;
+import android.view.KeyCharacterMap;
+import android.view.KeyEvent;
 import android.view.Surface;
 import android.view.WindowManager;
 
@@ -81,6 +83,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         implements IBinder.DeathRecipient {
 
+    private static final String TAG = "ComputerControlSession";
+
     // Throttle swipe events to avoid misinterpreting them as a fling. Each swipe will
     // consist of a DOWN event, 10 MOVE events spread over 500ms, and an UP event.
     @VisibleForTesting
@@ -88,8 +92,12 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @VisibleForTesting
     static final long SWIPE_EVENT_DELAY_MS = 50L;
 
+    @VisibleForTesting
+    static final long KEY_EVENT_DELAY_MS = 10L;
+
     private final IBinder mAppToken;
     private final ComputerControlSessionParams mParams;
+    private final String mOwnerPackageName;
     private final OnClosedListener mOnClosedListener;
     private final IVirtualDevice mVirtualDevice;
     private final int mVirtualDisplayId;
@@ -106,6 +114,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private int mDisplayWidth;
     private int mDisplayHeight;
     private ScheduledFuture<?> mSwipeFuture;
+    private ScheduledFuture<?> mInsertTextFuture;
 
     ComputerControlSessionImpl(IBinder appToken, ComputerControlSessionParams params,
             AttributionSource attributionSource,
@@ -113,12 +122,12 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             OnClosedListener onClosedListener, Injector injector) {
         mAppToken = appToken;
         mParams = params;
+        mOwnerPackageName = attributionSource.getPackageName();
         mOnClosedListener = onClosedListener;
         mInjector = injector;
 
         final VirtualDeviceParams virtualDeviceParams = new VirtualDeviceParams.Builder()
                 .setName(mParams.getName())
-                .setDevicePolicy(POLICY_TYPE_RECENTS, DEVICE_POLICY_CUSTOM)
                 .build();
 
         int displayFlags = DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
@@ -178,7 +187,10 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mVirtualDevice.setDisplayImePolicy(
                     mVirtualDisplayId, WindowManager.DISPLAY_IME_POLICY_HIDE);
 
-            final String dpadName = mParams.getName() + "-dpad";
+            final String inputDeviceNamePrefix =
+                    attributionSource.getPackageName() + ":" + mParams.getName();
+
+            final String dpadName = inputDeviceNamePrefix + "-dpad";
             final VirtualDpadConfig virtualDpadConfig =
                     new VirtualDpadConfig.Builder()
                             .setAssociatedDisplayId(mVirtualDisplayId)
@@ -187,7 +199,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mVirtualDpad = mVirtualDevice.createVirtualDpad(
                     virtualDpadConfig, new Binder(dpadName));
 
-            final String keyboardName = mParams.getName()  + "-keyboard";
+            final String keyboardName = inputDeviceNamePrefix + "-keyboard";
             final VirtualKeyboardConfig virtualKeyboardConfig =
                     new VirtualKeyboardConfig.Builder()
                             .setAssociatedDisplayId(mVirtualDisplayId)
@@ -196,7 +208,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mVirtualKeyboard = mVirtualDevice.createVirtualKeyboard(
                     virtualKeyboardConfig, new Binder(keyboardName));
 
-            final String touchscreenName = mParams.getName() + "-touchscreen";
+            final String touchscreenName = inputDeviceNamePrefix + "-touchscreen";
             final VirtualTouchscreenConfig virtualTouchscreenConfig =
                     new VirtualTouchscreenConfig.Builder(mDisplayWidth, mDisplayHeight)
                             .setAssociatedDisplayId(mVirtualDisplayId)
@@ -211,28 +223,28 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         }
     }
 
+    /**
+     * This assumes that {@link ComputerControlSessionParams#getTargetPackageNames()} never contains
+     * any packageNames that the session owner should never be able to launch. This is validated in
+     * {@link ComputerControlSessionProcessor} prior to creating the session.
+     */
     private void applyActivityPolicy() throws RemoteException {
-        String permissionControllerPackage = mInjector.getPermissionControllerPackageName();
-
         List<String> exemptedPackageNames = new ArrayList<>();
         if (Flags.computerControlActivityPolicyStrict()) {
             mVirtualDevice.setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM);
 
             exemptedPackageNames.addAll(mParams.getTargetPackageNames());
-            exemptedPackageNames.remove(permissionControllerPackage);
-        } else if (Flags.computerControlActivityPolicyRelaxed()) {
-            mVirtualDevice.setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM);
-
-            exemptedPackageNames.addAll(mParams.getTargetPackageNames());
-            exemptedPackageNames.addAll(mInjector.getAllApplicationsWithoutLauncherActivity());
-            exemptedPackageNames.remove(permissionControllerPackage);
         } else {
+            // TODO(b/439774796): Remove once v0 API is removed and the flag is rolled out.
+            // This legacy policy allows all apps other than PermissionController to be automated.
+            String permissionControllerPackage = mInjector.getPermissionControllerPackageName();
             exemptedPackageNames.add(permissionControllerPackage);
         }
-        for (String allowedPackageName : exemptedPackageNames) {
+        for (int i = 0; i < exemptedPackageNames.size(); i++) {
+            String exemptedPackageName = exemptedPackageNames.get(i);
             mVirtualDevice.addActivityPolicyExemption(
                     new ActivityPolicyExemption.Builder()
-                            .setPackageName(allowedPackageName)
+                            .setPackageName(exemptedPackageName)
                             .build());
         }
     }
@@ -244,6 +256,14 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     IVirtualDisplayCallback getVirtualDisplayToken() {
         return mVirtualDisplayToken;
+    }
+
+    String getName() {
+        return mParams.getName();
+    }
+
+    String getOwnerPackageName() {
+        return mOwnerPackageName;
     }
 
     public void launchApplication(@NonNull String packageName) {
@@ -289,6 +309,20 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     }
 
     @Override
+    public void performAction(@ComputerControlSession.Action int actionCode)
+            throws RemoteException {
+        cancelOngoingKeyGestures();
+        if (actionCode == ComputerControlSession.ACTION_GO_BACK) {
+            mVirtualDpad.sendKeyEvent(
+                    createKeyEvent(KeyEvent.KEYCODE_BACK, VirtualKeyEvent.ACTION_DOWN));
+            mVirtualDpad.sendKeyEvent(
+                    createKeyEvent(KeyEvent.KEYCODE_BACK, VirtualKeyEvent.ACTION_UP));
+        } else {
+            Slog.e(TAG, "Invalid action code for performAction: " + actionCode);
+        }
+    }
+
+    @Override
     @Nullable
     public IInteractiveMirrorDisplay createInteractiveMirrorDisplay(
             int width, int height, @NonNull Surface surface) throws RemoteException {
@@ -309,12 +343,49 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         return new InteractiveMirrorDisplayImpl(virtualDisplayConfig, mVirtualDevice);
     }
 
+    @SuppressLint("WrongConstant")
+    @Override
+    public void insertText(@NonNull String text, boolean replaceExisting, boolean commit) {
+        cancelOngoingKeyGestures();
+        if (android.companion.virtualdevice.flags.Flags.computerControlTyping()) {
+            // TODO(b/422134565): Implement Input connection based typing
+        } else {
+            KeyCharacterMap kcm = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD);
+            KeyEvent[] events = kcm.getEvents(text.toCharArray());
+
+            if (events == null) {
+                Slog.e(TAG, "Couldn't generate key events from the provided text");
+                return;
+            }
+            List<VirtualKeyEvent> keysToSend = new ArrayList<>();
+            if (replaceExisting) {
+                keysToSend.add(
+                        createKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, VirtualKeyEvent.ACTION_DOWN));
+                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_A, VirtualKeyEvent.ACTION_DOWN));
+                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_A, VirtualKeyEvent.ACTION_UP));
+                keysToSend.add(
+                        createKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, VirtualKeyEvent.ACTION_UP));
+                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_DEL, VirtualKeyEvent.ACTION_DOWN));
+                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_DEL, VirtualKeyEvent.ACTION_UP));
+            }
+
+            for (KeyEvent event : events) {
+                keysToSend.add(createKeyEvent(event.getKeyCode(), event.getAction()));
+            }
+
+            if (commit) {
+                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_ENTER, VirtualKeyEvent.ACTION_DOWN));
+                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_ENTER, VirtualKeyEvent.ACTION_UP));
+            }
+            performKeyStep(keysToSend, 0);
+        }
+    }
+
     @Override
     public void close() throws RemoteException {
-        mVirtualDevice.setDevicePolicy(POLICY_TYPE_RECENTS, DEVICE_POLICY_DEFAULT);
         mVirtualDevice.close();
         mAppToken.unlinkToDeath(this, 0);
-        mOnClosedListener.onClosed(asBinder());
+        mOnClosedListener.onClosed(this);
     }
 
     @Override
@@ -335,6 +406,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 .setToolType(VirtualTouchEvent.TOOL_TYPE_FINGER)
                 .setPressure(255)
                 .setMajorAxisSize(1)
+                .build();
+    }
+
+    VirtualKeyEvent createKeyEvent(int keyCode, @VirtualKeyEvent.Action int action) {
+        return new VirtualKeyEvent.Builder()
+                .setAction(action)
+                .setKeyCode(keyCode)
                 .build();
     }
 
@@ -365,6 +443,30 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 SWIPE_EVENT_DELAY_MS, TimeUnit.MILLISECONDS);
     }
 
+    private void performKeyStep(List<VirtualKeyEvent> keysToSend, int currStep) {
+        final int nextStep = currStep + 1;
+        try {
+            mVirtualKeyboard.sendKeyEvent(keysToSend.get(currStep));
+            if (nextStep >= keysToSend.size()) {
+                mInsertTextFuture = null;
+                return;
+            }
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+
+        mInsertTextFuture = mScheduler.schedule(
+                () -> performKeyStep(keysToSend, nextStep), KEY_EVENT_DELAY_MS,
+                TimeUnit.MILLISECONDS);
+    }
+
+    private void cancelOngoingKeyGestures() {
+        if (mInsertTextFuture != null) {
+            mInsertTextFuture.cancel(false);
+            mInsertTextFuture = null;
+        }
+    }
+
     private static class ComputerControlActivityListener
             extends IVirtualDeviceActivityListener.Stub {
         @Override
@@ -388,7 +490,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     /** Interface for listening for closing of sessions. */
     interface OnClosedListener {
-        void onClosed(IBinder token);
+        void onClosed(ComputerControlSessionImpl session);
     }
 
     @VisibleForTesting
@@ -405,20 +507,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
         public String getPermissionControllerPackageName() {
             return mPackageManager.getPermissionControllerPackageName();
-        }
-
-        public List<String> getAllApplicationsWithoutLauncherActivity() {
-            List<String> result = new ArrayList<>();
-            List<ApplicationInfo> installedApplications =
-                    mPackageManager.getInstalledApplications(0);
-            for (int i = 0; i < installedApplications.size(); i++) {
-                ApplicationInfo applicationInfo = installedApplications.get(i);
-                if (mPackageManager.getLaunchIntentForPackage(applicationInfo.packageName)
-                        == null) {
-                    result.add(applicationInfo.packageName);
-                }
-            }
-            return result;
         }
 
         public void launchApplicationOnDisplayAsUser(String packageName, int displayId,

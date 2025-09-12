@@ -729,26 +729,8 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
-    @DisableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING_OPT_OUT)
-    @EnableCompatChanges({OVERRIDE_CAMERA_COMPAT_ENABLE_FREEFORM_WINDOWING_TREATMENT})
-    public void testOrientation_allowFixedOrientationForCameraCompatInFreeformWindowing() {
-        doReturn(true).when(() -> DesktopModeHelper.canEnterDesktopMode(any()));
-        final ActivityRecord activity = setupDisplayAndActivityForCameraCompat(
-                /* isCameraRunning= */ true, WINDOWING_MODE_FREEFORM);
-
-        // Task in landscape.
-        assertEquals(ORIENTATION_LANDSCAPE, activity.getTask().getConfiguration().orientation);
-        // The app should be letterboxed.
-        assertEquals(ORIENTATION_PORTRAIT, activity.getConfiguration().orientation);
-        assertTrue(activity.mAppCompatController.getAspectRatioPolicy()
-                .isLetterboxedForFixedOrientationAndAspectRatio());
-    }
-
-    @Test
     @EnableFlags({Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING,
-            Flags.FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES,
-            Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING_OPT_OUT})
+            Flags.FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES})
     @EnableCompatChanges({OVERRIDE_CAMERA_COMPAT_ENABLE_FREEFORM_WINDOWING_TREATMENT})
     public void testOrientation_allowFixedOrientationForCameraCompatWhenEnabledForAll() {
         final ActivityRecord activity = setupDisplayAndActivityForCameraCompat(
@@ -763,23 +745,7 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
-    @DisableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING_OPT_OUT)
-    public void testOrientation_dontAllowFixedOrientationForCameraCompatFreeformIfNotEnabled() {
-        final ActivityRecord activity = setupDisplayAndActivityForCameraCompat(
-                /* isCameraRunning= */ true, WINDOWING_MODE_FREEFORM);
-
-        // Task in landscape.
-        assertEquals(ORIENTATION_LANDSCAPE, activity.getTask().getConfiguration().orientation);
-        // Activity is not letterboxed.
-        assertEquals(ORIENTATION_LANDSCAPE, activity.getConfiguration().orientation);
-        assertFalse(activity.mAppCompatController.getAspectRatioPolicy()
-                .isLetterboxedForFixedOrientationAndAspectRatio());
-    }
-
-    @Test
-    @EnableFlags({Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING,
-            Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING_OPT_OUT})
+    @EnableFlags({Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING})
     @EnableCompatChanges({OVERRIDE_CAMERA_COMPAT_DISABLE_SIMULATE_REQUESTED_ORIENTATION})
     public void testOrientation_dontAllowFixedOrientationForCameraCompatFreeformIfOptedOut() {
         final ActivityRecord activity = setupDisplayAndActivityForCameraCompat(
@@ -2980,11 +2946,12 @@ public class ActivityRecordTests extends WindowTestsBase {
     @Test
     public void testCreateRemoveLegacySplashScreenWindow() {
         registerTestStartingWindowOrganizer();
-        DeviceConfig.Properties properties = DeviceConfig.getProperties(
-                DeviceConfig.NAMESPACE_WINDOW_MANAGER);
+        final String exceptionListKey = "splash_screen_exception_list";
+        final String oldExceptionList = DeviceConfig.getProperty(
+                DeviceConfig.NAMESPACE_WINDOW_MANAGER, exceptionListKey);
+        DeviceConfig.setProperty(DeviceConfig.NAMESPACE_WINDOW_MANAGER, exceptionListKey,
+                DEFAULT_COMPONENT_PACKAGE_NAME, false);
         try {
-            DeviceConfig.setProperty(DeviceConfig.NAMESPACE_WINDOW_MANAGER,
-                    "splash_screen_exception_list", DEFAULT_COMPONENT_PACKAGE_NAME, false);
             testLegacySplashScreen(Build.VERSION_CODES.R, TYPE_PARAMETER_LEGACY_SPLASH_SCREEN);
             testLegacySplashScreen(Build.VERSION_CODES.S, TYPE_PARAMETER_LEGACY_SPLASH_SCREEN);
             testLegacySplashScreen(Build.VERSION_CODES.TIRAMISU,
@@ -2996,11 +2963,8 @@ public class ActivityRecordTests extends WindowTestsBase {
             // Above V
             testLegacySplashScreen(Build.VERSION_CODES.UPSIDE_DOWN_CAKE + 2, 0);
         } finally {
-            try {
-                DeviceConfig.setProperties(properties);
-            } catch (DeviceConfig.BadConfigException e) {
-                Assert.fail(e.getMessage());
-            }
+            DeviceConfig.setProperty(DeviceConfig.NAMESPACE_WINDOW_MANAGER, exceptionListKey,
+                    oldExceptionList, false);
         }
     }
 
@@ -3202,7 +3166,6 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENSURE_STARTING_WINDOW_REMOVE_FROM_TASK)
     public void testStartingWindowInTaskFragment_RemoveAfterTrampolineInvisible() {
         testStartingWindowInTaskFragment_RemoveFrom(false, true);
     }
@@ -3623,9 +3586,9 @@ public class ActivityRecordTests extends WindowTestsBase {
         newConfig.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_YES;
         activity.resolveOverrideConfiguration(newConfig);
 
-        assertEquals(activity.getRequestedOverrideConfiguration().touchscreen, config.touchscreen);
-        assertEquals(activity.getRequestedOverrideConfiguration().densityDpi, config.densityDpi);
-        assertEquals(activity.getRequestedOverrideConfiguration().colorMode, config.colorMode);
+        assertEquals(config.touchscreen, activity.getRequestedOverrideConfiguration().touchscreen);
+        assertEquals(config.densityDpi, activity.getRequestedOverrideConfiguration().densityDpi);
+        assertEquals(config.colorMode, activity.getRequestedOverrideConfiguration().colorMode);
     }
 
     @Test
@@ -3647,10 +3610,12 @@ public class ActivityRecordTests extends WindowTestsBase {
         newConfig.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_YES;
         activity.resolveOverrideConfiguration(newConfig);
 
-        assertNotEquals(activity.getRequestedOverrideConfiguration().touchscreen,
-                config.touchscreen);
-        assertNotEquals(activity.getRequestedOverrideConfiguration().densityDpi, config.densityDpi);
-        assertNotEquals(activity.getRequestedOverrideConfiguration().colorMode, config.colorMode);
+        assertEquals(Configuration.TOUCHSCREEN_UNDEFINED,
+                activity.getRequestedOverrideConfiguration().touchscreen);
+        assertEquals(Configuration.DENSITY_DPI_UNDEFINED,
+                activity.getRequestedOverrideConfiguration().densityDpi);
+        assertEquals(Configuration.COLOR_MODE_UNDEFINED,
+                activity.getRequestedOverrideConfiguration().colorMode);
     }
 
     @Test
@@ -3669,10 +3634,12 @@ public class ActivityRecordTests extends WindowTestsBase {
         newConfig.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_YES;
         activity.resolveOverrideConfiguration(newConfig);
 
-        assertNotEquals(activity.getRequestedOverrideConfiguration().touchscreen,
-                config.touchscreen);
-        assertNotEquals(activity.getRequestedOverrideConfiguration().densityDpi, config.densityDpi);
-        assertNotEquals(activity.getRequestedOverrideConfiguration().colorMode, config.colorMode);
+        assertEquals(Configuration.TOUCHSCREEN_UNDEFINED,
+                activity.getRequestedOverrideConfiguration().touchscreen);
+        assertEquals(Configuration.DENSITY_DPI_UNDEFINED,
+                activity.getRequestedOverrideConfiguration().densityDpi);
+        assertEquals(Configuration.COLOR_MODE_UNDEFINED,
+                activity.getRequestedOverrideConfiguration().colorMode);
     }
 
     @Test
@@ -3693,10 +3660,12 @@ public class ActivityRecordTests extends WindowTestsBase {
         newConfig.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_YES;
         activity.resolveOverrideConfiguration(newConfig);
 
-        assertEquals(activity.getRequestedOverrideConfiguration().touchscreen,
-                newConfig.touchscreen);
-        assertEquals(activity.getRequestedOverrideConfiguration().densityDpi, newConfig.densityDpi);
-        assertEquals(activity.getRequestedOverrideConfiguration().colorMode, newConfig.colorMode);
+        assertEquals(Configuration.TOUCHSCREEN_UNDEFINED,
+                activity.getRequestedOverrideConfiguration().touchscreen);
+        assertEquals(Configuration.DENSITY_DPI_UNDEFINED,
+                activity.getRequestedOverrideConfiguration().densityDpi);
+        assertEquals(Configuration.COLOR_MODE_UNDEFINED,
+                activity.getRequestedOverrideConfiguration().colorMode);
     }
 
     private ActivityRecord setupDisplayAndActivityForCameraCompat(boolean isCameraRunning,

@@ -652,6 +652,11 @@ public class BubbleController implements ConfigurationChangeListener,
                             wct.reorder(taskInfo.token, false /* onTop */);
                             wct.setInterceptBackPressedOnTaskRoot(taskInfo.token,
                                     true /* interceptBackPressed */);
+                            wct.setTaskForceExcludedFromRecents(taskInfo.token,
+                                    true /* forceExcluded */);
+                            wct.setDisablePip(taskInfo.token, true /* disablePip */);
+                            wct.setDisableLaunchAdjacent(taskInfo.token,
+                                    true /* disableLaunchAdjacent */);
                             mTaskOrganizer.applyTransaction(wct);
                         }
                     });
@@ -1083,7 +1088,8 @@ public class BubbleController implements ConfigurationChangeListener,
             // window to show this in, but we use a separate code path.
             // TODO(b/273312602): consider foldables where we do need a stack view when folded
             if (mLayerView == null) {
-                mLayerView = new BubbleBarLayerView(mContext, this, mBubbleData, mLogger);
+                mLayerView = new BubbleBarLayerView(mContext, this, mBubbleData, mLogger,
+                        mMainExecutor);
                 mLayerView.setUnBubbleConversationCallback(mSysuiProxy::onUnbubbleConversation);
             }
         } else {
@@ -1160,6 +1166,10 @@ public class BubbleController implements ConfigurationChangeListener,
                     return windowInsets;
                 });
             } else {
+                if (mStackView.isExpanded()) {
+                    ProtoLog.w(WM_SHELL_BUBBLES,
+                            "addToWindowManager - BubbleStackView is already expanded!");
+                }
                 mWindowManager.addView(mStackView, mWmLayoutParams);
                 mStackView.setOnApplyWindowInsetsListener((view, windowInsets) -> {
                     if (!windowInsets.equals(mWindowInsets) && mStackView != null) {
@@ -1222,6 +1232,10 @@ public class BubbleController implements ConfigurationChangeListener,
             }
             mOnImeHidden = null;
             if (mStackView != null) {
+                if (mStackView.isExpanded()) {
+                    ProtoLog.w(WM_SHELL_BUBBLES, "removeFromWindowManager - BubbleStackView is "
+                            + "expanded while being removed!");
+                }
                 mWindowManager.removeView(mStackView);
                 mBubbleData.getOverflow().cleanUpExpandedState();
             }
@@ -2676,9 +2690,14 @@ public class BubbleController implements ConfigurationChangeListener,
         public void selectionChanged(BubbleViewProvider selectedBubble) {
             // Only need to update the layer view if we're currently expanded for selection changes.
             if (mLayerView != null && mLayerView.isExpanded()) {
-                mLayerView.showExpandedView(selectedBubble);
+                final Bubble b = (selectedBubble instanceof Bubble bubble) ? bubble : null;
+                if (b == null || !b.isJumpcutBubbleSwitching()) {
+                    // Otherwise the animation will be called by the TransitionHandler when ready to
+                    // play.
+                    mLayerView.showExpandedView(selectedBubble);
+                }
 
-                if (selectedBubble instanceof Bubble) {
+                if (b != null) {
                     mLogger.log((Bubble) selectedBubble,
                             BubbleLogger.Event.BUBBLE_BAR_BUBBLE_SWITCHED);
                 }
@@ -3087,6 +3106,7 @@ public class BubbleController implements ConfigurationChangeListener,
         pw.print(prefix); pw.println("  stackViewSet= " + (mStackView != null));
         pw.print(prefix); pw.println("  layerViewSet= " + (mLayerView != null));
         pw.print(prefix); pw.println("  mBarToFloatingTransition= " + mBarToFloatingTransition);
+        pw.print(prefix); pw.println("  mOnImeHidden= " + mOnImeHidden);
         pw.println();
 
         mBubbleData.dump(pw);

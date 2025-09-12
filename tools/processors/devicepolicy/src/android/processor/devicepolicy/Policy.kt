@@ -19,37 +19,30 @@ package android.processor.devicepolicy
 import com.android.json.stream.JsonWriter
 
 data class Policy(
-    val name: String,
-    val type: String,
-    val documentation: String,
-    val metadata: PolicyMetadata
+    val name: String, val type: String, val documentation: String, val metadata: PolicyMetadata
 ) {
     fun dump(writer: JsonWriter) {
-        writer.beginObject()
+        writer.apply {
+            beginObject()
 
-        writer.name("name")
-        writer.value(name)
+            name("name")
+            value(name)
 
-        writer.name("type")
-        writer.value(type)
+            name("type")
+            value(type)
 
-        writer.name("documentation")
-        writer.value(documentation)
+            name("documentation")
+            value(documentation)
 
-        metadata.dump(writer)
+            metadata.dump(writer)
 
-        writer.endObject()
+            endObject()
+        }
     }
 }
 
 abstract class PolicyMetadata() {
     abstract fun dump(writer: JsonWriter)
-}
-
-class BooleanPolicyMetadata() : PolicyMetadata() {
-    override fun dump(writer: JsonWriter) {
-        // Nothing to include for BooleanPolicyMetadata.
-    }
 }
 
 fun dumpJSON(writer: JsonWriter, items: List<Policy>) {

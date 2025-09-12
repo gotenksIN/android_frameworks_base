@@ -1353,7 +1353,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         if (intrinsicHeight != getIntrinsicHeight()) {
             notifyHeightChanged(/* needsAnimation= */ false);
         }
-        if (Flags.notificationsHunAccessibilityRefactor() && !pinnedStatus.isPinned()) {
+        if (!pinnedStatus.isPinned()) {
             setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_NONE);
         }
         if (pinnedStatus.isPinned()) {
@@ -2286,6 +2286,11 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         if (NotificationBundleUi.isEnabled()) {
             mEntryAdapter = entryAdapter;
             mIsBundle = entryAdapter instanceof BundleEntryAdapter;
+            if (isBundle()) {
+                // Initial dimensions for the roundable state are set upon construction, which means
+                // we need to re-calculate at the point when we know whether this row is a bundle.
+                updateMaxRadius();
+            }
         } else {
             mEntry = (NotificationEntry) entry;
         }
@@ -3378,6 +3383,20 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         return mGroupExpansionManager.isGroupExpanded(getEntryLegacy());
     }
 
+    /**
+     * If this notification is a child of a group, returns whether the parent group is expanded.
+     * This is distinct from isGroupExpanded() specifically in the case of nested groups (for
+     * example, if a group is contained inside a bundle).
+     *
+     * Returns false if the notification is not a child of a group.
+     */
+    public boolean isParentGroupExpanded() {
+        if (isChildInGroup()) {
+            return getNotificationParent().isGroupExpanded();
+        }
+        return false;
+    }
+
     @VisibleForTesting
     boolean isGroupRoot() {
         return NotificationBundleUi.isEnabled()
@@ -3850,7 +3869,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     protected void onAppearAnimationStarted(boolean isAppear) {
         mLogger.logAppearAnimationStarted(mLoggingKey, /* isAppear = */ isAppear);
 
-        if (Flags.notificationsHunAccessibilityRefactor() && !isAppear) {
+        if (!isAppear) {
             // Stop using a live region as soon as a disappear animation starts so that we don't
             // re-announce the notification as it's animating away.
             setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_NONE);
@@ -3871,8 +3890,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 /* isAppear = */ wasAppearing,
                 /* cancelled = */ cancelled
         );
-        if (Flags.notificationsHunAccessibilityRefactor()
-                && PromotedNotificationUi.isEnabled()
+        if (PromotedNotificationUi.isEnabled()
                 && !cancelled
                 && wasAppearing
                 && mPinnedStatus == PinnedStatus.PinnedByUser) {
@@ -4510,6 +4528,19 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             return getClipPath(true /* ignoreTranslation */);
         }
         return super.getCustomClipPath(child);
+    }
+
+    @Override
+    float calculateMaxRadius() {
+        float radius = super.calculateMaxRadius();
+        if (isBundle()) {
+            // Bundle headers may be small enough that the max radius used for the ENR would
+            // clip more off the corner of the bundle header than the header height would allow.
+            // In this case, limit the radius for rounding to half the bundle header height.
+            return Math.min(radius, getContext().getResources().getDimension(
+                    R.dimen.notification_bundle_header_height) / 2.0f);
+        }
+        return radius;
     }
 
     public boolean isMediaRow() {

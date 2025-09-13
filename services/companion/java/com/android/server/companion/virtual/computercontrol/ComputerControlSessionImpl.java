@@ -18,6 +18,7 @@ package com.android.server.companion.virtual.computercontrol;
 
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_ACTIVITY;
+import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_BLOCKED_ACTIVITY;
 
 import android.annotation.IntRange;
 import android.annotation.NonNull;
@@ -32,6 +33,7 @@ import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.computercontrol.ComputerControlSession;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IComputerControlSession;
+import android.companion.virtual.computercontrol.IComputerControlStabilityListener;
 import android.companion.virtual.computercontrol.IInteractiveMirrorDisplay;
 import android.companion.virtualdevice.flags.Flags;
 import android.content.AttributionSource;
@@ -61,10 +63,16 @@ import android.view.DisplayInfo;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.Surface;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
 
+import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.inputmethod.IRemoteComputerControlInputConnection;
+import com.android.internal.inputmethod.InputConnectionCommandHeader;
 import com.android.server.LocalServices;
+import com.android.server.inputmethod.InputMethodManagerInternal;
+import com.android.server.pm.UserManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
 import java.util.ArrayList;
@@ -85,15 +93,41 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     private static final String TAG = "ComputerControlSession";
 
+    private static final String CUSTOM_BLOCKED_APP_PACKAGE = "com.android.virtualdevicemanager";
+
+    private static final ComponentName CUSTOM_BLOCKED_APP_ACTIVITY = new ComponentName(
+            CUSTOM_BLOCKED_APP_PACKAGE,
+            CUSTOM_BLOCKED_APP_PACKAGE + ".NotifyComputerControlBlockedActivity");
+
+    // Input device names are limited to 80 bytes, so keep the prefix shorter than that.
+    private static final int MAX_INPUT_DEVICE_NAME_PREFIX_LENGTH = 70;
+
     // Throttle swipe events to avoid misinterpreting them as a fling. Each swipe will
     // consist of a DOWN event, 10 MOVE events spread over 500ms, and an UP event.
     @VisibleForTesting
     static final int SWIPE_STEPS = 10;
+    // Delay between consecutive touch events sent during a swipe or a long press gesture.
     @VisibleForTesting
-    static final long SWIPE_EVENT_DELAY_MS = 50L;
-
+    static final long TOUCH_EVENT_DELAY_MS = 50L;
+    // Multiplier for the long press timeout to ensure it's registered as a long press,
+    // as some applications might have slightly different thresholds.
+    @VisibleForTesting
+    static final float LONG_PRESS_TIMEOUT_MULTIPLIER = 1.5f;
     @VisibleForTesting
     static final long KEY_EVENT_DELAY_MS = 10L;
+
+    // Vendor and Product IDs for Computer Control virtual input devices.
+    // These values are likely unique within the VIRTUAL bus type, but they are not
+    // guaranteed to be globally unique forever.
+    // TODO: b/443001754 - Remove setVendorId and setProductId in all input devices below,
+    //   in favor of reporting dedicated Computer Control metrics.
+    private static final int VENDOR_ID = 0x0000;
+    @VisibleForTesting
+    static final int PRODUCT_ID_DPAD = 0xCC01;
+    @VisibleForTesting
+    static final int PRODUCT_ID_KEYBOARD = 0xCC02;
+    @VisibleForTesting
+    static final int PRODUCT_ID_TOUCHSCREEN = 0xCC03;
 
     private final IBinder mAppToken;
     private final ComputerControlSessionParams mParams;
@@ -108,6 +142,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final AtomicInteger mMirrorDisplayCounter = new AtomicInteger(0);
     private final ScheduledExecutorService mScheduler =
             Executors.newSingleThreadScheduledExecutor();
+    private final Object mStabilityCalculatorLock = new Object();
 
     private final Injector mInjector;
 
@@ -115,6 +150,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private int mDisplayHeight;
     private ScheduledFuture<?> mSwipeFuture;
     private ScheduledFuture<?> mInsertTextFuture;
+
+    @GuardedBy("mStabilityCalculatorLock")
+    private StabilityCalculator mStabilityCalculator;
 
     ComputerControlSessionImpl(IBinder appToken, ComputerControlSessionParams params,
             AttributionSource attributionSource,
@@ -128,6 +166,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
         final VirtualDeviceParams virtualDeviceParams = new VirtualDeviceParams.Builder()
                 .setName(mParams.getName())
+                .setDevicePolicy(POLICY_TYPE_BLOCKED_ACTIVITY, DEVICE_POLICY_CUSTOM)
                 .build();
 
         int displayFlags = DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
@@ -188,31 +227,37 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     mVirtualDisplayId, WindowManager.DISPLAY_IME_POLICY_HIDE);
 
             final String inputDeviceNamePrefix =
-                    attributionSource.getPackageName() + ":" + mParams.getName();
+                    createInputDeviceNamePrefix(attributionSource.getPackageName());
 
             final String dpadName = inputDeviceNamePrefix + "-dpad";
             final VirtualDpadConfig virtualDpadConfig =
                     new VirtualDpadConfig.Builder()
                             .setAssociatedDisplayId(mVirtualDisplayId)
                             .setInputDeviceName(dpadName)
+                            .setVendorId(VENDOR_ID)
+                            .setProductId(PRODUCT_ID_DPAD)
                             .build();
             mVirtualDpad = mVirtualDevice.createVirtualDpad(
                     virtualDpadConfig, new Binder(dpadName));
 
-            final String keyboardName = inputDeviceNamePrefix + "-keyboard";
+            final String keyboardName = inputDeviceNamePrefix + "-kbrd";
             final VirtualKeyboardConfig virtualKeyboardConfig =
                     new VirtualKeyboardConfig.Builder()
                             .setAssociatedDisplayId(mVirtualDisplayId)
                             .setInputDeviceName(keyboardName)
+                            .setVendorId(VENDOR_ID)
+                            .setProductId(PRODUCT_ID_KEYBOARD)
                             .build();
             mVirtualKeyboard = mVirtualDevice.createVirtualKeyboard(
                     virtualKeyboardConfig, new Binder(keyboardName));
 
-            final String touchscreenName = inputDeviceNamePrefix + "-touchscreen";
+            final String touchscreenName = inputDeviceNamePrefix + "-tscr";
             final VirtualTouchscreenConfig virtualTouchscreenConfig =
                     new VirtualTouchscreenConfig.Builder(mDisplayWidth, mDisplayHeight)
                             .setAssociatedDisplayId(mVirtualDisplayId)
                             .setInputDeviceName(touchscreenName)
+                            .setVendorId(VENDOR_ID)
+                            .setProductId(PRODUCT_ID_TOUCHSCREEN)
                             .build();
             mVirtualTouchscreen = mVirtualDevice.createVirtualTouchscreen(
                     virtualTouchscreenConfig, new Binder(touchscreenName));
@@ -234,6 +279,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mVirtualDevice.setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM);
 
             exemptedPackageNames.addAll(mParams.getTargetPackageNames());
+            exemptedPackageNames.add(CUSTOM_BLOCKED_APP_PACKAGE);
         } else {
             // TODO(b/439774796): Remove once v0 API is removed and the flag is rolled out.
             // This legacy policy allows all apps other than PermissionController to be automated.
@@ -252,6 +298,14 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @Override
     public int getVirtualDisplayId() {
         return mVirtualDisplayId;
+    }
+
+    int getDeviceId() {
+        try {
+            return mVirtualDevice.getDeviceId();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
     }
 
     IVirtualDisplayCallback getVirtualDisplayToken() {
@@ -274,24 +328,39 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         final UserHandle user = UserHandle.of(UserHandle.getUserId(Binder.getCallingUid()));
         Binder.withCleanCallingIdentity(() -> mInjector.launchApplicationOnDisplayAsUser(
                 packageName, mVirtualDisplayId, user));
+        notifyApplicationLaunchToStabilityCalculator();
     }
 
     @Override
     public void tap(@IntRange(from = 0) int x, @IntRange(from = 0) int y) throws RemoteException {
+        cancelOngoingTouchGestures();
         mVirtualTouchscreen.sendTouchEvent(createTouchEvent(x, y, VirtualTouchEvent.ACTION_DOWN));
         mVirtualTouchscreen.sendTouchEvent(createTouchEvent(x, y, VirtualTouchEvent.ACTION_UP));
+        notifyNonContinuousInputToStabilityCalculator();
     }
 
     @Override
     public void swipe(
             @IntRange(from = 0) int fromX, @IntRange(from = 0) int fromY,
             @IntRange(from = 0) int toX, @IntRange(from = 0) int  toY) throws RemoteException {
-        if (mSwipeFuture != null) {
-            mSwipeFuture.cancel(false);
-        }
+        cancelOngoingTouchGestures();
         mVirtualTouchscreen.sendTouchEvent(
                 createTouchEvent(fromX, fromY, VirtualTouchEvent.ACTION_DOWN));
-        performSwipeStep(fromX, fromY, toX, toY, /* step= */ 0);
+        performSwipeStep(fromX, fromY, toX, toY, /* step= */ 0, SWIPE_STEPS);
+        notifyContinuousInputToStabilityCalculator();
+    }
+
+    @Override
+    public void longPress(@IntRange(from = 0) int x, @IntRange(from = 0) int y)
+            throws RemoteException {
+        cancelOngoingTouchGestures();
+        mVirtualTouchscreen.sendTouchEvent(
+                createTouchEvent(x, y, VirtualTouchEvent.ACTION_DOWN));
+        int longPressStepCount =
+                (int) Math.ceil(
+                        (double) mInjector.getLongPressTimeoutMillis() / TOUCH_EVENT_DELAY_MS);
+        performSwipeStep(x, y, x, y, /* step= */ 0, longPressStepCount);
+        notifyContinuousInputToStabilityCalculator();
     }
 
     @Override
@@ -311,12 +380,12 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @Override
     public void performAction(@ComputerControlSession.Action int actionCode)
             throws RemoteException {
-        cancelOngoingKeyGestures();
         if (actionCode == ComputerControlSession.ACTION_GO_BACK) {
             mVirtualDpad.sendKeyEvent(
                     createKeyEvent(KeyEvent.KEYCODE_BACK, VirtualKeyEvent.ACTION_DOWN));
             mVirtualDpad.sendKeyEvent(
                     createKeyEvent(KeyEvent.KEYCODE_BACK, VirtualKeyEvent.ACTION_UP));
+            notifyNonContinuousInputToStabilityCalculator();
         } else {
             Slog.e(TAG, "Invalid action code for performAction: " + actionCode);
         }
@@ -348,7 +417,35 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     public void insertText(@NonNull String text, boolean replaceExisting, boolean commit) {
         cancelOngoingKeyGestures();
         if (android.companion.virtualdevice.flags.Flags.computerControlTyping()) {
-            // TODO(b/422134565): Implement Input connection based typing
+            IRemoteComputerControlInputConnection ic = mInjector.getInputConnection(
+                    mVirtualDisplayId);
+            if (ic == null) {
+                Slog.e(TAG, "Unable to insert text: No input connection found!");
+                return;
+            }
+            // TODO(b/422134565): Implement client invoker logic to pass the correct session id when
+            //  "client text view" invalidates input while view remains focused.
+            //  Currently, if we set text using A11y nodes or the application sets text into the
+            //  text field outside of input connection (while text view is focused), CC session will
+            //  no longer be able to insert text until the text view restarts the input connection.
+            try {
+                if (replaceExisting) {
+                    ic.replaceText(new InputConnectionCommandHeader(0), 0 /* start */,
+                            Integer.MAX_VALUE /* end */, text, 1 /* newCursorPosition */);
+                } else {
+                    ic.commitText(new InputConnectionCommandHeader(0), text,
+                            1 /* newCursorPosition */);
+                }
+                // TODO(b/422134565): Use right editor action to commit text instead key enter
+                if (commit) {
+                    ic.sendKeyEvent(new InputConnectionCommandHeader(0),
+                            new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER));
+                    ic.sendKeyEvent(new InputConnectionCommandHeader(0),
+                            new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER));
+                }
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Unable to insert text through InputConnection", e);
+            }
         } else {
             KeyCharacterMap kcm = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD);
             KeyEvent[] events = kcm.getEvents(text.toCharArray());
@@ -379,10 +476,26 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             }
             performKeyStep(keysToSend, 0);
         }
+        notifyNonContinuousInputToStabilityCalculator();
+    }
+
+    @Override
+    public void setStabilityListener(IComputerControlStabilityListener listener) {
+        synchronized (mStabilityCalculatorLock) {
+            if (listener == null) {
+                clearStabilityCalculatorLocked();
+                return;
+            }
+            if (mStabilityCalculator != null) {
+                throw new IllegalStateException("Stability listener already set");
+            }
+            mStabilityCalculator = new StabilityCalculator(listener, mScheduler);
+        }
     }
 
     @Override
     public void close() throws RemoteException {
+        clearStabilityCalculator();
         mVirtualDevice.close();
         mAppToken.unlinkToDeath(this, 0);
         mOnClosedListener.onClosed(this);
@@ -403,7 +516,10 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 .setY(y)
                 .setAction(action)
                 .setPointerId(4)
-                .setToolType(VirtualTouchEvent.TOOL_TYPE_FINGER)
+                .setToolType(
+                        action == VirtualTouchEvent.ACTION_CANCEL
+                                ? VirtualTouchEvent.TOOL_TYPE_PALM
+                                : VirtualTouchEvent.TOOL_TYPE_FINGER)
                 .setPressure(255)
                 .setMajorAxisSize(1)
                 .build();
@@ -416,8 +532,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 .build();
     }
 
-    private void performSwipeStep(int fromX, int fromY, int toX, int toY, int step) {
-        final double fraction = ((double) step) / SWIPE_STEPS;
+    private void performSwipeStep(int fromX, int fromY, int toX, int toY, int step, int stepCount) {
+        final double fraction = ((double) step) / stepCount;
         // This makes the movement distance smaller towards the end.
         final double easedFraction = Math.sin(fraction * Math.PI / 2);
         final int currentX = (int) (fromX + (toX - fromX) * easedFraction);
@@ -428,7 +544,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mVirtualTouchscreen.sendTouchEvent(
                     createTouchEvent(currentX, currentY, VirtualTouchEvent.ACTION_MOVE));
 
-            if (nextStep > SWIPE_STEPS) {
+            if (nextStep > stepCount) {
                 mVirtualTouchscreen.sendTouchEvent(
                         createTouchEvent(toX, toY, VirtualTouchEvent.ACTION_UP));
                 mSwipeFuture = null;
@@ -439,8 +555,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         }
 
         mSwipeFuture = mScheduler.schedule(
-                () -> performSwipeStep(fromX, fromY, toX, toY, nextStep),
-                SWIPE_EVENT_DELAY_MS, TimeUnit.MILLISECONDS);
+                () -> performSwipeStep(fromX, fromY, toX, toY, nextStep, stepCount),
+                TOUCH_EVENT_DELAY_MS, TimeUnit.MILLISECONDS);
     }
 
     private void performKeyStep(List<VirtualKeyEvent> keysToSend, int currStep) {
@@ -467,8 +583,61 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         }
     }
 
-    private static class ComputerControlActivityListener
-            extends IVirtualDeviceActivityListener.Stub {
+    private void cancelOngoingTouchGestures() throws RemoteException {
+        if (mSwipeFuture != null && mSwipeFuture.cancel(false)) {
+            mVirtualTouchscreen.sendTouchEvent(
+                    createTouchEvent(0, 0, VirtualTouchEvent.ACTION_CANCEL));
+        }
+    }
+
+    private String createInputDeviceNamePrefix(String packageName) {
+        final String prefix = packageName + ":" + mParams.getName();
+        return (prefix.length() > MAX_INPUT_DEVICE_NAME_PREFIX_LENGTH)
+                ? prefix.substring(prefix.length() - MAX_INPUT_DEVICE_NAME_PREFIX_LENGTH)
+                : prefix;
+    }
+
+    private void clearStabilityCalculator() {
+        synchronized (mStabilityCalculatorLock) {
+            clearStabilityCalculatorLocked();
+        }
+    }
+
+    private void clearStabilityCalculatorLocked() {
+        if (mStabilityCalculator != null) {
+            mStabilityCalculator.close();
+            mStabilityCalculator = null;
+        }
+    }
+
+    // TODO(b/428957982): Remove once we implement actual stability signals from the framework.
+    private void notifyContinuousInputToStabilityCalculator() {
+        synchronized (mStabilityCalculatorLock) {
+            if (mStabilityCalculator != null) {
+                mStabilityCalculator.onContinuousInputEvent();
+            }
+        }
+    }
+
+    // TODO(b/428957982): Remove once we implement actual stability signals from the framework.
+    private void notifyNonContinuousInputToStabilityCalculator() {
+        synchronized (mStabilityCalculatorLock) {
+            if (mStabilityCalculator != null) {
+                mStabilityCalculator.onNonContinuousInputEvent();
+            }
+        }
+    }
+
+    // TODO(b/428957982): Remove once we implement actual stability signals from the framework.
+    private void notifyApplicationLaunchToStabilityCalculator() {
+        synchronized (mStabilityCalculatorLock) {
+            if (mStabilityCalculator != null) {
+                mStabilityCalculator.onApplicationLaunch();
+            }
+        }
+    }
+
+    private class ComputerControlActivityListener extends IVirtualDeviceActivityListener.Stub {
         @Override
         public void onTopActivityChanged(int displayId, ComponentName topActivity,
                 @UserIdInt int userId) {}
@@ -478,7 +647,17 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
         @Override
         public void onActivityLaunchBlocked(int displayId, ComponentName componentName,
-                UserHandle user, IntentSender intentSender) {}
+                UserHandle user, IntentSender intentSender) {
+            Slog.d(TAG, "Blocked activity launch for " + componentName + " on session "
+                    + mParams.getName());
+            if (Objects.equals(CUSTOM_BLOCKED_APP_ACTIVITY, componentName)) {
+                return;
+            }
+            Intent intent = new Intent()
+                    .setComponent(CUSTOM_BLOCKED_APP_ACTIVITY)
+                    .putExtra(Intent.EXTRA_COMPONENT_NAME, componentName);
+            mInjector.startCustomBlockedActivityOnDisplay(intent, displayId);
+        }
 
         @Override
         public void onSecureWindowShown(int displayId, ComponentName componentName,
@@ -490,7 +669,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     /** Interface for listening for closing of sessions. */
     interface OnClosedListener {
-        void onClosed(ComputerControlSessionImpl session);
+        void onClosed(@NonNull ComputerControlSessionImpl session);
     }
 
     @VisibleForTesting
@@ -498,11 +677,16 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         private final Context mContext;
         private final PackageManager mPackageManager;
         private final WindowManagerInternal mWindowManagerInternal;
+        private final InputMethodManagerInternal mInputMethodManagerInternal;
+        private final UserManagerInternal mUserManagerInternal;
 
         Injector(Context context) {
             mContext = context;
             mPackageManager = mContext.getPackageManager();
             mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
+            mInputMethodManagerInternal = LocalServices.getService(
+                    InputMethodManagerInternal.class);
+            mUserManagerInternal = LocalServices.getService(UserManagerInternal.class);
         }
 
         public String getPermissionControllerPackageName() {
@@ -520,6 +704,14 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle(), user);
         }
 
+        public void startCustomBlockedActivityOnDisplay(Intent intent, int displayId) {
+            mContext.startActivityAsUser(
+                    intent.addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                    ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle(),
+                    UserHandle.SYSTEM);
+        }
+
         public DisplayInfo getDisplayInfo(int displayId) {
             final Display display = DisplayManagerGlobal.getInstance().getRealDisplay(displayId);
             if (display == null) {
@@ -532,6 +724,18 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
         public void disableAnimationsForDisplay(int displayId) {
             mWindowManagerInternal.setAnimationsDisabledForDisplay(displayId, /* disabled= */ true);
+        }
+
+        public long getLongPressTimeoutMillis() {
+            return (long) (ViewConfiguration.getLongPressTimeout() * LONG_PRESS_TIMEOUT_MULTIPLIER);
+        }
+
+        public IRemoteComputerControlInputConnection getInputConnection(int displayId) {
+            // getUserAssignedToDisplay returns the main userId, if we want to support cross
+            // profile CC interactions and typing on CC display, we need to find the right user
+            // profile here for the CC input connection
+            return mInputMethodManagerInternal.getComputerControlInputConnection(
+                    mUserManagerInternal.getUserAssignedToDisplay(displayId), displayId);
         }
     }
 }

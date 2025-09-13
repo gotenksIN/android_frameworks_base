@@ -17,6 +17,7 @@
 package com.android.wm.shell.dagger;
 
 import static android.window.DesktopExperienceFlags.ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP;
+import static android.window.DesktopExperienceFlags.ENABLE_MULTI_DISPLAY_HOME_FOCUS_BUG_FIX;
 import static android.window.DesktopExperienceFlags.ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_SYSTEM_DIALOGS_TRANSITIONS;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS_BUGFIX;
@@ -92,6 +93,7 @@ import com.android.wm.shell.common.LockTaskChangeListener;
 import com.android.wm.shell.common.MultiDisplayDragMoveIndicatorController;
 import com.android.wm.shell.common.MultiDisplayDragMoveIndicatorSurface;
 import com.android.wm.shell.common.MultiInstanceHelper;
+import com.android.wm.shell.common.QuitFocusedAppKeyGestureHandler;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.common.TaskStackListenerImpl;
@@ -107,6 +109,7 @@ import com.android.wm.shell.compatui.letterbox.lifecycle.LetterboxCleanupAdapter
 import com.android.wm.shell.compatui.letterbox.state.LetterboxTaskListenerAdapter;
 import com.android.wm.shell.crashhandling.ShellCrashHandler;
 import com.android.wm.shell.dagger.back.ShellBackAnimationModule;
+import com.android.wm.shell.dagger.pinnedlayer.PinnedLayerModule;
 import com.android.wm.shell.dagger.pip.PipModule;
 import com.android.wm.shell.desktopmode.CloseDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.DefaultDragToDesktopTransitionHandler;
@@ -131,6 +134,7 @@ import com.android.wm.shell.desktopmode.DesktopTasksLimiter;
 import com.android.wm.shell.desktopmode.DesktopTasksTransitionObserver;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
 import com.android.wm.shell.desktopmode.DisplayDisconnectTransitionHandler;
+import com.android.wm.shell.desktopmode.DisplayFocusResolver;
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler;
 import com.android.wm.shell.desktopmode.EnterDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler;
@@ -240,8 +244,14 @@ import java.util.Optional;
  * <p>This module only defines Shell dependencies for handheld SystemUI implementation. Common
  * dependencies should go into {@link WMShellBaseModule}.
  */
-@Module(includes = {WMShellBaseModule.class, PipModule.class, ShellBackAnimationModule.class,
-        LetterboxModule.class})
+@Module(
+        includes = {
+            WMShellBaseModule.class,
+            PipModule.class,
+            ShellBackAnimationModule.class,
+            LetterboxModule.class,
+            PinnedLayerModule.class
+        })
 public abstract class WMShellModule {
 
     //
@@ -1094,7 +1104,8 @@ public abstract class WMShellModule {
             DesktopState desktopState,
             Optional<DesktopImeHandler> desktopImeHandler,
             Optional<DesktopBackNavTransitionObserver> desktopBackNavTransitionObserver,
-            DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver) {
+            DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver,
+            Optional<DisplayFocusResolver> displayFocusResolver) {
         if (ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP.isTrue()
                 && ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS.isTrue()
                 && desktopState.canEnterDesktopMode()) {
@@ -1104,10 +1115,12 @@ public abstract class WMShellModule {
                     desksTransitionObserver,
                     desktopImeHandler,
                     desktopBackNavTransitionObserver,
-                    desktopModeLoggerTransitionObserver));
+                    desktopModeLoggerTransitionObserver,
+                    displayFocusResolver));
         }
         return Optional.empty();
     }
+
     @WMSingleton
     @Provides
     static Optional<DesktopTasksLimiter> provideDesktopTasksLimiter(
@@ -1250,7 +1263,8 @@ public abstract class WMShellModule {
             FocusTransitionObserver focusTransitionObserver,
             @ShellMainThread ShellExecutor mainExecutor,
             DisplayController displayController,
-            DesktopState desktopState) {
+            DesktopState desktopState,
+            Optional<SplitScreenController> splitScreenController) {
         if (desktopState.canEnterDesktopMode()
                 && (DesktopExperienceFlags.ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT.isTrue()
                 || DesktopModeFlags.ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS.isTrue())) {
@@ -1258,9 +1272,25 @@ public abstract class WMShellModule {
                     desktopModeWindowDecorViewModel, desktopTasksController,
                     desktopUserRepositories,
                     inputManager, shellTaskOrganizer, focusTransitionObserver,
-                    mainExecutor, displayController, desktopState));
+                    mainExecutor, displayController, desktopState, splitScreenController));
         }
         return Optional.empty();
+    }
+
+    @WMSingleton
+    @Provides
+    static QuitFocusedAppKeyGestureHandler provideQuitFocusedAppKeyGestureHandler(
+            Context context,
+            InputManager inputManager,
+            DisplayController displayController,
+            LockTaskChangeListener lockTaskChangeListener,
+            Optional<DesktopModeKeyGestureHandler> desktopModeKeyGestureHandler,
+            IActivityTaskManager activityTaskManagerService,
+            FocusTransitionObserver focusTransitionObserver,
+            @ShellMainThread ShellExecutor mainExecutor) {
+        return new QuitFocusedAppKeyGestureHandler(context, inputManager, displayController,
+                lockTaskChangeListener, desktopModeKeyGestureHandler, activityTaskManagerService,
+                focusTransitionObserver, mainExecutor);
     }
 
     @WMSingleton
@@ -1343,14 +1373,12 @@ public abstract class WMShellModule {
 
     @WMSingleton
     @Provides
-    static MultiDisplayDragMoveIndicatorController
-            providesMultiDisplayDragMoveIndicatorController(
+    static MultiDisplayDragMoveIndicatorController providesMultiDisplayDragMoveIndicatorController(
             DisplayController displayController,
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
             MultiDisplayDragMoveIndicatorSurface.Factory
-                multiDisplayDragMoveIndicatorSurfaceFactory,
-            ShellDesktopState shellDesktopState
-    ) {
+                    multiDisplayDragMoveIndicatorSurfaceFactory,
+            ShellDesktopState shellDesktopState) {
         return new MultiDisplayDragMoveIndicatorController(
                 displayController, rootTaskDisplayAreaOrganizer,
                 multiDisplayDragMoveIndicatorSurfaceFactory, shellDesktopState);
@@ -1562,6 +1590,31 @@ public abstract class WMShellModule {
 
     @WMSingleton
     @Provides
+    static Optional<DisplayFocusResolver> provideDisplayFocusResolver(
+            Transitions transitions,
+            ShellTaskOrganizer shellTaskOrganizer,
+            FocusTransitionObserver focusTransitionObserver,
+            DesktopState desktopState,
+            Optional<DesktopUserRepositories> desktopUserRepositories,
+            Optional<DesktopTasksController> desktopTasksController,
+            ShellInit shellInit) {
+        if (desktopUserRepositories.isPresent()
+                && desktopTasksController.isPresent()
+                && desktopState.canEnterDesktopMode()
+                && ENABLE_MULTI_DISPLAY_HOME_FOCUS_BUG_FIX.isTrue()) {
+            return Optional.of(
+                    new DisplayFocusResolver(
+                        transitions,
+                        shellTaskOrganizer,
+                        focusTransitionObserver,
+                        desktopUserRepositories.get(),
+                        desktopTasksController.get()));
+        }
+        return Optional.empty();
+    }
+
+    @WMSingleton
+    @Provides
     static Optional<DesktopBackNavTransitionObserver> provideDesktopBackNavTransitionObserver(
             Optional<DesktopUserRepositories> desktopUserRepositories,
             Optional<DesktopMixedTransitionHandler> desktopMixedTransitionHandler,
@@ -1620,7 +1673,9 @@ public abstract class WMShellModule {
             @ShellMainThread Handler handler,
             ShellInit shellInit,
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
-            DesktopState desktopState
+            DesktopState desktopState,
+            Optional<DesksTransitionObserver> desksTransitionObserver,
+            DeskSwitchTransitionHandler deskSwitchTransitionHandler
     ) {
         if (!desktopState.canEnterDesktopMode()
                 && !desktopState.overridesShowAppHandle()) {
@@ -1640,7 +1695,9 @@ public abstract class WMShellModule {
                         interactionJankMonitor,
                         handler,
                         shellInit,
-                        rootTaskDisplayAreaOrganizer));
+                        rootTaskDisplayAreaOrganizer,
+                        desksTransitionObserver.get(),
+                        deskSwitchTransitionHandler));
     }
 
     @WMSingleton
@@ -1676,7 +1733,8 @@ public abstract class WMShellModule {
             Optional<DesktopDisplayModeController> desktopDisplayModeController,
             DesktopRepositoryInitializer desktopRepositoryInitializer,
             Optional<DesksTransitionObserver> desksTransitionObserver,
-            DesktopState desktopState
+            DesktopState desktopState,
+            Transitions transitions
     ) {
         if (!desktopState.canEnterDesktopMode()) {
             return Optional.empty();
@@ -1694,7 +1752,8 @@ public abstract class WMShellModule {
                         desktopTasksController.get(),
                         desktopDisplayModeController.get(),
                         desksTransitionObserver.get(),
-                        desktopState));
+                        desktopState,
+                        transitions));
     }
 
     @WMSingleton
@@ -2026,7 +2085,8 @@ public abstract class WMShellModule {
             Optional<DisplayDisconnectTransitionHandler> displayDisconnectTransitionHandler,
             Optional<DesktopImeHandler> desktopImeHandler,
             ShellCrashHandler shellCrashHandler,
-            AppToWebEducationController appToWebEducationController) {
+            AppToWebEducationController appToWebEducationController,
+            QuitFocusedAppKeyGestureHandler quitFocusedAppKeyGestureHandler) {
         return new Object();
     }
 

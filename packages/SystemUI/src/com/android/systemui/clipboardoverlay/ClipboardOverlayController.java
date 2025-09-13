@@ -19,7 +19,6 @@ package com.android.systemui.clipboardoverlay;
 import static android.content.Intent.ACTION_CLOSE_SYSTEM_DIALOGS;
 
 import static com.android.internal.config.sysui.SystemUiDeviceConfigFlags.CLIPBOARD_OVERLAY_SHOW_ACTIONS;
-import static com.android.systemui.Flags.clipboardAnnounceLiveRegion;
 import static com.android.systemui.Flags.clipboardOverlayMultiuser;
 import static com.android.systemui.Flags.showClipboardIndication;
 import static com.android.systemui.clipboardoverlay.ClipboardOverlayEvent.CLIPBOARD_OVERLAY_ACTION_SHOWN;
@@ -236,24 +235,12 @@ public class ClipboardOverlayController implements ClipboardListener.ClipboardOv
                 mClipboardLogger.logUnguarded(CLIPBOARD_OVERLAY_SHOWN_MINIMIZED);
                 mIsMinimized = true;
                 mView.setMinimized(true);
-                if (clipboardAnnounceLiveRegion()) {
-                    animateInWithAnnouncement(mClipboardModel.getType());
-                } else {
-                    animateIn();
-                }
+                animateInWithAnnouncement(mClipboardModel.getType());
             } else {
                 mClipboardLogger.logUnguarded(CLIPBOARD_OVERLAY_SHOWN_EXPANDED);
                 setExpandedView(() -> {
-                    if (clipboardAnnounceLiveRegion()) {
-                        animateInWithAnnouncement(mClipboardModel.getType());
-                    } else {
-                        animateIn();
-                    }
+                    animateInWithAnnouncement(mClipboardModel.getType());
                 });
-            }
-            if (!clipboardAnnounceLiveRegion()) {
-                mWindow.withWindowAttached(() -> mView.announceForAccessibility(
-                        getAccessibilityAnnouncement(mClipboardModel.getType())));
             }
         } else if (!mIsMinimized) {
             setExpandedView(() -> {
@@ -438,31 +425,6 @@ public class ClipboardOverlayController implements ClipboardListener.ClipboardOv
 
     private void finish(ClipboardOverlayEvent event) {
         finish(event, null);
-    }
-
-    private void animateOut() {
-        if (mExitAnimator != null && mExitAnimator.isRunning()) {
-            return;
-        }
-        mExitAnimator = mView.getExitAnimation();
-        mExitAnimator.addListener(new AnimatorListenerAdapter() {
-            private boolean mCancelled;
-
-            @Override
-            public void onAnimationCancel(Animator animation) {
-                super.onAnimationCancel(animation);
-                mCancelled = true;
-            }
-
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                super.onAnimationEnd(animation);
-                if (!mCancelled) {
-                    hideImmediate();
-                }
-            }
-        });
-        mExitAnimator.start();
     }
 
     private void finish(ClipboardOverlayEvent event, @Nullable Intent intent) {

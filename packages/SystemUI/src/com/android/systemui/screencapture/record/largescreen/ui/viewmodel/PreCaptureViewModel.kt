@@ -31,6 +31,7 @@ import com.android.systemui.screencapture.record.largescreen.domain.interactor.L
 import com.android.systemui.screencapture.record.largescreen.domain.interactor.ScreenshotInteractor
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureRegion
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureType
+import com.android.systemui.screencapture.record.ui.viewmodel.ScreenCaptureRecordParametersViewModel
 import com.android.systemui.screenrecord.ScreenRecordingAudioSource
 import com.android.systemui.screenrecord.domain.ScreenRecordingParameters
 import com.android.systemui.screenrecord.domain.interactor.ScreenRecordingServiceInteractor
@@ -58,6 +59,7 @@ constructor(
     private val screenCaptureUiInteractor: ScreenCaptureUiInteractor,
     private val screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
     @ScreenCapture private val screenCaptureUiParams: ScreenCaptureUiParameters,
+    screenCaptureRecordParametersViewModelFactory: ScreenCaptureRecordParametersViewModel.Factory,
 ) : HydratedActivatable(), DrawableLoaderViewModel by drawableLoaderViewModelImpl {
     private val isShowingUiFlow = MutableStateFlow(true)
     private val captureTypeSource =
@@ -71,6 +73,12 @@ constructor(
                 ?: ScreenCaptureRegion.FULLSCREEN
         )
     private val regionBoxSource = MutableStateFlow<Rect?>(null)
+    private val toolbarBoundsSource = MutableStateFlow(Rect())
+    private val toolbarOpacitySource = MutableStateFlow(1f)
+
+    // TODO(b/423697394) Init default value to be user's previously selected option
+    val screenCaptureRecordParametersViewModel =
+        screenCaptureRecordParametersViewModelFactory.create()
 
     val icons: ScreenCaptureIcons? by iconProvider.icons.hydratedStateOf()
 
@@ -83,6 +91,7 @@ constructor(
     val captureRegion: ScreenCaptureRegion by captureRegionSource.hydratedStateOf()
 
     val regionBox: Rect? by regionBoxSource.hydratedStateOf()
+    val toolbarOpacity: Float by toolbarOpacitySource.hydratedStateOf()
 
     val screenRecordingSupported = featuresInteractor.screenRecordingSupported
 
@@ -118,8 +127,41 @@ constructor(
         captureRegionSource.value = selectedRegion
     }
 
-    fun updateRegionBox(bounds: Rect) {
+    fun updateRegionBoxBounds(bounds: Rect) {
         regionBoxSource.value = bounds
+    }
+
+    /**
+     * Updates the toolbar opacity based on whether the region box selection intersects with the
+     * toolbar, and whether the region box is resized or moved.
+     *
+     * @param isInteracting whether the region box is currently resized or moved.
+     * @param regionBoxRect the current bounds of the region box selection. If not provided, will
+     *   use the last selected region as the input to calculate the desired opacity.
+     */
+    fun updateToolbarOpacityForRegionBox(isInteracting: Boolean, regionBoxRect: Rect? = null) {
+        if (isInteracting) {
+            toolbarOpacitySource.value = 0f
+            return
+        }
+
+        // When interaction stops, or a region is selected, calculate the final opacity.
+        val finalRegion = regionBoxRect ?: regionBoxSource.value
+        if (finalRegion == null) {
+            toolbarOpacitySource.value = 1f
+            return
+        }
+
+        val toolbarRect = toolbarBoundsSource.value
+        if (!toolbarRect.isEmpty && Rect.intersects(finalRegion, toolbarRect)) {
+            toolbarOpacitySource.value = 0.15f
+        } else {
+            toolbarOpacitySource.value = 1f
+        }
+    }
+
+    fun updateToolbarBounds(bounds: Rect) {
+        toolbarBoundsSource.value = bounds
     }
 
     /** Initiates capture of the screen depending on the currently chosen capture type. */
@@ -207,7 +249,10 @@ constructor(
     }
 
     override suspend fun onActivated() {
-        coroutineScope { launch { iconProvider.collectIcons() } }
+        coroutineScope {
+            launch { iconProvider.collectIcons() }
+            launch { screenCaptureRecordParametersViewModel.activate() }
+        }
     }
 
     private fun generateCaptureTypeButtonViewModels(

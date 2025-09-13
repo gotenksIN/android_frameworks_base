@@ -1246,7 +1246,7 @@ class Task extends TaskFragment {
         mRootWindowContainer.updateUIDsPresentOnDisplay();
     }
 
-    private boolean isOverrideBoundsAllowed() {
+    boolean isOverrideBoundsAllowed() {
         Task parentTask = getParent() != null ? getParent().asTask() : null;
         while (parentTask != null) {
             if (parentTask.mDisallowOverrideBoundsForChildren) {
@@ -2212,16 +2212,6 @@ class Task extends TaskFragment {
         if (!taskOrgChanged) {
             dispatchTaskInfoChangedIfNeeded(false /* force */);
         }
-    }
-
-    @Override
-    public void onRequestedOverrideConfigurationChanged(
-            @NonNull Configuration overrideConfiguration) {
-        if (!overrideConfiguration.windowConfiguration.getBounds().isEmpty()
-                && !isOverrideBoundsAllowed()) {
-            overrideConfiguration.windowConfiguration.setBounds(new Rect());
-        }
-        super.onRequestedOverrideConfigurationChanged(overrideConfiguration);
     }
 
     @Override

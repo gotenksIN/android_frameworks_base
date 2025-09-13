@@ -3121,9 +3121,9 @@ public final class ActivityRecord extends WindowToken {
 
         if (changed && task != null) {
             if (!occludesParent) {
-                getRootTask().convertActivityToTranslucent(this);
+                task.convertActivityToTranslucent(this);
             } else {
-                getRootTask().convertActivityFromTranslucent(this);
+                task.convertActivityFromTranslucent(this);
             }
         }
         // Always ensure visibility if this activity doesn't occlude parent, so the
@@ -4816,6 +4816,9 @@ public final class ActivityRecord extends WindowToken {
             if (!myBounds.equals(nextBounds)) {
                 // Mark as no animation, so these changes won't merge into playing transition.
                 if (mTransitionController.inPlayingTransition(this)) {
+                    // This handles the case where the top activity becomes invisible, so the next
+                    // activity may not have been collected yet.
+                    mTransitionController.collect(next);
                     mTransitionController.setNoAnimation(next);
                     mTransitionController.setNoAnimation(this);
                 }
@@ -4880,23 +4883,15 @@ public final class ActivityRecord extends WindowToken {
     }
 
     void setShowWhenLocked(boolean showWhenLocked) {
-        final boolean changed = (mShowWhenLocked != showWhenLocked);
-        mShowWhenLocked = showWhenLocked;
-
-        if (!Flags.fixShowWhenLockedSyncTimeout()) {
-            mAtmService.mRootWindowContainer.ensureActivitiesVisible();
-        } else if (changed) {
+        if (mShowWhenLocked != showWhenLocked) {
+            mShowWhenLocked = showWhenLocked;
             mDisplayContent.notifyKeyguardFlagsChanged();
         }
     }
 
     void setInheritShowWhenLocked(boolean inheritShowWhenLocked) {
-        final boolean changed = (mInheritShowWhenLocked != inheritShowWhenLocked);
-        mInheritShowWhenLocked = inheritShowWhenLocked;
-
-        if (!Flags.fixShowWhenLockedSyncTimeout()) {
-            mAtmService.mRootWindowContainer.ensureActivitiesVisible();
-        } else if (changed) {
+        if (mInheritShowWhenLocked != inheritShowWhenLocked) {
+            mInheritShowWhenLocked = inheritShowWhenLocked;
             mDisplayContent.notifyKeyguardFlagsChanged();
         }
     }

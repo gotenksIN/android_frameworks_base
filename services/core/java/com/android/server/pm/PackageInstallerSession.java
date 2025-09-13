@@ -3469,8 +3469,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 synchronized (mMetrics) {
                     mMetrics.onDeveloperVerificationFinished(mDeveloperVerificationStatusInternal);
                 }
-                if (mCurrentVerificationPolicy.get()
-                        != DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED) {
+                if (mCurrentVerificationPolicy.get() == DEVELOPER_VERIFICATION_POLICY_NONE) {
                     // Continue with the rest of the verification and installation.
                     mFuture.complete(DeveloperVerificationFutureResult.ofSuccess());
                     return;
@@ -3505,8 +3504,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 synchronized (mMetrics) {
                     mMetrics.onDeveloperVerificationFinished(mDeveloperVerificationStatusInternal);
                 }
-                if (mCurrentVerificationPolicy.get()
-                        != DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED) {
+                if (mCurrentVerificationPolicy.get() == DEVELOPER_VERIFICATION_POLICY_NONE) {
                     // Continue with the rest of the verification and installation.
                     mFuture.complete(DeveloperVerificationFutureResult.ofSuccess());
                     return;
@@ -3553,8 +3551,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 synchronized (mMetrics) {
                     mMetrics.onDeveloperVerificationFinished(mDeveloperVerificationStatusInternal);
                 }
-                if (mCurrentVerificationPolicy.get()
-                        != DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_CLOSED) {
+                if (mCurrentVerificationPolicy.get() == DEVELOPER_VERIFICATION_POLICY_NONE) {
                     // Continue with the rest of the verification and installation.
                     mFuture.complete(DeveloperVerificationFutureResult.ofSuccess());
                     return;

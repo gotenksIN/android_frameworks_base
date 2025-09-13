@@ -20,23 +20,44 @@ import android.tools.device.apphelpers.StandardAppHelper
 import android.tools.traces.parsers.toFlickerComponent
 import com.android.server.wm.flicker.helpers.SimpleAppHelper
 import com.android.server.wm.flicker.testapp.ActivityOptions
+import org.junit.Test
 
 /**
  * The base class for Bubble flicker tests that bubble an app that launches via a trampoline task
  */
 abstract class BubbleFlickerTrampolineTestBase : BubbleFlickerTestBase() {
 
-    override val testApp = trampolineFinishApp
+    override val testApp = runningApp
+
+    /** Verifies the transition from the trampoline activity to the running activity. */
+    @Test
+    fun trampolineActivityTransitions() {
+        layersTraceSubject
+            .skipUntilFirstAssertion()
+            .isSplashScreenVisibleFor(trampolineApp)
+            .then()
+            // Check that trampoline starts the running app, running app can show a splash or not
+            .isSplashScreenVisibleFor(runningApp, isOptional = true)
+            .then()
+            .isVisible(runningApp)
+            .forAllEntries()
+    }
 
     companion object {
-        val trampolineStartingApp: StandardAppHelper =
+        /**
+         * Entry point for the app that is launching via trampoline
+         */
+        val trampolineApp: StandardAppHelper =
             SimpleAppHelper(
                 instrumentation,
                 launcherName = ActivityOptions.TrampolineStartActivity.LABEL,
                 component = ActivityOptions.TrampolineStartActivity.COMPONENT.toFlickerComponent(),
             )
 
-        val trampolineFinishApp: StandardAppHelper =
+        /**
+         * App that will actually be running after the trampoline finishes
+         */
+        val runningApp: StandardAppHelper =
             SimpleAppHelper(
                 instrumentation,
                 launcherName = ActivityOptions.TrampolineFinishActivity.LABEL,

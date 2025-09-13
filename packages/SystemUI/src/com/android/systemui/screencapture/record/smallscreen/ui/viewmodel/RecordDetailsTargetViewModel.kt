@@ -29,6 +29,8 @@ import com.android.systemui.screencapture.common.domain.interactor.ScreenCapture
 import com.android.systemui.screencapture.common.domain.interactor.ScreenCaptureRecentTaskInteractor
 import com.android.systemui.screencapture.common.domain.model.ScreenCaptureRecentTask
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureTarget
+import com.android.systemui.screenrecord.domain.interactor.ScreenRecordingServiceInteractor
+import com.android.systemui.screenrecord.domain.interactor.Status
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.coroutineScope
@@ -53,17 +55,17 @@ sealed interface RecordDetailsTargetItemViewModel {
         override val isSelectable: Boolean = true
     }
 
-    data class SingleApp(val task: ScreenCaptureRecentTask? = null) :
-        RecordDetailsTargetItemViewModel {
+    data class SingleApp(val task: ScreenCaptureRecentTask) : RecordDetailsTargetItemViewModel {
 
-        override val screenCaptureTarget: ScreenCaptureTarget? =
-            task?.run { ScreenCaptureTarget.App(displayId = displayId, taskId = taskId) }
+        override val screenCaptureTarget: ScreenCaptureTarget =
+            ScreenCaptureTarget.App(displayId = task.displayId, taskId = task.taskId)
 
         override val labelRes: Int = R.string.screen_record_single_app
         override val isSelectable: Boolean = true
     }
 
     data object SingleAppNoRecents : RecordDetailsTargetItemViewModel {
+
         override val labelRes: Int = R.string.screen_record_single_app_no_recents
         override val isSelectable: Boolean = false
         override val screenCaptureTarget: ScreenCaptureTarget? = null
@@ -74,6 +76,7 @@ class RecordDetailsTargetViewModel
 @AssistedInject
 constructor(
     @ScreenCaptureUi private val display: Display,
+    private val screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
     private val screenCaptureRecentTaskInteractor: ScreenCaptureRecentTaskInteractor,
     private val labelInteractor: ScreenCaptureLabelInteractor,
 ) : HydratedActivatable() {
@@ -83,6 +86,13 @@ constructor(
         MutableStateFlow(null)
     private val _currentTarget = MutableStateFlow<RecordDetailsTargetItemViewModel?>(null)
 
+    val canChangeTarget: Boolean by
+        screenRecordingServiceInteractor.status
+            .map { it.canChangeTarget() }
+            .hydratedStateOf(
+                traceName = "RecordDetailsTargetViewModel#canChangeTarget",
+                initialValue = screenRecordingServiceInteractor.status.value.canChangeTarget(),
+            )
     val currentTarget: RecordDetailsTargetItemViewModel? by
         _currentTarget.hydratedStateOf(traceName = "RecordDetailsTargetViewModel#currentTarget")
     val items: List<RecordDetailsTargetItemViewModel>? by
@@ -127,7 +137,7 @@ constructor(
                                 if (tasks.isNullOrEmpty()) {
                                     RecordDetailsTargetItemViewModel.SingleAppNoRecents
                                 } else {
-                                    RecordDetailsTargetItemViewModel.SingleApp()
+                                    RecordDetailsTargetItemViewModel.SingleApp(tasks.first())
                                 }
                             )
                         }
@@ -158,3 +168,5 @@ constructor(
         fun create(): RecordDetailsTargetViewModel
     }
 }
+
+private fun Status.canChangeTarget(): Boolean = this is Status.Stopped || this is Status.Initial

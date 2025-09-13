@@ -1139,17 +1139,13 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         @Override
-        public void onActivityLaunched(long id, ComponentName name, int temperature, int userId) {
+        public void onActivityLaunched(long id, ComponentName name, int temperature,
+                String processName, int uid) {
             mAppProfiler.onActivityLaunched();
             synchronized (ActivityManagerService.this) {
-                ProcessRecord record = null;
-                try {
-                    record = getProcessRecordLocked(name.getPackageName(), mContext
-                            .getPackageManager().getPackageUidAsUser(name.getPackageName(), 0,
-                            userId));
-                } catch (NameNotFoundException nnfe) {
-                    // Ignore, record will be lost.
-                }
+                String processRecordName = Flags.appStartInfoProcessNameFix()
+                        ? processName : name.getPackageName();
+                ProcessRecord record = getProcessRecordLocked(processRecordName, uid);
                 mProcessList.getAppStartInfoTracker().onActivityLaunched(id, name, temperature,
                         record);
             }
@@ -8546,7 +8542,7 @@ public class ActivityManagerService extends IActivityManager.Stub
      * thread of the given process.
      */
     @GuardedBy("mProcLock")
-    static void setFifoPriority(@NonNull ProcessRecord app, boolean enable) {
+    static void setFifoPriority(@NonNull ProcessRecordInternal app, boolean enable) {
         final int pid = app.getPid();
         final int renderThreadTid = app.getRenderThreadTid();
         if (enable) {
@@ -19700,8 +19696,9 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             if (freezePolicy) {
                 if (Flags.cpuTimeCapabilityBasedFreezePolicy()
+                        && !com.android.server.notification.Flags.allowFreezingIdleNls()
                         && app.getCurAdj() < CACHED_APP_MIN_ADJ) {
-                    Slog.wtfStack(TAG, "Non-cached process may get frozen soon: "
+                    Slog.wtfStack(TAG, "Unexpected non-cached process may get frozen soon: "
                             + " name: " + app.processName
                             + " curAdj: " + app.getCurAdj()
                             + " oldOomAdj: " + oldOomAdj
@@ -19729,6 +19726,18 @@ public class ActivityManagerService extends IActivityManager.Stub
                     mCachedAppOptimizer.unfreezeAppLSP((ProcessRecord) app,
                             CachedAppOptimizer.getUnfreezeReasonCodeFromOomAdjReason(oomAdjReason));
                 }
+            }
+        }
+
+        @Override
+        public void onProcStateUpdated(ProcessRecordInternal appInternal, long now,
+                boolean forceUpdatePssTime) {
+            final ProcessRecord app = (ProcessRecord) appInternal;
+
+            synchronized (mAppProfiler.mProfilerLock) {
+                app.mProfile.updateProcState(app);
+                mAppProfiler.updateNextPssTimeLPf(app.getCurProcState(), app.mProfile, now,
+                        forceUpdatePssTime);
             }
         }
     }

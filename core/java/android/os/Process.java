@@ -45,6 +45,7 @@ import android.webkit.WebViewZygote;
 import com.android.sdksandbox.flags.Flags;
 
 import dalvik.annotation.optimization.CriticalNative;
+import dalvik.annotation.optimization.FastNative;
 import dalvik.system.VMDebug;
 import dalvik.system.VMRuntime;
 
@@ -1127,24 +1128,27 @@ public class Process {
         }
     }
 
+    @FastNative
     private static native void setThreadPriorityNative(int tid,
             @IntRange(from = -20, to = THREAD_PRIORITY_LOWEST) int priority)
             throws IllegalArgumentException, SecurityException;
 
     /**
+     * No-op stub, kept only for app compat purposes.
+     *
+     * Historical description:
      * Call with 'false' to cause future calls to {@link #setThreadPriority(int)} to
      * throw an exception if passed a background-level thread priority.  This is only
      * effective if the JNI layer is built with GUARD_THREAD_PRIORITY defined to 1.
      * This does not prevent a thread from backgrounding itself via other means, such
      * as a call to Thread.setPriority() or a native setpriority() call.
      *
+     * @deprecated This method does nothing.  Do not use.
+     *
      * @hide
      */
-    @RavenwoodRedirect
-    public static final native void setCanSelfBackground(boolean backgroundOk);
-
-    @RavenwoodRedirect
-    private static native boolean getCanSelfBackground();
+    @Deprecated
+    public static final void setCanSelfBackground(boolean backgroundOk) {}
 
     /**
      * Sets the scheduling group for a thread.
@@ -1335,10 +1339,6 @@ public class Process {
             setThreadPriority(myTid(), priority);
             return;
         }
-        if (priority >= THREAD_PRIORITY_BACKGROUND && !getCanSelfBackground()) {
-            throw new IllegalArgumentException(
-                "Priority " + priority + " blocked by setCanSelfBackground()");
-        }
         boolean succ = VMRuntime.getRuntime().setThreadNiceness(Thread.currentThread(), priority);
         // VMRuntime.setThreadNiceness() just returns false for out-of-range priority.
         if (!succ) {
@@ -1366,6 +1366,7 @@ public class Process {
      */
     @RavenwoodRedirect
     @IntRange(from = -20, to = THREAD_PRIORITY_LOWEST)
+    @FastNative
     public static final native int getThreadPriority(int tid)
             throws IllegalArgumentException;
 

@@ -41,6 +41,9 @@ public:
     // Global instance to use in order to maximize cache hits.
     static JniStringCache& getInstance();
 
+    // Clears all global references held by the cache.
+    static void Unload(JavaVM* vm);
+
     JniStringCache();
     ~JniStringCache();
 
@@ -67,6 +70,7 @@ public:
     // Under concurrent usage, some entries may not be cleared.
     // Use this for instance to trim memory usage if needed.
     void clear();
+    void clear(JNIEnv* env);
 
 private:
     struct CacheEntry {
@@ -100,9 +104,9 @@ private:
 
     // On most target architectures, CacheEntry can be stored in a lock-free atomic. We use the
     // assertion below to ensure that the struct remains this way.
-    // Supported RISC-V ISAs (RVA32 and RISC-V64) don't offer atomics that are wide enough. The code
-    // won't be as efficient, but will still be correct, so we relax the assertion for RISC-V.
-#if !defined(__riscv)
+    // On RISC-V without the Zacas extension, the atomic operations are not wide enough, but the
+    // code is otherwise correct, so relax the assertion.
+#if !(defined(__riscv) && !defined(__riscv_zacas))
     static_assert(std::atomic<CacheEntry>::is_always_lock_free);
 #endif
 

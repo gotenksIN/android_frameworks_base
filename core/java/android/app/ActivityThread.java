@@ -1176,24 +1176,21 @@ public final class ActivityThread extends ClientTransactionHandler
         @Override
         public boolean onTransact(int code, Parcel data, Parcel reply, int flags)
                 throws RemoteException {
-            if (Build.IS_DEBUGGABLE) {
+            boolean checkApplicationThreadCalledBySystem =
+                    android.security.Flags.checkApplicationThreadCalledBySystem();
+            if (Build.IS_DEBUGGABLE || checkApplicationThreadCalledBySystem) {
                 int callingUid = Binder.getCallingUid();
-                if (callingUid != Process.SYSTEM_UID) {
+                if (callingUid != Process.ROOT_UID && callingUid != Process.SYSTEM_UID) {
+                    String[] packagesForUid =
+                            getSystemContext().getPackageManager().getPackagesForUid(callingUid);
                     String packageName;
-                    if (callingUid == Process.ROOT_UID) {
-                        packageName = "root";
+                    if (packagesForUid == null || packagesForUid.length == 0) {
+                        packageName = "unknown";
+                    } else if (packagesForUid.length == 1) {
+                        packageName = packagesForUid[0];
                     } else {
-                        String[] packagesForUid =
-                                getSystemContext().getPackageManager().getPackagesForUid(
-                                        callingUid);
-                        if (packagesForUid == null || packagesForUid.length == 0) {
-                            packageName = "unknown";
-                        } else if (packagesForUid.length == 1) {
-                            packageName = packagesForUid[0];
-                        } else {
-                            packageName = Arrays.asList(packagesForUid).stream().sorted().collect(
-                                    Collectors.joining(", "));
-                        }
+                        packageName = Arrays.asList(packagesForUid).stream().sorted().collect(
+                                Collectors.joining(", "));
                     }
                     Slog.wtf(TAG, "ApplicationThread called by non-system process"
                             + " (callingUid: " + callingUid
@@ -1201,6 +1198,12 @@ public final class ActivityThread extends ClientTransactionHandler
                             + "; code: " + code
                             + "; flags: " + flags
                             + ")");
+                    if (checkApplicationThreadCalledBySystem) {
+                        throw new SecurityException(
+                                "ApplicationThread called by non-system process"
+                                        + " (callingUid: " + callingUid
+                                        + "; packageName: " + packageName + ")");
+                    }
                 }
             }
             return super.onTransact(code, data, reply, flags);
@@ -8113,8 +8116,7 @@ public final class ActivityThread extends ClientTransactionHandler
 
             // Propagate Content Capture options
             app.setContentCaptureOptions(data.contentCaptureOptions);
-            if (android.view.contentcapture.flags.Flags.warmUpBackgroundThreadForContentCapture()
-                    && data.contentCaptureOptions != null) {
+            if (data.contentCaptureOptions != null) {
                 if (data.contentCaptureOptions.enableReceiver
                         && !data.contentCaptureOptions.lite) {
                     // Warm up the background thread when:

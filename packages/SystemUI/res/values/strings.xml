@@ -375,6 +375,8 @@
     <string name="screen_record_capture_target_choose_app">Choose an app to record</string>
     <!-- Snackbar shows after the screen recording is saved [CHAR LIMIT=20] -->
     <string name="screen_record_video_saved">Video saved</string>
+    <!-- Snackbar shows after the screen recording is deleted [CHAR LIMIT=20] -->
+    <string name="screen_record_video_deleted">Video deleted</string>
     <!-- Snackbar shows after the screen recording is deleted. Undo action label [CHAR LIMIT=20] -->
     <string name="screen_record_undo">Undo</string>
     <!-- Button to retake a screen recording [CHAR LIMIT=20] -->
@@ -383,6 +385,10 @@
     <string name="screen_record_edit">Edit</string>
     <!-- Button to delete a screen recording [CHAR LIMIT=20] -->
     <string name="screen_record_delete">Delete</string>
+    <!-- Recording deletion confirmation dialog title [CHAR LIMIT=50] -->
+    <string name="screen_record_delete_dialog_title">Delete this recording?</string>
+    <!-- Recording deletion confirmation dialog content [CHAR LIMIT=50] -->
+    <string name="screen_record_delete_dialog_content">Deleting this recording will permanently delete the video file from your device.</string>
     <!-- Button to play record preview video [CHAR LIMIT=20] -->
     <string name="screen_record_play">Play</string>
     <!-- Button to pause record preview video [CHAR LIMIT=20] -->
@@ -425,6 +431,15 @@
     <string name="screen_capture_toolbar_fullscreen_button_record_a11y">Record entire screen</string>
     <!-- Content description for the settings button in the toolbar. [CHAR LIMIT=NONE] -->
     <string name="screen_capture_toolbar_settings_button_a11y">Screen capture settings</string>
+
+    <!-- Screen capture setting to show clicks and keys when recording [CHAR LIMIT=35] -->
+    <string name="screen_capture_show_clicks_and_keys">Show clicks and keys</string>
+    <!-- Screen capture setting to capture device audio when recording [CHAR LIMIT=35] -->
+    <string name="screen_capture_device_audio">Device audio</string>
+    <!-- Screen capture setting to capture microphone audio when recording [CHAR LIMIT=35] -->
+    <string name="screen_capture_microphone_audio">Microphone</string>
+    <!-- Screen capture setting to include the front camera when recording [CHAR LIMIT=35] -->
+    <string name="screen_capture_front_camera">Front camera</string>
 
     <!-- Text shown beneath partial screenshot region displaying the dimensions (width and height) of the area to be captured. [CHAR LIMIT=NONE] [SCREENSHOT=screen/7ytguTQdu3cEn4f] -->
     <string name="screen_capture_region_dimensions"><xliff:g example="210" id="width">%1$d</xliff:g> x <xliff:g example="129" id="height">%2$d</xliff:g></string>
@@ -1165,6 +1180,10 @@
     <string name="hearing_devices_presets_error">Couldn\'t update preset</string>
     <!-- QuickSettings: Title for hearing aids presets. Preset is a set of hearing aid settings. User can apply different settings in different environments (e.g. Outdoor, Restaurant, Home) [CHAR LIMIT=40]-->
     <string name="hearing_devices_preset_label">Preset</string>
+    <!-- QuickSettings: Title for hearing aids presets of left side device. Preset is a set of hearing aid settings. User can apply different settings in different environments (e.g. Outdoor, Restaurant, Home) [CHAR LIMIT=40]-->
+    <string name="hearing_devices_preset_label_left">Left Preset</string>
+    <!-- QuickSettings: Title for hearing aids presets of right side device. Preset is a set of hearing aid settings. User can apply different settings in different environments (e.g. Outdoor, Restaurant, Home) [CHAR LIMIT=40]-->
+    <string name="hearing_devices_preset_label_right">Right Preset</string>
     <!-- QuickSettings: Title for hearing aids input routing control in hearing device dialog. [CHAR LIMIT=40]-->
     <string name="hearing_devices_input_routing_label">Default microphone for calls</string>
     <!-- QuickSettings: Option for hearing aids input routing control in hearing device dialog. It will alter input routing for calls for hearing aid. [CHAR LIMIT=40]-->
@@ -1172,8 +1191,6 @@
         <item>Hearing aid microphone</item>
         <item>This phone\'s microphone</item>
     </string-array>
-    <!-- QuickSettings: Content description for the icon that indicates the item is selected [CHAR LIMIT=NONE]-->
-    <string name="hearing_devices_spinner_item_selected">Selected</string>
     <!-- QuickSettings: Title for ambient controls. [CHAR LIMIT=40]-->
     <string name="hearing_devices_ambient_label">Surroundings</string>
     <!-- QuickSettings: The text to show the control is for left side device. [CHAR LIMIT=30] -->
@@ -2265,7 +2282,7 @@
     <string name="notification_guts_recs_summary">Newsletters, recommended media, and more</string>
 
     <!-- Notification summaries onboarding affordance turn on button [CHAR LIMIT=40]-->
-    <string name="notification_onboarding_summaries_turn_on">Turn on</string>
+    <string name="notification_onboarding_summaries_turn_on">Turn on in Settings</string>
 
     <!--  Notification summaries onboarding affordance message [CHAR LIMIT=NONE]-->
     <string name="notification_onboarding_summaries_message">Your longer conversations can now be summarized to give you quick recaps</string>

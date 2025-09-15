@@ -128,6 +128,7 @@ import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
 import static android.internal.perfetto.protos.Inputmethodeditor.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
 import static android.internal.perfetto.protos.Inputmethodeditor.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
 import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION;
+import static android.window.DesktopExperienceFlags.DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW;
 
 import static com.android.graphics.surfaceflinger.flags.Flags.setClientDrawnCornerRadii;
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
@@ -889,7 +890,6 @@ public final class ViewRootImpl implements ViewParent,
     private int mRelayoutSeq;
     private final Rect mWinFrameInScreen = new Rect();
     private final InsetsState mTempInsets = new InsetsState();
-    private final InsetsSourceControl.Array mTempControls = new InsetsSourceControl.Array();
     private final WindowConfiguration mTempWinConfig = new WindowConfiguration();
     private float mInvCompatScale = 1f;
     final ViewTreeObserver.InternalInsetsInfo mLastGivenInsets
@@ -1194,7 +1194,7 @@ public final class ViewRootImpl implements ViewParent,
      * integer back over relayout.
      */
     private final WindowRelayoutResult mRelayoutResult = new WindowRelayoutResult(
-            mTmpFrames, mPendingMergedConfiguration, mTempInsets, mTempControls);
+            mTmpFrames, mPendingMergedConfiguration, mTempInsets, new InsetsSourceControl.Array());
 
     private static volatile boolean sAnrReported = false;
     static BLASTBufferQueue.TransactionHangCallback sTransactionHangCallback =
@@ -1631,6 +1631,9 @@ public final class ViewRootImpl implements ViewParent,
                     mWindowAttributes.privateFlags |= PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY;
                 }
 
+                final WindowRelayoutResult addResult = new WindowRelayoutResult(
+                        new ClientWindowFrames(), new MergedConfiguration(), mTempInsets,
+                        new InsetsSourceControl.Array());
                 try {
                     mOrigWindowType = mWindowAttributes.type;
                     mAttachInfo.mRecomputeGlobalAttributes = true;
@@ -1640,9 +1643,6 @@ public final class ViewRootImpl implements ViewParent,
                             mInsetsController.isBehaviorControlled());
                     controlInsetsForCompatibility(mWindowAttributes);
 
-                    final WindowRelayoutResult addResult = new WindowRelayoutResult(
-                            new ClientWindowFrames(), new MergedConfiguration(), mTempInsets,
-                            mTempControls);
                     res = mWindowSession.addToDisplayAsUser(mWindow, mWindowAttributes,
                             getHostVisibility(), mDisplay.getDisplayId(), userId,
                             mInsetsController.getRequestedVisibleTypes(), inputChannel, addResult);
@@ -1670,7 +1670,7 @@ public final class ViewRootImpl implements ViewParent,
                     }
                 }
 
-                handleInsetsControlChanged(mTempInsets, mTempControls);
+                handleInsetsControlChanged(mTempInsets, addResult.activeControls);
                 final InsetsState state = mInsetsController.getState();
                 final Rect displayCutoutSafe = mTempRect;
                 state.getDisplayCutoutSafe(displayCutoutSafe);
@@ -7436,9 +7436,16 @@ public final class ViewRootImpl implements ViewParent,
                 }
             }
 
-            // find the best view to give focus to in this brave new non-touch-mode
-            // world
-            return mView.restoreDefaultFocus();
+            if (DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW.isTrue()) {
+                // If the window has focus, then we should restore the default view focus.
+                if (mAttachInfo.mHasWindowFocus) {
+                    return mView.restoreDefaultFocus();
+                }
+            } else {
+                // find the best view to give focus to in this brave new non-touch-mode
+                // world
+                return mView.restoreDefaultFocus();
+            }
         }
         return false;
     }
@@ -7546,6 +7553,11 @@ public final class ViewRootImpl implements ViewParent,
         protected void onWindowFocusChanged(boolean hasWindowFocus) {
             if (mNext != null) {
                 mNext.onWindowFocusChanged(hasWindowFocus);
+            }
+            if (DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW.isTrue()) {
+                if (hasWindowFocus && !isInTouchMode() && mView != null && !mView.hasFocus()) {
+                    mView.restoreDefaultFocus();
+                }
             }
         }
 
@@ -9740,7 +9752,7 @@ public final class ViewRootImpl implements ViewParent,
             }
             mInvCompatScale = 1f / mTmpFrames.compatScale;
             CompatibilityInfo.applyOverrideIfNeeded(mPendingMergedConfiguration, getDisplayId());
-            handleInsetsControlChanged(mTempInsets, mTempControls);
+            handleInsetsControlChanged(mTempInsets, mRelayoutResult.activeControls);
         }
 
         final int transformHint = SurfaceControl.rotationToBufferTransform(

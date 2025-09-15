@@ -2614,11 +2614,10 @@ public final class DisplayManagerService extends SystemService {
 
     private void handleLogicalDisplayFrameRateOverridesChangedLocked(
             @NonNull LogicalDisplay display) {
-        final int displayId = display.getDisplayIdLocked();
         // We don't bother invalidating the display info caches here because any changes to the
         // display info will trigger a cache invalidation inside of LogicalDisplay before we hit
         // this point.
-        sendDisplayEventFrameRateOverrideLocked(displayId);
+        sendDisplayEventFrameRateOverrideLocked(display);
         scheduleTraversalLocked(false);
     }
 
@@ -3707,6 +3706,11 @@ public final class DisplayManagerService extends SystemService {
     private void sendDisplayEventLocked(@NonNull LogicalDisplay display, @DisplayEvent int event) {
         int displayId = display.getDisplayIdLocked();
         Message msg = mHandler.obtainMessage(MSG_DELIVER_DISPLAY_EVENT, displayId, event);
+        if (mFlags.isDisplayEventsLoggingEnabled()
+                && event == DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED) {
+            msg.obj = new DisplayInfoChangedFields(display.getDisplayInfoGroupsChangedLocked(),
+                    display.getDisplayInfoChangeSource());
+        }
         if (mExtraDisplayEventLogging) {
             Slog.i(TAG, "Deliver Display Event on Handler: " + event);
         }
@@ -3718,12 +3722,18 @@ public final class DisplayManagerService extends SystemService {
         mHandler.sendMessage(msg);
     }
 
-    private void sendDisplayEventFrameRateOverrideLocked(int displayId) {
+    private void sendDisplayEventFrameRateOverrideLocked(LogicalDisplay display) {
         int event = (mFlags.isFramerateOverrideTriggersRrCallbacksEnabled())
                 ? DisplayManagerGlobal.EVENT_DISPLAY_REFRESH_RATE_CHANGED
                 : DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED;
+        int displayId = display.getDisplayIdLocked();
         Message msg = mHandler.obtainMessage(MSG_DELIVER_DISPLAY_EVENT_FRAME_RATE_OVERRIDE,
                 displayId, event);
+        if (mFlags.isDisplayEventsLoggingEnabled()
+                && event == DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED) {
+            msg.obj = new DisplayInfoChangedFields(display.getDisplayInfoGroupsChangedLocked(),
+                    display.getDisplayInfoChangeSource());
+        }
         mHandler.sendMessage(msg);
     }
 
@@ -3741,7 +3751,7 @@ public final class DisplayManagerService extends SystemService {
     // Runs on Handler thread.
     // Delivers display event notifications to callbacks.
     private void deliverDisplayEvent(int displayId, ArraySet<Integer> uids,
-            @DisplayEvent int event) {
+            @DisplayEvent int event, DisplayInfoChangedFields displayInfoChangedFields) {
         if (DEBUG || mExtraDisplayEventLogging) {
             Slog.d(TAG, "Delivering display event: displayId="
                     + displayId + ", event=" + event
@@ -3778,7 +3788,14 @@ public final class DisplayManagerService extends SystemService {
         }
 
         if (mFlags.isDisplayEventsLoggingEnabled()) {
+            // Log DisplayEventCallbackOccurred atom
             mStatsLogger.logDisplayEvent(event, notifiedUids);
+
+            // Log DisplayInfoChanged atom
+            if (event == DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED) {
+                mStatsLogger.logDisplayInfoChanged(displayInfoChangedFields.changedGroups(),
+                        displayInfoChangedFields.source());
+            }
         }
 
         mTempCallbacks.clear();
@@ -4328,7 +4345,8 @@ public final class DisplayManagerService extends SystemService {
                     break;
 
                 case MSG_DELIVER_DISPLAY_EVENT:
-                    deliverDisplayEvent(msg.arg1, null, msg.arg2);
+                    deliverDisplayEvent(msg.arg1, null, msg.arg2,
+                            (DisplayInfoChangedFields) msg.obj);
                     break;
 
                 case MSG_REQUEST_TRAVERSAL:
@@ -4372,7 +4390,8 @@ public final class DisplayManagerService extends SystemService {
                         uids = display.getPendingFrameRateOverrideUids();
                         display.clearPendingFrameRateOverrideUids();
                     }
-                    deliverDisplayEvent(msg.arg1, uids, msg.arg2);
+                    deliverDisplayEvent(msg.arg1, uids, msg.arg2,
+                            (DisplayInfoChangedFields) msg.obj);
                     break;
 
                 case MSG_DELIVER_DISPLAY_GROUP_EVENT:
@@ -6595,4 +6614,8 @@ public final class DisplayManagerService extends SystemService {
         @Nullable
         DisplayInfo get(int displayId);
     }
+
+    private record DisplayInfoChangedFields(int changedGroups,
+                                            DisplayInfo.DisplayInfoChangeSource source) {}
+
 }

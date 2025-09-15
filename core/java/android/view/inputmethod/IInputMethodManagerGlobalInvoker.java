@@ -41,6 +41,7 @@ import com.android.internal.inputmethod.IConnectionlessHandwritingCallback;
 import com.android.internal.inputmethod.IImeTracker;
 import com.android.internal.inputmethod.IInputMethodClient;
 import com.android.internal.inputmethod.IRemoteAccessibilityInputConnection;
+import com.android.internal.inputmethod.IRemoteComputerControlInputConnection;
 import com.android.internal.inputmethod.IRemoteInputConnection;
 import com.android.internal.inputmethod.InputMethodInfoSafeList;
 import com.android.internal.inputmethod.SoftInputShowHideReason;
@@ -298,6 +299,7 @@ final class IInputMethodManagerGlobalInvoker {
             @WindowManager.LayoutParams.Flags int windowFlags, @Nullable EditorInfo editorInfo,
             @Nullable IRemoteInputConnection remoteInputConnection,
             @Nullable IRemoteAccessibilityInputConnection remoteAccessibilityInputConnection,
+            @Nullable IRemoteComputerControlInputConnection remoteComputerControlInputConnection,
             int unverifiedTargetSdkVersion, @UserIdInt int userId,
             @NonNull ResultReceiver imeBackCallbackReceiver, boolean imeRequestedVisible) {
         final IInputMethodManager service = getService();
@@ -307,9 +309,9 @@ final class IInputMethodManagerGlobalInvoker {
         try {
             service.startInputOrWindowGainedFocus(startInputReason, client, windowToken,
                     startInputFlags, softInputMode, windowFlags, editorInfo, remoteInputConnection,
-                    remoteAccessibilityInputConnection, unverifiedTargetSdkVersion, userId,
-                    imeBackCallbackReceiver, imeRequestedVisible,
-                    advanceAngGetStartInputSequenceNumber());
+                    remoteAccessibilityInputConnection, remoteComputerControlInputConnection,
+                    unverifiedTargetSdkVersion, userId, imeBackCallbackReceiver,
+                    imeRequestedVisible, advanceAngGetStartInputSequenceNumber());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -611,6 +613,21 @@ final class IInputMethodManagerGlobalInvoker {
         }
         try {
             service.setStylusWindowIdleTimeoutForTest(client, timeout);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    @AnyThread
+    @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
+    static void setAllowedImesByPolicyForTest(
+            IInputMethodClient client, @Nullable List<String> allowedPackages) {
+        final IInputMethodManager service = getService();
+        if (service == null) {
+            return;
+        }
+        try {
+            service.setAllowedImesByPolicyForTest(client, allowedPackages);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

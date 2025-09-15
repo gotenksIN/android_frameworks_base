@@ -928,8 +928,20 @@ public final class DisplayInfo implements Parcelable {
     }
 
     /**
+     * The source of a change in the display info object.
+     */
+    public enum DisplayInfoChangeSource {
+        DISPLAY_SWAP,
+        DISPLAY_MANAGER,
+        WINDOW_MANAGER,
+        OTHER
+    }
+
+    /**
      * Groups of related fields within a {@link DisplayInfo} object.
      * Used to categorize changes between two instances.
+     * Any changes to which fields belong to which groups need to update:
+     * {@link com.android.server.wm.utils.DisplayInfoOverrides#WM_OVERRIDE_GROUPS}.
      */
     public enum DisplayInfoGroup {
         /** Basic properties like IDs, flags, type, and ownership. */
@@ -956,6 +968,20 @@ public final class DisplayInfo implements Parcelable {
 
         public int getMask() {
             return mMask;
+        }
+
+        /** Convert bitmask to a string of group names. */
+        public static String displayInfoGroupsToString(int changedGroups) {
+            StringBuilder sb = new StringBuilder();
+            for (DisplayInfo.DisplayInfoGroup group : DisplayInfo.DisplayInfoGroup.values()) {
+                if ((changedGroups & group.getMask()) != 0) {
+                    if (sb.length() > 0) {
+                        sb.append(", ");
+                    }
+                    sb.append(group);
+                }
+            }
+            return sb.length() == 0 ? "NONE" : sb.toString();
         }
     }
 

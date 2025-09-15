@@ -184,6 +184,7 @@ import com.android.server.StorageManagerInternal;
 import com.android.server.SystemService;
 import com.android.server.am.UserState;
 import com.android.server.locksettings.LockSettingsInternal;
+import com.android.server.pm.UserFilter.DeathPredictor;
 import com.android.server.pm.UserManagerInternal.UserLifecycleListener;
 import com.android.server.pm.UserManagerInternal.UserRestrictionsListener;
 import com.android.server.storage.DeviceStorageMonitorInternal;
@@ -228,6 +229,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /**
  * Service for {@link UserManager}.
@@ -404,7 +406,7 @@ public class UserManagerService extends IUserManager.Stub {
     private final Object mAppRestrictionsLock = NamedLock.create("mAppRestrictionsLock");
 
     private final Handler mHandler;
-    private final MultiuserDeprecationReporter mDeprecationReporter;
+    private final MultiuserNonComplianceLogger mNonComplianceLogger;
 
     private final ThreadPoolExecutor mInternalExecutor;
 
@@ -582,6 +584,10 @@ public class UserManagerService extends IUserManager.Stub {
      */
     @GuardedBy("mUsersLock")
     private final SparseBooleanArray mRemovingUserIds = new SparseBooleanArray();
+
+    /** Used on methods that take a UserFilter (like {@link #getUsers(UserFilter)}) */
+    @GuardedBy("mUsersLock")
+    private final DeathPredictor mDeathPredictor = user -> mRemovingUserIds.get(user.id);
 
     /**
      * Queue of recently removed userIds. Used for recycling of userIds
@@ -993,6 +999,9 @@ public class UserManagerService extends IUserManager.Stub {
     @GuardedBy("mUsersLock")
     private @CanBeNULL @UserIdInt int mBootUser = UserHandle.USER_NULL;
 
+    /** Converter used on calls to {@link #getUsersInternal(UserFilter, Function)}. */
+    private final Function<UserInfo, UserInfo> mNameConverter = user -> userWithName(user);
+
     private static UserManagerService sInstance;
 
     public static UserManagerService getInstance() {
@@ -1119,7 +1128,7 @@ public class UserManagerService extends IUserManager.Stub {
         mPackagesLock = packagesLock;
         mUsers = users != null ? users : new SparseArray<>();
         mHandler = new MainHandler();
-        mDeprecationReporter = new MultiuserDeprecationReporter(mHandler);
+        mNonComplianceLogger = new MultiuserNonComplianceLogger(mHandler);
         mInternalExecutor = new ThreadPoolExecutor(/* corePoolSize */ 0, /* maximumPoolSize */ 1,
                 /* keepAliveTime */ 24, TimeUnit.HOURS, new LinkedBlockingQueue<>());
         mUserVisibilityMediator = new UserVisibilityMediator(mHandler);
@@ -1377,7 +1386,7 @@ public class UserManagerService extends IUserManager.Stub {
     @Override
     public @CanBeNULL @UserIdInt int getMainUserId() {
         checkQueryOrCreateUsersPermission("get main user id");
-        mDeprecationReporter.logGetMainUserCall();
+        mNonComplianceLogger.logGetMainUserCall();
         return getMainUserIdUnchecked();
     }
 
@@ -1402,7 +1411,7 @@ public class UserManagerService extends IUserManager.Stub {
 
     @Override
     public boolean isMainUser(int userId) {
-        mDeprecationReporter.logIsMainUserCall();
+        mNonComplianceLogger.logIsMainUserCall();
         UserInfo user = getUserInfo(userId);
         return user != null && user.isMainUnlogged();
     }
@@ -1649,10 +1658,17 @@ public class UserManagerService extends IUserManager.Stub {
     }
 
     // Used by cmd users
-    @NonNull List<UserInfo> getUsersWithUnresolvedNames(boolean excludePartial,
+    /**
+     * @deprecated should use {@link #getUsers(UserFilter)} instead.
+     */
+    @Deprecated
+    List<UserInfo> getUsersWithUnresolvedNames(boolean excludePartial,
             boolean excludeDying) {
         checkCreateUsersPermission("get users with unresolved names");
-        return getUsersInternal(excludePartial, excludeDying, /* resolveNullNames= */ false);
+        if (!android.multiuser.Flags.userFilterRefactoring()) {
+            return getUsersInternal(excludePartial, excludeDying, /* resolveNullNames= */ false);
+        }
+        return getUsers(getFilter(excludePartial, excludeDying));
     }
 
     /**
@@ -1662,6 +1678,8 @@ public class UserManagerService extends IUserManager.Stub {
     @VisibleForTesting
     List<UserInfo> getUsersInternal(boolean excludePartial, boolean excludeDying,
             boolean resolveNullNames) {
+        if (!android.multiuser.Flags.userFilterRefactoring()) {
+            // NOTE: not indented on purpose (to minimize git changes)
         synchronized (mUsersLock) {
             ArrayList<UserInfo> users = new ArrayList<>(mUsers.size());
             final int userSize = mUsers.size();
@@ -1678,6 +1696,74 @@ public class UserManagerService extends IUserManager.Stub {
             }
             return users;
         }
+        }
+        UserFilter filter = getFilter(excludePartial, excludeDying);
+        Function<UserInfo, UserInfo> converter = resolveNullNames ? mNameConverter : null;
+        return getUsersInternal(filter, converter);
+    }
+
+    // TODO(b/419086491): use cached filters
+    private static UserFilter getFilter(boolean excludePartial, boolean excludeDying) {
+        var builder = UserFilter.builder();
+        if (!excludePartial) {
+            builder.withPartialUsers();
+        }
+        if (!excludeDying) {
+            builder.withDyingUsers();
+        }
+        return builder.build();
+    }
+
+    /** Gets the users that match the given {@code filter}. */
+    List<UserInfo> getUsers(UserFilter filter) {
+        return getUsersInternal(filter, /* converter= */ null);
+    }
+
+    /**
+     * Gets the converted users that match the given {@code filter}.
+     *
+     * <p>Typically used with {@link #userWithName(UserInfo)} resolve {@code null} names.
+     */
+    @VisibleForTesting
+    List<UserInfo> getUsers(UserFilter filter, Function<UserInfo, UserInfo> converter) {
+        Objects.requireNonNull(converter, "converter cannot be null");
+        return getUsersInternal(filter, converter);
+    }
+
+    private List<UserInfo> getUsersInternal(UserFilter filter,
+            @Nullable Function<UserInfo, UserInfo> converter) {
+        Objects.requireNonNull(filter, "filter cannot be null");
+        synchronized (mUsersLock) {
+            ArrayList<UserInfo> users = new ArrayList<>(mUsers.size());
+            int userSize = mUsers.size();
+            for (int i = 0; i < userSize; i++) {
+                UserInfo user = mUsers.valueAt(i).info;
+                if (filter.matches(mDeathPredictor, user)) {
+                    if (converter == null) {
+                        users.add(user);
+                    } else {
+                        users.add(converter.apply(user));
+                    }
+                }
+            }
+            return users;
+        }
+    }
+
+    /** Gets the number of users that matches the given {@code filter}. */
+    int getNumberOfUsers(UserFilter filter) {
+        Objects.requireNonNull(filter, "filter cannot be null");
+        int number = 0;
+        synchronized (mUsersLock) {
+            int userSize = mUsers.size();
+            for (int i = 0; i < userSize; i++) {
+                UserInfo user = mUsers.valueAt(i).info;
+                if (filter.matches(mDeathPredictor, user)) {
+                    number++;
+                }
+            }
+        }
+        return number;
     }
 
     @Override
@@ -8127,12 +8213,11 @@ public class UserManagerService extends IUserManager.Stub {
                 case "--visibility-mediator":
                     mUserVisibilityMediator.dump(pw, args);
                     return;
-                // TODO(b/414326600): use a different arg for HSU SysUI actions
-                case "--deprecated-calls":
+                case "--non-compliance":
                     if (args.length > 1 && args[1].equals("reset")) {
-                        mDeprecationReporter.reset(pw);
+                        mNonComplianceLogger.reset(pw);
                     } else {
-                        mDeprecationReporter.dump(pw);
+                        mNonComplianceLogger.dump(pw);
                     }
                     return;
             }
@@ -8275,7 +8360,7 @@ public class UserManagerService extends IUserManager.Stub {
         }
 
         pw.println();
-        mDeprecationReporter.dump(pw);
+        mNonComplianceLogger.dump(pw);
 
         // NOTE: add new stuff here, as pw is closed after the try-with-resources block below
 
@@ -8965,7 +9050,7 @@ public class UserManagerService extends IUserManager.Stub {
 
         @Override
         public void logLaunchedHsuActivity(ComponentName activity) {
-            mDeprecationReporter.logLaunchedHsuActivity(activity);
+            mNonComplianceLogger.logLaunchedHsuActivity(activity);
         }
 
     } // class LocalService

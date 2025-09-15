@@ -134,16 +134,6 @@ flag {
 }
 
 flag {
-    name: "notification_content_alpha_optimization"
-    namespace: "systemui"
-    description: "Only reset alpha values of needed content views"
-    bug: "292024656"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
    name: "notification_transparent_header_fix"
    namespace: "systemui"
    description: "fix the transparent group header issue for async header inflation."
@@ -198,6 +188,16 @@ flag {
     namespace: "systemui"
     description: "Do not notify HeadsUpManager for silent updates."
     bug: "401068530"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "notification_fix_hun_shadows"
+    namespace: "systemui"
+    description: "Fix HUN shadows when the shade is collapsed."
+    bug: "440572084"
     metadata {
        purpose: PURPOSE_BUGFIX
     }
@@ -503,17 +503,6 @@ flag {
 }
 
 flag {
-    name: "global_actions_icon_refresh_2025"
-    namespace: "systemui"
-    description: "Build time flag for 2025 power menu icon refresh"
-    bug: "427755140"
-    is_fixed_read_only: true
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "promote_notifications_automatically"
     namespace: "systemui"
     description: "Flag to automatically turn certain notifications into promoted notifications so "
@@ -682,16 +671,6 @@ flag {
 }
 
 flag {
-    name: "clipboard_announce_live_region"
-    namespace: "systemui"
-    description: "Use live region for clipboard status announcement"
-    bug: "378856296"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "screen_reactions"
     namespace: "systemui"
     description: "Enables the new screen recording UX"
@@ -763,23 +742,6 @@ flag {
     namespace: "systemui"
     description: "Force screenshot sound when camera sound is forced and camera is open"
     bug: "411503333"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "screenshot_action_dismiss_system_windows"
-    namespace: "systemui"
-    description: "Dismiss existing system windows when starting action from screenshot UI"
-    bug: "309933761"
-}
-
-flag {
-    name: "fix_screenshot_action_dismiss_system_windows"
-    namespace: "systemui"
-    description: "Dismiss existing system windows when starting action from screenshot UI"
-    bug: "309933761"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -989,13 +951,6 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "qs_edit_mode_tabs"
-    namespace: "systemui"
-    description: "Splits the Quick Settings edit mode in tabs. This feature is for the compose version of Quick Settings."
-    bug: "416236871"
 }
 
 flag {
@@ -2238,4 +2193,24 @@ flag {
    metadata {
         purpose: PURPOSE_BUGFIX
    }
+}
+
+flag {
+    name: "check_desktop_mode_for_spacial_model_app_pushback"
+    namespace: "systemui"
+    description: "Checks desktop mode for disabling spacial model as opposed to just checking if the screen is large"
+    bug: "409529581"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+    name: "sysui_intrinsic_lock_dispatcher"
+    namespace: "systemui"
+    description: "Custom dispatcher for background tasks, which uses intrinsic locks instead of ReentrantLock"
+    bug: "419472502"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
 }

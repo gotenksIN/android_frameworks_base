@@ -204,30 +204,10 @@ flag {
 }
 
 flag {
-    name: "enable_enter_split_remove_bubble"
-    namespace: "multitasking"
-    description: "Enable removing a task from bubbles when it is entering split screen"
-    bug: "396315875"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_bubble_bar_to_floating_transition"
     namespace: "multitasking"
     description: "Enable transitioning from bubble bar to floating when folding"
     bug: "380105874"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "fix_bubbles_to_recents"
-    namespace: "multitasking"
-    description: "Fixes a bug with entering recents via 3 button when bubbles are open"
-    bug: "418760100"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

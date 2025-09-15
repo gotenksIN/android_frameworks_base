@@ -9289,21 +9289,23 @@ public class Notification implements Parcelable
      * This class is a "rebuilder": It attaches to a Builder object and modifies its behavior.
      * Here's an example of how this may be used:
      * <pre class="prettyprint">
-     *
      * Person user = new Person.Builder().setIcon(userIcon).setName(userName).build();
      * MessagingStyle style = new MessagingStyle(user)
      *      .addMessage(messages[1].getText(), messages[1].getTime(), messages[1].getPerson())
      *      .addMessage(messages[2].getText(), messages[2].getTime(), messages[2].getPerson())
      *      .setGroupConversation(hasMultiplePeople());
      *
-     * Notification noti = new Notification.Builder()
+     * Notification notif = new Notification.Builder()
      *     .setContentTitle(&quot;2 new messages with &quot; + sender.toString())
      *     .setContentText(subject)
      *     .setSmallIcon(R.drawable.new_message)
-     *     .setLargeIcon(aBitmap)
      *     .setStyle(style)
      *     .build();
      * </pre>
+     *
+     * Note that this style doesn't display the large icon set via
+     * {@link Builder#setLargeIcon(Icon)}, except as a fallback group icon if the shortcut doesn't
+     * include one. It can, however, display images set via {@link MessagingStyle.Message#setData}.
      */
     public static class MessagingStyle extends Style {
 
@@ -9904,7 +9906,6 @@ public class Notification implements Parcelable
         @NonNull
         private RemoteViews makeMessagingView(int viewType) {
             boolean isCollapsed = viewType != StandardTemplateParams.VIEW_TYPE_EXPANDED;
-            boolean hideRightIcons = viewType != StandardTemplateParams.VIEW_TYPE_NORMAL;
             boolean isConversationLayout = mConversationType != CONVERSATION_TYPE_LEGACY;
             boolean isImportantConversation = mConversationType == CONVERSATION_TYPE_IMPORTANT;
             boolean isLegacyHeaderless = !isConversationLayout && isCollapsed;
@@ -9939,8 +9940,8 @@ public class Notification implements Parcelable
                     .viewType(viewType)
                     .highlightExpander(isConversationLayout)
                     .hideProgress(true)
-                    .hideLeftIcon(isOneToOne)
-                    .hideRightIcon(hideRightIcons || isOneToOne);
+                    .hideLeftIcon(true)
+                    .hideRightIcon(true);
             if (notificationsRedesignTemplates()) {
                 String lastMessage = !mMessages.isEmpty()
                         ? mMessages.getLast().mText.toString() : null;
@@ -11080,6 +11081,9 @@ public class Notification implements Parcelable
      *     .setStyle(Notification.CallStyle.forIncomingCall(caller, declineIntent, answerIntent))
      *     .build();
      * </pre>
+     *
+     * <p>Note that this style doesn't display the large icon set via
+     * {@link Builder#setLargeIcon(Icon)}.
      */
     public static class CallStyle extends Style {
         /**
@@ -11648,7 +11652,7 @@ public class Notification implements Parcelable
      * <p>To use this style with your Notification, feed it to
      * {@link Notification.Builder#setStyle(android.app.Notification.Style)} like so:
      * <pre class="prettyprint">
-     * new Notification.Builder(context)
+     * Notification notif = new Notification.Builder(context)
      *   .setStyle(new MetricStyle()
      *       .addMetric(new Metric(new Metric.FixedInt(1979), "Steps"))
      *       .addMetric(new Metric(
@@ -11658,6 +11662,9 @@ public class Notification implements Parcelable
      *
      * <p>A MetricStyle must contain at least one {@link Metric} object to be valid; an invalid
      * style will be rejected when {@link Builder#build()} is called.
+     *
+     * <p>Note that this style doesn't display the large icon set via
+     * {@link Builder#setLargeIcon(Icon)}.
      */
     @FlaggedApi(Flags.FLAG_API_METRIC_STYLE)
     public static final class MetricStyle extends Style {
@@ -11799,7 +11806,7 @@ public class Notification implements Parcelable
             final TemplateBindResult result = new TemplateBindResult();
             final RemoteViews contentView = getStandardView(
                     mBuilder.getCollapsedMetricLayoutResource(), p, result);
-            return bindMetricStyleMetrics(contentView, /* isExpandedView = */false);
+            return bindMetricStyleMetrics(contentView, p, /* isExpandedView = */ false);
         }
 
         /** @hide */
@@ -11812,7 +11819,7 @@ public class Notification implements Parcelable
             final TemplateBindResult result = new TemplateBindResult();
             final RemoteViews contentView = getStandardView(
                     mBuilder.getCollapsedMetricLayoutResource(), p, result);
-            return bindMetricStyleMetrics(contentView, /* isExpandedView = */false);
+            return bindMetricStyleMetrics(contentView, p, /* isExpandedView = */ false);
         }
 
         /** @hide */
@@ -11825,11 +11832,11 @@ public class Notification implements Parcelable
             final TemplateBindResult result = new TemplateBindResult();
             final RemoteViews contentView = getStandardView(
                     mBuilder.getExpandedMetricLayoutResource(), p, result);
-            return bindMetricStyleMetrics(contentView, /* isExpandedView = */true);
+            return bindMetricStyleMetrics(contentView, p, /* isExpandedView = */ true);
         }
 
         private RemoteViews bindMetricStyleMetrics(
-                RemoteViews contentView, boolean isExpandedView) {
+                RemoteViews contentView, StandardTemplateParams p, boolean isExpandedView) {
             for (int i = 0; i < MAX_METRICS; i++) {
                 final MetricView metricView = MetricView.VIEWS.get(i);
                 if (i < mMetrics.size()) {
@@ -11856,10 +11863,12 @@ public class Notification implements Parcelable
                                 metric.getLabel());
                     }
 
+                    mBuilder.setTextViewColorSecondary(contentView, metricView.labelId(), p);
                     contentView.setTextViewText(metricView.labelId(), metricLabel);
                     if (Flags.metricStyleUnitInLabel()) {
                         contentView.setViewVisibility(metricView.unitId(), View.GONE);
                     } else if (isExpandedView) {
+                        mBuilder.setTextViewColorSecondary(contentView, metricView.unitId(), p);
                         contentView.setViewVisibility(metricView.unitId(),
                                 TextUtils.isEmpty(valueString.subtext())
                                         ? View.GONE
@@ -11870,6 +11879,9 @@ public class Notification implements Parcelable
                     if (metricValue instanceof Metric.TimeDifference timeDifference) {
                         contentView.setViewVisibility(metricView.textValueId(), View.GONE);
                         contentView.setViewVisibility(metricView.chronometerId(), View.VISIBLE);
+                        mBuilder.setTextViewColorSecondary(contentView, metricView.chronometerId(),
+                                p);
+
                         contentView.setChronometerCountDown(
                                 metricView.chronometerId(), timeDifference.isTimer());
                         contentView.setBoolean(metricView.chronometerId(),
@@ -11895,6 +11907,8 @@ public class Notification implements Parcelable
                     } else {
                         contentView.setViewVisibility(metricView.chronometerId(), View.GONE);
                         contentView.setViewVisibility(metricView.textValueId(), View.VISIBLE);
+                        mBuilder.setTextViewColorSecondary(contentView, metricView.textValueId(),
+                                p);
                         contentView.setTextViewText(metricView.textValueId(), valueString.text());
                     }
                 } else {
@@ -13927,7 +13941,7 @@ public class Notification implements Parcelable
      * <p>To use this style with your Notification, feed it to
      * {@link Notification.Builder#setStyle(android.app.Notification.Style)} like so:
      * <pre class="prettyprint">
-     * Notification noti = new Notification.Builder()
+     * Notification notif = new Notification.Builder()
      *     .setSmallIcon(R.drawable.ic_stat_player)
      *     .setLargeIcon(albumArtBitmap))
      *     .setCustomContentView(contentView);

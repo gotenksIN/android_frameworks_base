@@ -1710,7 +1710,7 @@ public final class CameraManager {
 
     private static CameraCompatibilityInfo getLandscapeToPortraitOverride(boolean shouldOverride) {
         return new CameraCompatibilityInfo.Builder()
-                .setRotateAndCropRotation(shouldOverride ? ROTATION_90 : ROTATION_0)
+                .setRotateAndCropRotation(shouldOverride ? ROTATION_90 : ROTATION_UNDEFINED)
                 .setShouldOverrideSensorOrientation(shouldOverride)
                 .build();
     }
@@ -1719,7 +1719,8 @@ public final class CameraManager {
         final CameraCompatibilityInfo compatInfo = CompatibilityInfo.getCameraCompatibilityInfo();
         return (compatInfo.getRotateAndCropRotation() != ROTATION_UNDEFINED
                 && compatInfo.getRotateAndCropRotation() != ROTATION_0)
-                || compatInfo.shouldOverrideSensorOrientation();
+                || compatInfo.shouldOverrideSensorOrientation()
+                || !compatInfo.shouldAllowTransformInverseDisplay();
     }
 
     // TODO(b/430274604): remove once refactoring is launched.

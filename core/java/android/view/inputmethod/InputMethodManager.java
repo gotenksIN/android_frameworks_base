@@ -117,6 +117,7 @@ import com.android.internal.inputmethod.IConnectionlessHandwritingCallback;
 import com.android.internal.inputmethod.IInputMethodClient;
 import com.android.internal.inputmethod.IInputMethodSession;
 import com.android.internal.inputmethod.IRemoteAccessibilityInputConnection;
+import com.android.internal.inputmethod.IRemoteComputerControlInputConnection;
 import com.android.internal.inputmethod.ImeTracing;
 import com.android.internal.inputmethod.InputBindResult;
 import com.android.internal.inputmethod.InputMethodDebug;
@@ -946,8 +947,7 @@ public final class InputMethodManager {
                         StartInputReason.WINDOW_FOCUS_GAIN_REPORT_ONLY, mClient,
                         viewForWindowFocus.getWindowToken(), startInputFlags, softInputMode,
                         windowFlags,
-                        null,
-                        null, null,
+                        null, null, null, null,
                         mCurRootView.mContext.getApplicationInfo().targetSdkVersion,
                         UserHandle.myUserId(), mImeBackCallbackProxy.getResultReceiver(),
                         imeRequestedVisible);
@@ -3641,13 +3641,19 @@ public final class InputMethodManager {
                     ? editorInfo.targetInputMethodUser.getIdentifier() : UserHandle.myUserId();
             Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "IMM.startInputOrWindowGainedFocus");
 
+            final IRemoteAccessibilityInputConnection accessibilityInputConnection =
+                    servedInputConnection == null ? null
+                            : servedInputConnection.asIRemoteAccessibilityInputConnection();
+            final IRemoteComputerControlInputConnection computerControlInputConnection =
+                    (!android.companion.virtualdevice.flags.Flags.computerControlTyping()
+                            || servedInputConnection == null) ? null
+                            : servedInputConnection.asIRemoteComputerControlInputConnection();
             // async result delivered via MSG_START_INPUT_RESULT.
             final int startInputSeq =
                     IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus(
                             startInputReason, mClient, windowGainingFocus, startInputFlags,
                             softInputMode, windowFlags, editorInfo, servedInputConnection,
-                            servedInputConnection == null ? null
-                                    : servedInputConnection.asIRemoteAccessibilityInputConnection(),
+                            accessibilityInputConnection, computerControlInputConnection,
                             view.getContext().getApplicationInfo().targetSdkVersion, targetUserId,
                             mImeBackCallbackProxy.getResultReceiver(), imeRequestedVisible);
 
@@ -3734,6 +3740,23 @@ public final class InputMethodManager {
     public void setStylusWindowIdleTimeoutForTest(@DurationMillisLong long timeout) {
         synchronized (mH) {
             IInputMethodManagerGlobalInvoker.setStylusWindowIdleTimeoutForTest(mClient, timeout);
+        }
+    }
+
+    /**
+     * A test-only method to set a list of allowed IMEs for the next session.
+     * Note: this will reset on the next window focus.
+     * @param allowedPackages {@link List} of allowed IME packages. Set {@code null} to reset after
+     *                                    the test run.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_ENFORCE_DEVICE_POLICY_IME)
+    @TestApi
+    @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
+    public void setAllowedImesByPolicyForTest(@Nullable List<String> allowedPackages) {
+        synchronized (mH) {
+            IInputMethodManagerGlobalInvoker.setAllowedImesByPolicyForTest(
+                    mClient, allowedPackages);
         }
     }
 

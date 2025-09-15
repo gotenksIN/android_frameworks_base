@@ -93,17 +93,6 @@ flag {
 }
 
 flag {
-    name: "remove_activity_starter_dream_callback"
-    namespace: "windowing_frontend"
-    description: "Avoid a race with DreamManagerService callbacks for isDreaming by checking Activity state directly"
-    bug: "366452352"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-    is_fixed_read_only: true
-}
-
-flag {
   name: "do_not_force_wallpaper_for_freeform_task"
   namespace: "windowing_frontend"
   description: "Remove legacy condition to reduce overhead"
@@ -137,6 +126,16 @@ flag {
   namespace: "windowing_frontend"
   description: "The orientation, aspect ratio, resizability of activity will follow system behavior by default"
   bug: "357141415"
+}
+
+flag {
+  name: "opt_out_override_orientation_to_user"
+  namespace: "windowing_frontend"
+  description: "If apps opt out universal resizable, the override-to-user should not take effect"
+  bug: "443951799"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -185,17 +184,6 @@ flag {
   is_fixed_read_only: true
   metadata {
       purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "fix_show_when_locked_sync_timeout"
-  namespace: "windowing_frontend"
-  description: "Prevent sync timeout from setShowWhenLocked(false) by setting the DisplayContent ready"
-  bug: "411544184"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
   }
 }
 
@@ -309,16 +297,6 @@ flag {
     }
 }
 
-flag {
-    name: "scramble_snapshot_file_name"
-    namespace: "windowing_frontend"
-    description: "Scramble the file name of task snapshot."
-    bug: "293139053"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
 
 flag {
     name: "enable_handlers_debugging_mode"
@@ -386,15 +364,7 @@ flag {
     bug: "410930250"
 }
 
-flag {
-    name: "screen_brightness_dim_on_emulator"
-    namespace: "wear_systems"
-    description: "Apply screen brightness to emulator display overlay"
-    bug: "418830217"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
+
 
 flag {
     name: "multiple_system_navigation_observer_callbacks"

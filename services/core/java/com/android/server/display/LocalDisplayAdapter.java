@@ -1262,29 +1262,18 @@ final class LocalDisplayAdapter extends DisplayAdapter {
 
         private void onActiveDisplayModeChangedLocked(int sfModeId, float renderFrameRate,
                 long appVsyncOffsetNanos, long presentationDeadlineNanos,
-                @Nullable float[] supportedRefreshRates) {
-            if (updateActiveModeAndFrameOverrideChangedLocked(sfModeId, renderFrameRate,
-                    appVsyncOffsetNanos, presentationDeadlineNanos, mFrameRateOverrides,
-                    supportedRefreshRates == null
-                            ? mSupportedRefreshRates
-                            : supportedRefreshRates)) {
-                updateDeviceInfoLocked();
-            }
+                float[] supportedRefreshRates) {
+            onModeAndFrameRateOverridesChangedLocked(sfModeId, renderFrameRate, appVsyncOffsetNanos,
+                    presentationDeadlineNanos, mFrameRateOverrides, supportedRefreshRates);
         }
 
         private void onFrameRateOverridesChangedLocked(
                 DisplayEventReceiver.FrameRateOverride[] overrides,
-                @Nullable float[] supportedRefreshRates) {
-            if (updateActiveModeAndFrameOverrideChangedLocked(mActiveSfDisplayMode.id,
+                float[] supportedRefreshRates) {
+            onModeAndFrameRateOverridesChangedLocked(mActiveSfDisplayMode.id,
                     mActiveRenderFrameRate, mAppVsyncOffsetNanos, mPresentationDeadlineNanos,
-                    overrides,
-                    supportedRefreshRates == null
-                            ? mSupportedRefreshRates
-                            : supportedRefreshRates)) {
-                updateDeviceInfoLocked();
-            }
+                    overrides, supportedRefreshRates);
         }
-
         private void onModeAndFrameRateOverridesChangedLocked(
                 int sfModeId, float renderFrameRate,
                 long appVsyncOffsetNanos, long presentationDeadlineNanos,
@@ -1659,12 +1648,6 @@ final class LocalDisplayAdapter extends DisplayAdapter {
     public interface DisplayEventListener {
         void onHotplug(long timestampNanos, long physicalDisplayId, boolean connected);
         void onHotplugConnectionError(long timestampNanos, int connectionError);
-        void onModeChanged(long timestampNanos, long physicalDisplayId, int modeId,
-                long renderPeriod, long appVsyncOffsetNanos, long presentationDeadlineNanos,
-                @Nullable float[] supportedRefreshRates);
-        void onFrameRateOverridesChanged(long timestampNanos, long physicalDisplayId,
-                DisplayEventReceiver.FrameRateOverride[] overrides,
-                @Nullable float[] supportedRefreshRates);
         void onModeAndFrameRateOverridesChanged(long timestampNanos, long physicalDisplayId,
                 int modeId,  long renderPeriod, long appVsyncOffsetNanos,
                 long presentationDeadlineNanos, DisplayEventReceiver.FrameRateOverride[] overrides,
@@ -1693,14 +1676,6 @@ final class LocalDisplayAdapter extends DisplayAdapter {
             mListener.onHotplugConnectionError(timestampNanos, errorCode);
         }
 
-        @Override
-        public void onModeChanged(long timestampNanos, long physicalDisplayId, int modeId,
-                long renderPeriod, long appVsyncOffsetNanos, long presentationDeadlineNanos) {
-            mListener.onModeChanged(timestampNanos, physicalDisplayId, modeId,
-                    renderPeriod, appVsyncOffsetNanos, presentationDeadlineNanos,
-                    /*supportedRefreshRates*/ null);
-        }
-
         public void onModeAndFrameRateOverridesChanged(long timestampNanos, long physicalDisplayId,
                 int modeId,  long renderPeriod, long appVsyncOffsetNanos,
                 long presentationDeadlineNanos,
@@ -1709,13 +1684,6 @@ final class LocalDisplayAdapter extends DisplayAdapter {
             mListener.onModeAndFrameRateOverridesChanged(timestampNanos, physicalDisplayId, modeId,
                     renderPeriod, appVsyncOffsetNanos, presentationDeadlineNanos, overrides,
                     supportedRefreshRates);
-        }
-
-        @Override
-        public void onFrameRateOverridesChanged(long timestampNanos, long physicalDisplayId,
-                DisplayEventReceiver.FrameRateOverride[] overrides) {
-            mListener.onFrameRateOverridesChanged(timestampNanos, physicalDisplayId, overrides,
-                    /*supportedRefreshRates*/ null);
         }
 
         @Override
@@ -1746,11 +1714,9 @@ final class LocalDisplayAdapter extends DisplayAdapter {
 
             mDisplayNotificationManager.onHotplugConnectionError();
         }
-
-        @Override
-        public void onModeChanged(long timestampNanos, long physicalDisplayId, int modeId,
+        private void onModeChanged(long timestampNanos, long physicalDisplayId, int modeId,
                 long renderPeriod, long appVsyncOffsetNanos, long presentationDealineNanos,
-                @Nullable float[] supportedRefreshRates) {
+                float[] supportedRefreshRates) {
             if (DEBUG) {
                 Slog.d(TAG, "onModeChanged("
                         + "timestampNanos=" + timestampNanos
@@ -1778,10 +1744,9 @@ final class LocalDisplayAdapter extends DisplayAdapter {
             }
         }
 
-        @Override
-        public void onFrameRateOverridesChanged(long timestampNanos, long physicalDisplayId,
+        private void onFrameRateOverridesChanged(long timestampNanos, long physicalDisplayId,
                 DisplayEventReceiver.FrameRateOverride[] overrides,
-                @Nullable float[] supportedRefreshRates) {
+                float[] supportedRefreshRates) {
             if (DEBUG) {
                 Slog.d(TAG, "onFrameRateOverrideChanged(timestampNanos=" + timestampNanos
                         + ", physicalDisplayId=" + physicalDisplayId + " overrides="

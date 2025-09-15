@@ -16,6 +16,7 @@
 
 package android.companion.virtual.computercontrol;
 
+import android.annotation.CallbackExecutor;
 import android.annotation.IntDef;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
@@ -227,6 +228,23 @@ public final class ComputerControlSession implements AutoCloseable {
         }
     }
 
+    /**
+     * Sends a long press event to the computer control session for the given coordinates.
+     *
+     * <p>The coordinates are in relative display space, e.g. (0.5, 0.5) is the center of the
+     * display.</p>
+     */
+    public void longPress(@IntRange(from = 0) int x, @IntRange(from = 0) int y) {
+        if (x < 0 || y < 0) {
+            throw new IllegalArgumentException("Long press coordinates must be non-negative");
+        }
+        try {
+            mSession.longPress(x, y);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
     /** Returns the ID of the single trusted virtual display for this session. */
     public int getVirtualDisplayId() {
         try {
@@ -301,6 +319,35 @@ public final class ComputerControlSession implements AutoCloseable {
         }
     }
 
+    /**
+     * Sets a {@link StabilityListener} to be notified when the computer control session is
+     * potentially stable.
+     *
+     * @throws IllegalStateException if a listener was previously set.
+     */
+    public void setStabilityListener(@NonNull @CallbackExecutor Executor executor,
+            @NonNull StabilityListener listener) {
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(listener);
+        try {
+            mSession.setStabilityListener(new StabilityListenerProxy(executor, listener));
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Clears any {@link StabilityListener} that was previously set using
+     * {@link #setStabilityListener(Executor, StabilityListener)}.
+     */
+    public void clearStabilityListener() {
+        try {
+            mSession.setStabilityListener(null);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
     @Override
     public void close() {
         try {
@@ -352,6 +399,20 @@ public final class ComputerControlSession implements AutoCloseable {
         void onSessionClosed();
     }
 
+    /**
+     * Listener to be notified of signals indicating that the computer control session is
+     * potentially stable.
+     *
+     * <p>These signals indicate that the session's display content is currently stable, such as the
+     * app under automation being idle and no UI animations being under progress. These are useful
+     * for tasks that should only run on a static UI, such as taking screenshots to determine the
+     * next step.
+     */
+    public interface StabilityListener {
+        /** Called when the computer control session is considered stable. */
+        void onSessionStable();
+    }
+
     /** @hide */
     public static class CallbackProxy extends IComputerControlSessionCallback.Stub {
 
@@ -390,6 +451,23 @@ public final class ComputerControlSession implements AutoCloseable {
             mSession.closeImageReader();
             Binder.withCleanCallingIdentity(() ->
                     mExecutor.execute(() -> mCallback.onSessionClosed()));
+        }
+    }
+
+    private static class StabilityListenerProxy extends IComputerControlStabilityListener.Stub {
+
+        private final Executor mExecutor;
+        private final StabilityListener mListener;
+
+        StabilityListenerProxy(@NonNull Executor executor,
+                @NonNull StabilityListener listener) {
+            mExecutor = executor;
+            mListener = listener;
+        }
+
+        @Override
+        public void onSessionStable() {
+            Binder.withCleanCallingIdentity(() -> mExecutor.execute(mListener::onSessionStable));
         }
     }
 }

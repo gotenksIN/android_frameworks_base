@@ -1740,9 +1740,20 @@ public class AppOpsManager {
      */
     public static final int OP_COMPUTER_CONTROL = AppOpEnums.APP_OP_COMPUTER_CONTROL;
 
+    /**
+     * Allow the app to read SMS messages that contain One Time Passwords (OTPs). This app op does
+     * not remove the need for the READ_SMS app op to be granted.
+     *
+     * @hide
+     */
+    public static final int OP_READ_OTP_SMS = AppOpEnums.APP_OP_READ_OTP_SMS;
+
+    /** @hide Access local network devices. */
+    public static final int OP_ACCESS_LOCAL_NETWORK = AppOpEnums.APP_OP_ACCESS_LOCAL_NETWORK;
+
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
-    public static final int _NUM_OP = 168;
+    public static final int _NUM_OP = 170;
 
     /**
      * All app ops represented as strings.
@@ -1914,6 +1925,8 @@ public class AppOpsManager {
             OPSTR_READ_CELL_IDENTITY,
             OPSTR_READ_CELL_INFO,
             OPSTR_COMPUTER_CONTROL,
+            OPSTR_READ_OTP_SMS,
+            OPSTR_ACCESS_LOCAL_NETWORK,
     })
     public @interface AppOpString {}
 
@@ -2726,6 +2739,12 @@ public class AppOpsManager {
     /** @hide Control other applications. */
     public static final String OPSTR_COMPUTER_CONTROL = "android:computer_control";
 
+    /** @hide Read OTP SMS messages */
+    public static final String OPSTR_READ_OTP_SMS = "android:read_otp_sms";
+
+    /** @hide */
+    public static final String OPSTR_ACCESS_LOCAL_NETWORK = "android:access_local_network";
+
     /** {@link #sAppOpsToNote} not initialized yet for this op */
     private static final byte SHOULD_COLLECT_NOTE_OP_NOT_INITIALIZED = 0;
     /** Should not collect noting of this app-op in {@link #sAppOpsToNote} */
@@ -2798,6 +2817,7 @@ public class AppOpsManager {
             OP_UWB_RANGING,
             OP_NEARBY_WIFI_DEVICES,
             Flags.rangingPermissionEnabled() ? OP_RANGING : OP_NONE,
+            Flags.accessLocalNetworkPermissionEnabled() ? OP_ACCESS_LOCAL_NETWORK : OP_NONE,
             // Notifications
             OP_POST_NOTIFICATION,
             // Health
@@ -3406,6 +3426,13 @@ public class AppOpsManager {
         new AppOpInfo.Builder(OP_COMPUTER_CONTROL, OPSTR_COMPUTER_CONTROL, "COMPUTER_CONTROL")
                 .setDefaultMode(AppOpsManager.MODE_IGNORED)
                 .build(),
+        new AppOpInfo.Builder(OP_READ_OTP_SMS, OPSTR_READ_OTP_SMS, "READ_OTP_SMS")
+                .build(),
+        new AppOpInfo.Builder(OP_ACCESS_LOCAL_NETWORK, OPSTR_ACCESS_LOCAL_NETWORK,
+                "ACCESS_LOCAL_NETWORK")
+                .setPermission(Flags.accessLocalNetworkPermissionEnabled()
+                        ? Manifest.permission.ACCESS_LOCAL_NETWORK : null)
+                .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
     };
 
     // The number of longs needed to form a full bitmask of app ops
@@ -10791,6 +10818,27 @@ public class AppOpsManager {
     public void resetPackageOpsNoHistory(@NonNull String packageName) {
         try {
             mService.resetPackageOpsNoHistory(packageName);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Gets a list of packages that have a particular app op set to a particular mode, if that mode
+     * is not the default mode for the op.
+     *
+     * @param op The op to check state for.
+     * @param mode The mode the op must have for a package to be included. This mode must not be
+     *             the default mode of the op, or the method will throw an IllegalArgumenException.
+     * @return A list of all packages whose app op mode matches the given mode for the given app op.
+     *
+     * @throws IllegalArgumentException if the specified mode is the default mode for the op
+     * @hide
+     */
+    @RequiresPermission(Manifest.permission.QUERY_ALL_PACKAGES)
+    public @NonNull List<String> getPackagesWithNonDefaultUidMode(int op, int mode) {
+        try {
+            return mService.getPackagesWithNonDefaultUidMode(op, mode, mContext.getUserId());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

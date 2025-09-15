@@ -2449,6 +2449,12 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         mTmpBounds.set(getResolvedOverrideConfiguration().windowConfiguration.getBounds());
         super.resolveOverrideConfiguration(newParentConfig);
         final Configuration resolvedConfig = getResolvedOverrideConfiguration();
+        final Task thisTask = asTask();
+        if (!resolvedConfig.windowConfiguration.getBounds().isEmpty() && thisTask != null
+                && !thisTask.isOverrideBoundsAllowed()) {
+            // clear the bounds if it is not allowed from its ancestors.
+            resolvedConfig.windowConfiguration.setBounds(new Rect());
+        }
 
         if (mRelativeEmbeddedBounds != null && !mRelativeEmbeddedBounds.isEmpty()) {
             // For embedded TaskFragment, make sure the bounds is set based on the relative bounds.
@@ -2476,7 +2482,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             }
         }
 
-        final Task thisTask = asTask();
         if (thisTask != null) {
             thisTask.resolveLeafTaskOnlyOverrideConfigs(newParentConfig,
                     mTmpBounds /* previousBounds */);

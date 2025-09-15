@@ -2031,37 +2031,63 @@ public final class Debug
     /** @hide */
     public static final int MEMINFO_PAGE_TABLES = 13;
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_SEC_PAGE_TABLES = 14;
     /** @hide */
     public static final int MEMINFO_KERNEL_STACK = 15;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /**
      * Note: MEMINFO_KRECLAIMABLE includes MEMINFO_SLAB_RECLAIMABLE (see KReclaimable field
      * description in kernel documentation).
      * @hide
      */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_KRECLAIMABLE = 16;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_ACTIVE = 17;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_INACTIVE = 18;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_UNEVICTABLE = 19;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_AVAILABLE = 20;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_ACTIVE_ANON = 21;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_INACTIVE_ANON = 22;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_ACTIVE_FILE = 23;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_INACTIVE_FILE = 24;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_CMA_TOTAL = 25;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_CMA_FREE = 26;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_COUNT = 27;
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
 
     /**
      * Retrieves /proc/meminfo.  outSizes is filled with fields

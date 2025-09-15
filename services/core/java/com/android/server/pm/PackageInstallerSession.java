@@ -179,9 +179,9 @@ import android.util.MathUtils;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.apk.ApkSignatureVerifier;
-// QTI_BEGIN: 2019-11-13: Performance: framework: add boost for package installation
+// QTI_BEGIN: 2019-11-13: Core: framework: add boost for package installation
 import android.util.BoostFramework;
-// QTI_END: 2019-11-13: Performance: framework: add boost for package installation
+// QTI_END: 2019-11-13: Core: framework: add boost for package installation
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -424,7 +424,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
      */
     private final StagingManager mStagingManager;
 
-// QTI_BEGIN: 2019-11-13: Performance: framework: add boost for package installation
+// QTI_BEGIN: 2019-11-13: Core: framework: add boost for package installation
     /*
     * @hide
     */
@@ -432,7 +432,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private boolean mIsPerfLockAcquired = false;
     private final int MAX_INSTALL_DURATION = 20000;
 
-// QTI_END: 2019-11-13: Performance: framework: add boost for package installation
+// QTI_END: 2019-11-13: Core: framework: add boost for package installation
     private final InstallDependencyHelper mInstallDependencyHelper;
 
     final int sessionId;
@@ -1949,7 +1949,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     public ParcelFileDescriptor openWrite(String name, long offsetBytes, long lengthBytes) {
         assertCanWrite(false);
         try {
-// QTI_BEGIN: 2019-11-13: Performance: framework: add boost for package installation
+// QTI_BEGIN: 2019-11-13: Core: framework: add boost for package installation
             if (mPerfBoostInstall == null){
                 mPerfBoostInstall = new BoostFramework();
             }
@@ -1958,7 +1958,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                         null, MAX_INSTALL_DURATION, -1);
                 mIsPerfLockAcquired = true;
             }
-// QTI_END: 2019-11-13: Performance: framework: add boost for package installation
+// QTI_END: 2019-11-13: Core: framework: add boost for package installation
             return doWriteInternal(name, offsetBytes, lengthBytes, null);
         } catch (IOException e) {
             throw ExceptionUtils.wrap(e);
@@ -2216,12 +2216,12 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
     @Override
     public void commit(@NonNull IntentSender statusReceiver, boolean forTransfer) {
-// QTI_BEGIN: 2019-11-13: Performance: framework: add boost for package installation
+// QTI_BEGIN: 2019-11-13: Core: framework: add boost for package installation
         if (mIsPerfLockAcquired && mPerfBoostInstall != null) {
             mPerfBoostInstall.perfLockRelease();
             mIsPerfLockAcquired = false;
         }
-// QTI_END: 2019-11-13: Performance: framework: add boost for package installation
+// QTI_END: 2019-11-13: Core: framework: add boost for package installation
         assertNotChild("commit");
         boolean throwsExceptionCommitImmutableCheck = CompatChanges.isChangeEnabled(
                 THROW_EXCEPTION_COMMIT_WITH_IMMUTABLE_PENDING_INTENT, Binder.getCallingUid());
@@ -4684,12 +4684,12 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
     @Override
     public void abandon() {
-// QTI_BEGIN: 2019-11-13: Performance: framework: add boost for package installation
+// QTI_BEGIN: 2019-11-13: Core: framework: add boost for package installation
         if (mIsPerfLockAcquired && mPerfBoostInstall != null) {
             mPerfBoostInstall.perfLockRelease();
             mIsPerfLockAcquired = false;
         }
-// QTI_END: 2019-11-13: Performance: framework: add boost for package installation
+// QTI_END: 2019-11-13: Core: framework: add boost for package installation
         final Runnable r;
         synchronized (mLock) {
             assertNotChild("abandon");

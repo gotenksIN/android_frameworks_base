@@ -1628,9 +1628,7 @@ class ActivityStarter {
         final Task targetTask = r.getTask() != null
                 ? r.getTask()
                 : mTargetTask;
-// QTI_BEGIN: 2021-09-27: Frameworks: RESTRICT AUTOMERGE Avoid the scenario Where taskdisplayarea is null
         if (startedActivityRootTask == null || targetTask == null || !targetTask.isAttached()) {
-// QTI_END: 2021-09-27: Frameworks: RESTRICT AUTOMERGE Avoid the scenario Where taskdisplayarea is null
             return;
         }
 
@@ -2510,9 +2508,7 @@ class ActivityStarter {
             // removed from calling performClearTaskLocked (For example, if it is being brought out
             // of history or if it is finished immediately), thus disassociating the task. Keep the
             // task-overlay activity because the targetTask will be reused to launch new activity.
-// QTI_BEGIN: 2024-03-28: Core: Revert PhoneLink in framework/base
             targetTask.performClearTaskForReuse(true /* excludingTaskOverlay*/);
-// QTI_END: 2024-03-28: Core: Revert PhoneLink in framework/base
             targetTask.setIntent(mStartActivity);
             mAddingToTask = true;
             mIsTaskCleared = true;
@@ -3193,9 +3189,9 @@ class ActivityStarter {
 
     /** Places {@link #mStartActivity} in {@code task} or an embedded {@link TaskFragment}. */
     private void addOrReparentStartingActivity(@NonNull Task task, String reason) {
-// QTI_BEGIN: 2023-09-19: Performance: Perf: Activity boost optimization.
+// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
         mStartActivity.acquireActivityBoost();
-// QTI_END: 2023-09-19: Performance: Perf: Activity boost optimization.
+// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
         TaskFragment newParent = task;
         if (mInTaskFragment != null) {
             int embeddingCheckResult = canEmbedActivity(mInTaskFragment, mStartActivity, task);

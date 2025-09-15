@@ -1212,9 +1212,7 @@ public abstract class WallpaperService extends Service {
         void updateSurface(boolean forceRelayout, boolean forceReport, boolean redrawNeeded) {
             if (mDestroyed) {
                 Log.w(TAG, "Ignoring updateSurface due to destroyed");
-// QTI_BEGIN: 2021-09-08: Android_UI: frameworks/base:NPE in ImageWallpaper
                 return;
-// QTI_END: 2021-09-08: Android_UI: frameworks/base:NPE in ImageWallpaper
             }
 
             boolean fixedSize = false;
@@ -2729,9 +2727,9 @@ public abstract class WallpaperService extends Service {
                     return;
                 }
                 case MSG_UPDATE_SURFACE:
-// QTI_BEGIN: 2018-09-20: Android_UI: Wallpaper is half black after rotating quickly
+// QTI_BEGIN: 2018-09-20: Core: Wallpaper is half black after rotating quickly
                     mEngine.updateSurface(true, false, true/*false*/);
-// QTI_END: 2018-09-20: Android_UI: Wallpaper is half black after rotating quickly
+// QTI_END: 2018-09-20: Core: Wallpaper is half black after rotating quickly
                     break;
                 case MSG_ZOOM:
                     mEngine.setZoom(Float.intBitsToFloat(message.arg1));

@@ -113,11 +113,11 @@ public class SystemConfig {
     // property for runtime configuration differentation in product
     private static final String PRODUCT_SKU_PROPERTY = "ro.boot.hardware.sku";
 
-// QTI_BEGIN: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
+// QTI_BEGIN: 2024-11-13: Core: Allow runtime configurations based on the baseband
     // property for runtime configuration differentiation based on baseband type
     private static final String NO_RIL_PROPERTY = "ro.radio.noril";
 
-// QTI_END: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
+// QTI_END: 2024-11-13: Core: Allow runtime configurations based on the baseband
     private static final ArrayMap<String, ArraySet<String>> EMPTY_PERMISSIONS =
             new ArrayMap<>();
 
@@ -367,9 +367,11 @@ public class SystemConfig {
     private ArrayMap<String, Set<String>> mPackageToUserTypeWhitelist = new ArrayMap<>();
     private ArrayMap<String, Set<String>> mPackageToUserTypeBlacklist = new ArrayMap<>();
 
+// QTI_BEGIN: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
     // Map of intent actions to the list of packages that want to receive those broadcast actions
     private ArrayMap<String, Set<String>> mQtiAllowImplicitBroadcasts = new ArrayMap<>();
 
+// QTI_END: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
     private final ArraySet<String> mRollbackWhitelistedPackages = new ArraySet<>();
     private final ArraySet<String> mWhitelistedStagedInstallers = new ArraySet<>();
     // A map from package name of vendor APEXes that can be updated to an installer package name
@@ -586,6 +588,7 @@ public class SystemConfig {
         return r;
     }
 
+// QTI_BEGIN: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
     /**
      * Gets map of intents to list of packages that want to receive those broadcast actions
      */
@@ -595,6 +598,7 @@ public class SystemConfig {
         return r;
     }
 
+// QTI_END: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
     /**
      * Gets map of packagesNames to userTypes, dictating on which user types each package should NOT
      * be initially installed, even if they are whitelisted, and then removes this map from
@@ -740,7 +744,7 @@ public class SystemConfig {
         }
 
 // QTI_END: 2020-03-09: Core: SystemConfig: Allow runtime differentiation of vendor configurations
-// QTI_BEGIN: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
+// QTI_BEGIN: 2024-11-13: Core: Allow runtime configurations based on the baseband
         boolean noRilSupport = SystemProperties.getBoolean(NO_RIL_PROPERTY, false);
         if (noRilSupport) {
             String noRilDir = "noRil";
@@ -752,7 +756,7 @@ public class SystemConfig {
                     vendorPermissionFlag);
         }
 
-// QTI_END: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
+// QTI_END: 2024-11-13: Core: Allow runtime configurations based on the baseband
         // Allow ODM to customize system configs as much as Vendor, because /odm is another
         // vendor partition other than /vendor.
         int odmPermissionFlag = vendorPermissionFlag;
@@ -1552,10 +1556,12 @@ public class SystemConfig {
                         readInstallInUserType(parser,
                                 mPackageToUserTypeWhitelist, mPackageToUserTypeBlacklist);
                     } break;
+// QTI_BEGIN: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
                     case "qti-allow-implicit-broadcast": {
                         MapOfImplicitBroadcastToPackageNames(parser,
                                 mQtiAllowImplicitBroadcasts);
                     } break;
+// QTI_END: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
                     case "named-actor": {
                         String namespace = TextUtils.safeIntern(
                                 parser.getAttributeValue(null, "namespace"));
@@ -2015,6 +2021,7 @@ public class SystemConfig {
         }
     }
 
+// QTI_BEGIN: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
     private void MapOfImplicitBroadcastToPackageNames(XmlPullParser parser,
             Map<String, Set<String>> broadcastPackagesMap)
             throws IOException, XmlPullParserException {
@@ -2048,6 +2055,7 @@ public class SystemConfig {
         }
     }
 
+// QTI_END: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
     void readOemPermissions(XmlPullParser parser) throws IOException, XmlPullParserException {
         readPermissionAllowlist(parser, mPermissionAllowlist.getOemAppAllowlist(),
                 "oem-permissions");

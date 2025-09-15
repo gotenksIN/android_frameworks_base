@@ -142,28 +142,28 @@ static jobject nativeGetSurface(JNIEnv* env, jclass clazz, jlong ptr,
                                                   queue->getSurface(includeSurfaceControlHandle));
 }
 
-// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
 static void nativeSetUndequeuedBufferCount(JNIEnv* env, jclass clazz, jlong ptr, jint count) {
     sp<BLASTBufferQueue> queue = reinterpret_cast<BLASTBufferQueue*>(ptr);
     if (queue == nullptr) return;
-// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
-// QTI_BEGIN: 2023-02-15: Performance: perf: recover the pre-rendering feature in the U
+// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
     queue->qtiSetUndequeuedBufferCount(count);
-// QTI_END: 2023-02-15: Performance: perf: recover the pre-rendering feature in the U
-// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
+// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
 }
 
 static jint nativeGetUndequeuedBufferCount(JNIEnv* env, jclass clazz, jlong ptr) {
     sp<BLASTBufferQueue> queue = reinterpret_cast<BLASTBufferQueue*>(ptr);
     if (queue == nullptr) return -1;
-// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
-// QTI_BEGIN: 2023-02-15: Performance: perf: recover the pre-rendering feature in the U
+// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
     return queue->qtiGetUndequeuedBufferCount();
-// QTI_END: 2023-02-15: Performance: perf: recover the pre-rendering feature in the U
-// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
+// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
 }
-// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
 
+// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
 class JGlobalRefHolder {
 public:
     JGlobalRefHolder(JavaVM* vm, jobject object) : mVm(vm), mObject(object) {}
@@ -291,10 +291,10 @@ static const JNINativeMethod gMethods[] = {
         // clang-format off
         {"nativeCreate", "(Ljava/lang/String;Z)J", (void*)nativeCreate},
         {"nativeGetSurface", "(JZ)Landroid/view/Surface;", (void*)nativeGetSurface},
-// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
         {"nativeSetUndequeuedBufferCount", "(JI)V", (void*)nativeSetUndequeuedBufferCount},
         {"nativeGetUndequeuedBufferCount", "(J)I", (void*)nativeGetUndequeuedBufferCount},
-// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
         {"nativeDestroy", "(J)V", (void*)nativeDestroy},
         {"nativeSyncNextTransaction", "(JLjava/util/function/Consumer;Z)Z", (void*)nativeSyncNextTransaction},
         {"nativeStopContinuousSyncTransaction", "(J)V", (void*)nativeStopContinuousSyncTransaction},

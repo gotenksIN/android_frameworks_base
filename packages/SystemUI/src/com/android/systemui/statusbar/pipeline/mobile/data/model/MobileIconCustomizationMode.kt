@@ -1,3 +1,4 @@
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 /*
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
@@ -6,15 +7,25 @@
 package com.android.systemui.statusbar.pipeline.mobile.data.model
 
 import android.telephony.CellSignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
 import android.telephony.ims.stub.ImsRegistrationImplBase
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 import android.telephony.TelephonyManager.NETWORK_TYPE_UNKNOWN
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 
 data class MobileIconCustomizationMode(
     val alwaysUseRsrpLevelForLte: Boolean = false,
     val lteRsrpLevel: Int = SIGNAL_STRENGTH_NONE_OR_UNKNOWN,
     val dataNetworkType: Int = NETWORK_TYPE_UNKNOWN,
     val voiceNetworkType: Int = NETWORK_TYPE_UNKNOWN,
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt network type icon customization
     val fiveGServiceState: FiveGServiceState = FiveGServiceState(),
     val isRatCustomization: Boolean = false,
     val alwaysShowNetworkTypeIcon: Boolean = false,
@@ -24,9 +35,15 @@ data class MobileIconCustomizationMode(
     val dataRoamingEnabled: Boolean = false,
     val isDefaultDataSub: Boolean = false,
     val isRoaming: Boolean = false,
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
     val originNetworkType: Int = NETWORK_TYPE_UNKNOWN,
     val voiceCapable: Boolean = false,
     val videoCapable: Boolean = false,
     val imsRegistered: Boolean = false,
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
     val imsRegistrationTech: Int = ImsRegistrationImplBase.REGISTRATION_TECH_NONE,
-)
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
+)// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon

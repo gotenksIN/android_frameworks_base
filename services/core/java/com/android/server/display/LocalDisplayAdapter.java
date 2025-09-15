@@ -756,12 +756,8 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                 }
 
                 final Resources res = getOverlayContext().getResources();
-// QTI_BEGIN: 2019-05-01: Display: Add support to check for Built-in Display
                 final boolean isBuiltIn = ((mInfo.address) != null) ?
-// QTI_END: 2019-05-01: Display: Add support to check for Built-in Display
-// QTI_BEGIN: 2021-05-02: Display: Check for builtin display with bitmask
                    ((((DisplayAddress.Physical) mInfo.address).getPort() & 0x80) == 0x80) : false;
-// QTI_END: 2021-05-02: Display: Check for builtin display with bitmask
 
                 mInfo.flags |= DisplayDeviceInfo.FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY;
 
@@ -771,11 +767,8 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                             && SystemProperties.getBoolean(PROPERTY_EMULATOR_CIRCULAR, false))) {
                         mInfo.flags |= DisplayDeviceInfo.FLAG_ROUND;
                     }
-// QTI_BEGIN: 2019-05-01: Display: Add support to check for Built-in Display
                 } else if (isBuiltIn) {
-// QTI_END: 2019-05-01: Display: Add support to check for Built-in Display
                     mInfo.type = Display.TYPE_INTERNAL;
-// QTI_BEGIN: 2019-05-01: Display: Add support to check for Built-in Display
                     mInfo.touch = DisplayDeviceInfo.TOUCH_INTERNAL;
                     mInfo.name = getContext().getResources().getString(
                             com.android.internal.R.string.display_manager_built_in_display_name);
@@ -793,11 +786,8 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                         mInfo.flags |= DisplayDeviceInfo.FLAG_OWN_CONTENT_ONLY;
                     }
 
-// QTI_END: 2019-05-01: Display: Add support to check for Built-in Display
                     mInfo.setAssumedDensityForExternalDisplay(mActiveSfDisplayMode.width, mActiveSfDisplayMode.height);
-// QTI_BEGIN: 2019-04-08: Display: Revert "display: Add support for multiple displays"
                 } else {
-// QTI_END: 2019-04-08: Display: Revert "display: Add support for multiple displays"
                     if (shouldOwnContentOnly()) {
                         mInfo.flags |= DisplayDeviceInfo.FLAG_OWN_CONTENT_ONLY;
                     }
@@ -885,15 +875,11 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                 @Nullable DisplayOffloadSessionImpl displayOffloadSession) {
 
             // Assume that the brightness is off if the display is being turned off.
-// QTI_BEGIN: 2023-06-13: Display: Revert "Revert "Use exact brightnesses values for comparison.""
             assert state != Display.STATE_OFF
                     || brightnessState == PowerManager.BRIGHTNESS_OFF_FLOAT;
-// QTI_END: 2023-06-13: Display: Revert "Revert "Use exact brightnesses values for comparison.""
             final boolean stateChanged = (mState != state);
-// QTI_BEGIN: 2023-06-13: Display: Revert "Revert "Use exact brightnesses values for comparison.""
             final boolean brightnessChanged = mBrightnessState != brightnessState
                     || mSdrBrightnessState != sdrBrightnessState;
-// QTI_END: 2023-06-13: Display: Revert "Revert "Use exact brightnesses values for comparison.""
             if (stateChanged || brightnessChanged) {
                 final long physicalDisplayId = mPhysicalDisplayId;
                 final IBinder token = getDisplayTokenLocked();
@@ -1069,9 +1055,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                     }
 
                     private float brightnessToBacklight(float brightness) {
-// QTI_BEGIN: 2023-06-13: Display: Revert "Revert "Use exact brightnesses values for comparison.""
                         if (brightness == PowerManager.BRIGHTNESS_OFF_FLOAT) {
-// QTI_END: 2023-06-13: Display: Revert "Revert "Use exact brightnesses values for comparison.""
                             return PowerManager.BRIGHTNESS_OFF_FLOAT;
                         } else {
                             return getDisplayDeviceConfig().getBacklightFromBrightness(brightness);

@@ -322,7 +322,6 @@ public class CachedBluetoothDeviceManager {
         }
     }
 
-// QTI_BEGIN: 2018-03-22: Bluetooth: Sync Preference in UI for new cached device
     public synchronized void clearAllDevices() {
         for (int i = mCachedDevices.size() - 1; i >= 0; i--) {
             CachedBluetoothDevice cachedDevice = mCachedDevices.get(i);
@@ -330,7 +329,6 @@ public class CachedBluetoothDeviceManager {
         }
     }
 
-// QTI_END: 2018-03-22: Bluetooth: Sync Preference in UI for new cached device
     public synchronized void onScanningStateChanged(boolean started) {
         if (!started) return;
         // If starting a new scan, clear old visibility
@@ -378,11 +376,9 @@ public class CachedBluetoothDeviceManager {
                     cachedDevice.release();
                     mCachedDevices.remove(i);
                 }
-// QTI_BEGIN: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
                 //Clear if there any Tws battery info on BT turning OFF
                 cachedDevice.mTwspBatteryState = -1;
                 cachedDevice.mTwspBatteryLevel = -1;
-// QTI_END: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
             }
 
             // To clear the SetMemberPair flag when the Bluetooth is turning off.

@@ -53,12 +53,10 @@
 #include "NinePatchPeeker.h"
 #include "Utils.h"
 
-/* QTI_BEGIN */
 #include <cutils/properties.h>
 #include <sys/types.h>
 #include <unistd.h>
 #define UI_PERFMODE "debug.ui.perfmode.enable"
-/* QTI_END */
 
 using namespace android;
 
@@ -242,7 +240,6 @@ static jobject ImageDecoder_nCreateByteBuffer(JNIEnv* env, jobject /*clazz*/,
 static jobject ImageDecoder_nCreateByteArray(JNIEnv* env, jobject /*clazz*/,
         jbyteArray byteArray, jint offset, jint length,
         jboolean preferAnimation, jobject source) {
-    /* QTI_BEGIN */
     int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
     if (ui_perfmode > 0 && ui_perfmode == getpid()) {
         AutoJavaByteArray ar(env, byteArray);
@@ -250,7 +247,6 @@ static jobject ImageDecoder_nCreateByteArray(JNIEnv* env, jobject /*clazz*/,
             std::make_unique<SkMemoryStream>(ar.ptr() + offset, length, false);
         return native_create(env, std::move(stream), source, preferAnimation);
     }
-    /* QTI_END */
     std::unique_ptr<SkStream> stream(CreateByteArrayStreamAdaptor(env, byteArray, offset, length));
     return native_create(env, std::move(stream), source, preferAnimation);
 }
@@ -312,13 +308,11 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
         colorType = decoder->mCodec->computeOutputColorType(colorType);
     }
 
-    /* QTI_BEGIN */
     bool should_use_sw = false;
     int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
     if (ui_perfmode > 0 && ui_perfmode == getpid()) {
         should_use_sw = true;
     }
-    /* QTI_END */
 
     const bool isHardware = !requireMutable
         && ((allocator == kDefault_Allocator && !should_use_sw) ||

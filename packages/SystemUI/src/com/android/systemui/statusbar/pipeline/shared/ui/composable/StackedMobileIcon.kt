@@ -29,6 +29,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -149,17 +151,26 @@ fun CustomStackedMobileIcon(viewModel: StackedMobileIconViewModel, modifier: Mod
     val padding = with(LocalDensity.current) { IconSpacingSp.toDp() }
     val horizontalArrangement = with(LocalDensity.current) { spacedBy(IconSpacingSp.toDp()) }
 
+    val showSignalStrengthIcon by
+        viewModel.primaryViewModel?.let {
+            it.showSignalStrengthIcon.collectAsStateWithLifecycle(initialValue = true)
+        } ?: run {
+            remember { mutableStateOf(true) }
+        }
+
     Row(
         horizontalArrangement = horizontalArrangement,
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.padding(horizontal = padding),
     ) {
         CustomDualMobileGroupIcon(viewModel)
-        StackedMobileIcon(
-            viewModel = dualSim,
-            color = contentColor,
-            contentDescription = viewModel.contentDescription,
-        )
+        if (showSignalStrengthIcon) {
+            StackedMobileIcon(
+                viewModel = dualSim,
+                color = contentColor,
+                contentDescription = viewModel.contentDescription,
+            )
+        }
 
         if (viewModel.roaming) {
             val height = with(LocalDensity.current) { RoamingIconHeightSp.toDp() }

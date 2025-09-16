@@ -95,6 +95,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.IProgressListener;
+import android.os.ParcelDuration;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
@@ -668,6 +669,10 @@ public class LockSettingsService extends ILockSettings.Stub {
         public Duration getTimeSinceBoot() {
             return Duration.ofMillis(SystemClock.elapsedRealtime());
         }
+
+        public void invalidateLockoutEndTimeCache() {
+            LockPatternUtils.invalidateLockoutEndTimeCache();
+        }
     }
 
     private class SoftwareRateLimiterInjector implements SoftwareRateLimiter.Injector {
@@ -700,6 +705,11 @@ public class LockSettingsService extends ILockSettings.Stub {
         @Override
         public int getHardwareRateLimiter(LskfIdentifier id) {
             return mSpManager.getHardwareRateLimiter(id);
+        }
+
+        @Override
+        public void invalidateLockoutEndTimeCache() {
+            mInjector.invalidateLockoutEndTimeCache();
         }
     }
 
@@ -1626,12 +1636,17 @@ public class LockSettingsService extends ILockSettings.Stub {
         mKeyStoreAuthorization.onUserStorageLocked(userId);
     }
 
-    @VisibleForTesting /** Note: this method is overridden in unit tests */
-    protected LockscreenCredential getDecryptedPasswordForUnifiedProfile(int userId)
-            throws KeyStoreException, UnrecoverableKeyException,
-            NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException,
-            InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException,
-            CertificateException, IOException {
+    private LockscreenCredential getDecryptedPasswordForUnifiedProfile(int userId)
+            throws KeyStoreException,
+                    UnrecoverableKeyException,
+                    NoSuchAlgorithmException,
+                    NoSuchPaddingException,
+                    InvalidKeyException,
+                    InvalidAlgorithmParameterException,
+                    IllegalBlockSizeException,
+                    BadPaddingException,
+                    CertificateException,
+                    IOException {
         Slogf.d(TAG, "Decrypting password for unified profile %d", userId);
         byte[] storedData = mStorage.readChildProfileLock(userId);
         if (storedData == null) {
@@ -2245,9 +2260,12 @@ public class LockSettingsService extends ILockSettings.Stub {
         }
     }
 
-    @VisibleForTesting /** Note: this method is overridden in unit tests */
-    protected void tieProfileLockToParent(int profileUserId, int parentUserId,
-            LockscreenCredential password) {
+    /**
+     * Sets up an encrypted password protected by a new encryption key bound to the parent sid. The
+     * credential must be a PASSWORD, rather than NONE.
+     */
+    private void tieProfileLockToParent(
+            int profileUserId, int parentUserId, LockscreenCredential password) {
         Slogf.i(TAG, "Tying lock for profile user %d to parent user %d", profileUserId,
                 parentUserId);
         final long parentSid;
@@ -2560,20 +2578,20 @@ public class LockSettingsService extends ILockSettings.Stub {
                 mSoftwareRateLimiter.reportSuccess(lskfId);
             } else {
                 boolean isCertainlyWrongGuess = response.isCredCertainlyIncorrect();
-                Duration swTimeout =
-                        mSoftwareRateLimiter.reportFailure(
-                                lskfId, credential, isCertainlyWrongGuess);
+                Duration hwTimeout = response.getTimeoutAsDuration();
 
                 // The software rate-limiter may use longer delays than the hardware one. While the
                 // long-term solution is to update the hardware rate-limiter to match, for now this
                 // case needs to be handled by reporting the maximum of the two delays so that the
                 // lock screen doesn't allow another attempt until both rate-limiters allow it.
-                Duration hwTimeout = response.getTimeoutAsDuration();
-                if (swTimeout.compareTo(hwTimeout) > 0) {
+                Duration maxTimeout =
+                        mSoftwareRateLimiter.reportFailure(
+                                lskfId, credential, isCertainlyWrongGuess, hwTimeout);
+                if (maxTimeout.compareTo(hwTimeout) > 0) {
                     response =
                             isCertainlyWrongGuess
-                                    ? VerifyCredentialResponse.credIncorrect(swTimeout)
-                                    : VerifyCredentialResponse.fromTimeout(swTimeout);
+                                    ? VerifyCredentialResponse.credIncorrect(maxTimeout)
+                                    : VerifyCredentialResponse.fromTimeout(maxTimeout);
                 }
             }
         }
@@ -3157,8 +3175,12 @@ public class LockSettingsService extends ILockSettings.Stub {
         return handle;
     }
 
-    private void onCredentialVerified(SyntheticPassword sp, @Nullable PasswordMetrics metrics,
-            int userId) {
+    /**
+     * Performs unlocking actions after the synthetic password is known, e.g. after LSKF or token
+     * protector verification.
+     */
+    private void onCredentialVerified(
+            SyntheticPassword sp, @Nullable PasswordMetrics metrics, int userId) {
         SecureLockDeviceServiceInternal secureLockDeviceServiceInternal =
                 mInjector.getSecureLockDeviceServiceInternal();
         if (secureLockDeviceServiceInternal != null
@@ -3788,6 +3810,27 @@ public class LockSettingsService extends ILockSettings.Stub {
         // Disable escrow token permanently on all other device/user types.
         Slogf.i(TAG, "Permanently disabling support for escrow tokens on user %d", userId);
         mSpManager.destroyEscrowData(userId);
+    }
+
+    /**
+     * Returns the end time of a lockout for the given user's LSKF as a time since boot, or {@link
+     * java.time.Duration.ZERO} if there is no lockout.
+     *
+     * <p>This API is cached; whenever the result would change, {@link
+     * LockPatternUtils#invalidateLockoutEndTimeCache()} must be called.
+     */
+    @Override
+    public ParcelDuration getLockoutEndTime(@UserIdInt int userId) {
+        checkPasswordHavePermission();
+        final long protectorId = getCurrentLskfBasedProtectorId(userId);
+        final Duration lockoutEndTime;
+        if (protectorId == SyntheticPasswordManager.NULL_PROTECTOR_ID) {
+            lockoutEndTime = Duration.ZERO;
+        } else {
+            final LskfIdentifier lskfId = new LskfIdentifier(userId, protectorId);
+            lockoutEndTime = mSoftwareRateLimiter.getLockoutEndTime(lskfId);
+        }
+        return new ParcelDuration(lockoutEndTime);
     }
 
     private class DeviceProvisionedObserver extends ContentObserver {

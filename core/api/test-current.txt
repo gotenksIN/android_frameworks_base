@@ -1051,6 +1051,10 @@ package android.content {
     field public static final String TEST_NETWORK_SERVICE = "test_network";
   }
 
+  public static final class Context.BindServiceFlags {
+    method @FlaggedApi("android.content.flags.enable_update_service_bindings") public long getValue();
+  }
+
   public class ContextWrapper extends android.content.Context {
     method public int getDisplayId();
     method public void updateDisplay(int);
@@ -1797,6 +1801,10 @@ package android.hardware.display {
 
   public final class ColorDisplayManager {
     method @RequiresPermission(android.Manifest.permission.CONTROL_DISPLAY_COLOR_TRANSFORMS) public boolean isSaturationActivated();
+  }
+
+  @FlaggedApi("com.android.graphics.surfaceflinger.flags.parse_edid_version_and_input_type") public static final class DeviceProductInfo.EdidStructureMetadata implements android.os.Parcelable {
+    ctor public DeviceProductInfo.EdidStructureMetadata(@IntRange(from=0) int, @IntRange(from=0) int);
   }
 
   public final class DisplayManager {
@@ -2678,7 +2686,7 @@ package android.os {
   }
 
   public class UserManager {
-    method @FlaggedApi("android.os.allow_private_profile") @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS}) public boolean canAddPrivateProfile();
+    method @Deprecated @FlaggedApi("android.multiuser.consistent_max_users") @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS}) public boolean canAddPrivateProfile();
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo createProfileForUser(@Nullable String, @NonNull String, int, int, @Nullable String[]);
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo createRestrictedProfile(@Nullable String);
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo createUser(@Nullable String, @NonNull String, int);

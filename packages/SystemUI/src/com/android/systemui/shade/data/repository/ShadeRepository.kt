@@ -117,9 +117,6 @@ interface ShadeRepository {
      */
     val legacyUseSplitShade: MutableStateFlow<Boolean>
 
-    /** Provides whether the display containing the shade is wide (i.e. >= 600dp). */
-    val isWideScreen: MutableStateFlow<Boolean>
-
     /** True when QS is taking up the entire screen, i.e. fully expanded on a non-unfolded phone. */
     @Deprecated("Use ShadeInteractor instead") val legacyQsFullscreen: StateFlow<Boolean>
 
@@ -128,9 +125,6 @@ interface ShadeRepository {
 
     /** Sets the bounds of a shade overlay if it is currently visible. */
     fun setShadeOverlayBounds(bounds: Rect?)
-
-    /** Sets whether the shade layout should be wide (true) or narrow (false). */
-    fun setShadeLayoutWide(isShadeLayoutWide: Boolean)
 
     /** Sets whether a closing animation is happening. */
     @Deprecated("Use ShadeAnimationInteractor instead") fun setLegacyIsClosing(isClosing: Boolean)
@@ -251,8 +245,6 @@ class ShadeRepositoryImpl @Inject constructor(@Background val backgroundScope: C
     @Deprecated("Use ShadeInteractor instead")
     override val legacyExpandImmediate: StateFlow<Boolean> = _legacyExpandImmediate.asStateFlow()
 
-    override val isWideScreen = MutableStateFlow(false)
-
     override val legacyUseSplitShade = MutableStateFlow(false)
 
     private val _legacyQsFullscreen = MutableStateFlow(false)
@@ -267,11 +259,6 @@ class ShadeRepositoryImpl @Inject constructor(@Background val backgroundScope: C
         shadeOverlayBoundsListeners.forEach { listener ->
             listener.onShadeOverlayBoundsChanged(shadeOverlayBounds)
         }
-    }
-
-    override fun setShadeLayoutWide(isShadeLayoutWide: Boolean) {
-        isWideScreen.value = isShadeLayoutWide
-        legacyUseSplitShade.value = isShadeLayoutWide
     }
 
     @Deprecated("Use ShadeInteractor instead")

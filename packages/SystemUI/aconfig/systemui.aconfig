@@ -1174,15 +1174,7 @@ flag {
   }
 }
 
-flag {
-  name: "dream_transition_fixes"
-  namespace: "systemui"
-  description: "Flags some minor transition fixes for opening the dream"
-  bug: "409720192"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
+
 
 flag {
   name: "dream_bouncer_transition_fix"
@@ -1241,13 +1233,6 @@ flag {
   namespace: "systemui"
   description: "Use media3 API for action button placement preferences"
   bug: "360196209"
-}
-
-flag {
-  name: "media_controls_ui_update"
-  namespace: "systemui"
-  description: "Enables media visuals update"
-  bug: "379044958"
 }
 
 flag {
@@ -1757,14 +1742,6 @@ flag {
 }
 
 flag {
-    name: "lockscreen_font"
-    namespace: "systemui"
-    description: "Read-only flag for lockscreen font"
-    bug: "393610165"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "move_transition_animation_layer"
     namespace: "systemui"
     description: "Enables moving the launching window on top of the origin window in the Animation library."
@@ -1810,13 +1787,6 @@ flag {
     namespace: "ailabs"
     description: "Enable the underlay additional layer"
     bug: "403422950"
-}
-
-flag {
-    name: "tv_global_actions_focus"
-    namespace: "systemui"
-    description: "Enables global actions focus on TV."
-    bug: "402759931"
 }
 
 flag {
@@ -1948,6 +1918,16 @@ flag {
    namespace: "systemui"
    description: "Adds new dozing keyguard states for more robust animations to/from dozing."
    bug: "415704030"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+   name: "allow_doze_touches_for_lock_icon"
+   namespace: "systemui"
+   description: "Allow touches for device entry lock icon during aod deferment."
+   bug: "433400058"
    metadata {
         purpose: PURPOSE_BUGFIX
    }
@@ -2143,7 +2123,7 @@ flag {
     name: "no_shade_blur_on_dream_start"
     namespace: "systemui"
     description: "Suppress shade blur when starting dream"
-    bug: "440661063"
+    bug: "422835977"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -2213,4 +2193,18 @@ flag {
     metadata {
          purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "blur_on_more_surfaces"
+    namespace: "systemui"
+    description: "Enable blur on more systemui surfaces"
+    bug: "444141641"
+}
+
+flag {
+    name: "enable_cue_bar_animated_icon"
+    namespace: "ailabs"
+    description: "Enable the animated icon in cue bar"
+    bug: "443197064"
 }

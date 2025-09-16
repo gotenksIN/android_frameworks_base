@@ -1796,6 +1796,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     @GuardedBy("mLock")
     private List<ApkLite> getAddedApkLitesLocked() throws PackageManagerException {
         if (!isArchivedInstallation()) {
+            long addedApksSizeBytes = 0;
             List<File> files = getAddedApksLocked();
             final List<ApkLite> result = new ArrayList<>(files.size());
 
@@ -1809,8 +1810,13 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                             parseResult.getErrorMessage(), parseResult.getException());
                 }
                 result.add(parseResult.getResult());
+                addedApksSizeBytes += files.get(i).length();
             }
 
+            // As a byproduct of this parsing method, also log the total size of added APK files
+            synchronized (mMetrics) {
+                mMetrics.onAddedApksSizeBytesCalculated(addedApksSizeBytes);
+            }
             return result;
         }
 

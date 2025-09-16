@@ -45,6 +45,7 @@ import com.android.extensions.computercontrol.input.KeyEvent;
 import com.android.extensions.computercontrol.input.TouchEvent;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
@@ -105,14 +106,24 @@ public final class ComputerControlSession implements AutoCloseable {
     /**
      * Launches an application's launcher activity in the computer control session.
      *
-     * <p>The application with the given package name must have a launcher activity and the
-     * package name must have been included during the session creation.</p>
-     *
+     * @throws IllegalArgumentException if the package does not have a launcher activity.
      * @see Params#getTargetPackageNames()
      */
     public void launchApplication(@NonNull String packageName) {
         mSession.launchApplication(Objects.requireNonNull(packageName));
         mAccessibilityProxy.resetStabilityState();
+    }
+
+    /**
+     * Hand over full control of the automation session to the user.
+     *
+     * <p>All of the applications currently automated in the session are moved from the session's
+     * display to the user's default display. No further automation is possible on these tasks,
+     * although the session remains active and new applications may be launched via
+     * {@link #launchApplication(String)}</p>
+     */
+    public void handOverApplications() {
+        mSession.handOverApplications();
     }
 
     /**
@@ -229,10 +240,14 @@ public final class ComputerControlSession implements AutoCloseable {
 
     /**
      * Returns all windows on the display associated with the {@link ComputerControlSession}.
+     *
+     * @deprecated This method is no longer in use and will be removed in a future release.
      */
+    // TODO: b/437852886 - Remove this method when moving to v1 of the API.
+    @Deprecated
     @NonNull
     public List<AccessibilityWindowInfo> getAccessibilityWindows() {
-        return mAccessibilityProxy.getWindows();
+        return Collections.emptyList();
     }
 
     /**

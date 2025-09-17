@@ -58,6 +58,7 @@ import com.android.internal.widget.LockPatternUtils;
 import com.android.internal.widget.LockscreenCredential;
 import com.android.server.LocalServices;
 import com.android.server.StorageManagerInternal;
+import com.android.server.locksettings.FakeKeyStore.FakeKeyStoreRule;
 import com.android.server.locksettings.recoverablekeystore.RecoverableKeyStoreManager;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.security.authenticationpolicy.SecureLockDeviceServiceInternal;
@@ -116,12 +117,15 @@ public abstract class BaseLockSettingsServiceTests {
     FaceManager mFaceManager;
     PackageManager mPackageManager;
     SecureLockDeviceServiceInternal mSecureLockDeviceServiceInternal;
+    Runnable mInvalidateLockoutEndTimeCacheMock;
     LockSettingsServiceTestable.MockInjector mInjector;
     @Rule
     public FakeSettingsProviderRule mSettingsRule = FakeSettingsProvider.rule();
 
     @Rule
     public PropertyInvalidatedCacheTestRule mCacheRule = new PropertyInvalidatedCacheTestRule();
+
+    @Rule public FakeKeyStoreRule mKeyStoreRule = new FakeKeyStoreRule();
 
     @Before
     public void setUp_baseServices() throws Exception {
@@ -144,6 +148,7 @@ public abstract class BaseLockSettingsServiceTests {
         mPackageManager = mock(PackageManager.class);
         mStrongAuth = mock(LockSettingsStrongAuth.class);
         mStrongAuthTracker = mock(LockSettingsService.SynchronizedStrongAuthTracker.class);
+        mInvalidateLockoutEndTimeCacheMock = mock(Runnable.class);
 
         LocalServices.removeServiceForTest(LockSettingsInternal.class);
         LocalServices.removeServiceForTest(DevicePolicyManagerInternal.class);
@@ -187,7 +192,9 @@ public abstract class BaseLockSettingsServiceTests {
                         mRecoverableKeyStoreManager,
                         mUserManagerInternal,
                         mDeviceStateCache,
-                        mSecureLockDeviceServiceInternal);
+                        mSecureLockDeviceServiceInternal,
+                        mKeyStoreRule.getKeyStore(),
+                        mInvalidateLockoutEndTimeCacheMock);
         mService =
                 new LockSettingsServiceTestable(mInjector, mGateKeeperService, mAuthSecretService);
         mService.mHasSecureLockScreen = true;

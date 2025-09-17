@@ -540,6 +540,8 @@ class Task extends TaskFragment {
      */
     private boolean mDisallowOverrideBoundsForChildren;
 
+    SurfaceControl[] mExcludeLayersFromTaskSnapshot;
+
     /**
      * If the window is allowed to be repositioned by {@link
      * android.app.ActivityManager.AppTask#moveTaskTo}.
@@ -2899,6 +2901,7 @@ class Task extends TaskFragment {
 
         EventLogTags.writeWmTaskRemoved(mTaskId, getRootTaskId(), getDisplayId(), reason);
         clearPinnedTaskIfNeed();
+        clearExcludeLayersFromTaskSnapshot();
         if (mChildPipActivity != null) {
             mChildPipActivity.clearLastParentBeforePip();
         }
@@ -7120,6 +7123,26 @@ class Task extends TaskFragment {
             return false;
         }
         return !DevicePolicyCache.getInstance().isScreenCaptureAllowed(mUserId);
+    }
+
+    void setExcludeLayersFromTaskSnapshot(SurfaceControl[] layers) throws RemoteException {
+        clearExcludeLayersFromTaskSnapshot();
+        for (SurfaceControl layer : layers) {
+            if (!layer.isValid()) {
+                throw new RemoteException("Invalid exclude layer from snapshot");
+            }
+        }
+        mExcludeLayersFromTaskSnapshot = layers;
+    }
+
+    void clearExcludeLayersFromTaskSnapshot() {
+        if (mExcludeLayersFromTaskSnapshot == null) {
+            return;
+        }
+        for (SurfaceControl layer : mExcludeLayersFromTaskSnapshot) {
+            layer.release();
+        }
+        mExcludeLayersFromTaskSnapshot = null;
     }
 
     /**

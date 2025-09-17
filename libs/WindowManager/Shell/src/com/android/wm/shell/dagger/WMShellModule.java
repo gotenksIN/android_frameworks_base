@@ -319,9 +319,7 @@ public abstract class WMShellModule {
             @NonNull ShellTaskOrganizer organizer,
             SyncTransactionQueue syncQueue
     ) {
-        return TaskViewTransitions.useRepo()
-                ? new TaskViewTransitions(transitions, repository, organizer, syncQueue)
-                : taskViewTransitions;
+        return new TaskViewTransitions(transitions, repository, organizer, syncQueue);
     }
 
     @WMSingleton
@@ -1734,7 +1732,8 @@ public abstract class WMShellModule {
             DesktopRepositoryInitializer desktopRepositoryInitializer,
             Optional<DesksTransitionObserver> desksTransitionObserver,
             DesktopState desktopState,
-            Transitions transitions
+            Transitions transitions,
+            KeyguardManager keyguardManager
     ) {
         if (!desktopState.canEnterDesktopMode()) {
             return Optional.empty();
@@ -1753,7 +1752,8 @@ public abstract class WMShellModule {
                         desktopDisplayModeController.get(),
                         desksTransitionObserver.get(),
                         desktopState,
-                        transitions));
+                        transitions,
+                        keyguardManager));
     }
 
     @WMSingleton

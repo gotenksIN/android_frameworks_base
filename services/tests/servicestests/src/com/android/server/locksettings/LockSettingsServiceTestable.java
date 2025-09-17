@@ -25,15 +25,11 @@ import android.content.Intent;
 import android.content.pm.UserInfo;
 import android.hardware.authsecret.IAuthSecret;
 import android.os.Handler;
-import android.os.Parcel;
 import android.os.Process;
-import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.storage.IStorageManager;
-import android.security.keystore.KeyPermanentlyInvalidatedException;
 import android.service.gatekeeper.IGateKeeperService;
 
-import com.android.internal.widget.LockscreenCredential;
 import com.android.server.ServiceThread;
 import com.android.server.StorageManagerInternal;
 import com.android.server.locksettings.SyntheticPasswordManager.SyntheticPassword;
@@ -41,7 +37,6 @@ import com.android.server.locksettings.recoverablekeystore.RecoverableKeyStoreMa
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.security.authenticationpolicy.SecureLockDeviceServiceInternal;
 
-import java.io.FileNotFoundException;
 import java.security.KeyStore;
 import java.time.Duration;
 
@@ -65,6 +60,8 @@ public class LockSettingsServiceTestable extends LockSettingsService {
         private UserManagerInternal mUserManagerInternal;
         private DeviceStateCache mDeviceStateCache;
         private Duration mTimeSinceBoot;
+        private KeyStore mKeyStore;
+        Runnable mInvalidateLockoutEndTimeCacheMock;
 
         public boolean mIsHeadlessSystemUserMode = false;
 
@@ -81,7 +78,9 @@ public class LockSettingsServiceTestable extends LockSettingsService {
                 RecoverableKeyStoreManager recoverableKeyStoreManager,
                 UserManagerInternal userManagerInternal,
                 DeviceStateCache deviceStateCache,
-                SecureLockDeviceServiceInternal secureLockDeviceServiceInternal) {
+                SecureLockDeviceServiceInternal secureLockDeviceServiceInternal,
+                KeyStore keyStore,
+                Runnable invalidateLockoutEndTimeCacheMock) {
             super(context);
             mLockSettingsStorage = storage;
             mStrongAuth = strongAuth;
@@ -95,6 +94,8 @@ public class LockSettingsServiceTestable extends LockSettingsService {
             mUserManagerInternal = userManagerInternal;
             mDeviceStateCache = deviceStateCache;
             mSecureLockDeviceServiceInternal = secureLockDeviceServiceInternal;
+            mKeyStore = keyStore;
+            mInvalidateLockoutEndTimeCacheMock = invalidateLockoutEndTimeCacheMock;
         }
 
         @Override
@@ -177,6 +178,11 @@ public class LockSettingsServiceTestable extends LockSettingsService {
             return mIsHeadlessSystemUserMode;
         }
 
+        @Override
+        public KeyStore getKeyStore() {
+            return mKeyStore;
+        }
+
         void setTimeSinceBoot(Duration time) {
             mTimeSinceBoot = time;
         }
@@ -188,6 +194,11 @@ public class LockSettingsServiceTestable extends LockSettingsService {
             }
             return super.getTimeSinceBoot();
         }
+
+        @Override
+        public void invalidateLockoutEndTimeCache() {
+            mInvalidateLockoutEndTimeCacheMock.run();
+        }
     }
 
     protected LockSettingsServiceTestable(
@@ -197,39 +208,6 @@ public class LockSettingsServiceTestable extends LockSettingsService {
         super(injector);
         mGateKeeperService = gatekeeper;
         mAuthSecretService = authSecretService;
-    }
-
-    @Override
-    protected void tieProfileLockToParent(int profileUserId, int parentUserId,
-            LockscreenCredential password) {
-        Parcel parcel = Parcel.obtain();
-        parcel.writeParcelable(password, 0);
-        mStorage.writeChildProfileLock(profileUserId, parcel.marshall());
-        parcel.recycle();
-    }
-
-    @Override
-    protected LockscreenCredential getDecryptedPasswordForUnifiedProfile(int userId)
-            throws FileNotFoundException, KeyPermanentlyInvalidatedException {
-        byte[] storedData = mStorage.readChildProfileLock(userId);
-        if (storedData == null) {
-            throw new FileNotFoundException("Child profile lock file not found");
-        }
-        try {
-            if (mGateKeeperService.getSecureUserId(userId) == 0) {
-                throw new KeyPermanentlyInvalidatedException();
-            }
-        } catch (RemoteException e) {
-            // shouldn't happen.
-        }
-        Parcel parcel = Parcel.obtain();
-        try {
-            parcel.unmarshall(storedData, 0, storedData.length);
-            parcel.setDataPosition(0);
-            return (LockscreenCredential) parcel.readParcelable(null);
-        } finally {
-            parcel.recycle();
-        }
     }
 
     @Override

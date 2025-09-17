@@ -28,6 +28,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
+import android.annotation.UserIdInt;
 import android.app.ActivityOptions;
 import android.app.compat.CompatChanges;
 import android.app.role.RoleManager;
@@ -52,6 +53,7 @@ import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledAfter;
 import android.content.AttributionSource;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.display.DisplayManagerInternal;
 import android.hardware.display.IVirtualDisplayCallback;
@@ -69,6 +71,7 @@ import android.os.UserHandle;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.ExceptionUtils;
+import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.view.Display;
@@ -195,8 +198,7 @@ public class VirtualDeviceManagerService extends SystemService {
         mLocalService = new LocalService();
         mComputerControlSessionProcessor =
                 new ComputerControlSessionProcessor(context, mImpl::createLocalVirtualDevice);
-        mAutomatedPackagesRepository =
-                new AutomatedPackagesRepository(context.getPackageManager(), mHandler);
+        mAutomatedPackagesRepository = new AutomatedPackagesRepository(mHandler);
     }
 
     private final ActivityInterceptorCallback mActivityInterceptorCallback =
@@ -303,7 +305,8 @@ public class VirtualDeviceManagerService extends SystemService {
 
     @VisibleForTesting
     void onRunningAppsChanged(int deviceId, @NonNull String deviceOwnerPackageName,
-            @NonNull ArraySet<Integer> runningUids) {
+            @NonNull ArraySet<Integer> runningUids,
+            @NonNull ArraySet<Pair<Integer, String>> uidPackagePairs) {
         final List<VirtualDeviceManagerInternal.AppsOnVirtualDeviceListener> listeners;
         synchronized (mVirtualDeviceManagerLock) {
             listeners = List.copyOf(mAppsOnVirtualDeviceListeners);
@@ -315,7 +318,7 @@ public class VirtualDeviceManagerService extends SystemService {
         });
 
         if (mComputerControlSessionProcessor.isComputerControlSession(deviceId)) {
-            mAutomatedPackagesRepository.update(deviceId, deviceOwnerPackageName, runningUids);
+            mAutomatedPackagesRepository.update(deviceId, deviceOwnerPackageName, uidPackagePairs);
         }
     }
 
@@ -420,6 +423,20 @@ public class VirtualDeviceManagerService extends SystemService {
         synchronized (mVirtualDeviceManagerLock) {
             return mVirtualDevices.get(deviceId);
         }
+    }
+
+    private String getDeviceOwnerForDisplayId(int displayId) {
+        if (displayId == Display.INVALID_DISPLAY || displayId == Display.DEFAULT_DISPLAY) {
+            return null;
+        }
+        ArrayList<VirtualDeviceImpl> virtualDevicesSnapshot = getVirtualDevicesSnapshot();
+        for (int i = 0; i < virtualDevicesSnapshot.size(); i++) {
+            VirtualDeviceImpl virtualDevice = virtualDevicesSnapshot.get(i);
+            if (virtualDevice.isDisplayOwnedByVirtualDevice(displayId)) {
+                return virtualDevice.getOwnerPackageName();
+            }
+        }
+        return null;
     }
 
     // TODO(b/442624418): Replace this explicit role holder check with a new role permission.
@@ -933,6 +950,17 @@ public class VirtualDeviceManagerService extends SystemService {
         @Override
         public boolean isComputerControlDisplay(int displayId) {
             return mComputerControlSessionProcessor.isComputerControlDisplay(displayId);
+        }
+
+        @Nullable
+        @Override
+        public Intent createAutomatedAppLaunchWarningIntent(
+                @NonNull String packageName, @UserIdInt int userId,
+                @Nullable String callingPackageName, int displayId) {
+            final String deviceOwnerForLaunchDisplayId = getDeviceOwnerForDisplayId(displayId);
+            return mAutomatedPackagesRepository.createAutomatedAppLaunchWarningIntent(
+                    packageName, userId, callingPackageName, deviceOwnerForLaunchDisplayId,
+                    mComputerControlSessionProcessor::closeSession);
         }
 
         @Override

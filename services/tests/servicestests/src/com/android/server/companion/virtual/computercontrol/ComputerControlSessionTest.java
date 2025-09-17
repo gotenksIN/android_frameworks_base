@@ -93,6 +93,7 @@ public class ComputerControlSessionTest {
 
     private static final String PERMISSION_CONTROLLER_PACKAGE = "permission.controller.package";
 
+    private static final int MAIN_DISPLAY_ID = 41;
     private static final int VIRTUAL_DISPLAY_ID = 42;
     private static final int DISPLAY_WIDTH = 600;
     private static final int DISPLAY_HEIGHT = 1000;
@@ -147,11 +148,14 @@ public class ComputerControlSessionTest {
     public void setUp() throws Exception {
         mMockitoSession = MockitoAnnotations.openMocks(this);
 
+        when(mInjector.getMainDisplayIdForUser(anyInt())).thenReturn(MAIN_DISPLAY_ID);
+
         DisplayInfo displayInfo = new DisplayInfo();
         displayInfo.logicalWidth = DISPLAY_WIDTH;
         displayInfo.logicalHeight = DISPLAY_HEIGHT;
         displayInfo.logicalDensityDpi = DISPLAY_DPI;
-        when(mInjector.getDisplayInfo(anyInt())).thenReturn(displayInfo);
+        when(mInjector.getDisplayInfo(MAIN_DISPLAY_ID)).thenReturn(displayInfo);
+        when(mInjector.getDisplayInfo(VIRTUAL_DISPLAY_ID)).thenReturn(displayInfo);
 
         when(mInjector.getPermissionControllerPackageName())
                 .thenReturn(PERMISSION_CONTROLLER_PACKAGE);
@@ -271,7 +275,7 @@ public class ComputerControlSessionTest {
     }
 
     @Test
-    public void launchApplication_launchesApplication() {
+    public void launchApplication_launchesApplication() throws RemoteException {
         createComputerControlSession(mDefaultParams);
         mSession.launchApplication(TARGET_PACKAGE_1);
         verify(mInjector).launchApplicationOnDisplayAsUser(
@@ -279,10 +283,23 @@ public class ComputerControlSessionTest {
     }
 
     @Test
-    public void launchApplication_undeclaredPackage_throws() {
+    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
+    public void launchApplication_noActivityPolicy_launchesApplication() throws RemoteException {
         createComputerControlSession(mDefaultParams);
-        assertThrows(IllegalArgumentException.class,
-                () -> mSession.launchApplication(UNDECLARED_TARGET_PACKAGE));
+        mSession.launchApplication(UNDECLARED_TARGET_PACKAGE);
+        verify(mInjector).launchApplicationOnDisplayAsUser(
+                eq(UNDECLARED_TARGET_PACKAGE), eq(VIRTUAL_DISPLAY_ID), any());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
+    public void launchApplication_strictActivityPolicy_addsExemption() throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+        mSession.launchApplication(UNDECLARED_TARGET_PACKAGE);
+        verify(mVirtualDevice).addActivityPolicyExemption(
+                argThat(new MatchesActivityPolicyExcemption(UNDECLARED_TARGET_PACKAGE)));
+        verify(mInjector).launchApplicationOnDisplayAsUser(
+                eq(UNDECLARED_TARGET_PACKAGE), eq(VIRTUAL_DISPLAY_ID), any());
     }
 
     @Test
@@ -489,13 +506,48 @@ public class ComputerControlSessionTest {
     }
 
     @Test
-    public void insertText_notifiesStabilityListener() throws Exception {
+    public void performAction_withInvalidCode_notifiesStabilityListener() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        mSession.setStabilityListener(mStabilityListener);
+
+        mSession.performAction(-1);
+
+        verify(mStabilityListener).onSessionStable();
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_TYPING)
+    public void insertTextLegacy_notifiesStabilityListener() throws Exception {
         createComputerControlSession(mDefaultParams);
         mSession.setStabilityListener(mStabilityListener);
 
         mSession.insertText("hello", false /* replaceExisting */, true /* commit */);
 
         verify(mStabilityListener, timeout(STABILITY_TIMEOUT_MS)).onSessionStable();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_TYPING)
+    public void insertText_notifiesStabilityListener() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        when(mInjector.getInputConnection(VIRTUAL_DISPLAY_ID)).thenReturn(
+                mRemoteComputerControlInputConnection);
+        mSession.setStabilityListener(mStabilityListener);
+
+        mSession.insertText("hello", false /* replaceExisting */, true /* commit */);
+
+        verify(mStabilityListener, timeout(STABILITY_TIMEOUT_MS)).onSessionStable();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_TYPING)
+    public void insertText_withNoInputConnection_notifiesStabilityListener() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        mSession.setStabilityListener(mStabilityListener);
+
+        mSession.insertText("hello", false /* replaceExisting */, true /* commit */);
+
+        verify(mStabilityListener).onSessionStable();
     }
 
     @Test

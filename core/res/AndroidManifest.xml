@@ -2392,10 +2392,9 @@
                 android:featureFlag="android.permission.flags.bluetooth_permission_use_module_protection_level"
                 android:protectionLevel="signature|role|module" />
 
-    <!-- @SystemApi @hide Allows applications to register a NetworkAgent for its own use.
+    <!-- @hide Allows applications to register a NetworkAgent for its own use.
          <p>Such networks are not available to other applications on the device unless they have
          the CONNECTIVITY_USE_RESTRICTED_NETWORKS permission.
-         @FlaggedApi(android.net.platform.flags.Flags.FLAG_CREATE_APP_SPECIFIC_NETWORK_PERMISSION)
     -->
     <permission android:name="android.permission.CREATE_APP_SPECIFIC_NETWORK"
                 android:protectionLevel="signature|privileged"
@@ -9734,12 +9733,6 @@
                 android:theme="@style/Theme.Dialog.Confirmation"
                 android:excludeFromRecents="true"
                 android:process=":ui">
-        </activity>
-
-        <activity android:name="com.android.internal.app.SetScreenLockDialogActivity"
-                  android:theme="@style/Theme.Dialog.Confirmation"
-                  android:excludeFromRecents="true"
-                  android:process=":ui">
         </activity>
 
         <activity android:name="com.android.internal.app.BlockedAppActivity"

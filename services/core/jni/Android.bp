@@ -143,6 +143,7 @@ cc_defaults {
         "libinput",
         "libinputflinger",
         "libinputservice",
+        "libselinux",
         "libservices.core-gnss",
         "libstatshidl",
         "libstatspull",

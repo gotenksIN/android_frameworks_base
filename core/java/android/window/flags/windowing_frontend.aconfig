@@ -85,6 +85,16 @@ flag {
 }
 
 flag {
+  name: "rank_task_layer_with_window_layout"
+  namespace: "windowing_frontend"
+  description: "Reduce lock contention of display thread"
+  bug: "445591466"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "no_alpha_rotation_enter_animation"
   namespace: "windowing_frontend"
   description: "Remove alpha effect of rotation enter animation"
@@ -444,9 +454,3 @@ flag {
     }
 }
 
-flag {
-    name: "scvh_set_focusable"
-    namespace: "windowing_frontend"
-    description: "Adds a focusable flag to SurfaceControlViewHost"
-    bug: "425415517"
-}

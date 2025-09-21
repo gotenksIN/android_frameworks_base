@@ -59,6 +59,7 @@ import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.app.admin.DevicePolicyManager;
 import android.app.compat.CompatChanges;
+import android.app.SetNotificationBackgroundColorRefactor;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
 import android.compat.annotation.UnsupportedAppUsage;
@@ -850,6 +851,8 @@ public class Notification implements Parcelable
                 case R.layout.notification_2025_template_collapsed_metric
                         -> Flags.apiMetricStyle();
                 case R.layout.notification_2025_template_expanded_metric
+                        -> Flags.apiMetricStyle();
+                case R.layout.notification_2025_template_expanded_single_metric
                         -> Flags.apiMetricStyle();
                 default -> false;
             };
@@ -8073,6 +8076,10 @@ public class Notification implements Parcelable
             return R.layout.notification_2025_template_expanded_metric;
         }
 
+        private int getExpandedSingleMetricLayoutResource() {
+            return R.layout.notification_2025_template_expanded_single_metric;
+        }
+
         private int getCollapsedMediaLayoutResource() {
             if (Flags.notificationsRedesignTemplates()) {
                 return R.layout.notification_2025_template_collapsed_media;
@@ -9984,9 +9991,11 @@ public class Notification implements Parcelable
                     mBuilder.getPrimaryTextColor(p));
             contentView.setInt(R.id.status_bar_latest_event_content, "setMessageTextColor",
                     mBuilder.getSecondaryTextColor(p));
-            contentView.setInt(R.id.status_bar_latest_event_content,
-                    "setNotificationBackgroundColor",
-                    mBuilder.getBackgroundColor(p));
+            if (!SetNotificationBackgroundColorRefactor.isEnabled()) {
+                contentView.setInt(R.id.status_bar_latest_event_content,
+                        "setNotificationBackgroundColor",
+                        mBuilder.getBackgroundColor(p));
+            }
             contentView.setBoolean(R.id.status_bar_latest_event_content, "setIsCollapsed",
                     isCollapsed);
             contentView.setIcon(R.id.status_bar_latest_event_content, "setAvatarReplacement",
@@ -10172,8 +10181,10 @@ public class Notification implements Parcelable
             } else if (mIsGroupConversation) {
                 contentView.setViewVisibility(R.id.icon, View.GONE);
                 contentView.setViewVisibility(R.id.conversation_icon, View.GONE);
-                contentView.setInt(R.id.status_bar_latest_event_content,
-                        "setNotificationBackgroundColor", mBuilder.getBackgroundColor(p));
+                if (!SetNotificationBackgroundColorRefactor.isEnabled()) {
+                    contentView.setInt(R.id.status_bar_latest_event_content,
+                            "setNotificationBackgroundColor", mBuilder.getBackgroundColor(p));
+                }
                 contentView.setInt(R.id.status_bar_latest_event_content, "setLayoutColor",
                         mBuilder.getSmallIconColor(p));
                 contentView.setBundle(R.id.status_bar_latest_event_content, "setGroupFacePile",
@@ -11513,8 +11524,10 @@ public class Notification implements Parcelable
             // Bind some custom CallLayout properties
             contentView.setInt(R.id.status_bar_latest_event_content, "setLayoutColor",
                     mBuilder.getSmallIconColor(p));
-            contentView.setInt(R.id.status_bar_latest_event_content,
-                    "setNotificationBackgroundColor", mBuilder.getBackgroundColor(p));
+            if (!SetNotificationBackgroundColorRefactor.isEnabled()) {
+                contentView.setInt(R.id.status_bar_latest_event_content,
+                        "setNotificationBackgroundColor", mBuilder.getBackgroundColor(p));
+            }
             contentView.setIcon(R.id.status_bar_latest_event_content, "setLargeIcon",
                     mBuilder.mN.mLargeIcon);
             contentView.setBundle(R.id.status_bar_latest_event_content, "setData",
@@ -11844,9 +11857,14 @@ public class Notification implements Parcelable
                     .titleViewId(R.id.alt_title)
                     .hideRightIcon(true);
             final TemplateBindResult result = new TemplateBindResult();
-            final RemoteViews contentView = getStandardView(
-                    mBuilder.getExpandedMetricLayoutResource(), p, result);
-            return bindMetricStyleMetrics(contentView, p, /* isExpandedView = */ true);
+            final int expandedLayoutRes;
+            if (mMetrics.size() == 1) {
+                expandedLayoutRes = mBuilder.getExpandedSingleMetricLayoutResource();
+            } else {
+                expandedLayoutRes = mBuilder.getExpandedMetricLayoutResource();
+            }
+            final RemoteViews contentView = getStandardView(expandedLayoutRes, p, result);
+            return bindMetricStyleMetrics(contentView, p, /* isExpandedView = */true);
         }
 
         private RemoteViews bindMetricStyleMetrics(

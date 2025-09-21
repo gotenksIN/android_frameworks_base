@@ -47,12 +47,12 @@ import com.android.wm.shell.bubbles.Bubble;
 import com.android.wm.shell.bubbles.BubbleController;
 import com.android.wm.shell.bubbles.BubbleData;
 import com.android.wm.shell.bubbles.BubbleExpandedViewTransitionAnimator;
-import com.android.wm.shell.bubbles.BubbleLogger;
 import com.android.wm.shell.bubbles.BubbleOverflow;
 import com.android.wm.shell.bubbles.BubblePositioner;
 import com.android.wm.shell.bubbles.BubbleViewProvider;
 import com.android.wm.shell.bubbles.DismissViewUtils;
 import com.android.wm.shell.bubbles.bar.BubbleBarExpandedViewDragController.DragListener;
+import com.android.wm.shell.bubbles.logging.BubbleLogger;
 import com.android.wm.shell.bubbles.util.ReferenceCounter;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
@@ -536,7 +536,7 @@ public class BubbleBarLayerView extends FrameLayout
     }
 
     public void removeBubble(@NonNull Bubble bubble, @NonNull Runnable endAction) {
-        final boolean inTransition = bubble.getPreparingTransition() != null;
+        final boolean inTransition = bubble.getCurrentTransition() != null;
         ProtoLog.d(WM_SHELL_BUBBLES_NOISY,
                 "BBLayerView.removeBubble(): bubble=%s hasBubbles=%b inTransition=%b",
                 bubble, !mBubbleData.getBubbles().isEmpty(), inTransition);

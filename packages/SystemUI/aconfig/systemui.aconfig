@@ -584,16 +584,6 @@ flag {
 }
 
 flag {
-   name: "activity_transition_use_largest_window"
-   namespace: "systemui"
-   description: "Target largest opening window during activity transitions."
-   bug: "323294573"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "enable_layout_tracing"
   namespace: "systemui"
   description: "Enables detailed traversal slices during measure and layout in perfetto traces"
@@ -1521,14 +1511,6 @@ flag {
 }
 
 flag {
-  name: "shade_header_font_update"
-  namespace: "systemui"
-  description: "Updates the fonts of the shade header"
-  bug: "393609960"
-  is_fixed_read_only: true
-}
-
-flag {
   name: "shade_header_blur_font_color"
   namespace: "systemui"
   description: "Updates the font colors of the shade header for blur"
@@ -1893,6 +1875,13 @@ flag {
 }
 
 flag {
+    name: "large_screen_screenshot_save_location"
+    namespace: "systemui"
+    description: "Enables ability to specify a custom save location for screenshots within settings menu on large screen devices."
+    bug: "439894467"
+}
+
+flag {
     name: "large_screen_recording"
     namespace: "systemui"
     description: "Enables screen recording UI for large screen devices."
@@ -2207,4 +2196,24 @@ flag {
     namespace: "ailabs"
     description: "Enable the animated icon in cue bar"
     bug: "443197064"
+}
+
+flag {
+    name: "wakefulness_for_animations"
+    namespace: "systemui"
+    description: "Changes the signal used for animation wakefulness on keyguard"
+    bug: "445366741"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "expandable_force_modifier_implementation"
+    namespace: "systemui"
+    description: "Always use the Compose Expandable modifier implementation everywhere, independently of useModifierBasedImplementation"
+    bug: "428899288"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }

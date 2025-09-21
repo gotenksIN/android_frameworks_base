@@ -6385,6 +6385,10 @@ public final class ActivityThread extends ClientTransactionHandler
         onCoreSettingsChange();
     }
 
+    /**
+     * Handles updates to core settings. This may trigger a relaunch of all activities if
+     * settings that affect the UI, like debug view attributes, have changed.
+     */
     private void onCoreSettingsChange() {
         if (updateDebugViewAttributeState()) {
             // request all activities to relaunch for the changes to take place
@@ -8672,18 +8676,13 @@ public final class ActivityThread extends ClientTransactionHandler
                             Slog.v(TAG, "incProviderRef: Now unstable - "
                                     + prc.holder.info.name);
                         }
-                        if (Flags.skipRefContentProvider()) {
-                            // If the provider is persistent process and has unstable
-                            // connection, then we don't need to increment the ref count
-                            // in the activity manager.
-                            if (prc != null && prc.holder != null
-                                        && !prc.holder.noReleaseNeededIfUnstable) {
-                                ActivityManager.getService().refContentProvider(
-                                        prc.holder.connection, 0, 1);
-                            }
-                        } else {
+                        // If the provider is persistent process and has unstable
+                        // connection, then we don't need to increment the ref count
+                        // in the activity manager.
+                        if (prc != null && prc.holder != null
+                                    && !prc.holder.noReleaseNeededIfUnstable) {
                             ActivityManager.getService().refContentProvider(
-                                        prc.holder.connection, 0, 1);
+                                    prc.holder.connection, 0, 1);
                         }
                     } catch (RemoteException e) {
                         //do nothing content provider object is dead any way
@@ -8783,16 +8782,11 @@ public final class ActivityThread extends ClientTransactionHandler
                                 Slog.v(TAG, "releaseProvider: No longer unstable - "
                                         + prc.holder.info.name);
                             }
-                            if (Flags.skipRefContentProvider()) {
-                                // If the provider is persistent process and has unstable
-                                // connection, then we don't need to decrement the ref count
-                                // in the activity manager.
-                                if (prc != null && prc.holder != null
-                                        && !prc.holder.noReleaseNeededIfUnstable) {
-                                    ActivityManager.getService().refContentProvider(
-                                            prc.holder.connection, 0, -1);
-                                }
-                            } else {
+                            // If the provider is persistent process and has unstable
+                            // connection, then we don't need to decrement the ref count
+                            // in the activity manager.
+                            if (prc != null && prc.holder != null
+                                    && !prc.holder.noReleaseNeededIfUnstable) {
                                 ActivityManager.getService().refContentProvider(
                                         prc.holder.connection, 0, -1);
                             }
@@ -9282,8 +9276,20 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
+    /**
+     * Gets the core settings for the default device.
+     *
+     * On HSUM devices, core settings for a non-system user might not be available immediately
+     * after the user's process starts.
+     * In such cases, this method returns an empty Bundle to prevent crashes.
+     */
     private Bundle getCoreSettingsForDefaultDeviceLocked() {
-        return getCoreSettingsForDeviceLocked(Context.DEVICE_ID_DEFAULT);
+        Bundle bundle = getCoreSettingsForDeviceLocked(Context.DEVICE_ID_DEFAULT);
+        if (bundle == null) {
+            Log.w(TAG, "Core settings not yet available for current user; returning empty bundle");
+            return Bundle.EMPTY;
+        }
+        return bundle;
     }
 
     private Bundle getCoreSettingsForDeviceLocked(int deviceId) {

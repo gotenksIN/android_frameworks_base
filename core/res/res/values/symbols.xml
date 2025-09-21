@@ -785,6 +785,10 @@
   <java-symbol type="string" name="gpsNotifTitle" />
   <java-symbol type="string" name="gpsVerifNo" />
   <java-symbol type="string" name="gpsVerifYes" />
+  <java-symbol type="string" name="emergency_location_notification_title" />
+  <java-symbol type="string" name="emergency_location_notification_message" />
+  <java-symbol type="string" name="emergency_location_notification_learn_more" />
+  <java-symbol type="string" name="emergency_location_notification_learn_more_url" />
   <java-symbol type="string" name="gsm_alphabet_default_charset" />
   <java-symbol type="string" name="httpError" />
   <java-symbol type="string" name="httpErrorAuth" />
@@ -2508,6 +2512,7 @@
   <java-symbol type="layout" name="notification_2025_template_collapsed_base" />
   <java-symbol type="layout" name="notification_2025_template_collapsed_metric" />
   <java-symbol type="layout" name="notification_2025_template_expanded_metric" />
+  <java-symbol type="layout" name="notification_2025_template_expanded_single_metric" />
   <java-symbol type="layout" name="notification_2025_template_expanded_base" />
   <java-symbol type="layout" name="notification_2025_template_heads_up_base" />
   <java-symbol type="layout" name="notification_2025_template_compact_heads_up_base" />
@@ -6125,6 +6130,8 @@
   <java-symbol type="string" name="config_defaultContextualSearchLegacyEnabled" />
 
   <java-symbol type="string" name="unarchival_session_app_label" />
+
+  <java-symbol type="bool" name="config_appResolutionSwitchVoteDisabled" />
 
   <!-- Whether WM DisplayContent supports high performance transitions -->
   <java-symbol type="bool" name="config_deviceSupportsHighPerfTransitions" />

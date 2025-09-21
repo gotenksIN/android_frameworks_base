@@ -909,8 +909,7 @@ public class ContentProviderHelper {
                 (conn.provider != null && conn.provider.info != null
                 ? conn.provider.info.authority : ""));
         try {
-            if (android.app.Flags.skipRefContentProvider()
-                    && unstable <= 0 && conn.unstableCount() <= 0) {
+            if (unstable <= 0 && conn.unstableCount() <= 0) {
                 return false;
             }
             conn.adjustCounts(stable, unstable);
@@ -1376,7 +1375,7 @@ public class ContentProviderHelper {
         }
 
         mService.mConstants.start(mService.mContext.getContentResolver());
-        mService.mCoreSettingsObserver = new CoreSettingsObserver(mService);
+        mService.mCoreSettingsObserver = CoreSettingsObserver.create(mService);
         mService.mActivityTaskManager.installSystemProviders();
         new DevelopmentSettingsObserver(); // init to observe developer settings enable/disable
         SettingsToPropertiesMapper.start(mService.mContext.getContentResolver());

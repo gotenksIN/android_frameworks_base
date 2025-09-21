@@ -54,6 +54,7 @@ import androidx.test.filters.SmallTest;
 import com.android.internal.logging.testing.UiEventLoggerFake;
 import com.android.wm.shell.ShellTestCase;
 import com.android.wm.shell.bubbles.BubbleData.TimeSource;
+import com.android.wm.shell.bubbles.logging.BubbleLogger;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.bubbles.BubbleBarUpdate;
@@ -1529,6 +1530,29 @@ public class BubbleDataTest extends ShellTestCase {
         assertThat(bubbleBarUpdate.removedBubbles.get(0).getKey()).isEqualTo(mBubbleC1.getKey());
         assertThat(bubbleBarUpdate.removedBubbles.get(0).getRemovalReason())
                 .isEqualTo(Bubbles.DISMISS_JUMPCUT_BUBBLE_SWITCH);
+    }
+
+    @Test
+    public void testSensitiveNotificationProtection_active() {
+        mBubbleData.setSensitiveNotificationProtectionActive(true);
+        sendUpdatedEntryAtTime(mEntryA1, 1000);
+        Bubble bubbleA1 = mBubbleData.getBubbleInStackWithKey(mEntryA1.getKey());
+        assertThat(bubbleA1.showFlyout()).isFalse();
+    }
+
+    @Test
+    public void testSensitiveNotificationProtection_notActive() {
+        mBubbleData.setSensitiveNotificationProtectionActive(true);
+        sendUpdatedEntryAtTime(mEntryA1, 1000);
+        Bubble bubbleA1 = mBubbleData.getBubbleInStackWithKey(mEntryA1.getKey());
+        assertThat(bubbleA1.showFlyout()).isFalse();
+
+        mBubbleData.setSensitiveNotificationProtectionActive(false);
+        sendUpdatedEntryAtTime(mEntryA1, 1000);
+        sendUpdatedEntryAtTime(mEntryA2, 1000);
+        assertThat(bubbleA1.showFlyout()).isTrue();
+        Bubble bubbleA2 = mBubbleData.getBubbleInStackWithKey(mEntryA1.getKey());
+        assertThat(bubbleA2.showFlyout()).isTrue();
     }
 
     private void verifyUpdateReceived() {

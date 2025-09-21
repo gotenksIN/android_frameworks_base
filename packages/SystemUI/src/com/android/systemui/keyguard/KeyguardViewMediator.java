@@ -905,7 +905,8 @@ public class KeyguardViewMediator implements CoreStartable,
             if (userId != mSelectedUserInteractor.getSelectedUserId()) {
                 return;
             }
-            if (mLockPatternUtils.isUserInLockdown(mSelectedUserInteractor.getSelectedUserId())) {
+
+            if (mUpdateMonitor.isUserInLockdown(userId)) {
                 doKeyguardLocked(null);
             }
         }
@@ -2213,7 +2214,7 @@ public class KeyguardViewMediator implements CoreStartable,
             mExternallyEnabled = enabled;
 
             if (!enabled && mShowing) {
-                if (mLockPatternUtils.isUserInLockdown(
+                if (mUpdateMonitor.isUserInLockdown(
                         mSelectedUserInteractor.getSelectedUserId())) {
                     Log.d(TAG, "keyguardEnabled(false) overridden by user lockdown");
                     return;
@@ -2523,7 +2524,7 @@ public class KeyguardViewMediator implements CoreStartable,
 
         // if another app is disabling us, don't show
         if (!mExternallyEnabled
-                && !mLockPatternUtils.isUserInLockdown(
+                && !mUpdateMonitor.isUserInLockdown(
                         mSelectedUserInteractor.getSelectedUserId())) {
             if (DEBUG) Log.d(TAG, "doKeyguard: not showing because externally disabled");
             notifyLockNowCallback();

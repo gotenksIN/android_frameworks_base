@@ -19,7 +19,6 @@ import static com.android.internal.annotations.VisibleForTesting.Visibility.PRIV
 import static com.android.wm.shell.bubbles.BubbleDebugConfig.TAG_BUBBLES;
 import static com.android.wm.shell.bubbles.BubbleDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.wm.shell.bubbles.Bubbles.dismissReasonToString;
-import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BUBBLES;
 
 import android.annotation.NonNull;
 import android.app.PendingIntent;
@@ -38,15 +37,16 @@ import android.view.View;
 import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.wm.shell.R;
 import com.android.wm.shell.bubbles.Bubbles.DismissReason;
+import com.android.wm.shell.bubbles.logging.BubbleLogger;
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.bubbles.BubbleBarUpdate;
 import com.android.wm.shell.shared.bubbles.RemovedBubble;
+import com.android.wm.shell.shared.bubbles.logging.BubbleLog;
 import com.android.wm.shell.taskview.TaskViewTaskController;
 
 import java.io.PrintWriter;
@@ -264,6 +264,11 @@ public class BubbleData {
     private Bubbles.PendingIntentCanceledListener mCancelledListener;
 
     /**
+     * When sensitive notification protection is active we shouldn't show the flyout for bubbles.
+     */
+    private boolean mSensitiveNotificationProtectionActive = false;
+
+    /**
      * We track groups with summaries that aren't visibly displayed but still kept around because
      * the bubble(s) associated with the summary still exist.
      *
@@ -314,6 +319,15 @@ public class BubbleData {
     public void setPendingIntentCancelledListener(
             Bubbles.PendingIntentCanceledListener listener) {
         mCancelledListener = listener;
+    }
+
+    /**
+     * Sets whether the sensitive notification protection state is active (e.g. user is screen
+     * recording so we hide bubble flyouts)
+     */
+    public void setSensitiveNotificationProtectionActive(
+            boolean sensitiveNotificationProtectionActive) {
+        mSensitiveNotificationProtectionActive = sensitiveNotificationProtectionActive;
     }
 
     public void onMaxBubblesChanged() {
@@ -404,7 +418,7 @@ public class BubbleData {
      * updated to have the correct state.
      */
     public void expandAndSelectBubbleFromLauncher(BubbleViewProvider bubble) {
-        ProtoLog.d(WM_SHELL_BUBBLES, "setSelectedBubbleFromLauncher=%s",
+        BubbleLog.d("BubbleData.expandAndSelectBubbleFromLauncher() bubble key=%s",
                 (bubble != null ? bubble.getKey() : "null"));
         mExpanded = true;
         boolean isOverflow = bubble != null && BubbleOverflow.KEY.equals(bubble.getKey());
@@ -584,9 +598,9 @@ public class BubbleData {
             @Nullable BubbleBarLocation bubbleBarLocation) {
         mPendingBubbles.remove(bubble.getKey()); // No longer pending once we're here
         Bubble prevBubble = getBubbleInStackWithKey(bubble.getKey());
-        suppressFlyout |= !bubble.isTextChanged();
-        ProtoLog.d(WM_SHELL_BUBBLES,
-                "notifEntryUpdated=%s prevBubble=%b suppressFlyout=%b showInShade=%b autoExpand=%b",
+        suppressFlyout |= !bubble.isTextChanged() || mSensitiveNotificationProtectionActive;
+        BubbleLog.d("BubbleData.notificationEntryUpdated() notifEntryUpdated=%s prevBubble=%b"
+                        + " suppressFlyout=%b showInShade=%b autoExpand=%b",
                 bubble.getKey(), (prevBubble != null), suppressFlyout, showInShade,
                 bubble.shouldAutoExpand());
 
@@ -777,7 +791,7 @@ public class BubbleData {
     }
 
     private void doAdd(Bubble bubble) {
-        ProtoLog.d(WM_SHELL_BUBBLES, "doAdd=%s", bubble.getKey());
+        BubbleLog.d("BubbleData.doAdd() bubble key=%s", bubble.getKey());
         mBubbles.add(0, bubble);
         mStateChange.addedBubble = bubble;
         // Adding the first bubble doesn't change the order
@@ -806,7 +820,7 @@ public class BubbleData {
     }
 
     private void doUpdate(Bubble bubble, boolean reorder) {
-        ProtoLog.d(WM_SHELL_BUBBLES, "BubbleData - doUpdate=%s", bubble.getKey());
+        BubbleLog.d("BubbleData.doUpdate() bubble key=%s", bubble.getKey());
         mStateChange.updatedBubble = bubble;
         if (!isExpanded() && reorder) {
             int prevPos = mBubbles.indexOf(bubble);
@@ -852,7 +866,7 @@ public class BubbleData {
             if (hasOverflowBubbleWithKey(key)
                     && shouldRemoveHiddenBubble) {
                 Bubble b = getOverflowBubbleWithKey(key);
-                ProtoLog.d(WM_SHELL_BUBBLES, "doRemove - cancel overflow bubble=%s reason=%s",
+                BubbleLog.d("BubbleData.doRemove() cancel overflow bubble=%s reason=%s",
                         key, dismissReasonToString(reason));
                 if (b != null) {
                     b.stopInflation();
@@ -867,7 +881,7 @@ public class BubbleData {
             }
             if (hasSuppressedBubbleWithKey(key) && shouldRemoveHiddenBubble) {
                 Bubble b = getSuppressedBubbleWithKey(key);
-                ProtoLog.d(WM_SHELL_BUBBLES, "doRemove - cancel suppressed bubble=%s reason=%s",
+                BubbleLog.d("BubbleData.doRemove() cancel suppressed bubble=%s reason=%s",
                         key, dismissReasonToString(reason));
                 if (b != null) {
                     mSuppressedBubbles.remove(b.getLocusId());
@@ -878,7 +892,7 @@ public class BubbleData {
             return;
         }
         Bubble bubbleToRemove = mBubbles.get(indexToRemove);
-        ProtoLog.d(WM_SHELL_BUBBLES, "doRemove=%s reason=%s", bubbleToRemove.getKey(),
+        BubbleLog.d("BubbleData.doRemove() bubble key=%s reason=%s", bubbleToRemove.getKey(),
                 dismissReasonToString(reason));
         bubbleToRemove.stopInflation();
         doOverflow(reason, bubbleToRemove);
@@ -940,7 +954,7 @@ public class BubbleData {
     }
 
     private void doSuppress(Bubble bubble) {
-        ProtoLog.d(WM_SHELL_BUBBLES, "doSuppress=%s", bubble.getKey());
+        BubbleLog.d("BubbleData.doSuppress() bubble key=%s", bubble.getKey());
         mStateChange.suppressedBubble = bubble;
         bubble.setSuppressBubble(true);
 
@@ -963,7 +977,7 @@ public class BubbleData {
     }
 
     private void doUnsuppress(Bubble bubble) {
-        ProtoLog.d(WM_SHELL_BUBBLES, "doUnsuppress=%s", bubble.getKey());
+        BubbleLog.d("BubbleData.doUnsuppress() bubble key=%s", bubble.getKey());
         bubble.setSuppressBubble(false);
         mStateChange.unsuppressedBubble = bubble;
         mBubbles.add(bubble);
@@ -986,7 +1000,7 @@ public class BubbleData {
         if (bubble.getPendingIntentCanceled() || !isOverflowReason) {
             return;
         }
-        ProtoLog.d(WM_SHELL_BUBBLES, "overflowBubble=%s reason=%s", bubble.getKey(),
+        BubbleLog.d("BubbleData.doOverflow() overflowBubble=%s reason=%s", bubble.getKey(),
                 dismissReasonToString(reason));
         mLogger.logOverflowAdd(bubble, mPositioner.isShowingInBubbleBar(), reason);
         if (mOverflowBubbles.isEmpty()) {
@@ -999,7 +1013,7 @@ public class BubbleData {
         if (mOverflowBubbles.size() == mMaxOverflowBubbles + 1) {
             // Remove oldest bubble.
             Bubble oldest = mOverflowBubbles.get(mOverflowBubbles.size() - 1);
-            ProtoLog.d(WM_SHELL_BUBBLES, "overflow full, remove=%s", oldest.getKey());
+            BubbleLog.d("BubbleData.doOverflow() overflow full, remove=%s", oldest.getKey());
             mStateChange.bubbleRemoved(oldest, Bubbles.DISMISS_OVERFLOW_MAX_REACHED);
             if (!mPositioner.isShowingInBubbleBar()) {
                 // Only logged for bubbles in stack view
@@ -1011,7 +1025,7 @@ public class BubbleData {
     }
 
     public void dismissAll(@DismissReason int reason) {
-        ProtoLog.d(WM_SHELL_BUBBLES, "dismissAll reason=%s", dismissReasonToString(reason));
+        BubbleLog.d("BubbleData.dismissAll() reason=%s", dismissReasonToString(reason));
         if (mBubbles.isEmpty() && mSuppressedBubbles.isEmpty()) {
             return;
         }
@@ -1039,7 +1053,7 @@ public class BubbleData {
     public void onLocusVisibilityChanged(int taskId, LocusId locusId, boolean visible) {
         if (locusId == null) return;
 
-        ProtoLog.d(WM_SHELL_BUBBLES, "onLocusVisibilityChanged=%s visible=%b taskId=%d",
+        BubbleLog.d("BubbleData.onLocusVisibilityChanged() locusId=%s visible=%b taskId=%d",
                 locusId.getId(), visible, taskId);
 
         Bubble matchingBubble = getBubbleInStackWithLocusId(locusId);
@@ -1105,7 +1119,7 @@ public class BubbleData {
      * @param bubble the new selected bubble
      */
     private void setSelectedBubbleInternal(@Nullable BubbleViewProvider bubble) {
-        ProtoLog.d(WM_SHELL_BUBBLES, "setSelectedBubbleInternal=%s",
+        BubbleLog.d("BubbleData.setSelectedBubbleInternal() bubble key=%s",
                 (bubble != null ? bubble.getKey() : "null"));
         if (Objects.equals(bubble, mSelectedBubble)) {
             return;
@@ -1169,7 +1183,7 @@ public class BubbleData {
         if (mExpanded == shouldExpand) {
             return;
         }
-        ProtoLog.d(WM_SHELL_BUBBLES, "setExpandedInternal=%b", shouldExpand);
+        BubbleLog.d("BubbleData.setExpandedInternal() shouldExpand=%b", shouldExpand);
         if (shouldExpand) {
             if (mBubbles.isEmpty() && !mShowingOverflow) {
                 Log.e(TAG, "Attempt to expand stack when empty!");

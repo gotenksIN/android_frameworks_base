@@ -536,16 +536,12 @@ public class BtHelper {
         } else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
             int btState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1);
             Log.i(TAG,"receiveBtEvent ACTION_AUDIO_STATE_CHANGED: "+btState);
-// QTI_BEGIN: 2022-10-07: Audio: Merge "CallAudio: Bring up/Tear down Audio path setup based on group device status" into t-keystone-qcom-dev
             if (checkAndUpdatTwsPlusScoState(intent,
                             btState) &&
                         checkAndUpdateGroupScoState(intent,
                             btState)) {
-// QTI_END: 2022-10-07: Audio: Merge "CallAudio: Bring up/Tear down Audio path setup based on group device status" into t-keystone-qcom-dev
                 onScoAudioStateChanged(btState);
-// QTI_BEGIN: 2022-10-07: Audio: Merge "CallAudio: Bring up/Tear down Audio path setup based on group device status" into t-keystone-qcom-dev
             }
-// QTI_END: 2022-10-07: Audio: Merge "CallAudio: Bring up/Tear down Audio path setup based on group device status" into t-keystone-qcom-dev
         }
     }
 

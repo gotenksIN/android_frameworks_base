@@ -12,13 +12,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  *
-// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
  */
 package com.android.server.audio;
 
@@ -1138,21 +1136,14 @@ public class AudioDeviceInventory {
             if (mDeviceBroker.hasScheduledA2dpConnection(btDevice, btInfo.mProfile)) {
                 AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
                         "A2dp config change ignored (scheduled connection change)")
-// QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                         .printLog(TAG));
-// QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                 mmi.set(MediaMetrics.Property.EARLY_RETURN, "A2dp config change ignored")
                         .record();
                 return delayMs;
             }
             final String key = DeviceInfo.makeDeviceListKey(deviceType, address);
-// QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
             final DeviceInfo di = mConnectedDevices.get(key);
-// QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
-// QTI_BEGIN: 2022-10-07: Bluetooth: Merge "base: Reduce A2SP SHO time" into t-keystone-qcom-dev
             if (di == null) {
-// QTI_END: 2022-10-07: Bluetooth: Merge "base: Reduce A2SP SHO time" into t-keystone-qcom-dev
-// QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                 Log.e(TAG, "invalid null DeviceInfo in onBluetoothDeviceConfigChange");
                 mmi.set(MediaMetrics.Property.EARLY_RETURN, "null DeviceInfo").record();
                 return delayMs;
@@ -1160,16 +1151,11 @@ public class AudioDeviceInventory {
 
             mmi.set(MediaMetrics.Property.ADDRESS, address)
                     .set(MediaMetrics.Property.ENCODING, AudioSystem.audioFormatToString(codec))
-// QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                     .set(MediaMetrics.Property.INDEX, volume)
-// QTI_BEGIN: 2022-10-07: Bluetooth: Merge "base: Reduce A2SP SHO time" into t-keystone-qcom-dev
                     .set(MediaMetrics.Property.NAME, di.mDeviceName);
-// QTI_END: 2022-10-07: Bluetooth: Merge "base: Reduce A2SP SHO time" into t-keystone-qcom-dev
-// QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
 
 
             if (event == BtHelper.EVENT_DEVICE_CONFIG_CHANGE) {
-// QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                 if (btInfo.mProfile == BluetoothProfile.A2DP
                         || btInfo.mProfile == BluetoothProfile.LE_AUDIO
                         || btInfo.mProfile == BluetoothProfile.LE_AUDIO_BROADCAST) {
@@ -1177,7 +1163,6 @@ public class AudioDeviceInventory {
                         di.mDeviceCodecFormat = codec;
                         mConnectedDevices.replace(key, di);
                     }
-// QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                     final int res = mAudioSystem.handleDeviceConfigChange(
                             btInfo.mAudioSystemDevice, address, BtHelper.getName(btDevice), codec);
                     if (res != AudioSystem.AUDIO_STATUS_OK) {
@@ -1187,7 +1172,6 @@ public class AudioDeviceInventory {
                                         + AudioSystem.audioFormatToString(codec))
                                 .printLog(TAG));
 
-// QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                             // force A2DP device disconnection in case of error so that AudioService
                             // state is consistent with audio policy manager state
                             disconnectDevice = true;
@@ -1200,13 +1184,11 @@ public class AudioDeviceInventory {
                             delayMs = BT_CONFIG_CHANGE_MUTE_DELAY_MS;
 
                         }
-// QTI_BEGIN: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
                     }
                 }
                 if (!codecChanged) {
                     updateBluetoothPreferredModes_l(btDevice /*connectedDevice*/);
                 }
-// QTI_END: 2024-05-11: Audio: base: Remove A2DP to A2DP quick SHO changes
             }
         if (disconnectDevice) {
             setBluetoothActiveDevice(new AudioDeviceBroker.BtDeviceInfo(btInfo,
@@ -1224,15 +1206,11 @@ public class AudioDeviceInventory {
     }
 
     /*package*/ void onMakeLeAudioDeviceUnavailableNow(String address, int device, int codec) {
-// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
         synchronized (mDevicesLock) {
-// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
             makeLeAudioDeviceUnavailableNow(address, device, codec, false /*deviceSwitch*/);
-// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
         }
     }
 
-// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
     /*package*/ void onMakeHearingAidDeviceUnavailableNow(String address) {
         synchronized (mDevicesLock) {
             makeHearingAidDeviceUnavailableNow(address, false /*deviceSwitch*/);
@@ -2217,11 +2195,9 @@ public class AudioDeviceInventory {
      /*package*/ void disconnectLeAudio(int device) {
         synchronized (mDevicesLock) {
             final ArraySet<Pair<String, Integer>> toRemove = new ArraySet<>();
-// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
             /* Disconnect ALL DEVICE_OUT_BLE_HEADSET,
              *  DEVICE_IN_BLE_HEADSET or DEVICE_OUT_BLE_BROADCAST devices
              */
-// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
             mConnectedDevices.values().forEach(deviceInfo -> {
                 if (deviceInfo.mDeviceType == device) {
                     toRemove.add(
@@ -2232,17 +2208,13 @@ public class AudioDeviceInventory {
                     .set(MediaMetrics.Property.EVENT, "disconnectLeAudio")
                     .record();
             if (toRemove.size() > 0) {
-// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
                 final int delay;
                 if (device != AudioSystem.DEVICE_IN_BLE_HEADSET) {
-// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
                     delay = checkSendBecomingNoisyIntentInt(device, AudioService.CONNECTION_STATE_DISCONNECTED,
                         AudioSystem.DEVICE_NONE);
-// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
                 } else {
                     delay = 0;
                 }
-// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
                 toRemove.stream().forEach(entry ->
                         makeLeAudioDeviceUnavailableLater(entry.first, device, entry.second, delay)
                 );
@@ -2252,9 +2224,7 @@ public class AudioDeviceInventory {
 
     /*package*/ void disconnectLeAudioUnicast() {
         disconnectLeAudio(AudioSystem.DEVICE_OUT_BLE_HEADSET);
-// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
         disconnectLeAudio(AudioSystem.DEVICE_IN_BLE_HEADSET);
-// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
     }
 
     /*package*/ void disconnectLeAudioBroadcast() {
@@ -2661,21 +2631,15 @@ public class AudioDeviceInventory {
         mDeviceBroker.setA2dpTimeout(address, a2dpCodec, delayMs);
     }
 
-// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
     @GuardedBy("mDevicesLock")
-// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
     private void makeLeAudioUnavailableLater(String address, int delayMs, int codec, int device) {
-// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
         final String deviceKey =
                 DeviceInfo.makeDeviceListKey(device, address);
         // the device will be made unavailable later, so consider it disconnected right away
         mConnectedDevices.remove(deviceKey);
         // send the delayed message to make the device unavailable later
-// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
         mDeviceBroker.setLeAudioTimeout(address, device, codec, delayMs);
-// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
     }
-// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
 
     @GuardedBy("mDevicesLock")
     private void makeA2dpSrcAvailable(String address, int a2dpCodec) {

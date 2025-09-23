@@ -108,9 +108,7 @@ import android.os.SystemClock;
 import android.os.Trace;
 import android.util.ArrayMap;
 import android.util.ArraySet;
-// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 import android.util.BoostFramework;
-// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 import android.util.Slog;
 import android.util.SparseArray;
 import android.view.Display;
@@ -213,12 +211,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     private SurfaceControl.Transaction mStartTransaction = null;
     private SurfaceControl.Transaction mFinishTransaction = null;
 
-// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
     /** Perf **/
     private BoostFramework mPerf = null;
     private boolean mIsAnimationPerfLockAcquired = false;
 
-// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
     /** Used for failsafe clean-up to prevent leaks due to misbehaving player impls. */
     private SurfaceControl.Transaction mCleanupTransaction = null;
 
@@ -401,12 +397,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
        if (!mController.useFullReadyTracking()) {
             mReadyTracker.add(mReadyTrackerOld);
         }
-// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 
         if (mPerf == null) {
             mPerf = new BoostFramework();
         }
-// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
     }
 
     @Nullable
@@ -802,15 +796,11 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
         mState = STATE_STARTED;
 
-// QTI_BEGIN: 2023-07-03: Core: perf: Add Transition Type check.
         if (mPerf != null && mType == TRANSIT_CHANGE) {
-// QTI_END: 2023-07-03: Core: perf: Add Transition Type check.
-// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
             mPerf.perfHint(BoostFramework.VENDOR_HINT_ROTATION_ANIM_BOOST, null);
             mIsAnimationPerfLockAcquired = true;
         }
 
-// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, "Starting Transition %d",
                 mSyncId);
         applyReady();
@@ -1719,12 +1709,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         validateKeyguardOcclusion();
 
         mState = STATE_FINISHED;
-// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         if (mPerf != null && mIsAnimationPerfLockAcquired) {
             mPerf.perfLockRelease();
             mIsAnimationPerfLockAcquired = false;
         }
-// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         // Rotation change may be deferred while there is a display change transition, so check
         // again in case there is a new pending change.
         if (hasParticipatedDisplay && !mController.useShellTransitionsRotation()) {

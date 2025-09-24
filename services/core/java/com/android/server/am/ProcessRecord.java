@@ -57,9 +57,7 @@ import android.util.EventLog;
 import android.util.Slog;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
 import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
@@ -696,13 +694,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     public void makeActive(ApplicationThreadDeferred thread, ProcessStatsService tracker) {
         // TODO(b/180501180): Add back this logging message.
         /*
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         String seempStr = "app_uid=" + uid
                             + ",app_pid=" + pid + ",oom_adj=" + curAdj
                             + ",setAdj=" + setAdj + ",hasShownUi=" + (hasShownUi ? 1 : 0)
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             + ",cached=" + (mCached ? 1 : 0)
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             + ",fA=" + (mHasForegroundActivities ? 1 : 0)
                             + ",fS=" + (mHasForegroundServices ? 1 : 0)
                             + ",systemNoUi=" + (systemNoUi ? 1 : 0)
@@ -711,7 +706,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                             + ",killed=" + (killed ? 1 : 0) + ",killedByAm=" + (killedByAm ? 1 : 0)
                             + ",isDebugging=" + (isDebugging() ? 1 : 0);
         android.util.SeempLog.record_str(386, seempStr);
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         */
         mProfile.onProcessActive(thread, tracker);
         mThread = thread;
@@ -730,13 +724,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     public void makeInactive(ProcessStatsService tracker) {
         // TODO(b/180501180): Add back this logging message.
         /*
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         String seempStr = "app_uid=" + uid
                             + ",app_pid=" + pid + ",oom_adj=" + curAdj
                             + ",setAdj=" + setAdj + ",hasShownUi=" + (hasShownUi ? 1 : 0)
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             + ",cached=" + (mCached ? 1 : 0)
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             + ",fA=" + (mHasForegroundActivities ? 1 : 0)
                             + ",fS=" + (mHasForegroundServices ? 1 : 0)
                             + ",systemNoUi=" + (systemNoUi ? 1 : 0)
@@ -745,7 +736,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                             + ",killed=" + (killed ? 1 : 0) + ",killedByAm=" + (killedByAm ? 1 : 0)
                             + ",isDebugging=" + (isDebugging() ? 1 : 0);
         android.util.SeempLog.record_str(387, seempStr);
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         */
         mThread = null;
         mOnewayThread = null;
@@ -1351,13 +1341,9 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                 }
                 mService.mUxPerf.perfEvent(
                     BoostFramework.VENDOR_HINT_KILL,this.processName, 2, 0,getPid());
-// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
             } else {
                 mService.mForceStopKill = false;
-// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             if (mService.mUxPerf != null && processName.equals(info.packageName)) {
                 mService.mUxPerf.perfHint(
                     BoostFramework.VENDOR_HINT_UNPIN_FILE, info.packageName, 0, 0);

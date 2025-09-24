@@ -72,9 +72,7 @@ import android.os.FileUtils;
 import android.os.IBinder;
 import android.os.IBinderCallback;
 import android.os.IIncidentManager;
-// QTI_BEGIN: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 import android.os.IBinder;
-// QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 import android.os.Looper;
 import android.os.Message;
 import android.os.Parcel;
@@ -321,11 +319,9 @@ import com.android.server.wm.WindowManagerService;
 
 import dalvik.system.VMDebug;
 import dalvik.system.VMRuntime;
-// QTI_BEGIN: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 import dalvik.system.PathClassLoader;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-// QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -1573,10 +1569,8 @@ public final class SystemServer implements Dumpable {
         MmsServiceBroker mmsService = null;
         HardwarePropertiesManagerService hardwarePropertiesService = null;
         PacProxyService pacProxyService = null;
-// QTI_BEGIN: 2018-02-17: Wigig: frameworks/base: Add WiGig support
         Object wigigP2pService = null;
         Object wigigService = null;
-// QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 
         boolean disableSystemTextClassifier = SystemProperties.getBoolean(
                 "config.disable_systemtextclassifier", false);
@@ -1586,9 +1580,7 @@ public final class SystemServer implements Dumpable {
         boolean disableCameraService = SystemProperties.getBoolean("config.disable_cameraservice",
                 false);
 
-// QTI_BEGIN: 2018-02-17: Wigig: frameworks/base: Add WiGig support
         boolean enableWigig = SystemProperties.getBoolean("persist.vendor.wigig.enable", false);
-// QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 
         boolean isWatch = RoSystemFeatures.hasFeatureWatch(context);
 
@@ -1815,10 +1807,8 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(PinnerService.class);
             t.traceEnd();
 
-// QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
             mSystemServiceManager.startService(ActivityTriggerService.class);
 
-// QTI_END: 2019-11-13: Core: Add mechanism to improve consistancy of notification
             if (Build.IS_DEBUGGABLE && ProfcollectForwardingService.enabled()) {
                 t.traceBegin("ProfcollectForwardingService");
                 mSystemServiceManager.startService(ProfcollectForwardingService.class);
@@ -3253,7 +3243,6 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startBootPhase(t, SystemService.PHASE_SYSTEM_SERVICES_READY);
         t.traceEnd();
 
-// QTI_BEGIN: 2018-02-17: Wigig: frameworks/base: Add WiGig support
         // Wigig services are not registered as system services because of class loader
         // limitations, send boot phase notification separately
         if (enableWigig) {
@@ -3273,7 +3262,6 @@ public final class SystemServer implements Dumpable {
             }
         }
 
-// QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
         t.traceBegin("MakeWindowManagerServiceReady");
         try {
             wm.systemReady();

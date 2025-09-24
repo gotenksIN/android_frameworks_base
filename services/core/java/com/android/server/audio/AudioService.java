@@ -404,11 +404,9 @@ public class AudioService extends IAudioService.Stub
     // indicates whether the system maps all streams to a single stream.
     private final boolean mIsSingleVolume;
 
-// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     private static HashMap<String, String> mCachedParams =
         new HashMap<String, String>();
 
-// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     /**
      * indicates whether STREAM_NOTIFICATION is aliased to STREAM_RING
      *     not final due to test method, see {@link #setNotifAliasRingForTest(boolean)}.
@@ -1727,7 +1725,6 @@ public class AudioService extends IAudioService.Stub
         // done with service initialization, continue additional work in our Handler thread
         queueMsgUnderWakeLock(mAudioHandler, MSG_INIT_STREAMS_VOLUMES,
                 0 /* arg1 */,  0 /* arg2 */, null /* obj */,  0 /* delay */);
-// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
 
         mCachedParams.put("hdr_record_on", "false");
         mCachedParams.put("wnr_on", "false");
@@ -1737,7 +1734,6 @@ public class AudioService extends IAudioService.Stub
         mCachedParams.put("facing", "none");
         mCachedParams.put("hdr_audio_channel_count", "0");
         mCachedParams.put("hdr_audio_sampling_rate", "0");
-// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
 
         queueMsgUnderWakeLock(mAudioHandler, MSG_INIT_ADI_DEVICE_STATES,
                 0 /* arg1 */, 0 /* arg2 */, null /* obj */, 0 /* delay */);
@@ -2198,7 +2194,6 @@ public class AudioService extends IAudioService.Stub
         // process restarts after a crash, not the first time it is started.
         AudioSystem.setParameters("restarting=true");
 
-// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
         // Restore cached parameters
         String params = new String("");
         Log.i(TAG, "Cached params " + mCachedParams.toString());
@@ -2219,7 +2214,6 @@ public class AudioService extends IAudioService.Stub
             Log.i(TAG, "Empty cached params " + params);
         }
 
-// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
         readAndSetLowRamDevice();
 
         mIsCallScreeningModeSupported = AudioSystem.isCallScreeningModeSupported();
@@ -7915,7 +7909,6 @@ public class AudioService extends IAudioService.Stub
         return mDeviceBroker.isBluetoothA2dpOn();
     }
 
-// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     public void setSwbParameters(String keyValuePairs) {
         mDeviceBroker.setSwbParameters(keyValuePairs);
     }
@@ -7924,7 +7917,6 @@ public class AudioService extends IAudioService.Stub
         mDeviceBroker.setScoParameters(name, hasNrecEnabled, hasWbsEnabled);
     }
 
-// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     /** @see AudioManager#startBluetoothSco() */
     public void startBluetoothSco(IBinder cb, int targetSdkVersion,
             @NonNull AttributionSource attributionSource) {
@@ -9250,7 +9242,6 @@ public class AudioService extends IAudioService.Stub
         getVssForStreamOrDefault(AudioSystem.STREAM_MUSIC).muteInternally(mute);
     }
 
-// QTI_BEGIN: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
     /**
      * @see AudioManager#handleBluetoothA2dpActiveDeviceChange(BluetoothDevice, int, int,
      *                                                        boolean, int)
@@ -9268,13 +9259,10 @@ public class AudioService extends IAudioService.Stub
                 && state != BluetoothProfile.STATE_DISCONNECTED) {
             throw new IllegalArgumentException("Invalid state " + state);
         }
-// QTI_END: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
         mDeviceBroker.queueOnBluetoothActiveDeviceChanged(
                   new AudioDeviceBroker.BtDeviceChangedData(device, device, new BluetoothProfileConnectionInfo(profile), "AudioService"));
-// QTI_BEGIN: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
     }
 
-// QTI_END: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
     /** Mute or unmute call audio */
     /*package*/ void setCallMute(boolean mute) {
         getVssForStreamOrDefault(AudioSystem.STREAM_VOICE_CALL).muteInternally(mute);
@@ -15925,7 +15913,6 @@ public class AudioService extends IAudioService.Stub
         }
     }
 
-// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     public void cacheParameters(String keyValuePairs) {
         String[] kvpairs = keyValuePairs.split(";");
         for (String pair : kvpairs) {
@@ -15937,7 +15924,6 @@ public class AudioService extends IAudioService.Stub
         }
     }
 
-// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     /**
      * Queries whether multi-audio focus is enabled or not.
      * @return true if multi-audio focus is enabled, false otherwise

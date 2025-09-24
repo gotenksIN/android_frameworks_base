@@ -97,9 +97,7 @@ import android.content.Context;
 import android.content.pm.ServiceInfo;
 import android.os.Trace;
 import android.util.ArraySet;
-// QTI_BEGIN: 2025-04-20: Core: perf: Bring-back QC-VA's based on new code refactoring.
 import android.util.BoostFramework;
-// QTI_END: 2025-04-20: Core: perf: Bring-back QC-VA's based on new code refactoring.
 import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
@@ -196,7 +194,6 @@ public class OomAdjusterImpl extends OomAdjuster {
         UNKNOWN_ADJ,
     };
 
-// QTI_BEGIN: 2025-04-20: Core: perf: Bring-back QC-VA's based on new code refactoring.
     //Per Task Boost of top-app renderThread
     public static BoostFramework mPerfBoost = new BoostFramework();
     public static int mPerfHandle = -1;
@@ -205,7 +202,6 @@ public class OomAdjusterImpl extends OomAdjuster {
     public static int mCurRenderThreadTid = -1;
     public static boolean mIsTopAppRenderThreadBoostEnabled = false;
 
-// QTI_END: 2025-04-20: Core: perf: Bring-back QC-VA's based on new code refactoring.
     /**
      * Note: Always use the raw adj to call this API.
      */
@@ -623,12 +619,10 @@ public class OomAdjusterImpl extends OomAdjuster {
             ActiveUids activeUids, ServiceThread adjusterThread, GlobalState globalState,
             Injector injector, Callback callback) {
         super(service, processList, activeUids, adjusterThread, globalState, injector, callback);
-// QTI_BEGIN: 2025-04-20: Core: perf: Bring-back QC-VA's based on new code refactoring.
 
         if(mPerfBoost != null) {
             mIsTopAppRenderThreadBoostEnabled = Boolean.parseBoolean(mPerfBoost.perfGetProp("vendor.perf.topAppRenderThreadBoost.enable", "false"));
         }
-// QTI_END: 2025-04-20: Core: perf: Bring-back QC-VA's based on new code refactoring.
     }
 
     private final ProcessRecordNodes mProcessRecordProcStateNodes = new ProcessRecordNodes(
@@ -1250,7 +1244,6 @@ public class OomAdjusterImpl extends OomAdjuster {
             }
             hasVisibleActivities = true;
             procState = PROCESS_STATE_TOP;
-// QTI_BEGIN: 2025-04-20: Core: perf: Bring-back QC-VA's based on new code refactoring.
 
             if(mIsTopAppRenderThreadBoostEnabled) {
                 if(mCurRenderThreadTid != app.getRenderThreadTid() && app.getRenderThreadTid() > 0) {
@@ -1285,7 +1278,6 @@ public class OomAdjusterImpl extends OomAdjuster {
             }
 
 
-// QTI_END: 2025-04-20: Core: perf: Bring-back QC-VA's based on new code refactoring.
             if (reportDebugMsgs) {
                 reportOomAdjMessageLocked(TAG_OOM_ADJ, "Making top: " + app);
             }

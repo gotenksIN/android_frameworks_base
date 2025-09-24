@@ -168,9 +168,7 @@ import com.android.server.utils.WatchedArrayMap;
 import com.android.server.utils.Watcher;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal.ScreenObserver;
-// QTI_BEGIN: 2018-05-29: Core: frameworks: base: Port password retention feature
 import com.android.internal.widget.ILockSettings;
-// QTI_END: 2018-05-29: Core: frameworks: base: Port password retention feature
 
 import libcore.io.IoUtils;
 import libcore.util.EmptyArray;

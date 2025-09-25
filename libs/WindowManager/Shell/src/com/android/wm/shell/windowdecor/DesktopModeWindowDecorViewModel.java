@@ -127,6 +127,7 @@ import com.android.wm.shell.desktopmode.data.DesktopRepository;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationController;
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer;
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter;
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController;
 import com.android.wm.shell.recents.RecentsTransitionHandler;
 import com.android.wm.shell.recents.RecentsTransitionStateListener;
 import com.android.wm.shell.shared.FocusTransitionListener;
@@ -146,6 +147,7 @@ import com.android.wm.shell.transition.FocusTransitionObserver;
 import com.android.wm.shell.transition.Transitions;
 import com.android.wm.shell.windowdecor.common.AppHandleAndHeaderVisibilityHelper;
 import com.android.wm.shell.windowdecor.common.ExclusionRegionListener;
+import com.android.wm.shell.windowdecor.common.InputPilfererImpl;
 import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader;
 import com.android.wm.shell.windowdecor.common.WindowDecorationGestureExclusionTracker;
 import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHost;
@@ -219,6 +221,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
     private final DesksOrganizer mDesksOrganizer;
     private final ShellDesktopState mShellDesktopState;
     private final DesktopConfig mDesktopConfig;
+    private final PinnedLayerController mPinnedLayerController;
     private boolean mTransitionDragActive;
 
     private SparseArray<EventReceiver> mEventReceiversByDisplay = new SparseArray<>();
@@ -328,7 +331,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             ShellDesktopState shellDesktopState,
             DesktopConfig desktopConfig,
             UserProfileContexts userProfileContexts,
-            LockTaskChangeListener lockTaskChangeListener) {
+            LockTaskChangeListener lockTaskChangeListener,
+            PinnedLayerController pinnedLayerController) {
         this(
                 context,
                 shellExecutor,
@@ -358,7 +362,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 new WindowDecorationWrapper.Factory(),
                 new InputMonitorFactory(),
                 SurfaceControl.Transaction::new,
-                new AppHeaderViewHolder.Factory(),
+                new AppHeaderViewHolder.DefaultFactory(),
                 new AppHandleViewHolder.Factory(),
                 rootTaskDisplayAreaOrganizer,
                 new SparseArray<>(),
@@ -382,7 +386,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 shellDesktopState,
                 desktopConfig,
                 userProfileContexts,
-                lockTaskChangeListener);
+                lockTaskChangeListener,
+                pinnedLayerController);
     }
 
     @VisibleForTesting
@@ -439,7 +444,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             ShellDesktopState shellDesktopState,
             DesktopConfig desktopConfig,
             UserProfileContexts userProfileContexts,
-            LockTaskChangeListener lockTaskChangeListener) {
+            LockTaskChangeListener lockTaskChangeListener,
+            PinnedLayerController pinnedLayerController) {
         mContext = context;
         mMainExecutor = shellExecutor;
         mMainHandler = mainHandler;
@@ -534,6 +540,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                     return Unit.INSTANCE;
                 });
         mLockTaskChangeListener = lockTaskChangeListener;
+        mPinnedLayerController = pinnedLayerController;
         shellInit.addInitCallback(this::onInit, this);
     }
 
@@ -878,6 +885,18 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             @NonNull Intent intent, @NonNull UserHandle userHandle, int displayId) {
         final ActivityOptions options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId);
         mContext.startActivityAsUser(intent, options.toBundle(), userHandle);
+    }
+
+    /**
+     * Opens the provided Intent as the current user.
+     */
+    private void openIntent(int taskId, Intent intent) {
+        final WindowDecorationWrapper decoration = mWindowDecorByTaskId.get(taskId);
+        if (decoration == null) {
+            return;
+        }
+        final UserHandle userHandle = decoration.getUser();
+        mContext.startActivityAsUser(intent, userHandle);
     }
 
     private void moveToDesktop(int taskId, DesktopModeTransitionSource source) {
@@ -1718,7 +1737,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                     mDesktopConfig,
                     mWindowDecorationActions,
                     mAppToWebRepository,
-                    mLockTaskChangeListener);
+                    mLockTaskChangeListener,
+                    mPinnedLayerController);
             windowDecoration =
                     mWindowDecoratioWrapperFactory.fromDefaultDecoration(defaultWindowDecoration);
         } else {
@@ -1782,7 +1802,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 new DesktopModeTouchEventListener(mContext, taskInfo, taskPositioner,
                         mWindowDecorationFinder, mDesktopTasksController, mTaskOperations,
                         mDesktopModeUiEventLogger, mWindowDecorationActions,
-                        mDesktopUserRepositories, mGestureExclusionTracker, mInputManager,
+                        mDesktopUserRepositories, mGestureExclusionTracker,
+                        new InputPilfererImpl(mInputManager), mInputManager,
                         mFocusTransitionObserver, mShellDesktopState,
                         mMultiDisplayDragMoveIndicatorController, mTransactionFactory,
                         mCaptionTouchStatusListener, mAppHandleMotionEventHandler);
@@ -2073,6 +2094,11 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 }
             }
             mDesktopTasksController.minimizeTask(taskInfo, MinimizeReason.MINIMIZE_BUTTON);
+        }
+
+        @Override
+        public void onOpenIntent(int taskId, @NotNull Intent intent) {
+            mViewModel.openIntent(taskId, intent);
         }
 
         @Override

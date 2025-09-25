@@ -432,7 +432,8 @@ public class BubbleController implements ConfigurationChangeListener,
                         context, organizer, mTaskViewController, syncQueue);
                 TaskView taskView = new TaskView(context, mTaskViewController,
                         taskViewTaskController);
-                return new BubbleTaskView(taskView, mainExecutor, splitScreenController);
+                return new BubbleTaskView(taskView, mainExecutor, BubbleController.this,
+                        splitScreenController);
             }
         };
         mExpandedViewManager = BubbleExpandedViewManager.fromBubbleController(this);
@@ -444,8 +445,7 @@ public class BubbleController implements ConfigurationChangeListener,
         mSessionTracker = sessionTracker;
         shellInit.addInitCallback(this::onInit, this);
 
-        if (unfoldProgressProvider.isPresent() && Flags.enableBubbleBar()
-                && Flags.enableBubbleBarToFloatingTransition()) {
+        if (unfoldProgressProvider.isPresent() && Flags.enableBubbleBar()) {
             addUnfoldProgressProviderListener(unfoldProgressProvider.get());
         }
     }
@@ -1536,6 +1536,12 @@ public class BubbleController implements ConfigurationChangeListener,
         }
 
         return taskInfo.isAppBubble;
+    }
+
+    /** @return the bubble in the stack that matches the provided taskInfo. */
+    @Nullable
+    public Bubble getBubble(@NonNull ActivityManager.RunningTaskInfo taskInfo) {
+        return mBubbleData.getBubbleInStackWithTaskId(taskInfo.taskId);
     }
 
     public boolean isStackExpanded() {
@@ -3471,7 +3477,7 @@ public class BubbleController implements ConfigurationChangeListener,
                             // we just received an updated bubble bar relative position so we can
                             // now continue converting the bubble
                             ((Bubble) mBubbleData.getSelectedBubble()).getCurrentTransition()
-                                    .continueConvert(mLayerView);
+                                    .continueConvert();
                         }
                         if (mLayerView != null) mLayerView.updateExpandedView();
                     });

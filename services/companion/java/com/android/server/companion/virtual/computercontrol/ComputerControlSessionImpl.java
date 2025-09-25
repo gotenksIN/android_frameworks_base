@@ -42,6 +42,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.ResolveInfoFlags;
+import android.content.pm.ResolveInfo;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.IVirtualDisplayCallback;
@@ -79,6 +81,7 @@ import com.android.server.wm.WindowManagerInternal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -93,6 +96,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         implements IBinder.DeathRecipient {
 
     private static final String TAG = "ComputerControlSession";
+
+    public static final long GLOBAL_SESSION_TIMEOUT_DURATION_MS =
+            TimeUnit.MILLISECONDS.convert(360, TimeUnit.MINUTES);
 
     private static final String CUSTOM_BLOCKED_APP_PACKAGE = "com.android.virtualdevicemanager";
 
@@ -146,23 +152,35 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final ScheduledExecutorService mScheduler =
             Executors.newSingleThreadScheduledExecutor();
     private final Object mStabilityCalculatorLock = new Object();
-
+    private final Set<UserHandle> mAllowedUsers;
     private final Injector mInjector;
 
     private ScheduledFuture<?> mSwipeFuture;
     private ScheduledFuture<?> mInsertTextFuture;
+    private ScheduledFuture<?> mCloseSessionFuture;
 
     @GuardedBy("mStabilityCalculatorLock")
     private StabilityCalculator mStabilityCalculator;
 
-    ComputerControlSessionImpl(IBinder appToken, ComputerControlSessionParams params,
-            AttributionSource attributionSource,
+    ComputerControlSessionImpl(Context context, IBinder appToken,
+            ComputerControlSessionParams params, AttributionSource attributionSource,
             ComputerControlSessionProcessor.VirtualDeviceFactory virtualDeviceFactory,
-            OnClosedListener onClosedListener, Injector injector) {
+            Set<UserHandle> allowedUsers, OnClosedListener onClosedListener) {
+        this(
+                appToken, params, attributionSource, virtualDeviceFactory, allowedUsers,
+                onClosedListener, new Injector(context));
+    }
+
+    @VisibleForTesting
+    ComputerControlSessionImpl(IBinder appToken,
+            ComputerControlSessionParams params, AttributionSource attributionSource,
+            ComputerControlSessionProcessor.VirtualDeviceFactory virtualDeviceFactory,
+            Set<UserHandle> allowedUsers, OnClosedListener onClosedListener, Injector injector) {
         mAppToken = appToken;
         mParams = params;
         mOwnerPackageName = attributionSource.getPackageName();
         mOnClosedListener = onClosedListener;
+        mAllowedUsers = allowedUsers;
         mInjector = injector;
         // TODO(b/440005498): Consider using the display from the app's context instead.
         mMainDisplayId = injector.getMainDisplayIdForUser(
@@ -171,6 +189,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         final VirtualDeviceParams virtualDeviceParams = new VirtualDeviceParams.Builder()
                 .setName(mParams.getName())
                 .setDevicePolicy(POLICY_TYPE_BLOCKED_ACTIVITY, DEVICE_POLICY_CUSTOM)
+                .setAllowedUsers(mAllowedUsers)
                 .build();
 
         int displayFlags = DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
@@ -269,6 +288,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     virtualTouchscreenConfig, new Binder(touchscreenName));
 
             mAppToken.linkToDeath(this, 0);
+            startSessionCloseGlobalTimeout();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -323,7 +343,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     }
 
     @Override
-    public void launchApplication(@NonNull String packageName) throws RemoteException {
+    public void launchApplication(@NonNull String packageName, @Nullable String className)
+            throws RemoteException {
+        final Intent intent = mInjector.getLaunchIntent(packageName, className);
+        if (intent == null) {
+            throw new IllegalArgumentException(
+                    "Could not find launcher activity for " + packageName + "/" + className);
+        }
         if (Flags.computerControlActivityPolicyStrict()) {
             // TODO(b/444600407): Remove this once the consent model is per-target app. While the
             // consent is general, the caller can extend the list of target packages dynamically.
@@ -332,7 +358,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         }
         final UserHandle user = Binder.getCallingUserHandle();
         Binder.withCleanCallingIdentity(() -> mInjector.launchApplicationOnDisplayAsUser(
-                packageName, mVirtualDisplayId, user));
+                intent, mVirtualDisplayId, user));
         notifyApplicationLaunchToStabilityCalculator();
     }
 
@@ -508,6 +534,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     @Override
     public void close() throws RemoteException {
+        cancelOngoingKeyGestures();
+        cancelOngoingTouchGestures();
+        cancelPendingCloseSession();
         clearStabilityCalculator();
         mVirtualDevice.close();
         mAppToken.unlinkToDeath(this, 0);
@@ -589,6 +618,17 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 TimeUnit.MILLISECONDS);
     }
 
+    private void startSessionCloseGlobalTimeout() {
+        mCloseSessionFuture = mScheduler.schedule(() -> {
+            try {
+                close();
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        },
+        mInjector.getMaxSessionDurationMillis(), TimeUnit.MILLISECONDS);
+    }
+
     private void cancelOngoingKeyGestures() {
         if (mInsertTextFuture != null) {
             mInsertTextFuture.cancel(false);
@@ -600,6 +640,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         if (mSwipeFuture != null && mSwipeFuture.cancel(false)) {
             mVirtualTouchscreen.sendTouchEvent(
                     createTouchEvent(0, 0, VirtualTouchEvent.ACTION_CANCEL));
+        }
+    }
+
+    private void cancelPendingCloseSession() {
+        if (mCloseSessionFuture != null) {
+            mCloseSessionFuture.cancel(false);
+            mCloseSessionFuture = null;
         }
     }
 
@@ -718,15 +765,25 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             return mPackageManager.getPermissionControllerPackageName();
         }
 
-        public void launchApplicationOnDisplayAsUser(String packageName, int displayId,
+        public void launchApplicationOnDisplayAsUser(Intent intent, int displayId,
                 UserHandle user) {
-            Intent intent = mPackageManager.getLaunchIntentForPackage(packageName);
-            if (intent == null) {
-                throw new IllegalArgumentException(
-                        "Package " + packageName + " does not have a launcher activity.");
-            }
             mContext.startActivityAsUser(intent,
                     ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle(), user);
+        }
+
+        public Intent getLaunchIntent(String packageName, String className) {
+            if (className == null) {
+                return mPackageManager.getLaunchIntentForPackage(packageName);
+            }
+            final Intent intent = new Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_LAUNCHER)
+                    .setClassName(packageName, className);
+            final List<ResolveInfo> resolveInfos = mPackageManager.queryIntentActivities(
+                    intent, ResolveInfoFlags.of(PackageManager.MATCH_ALL));
+            if (resolveInfos.isEmpty()) {
+                return null;
+            }
+            return intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         }
 
         public void startCustomBlockedActivityOnDisplay(Intent intent, int displayId) {
@@ -769,6 +826,10 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
         public void moveAllTasks(int fromDisplayId, int toDisplayId) {
             mActivityTaskManagerInternal.moveAllTasks(fromDisplayId, toDisplayId);
+        }
+
+        public long getMaxSessionDurationMillis() {
+            return GLOBAL_SESSION_TIMEOUT_DURATION_MS;
         }
     }
 }

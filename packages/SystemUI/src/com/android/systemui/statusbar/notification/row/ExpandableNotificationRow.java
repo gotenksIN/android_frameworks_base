@@ -251,9 +251,9 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
      */
     private boolean mExpandedWhenPinned;
     /**
-     * Is the user currently swiping down on this row to expand it
+     * Is the user touching this row
      */
-    private boolean mIsUserSwipingToExpandRow;
+    private boolean mUserLocked;
     /**
      * Are we showing the "public" version
      */
@@ -457,7 +457,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 setUserExpanded(nowExpanded);
             }
 
-            notifyHeightChanged(/* needsAnimation= */ true);
+            notifyHeightChanged(/* needsAnimation= */ true, "ENR.toggleExpansionState");
             if (NotificationBundleUi.isEnabled()) {
                 mOnExpandClickListener.onExpandClicked(this, mEntryAdapter, nowExpanded);
             } else {
@@ -1006,7 +1006,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             mChildrenContainer.updateGroupOverflow();
         }
         if (intrinsicBefore != getIntrinsicHeight()) {
-            notifyHeightChanged(/* needsAnimation= */ false);
+            notifyHeightChanged(/* needsAnimation= */ false, "ENR.setHeadsUp");
         }
         if (isHeadsUp) {
             mMustStayOnScreen = true;
@@ -1085,7 +1085,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             if (mChildrenContainer != null) {
                 mChildrenContainer.setHeaderVisibleAmount(headerVisibleAmount);
             }
-            notifyHeightChanged(/* needsAnimation= */ false);
+            notifyHeightChanged(/* needsAnimation= */ false, "setHeaderVisibleAmount");
         }
     }
 
@@ -1350,7 +1350,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         boolean wasAboveShelf = isAboveShelf();
         mPinnedStatus = pinnedStatus;
         if (intrinsicHeight != getIntrinsicHeight()) {
-            notifyHeightChanged(/* needsAnimation= */ false);
+            notifyHeightChanged(/* needsAnimation= */ false, "ENR.setPinnedStatus");
         }
         if (pinnedStatus.isPinned()) {
             setAnimationRunning(true);
@@ -3148,8 +3148,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     @Override
     public void setClipToActualHeight(boolean clipToActualHeight) {
-        super.setClipToActualHeight(clipToActualHeight || isUserSwipingToExpandRow());
-        getShowingLayout().setClipToActualHeight(clipToActualHeight || isUserSwipingToExpandRow());
+        super.setClipToActualHeight(clipToActualHeight || isUserLocked());
+        getShowingLayout().setClipToActualHeight(clipToActualHeight || isUserLocked());
     }
 
     /**
@@ -3201,7 +3201,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         onExpansionChanged(true /* userAction */, wasExpanded);
         if (!wasExpanded && isExpanded()
                 && getActualHeight() != getIntrinsicHeight()) {
-            notifyHeightChanged(/* needsAnimation= */ true);
+            notifyHeightChanged(/* needsAnimation= */ true, "ENR.setUserExpanded");
         }
     }
 
@@ -3213,26 +3213,26 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             if (mIsSummaryWithChildren) {
                 mChildrenContainer.onExpansionChanged();
             }
-            notifyHeightChanged(/* needsAnimation= */ false);
+            notifyHeightChanged(/* needsAnimation= */ false, "ENR.resetUserExpansion");
         }
         updateShelfIconColor();
     }
 
-    public boolean isUserSwipingToExpandRow() {
-        return mIsUserSwipingToExpandRow;
+    public boolean isUserLocked() {
+        return mUserLocked;
     }
 
-    public void setUserSwipingToExpandRow(boolean userSwipingToExpandRow) {
+    public void setUserLocked(boolean userLocked) {
         if (isPromotedOngoing()) return;
 
-        mIsUserSwipingToExpandRow = userSwipingToExpandRow;
-        mPrivateLayout.setUserExpanding(userSwipingToExpandRow);
-        mPublicLayout.setUserExpanding(userSwipingToExpandRow);
+        mUserLocked = userLocked;
+        mPrivateLayout.setUserExpanding(userLocked);
+        mPublicLayout.setUserExpanding(userLocked);
         // This is intentionally not guarded with mIsSummaryWithChildren since we might have had
         // children but not anymore.
         if (mChildrenContainer != null) {
-            mChildrenContainer.setUserSwipingToExpandRow(userSwipingToExpandRow);
-            if (mIsSummaryWithChildren && (userSwipingToExpandRow || !isGroupExpanded())) {
+            mChildrenContainer.setUserLocked(userLocked);
+            if (mIsSummaryWithChildren && (userLocked || !isGroupExpanded())) {
                 updateBackgroundForGroupState();
             }
         }
@@ -3258,7 +3258,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 wasExpanded = mGroupExpansionManager.isGroupExpanded(mEntryAdapter);
                 mGroupExpansionManager.setGroupExpanded(mEntryAdapter, expand);
             }
-            notifyHeightChanged(/* needsAnimation= */ false);
+            notifyHeightChanged(/* needsAnimation= */ false, "ENR.setSystemExpanded");
             onExpansionChanged(false /* userAction */, wasExpanded);
             if (mIsSummaryWithChildren) {
                 mChildrenContainer.updateGroupOverflow();
@@ -3283,7 +3283,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             if (mIsSummaryWithChildren) {
                 mChildrenContainer.updateGroupOverflow();
             }
-            notifyHeightChanged(/* needsAnimation= */ false);
+            notifyHeightChanged(/* needsAnimation= */ !onKeyguard, "ENR.setOnKeyguard="+onKeyguard);
         }
         if (isAboveShelf() != wasAboveShelf) {
             mAboveShelfChangedListener.onAboveShelfStateChanged(!wasAboveShelf);
@@ -3305,7 +3305,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     @Override
     public int getIntrinsicHeight() {
-        if (isUserSwipingToExpandRow()) {
+        if (isUserLocked()) {
             return getActualHeight();
         }
         if (mGuts != null && mGuts.isExposed()) {
@@ -3554,7 +3554,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         super.onLayout(changed, left, top, right, bottom);
         if (intrinsicBefore != getIntrinsicHeight()
                 && (intrinsicBefore != 0 || getActualHeight() > 0)) {
-            notifyHeightChanged(/* needsAnimation= */ true);
+            notifyHeightChanged(/* needsAnimation= */ true, "ENR.onLayout");
         }
         if (mMenuRow != null && mMenuRow.getMenuView() != null) {
             mMenuRow.onParentHeightUpdate();
@@ -3586,9 +3586,9 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     }
 
     @Override
-    public void notifyHeightChanged(boolean needsAnimation) {
-        super.notifyHeightChanged(needsAnimation);
-        getShowingLayout().requestSelectLayout(needsAnimation || isUserSwipingToExpandRow());
+    public void notifyHeightChanged(boolean needsAnimation, String caller) {
+        super.notifyHeightChanged(needsAnimation, caller);
+        getShowingLayout().requestSelectLayout(needsAnimation || isUserLocked());
     }
 
     public void setSensitive(boolean sensitive, boolean hideSensitive) {
@@ -3602,7 +3602,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mSensitiveHiddenInGeneral = hideSensitive;
         int intrinsicAfter = getIntrinsicHeight();
         if (intrinsicBefore != intrinsicAfter) {
-            notifyHeightChanged(/* needsAnimation= */ true);
+            notifyHeightChanged(/* needsAnimation= */ true, "ENR.setSensitive");
         } else if (notificationsRedesignTemplates()) {
             // Just request the correct layout, even if the height hasn't changed
             getShowingLayout().requestSelectLayout(/* needsAnimation= */ true);
@@ -3773,7 +3773,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 mGroupExpansionManager.setGroupExpanded(getEntryLegacy(), true);
             }
         }
-        notifyHeightChanged(/* needsAnimation= */ false);
+        notifyHeightChanged(/* needsAnimation= */ false, "ENR.makeActionsVisible");
     }
 
     public void setChildrenExpanded(boolean expanded) {
@@ -4200,7 +4200,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             mChildrenContainer.updateHeaderForExpansion(mShowNoBackground);
         } else if (mIsSummaryWithChildren) {
             mShowNoBackground = !mShowGroupBackgroundWhenExpanded && isGroupExpanded()
-                    && !isGroupExpansionChanging() && !isUserSwipingToExpandRow();
+                    && !isGroupExpansionChanging() && !isUserLocked();
             mChildrenContainer.updateHeaderForExpansion(mShowNoBackground);
             List<ExpandableNotificationRow> children = mChildrenContainer.getAttachedChildren();
             for (int i = 0; i < children.size(); i++) {
@@ -4218,7 +4218,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 // expanding / collapsing and has a custom background color.
                 final boolean showBackground = isGroupExpanded()
                         || ((mNotificationParent.isGroupExpansionChanging()
-                        || mNotificationParent.isUserSwipingToExpandRow()) && childColor != 0);
+                        || mNotificationParent.isUserLocked()) && childColor != 0);
                 mShowNoBackground = !showBackground;
             }
         } else {
@@ -4771,7 +4771,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 true /* atLeastMinHeight */));
         pw.println();
         pw.print("Intrinsic Height Factors: ");
-        pw.print("isUserSwipingToExpandRow()", isUserSwipingToExpandRow());
+        pw.print("isUserLocked()", isUserLocked());
         pw.print("isChildInGroup()", isChildInGroup());
         pw.print("isGroupExpanded()", isGroupExpanded());
         pw.print("sensitive", mSensitive);

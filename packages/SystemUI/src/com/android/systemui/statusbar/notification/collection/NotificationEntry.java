@@ -35,7 +35,6 @@ import static com.android.systemui.statusbar.notification.collection.NotifCollec
 import static java.util.Objects.requireNonNull;
 
 import android.annotation.FlaggedApi;
-import android.app.Flags;
 import android.app.Notification;
 import android.app.Notification.MessagingStyle.Message;
 import android.app.NotificationChannel;
@@ -755,12 +754,12 @@ public final class NotificationEntry extends ListEntry {
         return row;
     }
 
-    public void setUserSwipingToExpandRow(boolean isUserSwiping) {
-        if (row != null) row.setUserSwipingToExpandRow(isUserSwiping);
+    public void setUserLocked(boolean userLocked) {
+        if (row != null) row.setUserLocked(userLocked);
     }
 
     public void notifyHeightChanged(boolean needsAnimation) {
-        if (row != null) row.notifyHeightChanged(needsAnimation);
+        if (row != null) row.notifyHeightChanged(needsAnimation, "NotifEntry.notifyHeightChanged");
     }
 
     public void closeRemoteInput() {
@@ -1080,7 +1079,6 @@ public final class NotificationEntry extends ListEntry {
     /**
      * Returns whether the NotificationEntry is promoted ongoing.
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public boolean isPromotedOngoing() {
         return mSbn.getNotification().isPromotedOngoing();
     }

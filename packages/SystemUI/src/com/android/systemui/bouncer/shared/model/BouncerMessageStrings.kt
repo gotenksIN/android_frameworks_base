@@ -16,6 +16,7 @@
 
 package com.android.systemui.bouncer.shared.model
 
+import android.security.Flags.lockscreenTimeoutShortlink
 import android.security.Flags.secureLockDevice
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel.Biometric
@@ -64,24 +65,24 @@ object BouncerMessageStrings {
         securityMode: AuthenticationMethodModel,
         fpAuthIsAllowed: Boolean,
         secureLockDeviceEnabled: Boolean = false,
+        isDuplicate: Boolean = false,
     ): BouncerMessagePair {
+        val wrongInputMessage =
+            when (securityMode) {
+                Pattern -> R.string.kg_wrong_pattern_try_again
+                Password -> R.string.kg_wrong_password_try_again
+                Pin -> R.string.kg_wrong_pin_try_again
+                else -> 0
+            }
         if (secureLockDevice() && secureLockDeviceEnabled) {
-            val secondaryMsgId: Int =
-                when (securityMode) {
-                    Pattern -> R.string.kg_wrong_pattern_try_again
-                    Password -> R.string.kg_wrong_password_try_again
-                    Pin -> R.string.kg_wrong_pin_try_again
-                    else -> 0
-                }
-            return Pair(R.string.kg_prompt_title_after_secure_lock_device, secondaryMsgId)
+            return Pair(R.string.kg_prompt_title_after_secure_lock_device, wrongInputMessage)
         }
 
         val secondaryMessage = incorrectSecurityInputSecondaryMessage(fpAuthIsAllowed)
-        return when (securityMode) {
-            Pattern -> Pair(R.string.kg_wrong_pattern_try_again, secondaryMessage)
-            Password -> Pair(R.string.kg_wrong_password_try_again, secondaryMessage)
-            Pin -> Pair(R.string.kg_wrong_pin_try_again, secondaryMessage)
-            else -> EmptyMessage
+        return if (wrongInputMessage == 0) {
+            EmptyMessage
+        } else {
+            Pair(wrongInputMessage, secondaryMessage)
         }
     }
 
@@ -336,17 +337,29 @@ object BouncerMessageStrings {
             Pattern ->
                 Pair(
                     R.string.kg_too_many_failed_attempts_countdown,
-                    R.string.kg_primary_auth_locked_out_pattern,
+                    if (lockscreenTimeoutShortlink()) {
+                        R.string.kg_primary_auth_locked_out_pattern_shortlink
+                    } else {
+                        R.string.kg_primary_auth_locked_out_pattern
+                    },
                 )
             Password ->
                 Pair(
                     R.string.kg_too_many_failed_attempts_countdown,
-                    R.string.kg_primary_auth_locked_out_password,
+                    if (lockscreenTimeoutShortlink()) {
+                        R.string.kg_primary_auth_locked_out_password_shortlink
+                    } else {
+                        R.string.kg_primary_auth_locked_out_password
+                    },
                 )
             Pin ->
                 Pair(
                     R.string.kg_too_many_failed_attempts_countdown,
-                    R.string.kg_primary_auth_locked_out_pin,
+                    if (lockscreenTimeoutShortlink()) {
+                        R.string.kg_primary_auth_locked_out_pin_shortlink
+                    } else {
+                        R.string.kg_primary_auth_locked_out_pin
+                    },
                 )
             else -> EmptyMessage
         }

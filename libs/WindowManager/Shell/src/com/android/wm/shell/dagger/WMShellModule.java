@@ -175,6 +175,7 @@ import com.android.wm.shell.freeform.FreeformTaskTransitionStarterInitializer;
 import com.android.wm.shell.freeform.TaskChangeListener;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.onehanded.OneHandedController;
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController;
 import com.android.wm.shell.pip.PipTransitionController;
 import com.android.wm.shell.recents.RecentTasksController;
 import com.android.wm.shell.recents.RecentsTransitionHandler;
@@ -974,11 +975,12 @@ public abstract class WMShellModule {
             DeskSwitchTransitionHandler deskSwitchTransitionHandler,
             DesktopModeMoveToDisplayTransitionHandler moveToDisplayTransitionHandler,
             HomeIntentProvider homeIntentProvider,
-            DesktopState desktopState,
+            ShellDesktopState shellDesktopState,
             DesktopConfig desktopConfig,
             VisualIndicatorUpdateScheduler visualIndicatorUpdateScheduler,
             Optional<DesktopFirstListenerManager> desktopFirstListenerManager,
-            TaskSnapshotManager taskSnapshotManager) {
+            TaskSnapshotManager taskSnapshotManager,
+            TransactionPool transactionPool) {
         return new DesktopTasksController(
                 context,
                 shellInit,
@@ -1024,11 +1026,12 @@ public abstract class WMShellModule {
                 deskSwitchTransitionHandler,
                 moveToDisplayTransitionHandler,
                 homeIntentProvider,
-                desktopState,
+                shellDesktopState,
                 desktopConfig,
                 visualIndicatorUpdateScheduler,
                 desktopFirstListenerManager,
-                taskSnapshotManager);
+                taskSnapshotManager,
+                transactionPool);
     }
 
     @WMSingleton
@@ -1261,8 +1264,7 @@ public abstract class WMShellModule {
             FocusTransitionObserver focusTransitionObserver,
             @ShellMainThread ShellExecutor mainExecutor,
             DisplayController displayController,
-            DesktopState desktopState,
-            Optional<SplitScreenController> splitScreenController) {
+            DesktopState desktopState) {
         if (desktopState.canEnterDesktopMode()
                 && (DesktopExperienceFlags.ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT.isTrue()
                 || DesktopModeFlags.ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS.isTrue())) {
@@ -1270,7 +1272,7 @@ public abstract class WMShellModule {
                     desktopModeWindowDecorViewModel, desktopTasksController,
                     desktopUserRepositories,
                     inputManager, shellTaskOrganizer, focusTransitionObserver,
-                    mainExecutor, displayController, desktopState, splitScreenController));
+                    mainExecutor, displayController, desktopState));
         }
         return Optional.empty();
     }
@@ -1339,7 +1341,8 @@ public abstract class WMShellModule {
             ShellDesktopState shelldesktopState,
             DesktopConfig desktopConfig,
             UserProfileContexts userProfileContexts,
-            LockTaskChangeListener lockTaskChangeListener
+            LockTaskChangeListener lockTaskChangeListener,
+            Optional<PinnedLayerController> pinnedLayerController
     ) {
         if (!shelldesktopState.canEnterDesktopModeOrShowAppHandle()) {
             return Optional.empty();
@@ -1359,7 +1362,7 @@ public abstract class WMShellModule {
                 desktopModeCompatPolicy, desktopTilingDecorViewModel,
                 multiDisplayDragMoveIndicatorController, compatUI.orElse(null),
                 desksOrganizer, shelldesktopState, desktopConfig, userProfileContexts,
-                lockTaskChangeListener));
+                lockTaskChangeListener, pinnedLayerController.orElse(null)));
     }
 
     @WMSingleton

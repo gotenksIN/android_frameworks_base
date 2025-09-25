@@ -750,9 +750,9 @@ package android.app.appfunctions {
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @RequiresPermission(android.Manifest.permission.MANAGE_APP_FUNCTION_ACCESS) public void clearAccessHistory();
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_APP_FUNCTION_ACCESS) public java.util.List<android.content.pm.SignedPackage> getAgentAllowlist();
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @NonNull public java.util.Set<java.lang.String> getDeviceSettingPackages();
-    field public static final int ACCESS_FLAG_MASK_ALL = 31; // 0x1f
-    field public static final int ACCESS_FLAG_MASK_OTHER = 6; // 0x6
-    field public static final int ACCESS_FLAG_MASK_USER = 24; // 0x18
+    field @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public static final int ACCESS_FLAG_MASK_ALL = 63; // 0x3f
+    field @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public static final int ACCESS_FLAG_MASK_OTHER = 48; // 0x30
+    field @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public static final int ACCESS_FLAG_MASK_USER = 12; // 0xc
   }
 
 }
@@ -2700,7 +2700,7 @@ package android.os {
     method @NonNull @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public java.util.List<android.content.pm.UserInfo> getUsers();
     method @Deprecated @NonNull @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public java.util.List<android.content.pm.UserInfo> getUsers(boolean, boolean, boolean);
     method @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public boolean hasBaseUserRestriction(@NonNull String, @NonNull android.os.UserHandle);
-    method @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public boolean isUserTypeEnabled(@NonNull String);
+    method @FlaggedApi("android.multiuser.query_user_type_supported") @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public boolean isUserTypeSupported(@NonNull String);
     method public boolean isVisibleBackgroundUsersOnDefaultDisplaySupported();
     method public boolean isVisibleBackgroundUsersSupported();
     method @Deprecated @NonNull @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo preCreateUser(@NonNull String) throws android.os.UserManager.UserOperationException;
@@ -3508,41 +3508,6 @@ package android.speech {
 
 }
 
-package android.telecom {
-
-  public static class Call.Details {
-    method public String getTelecomCallId();
-  }
-
-  public final class CallAudioState implements android.os.Parcelable {
-    ctor public CallAudioState(boolean, int, int, @Nullable android.bluetooth.BluetoothDevice, @NonNull java.util.Collection<android.bluetooth.BluetoothDevice>);
-  }
-
-  public static final class ConnectionRequest.Builder {
-    ctor public ConnectionRequest.Builder();
-    method @NonNull public android.telecom.ConnectionRequest build();
-    method @NonNull public android.telecom.ConnectionRequest.Builder setAccountHandle(@NonNull android.telecom.PhoneAccountHandle);
-    method @NonNull public android.telecom.ConnectionRequest.Builder setAddress(@NonNull android.net.Uri);
-    method @NonNull public android.telecom.ConnectionRequest.Builder setExtras(@NonNull android.os.Bundle);
-    method @NonNull public android.telecom.ConnectionRequest.Builder setIsAdhocConferenceCall(boolean);
-    method @NonNull public android.telecom.ConnectionRequest.Builder setParticipants(@Nullable java.util.List<android.net.Uri>);
-    method @NonNull public android.telecom.ConnectionRequest.Builder setRttPipeFromInCall(@NonNull android.os.ParcelFileDescriptor);
-    method @NonNull public android.telecom.ConnectionRequest.Builder setRttPipeToInCall(@NonNull android.os.ParcelFileDescriptor);
-    method @NonNull public android.telecom.ConnectionRequest.Builder setShouldShowIncomingCallUi(boolean);
-    method @NonNull public android.telecom.ConnectionRequest.Builder setTelecomCallId(@NonNull String);
-    method @NonNull public android.telecom.ConnectionRequest.Builder setVideoState(int);
-  }
-
-  public abstract class ConnectionService extends android.app.Service {
-    method public void onBindClient(@Nullable android.content.Intent);
-  }
-
-  public class TelecomManager {
-    method public boolean hasForegroundServiceDelegation(@Nullable android.telecom.PhoneAccountHandle);
-  }
-
-}
-
 package android.telephony {
 
   public final class BarringInfo implements android.os.Parcelable {
@@ -3721,10 +3686,6 @@ package android.text {
     method @NonNull public String getName();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.text.FontConfig.NamedFamilyList> CREATOR;
-  }
-
-  public abstract class Layout {
-    method @FlaggedApi("com.android.text.flags.fix_shift_drawing_amount_test_api") public void drawText(@NonNull android.graphics.Canvas, int, int, @Nullable java.util.function.BiConsumer<java.lang.Integer,java.lang.Integer>);
   }
 
   public class MeasuredParagraph {
@@ -4456,7 +4417,6 @@ package android.window {
     field public static final int FEATURE_SYSTEM_LAST = 10000; // 0x2710
     field public static final int FEATURE_UNDEFINED = -1; // 0xffffffff
     field public static final int FEATURE_VENDOR_FIRST = 10001; // 0x2711
-    field public static final int FEATURE_WINDOWED_MAGNIFICATION = 4; // 0x4
     field public static final int FEATURE_WINDOW_TOKENS = 2; // 0x2
   }
 

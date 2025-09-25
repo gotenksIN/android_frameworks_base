@@ -252,9 +252,10 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
         }
 
         @Override
-        public void reportUnlockAttempt(int userId, boolean success, int timeoutMs) {
+        public void reportUnlockAttempt(int userId, boolean success, int timeoutMs,
+                boolean isDuplicate) {
             if (timeoutMs == 0 && !success) {
-                mBouncerMessageInteractor.onPrimaryAuthIncorrectAttempt();
+                mBouncerMessageInteractor.onPrimaryAuthIncorrectAttempt(isDuplicate);
             }
             int bouncerSide = SysUiStatsLog.KEYGUARD_BOUNCER_PASSWORD_ENTERED__SIDE__DEFAULT;
             if (mView.isSidedSecurityMode()) {
@@ -969,9 +970,9 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
                     break;
             }
         }
-        // A check to dismiss was made without any authentication. Verify there are no remaining SIM
-        // screens, which may happen on an unlocked lockscreen
-        if (!authenticated) {
+        // A check to dismiss was made without any authentication, or the previous code believes
+        // that bouncer is no longer required. Verify there are no remaining SIM screens first.
+        if (!authenticated || finish) {
             SecurityMode securityMode = mSecurityModel.getSecurityMode(targetUserId);
             if (Arrays.asList(SimPin, SimPuk).contains(securityMode)) {
                 Log.v(TAG, "Dismiss called but SIM/PUK unlock screen still required");

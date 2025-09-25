@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
 #include "Bitmap.h"
 
 #include <android-base/file.h>
@@ -76,11 +78,17 @@ constexpr bool bitmap_ashmem_long_name() { return false; }
 }
 #endif
 
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 #include <cutils/properties.h>
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 #include <sys/types.h>
 #include <unistd.h>
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 #define UI_PERFMODE "debug.ui.perfmode.enable"
 
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
 namespace android {
 
 #ifdef __ANDROID__
@@ -633,29 +641,47 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
         return false;
     }
 
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     bool ui_perf_enabled = false;
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
     if (ui_perfmode > 0 && ui_perfmode == getpid()) {
         ui_perf_enabled = true;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     }
 
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
     switch (format) {
         case JavaCompressFormat::Jpeg: {
             SkJpegEncoder::Options options;
             options.fQuality = quality;
             return SkJpegEncoder::Encode(stream, bitmap.pixmap(), options);
         }
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         case JavaCompressFormat::Png: {
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
             if (ui_perf_enabled && bitmap.width() >= 1280
                                 && bitmap.height() >= 720) {
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
                 SkPngEncoder::Options options;
                 options.fZLibLevel = 0;
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
                 options.fFilterFlags = SkPngEncoder::FilterFlag::kNone |
                                        SkPngEncoder::FilterFlag::kAvg;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
                 return SkPngEncoder::Encode(stream, bitmap.pixmap(), options);
             }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
             return SkPngEncoder::Encode(stream, bitmap.pixmap(), {});
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
             }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
         case JavaCompressFormat::Webp: {
             SkWebpEncoder::Options options;
             if (quality >= 100) {
@@ -673,9 +699,11 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
             options.fQuality = quality;
             options.fCompression = format == JavaCompressFormat::WebpLossy ?
                     SkWebpEncoder::Compression::kLossy : SkWebpEncoder::Compression::kLossless;
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
             if (ui_perf_enabled) {
                 options.fCompression = SkWebpEncoder::Compression::kLossless;
             }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
             return SkWebpEncoder::Encode(stream, bitmap.pixmap(), options);
         }
     }

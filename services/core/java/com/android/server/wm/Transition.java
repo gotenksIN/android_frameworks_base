@@ -760,9 +760,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
         mState = STATE_STARTED;
 
-// QTI_BEGIN: 2023-07-03: Core: perf: Add Transition Type check.
+// QTI_BEGIN: 2023-07-03: Performance: perf: Add Transition Type check.
         if (mPerf != null && mType == TRANSIT_CHANGE) {
-// QTI_END: 2023-07-03: Core: perf: Add Transition Type check.
+// QTI_END: 2023-07-03: Performance: perf: Add Transition Type check.
 // QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
             mPerf.perfHint(BoostFramework.VENDOR_HINT_ROTATION_ANIM_BOOST, null);
             mIsAnimationPerfLockAcquired = true;

@@ -149,8 +149,10 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
     private static final String USB_STATE_MATCH =
             "DEVPATH=/devices/virtual/android_usb/android0";
+// QTI_BEGIN: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
     private static final String USB_STATE_MATCH_SEC =
             "DEVPATH=/devices/virtual/android_usb/android1";
+// QTI_END: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
     private static final String ACCESSORY_START_MATCH =
             "DEVPATH=/devices/virtual/misc/usb_accessory";
     private static final String UDC_SUBSYS_MATCH =
@@ -449,7 +451,9 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
         // Watch for USB configuration changes
         mUEventObserver = new UsbUEventObserver();
+// QTI_BEGIN: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
         mUEventObserver.startObserving(USB_STATE_MATCH_SEC);
+// QTI_END: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
         mUEventObserver.startObserving(ACCESSORY_START_MATCH);
 
         mEnableUdcSysfsUsbStateUpdate =

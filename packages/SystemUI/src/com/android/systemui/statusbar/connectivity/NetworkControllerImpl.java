@@ -37,7 +37,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.Looper;
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
 import android.os.SystemProperties;
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
 import android.provider.Settings;
 import android.telephony.CarrierConfigManager;
 import android.telephony.CellSignalStrength;
@@ -82,7 +84,9 @@ import com.android.systemui.statusbar.policy.DataSaverController;
 import com.android.systemui.statusbar.policy.DataSaverControllerImpl;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceProvisionedListener;
+// QTI_BEGIN: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
 import com.android.systemui.statusbar.policy.FiveGServiceClient;
+// QTI_END: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
 import com.android.systemui.telephony.TelephonyListenerManager;
 import com.android.systemui.util.CarrierConfigTracker;
 
@@ -206,8 +210,10 @@ public class NetworkControllerImpl extends BroadcastReceiver
     private InternetDialogManager mInternetDialogManager;
     private Handler mMainHandler;
 
+// QTI_BEGIN: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
     @VisibleForTesting
     FiveGServiceClient mFiveGServiceClient;
+// QTI_END: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
 
     private ConfigurationController.ConfigurationListener mConfigurationListener =
             new ConfigurationController.ConfigurationListener() {
@@ -385,7 +391,9 @@ public class NetworkControllerImpl extends BroadcastReceiver
             mWifiManager.registerScanResultsCallback(mReceiverHandler::post, scanResultsCallback);
         }
 
+// QTI_BEGIN: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
         mFiveGServiceClient = FiveGServiceClient.getInstance(context);
+// QTI_END: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
 
         NetworkCallback callback =
                 new NetworkCallback(NetworkCallback.FLAG_INCLUDE_LOCATION_INFO){
@@ -501,7 +509,9 @@ public class NetworkControllerImpl extends BroadcastReceiver
         for (int i = 0; i < mMobileSignalControllers.size(); i++) {
             MobileSignalController mobileSignalController = mMobileSignalControllers.valueAt(i);
             mobileSignalController.registerListener();
+// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
             mobileSignalController.registerFiveGStateListener(mFiveGServiceClient);
+// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
         }
         if (mSubscriptionListener == null) {
             mSubscriptionListener = new SubListener(mBgLooper);
@@ -556,17 +566,21 @@ public class NetworkControllerImpl extends BroadcastReceiver
         for (int i = 0; i < mMobileSignalControllers.size(); i++) {
             MobileSignalController mobileSignalController = mMobileSignalControllers.valueAt(i);
             mobileSignalController.unregisterListener();
+// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
             mobileSignalController.unregisterFiveGStateListener(mFiveGServiceClient);
+// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
         }
         mSubscriptionManager.removeOnSubscriptionsChangedListener(mSubscriptionListener);
         mBroadcastDispatcher.unregisterReceiver(this);
     }
 
+// QTI_BEGIN: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
     @VisibleForTesting
     public FiveGServiceClient getFiveGServiceClient() {
         return mFiveGServiceClient;
     }
 
+// QTI_END: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
     @Override
     public AccessPointController getAccessPointController() {
         return mAccessPoints;
@@ -960,7 +974,9 @@ public class NetworkControllerImpl extends BroadcastReceiver
             public int compare(SubscriptionInfo lhs, SubscriptionInfo rhs) {
                 return lhs.getSimSlotIndex() == rhs.getSimSlotIndex()
                         ? lhs.getSubscriptionId() - rhs.getSubscriptionId()
+// QTI_BEGIN: 2019-04-11: Android_UI: SystemUI: Revert qti changes sorted subscriptions
                         : lhs.getSimSlotIndex() - rhs.getSimSlotIndex();
+// QTI_END: 2019-04-11: Android_UI: SystemUI: Revert qti changes sorted subscriptions
             }
         });
         Log.i(
@@ -1002,7 +1018,9 @@ public class NetworkControllerImpl extends BroadcastReceiver
                 }
                 if (mListening) {
                     controller.registerListener();
+// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
                     controller.registerFiveGStateListener(mFiveGServiceClient);
+// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
                 }
             }
         }
@@ -1013,7 +1031,9 @@ public class NetworkControllerImpl extends BroadcastReceiver
                     mDefaultSignalController = null;
                 }
                 cachedControllers.get(key).unregisterListener();
+// QTI_BEGIN: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
                 cachedControllers.get(key).unregisterFiveGStateListener(mFiveGServiceClient);
+// QTI_END: 2023-04-27: Android_UI: SystemUI: Fix Qs tile network type not correct
             }
         }
         mCallbackHandler.setSubs(subscriptions);

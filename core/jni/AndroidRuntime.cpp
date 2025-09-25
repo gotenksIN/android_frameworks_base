@@ -110,9 +110,9 @@ extern int register_android_media_audio_common_AidlConversion(JNIEnv* env);
 extern int register_android_media_midi(JNIEnv *env);
 
 namespace android {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
 extern int register_android_util_SeempLog(JNIEnv* env);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
 
 /*
  * JNI-based registration functions.  Note these are properly contained in
@@ -233,9 +233,9 @@ extern int register_com_android_internal_util_VirtualRefBasePtr(JNIEnv *env);
 extern int register_android_window_WindowInfosListener(JNIEnv* env);
 extern int register_android_window_ScreenCapture(JNIEnv* env);
 extern int register_jni_common(JNIEnv* env);
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
 extern int register_com_android_internal_app_ActivityTrigger(JNIEnv *env);
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
 extern int register_android_tracing_PerfettoDataSource(JNIEnv* env);
 extern int register_android_tracing_PerfettoDataSourceInstance(JNIEnv* env);
 extern int register_android_tracing_PerfettoProducer(JNIEnv* env);

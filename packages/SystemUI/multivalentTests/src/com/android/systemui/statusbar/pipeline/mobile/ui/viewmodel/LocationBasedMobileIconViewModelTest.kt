@@ -116,9 +116,9 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 context,
                 flags,
-// QTI_BEGIN: 2025-04-15: Data: SystemUI: Readapt Mobile Icon Features For Kairos part 2
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 2
                 mock(),
-// QTI_END: 2025-04-15: Data: SystemUI: Readapt Mobile Icon Features For Kairos part 2
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 2
             )
 
         interactor =
@@ -136,7 +136,7 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 repository,
                 context,
                 MobileIconCarrierIdOverridesFake(),
-// QTI_BEGIN: 2025-04-15: Data: SystemUI: Readapt Mobile Icon Features For Kairos part 2
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 2
                 mock(),
                 mock(),
                 mock(),
@@ -146,7 +146,7 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 mock(),
                 mock(),
                 mock(),
-// QTI_END: 2025-04-15: Data: SystemUI: Readapt Mobile Icon Features For Kairos part 2
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 2
             )
 
         commonImpl =

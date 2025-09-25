@@ -1136,7 +1136,7 @@ public class UserManagerService extends IUserManager.Stub {
         mPackagesLock = packagesLock;
         mUsers = users != null ? users : new SparseArray<>();
         mHandler = new MainHandler();
-        mNonComplianceLogger = new MultiuserNonComplianceLogger(mHandler);
+        mNonComplianceLogger = new MultiuserNonComplianceLogger(mContext, mHandler);
         mInternalExecutor = new ThreadPoolExecutor(/* corePoolSize */ 0, /* maximumPoolSize */ 1,
                 /* keepAliveTime */ 24, TimeUnit.HOURS, new LinkedBlockingQueue<>());
         mUserVisibilityMediator = new UserVisibilityMediator(mHandler);
@@ -1785,14 +1785,11 @@ public class UserManagerService extends IUserManager.Stub {
         }
     }
 
-    // TODO(b/142482943): Will probably need a getProfiles(userType). But permissions may vary.
-
     @Override
     public int[] getProfileIds(@UserIdInt int userId, boolean enabledOnly) {
         return getProfileIds(userId, null, enabledOnly, /* excludeHidden */ false);
     }
 
-    // TODO(b/142482943): Probably @Override and make this accessible in UserManager.
     /**
      * Returns all the users of type userType that are in the same profile group as userId
      * (including userId itself, if it is of the appropriate user type).
@@ -4313,14 +4310,11 @@ public class UserManagerService extends IUserManager.Stub {
         if (!android.multiuser.Flags.consistentMaxUsers()) {
             throw new UnsupportedOperationException("This method requires flag consistentMaxUsers");
         }
-        if (!isUserTypeEnabled(userTypeDetails)) {
-            return 0;
-        }
-        if (!doSystemFeaturesSupportUserType(userTypeDetails.getName())) {
-            return 0;
-        }
         if (userTypeDetails.isSystem()) {
             // You can never create another system user.
+            return 0;
+        }
+        if (!isUserTypeSupported(userTypeDetails)) {
             return 0;
         }
         synchronized (mUsersLock) {
@@ -4418,10 +4412,54 @@ public class UserManagerService extends IUserManager.Stub {
         return userTypeDetails != null && canAddMoreUsersOfType(userTypeDetails);
     }
 
-    /** Returns whether the creation of users of the given user type is enabled on this device. */
+    /**
+     * Returns whether the given user type is supported on this device.
+     * Also works for SYSTEM user types.
+     */
     @Override
-    public boolean isUserTypeEnabled(String userType) {
-        checkCreateUsersPermission("check if user type is enabled.");
+    public boolean isUserTypeSupportedIncludingSystem(String userType) {
+        checkCreateUsersPermission("check if user type is supported.");
+        final UserTypeDetails userTypeDetails = mUserTypes.get(userType);
+        if (!android.multiuser.Flags.queryUserTypeSupported()) {
+            return userTypeDetails != null && isUserTypeEnabled(userTypeDetails);
+        }
+        if (userTypeDetails == null) {
+            return false;
+        }
+        if (userTypeDetails.isSystem()) {
+            // Regardless of the theoretical configuration, the only supported system user type is
+            // that of the device's actual system user.
+            synchronized (mUsersLock) {
+                final UserData systemUserData = mUsers.get(UserHandle.USER_SYSTEM);
+                return userType.equals(systemUserData.info.userType);
+            }
+        }
+        return isUserTypeSupported(userTypeDetails);
+    }
+
+    /**
+     * Returns whether the creation of users of the given user type is supported on this device.
+     *
+     * Does not apply to SYSTEM user types, which can never be "created" and are only supported if
+     * the existing system user is of that type. So don't call this for SYSTEM user types.
+     */
+    private boolean isUserTypeSupported(@NonNull UserTypeDetails userTypeDetails) {
+        if (isCreationOverrideEnabled()) {
+            return true;
+        }
+        return isUserTypeEnabled(userTypeDetails)
+                && userTypeDetails.getMaxAllowed() > 0
+                && (!isUserTypeSubjectToSwitchableUserMaximum(userTypeDetails)
+                        || UserManager.getMaxSwitchableUsers() > 0)
+                && doSystemFeaturesSupportUserType(userTypeDetails.getName());
+    }
+
+    /** Returns whether the creation of users of the given user type is enabled on this device. */
+    private boolean isUserTypeEnabled(String userType) {
+        if (android.multiuser.Flags.consistentMaxUsers()) {
+            // TODO(b/394178333): When the flag is permanent, delete this method entirely.
+            throw new UnsupportedOperationException("This method is no longer supported");
+        }
         final UserTypeDetails userTypeDetails = mUserTypes.get(userType);
         return userTypeDetails != null && isUserTypeEnabled(userTypeDetails);
     }
@@ -5319,7 +5357,6 @@ public class UserManagerService extends IUserManager.Stub {
                         try {
                             userData.info.userType = UserInfo.getDefaultUserType(flags);
                         } catch (IllegalArgumentException e) {
-                            // TODO(b/142482943): What should we do here? Delete user? Crashloop?
                             throw new IllegalStateException("Cannot upgrade user with flags "
                                     + Integer.toHexString(flags) + " because it doesn't correspond "
                                     + "to a valid user type.", e);
@@ -6376,6 +6413,7 @@ public class UserManagerService extends IUserManager.Stub {
                             + ") and userTypeDetails (" + userType +  ") are inconsistent.",
                     USER_OPERATION_ERROR_UNKNOWN);
         }
+
         // Preliminary checks for sake of error messaging. Creation would've failed later anyway.
         if ((flags & UserInfo.FLAG_SYSTEM) != 0) {
             throwCheckedUserOperationException(
@@ -8209,7 +8247,9 @@ public class UserManagerService extends IUserManager.Stub {
                     if (args.length > 1 && args[1].equals("reset")) {
                         mNonComplianceLogger.reset(pw);
                     } else {
-                        mNonComplianceLogger.dump(pw);
+                        try (IndentingPrintWriter ipw = new IndentingPrintWriter(pw)) {
+                            mNonComplianceLogger.dump(ipw);
+                        }
                     }
                     return;
             }
@@ -8347,9 +8387,6 @@ public class UserManagerService extends IUserManager.Stub {
             mUserTypes.valueAt(i).dump(pw, "        ");
         }
 
-        pw.println();
-        mNonComplianceLogger.dump(pw);
-
         // NOTE: add new stuff here, as pw is closed after the try-with-resources block below
 
         // TODO(b/163423525): create IndentingPrintWriter at the beginning of dump() and use the
@@ -8359,6 +8396,12 @@ public class UserManagerService extends IUserManager.Stub {
             // Dump SystemPackageInstaller info
             ipw.println();
             mSystemPackageInstaller.dump(ipw);
+
+            ipw.println();
+            ipw.println("Non-multiuser-compliant events:");
+            ipw.increaseIndent();
+            mNonComplianceLogger.dump(ipw);
+            ipw.decreaseIndent();
         }
 
         // NOTE: pw's not available after this point as it's auto-closed by ipw, so new dump
@@ -9151,17 +9194,6 @@ public class UserManagerService extends IUserManager.Stub {
             }
         }
         return 0;
-    }
-
-    /**
-     * Formerly: Checks if the given user has a profile associated with it.
-     * Now: Just throws. Do not use it.
-     * @param userId The parent user (passing in a profile user is not supported)
-     * @deprecated
-     */
-    boolean hasProfile(@UserIdInt int userId) {
-        // TODO(b/332664521): Remove this method entirely. It is no longer used.
-        throw new UnsupportedOperationException();
     }
 
     /**

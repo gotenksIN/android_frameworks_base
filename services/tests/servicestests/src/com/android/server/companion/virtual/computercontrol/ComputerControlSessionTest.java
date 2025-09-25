@@ -41,6 +41,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertThrows;
 
+import android.annotation.SuppressLint;
 import android.companion.virtual.ActivityPolicyExemption;
 import android.companion.virtual.IVirtualDevice;
 import android.companion.virtual.VirtualDeviceParams;
@@ -49,6 +50,7 @@ import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IComputerControlStabilityListener;
 import android.companion.virtualdevice.flags.Flags;
 import android.content.AttributionSource;
+import android.content.Intent;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplayConfig;
 import android.hardware.input.IVirtualInputDevice;
@@ -60,6 +62,7 @@ import android.hardware.input.VirtualTouchscreenConfig;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.UserHandle;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
@@ -84,6 +87,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.util.List;
+import java.util.Set;
 
 @Presubmit
 @RunWith(AndroidJUnit4.class)
@@ -105,6 +109,10 @@ public class ComputerControlSessionTest {
     private static final List<String> TARGET_PACKAGE_NAMES =
             List.of(TARGET_PACKAGE_1, TARGET_PACKAGE_2);
     private static final String UNDECLARED_TARGET_PACKAGE = "com.android.baz";
+    private static final String TARGET_CLASS = "com.android.foo.FooActivity";
+    private static final Intent LAUNCH_INTENT = new Intent(Intent.ACTION_MAIN);
+    private static final Set<UserHandle> ALLOWED_USERS =
+            Set.of(UserHandle.of(100), UserHandle.of(200));
 
     @Mock
     private ComputerControlSessionProcessor.VirtualDeviceFactory mVirtualDeviceFactory;
@@ -167,6 +175,9 @@ public class ComputerControlSessionTest {
         when(mVirtualDevice.createVirtualDpad(any(), any())).thenReturn(mVirtualDpad);
         when(mInjector.getLongPressTimeoutMillis()).thenReturn(
                 LONG_PRESS_STEP_COUNT * TOUCH_EVENT_DELAY_MS);
+        // Keeping the global timeout > stability hint timeouts to avoid "session closure" affecting
+        // tests checking stability hints.
+        when(mInjector.getMaxSessionDurationMillis()).thenReturn(10000L);
     }
 
     @After
@@ -185,6 +196,8 @@ public class ComputerControlSessionTest {
         assertThat(mVirtualDeviceParamsArgumentCaptor.getValue()
                 .getDevicePolicy(POLICY_TYPE_RECENTS))
                 .isEqualTo(DEVICE_POLICY_DEFAULT);
+        assertThat(mVirtualDeviceParamsArgumentCaptor.getValue()
+                .getAllowedUsers()).isEqualTo(ALLOWED_USERS);
 
         verify(mVirtualDevice).createVirtualDisplay(
                 mVirtualDisplayConfigArgumentCaptor.capture(), any());
@@ -277,29 +290,31 @@ public class ComputerControlSessionTest {
     @Test
     public void launchApplication_launchesApplication() throws RemoteException {
         createComputerControlSession(mDefaultParams);
-        mSession.launchApplication(TARGET_PACKAGE_1);
+        when(mInjector.getLaunchIntent(TARGET_PACKAGE_1, TARGET_CLASS)).thenReturn(LAUNCH_INTENT);
+        mSession.launchApplication(TARGET_PACKAGE_1, TARGET_CLASS);
         verify(mInjector).launchApplicationOnDisplayAsUser(
-                eq(TARGET_PACKAGE_1), eq(VIRTUAL_DISPLAY_ID), any());
-    }
-
-    @Test
-    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
-    public void launchApplication_noActivityPolicy_launchesApplication() throws RemoteException {
-        createComputerControlSession(mDefaultParams);
-        mSession.launchApplication(UNDECLARED_TARGET_PACKAGE);
-        verify(mInjector).launchApplicationOnDisplayAsUser(
-                eq(UNDECLARED_TARGET_PACKAGE), eq(VIRTUAL_DISPLAY_ID), any());
+                eq(LAUNCH_INTENT), eq(VIRTUAL_DISPLAY_ID), any());
     }
 
     @Test
     @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
     public void launchApplication_strictActivityPolicy_addsExemption() throws RemoteException {
         createComputerControlSession(mDefaultParams);
-        mSession.launchApplication(UNDECLARED_TARGET_PACKAGE);
+        when(mInjector.getLaunchIntent(UNDECLARED_TARGET_PACKAGE, TARGET_CLASS))
+                .thenReturn(LAUNCH_INTENT);
+        mSession.launchApplication(UNDECLARED_TARGET_PACKAGE, TARGET_CLASS);
         verify(mVirtualDevice).addActivityPolicyExemption(
                 argThat(new MatchesActivityPolicyExcemption(UNDECLARED_TARGET_PACKAGE)));
         verify(mInjector).launchApplicationOnDisplayAsUser(
-                eq(UNDECLARED_TARGET_PACKAGE), eq(VIRTUAL_DISPLAY_ID), any());
+                eq(LAUNCH_INTENT), eq(VIRTUAL_DISPLAY_ID), any());
+    }
+
+    @Test
+    public void launchApplication_noLaunchIntent_throws() throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+        when(mInjector.getLaunchIntent(TARGET_PACKAGE_1, TARGET_CLASS)).thenReturn(null);
+        assertThrows(IllegalArgumentException.class,
+                () -> mSession.launchApplication(TARGET_PACKAGE_1, TARGET_CLASS));
     }
 
     @Test
@@ -506,6 +521,7 @@ public class ComputerControlSessionTest {
     }
 
     @Test
+    @SuppressLint("WrongConstant")
     public void performAction_withInvalidCode_notifiesStabilityListener() throws Exception {
         createComputerControlSession(mDefaultParams);
         mSession.setStabilityListener(mStabilityListener);
@@ -565,7 +581,8 @@ public class ComputerControlSessionTest {
         createComputerControlSession(mDefaultParams);
         mSession.setStabilityListener(mStabilityListener);
 
-        mSession.launchApplication(TARGET_PACKAGE_1);
+        when(mInjector.getLaunchIntent(TARGET_PACKAGE_1, TARGET_CLASS)).thenReturn(LAUNCH_INTENT);
+        mSession.launchApplication(TARGET_PACKAGE_1, TARGET_CLASS);
 
         verify(mStabilityListener, timeout(STABILITY_TIMEOUT_MS)).onSessionStable();
     }
@@ -579,10 +596,18 @@ public class ComputerControlSessionTest {
                 () -> mSession.setStabilityListener(mStabilityListener));
     }
 
+    @Test
+    public void sessionCloses_afterGlobalTimeout() throws Exception {
+        when(mInjector.getMaxSessionDurationMillis()).thenReturn(100L);
+        createComputerControlSession(mDefaultParams);
+
+        verify(mOnClosedListener, timeout(2 * 100L)).onClosed(mSession);
+    }
+
     private void createComputerControlSession(ComputerControlSessionParams params) {
-        mSession = new ComputerControlSessionImpl(mAppToken, params,
-                AttributionSource.myAttributionSource(), mVirtualDeviceFactory, mOnClosedListener,
-                mInjector);
+        mSession = new ComputerControlSessionImpl(
+                mAppToken, params, new AttributionSource(100, "com.package", "tag"),
+                mVirtualDeviceFactory, ALLOWED_USERS, mOnClosedListener, mInjector);
     }
 
     private static class MatchesActivityPolicyExcemption implements

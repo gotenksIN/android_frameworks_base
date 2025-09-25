@@ -95,14 +95,12 @@ import com.android.systemui.Dumpable;
 import com.android.systemui.ExpandHelper;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
-import com.android.systemui.qs.flags.QSComposeFragment;
 import com.android.systemui.res.R;
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.shade.QSHeaderBoundsProvider;
 import com.android.systemui.shade.TouchLogger;
 import com.android.systemui.statusbar.NotificationShelf;
 import com.android.systemui.statusbar.StatusBarState;
-import com.android.systemui.statusbar.headsup.shared.StatusBarNoHunBehavior;
 import com.android.systemui.statusbar.notification.ColorUpdateLogger;
 import com.android.systemui.statusbar.notification.FakeShadowView;
 import com.android.systemui.statusbar.notification.LaunchAnimationParameters;
@@ -177,7 +175,7 @@ public class NotificationStackScrollLayout
     public static final float BACKGROUND_ALPHA_DIMMED = 0.7f;
     private static final String TAG = "StackScroller";
     private static final boolean SPEW = Log.isLoggable(TAG, Log.VERBOSE);
-
+    private static final boolean DEBUG_CHILD_HEIGHT_CHANGE = false;
     private boolean mShadeNeedsToClose = false;
 
     @VisibleForTesting
@@ -379,7 +377,6 @@ public class NotificationStackScrollLayout
     private final ArrayList<ExpandableView> mTmpSortedChildren = new ArrayList<>();
     private final ArrayList<ExpandableView> mTmpNonOverlapChildren = new ArrayList<>();
     private final ArrayDeque<ExpandableView> mTmpStack = new ArrayDeque<>();
-    protected ViewGroup mQsHeader;
 
     @Nullable
     private QSHeaderBoundsProvider mQSHeaderBoundsProvider;
@@ -631,8 +628,10 @@ public class NotificationStackScrollLayout
     private final ExpandableView.OnHeightChangedListener mOnChildHeightChangedListener =
             new ExpandableView.OnHeightChangedListener() {
                 @Override
-                public void onHeightChanged(ExpandableView view, boolean needsAnimation) {
-                    onChildHeightChanged(view, needsAnimation);
+                public void onHeightChanged(ExpandableView view, boolean needsAnimation,
+                        String caller) {
+                    onChildHeightChanged(view, needsAnimation,
+                            caller + " => NSSL.EV.onHeightChanged");
                 }
 
                 @Override
@@ -1057,7 +1056,8 @@ public class NotificationStackScrollLayout
 
     private void notifyHeightChangeListener(ExpandableView view, boolean needsAnimation) {
         if (mOnHeightChangedListener != null) {
-            mOnHeightChangedListener.onHeightChanged(view, needsAnimation);
+            mOnHeightChangedListener.onHeightChanged(view, needsAnimation,
+                    "NSSL.notifyHeightChangeListener");
         }
 
         if (mOnHeightChangedRunnable != null) {
@@ -1235,18 +1235,10 @@ public class NotificationStackScrollLayout
             // Give The Algorithm information regarding the QS height so it can layout notifications
             // properly. Needed for some devices that grows notifications down-to-top
             int height;
-            if (QSComposeFragment.isEnabled()) {
-                if (mQSHeaderBoundsProvider != null) {
-                    height = mQSHeaderBoundsProvider.getHeightProvider().invoke();
-                } else {
-                    height = 0;
-                }
+            if (mQSHeaderBoundsProvider != null) {
+                height = mQSHeaderBoundsProvider.getHeightProvider().invoke();
             } else {
-                if (mQsHeader != null) {
-                    height = mQsHeader.getHeight();
-                } else {
-                    height = 0;
-                }
+                height = 0;
             }
             mStackScrollAlgorithm.updateQSFrameTop(height);
         }
@@ -2222,14 +2214,8 @@ public class NotificationStackScrollLayout
         return Math.min(mMaxLayoutHeight, mCurrentStackHeight);
     }
 
-    public void setQsHeader(ViewGroup qsHeader) {
-        QSComposeFragment.assertInLegacyMode();
-        mQsHeader = qsHeader;
-    }
-
     public void setQsHeaderBoundsProvider(QSHeaderBoundsProvider qsHeaderBoundsProvider) {
         SceneContainerFlag.assertInLegacyMode();
-        QSComposeFragment.isUnexpectedlyInLegacyMode();
         mQSHeaderBoundsProvider = qsHeaderBoundsProvider;
     }
 
@@ -4379,20 +4365,11 @@ public class NotificationStackScrollLayout
 
     protected boolean isInsideQsHeader(MotionEvent ev) {
         SceneContainerFlag.assertInLegacyMode();
-        if (QSComposeFragment.isEnabled()) {
-            if (mQSHeaderBoundsProvider == null) {
-                return false;
-            } else {
-                mQSHeaderBoundsProvider.getBoundsOnScreenProvider().invoke(mQsHeaderBound);
-            }
+        if (mQSHeaderBoundsProvider == null) {
+            return false;
         } else {
-            if (mQsHeader == null) {
-                return false;
-            } else {
-                mQsHeader.getBoundsOnScreen(mQsHeaderBound);
-            }
+            mQSHeaderBoundsProvider.getBoundsOnScreenProvider().invoke(mQsHeaderBound);
         }
-
         /**
          * One-handed mode defines a feature FEATURE_ONE_HANDED of DisplayArea {@link DisplayArea}
          * that will translate down the Y-coordinate whole window screen type except for
@@ -4402,9 +4379,7 @@ public class NotificationStackScrollLayout
          * of DisplayArea into relative coordinates for all windows, we need to correct the
          * QS Head bounds here.
          */
-        int left =
-                QSComposeFragment.isEnabled() ? mQSHeaderBoundsProvider.getLeftProvider().invoke()
-                        : mQsHeader.getLeft();
+        int left = mQSHeaderBoundsProvider.getLeftProvider().invoke();
         final int xOffset = Math.round(ev.getRawX() - ev.getX() + left);
         final int yOffset = Math.round(ev.getRawY() - ev.getY());
         mQsHeaderBound.offsetTo(xOffset, yOffset);
@@ -4780,7 +4755,7 @@ public class NotificationStackScrollLayout
         for (int i = 0; i < getChildCount(); i++) {
             ExpandableView child = getChildAtIndex(i);
             if (child instanceof ExpandableNotificationRow row) {
-                row.setUserSwipingToExpandRow(false);
+                row.setUserLocked(false);
             }
         }
     }
@@ -4901,7 +4876,11 @@ public class NotificationStackScrollLayout
         }
     }
 
-    void onChildHeightChanged(ExpandableView view, boolean needsAnimation) {
+    void onChildHeightChanged(ExpandableView view, boolean needsAnimation, String caller) {
+        if (DEBUG_CHILD_HEIGHT_CHANGE) {
+            Log.d(TAG, caller + " => NSSL.onChildHeightChanged: needsAnimation=" + needsAnimation);
+        }
+
         boolean previouslyNeededAnimation = mAnimateStackYForContentHeightChange;
         if (needsAnimation) {
             mAnimateStackYForContentHeightChange = true;
@@ -4948,7 +4927,7 @@ public class NotificationStackScrollLayout
     private void updateScrollPositionOnExpandInBottom(ExpandableView view) {
         if (view instanceof ExpandableNotificationRow row && !onKeyguard()) {
             // TODO: once we're recycling this will need to check the adapter position of the child
-            if (row.isUserSwipingToExpandRow() && row != getFirstChildNotGoneInternal()) {
+            if (row.isUserLocked() && row != getFirstChildNotGoneInternal()) {
                 if (row.isSummaryWithChildren()) {
                     return;
                 }
@@ -5838,11 +5817,6 @@ public class NotificationStackScrollLayout
 
     void onStatePostChange(boolean fromShadeLocked) {
         boolean onKeyguard = onKeyguard();
-
-        if (mHeadsUpAppearanceController != null && !StatusBarNoHunBehavior.isEnabled()) {
-            mHeadsUpAppearanceController.onStateChanged();
-        }
-
         setExpandingEnabled(!onKeyguard);
         requestChildrenUpdate();
         onUpdateRowStates();
@@ -7294,7 +7268,7 @@ public class NotificationStackScrollLayout
         }
 
         changedRow.setChildrenExpanded(expanded);
-        onChildHeightChanged(changedRow, false /* needsAnimation */);
+        onChildHeightChanged(changedRow, false /* needsAnimation */, "NSSL.onGroupExpandChanged");
 
         runAfterAnimationFinished(changedRow::onFinishedExpansionChange);
     }
@@ -7330,7 +7304,7 @@ public class NotificationStackScrollLayout
                     // We also need to un-user lock it here, since otherwise the content height
                     // calculated might be wrong. We also can't invert the two calls since
                     // un-userlocking it will trigger a layout switch in the content view.
-                    row.setUserSwipingToExpandRow(false);
+                    row.setUserLocked(false);
                     updateContentHeight();
                     notifyHeightChangeListener(row);
                     return;
@@ -7348,9 +7322,9 @@ public class NotificationStackScrollLayout
         }
 
         @Override
-        public void setUserSwipingToExpand(View v, boolean isUserSwiping) {
+        public void setUserLockedChild(View v, boolean userLocked) {
             if (v instanceof ExpandableNotificationRow) {
-                ((ExpandableNotificationRow) v).setUserSwipingToExpandRow(isUserSwiping);
+                ((ExpandableNotificationRow) v).setUserLocked(userLocked);
             }
             cancelLongPress();
             requestDisallowInterceptTouchEvent(true);

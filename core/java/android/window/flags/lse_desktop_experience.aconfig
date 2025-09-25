@@ -154,6 +154,13 @@ flag {
 }
 
 flag {
+    name: "enable_auto_rotate_on_slate_state"
+    namespace: "lse_desktop_experience"
+    description: "Enables Auto Rotate when a device is in SLATE state"
+    bug: "394947531"
+}
+
+flag {
     name: "enable_backup_and_restore_display_window_settings"
     namespace: "lse_desktop_experience"
     description: "Enables backup and restore for display window settings."
@@ -357,6 +364,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables launching an app while it's in PiP on another display."
     bug: "424569682"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_density_reset_on_cross_displays_pip_launch"
+    namespace: "lse_desktop_experience"
+    description: "Enables resetting the app's density and other configs when launching an app while it's in PiP on another display."
+    bug: "431280403"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -985,6 +1002,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables bugfix for desktop persistence on external displays."
     bug: "437420625"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_filter_removing_display_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Filter out removing display when reporting top display."
+    bug: "441826525"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

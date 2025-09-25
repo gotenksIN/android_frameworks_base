@@ -148,6 +148,7 @@ import static android.app.admin.DevicePolicyManager.PERSONAL_APPS_NOT_SUSPENDED;
 import static android.app.admin.DevicePolicyManager.PERSONAL_APPS_SUSPENDED_EXPLICITLY;
 import static android.app.admin.DevicePolicyManager.PERSONAL_APPS_SUSPENDED_PROFILE_TIMEOUT;
 import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_DEVICE;
+import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_PARENT_USER;
 import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_USER;
 import static android.app.admin.DevicePolicyManager.PRIVATE_DNS_MODE_OFF;
 import static android.app.admin.DevicePolicyManager.PRIVATE_DNS_MODE_OPPORTUNISTIC;
@@ -514,6 +515,7 @@ import com.android.server.LockGuard;
 import com.android.server.SystemServerInitThreadPool;
 import com.android.server.SystemService;
 import com.android.server.SystemServiceManager;
+import com.android.server.accounts.AccountManagerService;
 import com.android.server.devicepolicy.ActiveAdmin.TrustAgentInfo;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.locksettings.LockSettingsInternal;
@@ -874,6 +876,48 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     }
 
     /**
+     * Creates the list of {@link PolicyHandler}s that depend on private methods inside
+     * {@link DevicePolicyManagerService}.
+     */
+    private static List<PolicyHandler<?>> createPolicyHandlersDependingOnDpms(
+            DevicePolicyManagerService dpms
+    ){
+        List<PolicyHandler<?>> handlers = new ArrayList<PolicyHandler<?>>();
+
+        handlers.add(
+                new PolicyHandler<Integer>(PolicyIdentifier.SCREEN_CAPTURE) {
+                    @Override
+                    protected void checkPermissions(CallerIdentity caller, int scope) {
+                        super.checkPermissions(caller, scope);
+
+                        int callerDpcType = getDelegate().getDpcType(caller);
+                        if (scope == POLICY_SCOPE_DEVICE && callerDpcType != DEFAULT_DEVICE_OWNER
+                                && callerDpcType != PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE) {
+                            throw new SecurityException(
+                                    "Caller must be a device owner or profile owner of an "
+                                            + "organization-owned managed profile to be able"
+                                            + " to set the policy with POLICY_SCOPE_DEVICE.");
+                        }
+                    }
+
+                    @Override
+                    protected void storePolicyValue(
+                            CallerIdentity caller, int scope, Integer value) {
+                        dpms.setScreenCaptureUnchecked(caller, scope, value);
+                    }
+                });
+
+        // NEW HANDLERS SHOULD GO IN {@link PolicyHandler.HANDLERS}, NOT HERE!
+        //
+        // Handlers should only be added here if you are migrating a pre-existing policy and your
+        // handler invokes the pre-existing hand-written code for this policy.
+        //
+        // NEW HANDLERS SHOULD GO IN {@link PolicyHandler.HANDLERS}, NOT HERE!
+
+        return handlers;
+    }
+
+    /**
      * Admin apps targeting Android S+ may not use
      * {@link DevicePolicyManager#setPasswordQuality} to set password quality
      * on the {@code DevicePolicyManager} instance obtained by calling
@@ -1010,6 +1054,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     private final DevicePolicyManagementRoleObserver mDevicePolicyManagementRoleObserver;
 
     private final DevicePolicyEngine mDevicePolicyEngine;
+
+    // {@link PolicyHandler}s, keyed by their policy name ({@link PolicyIdentifier}).
+    // Lazily initialized by calling `maybeInitializePolicyHandlers()` when the code needs them.
+    private Map<String, PolicyHandler<?>> mPolicyHandlers = null;
 
     private static final boolean ENABLE_LOCK_GUARD = true;
 
@@ -2435,6 +2483,41 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                         mOwners.getDeviceOwnerType(mOwners.getDeviceOwnerPackageName()));
             }
         }
+    }
+
+    /**
+     * Initializes the policy handlers by collecting them from the hard coded list(s), setting their
+     * delegate and combining them in a map keyed by the policy identifier string.
+     *
+     * <p>A no-op if the policy handlers have already been initialized.
+     *
+     * <p>After this function finishes, {@link mPolicyHandlers} is guaranteed to be not null.
+     *
+     * TODO(445663366): Actually track the impact of this method on the boot time, so we can
+     * intervene if it ever becomes a problem.
+     */
+    void maybeInitializePolicyHandlers() {
+        if (mPolicyHandlers != null) {
+            return;
+        }
+
+        var delegate = new PolicyHandlerDelegate();
+        var allHandlers =
+                Stream.concat(
+                        PolicyHandler.HANDLERS.stream(),
+                        createPolicyHandlersDependingOnDpms(this).stream());
+        mPolicyHandlers =
+                allHandlers
+                        .peek(
+                                (handler) -> {
+                                    handler.setDelegate(delegate);
+                                })
+                        .collect(
+                                // `toMap` will throw an IllegalStateException when encountering
+                                // duplicate keys, which nicely prevents mistakes.
+                                Collectors.toMap(
+                                        (handler) -> handler.getKey().getId(),
+                                        (handler) -> handler));
     }
 
     /**
@@ -9069,6 +9152,18 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             return;
         }
 
+        if (Flags.policyStreamliningScreenCapture()) {
+            CallerIdentity caller = getCallerIdentity(who, callerPackage);
+            boolean deviceScope = parent || isDefaultDeviceOwner(caller);
+            int scope = deviceScope ? POLICY_SCOPE_DEVICE : POLICY_SCOPE_USER;
+            int enumValue = disabled ? PolicyIdentifier.SCREEN_CAPTURE_DISALLOWED
+                    : PolicyIdentifier.SCREEN_CAPTURE_ALLOWED;
+
+            setPolicy(caller, PolicyIdentifier.SCREEN_CAPTURE.getId(), scope,
+                    PolicyValueTransport.integerField(enumValue));
+            return;
+        }
+
         CallerIdentity caller = getCallerIdentity(who, callerPackage);
         int callerUserId = Binder.getCallingUserHandle().getIdentifier();
         int targetUserId = parent ? getProfileParentId(callerUserId) : callerUserId;
@@ -10108,21 +10203,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 "Caller must be shell or hold MANAGE_PROFILE_AND_DEVICE_OWNERS to call "
                         + "clearMultiUserDeviceManagement");
         synchronized (getLockObject()) {
-            setDeviceManagedLocked(false);
+            mOwners.setDeviceManaged(false);
+            mOwners.writeDeviceOwner();
             forceRemoveActiveAdminUnchecked(adminReceiver, UserHandle.USER_SYSTEM);
         }
-    }
-
-    /**
-     * Sets the device managed state.
-     *
-     * @param isDeviceManaged true if the device is managed, false otherwise.
-     */
-    private void setDeviceManagedLocked(boolean isDeviceManaged) {
-        ensureLocked();
-        mOwners.setDeviceManaged(isDeviceManaged);
-        mOwners.writeDeviceOwner();
-        mPolicyCache.setDeviceManaged(isDeviceManaged);
     }
 
     /**
@@ -10362,6 +10446,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     }
 
     // TODO(b/240562946): Remove api as owner name is not used.
+
     /**
      * Returns the "name" of the device owner.  It'll work for non-DO users too, but requires
      * MANAGE_USERS.
@@ -17643,7 +17728,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     private int checkProvisioningPreconditionSkipPermission(
             String action, String packageName, @Nullable ComponentName componentName, int userId) {
         if (Flags.multiUserManagementDeviceProvisioning()
-                && action == DevicePolicyManager.ACTION_PROVISION_MULTI_USER_DEVICE) {
+                && DevicePolicyManager.ACTION_PROVISION_MULTI_USER_DEVICE.equals(action)) {
             return checkMultiUserDeviceProvisioningPreCondition(userId);
         }
         if (!mHasFeature && !shouldEnableForRetailDemoPackage(packageName)) {
@@ -17896,7 +17981,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             }
             // There must be no users that have completed setup.
             for (int i = 0; i < mUserData.size(); i++) {
-                if (mInjector.hasUserSetupCompleted(getUserData(i))) {
+                int userId = mUserData.keyAt(i);
+                if (mInjector.hasUserSetupCompleted(getUserData(userId))) {
+                    Slogf.d(LOG_TAG, "checkMultiUserDeviceProvisioningPreCondition: User %d has "
+                            + "completed setup", userId);
                     return STATUS_USER_SETUP_COMPLETED;
                 }
             }
@@ -22784,7 +22872,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             // provisioning-related data instead of ActiveAdmin.
             enableAndSetActiveAdmin(UserHandle.USER_SYSTEM, UserHandle.USER_SYSTEM, deviceAdmin);
 
-            setDeviceManagedLocked(true);
+            mOwners.setDeviceManaged(true);
+            mOwners.writeDeviceOwner();
 
             onProvisionMultiUserDeviceCompleted(provisioningParams);
             // TODO(b/390162247): This is only used by ManagedProvisioning app
@@ -23434,22 +23523,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     }
 
     private boolean hasAccountsOnAnyUser() {
-        long callingIdentity = Binder.clearCallingIdentity();
-        try {
-            for (UserInfo user : mUserManagerInternal.getUsers(/* excludeDying= */ true)) {
-                AccountManager am = mContext.createContextAsUser(
-                                UserHandle.of(user.id), /* flags= */ 0)
-                        .getSystemService(AccountManager.class);
-                Account[] accounts = am.getAccounts();
-                if (accounts.length != 0) {
-                    return true;
-                }
-            }
-
-            return false;
-        } finally {
-            Binder.restoreCallingIdentity(callingIdentity);
-        }
+        AccountManagerService accountManagerService = AccountManagerService.getSingleton();
+        return accountManagerService.getAllAccountsForSystemProcess().length != 0;
     }
 
     private void setBypassDevicePolicyManagementRoleQualificationStateInternal(
@@ -25004,25 +25079,22 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         return Binder.withCleanCallingIdentity(() -> getHeadlessDeviceOwnerModeForDeviceOwner());
     }
 
-    private void setScreenCaptureDisabled(CallerIdentity caller, int scope, Boolean disabled) {
-        if (scope != POLICY_SCOPE_DEVICE && scope != POLICY_SCOPE_USER) {
-            throw new IllegalArgumentException("Invalid scope " + scope);
+    private void requirePolicyScopeIsOneOf(int scope, int... acceptedScopes) {
+        for (int acceptedScope : acceptedScopes) {
+            if (scope == acceptedScope) {
+                return;
+            }
         }
+        throw new IllegalArgumentException(
+                "Invalid scope " + scope + ". Accepted scopes are " + Arrays.toString(
+                        acceptedScopes));
+    }
 
-        mPermissions.enforce(MANAGE_DEVICE_POLICY_SCREEN_CAPTURE, caller);
+    private void setScreenCaptureUnchecked(CallerIdentity caller, int scope, Integer value) {
+        requirePolicyScopeIsOneOf(scope, POLICY_SCOPE_DEVICE, POLICY_SCOPE_USER);
+
         EnforcingAdmin admin = getEnforcingAdmin(caller);
-        if (scope == POLICY_SCOPE_DEVICE && !isDefaultDeviceOwner(caller)
-                && !isProfileOwnerOfOrganizationOwnedDevice(caller)) {
-            throw new SecurityException(
-                    "Caller must be a device owner or profile owner of an organization-owned "
-                            + "managed profile to be able to set the policy with "
-                            + "POLICY_SCOPE_DEVICE.");
-        }
-
-        // Clearing is done by false.
-        if (disabled == null) {
-            disabled = false;
-        }
+        boolean disabled = (value == null || value == PolicyIdentifier.SCREEN_CAPTURE_DISALLOWED);
 
         switch (scope) {
             case POLICY_SCOPE_DEVICE:
@@ -25049,7 +25121,20 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             default:
                 throw new IllegalArgumentException(
                         "SCREEN_CAPTURE_DISABLED only supports POLICY_SCOPE_DEVICE and "
-                        + "POLICY_SCOPE_USER");
+                                + "POLICY_SCOPE_USER");
+        }
+    }
+
+    class PolicyHandlerDelegate implements PolicyHandler.Delegate {
+        @Override
+        public @DpcType int getDpcType(@NonNull CallerIdentity caller) {
+            return DevicePolicyManagerService.this.getDpcType(caller);
+        }
+
+        @Override
+        @NonNull
+        public PermissionChecker getPermissionChecker() {
+            return DevicePolicyManagerService.this.mPermissions;
         }
     }
 
@@ -25059,20 +25144,23 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (!mHasFeature) {
             return;
         }
+        setPolicy(getCallerIdentity(callerPackageName), id, scope, value);
+    }
 
-        CallerIdentity caller = getCallerIdentity(callerPackageName);
+    private void setPolicy(CallerIdentity caller, String id, int scope,
+            PolicyValueTransport value) {
+        Slogf.d(LOG_TAG, "Setting policy %s with scope %d through generic API", id, scope);
+        requirePolicyScopeIsOneOf(scope, POLICY_SCOPE_USER, POLICY_SCOPE_DEVICE,
+                POLICY_SCOPE_PARENT_USER);
+
+        maybeInitializePolicyHandlers();
+        PolicyHandler<?> handler = mPolicyHandlers.get(id);
+        if (handler == null) {
+            throw new IllegalArgumentException("Unknown policy " + id);
+        }
 
         Binder.withCleanCallingIdentity(() -> {
-            if (id.equals(PolicyIdentifier.SCREEN_CAPTURE.getId())) {
-                if (value.getTag() != PolicyValueTransport.Tag.integerField) {
-                    throw new IllegalArgumentException("SCREEN_CAPTURE requires an Integer value");
-                }
-                boolean isDisabled =
-                        value.getIntegerField() == PolicyIdentifier.SCREEN_CAPTURE_BLOCKED;
-                setScreenCaptureDisabled(caller, scope, isDisabled);
-            } else {
-                throw new IllegalArgumentException("Unhandled policy " + id);
-            }
+            handler.setPolicy(caller, scope, value);
         });
     }
 }

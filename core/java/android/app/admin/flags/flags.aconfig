@@ -402,7 +402,6 @@ flag {
   namespace: "enterprise"
   description: "Split up existing create and provision managed profile API."
   bug: "375382324"
-  is_exported: true
 }
 
 flag {
@@ -535,4 +534,11 @@ flag {
   namespace: "enterprise"
   description: "Enable the multi user management device provisioning APIs."
   bug: "390162247"
+}
+
+flag {
+  name: "policy_streamlining_screen_capture"
+  namespace: "enterprise"
+  description: "Redirect set/getScreenCaptureDisabled to the generic set/getPolicy APIs"
+  bug: "434919316"
 }

@@ -100,13 +100,8 @@
 
     <!-- The number of columns that the top level tiles span in the QuickSettings -->
 
-    <!-- The default tiles to display in QuickSettings -->
+    <!-- The default tiles to display in QuickSettings-->
     <string name="quick_settings_tiles_default" translatable="false">
-        internet,bt,flashlight,dnd,alarm,airplane,controls,wallet,rotation,battery,cast,screenrecord,mictoggle,cameratoggle,custom(com.android.permissioncontroller/.permission.service.v33.SafetyCenterQsTileService)
-    </string>
-
-    <!-- The default tiles to display in QuickSettings with the new UI -->
-    <string name="quick_settings_tiles_new_default" translatable="false">
         internet,bt,dnd,cast,flashlight,airplane,rotation,wallet,alarm,controls,screenrecord,battery
     </string>
 
@@ -692,10 +687,6 @@
     lockscreen.enable_landscape is enabled. -->
     <!-- TODO(b/411449027): This config is deprecated. Remove with the launch of SceneContainer. -->
     <bool name="force_config_use_split_notification_shade">false</bool>
-
-    <!-- Whether to disable split shade on this configuration, and use dual shade instead. -->
-    <!-- TODO(b/411449027): Remove this config once it is true on all configurations. -->
-    <bool name="config_disableSplitShade">false</bool>
 
     <!-- Whether we use large screen shade header which takes only one row compared to QS header -->
     <bool name="config_use_large_screen_shade_header">false</bool>

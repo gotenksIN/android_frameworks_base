@@ -348,7 +348,6 @@ public final class ViewRootImpl implements ViewParent,
     private static final boolean DEBUG_INPUT_RESIZE = false || LOCAL_LOGV;
     private static final boolean DEBUG_ORIENTATION = false || LOCAL_LOGV;
     private static final boolean DEBUG_TRACKBALL = false || LOCAL_LOGV;
-    private static final boolean DEBUG_IMF = false || LOCAL_LOGV;
     private static final boolean DEBUG_CONFIGURATION = false || LOCAL_LOGV;
     private static final boolean DEBUG_FPS = false;
     private static final boolean DEBUG_INPUT_STAGES = false || LOCAL_LOGV;
@@ -9598,6 +9597,17 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private @Nullable AutofillManager getAutofillManager() {
+        if (android.service.autofill.Flags.useFocusedViewToGetAfmInViewRoot()) {
+            View focusedView = getFocusedViewOrNull();
+            if (focusedView == null) {
+                return getAutofillManagerFromFirstChild();
+            }
+            return focusedView.getContext().getSystemService(AutofillManager.class);
+        }
+        return getAutofillManagerFromFirstChild();
+    }
+
+    private @Nullable AutofillManager getAutofillManagerFromFirstChild() {
         if (mView instanceof ViewGroup) {
             ViewGroup decorView = (ViewGroup) mView;
             if (decorView.getChildCount() > 0) {

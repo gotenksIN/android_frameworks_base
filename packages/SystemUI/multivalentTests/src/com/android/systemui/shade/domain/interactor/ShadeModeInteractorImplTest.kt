@@ -16,8 +16,8 @@
 
 package com.android.systemui.shade.domain.interactor
 
-import android.content.testableContext
 import android.provider.Settings
+import androidx.compose.ui.Alignment
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
@@ -29,7 +29,6 @@ import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.res.R
-import com.android.systemui.shade.data.repository.shadeRepository
 import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.shared.settings.data.repository.fakeSecureSettingsRepository
 import com.android.systemui.testKosmos
@@ -85,26 +84,31 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
-    fun legacyShadeMode_disableSplitShade_wideScreen_dualShade() =
+    fun defaultShadeMode_splitShadeOverridden_dualShade() =
         kosmos.runTest {
-            overrideResource(R.bool.config_disableSplitShade, true)
-            val shadeMode by collectLastValue(underTest.shadeMode)
             enableSplitShade()
+            val shadeMode by collectLastValue(underTest.shadeMode)
+            assertThat(shadeMode).isEqualTo(ShadeMode.Split)
+
+            overrideResource(R.bool.config_useDualShadeSetting, false)
+            overrideResource(R.bool.config_dualShadeEnabledByDefault, true)
             fakeConfigurationRepository.onConfigurationChange()
 
             assertThat(shadeMode).isEqualTo(ShadeMode.Dual)
         }
 
     @Test
-    fun legacyShadeMode_disableSplitShade_narrowScreen_singleShade() =
+    fun defaultShadeMode_singleShadeOverridden_dualShade() =
         kosmos.runTest {
-            overrideResource(R.bool.config_disableSplitShade, true)
-            val shadeMode by collectLastValue(underTest.shadeMode)
             enableSingleShade()
+            val shadeMode by collectLastValue(underTest.shadeMode)
+            assertThat(shadeMode).isEqualTo(ShadeMode.Single)
 
+            overrideResource(R.bool.config_useDualShadeSetting, false)
+            overrideResource(R.bool.config_dualShadeEnabledByDefault, true)
             fakeConfigurationRepository.onConfigurationChange()
 
-            assertThat(shadeMode).isEqualTo(ShadeMode.Single)
+            assertThat(shadeMode).isEqualTo(ShadeMode.Dual)
         }
 
     @Test
@@ -154,16 +158,16 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
             // Large screen portrait
             setupScreenConfig(wideScreen = true, legacyUseSplitShade = false)
 
-            setupShadeConfig(dualShadeSettingEnabled = true, disableSplitShade = false)
+            setupShadeConfig(dualShadeSettingEnabled = true, dualShadeEnabledByDefault = false)
             assertThat(isFullWidthShade).isFalse()
 
-            setupShadeConfig(dualShadeSettingEnabled = true, disableSplitShade = true)
+            setupShadeConfig(dualShadeSettingEnabled = true, dualShadeEnabledByDefault = true)
             assertThat(isFullWidthShade).isFalse()
 
-            setupShadeConfig(dualShadeSettingEnabled = false, disableSplitShade = true)
+            setupShadeConfig(dualShadeSettingEnabled = false, dualShadeEnabledByDefault = true)
             assertThat(isFullWidthShade).isTrue()
 
-            setupShadeConfig(dualShadeSettingEnabled = false, disableSplitShade = false)
+            setupShadeConfig(dualShadeSettingEnabled = false, dualShadeEnabledByDefault = false)
             assertThat(isFullWidthShade).isTrue()
         }
 
@@ -175,16 +179,16 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
             // Large screen landscape
             setupScreenConfig(wideScreen = true, legacyUseSplitShade = true)
 
-            setupShadeConfig(dualShadeSettingEnabled = true, disableSplitShade = false)
+            setupShadeConfig(dualShadeSettingEnabled = true, dualShadeEnabledByDefault = false)
             assertThat(isFullWidthShade).isFalse()
 
-            setupShadeConfig(dualShadeSettingEnabled = true, disableSplitShade = true)
+            setupShadeConfig(dualShadeSettingEnabled = true, dualShadeEnabledByDefault = true)
             assertThat(isFullWidthShade).isFalse()
 
-            setupShadeConfig(dualShadeSettingEnabled = false, disableSplitShade = true)
+            setupShadeConfig(dualShadeSettingEnabled = false, dualShadeEnabledByDefault = true)
             assertThat(isFullWidthShade).isFalse()
 
-            setupShadeConfig(dualShadeSettingEnabled = false, disableSplitShade = false)
+            setupShadeConfig(dualShadeSettingEnabled = false, dualShadeEnabledByDefault = false)
             assertThat(isFullWidthShade).isFalse()
         }
 
@@ -196,16 +200,16 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
             // Compact screen portrait
             setupScreenConfig(wideScreen = false, legacyUseSplitShade = false)
 
-            setupShadeConfig(dualShadeSettingEnabled = true, disableSplitShade = false)
+            setupShadeConfig(dualShadeSettingEnabled = true, dualShadeEnabledByDefault = false)
             assertThat(isFullWidthShade).isTrue()
 
-            setupShadeConfig(dualShadeSettingEnabled = true, disableSplitShade = true)
+            setupShadeConfig(dualShadeSettingEnabled = true, dualShadeEnabledByDefault = true)
             assertThat(isFullWidthShade).isTrue()
 
-            setupShadeConfig(dualShadeSettingEnabled = false, disableSplitShade = true)
+            setupShadeConfig(dualShadeSettingEnabled = false, dualShadeEnabledByDefault = true)
             assertThat(isFullWidthShade).isTrue()
 
-            setupShadeConfig(dualShadeSettingEnabled = false, disableSplitShade = false)
+            setupShadeConfig(dualShadeSettingEnabled = false, dualShadeEnabledByDefault = false)
             assertThat(isFullWidthShade).isTrue()
         }
 
@@ -217,38 +221,96 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
             // Compact screen landscape
             setupScreenConfig(wideScreen = true, legacyUseSplitShade = false)
 
-            setupShadeConfig(dualShadeSettingEnabled = true, disableSplitShade = false)
+            setupShadeConfig(dualShadeSettingEnabled = true, dualShadeEnabledByDefault = false)
             assertThat(isFullWidthShade).isFalse()
 
-            setupShadeConfig(dualShadeSettingEnabled = true, disableSplitShade = true)
+            setupShadeConfig(dualShadeSettingEnabled = true, dualShadeEnabledByDefault = true)
             assertThat(isFullWidthShade).isFalse()
 
-            setupShadeConfig(dualShadeSettingEnabled = false, disableSplitShade = true)
+            setupShadeConfig(dualShadeSettingEnabled = false, dualShadeEnabledByDefault = true)
             assertThat(isFullWidthShade).isTrue()
 
-            setupShadeConfig(dualShadeSettingEnabled = false, disableSplitShade = false)
+            setupShadeConfig(dualShadeSettingEnabled = false, dualShadeEnabledByDefault = false)
             assertThat(isFullWidthShade).isTrue()
+        }
+
+    @Test
+    fun notificationStackHorizontalAlignment_singleShade_centeredHorizontally() =
+        kosmos.runTest {
+            val alignment by collectLastValue(underTest.notificationStackHorizontalAlignment)
+
+            enableSingleShade(wideLayout = true)
+
+            assertThat(alignment).isEqualTo(Alignment.CenterHorizontally)
+        }
+
+    @Test
+    fun notificationStackHorizontalAlignment_splitShade_endAligned() =
+        kosmos.runTest {
+            val alignment by collectLastValue(underTest.notificationStackHorizontalAlignment)
+
+            enableSplitShade()
+
+            assertThat(alignment).isEqualTo(Alignment.End)
+        }
+
+    @Test
+    fun notificationStackHorizontalAlignment_dualShadeNarrow_centeredHorizontally() =
+        kosmos.runTest {
+            val alignment by collectLastValue(underTest.notificationStackHorizontalAlignment)
+
+            enableDualShade(wideLayout = false)
+
+            assertThat(alignment).isEqualTo(Alignment.CenterHorizontally)
+        }
+
+    @Test
+    fun notificationStackHorizontalAlignment_dualShadeWide_startAligned() =
+        kosmos.runTest {
+            val alignment by collectLastValue(underTest.notificationStackHorizontalAlignment)
+
+            enableDualShade(wideLayout = true)
+
+            assertThat(alignment).isEqualTo(Alignment.Start)
+        }
+
+    @Test
+    fun notificationStackHorizontalAlignment_desktopWithTopEndConfig_endAligned() =
+        kosmos.runTest {
+            overrideResource(R.bool.config_notificationShadeOnTopEnd, true)
+
+            val alignment by collectLastValue(underTest.notificationStackHorizontalAlignment)
+
+            enableDualShade(wideLayout = true)
+
+            assertThat(alignment).isEqualTo(Alignment.End)
+        }
+
+    @Test
+    fun notificationStackHorizontalAlignment_desktopWithoutTopEndConfig_startAligned() =
+        kosmos.runTest {
+            overrideResource(R.bool.config_notificationShadeOnTopEnd, false)
+
+            val alignment by collectLastValue(underTest.notificationStackHorizontalAlignment)
+
+            enableDualShade(wideLayout = true)
+
+            assertThat(alignment).isEqualTo(Alignment.Start)
         }
 
     private fun Kosmos.setupScreenConfig(wideScreen: Boolean, legacyUseSplitShade: Boolean) {
-        testableContext.orCreateTestableResources.apply {
-            addOverride(R.bool.config_isFullWidthShade, !wideScreen)
-            addOverride(R.bool.config_use_split_notification_shade, legacyUseSplitShade)
-            addOverride(R.bool.config_use_large_screen_shade_header, legacyUseSplitShade)
-        }
+        overrideResource(R.bool.config_isFullWidthShade, !wideScreen)
+        overrideResource(R.bool.config_use_split_notification_shade, legacyUseSplitShade)
+        overrideResource(R.bool.config_use_large_screen_shade_header, legacyUseSplitShade)
         fakeConfigurationRepository.onConfigurationChange()
-        shadeRepository.legacyUseSplitShade.value = legacyUseSplitShade
     }
 
     private fun Kosmos.setupShadeConfig(
         dualShadeSettingEnabled: Boolean,
-        disableSplitShade: Boolean,
+        dualShadeEnabledByDefault: Boolean,
     ) = runBlocking {
         fakeSecureSettingsRepository.setBoolean(Settings.Secure.DUAL_SHADE, dualShadeSettingEnabled)
-        testableContext.orCreateTestableResources.addOverride(
-            R.bool.config_disableSplitShade,
-            disableSplitShade,
-        )
+        overrideResource(R.bool.config_dualShadeEnabledByDefault, dualShadeEnabledByDefault)
         fakeConfigurationRepository.onConfigurationChange()
     }
 }

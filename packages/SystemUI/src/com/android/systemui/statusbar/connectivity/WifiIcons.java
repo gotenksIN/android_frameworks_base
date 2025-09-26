@@ -44,6 +44,7 @@ public class WifiIcons {
                 com.android.settingslib.R.drawable.ic_wifi_0,
                 com.android.settingslib.R.drawable.ic_wifi_1,
                 com.android.settingslib.R.drawable.ic_wifi_2,
+                com.android.settingslib.R.drawable.ic_wifi_2,
                 com.android.settingslib.R.drawable.ic_wifi_3
             };
         } else {
@@ -65,6 +66,7 @@ public class WifiIcons {
             return new int[] {
                 com.android.settingslib.R.drawable.ic_wifi_0_error,
                 com.android.settingslib.R.drawable.ic_wifi_1_error,
+                com.android.settingslib.R.drawable.ic_wifi_2_error,
                 com.android.settingslib.R.drawable.ic_wifi_2_error,
                 com.android.settingslib.R.drawable.ic_wifi_3_error
             };

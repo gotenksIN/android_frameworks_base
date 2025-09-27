@@ -553,9 +553,11 @@ public interface RILConstants {
     int RIL_REQUEST_SET_SATELLITE_ENABLED_FOR_CARRIER = 252;
     int RIL_REQUEST_IS_SATELLITE_ENABLED_FOR_CARRIER = 253;
 
+// QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /* RIL Request to get newly supported radio
        capabilities include 5G SA*/
     int RIL_REQUEST_GET_ENHANCED_RADIO_CAPABILITY = 600;
+// QTI_END: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /* Responses begin */
     int RIL_RESPONSE_ACKNOWLEDGEMENT = 800;
 

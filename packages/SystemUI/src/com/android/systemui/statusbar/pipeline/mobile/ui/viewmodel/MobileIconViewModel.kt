@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
@@ -20,10 +21,13 @@
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 package com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 
 import android.telephony.TelephonyManager
 import com.android.settingslib.mobile.TelephonyIcons
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.systemui.Flags.statusBarStaticInoutIndicators
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
@@ -31,7 +35,9 @@ import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.core.NewStatusBarIcons
 import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconInteractor
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
@@ -65,8 +71,10 @@ interface MobileIconViewModelCommon {
     val activityInVisible: Flow<Boolean>
     val activityOutVisible: Flow<Boolean>
     val activityContainerVisible: Flow<Boolean>
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     val volteId: Flow<Int>
     val showSignalStrengthIcon: Flow<Boolean>
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 }
 /**
  * View model for the state of a single mobile icon. Each [MobileIconViewModel] will keep watch over
@@ -139,11 +147,13 @@ class MobileIconViewModel(
         vmProvider.flatMapLatest { it.activityOutVisible }
     override val activityContainerVisible: Flow<Boolean> =
         vmProvider.flatMapLatest { it.activityContainerVisible }
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     override val volteId: Flow<Int> =
         vmProvider.flatMapLatest { it.volteId }
 
     override val showSignalStrengthIcon: Flow<Boolean> =
         vmProvider.flatMapLatest { it.showSignalStrengthIcon }
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 }
 /** Representation of this network when it is non-terrestrial (e.g., satellite) */
 private class CarrierBasedSatelliteViewModelImpl(
@@ -165,8 +175,12 @@ private class CarrierBasedSatelliteViewModelImpl(
     override val activityInVisible: Flow<Boolean> = flowOf(false)
     override val activityOutVisible: Flow<Boolean> = flowOf(false)
     override val activityContainerVisible: Flow<Boolean> = flowOf(false)
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     override val volteId: Flow<Int> = flowOf(0)
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Fixed satellite icon display issue.
     override val showSignalStrengthIcon: Flow<Boolean> = flowOf(true)
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Fixed satellite icon display issue.
 }
 /** Terrestrial (cellular) icon. */
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")
@@ -185,11 +199,13 @@ private class CellularIconViewModel(
                     airplaneModeInteractor.isAirplaneMode,
                     iconInteractor.isAllowedDuringAirplaneMode,
                     iconInteractor.isForceHidden,
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                     iconInteractor.voWifiAvailable,
                 ) { isAirplaneMode, isAllowedDuringAirplaneMode, isForceHidden, voWifiAvailable ->
                     if (voWifiAvailable) {
                         true
                     } else if (isForceHidden) {
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                         false
                     } else if (isAirplaneMode) {
                         isAllowedDuringAirplaneMode
@@ -259,6 +275,7 @@ private class CellularIconViewModel(
             )
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val networkTypeIcon: Flow<Icon.Resource?> =
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
         combine(
                 iconInteractor.networkTypeIconGroup,
                 showNetworkTypeIcon,
@@ -267,13 +284,15 @@ private class CellularIconViewModel(
                 iconInteractor.isInService,
             ) { networkTypeIconGroup, shouldShow, networkTypeIconCustomization, voWifiAvailable,
                 isInService ->
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                 val desc =
                     if (networkTypeIconGroup.contentDescription != 0)
                         ContentDescription.Resource(networkTypeIconGroup.contentDescription)
                     else null
-// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
                 val icon =
-// QTI_END: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                     if (voWifiAvailable) {
                         Icon.Resource(TelephonyIcons.VOWIFI.dataType, desc)
                     } else {
@@ -281,7 +300,9 @@ private class CellularIconViewModel(
                             Icon.Resource(networkTypeIconGroup.iconId, desc)
                         else null
                     }
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                 return@combine when {
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                     voWifiAvailable -> icon
                     networkTypeIconCustomization.isRatCustomization -> {
                         if (shouldShowNetworkTypeIcon(networkTypeIconCustomization)
@@ -291,6 +312,7 @@ private class CellularIconViewModel(
                             null
                         }
                     }
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                     !shouldShow -> null
                     else -> icon
                 }
@@ -316,6 +338,7 @@ private class CellularIconViewModel(
                 initialValue = false,
             )
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 
 
     override val volteId =
@@ -353,6 +376,7 @@ private class CellularIconViewModel(
         .distinctUntilChanged()
         .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     private val activity: Flow<DataActivityModel?> =
         if (!constants.shouldShowActivityConfig) {
             flowOf(null)
@@ -374,6 +398,7 @@ private class CellularIconViewModel(
                 activity.map { it != null && (it.hasActivityIn || it.hasActivityOut) }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 
     private fun shouldShowNetworkTypeIcon(mode: MobileIconCustomizationMode): Boolean {
         return (mode.alwaysShowNetworkTypeIcon
@@ -381,4 +406,5 @@ private class CellularIconViewModel(
             || mode.nonDdsRatIconEnhancementEnabled
                 && mode.mobileDataEnabled && (mode.dataRoamingEnabled || !mode.isRoaming))
     }
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 }

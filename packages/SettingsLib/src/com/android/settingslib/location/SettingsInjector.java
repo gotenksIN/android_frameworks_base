@@ -94,7 +94,9 @@ public class SettingsInjector {
      * {@link Message#what} value sent after the timeout waiting for a status message.
      */
     private static final int WHAT_TIMEOUT = 3;
+// QTI_BEGIN: 2019-03-29: GPS: Fix for dimmableIcon not showing properly (no call to showIzat)
     protected final Context mContext;
+// QTI_END: 2019-03-29: GPS: Fix for dimmableIcon not showing properly (no call to showIzat)
 
     /**
      * The settings that were injected
@@ -216,7 +218,9 @@ public class SettingsInjector {
      *
      * Duplicates some code from {@link android.content.pm.RegisteredServicesCache}.
      */
+// QTI_BEGIN: 2019-03-29: GPS: Fix for dimmableIcon not showing properly (no call to showIzat)
     protected InjectedSetting parseServiceInfo(ResolveInfo service, UserHandle userHandle,
+// QTI_END: 2019-03-29: GPS: Fix for dimmableIcon not showing properly (no call to showIzat)
             PackageManager pm) throws XmlPullParserException, IOException {
 
         ServiceInfo si = service.serviceInfo;

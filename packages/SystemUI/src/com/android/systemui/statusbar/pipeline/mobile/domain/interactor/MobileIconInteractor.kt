@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
@@ -20,28 +21,37 @@
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 import android.content.Context
 import com.android.internal.telephony.flags.Flags
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import android.telephony.CarrierConfigManager
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_CROSS_SIM
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_IWLAN
 import android.telephony.TelephonyDisplayInfo
 import android.telephony.TelephonyManager
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.settingslib.SignalIcon.MobileIconGroup
 import com.android.settingslib.graph.SignalDrawable
 import com.android.settingslib.mobile.MobileIconCarrierIdOverrides
 import com.android.settingslib.mobile.MobileIconCarrierIdOverridesImpl
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.settingslib.mobile.MobileMappings
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.statusbar.pipeline.mobile.data.model.DataConnectionState.Connected
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.DefaultNetworkType
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.OverrideNetworkType
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionRepository
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.NetworkTypeIconModel
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.NetworkTypeIconModel.DefaultIcon
@@ -49,8 +59,10 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.model.NetworkTypeIc
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.satellite.ui.model.SatelliteIconModel
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState
 import com.android.systemui.util.CarrierNameCustomization
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -59,7 +71,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import kotlinx.coroutines.flow.mapLatest
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 import kotlinx.coroutines.flow.stateIn
 interface MobileIconInteractor {
     /** The table log created for this connection */
@@ -76,9 +90,11 @@ interface MobileIconInteractor {
      */
     val isDataConnected: Flow<Boolean>
 
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     /** Only true if mobile is the cellular transport but is not validated, otherwise false */
     val isConnectionFailed: Flow<Boolean>
 
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     /** True if we consider this connection to be in service, i.e. can make calls */
     val isInService: Flow<Boolean>
 
@@ -138,15 +154,18 @@ interface MobileIconInteractor {
 
     /** See [MobileIconsInteractor.isForceHidden]. */
     val isForceHidden: Flow<Boolean>
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 
     /** True if the rsrp level should be preferred over the primary level for LTE. */
     val alwaysUseRsrpLevelForLte: Flow<Boolean>
 
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     /** See [MobileConnectionRepository.isAllowedDuringAirplaneMode]. */
     val isAllowedDuringAirplaneMode: Flow<Boolean>
 
     /** True when in carrier network change mode */
     val carrierNetworkChangeActive: Flow<Boolean>
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     /** True if the no internet icon should be hidden.  */
     val hideNoInternetState: Flow<Boolean>
 
@@ -165,6 +184,7 @@ interface MobileIconInteractor {
     val customizedCarrierName: Flow<String>
 
     val customizedNetworkName: Flow<NetworkNameModel>
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 }
 /** Interactor for a single mobile connection. This connection _should_ have one subscription ID */
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")
@@ -182,6 +202,7 @@ class MobileIconInteractorImpl(
     connectionRepository: MobileConnectionRepository,
     private val context: Context,
     val carrierIdOverrides: MobileIconCarrierIdOverrides = MobileIconCarrierIdOverridesImpl(),
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     override val alwaysUseRsrpLevelForLte: StateFlow<Boolean>,
     override val hideNoInternetState: StateFlow<Boolean>,
     networkTypeIconCustomizationFlow: StateFlow<MobileIconCustomizationMode>,
@@ -191,6 +212,7 @@ class MobileIconInteractorImpl(
     ddsIcon: StateFlow<SignalIconModel?>,
     crossSimdisplaySingnalLevel: StateFlow<Boolean>,
     carrierNameCustomization: CarrierNameCustomization,
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 ) : MobileIconInteractor {
     override val tableLogBuffer: TableLogBuffer = connectionRepository.tableLogBuffer
     override val activity = connectionRepository.dataActivityDirection
@@ -235,6 +257,7 @@ class MobileIconInteractorImpl(
                 SharingStarted.WhileSubscribed(),
                 connectionRepository.carrierName.value.name,
             )
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 
     private val signalStrengthCustomization: StateFlow<MobileIconCustomizationMode> =
         combine(
@@ -414,20 +437,25 @@ class MobileIconInteractorImpl(
         }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     /** What the mobile icon would be before carrierId overrides */
     private val defaultNetworkType: StateFlow<MobileIconGroup> =
         combine(
                 connectionRepository.resolvedNetworkType,
                 defaultMobileIconMapping,
                 defaultMobileIconGroup,
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                 mobileIconCustomization,
             ) { resolvedNetworkType, mapping, defaultGroup, mobileIconCustomization ->
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                 when (resolvedNetworkType) {
                     is ResolvedNetworkType.CarrierMergedNetworkType ->
                         resolvedNetworkType.iconGroupOverride
                     else -> {
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                         getMobileIconGroup(resolvedNetworkType, mobileIconCustomization, mapping)
                             ?: defaultGroup
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                     }
                 }
             }
@@ -472,16 +500,19 @@ class MobileIconInteractorImpl(
     override val isNonTerrestrial: StateFlow<Boolean> = connectionRepository.isNonTerrestrial
 
     private val level: StateFlow<Int> =
-// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support customization signal strength icon
+// QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon
         combine(
-// QTI_END: 2023-03-02: Data: SystemUI: Support customization signal strength icon
+// QTI_END: 2023-03-02: Android_UI: SystemUI: Support customization signal strength icon
                 connectionRepository.isGsm,
                 connectionRepository.primaryLevel,
                 connectionRepository.cdmaLevel,
                 alwaysUseCdmaLevel,
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                 signalStrengthCustomization
             ) { isGsm, primaryLevel, cdmaLevel, alwaysUseCdmaLevel, signalStrengthCustomization ->
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                 when {
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                     signalStrengthCustomization.alwaysUseRsrpLevelForLte -> {
                         if (isLteCamped(signalStrengthCustomization)) {
                             signalStrengthCustomization.lteRsrpLevel
@@ -489,6 +520,7 @@ class MobileIconInteractorImpl(
                             primaryLevel
                         }
                     }
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                     // GSM connections should never use the CDMA level
                     isGsm -> primaryLevel
                     alwaysUseCdmaLevel -> cdmaLevel
@@ -502,6 +534,7 @@ class MobileIconInteractorImpl(
             .map { it == Connected }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val isInService = connectionRepository.isInService
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 
     override val isConnectionFailed: StateFlow<Boolean> = connectionRepository.isConnectionFailed
 
@@ -547,10 +580,12 @@ class MobileIconInteractorImpl(
                 || networkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA
     }
 
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     override val isEmergencyOnly: StateFlow<Boolean> = connectionRepository.isEmergencyOnly
     override val isAllowedDuringAirplaneMode = connectionRepository.isAllowedDuringAirplaneMode
     /** Whether or not to show the error state of [SignalDrawable] */
     private val showExclamationMark: StateFlow<Boolean> =
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
         combine(
                 isDataEnabled,
                 isDataConnected,
@@ -561,6 +596,7 @@ class MobileIconInteractorImpl(
                         hideNoInternetState ->
                 !hideNoInternetState && (!isDataEnabled || (isDataConnected && isConnectionFailed)
                         || !isInService)
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), true)
     private val cellularShownLevel: StateFlow<Int> =
@@ -605,6 +641,7 @@ class MobileIconInteractorImpl(
                         ?: SatelliteIconModel.fromSignalStrength(0)!!,
             )
         }
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
 
     private val customizedCellularIcon : Flow<SignalIconModel.Cellular> =
         combine(
@@ -618,6 +655,7 @@ class MobileIconInteractorImpl(
             }
         }
 
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
     override val signalLevelIcon: StateFlow<SignalIconModel> = run {
         val initial =
             SignalIconModel.Cellular(
@@ -631,7 +669,9 @@ class MobileIconInteractorImpl(
                 if (ntn) {
                     satelliteIcon
                 } else {
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                     customizedCellularIcon
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 1
                 }
             }
             .distinctUntilChanged()

@@ -17,7 +17,9 @@
 package com.android.keyguard;
 
 import android.content.Context;
+// QTI_BEGIN: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 import android.content.res.Configuration;
+// QTI_END: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 import android.content.res.TypedArray;
 import android.text.TextUtils;
 import android.text.method.SingleLineTransformationMethod;
@@ -36,7 +38,9 @@ public class CarrierText extends TextView {
     private final boolean mShowAirplaneMode;
 
     private final String mDebugLocation;
+// QTI_BEGIN: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
     private OnConfigurationChangedListener mOnConfigurationChangedListener;
+// QTI_END: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 
     public CarrierText(Context context) {
         this(context, null);
@@ -108,6 +112,7 @@ public class CarrierText extends TextView {
             return source;
         }
     }
+// QTI_BEGIN: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 
     public void setOnConfigurationChangedListener(OnConfigurationChangedListener listener) {
         mOnConfigurationChangedListener = listener;
@@ -124,4 +129,5 @@ public class CarrierText extends TextView {
     interface OnConfigurationChangedListener {
         void onConfigurationChanged(Configuration newConfig);
     }
+// QTI_END: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 }

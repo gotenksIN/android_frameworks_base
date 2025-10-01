@@ -246,10 +246,12 @@ sealed class WifiNetworkModel : Diffable<WifiNetworkModel> {
          */
         val hotspotDeviceType: HotspotDeviceType,
 
+// QTI_BEGIN: 2024-06-02: WLAN: SystemUI: Wifi generation icons in Notification bar.
         /** See [android.net.wifi.WifiInfo.getWifiStandard]. */
-// QTI_BEGIN: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
+// QTI_END: 2024-06-02: WLAN: SystemUI: Wifi generation icons in Notification bar.
+// QTI_BEGIN: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
         val wifiStandard: Int?,
-// QTI_END: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
+// QTI_END: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
     ) : WifiNetworkModel() {
         companion object {
             /**
@@ -262,16 +264,16 @@ sealed class WifiNetworkModel : Diffable<WifiNetworkModel> {
                 level: Int,
                 ssid: String? = null,
                 hotspotDeviceType: HotspotDeviceType = HotspotDeviceType.NONE,
-// QTI_BEGIN: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
+// QTI_BEGIN: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
                 wifiStandard: Int? = 0,
-// QTI_END: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
+// QTI_END: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
             ): WifiNetworkModel {
                 if (!level.isValid()) {
                     return Inactive(getInvalidLevelErrorString(level))
                 }
-// QTI_BEGIN: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
+// QTI_BEGIN: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
                 return Active(isValidated, level, ssid, hotspotDeviceType, wifiStandard)
-// QTI_END: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
+// QTI_END: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
             }
 
             private fun Int.isValid(): Boolean {

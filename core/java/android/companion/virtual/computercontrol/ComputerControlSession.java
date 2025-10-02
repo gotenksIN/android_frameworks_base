@@ -30,15 +30,16 @@ import android.content.IntentSender;
 import android.graphics.PixelFormat;
 import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.IVirtualDisplayCallback;
-import android.hardware.input.VirtualKeyEvent;
-import android.hardware.input.VirtualTouchEvent;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Binder;
 import android.os.RemoteException;
+import android.util.Size;
 import android.view.Display;
 import android.view.DisplayInfo;
-import android.view.Surface;
+import android.view.SurfaceControl;
+import android.view.accessibility.AccessibilityManager;
+import android.view.accessibility.AccessibilityWindowInfo;
 import android.view.inputmethod.InputConnection;
 
 import com.android.internal.annotations.GuardedBy;
@@ -48,6 +49,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 
@@ -118,40 +120,44 @@ public final class ComputerControlSession implements AutoCloseable {
 
     @NonNull
     private final IComputerControlSession mSession;
+    @NonNull
+    private final Size mDisplaySize;
     private final Object mLock = new Object();
     @GuardedBy("mLock")
     @Nullable
     private ImageReader mImageReader;
-    @GuardedBy("mLock")
-    private boolean mIsValid = true;
+
+    private final ComputerControlAccessibilityProxy mAccessibilityProxy;
 
     /** @hide */
     public ComputerControlSession(int displayId, @NonNull IVirtualDisplayCallback displayToken,
-            @NonNull IComputerControlSession session) {
-        this(displayId, displayToken, session, DisplayManagerGlobal.getInstance());
+            @NonNull IComputerControlSession session,
+            @NonNull AccessibilityManager accessibilityManager) {
+        this(displayId, displayToken, session, accessibilityManager,
+                DisplayManagerGlobal.getInstance());
     }
 
     /** @hide */
     @VisibleForTesting
     public ComputerControlSession(int displayId, @NonNull IVirtualDisplayCallback displayToken,
             @NonNull IComputerControlSession session,
+            @NonNull AccessibilityManager accessibilityManager,
             @NonNull DisplayManagerGlobal displayManagerGlobal) {
         mSession = Objects.requireNonNull(session);
 
-        // TODO(b/439774796): Require a valid display id.
-        if (displayId != Display.INVALID_DISPLAY) {
-            final Display display = displayManagerGlobal.getRealDisplay(displayId);
-            Objects.requireNonNull(display);
-            final DisplayInfo displayInfo = new DisplayInfo();
-            display.getDisplayInfo(displayInfo);
+        final Display display = displayManagerGlobal.getRealDisplay(displayId);
+        Objects.requireNonNull(display);
+        final DisplayInfo displayInfo = new DisplayInfo();
+        display.getDisplayInfo(displayInfo);
+        mDisplaySize = new Size(displayInfo.logicalWidth, displayInfo.logicalHeight);
 
-            mImageReader = ImageReader.newInstance(displayInfo.logicalWidth,
-                    displayInfo.logicalHeight,
-                    PixelFormat.RGBA_8888, /* maxImages= */ 2);
-            displayManagerGlobal.setVirtualDisplaySurface(displayToken, mImageReader.getSurface());
-        } else {
-            mImageReader = null;
-        }
+        mImageReader = ImageReader.newInstance(displayInfo.logicalWidth,
+                displayInfo.logicalHeight,
+                PixelFormat.RGBA_8888, /* maxImages= */ 2);
+        displayManagerGlobal.setVirtualDisplaySurface(displayToken, mImageReader.getSurface());
+
+        mAccessibilityProxy = new ComputerControlAccessibilityProxy(displayId);
+        accessibilityManager.registerDisplayProxy(mAccessibilityProxy);
     }
 
     /**
@@ -166,6 +172,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+        mAccessibilityProxy.resetStabilityState();
     }
 
     /**
@@ -180,6 +187,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+        mAccessibilityProxy.resetStabilityState();
     }
 
     /**
@@ -229,6 +237,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+        mAccessibilityProxy.resetStabilityState();
     }
 
     /**
@@ -252,6 +261,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+        mAccessibilityProxy.resetStabilityState();
     }
 
     /**
@@ -269,30 +279,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-    }
-
-    /** Returns the ID of the single trusted virtual display for this session. */
-    public int getVirtualDisplayId() {
-        try {
-            return mSession.getVirtualDisplayId();
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Injects a key event into the trusted virtual display.
-     *
-     * @deprecated use {@link #insertText(String, boolean, boolean)} for injecting text into the
-     * text field and use {@link #performAction(int)} to perform actions like "back navigation".
-     */
-    @Deprecated
-    public void sendKeyEvent(@NonNull VirtualKeyEvent event) {
-        try {
-            mSession.sendKeyEvent(Objects.requireNonNull(event));
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        mAccessibilityProxy.resetStabilityState();
     }
 
     /**
@@ -313,6 +300,7 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+        mAccessibilityProxy.resetStabilityState();
     }
 
     /** Perform provided action on the trusted virtual display. */
@@ -322,36 +310,28 @@ public final class ComputerControlSession implements AutoCloseable {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-    }
-
-    /** Injects a touch event into the trusted virtual display. */
-    public void sendTouchEvent(@NonNull VirtualTouchEvent event) {
-        try {
-            mSession.sendTouchEvent(Objects.requireNonNull(event));
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        mAccessibilityProxy.resetStabilityState();
     }
 
     /** Creates an interactive virtual display, mirroring the trusted one. */
     @Nullable
-    public InteractiveMirrorDisplay createInteractiveMirrorDisplay(
-            @IntRange(from = 1) int width, @IntRange(from = 1) int height,
-            @NonNull Surface surface) {
-        Objects.requireNonNull(surface);
-        if (width <= 0 || height <= 0) {
-            throw new IllegalArgumentException("Display dimensions must be positive");
-        }
+    public InteractiveMirror createInteractiveMirror() {
         try {
-            IInteractiveMirrorDisplay display =
-                    mSession.createInteractiveMirrorDisplay(width, height, surface);
-            if (display == null) {
+            SurfaceControl mirrorSurface = new SurfaceControl();
+            IInteractiveMirror mirror = mSession.createInteractiveMirror(mirrorSurface);
+            if (mirror == null) {
                 return null;
             }
-            return new InteractiveMirrorDisplay(display);
+            return new InteractiveMirror(mirror, mirrorSurface);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+    }
+
+    /** Get the size of the session's display. */
+    @NonNull
+    public Size getDisplaySize() {
+        return mDisplaySize;
     }
 
     /**
@@ -364,49 +344,38 @@ public final class ComputerControlSession implements AutoCloseable {
             @NonNull StabilityListener listener) {
         Objects.requireNonNull(executor);
         Objects.requireNonNull(listener);
-        try {
-            mSession.setStabilityListener(new StabilityListenerProxy(executor, listener));
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        mAccessibilityProxy.setStabilityListener(executor, listener);
     }
 
     /**
      * Clears any {@link StabilityListener} that was previously set using
      * {@link #setStabilityListener(Executor, StabilityListener)}.
+     *
+     * @throws IllegalStateException if a listener was not previously set.
      */
     public void clearStabilityListener() {
-        try {
-            mSession.setStabilityListener(null);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        mAccessibilityProxy.clearStabilityListener();
     }
 
     /**
-     * Returns whether the session is still valid or has been closed.
-     *
-     * @hide
+     * Returns all windows on the display associated with the {@link ComputerControlSession}.
      */
-    public boolean isValid() {
-        synchronized (mLock) {
-            return mIsValid;
-        }
+    @NonNull
+    public List<AccessibilityWindowInfo> getAccessibilityWindows() {
+        return mAccessibilityProxy.getWindows();
     }
 
     @Override
     public void close() {
         try {
-            closeInternal();
             mSession.close();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
-    private void closeInternal() {
+    private void releaseResources() {
         synchronized (mLock) {
-            mIsValid = false;
             if (mImageReader != null) {
                 mImageReader.close();
                 mImageReader = null;
@@ -464,11 +433,14 @@ public final class ComputerControlSession implements AutoCloseable {
     /** @hide */
     public static class CallbackProxy extends IComputerControlSessionCallback.Stub {
 
+        private final Context mContext;
         private final Callback mCallback;
         private final Executor mExecutor;
         private ComputerControlSession mSession;
 
-        public CallbackProxy(@NonNull Executor executor, @NonNull Callback callback) {
+        public CallbackProxy(
+                @NonNull Context context, @NonNull Executor executor, @NonNull Callback callback) {
+            mContext = context;
             mExecutor = executor;
             mCallback = callback;
         }
@@ -483,7 +455,8 @@ public final class ComputerControlSession implements AutoCloseable {
         @Override
         public void onSessionCreated(int displayId, IVirtualDisplayCallback displayToken,
                 IComputerControlSession session) {
-            mSession = new ComputerControlSession(displayId, displayToken, session);
+            mSession = new ComputerControlSession(displayId, displayToken, session,
+                    mContext.getSystemService(AccessibilityManager.class));
             Binder.withCleanCallingIdentity(() ->
                     mExecutor.execute(() -> mCallback.onSessionCreated(mSession)));
         }
@@ -496,26 +469,9 @@ public final class ComputerControlSession implements AutoCloseable {
 
         @Override
         public void onSessionClosed() {
-            mSession.closeInternal();
+            mSession.releaseResources();
             Binder.withCleanCallingIdentity(() ->
                     mExecutor.execute(() -> mCallback.onSessionClosed()));
-        }
-    }
-
-    private static class StabilityListenerProxy extends IComputerControlStabilityListener.Stub {
-
-        private final Executor mExecutor;
-        private final StabilityListener mListener;
-
-        StabilityListenerProxy(@NonNull Executor executor,
-                @NonNull StabilityListener listener) {
-            mExecutor = executor;
-            mListener = listener;
-        }
-
-        @Override
-        public void onSessionStable() {
-            Binder.withCleanCallingIdentity(() -> mExecutor.execute(mListener::onSessionStable));
         }
     }
 }

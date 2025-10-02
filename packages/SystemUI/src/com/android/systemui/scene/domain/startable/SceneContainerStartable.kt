@@ -615,17 +615,28 @@ constructor(
                 if (wakefulness.lastSleepReason != WakeSleepReason.POWER_BUTTON) return@collect
 
                 // If we're mid-transition from Gone to Lockscreen due to the first power button
-                // press, then return to Gone.
-                val transition: ObservableTransitionState.Transition =
+                // press, then unlock the device if needed and return to Gone.
+                val transition: ObservableTransitionState.Transition? =
                     sceneInteractor.transitionState.value as? ObservableTransitionState.Transition
-                        ?: return@collect
+
                 if (
-                    transition.fromContent == Scenes.Gone &&
+                    transition != null &&
+                        transition.fromContent == Scenes.Gone &&
                         transition.toContent == Scenes.Lockscreen
                 ) {
+                    // Immediately re-unlock the device - this is the first authoritative signal
+                    // that we've decided this is a power button launch gesture from Gone.
+                    deviceUnlockedInteractor.unlockNowForPowerButtonGesture(
+                        "double-tap power gesture while coming from gone"
+                    )
                     switchToScene(
                         targetSceneKey = Scenes.Gone,
                         loggingReason = "double-tap power gesture",
+                    )
+                } else if (occlusionInteractor.shouldTransitionFromPowerButtonGesture()) {
+                    switchToScene(
+                        Scenes.Occluded,
+                        "double tap power while not doing gone -> lockscreen",
                     )
                 }
             }

@@ -2528,9 +2528,9 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         AppCompatDisplayInsets compatInsets = null;
         boolean useOverrideInsetsForConfig = false;
         if (overrideHint != null) {
-            overrideDisplayInfo = overrideHint.mTmpOverrideDisplayInfo;
-            compatInsets = overrideHint.mTmpCompatInsets;
-            useOverrideInsetsForConfig = overrideHint.mUseOverrideInsetsForConfig;
+            overrideDisplayInfo = overrideHint.getOverrideDisplayInfo();
+            compatInsets = overrideHint.getAppCompatDisplayInsets();
+            useOverrideInsetsForConfig = overrideHint.shouldUseOverrideInsetsForConfig();
             if (overrideDisplayInfo != null) {
                 // Make sure the screen related configs can be computed by the provided
                 // display info.
@@ -2577,10 +2577,10 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             outAppBounds = inOutConfig.windowConfiguration.getAppBounds();
 
             if (insideParentBounds && useOverrideInsetsForConfig && !customContainerPolicy
-                    && overrideHint.mParentAppBoundsOverride != null
+                    && overrideHint.getParentAppBoundsOverride() != null
                     && !WindowConfiguration.isFloating(windowingMode)) {
                 // Clip decor insets for legacy apps (no INSETS_DECOUPLED_CONFIGURATION_ENFORCED).
-                outAppBounds.intersectUnchecked(overrideHint.mParentAppBoundsOverride);
+                outAppBounds.intersectUnchecked(overrideHint.getParentAppBoundsOverride());
             } else if (resolvedBounds.isEmpty()) {
                 // Inherit from parent if there is no override bounds.
                 final Rect parentAppBounds = parentConfig.windowConfiguration.getAppBounds();
@@ -2721,7 +2721,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             DisplayInfo displayInfo, boolean useLegacyInsetsForStableBounds) {
         outNonDecorBounds.set(bounds);
         outStableBounds.set(bounds);
-        if (mDisplayContent == null) {
+        if (!useLegacyInsetsForStableBounds || mDisplayContent == null) {
             return;
         }
         mTmpBounds.set(0, 0, displayInfo.logicalWidth, displayInfo.logicalHeight);
@@ -2729,13 +2729,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         final DisplayPolicy policy = mDisplayContent.getDisplayPolicy();
         final DisplayPolicy.DecorInsets.Info info = policy.getDecorInsetsInfo(
                 displayInfo.rotation, displayInfo.logicalWidth, displayInfo.logicalHeight);
-        if (!useLegacyInsetsForStableBounds) {
-            intersectWithInsetsIfFits(outStableBounds, mTmpBounds, info.mConfigInsets);
-            intersectWithInsetsIfFits(outNonDecorBounds, mTmpBounds, info.mNonDecorInsets);
-        } else {
-            intersectWithInsetsIfFits(outStableBounds, mTmpBounds, info.mOverrideConfigInsets);
-            intersectWithInsetsIfFits(outNonDecorBounds, mTmpBounds, info.mOverrideNonDecorInsets);
-        }
+        intersectWithInsetsIfFits(outStableBounds, mTmpBounds, info.mOverrideConfigInsets);
+        intersectWithInsetsIfFits(outNonDecorBounds, mTmpBounds, info.mOverrideNonDecorInsets);
     }
 
     /**

@@ -35,7 +35,6 @@ import static android.hardware.devicestate.DeviceState.PROPERTY_POWER_CONFIGURAT
 
 import static com.android.server.policy.BookStyleStateTransitions.DEFAULT_STATE_TRANSITIONS;
 import static com.android.server.policy.FoldableDeviceStateProvider.DeviceStatePredicateWrapper.createConfig;
-import static com.android.server.policy.FoldableDeviceStateProvider.DeviceStatePredicateWrapper.createTentModeClosedState;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -44,7 +43,10 @@ import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.hardware.devicestate.DeviceState;
 import android.hardware.display.DisplayManager;
+import android.os.PowerManager;
+import android.os.PowerManagerInternal;
 
+import com.android.server.LocalServices;
 import com.android.server.devicestate.DeviceStatePolicy;
 import com.android.server.devicestate.DeviceStateProvider;
 import com.android.server.policy.FoldableDeviceStateProvider.DeviceStatePredicateWrapper;
@@ -67,12 +69,12 @@ import java.util.function.Predicate;
 public class BookStyleDeviceStatePolicy extends DeviceStatePolicy implements
         BookStyleClosedStatePredicate.ClosedStateUpdatesListener {
 
-    private static final int DEVICE_STATE_CLOSED = 0;
-    private static final int DEVICE_STATE_HALF_OPENED = 1;
-    private static final int DEVICE_STATE_OPENED = 2;
-    private static final int DEVICE_STATE_REAR_DISPLAY = 3;
-    private static final int DEVICE_STATE_CONCURRENT_INNER_DEFAULT = 4;
-    private static final int DEVICE_STATE_REAR_DISPLAY_OUTER_DEFAULT = 5;
+    static final int DEVICE_STATE_CLOSED = 0;
+    static final int DEVICE_STATE_HALF_OPENED = 1;
+    static final int DEVICE_STATE_OPENED = 2;
+    static final int DEVICE_STATE_REAR_DISPLAY = 3;
+    static final int DEVICE_STATE_CONCURRENT_INNER_DEFAULT = 4;
+    static final int DEVICE_STATE_REAR_DISPLAY_OUTER_DEFAULT = 5;
     private static final int TENT_MODE_SWITCH_ANGLE_DEGREES = 90;
     private static final int TABLE_TOP_MODE_SWITCH_ANGLE_DEGREES = 125;
     private static final int MIN_CLOSED_ANGLE_DEGREES = 0;
@@ -81,7 +83,6 @@ public class BookStyleDeviceStatePolicy extends DeviceStatePolicy implements
     private final FoldableDeviceStateProvider mProvider;
 
     private final boolean mIsDualDisplayBlockingEnabled;
-    private final boolean mEnablePostureBasedClosedState;
     private static final Predicate<FoldableDeviceStateProvider> ALLOWED = p -> true;
     private static final Predicate<FoldableDeviceStateProvider> NOT_ALLOWED = p -> false;
 
@@ -90,26 +91,20 @@ public class BookStyleDeviceStatePolicy extends DeviceStatePolicy implements
      *
      * @param context           Android context
      * @param hingeAngleSensor  hinge angle sensor that will be used to switch between states
-     * @param hallSensor        hall sensor that will be used to switch between states
      * @param closeAngleDegrees if non-zero, this angle will be used as a threshold to switch
      *                          between folded and unfolded modes, otherwise when folding the
      *                          display switch will happen at 0 degrees
      */
     public BookStyleDeviceStatePolicy(@NonNull FeatureFlags featureFlags, @NonNull Context context,
-            @NonNull Sensor hingeAngleSensor, @NonNull Sensor hallSensor,
-            @Nullable Sensor leftAccelerometerSensor, @Nullable Sensor rightAccelerometerSensor,
-            Integer closeAngleDegrees) {
+            @NonNull Sensor hingeAngleSensor, @Nullable Sensor leftAccelerometerSensor,
+            @Nullable Sensor rightAccelerometerSensor, Integer closeAngleDegrees) {
         super(context);
 
         final SensorManager sensorManager = mContext.getSystemService(SensorManager.class);
         final DisplayManager displayManager = mContext.getSystemService(DisplayManager.class);
-
-        mEnablePostureBasedClosedState = featureFlags.enableFoldablesPostureBasedClosedState();
-        if (mEnablePostureBasedClosedState) {
-            // This configuration doesn't require listening to hall sensor, it solely relies
-            // on the fused hinge angle sensor
-            hallSensor = null;
-        }
+        final PowerManager powerManager = mContext.getSystemService(PowerManager.class);
+        final PowerManagerInternal powerManagerInternal = LocalServices.getService(
+                PowerManagerInternal.class);
 
         mIsDualDisplayBlockingEnabled = featureFlags.enableDualDisplayBlocking();
 
@@ -117,7 +112,7 @@ public class BookStyleDeviceStatePolicy extends DeviceStatePolicy implements
                 leftAccelerometerSensor, rightAccelerometerSensor, closeAngleDegrees, featureFlags);
 
         mProvider = new FoldableDeviceStateProvider(mContext, sensorManager, hingeAngleSensor,
-                hallSensor, displayManager, configuration);
+            displayManager, powerManager, powerManagerInternal, configuration);
     }
 
     private DeviceStatePredicateWrapper[] createConfiguration(
@@ -160,21 +155,14 @@ public class BookStyleDeviceStatePolicy extends DeviceStatePolicy implements
                     });
         }
 
-        if (mEnablePostureBasedClosedState) {
-            // Use smart closed state predicate that will use different switch angles
-            // based on the device posture (e.g. wedge mode, tent mode, reverse wedge mode)
-            final BookStyleClosedStatePredicate predicate = new BookStyleClosedStatePredicate(
-                    mContext, this, leftAccelerometerSensor, rightAccelerometerSensor,
-                    DEFAULT_STATE_TRANSITIONS, featureFlags);
-            return createConfig(getClosedDeviceState(),
-                    /* activeStatePredicate= */ predicate,
-                    /* initializer= */ predicate::init);
-        }
-
-        // Switch to the outer display only at 0 degrees but use TENT_MODE_SWITCH_ANGLE_DEGREES
-        // angle when switching to the inner display
-        return createTentModeClosedState(getClosedDeviceState(),
-                MIN_CLOSED_ANGLE_DEGREES, MAX_CLOSED_ANGLE_DEGREES, TENT_MODE_SWITCH_ANGLE_DEGREES);
+        // Use smart closed state predicate that will use different switch angles
+        // based on the device posture (e.g. wedge mode, tent mode, reverse wedge mode)
+        final BookStyleClosedStatePredicate predicate = new BookStyleClosedStatePredicate(
+                mContext, this, leftAccelerometerSensor, rightAccelerometerSensor,
+                DEFAULT_STATE_TRANSITIONS, featureFlags);
+        return createConfig(getClosedDeviceState(),
+                /* activeStatePredicate= */ predicate,
+                /* initializer= */ predicate::init);
     }
 
     @Override

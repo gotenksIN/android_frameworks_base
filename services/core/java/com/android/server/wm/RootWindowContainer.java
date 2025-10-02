@@ -1285,7 +1285,17 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (taskDisplayArea.topRunningActivity() == null) {
                 int userId = mWmService.getUserAssignedToDisplay(taskDisplayArea.getDisplayId());
                 startHomeOnTaskDisplayArea(userId, reason, taskDisplayArea,
-                        false /* allowInstrumenting */, false /* fromHomeKey */);
+                        false /* allowInstrumenting */, false /* fromHomeKey */, true /* onTop */);
+            }
+        });
+    }
+
+    void startHomeOnDisplaysWithNoHome(String reason) {
+        forAllTaskDisplayAreas(taskDisplayArea -> {
+            if (taskDisplayArea.getHomeActivity() == null) {
+                int userId = mWmService.getUserAssignedToDisplay(taskDisplayArea.getDisplayId());
+                startHomeOnTaskDisplayArea(userId, reason, taskDisplayArea,
+                        false /* allowInstrumenting */, false /* fromHomeKey */, false /* onTop */);
             }
         });
     }
@@ -1306,7 +1316,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         final DisplayContent display = getDisplayContentOrCreate(displayId);
         return display.reduceOnAllTaskDisplayAreas((taskDisplayArea, result) ->
                         result | startHomeOnTaskDisplayArea(userId, reason, taskDisplayArea,
-                                allowInstrumenting, fromHomeKey),
+                                allowInstrumenting, fromHomeKey, true /* onTop */),
                 false /* initValue */);
     }
 
@@ -1322,7 +1332,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
      * - Use the secondary home defined in the config.
      */
     boolean startHomeOnTaskDisplayArea(int userId, String reason, TaskDisplayArea taskDisplayArea,
-            boolean allowInstrumenting, boolean fromHomeKey) {
+            boolean allowInstrumenting, boolean fromHomeKey, boolean onTop) {
         // Fallback to top focused display area if the provided one is invalid.
         if (taskDisplayArea == null) {
             final Task rootTask = getTopDisplayFocusedRootTask();
@@ -1378,7 +1388,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         final String myReason = reason + ":" + userId + ":" + UserHandle.getUserId(
                 aInfo.applicationInfo.uid) + ":" + taskDisplayArea.getDisplayId();
         mService.getActivityStartController().startHomeActivity(homeIntent, aInfo, myReason,
-                taskDisplayArea);
+                taskDisplayArea, onTop);
         return true;
     }
 
@@ -1532,7 +1542,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
         int userId = mWmService.getUserAssignedToDisplay(taskDisplayArea.getDisplayId());
         return startHomeOnTaskDisplayArea(userId, myReason, taskDisplayArea,
-                false /* allowInstrumenting */, false /* fromHomeKey */);
+                false /* allowInstrumenting */, false /* fromHomeKey */, true /* onTop */);
     }
 
     /**
@@ -1708,14 +1718,14 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     topVisibleActivities.add(new ActivityAssistInfo(activity));
                 }
             };
-            final Consumer<Task> collectFromDisplay = leafTaskFragment -> {
-                if (!leafTaskFragment.isVisibleRequested()) {
+            final Consumer<Task> collectFromDisplay = rootTask -> {
+                if (!rootTask.isVisibleRequested()) {
                     return;
                 }
-                if (leafTaskFragment.getRootTask() == topFocusedRootTask) {
-                    leafTaskFragment.forAllActivities(collectFromFocusedRoot);
+                if (rootTask == topFocusedRootTask) {
+                    rootTask.forAllActivities(collectFromFocusedRoot);
                 } else {
-                    leafTaskFragment.forAllActivities(collectFromNonFocusedRoot);
+                    rootTask.forAllActivities(collectFromNonFocusedRoot);
                 }
             };
 
@@ -3211,16 +3221,18 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
     // Tries to put all activity tasks to sleep. Returns true if all tasks were
     // successfully put to sleep.
-    boolean putTasksToSleep(boolean allowDelay, boolean shuttingDown) {
+    boolean putTasksToSleep(boolean shuttingDown) {
         final boolean[] result = {true};
         forAllRootTasks(task -> {
-            if (allowDelay) {
-                result[0] &= task.goToSleepIfPossible(shuttingDown);
-            } else {
-                task.ensureActivitiesVisible(null /* starting */);
-            }
+            result[0] &= task.goToSleepIfPossible(shuttingDown);
         });
         return result[0];
+    }
+
+    void putTasksToSleepNow() {
+        forAllRootTasks(task -> {
+            task.ensureActivitiesVisible(null /* starting */);
+        });
     }
 
     ActivityRecord findActivity(Intent intent, ActivityInfo info, boolean compareIntentFilters) {

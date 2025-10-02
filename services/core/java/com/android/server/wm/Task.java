@@ -293,12 +293,6 @@ class Task extends TaskFragment {
     private ActivityRecord mPendingConvertFromTranslucentActivity = null;
 
     /**
-     * Set when we know we are going to be calling updateConfiguration()
-     * soon, so want to skip intermediate config checks.
-     */
-    boolean mConfigWillChange;
-
-    /**
      * Used to keep resumeTopActivityUncheckedLocked() from being entered recursively
      */
     boolean mInResumeTopActivity = false;
@@ -2437,14 +2431,14 @@ class Task extends TaskFragment {
         if (mSurfaceControl == null
                 // Organized tasks are controlled by shell, so only manipulate those surfaces
                 // during syncs
-                || (isOrganized() && (!Flags.updateTaskCropInSync() || !inSync))) {
+                || (isOrganized() && !inSync)) {
             return;
         }
 
         // Apply crop to root tasks only and clear the crops of the descendant tasks.
         int width = 0;
         int height = 0;
-        if ((isRootTask() || (Flags.updateTaskCropInSync() && !fillsParentBounds()))
+        if ((isRootTask() || !fillsParentBounds())
                 && !mTransitionController.mIsWaitingForDisplayEnabled) {
             final Rect taskBounds = getBounds();
             width = taskBounds.width();
@@ -4724,7 +4718,9 @@ class Task extends TaskFragment {
                 .equals(mMultiWindowRestoreParent)) {
             // Restore previous parent if parent has changed.
             final Task parent = fromWindowContainerToken(mMultiWindowRestoreParent);
-            reparent(parent, MAX_VALUE);
+            if (parent != null && parent.isAttached()) {
+                reparent(parent, MAX_VALUE);
+            }
         }
 
         // mMultiWindowRestoreWindowingMode is INVALID for non-root tasks
@@ -5073,7 +5069,7 @@ class Task extends TaskFragment {
 
     void checkReadyForSleep() {
         if (shouldSleepActivities() && goToSleepIfPossible(false /* shuttingDown */)) {
-            mTaskSupervisor.checkReadyForSleepLocked(true /* allowDelay */);
+            mTaskSupervisor.checkReadyForSleepLocked();
         }
     }
 

@@ -101,6 +101,7 @@ import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.qs.flags.QsWifiConfig;
 import com.android.systemui.res.R;
 import com.android.systemui.shade.ShadeDisplayAware;
+import com.android.systemui.shade.domain.interactor.ShadeDialogContextInteractor;
 import com.android.systemui.statusbar.connectivity.AccessPointController;
 import com.android.systemui.statusbar.policy.FiveGServiceClient;
 import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceState;
@@ -196,6 +197,7 @@ public class InternetDetailsContentController implements AccessPointController.A
     @VisibleForTesting
     final Map<Integer, TelephonyCallback>
             mSubIdTelephonyCallbackMap = new HashMap<>();
+    private final ShadeDialogContextInteractor mShadeDialogContextInteractor;
 
     private WifiManager mWifiManager;
     @Nullable
@@ -356,6 +358,7 @@ public class InternetDetailsContentController implements AccessPointController.A
             DialogTransitionAnimator dialogTransitionAnimator,
             WifiStateWorker wifiStateWorker,
             FeatureFlags featureFlags,
+            ShadeDialogContextInteractor shadeDialogContextInteractor,
             CarrierNameCustomization carrierNameCustomization
     ) {
         if (DEBUG) {
@@ -393,6 +396,7 @@ public class InternetDetailsContentController implements AccessPointController.A
         mWifiStateWorker = wifiStateWorker;
         mFeatureFlags = featureFlags;
         mCarrierNameCustomization = carrierNameCustomization;
+        mShadeDialogContextInteractor = shadeDialogContextInteractor;
         mExtTelephonyManager = ExtTelephonyManager.getInstance(context);
         mFiveGServiceClient = FiveGServiceClient.getInstance(context);
     }
@@ -1993,11 +1997,13 @@ public class InternetDetailsContentController implements AccessPointController.A
     }
 
     void makeOverlayToast(int stringId) {
-        final Resources res = mContext.getResources();
+        final Context displaySpecificContext = mShadeDialogContextInteractor.getContext();
+        final Resources res = displaySpecificContext.getResources();
 
-        final SystemUIToast systemUIToast = mToastFactory.createToast(mContext, mContext,
-                res.getString(stringId), mContext.getPackageName(), UserHandle.myUserId(),
-                res.getConfiguration().orientation);
+        final SystemUIToast systemUIToast = mToastFactory.createToast(mContext,
+            displaySpecificContext,
+            res.getString(stringId), mContext.getPackageName(), UserHandle.myUserId(),
+            res.getConfiguration().orientation);
         if (systemUIToast == null) {
             return;
         }
@@ -2023,8 +2029,8 @@ public class InternetDetailsContentController implements AccessPointController.A
         if ((absGravity & Gravity.VERTICAL_GRAVITY_MASK) == Gravity.FILL_VERTICAL) {
             params.verticalWeight = TOAST_PARAMS_VERTICAL_WEIGHT;
         }
-
-        mWindowManager.addView(toastView, params);
+        WindowManager displayWm = displaySpecificContext.getSystemService(WindowManager.class);
+        displayWm.addView(toastView, params);
 
         Animator inAnimator = systemUIToast.getInAnimation();
         if (inAnimator != null) {

@@ -1741,8 +1741,6 @@ public final class DisplayPowerControllerTest {
     public void testOffloadBlocker_turnON_thenOFF_cancelBlockScreenOnNotCalledIfUnblocked() {
         // Set up.
         when(mDisplayManagerFlagsMock.isDisplayOffloadEnabled()).thenReturn(true);
-        when(mDisplayManagerFlagsMock.isOffloadSessionCancelBlockScreenOnEnabled())
-                .thenReturn(true);
         int initState = Display.STATE_OFF;
         mHolder = createDisplayPowerController(DISPLAY_ID, UNIQUE_ID);
         mHolder.dpc.setDisplayOffloadSession(mDisplayOffloadSession);
@@ -1780,8 +1778,6 @@ public final class DisplayPowerControllerTest {
     public void testOffloadBlocker_turnON_thenOFF_cancelBlockScreenOn() {
         // Set up.
         when(mDisplayManagerFlagsMock.isDisplayOffloadEnabled()).thenReturn(true);
-        when(mDisplayManagerFlagsMock.isOffloadSessionCancelBlockScreenOnEnabled())
-                .thenReturn(true);
         int initState = Display.STATE_OFF;
         mHolder = createDisplayPowerController(DISPLAY_ID, UNIQUE_ID);
         mHolder.dpc.setDisplayOffloadSession(mDisplayOffloadSession);
@@ -1873,7 +1869,6 @@ public final class DisplayPowerControllerTest {
 
     @Test
     public void testSwitchToDozeAutoBrightnessMode() {
-        when(mDisplayManagerFlagsMock.areAutoBrightnessModesEnabled()).thenReturn(true);
         when(mHolder.displayPowerState.getScreenState()).thenReturn(Display.STATE_DOZE);
 
         DisplayPowerRequest dpr = new DisplayPowerRequest();
@@ -1896,7 +1891,6 @@ public final class DisplayPowerControllerTest {
 
     @Test
     public void testDoesNotSwitchFromIdleToDozeAutoBrightnessMode() {
-        when(mDisplayManagerFlagsMock.areAutoBrightnessModesEnabled()).thenReturn(true);
         when(mHolder.displayPowerState.getScreenState()).thenReturn(Display.STATE_DOZE);
         when(mHolder.automaticBrightnessController.isInIdleMode()).thenReturn(true);
 
@@ -1909,21 +1903,7 @@ public final class DisplayPowerControllerTest {
     }
 
     @Test
-    public void testDoesNotSwitchDozeAutoBrightnessModeIfFeatureFlagOff() {
-        when(mDisplayManagerFlagsMock.areAutoBrightnessModesEnabled()).thenReturn(false);
-        when(mHolder.displayPowerState.getScreenState()).thenReturn(Display.STATE_DOZE);
-
-        DisplayPowerRequest dpr = new DisplayPowerRequest();
-        mHolder.dpc.requestPowerState(dpr, /* waitForNegativeProximity= */ false);
-        advanceTime(1); // Run updatePowerState
-
-        verify(mHolder.automaticBrightnessController, never())
-                .switchMode(eq(AUTO_BRIGHTNESS_MODE_DOZE), /* sendUpdate= */ anyBoolean());
-    }
-
-    @Test
     public void testSwitchToBedtimeAutoBrightnessMode_wearBedtimeEnabledAndBrightRequest() {
-        when(mDisplayManagerFlagsMock.areAutoBrightnessModesEnabled()).thenReturn(true);
         when(mDisplayManagerFlagsMock.isAutoBrightnessModeBedtimeWearEnabled()).thenReturn(true);
         Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.Wearable.BEDTIME_MODE,
                 /* value= */ 1);
@@ -1941,7 +1921,6 @@ public final class DisplayPowerControllerTest {
 
     @Test
     public void testNotSwitchToBedtimeAutoBrightnessMode_wearBedtimeDisabled() {
-        when(mDisplayManagerFlagsMock.areAutoBrightnessModesEnabled()).thenReturn(true);
         when(mDisplayManagerFlagsMock.isAutoBrightnessModeBedtimeWearEnabled()).thenReturn(true);
         Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.Wearable.BEDTIME_MODE,
                 /* value= */ 0);
@@ -1959,7 +1938,6 @@ public final class DisplayPowerControllerTest {
 
     @Test
     public void testSwitchToDozeAutoBrightnessMode_wearBedtimeEnabledAndDozeRequest() {
-        when(mDisplayManagerFlagsMock.areAutoBrightnessModesEnabled()).thenReturn(true);
         when(mDisplayManagerFlagsMock.isAutoBrightnessModeBedtimeWearEnabled()).thenReturn(true);
         Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.Wearable.BEDTIME_MODE,
                 /* value= */ 1);

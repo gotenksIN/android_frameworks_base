@@ -194,6 +194,13 @@ flag {
 }
 
 flag {
+    name: "dual_shade"
+    namespace: "systemui"
+    description: "Enables the Dual Shade (go/bc25-dual-shade-design)."
+    bug: "337259436"
+}
+
+flag {
     name: "visual_interruptions_refactor"
     namespace: "systemui"
     description: "Enables the refactored version of the code to decide when notifications "
@@ -385,16 +392,6 @@ flag {
     namespace: "systemui"
     description: "Fix the HUN animation when tapping on a status bar call chip"
     bug: "444551887"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "status_bar_share_dialog_with_app_name"
-    namespace: "systemui"
-    description: "Update the status bar share-to-app chip dialog to include the app name more often"
-    bug: "432665824"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -1089,6 +1086,16 @@ flag {
 }
 
 flag {
+  name: "restrict_communal_shade_to_when_idle"
+  namespace: "systemui"
+  description: "Only allow for the shade to be pulled down over the hub when idle on the hub"
+  bug: "446291379"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "communal_shade_touch_handling_fixes"
   namespace: "systemui"
   description: "Flags some minor bug fixes for opening the shade on the hub"
@@ -1181,16 +1188,6 @@ flag {
     namespace: "systemui"
     description: "Show arrow buttons to page the media carousel"
     bug: "383974508"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name:"media_frame_dimensions_fix"
-    namespace: "systemui"
-    description: "measure and layout media frame when the desired location of media carousel changes"
-    bug: "417204970"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -1578,13 +1575,6 @@ flag {
 }
 
 flag {
-   name: "magnetic_notification_swipes"
-   namespace: "systemui"
-   description: "Add support for magnetic behavior on horizontal notification swipes."
-   bug: "390179908"
-}
-
-flag {
   name: "permission_helper_ui_rich_ongoing"
   namespace: "systemui"
   description: "[RONs] Guards inline permission helper for demoting RONs [Guts/card version]"
@@ -1705,16 +1695,6 @@ flag {
 }
 
 flag {
-    name: "stuck_hearing_devices_qs_tile_fix"
-    namespace: "systemui"
-    description: "Prevent the Hearing Device Dialog's exit animation to avoid the appearance of it being stuck during activity launch."
-    bug: "397868916"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "use_aad_prox_sensor_if_present"
     namespace: "systemui"
     description: "Use AAD proximity sensor if flag is enabled and sensor is present"
@@ -1761,16 +1741,6 @@ flag {
     namespace: "systemui"
     description: "Enables the UI for the suggested devices feature."
     bug: "392942321"
-}
-
-flag {
-    name: "qs_tile_transition_interaction_refinement"
-    namespace: "systemui"
-    description: "Allowing Click Events for Quick Setting Tile while QS dialog is collapsing. This Flag also prevents QS Tile from Dismissal when it is tapped during launch "
-    bug: "358291064"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1836,16 +1806,6 @@ flag {
 }
 
 flag {
-   name: "new_dozing_keyguard_states"
-   namespace: "systemui"
-   description: "Adds new dozing keyguard states for more robust animations to/from dozing."
-   bug: "415704030"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "allow_doze_touches_for_lock_icon"
    namespace: "systemui"
    description: "Allow touches for device entry lock icon during aod deferment."
@@ -1860,6 +1820,16 @@ flag {
    namespace: "systemui"
    description: "Start expansion from QQS into QS early when touching the shade."
    bug: "414856236"
+   metadata {
+     purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+   name: "per_display_ongoing_call_status_bar_visibility"
+   namespace: "systemui"
+   description: "Adds per display implementation for the logic of whether the status bar should be visible for ongoing calls."
+   bug: "433704306"
    metadata {
      purpose: PURPOSE_BUGFIX
    }
@@ -1949,6 +1919,16 @@ flag {
    namespace: "systemui"
    description: "Clear any tint present on incoming lockscreen shortcuts icons"
    bug: "394282762"
+   metadata {
+       purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+   name: "disable_flags_per_display"
+   namespace: "systemui"
+   description: "Make sure DisableFlags are implemented per display"
+   bug: "437310166"
    metadata {
        purpose: PURPOSE_BUGFIX
    }

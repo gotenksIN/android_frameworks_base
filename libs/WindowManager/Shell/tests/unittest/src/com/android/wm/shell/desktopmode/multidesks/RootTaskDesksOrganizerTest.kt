@@ -87,6 +87,7 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
 
     private val launchAdjacentController = LaunchAdjacentController(mock())
     private val taskInfoChangedListener = mock<(ActivityManager.RunningTaskInfo) -> Unit>()
+    private val taskVanishedListener = mock<(ActivityManager.RunningTaskInfo) -> Unit>()
 
     private lateinit var organizer: RootTaskDesksOrganizer
 
@@ -102,6 +103,7 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
                 Optional.of(mockTaskChangeListener),
             )
         organizer.addOnDesktopTaskInfoChangedListener(taskInfoChangedListener)
+        organizer.addOnDesktopTaskVanishedListener(taskVanishedListener)
 
         val tda = DisplayAreaInfo(MockToken().token(), DEFAULT_DISPLAY, 0)
         whenever(mockTDAOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)).thenReturn(tda)
@@ -680,6 +682,26 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
     }
 
     @Test
+    fun getDeskIdFromTaskInfo_taskInDesk_returnsDesk() = runTest {
+        val desk = createDeskSuspending()
+        val taskInDesk = createFreeformTask().apply { parentTaskId = desk.deskRoot.deskId }
+
+        val deskId = organizer.getDeskIdFromTaskInfo(taskInDesk)
+
+        assertThat(deskId).isEqualTo(desk.deskRoot.deskId)
+    }
+
+    @Test
+    fun getDeskIdFromTaskInfo_taskNotInDesk_returnsNull() = runTest {
+        val desk = createDeskSuspending()
+        val taskInDesk = createFreeformTask().apply { parentTaskId = desk.deskRoot.deskId + 1 }
+
+        val deskId = organizer.getDeskIdFromTaskInfo(taskInDesk)
+
+        assertThat(deskId).isNull()
+    }
+
+    @Test
     fun deactivateDesk_clearsLaunchRoot() = runTest {
         val wct = WindowContainerTransaction()
         val desk = createDeskSuspending()
@@ -1055,6 +1077,16 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
         organizer.onTaskVanished(desk.deskRoot.taskInfo)
 
         assertThat(launchAdjacentController.launchAdjacentEnabled).isFalse()
+    }
+
+    @Test
+    fun onTaskVanished_taskNotRoot_invokesListener() = runTest {
+        createDeskSuspending()
+        val task = createFreeformTask().apply { taskId = TEST_CHILD_TASK_ID }
+
+        organizer.onTaskVanished(task)
+
+        verify(taskVanishedListener).invoke(task)
     }
 
     @Test

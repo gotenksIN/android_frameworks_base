@@ -62,7 +62,9 @@ public final class RavenwoodNativeLoader {
     private static final Class<?>[] sLibandroidExperimentalClasses = {
             android.view.KeyCharacterMap.class,
             android.view.KeyEvent.class,
+            android.view.InputChannel.class,
             android.view.InputDevice.class,
+            android.view.InputEventReceiver.class,
             android.view.MotionEvent.class,
             android.animation.PropertyValuesHolder.class,
     };
@@ -174,6 +176,10 @@ public final class RavenwoodNativeLoader {
                 + RavenwoodRuntimeNative.getIcuDataName()
                 + ".dat";
         setProperty(ICU_DATA_PATH, icuData);
+
+        RavenwoodIntegrityChecker.checkForNativeAllocationRegistry(sLibandroidClasses);
+        RavenwoodIntegrityChecker.checkForNativeAllocationRegistry(sLibandroidExperimentalClasses);
+        RavenwoodIntegrityChecker.checkForNativeAllocationRegistry(sLibhwuiClasses);
 
         // Build the property values
         final var joiner = Collectors.joining(",");

@@ -132,6 +132,7 @@ public class SecureSettings {
         Settings.Secure.POWER_MENU_LOCKED_SHOW_CONTENT,
         Settings.Secure.DOZE_ENABLED,
         Settings.Secure.DOZE_ALWAYS_ON,
+        Settings.Secure.DOZE_ALWAYS_ON_INACTIVITY_DETECTION,
         Settings.Secure.DOZE_ALWAYS_ON_WALLPAPER_ENABLED,
         Settings.Secure.DOZE_PICK_UP_GESTURE,
         Settings.Secure.DOZE_DOUBLE_TAP_GESTURE,
@@ -328,5 +329,6 @@ public class SecureSettings {
         Settings.Secure.IDENTITY_CHECK_NOTIFICATION_VIEW_DETAILS_CLICKED,
         Settings.Secure.NOTIFICATION_BUNDLES_ALWAYS_EXPAND,
         Settings.Secure.ACCESSIBILITY_TOP_ROW_KEY_TARGETS,
+        Settings.Secure.NAVIGATIONBAR_KEY_ORDER,
     };
 }

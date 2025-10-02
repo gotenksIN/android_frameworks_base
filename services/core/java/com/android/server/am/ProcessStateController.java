@@ -60,6 +60,7 @@ import java.util.function.Consumer;
 public class ProcessStateController {
     public static final String TAG = "ProcessStateController";
 
+    private final OomAdjuster.Constants mOomConstants;
     private final OomAdjuster mOomAdjuster;
     private final BiConsumer<ConnectionRecord, Boolean> mServiceBinderCallUpdater;
 
@@ -84,9 +85,10 @@ public class ProcessStateController {
             ActiveUids activeUids, ServiceThread handlerThread,
             Object lock, Object procLock, Consumer<ProcessRecord> topChangeCallback,
             ProcessLruUpdater lruUpdater, OomAdjuster.Injector oomAdjInjector,
-            OomAdjuster.Callback callback) {
+            OomAdjuster.Constants oomConstants, OomAdjuster.Callback callback) {
+        mOomConstants = oomConstants;
         mOomAdjuster = new OomAdjusterImpl(ams, processList, activeUids, handlerThread,
-                mGlobalState, oomAdjInjector, callback);
+                mOomConstants, mGlobalState, oomAdjInjector, callback);
 
         mLock = lock;
         mProcLock = procLock;
@@ -101,6 +103,14 @@ public class ProcessStateController {
             }
         });
 
+    }
+
+    public OomAdjuster.Constants getOomConstants() {
+        return mOomConstants;
+    }
+
+    public void setServiceBindAlmostPerceptibleTimeoutMs(long value) {
+        mOomConstants.mServiceBindAlmostPerceptibleTimeoutMs = value;
     }
 
     /**
@@ -285,7 +295,7 @@ public class ProcessStateController {
             return mIsAwake;
         }
 
-        public ProcessRecord getBackupTarget(@UserIdInt int userId) {
+        public ProcessRecordInternal getBackupTarget(@UserIdInt int userId) {
             return mBackupTargets.get(userId);
         }
 
@@ -536,8 +546,7 @@ public class ProcessStateController {
         proc.setIsRunningRemoteAnimation(runningRemoteAnimation);
 
         if (Flags.autoTriggerOomadjUpdates()) {
-            enqueueUpdateTarget(proc);
-            runPendingUpdate(OOM_ADJ_REASON_UI_VISIBILITY);
+            runUpdate(proc, OOM_ADJ_REASON_UI_VISIBILITY);
         }
         return true;
     }
@@ -894,9 +903,7 @@ public class ProcessStateController {
         proc.getReceivers().setIsReceivingBroadcast(true);
         proc.getReceivers().setBroadcastReceiverSchedGroup(schedGroup);
 
-        if (Flags.pushBroadcastStateToOomadjuster()) {
-            proc.mProfile.addHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
-        }
+        proc.mProfile.addHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
     }
 
     /**
@@ -907,9 +914,7 @@ public class ProcessStateController {
         proc.getReceivers().setIsReceivingBroadcast(false);
         proc.getReceivers().setBroadcastReceiverSchedGroup(ProcessList.SCHED_GROUP_UNDEFINED);
 
-        if (Flags.pushBroadcastStateToOomadjuster()) {
-            proc.mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
-        }
+        proc.mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
     }
 
     @GuardedBy("mLock")
@@ -1121,6 +1126,7 @@ public class ProcessStateController {
         private final ActivityManagerService mAms;
         private final ProcessList mProcessList;
         private final ActiveUids mActiveUids;
+        private final OomAdjuster.Constants mOomConstants;
         private final OomAdjuster.Callback mOomAdjCallback;
 
         private ServiceThread mHandlerThread = null;
@@ -1130,10 +1136,11 @@ public class ProcessStateController {
         private OomAdjuster.Injector mOomAdjInjector = null;
 
         public Builder(ActivityManagerService ams, ProcessList processList, ActiveUids activeUids,
-                OomAdjuster.Callback oomAdjCallback) {
+                OomAdjuster.Constants oomConstants, OomAdjuster.Callback oomAdjCallback) {
             mAms = ams;
             mProcessList = processList;
             mActiveUids = activeUids;
+            mOomConstants = oomConstants;
             mOomAdjCallback = oomAdjCallback;
         }
 
@@ -1163,7 +1170,7 @@ public class ProcessStateController {
             }
             return new ProcessStateController(mAms, mProcessList, mActiveUids, mHandlerThread,
                     mLock, mAms.mProcLock, mTopChangeCallback, mProcessLruUpdater, mOomAdjInjector,
-                    mOomAdjCallback);
+                    mOomConstants, mOomAdjCallback);
         }
 
         /**

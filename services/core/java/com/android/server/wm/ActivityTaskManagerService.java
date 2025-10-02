@@ -89,7 +89,6 @@ import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_LOCKTASK;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_TASKS;
 import static com.android.server.am.ActivityManagerService.STOCK_PM_FLAGS;
 import static com.android.server.am.ActivityManagerServiceDumpActivitiesProto.ROOT_WINDOW_CONTAINER;
-import static com.android.server.am.ActivityManagerServiceDumpProcessesProto.CONFIG_WILL_CHANGE;
 import static com.android.server.am.ActivityManagerServiceDumpProcessesProto.CONTROLLER;
 import static com.android.server.am.ActivityManagerServiceDumpProcessesProto.CURRENT_TRACKER;
 import static com.android.server.am.ActivityManagerServiceDumpProcessesProto.Controller.IS_A_MONKEY;
@@ -5674,6 +5673,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 mActivityStateUpdater.setTopProcessStateAsync(mInternal.getTopProcessState());
                 Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP_SLEEPING");
                 mTaskSupervisor.goingToSleepLocked();
+                mTaskSupervisor.checkReadyForSleepLocked();
                 updateResumedAppTrace(null /* resumed */);
                 updateOomAdj = true;
             }
@@ -6914,7 +6914,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mShuttingDown = true;
             mWindowManager.mSnapshotController.mTaskSnapshotController.prepareShutdown();
             synchronized (mGlobalLock) {
-                mRootWindowContainer.prepareForShutdown();
                 updateEventDispatchingLocked(booted);
                 notifyTaskPersisterLocked(null, true);
                 return mTaskSupervisor.shutdownLocked(timeout);
@@ -7468,10 +7467,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     mRootWindowContainer.dumpDisplayConfigs(pw, "  ");
                 }
                 if (dumpAll) {
-                    final Task topFocusedRootTask = getTopDisplayFocusedRootTask();
-                    if (dumpPackage == null && topFocusedRootTask != null) {
-                        pw.println("  mConfigWillChange: " + topFocusedRootTask.mConfigWillChange);
-                    }
                     if (mCompatModePackages.getPackages().size() > 0) {
                         boolean printed = false;
                         for (Map.Entry<String, Integer> entry
@@ -7550,10 +7545,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             synchronized (mGlobalLock) {
                 if (dumpPackage == null) {
                     getGlobalConfiguration().dumpDebug(proto, GLOBAL_CONFIGURATION);
-                    final Task topFocusedRootTask = getTopDisplayFocusedRootTask();
-                    if (topFocusedRootTask != null) {
-                        proto.write(CONFIG_WILL_CHANGE, topFocusedRootTask.mConfigWillChange);
-                    }
                     writeSleepStateToProto(proto, wakeFullness, testPssMode);
                     if (mRunningVoice != null) {
                         final long vrToken = proto.start(

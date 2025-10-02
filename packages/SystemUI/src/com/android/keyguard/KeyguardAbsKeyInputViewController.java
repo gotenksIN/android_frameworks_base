@@ -16,6 +16,9 @@
 
 package com.android.keyguard;
 
+import static android.security.Flags.lockscreenIndicateDuplicateGuesses;
+import static android.security.Flags.manageLockoutEndTimeInService;
+
 import static com.android.internal.util.LatencyTracker.ACTION_CHECK_CREDENTIAL;
 import static com.android.internal.util.LatencyTracker.ACTION_CHECK_CREDENTIAL_UNLOCKED;
 import static com.android.keyguard.KeyguardAbsKeyInputView.MINIMUM_PASSWORD_LENGTH_BEFORE_REPORT;
@@ -32,6 +35,7 @@ import com.android.internal.util.LatencyTracker;
 import com.android.internal.widget.LockPatternChecker;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.internal.widget.LockscreenCredential;
+import com.android.internal.widget.VerifyCredentialResponse;
 import com.android.keyguard.EmergencyButtonController.EmergencyButtonCallback;
 import com.android.keyguard.KeyguardAbsKeyInputView.KeyDownListener;
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
@@ -118,8 +122,16 @@ public abstract class KeyguardAbsKeyInputViewController<T extends KeyguardAbsKey
         mView.setKeyDownListener(mKeyDownListener);
         mEmergencyButtonController.setEmergencyButtonCallback(mEmergencyButtonCallback);
         // if the user is currently locked out, enforce it.
-        Duration lockoutEndTime = Duration.ofMillis(mLockPatternUtils.getLockoutAttemptDeadline(
-                mSelectedUserInteractor.getSelectedUserId()));
+        Duration lockoutEndTime;
+        if (manageLockoutEndTimeInService()) {
+            lockoutEndTime =
+                    mLockPatternUtils.getLockoutEndTime(
+                            mSelectedUserInteractor.getSelectedUserId());
+        } else {
+            lockoutEndTime =
+                    Duration.ofMillis(mLockPatternUtils.getLockoutAttemptDeadline(
+                            mSelectedUserInteractor.getSelectedUserId()));
+        }
         if (shouldLockout(lockoutEndTime)) {
             handleAttemptLockout(lockoutEndTime);
         }
@@ -217,8 +229,13 @@ public abstract class KeyguardAbsKeyInputViewController<T extends KeyguardAbsKey
                 getKeyguardSecurityCallback()
                         .reportUnlockAttempt(userId, false, timeoutMs, isDuplicate);
                 if (timeoutMs > 0) {
-                    Duration lockoutEndTime = Duration.ofMillis(
+                    Duration lockoutEndTime;
+                    if (manageLockoutEndTimeInService()) {
+                        lockoutEndTime = mLockPatternUtils.getLockoutEndTime(userId);
+                    } else {
+                        lockoutEndTime = Duration.ofMillis(
                                 mLockPatternUtils.setLockoutAttemptDeadline(userId, timeoutMs));
+                    }
                     handleAttemptLockout(lockoutEndTime);
                 }
             }
@@ -272,13 +289,27 @@ public abstract class KeyguardAbsKeyInputViewController<T extends KeyguardAbsKey
                     }
 
                     @Override
+                    public void onChecked(VerifyCredentialResponse response) {
+                        handleChecked(
+                                response.isMatched(),
+                                response.getTimeout(),
+                                lockscreenIndicateDuplicateGuesses()
+                                        && response.isCredAlreadyTried());
+                    }
+
+                    @Override
                     public void onChecked(boolean matched, int timeoutMs) {
+                        handleChecked(matched, timeoutMs, false /* isDuplicate */);
+                    }
+
+                    private void handleChecked(
+                            boolean matched, int timeoutMs, boolean isDuplicate) {
                         mLatencyTracker.onActionEnd(ACTION_CHECK_CREDENTIAL_UNLOCKED);
                         mView.setPasswordEntryInputEnabled(true);
                         mPendingLockCheck = null;
                         if (!matched) {
                             onPasswordChecked(userId, false /* matched */, timeoutMs,
-                                    true /* isValidPassword */, false /* isDuplicate */);
+                                    true /* isValidPassword */, isDuplicate);
                         }
                         password.zeroize();
                     }

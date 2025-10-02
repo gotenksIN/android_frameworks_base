@@ -60,6 +60,7 @@ import static com.android.internal.accessibility.common.ShortcutConstants.UserSh
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.KEY_GESTURE;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.QUICK_SETTINGS;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.SOFTWARE;
+import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.TOP_ROW_KEY;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.TRIPLETAP;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.TWOFINGER_DOUBLETAP;
 import static com.android.internal.accessibility.dialog.AccessibilityButtonChooserActivity.EXTRA_TYPE_TO_CHOOSE;
@@ -794,6 +795,12 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 }
                 if (accessibilityServiceInfo == null) {
                     return;
+                }
+
+                // Skip warning check if target is preinstalled screen reader.
+                if (gestureType == KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER
+                        && isAccessibilityServicePreinstalled(accessibilityServiceInfo)) {
+                    break;
                 }
 
                 // Skip enabling if a warning dialog is required for the feature.
@@ -2576,9 +2583,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     private void showAccessibilityTargetsSelection(int displayId, int shortcutType,
             int userId) {
         final Intent intent = new Intent(AccessibilityManager.ACTION_CHOOSE_ACCESSIBILITY_BUTTON);
-        final String chooserClassName = (shortcutType == HARDWARE)
-                ? AccessibilityShortcutChooserActivity.class.getName()
-                : AccessibilityButtonChooserActivity.class.getName();
+        final String chooserClassName = (shortcutType == SOFTWARE || shortcutType == GESTURE)
+                ? AccessibilityButtonChooserActivity.class.getName()
+                : AccessibilityShortcutChooserActivity.class.getName();
         intent.setClassName(CHOOSER_PACKAGE_NAME, chooserClassName);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         intent.putExtra(EXTRA_TYPE_TO_CHOOSE, shortcutType);
@@ -3466,6 +3473,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         updateAccessibilityShortcutTargetsLocked(userState, GESTURE);
         updateAccessibilityShortcutTargetsLocked(userState, QUICK_SETTINGS);
         updateAccessibilityShortcutTargetsLocked(userState, KEY_GESTURE);
+        if (android.view.accessibility.Flags.enableA11yTopRowShortcut()) {
+            updateAccessibilityShortcutTargetsLocked(userState, TOP_ROW_KEY);
+        }
         // Update the capabilities before the mode because we will check the current mode is
         // invalid or not..
         updateMagnificationCapabilitiesSettingsChangeLocked(userState);
@@ -3597,6 +3607,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         somethingChanged |= readAccessibilityShortcutTargetsLocked(userState, SOFTWARE);
         somethingChanged |= readAccessibilityShortcutTargetsLocked(userState, GESTURE);
         somethingChanged |= readAccessibilityShortcutTargetsLocked(userState, KEY_GESTURE);
+        somethingChanged |= readAccessibilityShortcutTargetsLocked(userState, TOP_ROW_KEY);
         somethingChanged |= readAccessibilityButtonTargetComponentLocked(userState);
         somethingChanged |= readUserRecommendedUiTimeoutSettingsLocked(userState);
         somethingChanged |= readMagnificationModeForDefaultDisplayLocked(userState);
@@ -3753,6 +3764,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
      */
     private boolean readAccessibilityShortcutTargetsLocked(AccessibilityUserState userState,
             @UserShortcutType int shortcutType) {
+        if (!android.view.accessibility.Flags.enableA11yTopRowShortcut()
+                && shortcutType == TOP_ROW_KEY) {
+            return false;
+        }
         assertNoTapShortcut(shortcutType);
         final String settingValue = getRawShortcutSetting(userState.mUserId, shortcutType);
         final Set<String> targetsFromSetting = new ArraySet<>();
@@ -4207,6 +4222,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         shortcutTypes.add(QUICK_SETTINGS);
         shortcutTypes.add(GESTURE);
         shortcutTypes.add(KEY_GESTURE);
+        shortcutTypes.add(TOP_ROW_KEY);
 
         final ComponentName serviceName = service.getComponentName();
         for (Integer shortcutType: shortcutTypes) {
@@ -5279,7 +5295,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         }
     }
 
-    boolean isDisplayProxyed(int displayId) {
+    public boolean isDisplayProxyed(int displayId) {
         return mProxyManager.isProxyedDisplay(displayId);
     }
 
@@ -5392,22 +5408,23 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         return true;
     }
 
+    private boolean isAccessibilityServicePreinstalled(AccessibilityServiceInfo info) {
+        return info.getResolveInfo().serviceInfo.applicationInfo.isSystemApp();
+    }
+
     private boolean isAccessibilityServicePreinstalledAndTrusted(AccessibilityServiceInfo info) {
         final ComponentName componentName = info.getComponentName();
         if (componentName.equals(mTrustedAccessibilityServiceForTesting)) {
             return true;
         }
-        final boolean isPreinstalled =
-                info.getResolveInfo().serviceInfo.applicationInfo.isSystemApp();
+        final boolean isPreinstalled = isAccessibilityServicePreinstalled(info);
         if (isPreinstalled) {
             final String[] trustedAccessibilityServices =
                     mContext.getResources().getStringArray(
                             R.array.config_trustedAccessibilityServices);
-            if (Arrays.stream(trustedAccessibilityServices)
+            return Arrays.stream(trustedAccessibilityServices)
                     .map(ComponentName::unflattenFromString)
-                    .anyMatch(componentName::equals)) {
-                return true;
-            }
+                    .anyMatch(componentName::equals);
         }
         return false;
     }
@@ -6009,6 +6026,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         private final Uri mAccessibilityKeyGestureTargetsUri = Settings.Secure.getUriFor(
                 Settings.Secure.ACCESSIBILITY_KEY_GESTURE_TARGETS);
 
+        private final Uri mAccessibilityTopRowKeyTargetsUri = Settings.Secure.getUriFor(
+                Settings.Secure.ACCESSIBILITY_TOP_ROW_KEY_TARGETS);
+
         private final Uri mUserNonInteractiveUiTimeoutUri = Settings.Secure.getUriFor(
                 Settings.Secure.ACCESSIBILITY_NON_INTERACTIVE_UI_TIMEOUT_MS);
 
@@ -6086,6 +6106,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     mAccessibilityGestureTargetsUri, false, this, UserHandle.USER_ALL);
             contentResolver.registerContentObserver(
                     mAccessibilityKeyGestureTargetsUri, false, this, UserHandle.USER_ALL);
+            contentResolver.registerContentObserver(
+                    mAccessibilityTopRowKeyTargetsUri, false, this, UserHandle.USER_ALL);
             contentResolver.registerContentObserver(
                     mUserNonInteractiveUiTimeoutUri, false, this, UserHandle.USER_ALL);
             contentResolver.registerContentObserver(
@@ -6184,6 +6206,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     }
                 } else if (mAccessibilityKeyGestureTargetsUri.equals(uri)) {
                     if (readAccessibilityShortcutTargetsLocked(userState, KEY_GESTURE)) {
+                        onUserStateChangedLocked(userState);
+                    }
+                } else if (mAccessibilityTopRowKeyTargetsUri.equals(uri)) {
+                    if (readAccessibilityShortcutTargetsLocked(userState, TOP_ROW_KEY)) {
                         onUserStateChangedLocked(userState);
                     }
                 } else if (mUserNonInteractiveUiTimeoutUri.equals(uri)

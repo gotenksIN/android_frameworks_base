@@ -17,25 +17,44 @@
 package com.android.systemui.statusbar.dagger
 
 import android.content.Context
+import android.os.Bundle
+import android.view.Display
+import android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR
+import com.android.systemui.Flags
 import com.android.systemui.common.ui.ConfigurationState
 import com.android.systemui.common.ui.ConfigurationStateImpl
+import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.dagger.qualifiers.Default
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.DisplayAware
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.DisplayAwareStatusBar
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.PerDisplaySingleton
+import com.android.systemui.res.R
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModel
 import com.android.systemui.statusbar.data.repository.StatusBarConfigurationController
 import com.android.systemui.statusbar.data.repository.StatusBarConfigurationControllerStore
+import com.android.systemui.statusbar.disableflags.data.repository.DisableFlagsRepository
+import com.android.systemui.statusbar.disableflags.data.repository.DisableFlagsRepositoryImpl
+import com.android.systemui.statusbar.disableflags.domain.interactor.DisableFlagsInteractor
 import com.android.systemui.statusbar.domain.interactor.StatusBarIconRefreshInteractor
 import com.android.systemui.statusbar.domain.interactor.StatusBarIconRefreshInteractorImpl
+import com.android.systemui.statusbar.gesture.SwipeStatusBarAwayGestureHandler
 import com.android.systemui.statusbar.layout.StatusBarContentInsetsProvider
 import com.android.systemui.statusbar.layout.StatusBarContentInsetsProviderImpl
+import com.android.systemui.statusbar.phone.ongoingcall.domain.interactor.OngoingCallStatusBarInteractor
+import com.android.systemui.statusbar.phone.ongoingcall.shared.PerDisplayOngoingCallStatusBarVisibility
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarInteractor
 import com.android.systemui.statusbar.ui.SystemBarUtilsState
+import com.android.systemui.statusbar.window.StatusBarWindowController
+import com.android.systemui.statusbar.window.StatusBarWindowControllerImpl
 import com.android.systemui.statusbar.window.StatusBarWindowStateController
 import dagger.Binds
+import dagger.Lazy
 import dagger.Module
 import dagger.Provides
+import dagger.multibindings.ElementsIntoSet
 import dagger.multibindings.IntoSet
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Contains bindings that are [SystemUIDisplaySubcomponent.DisplayAware] related to the statusbar.
@@ -52,6 +71,10 @@ interface PerDisplayStatusBarModule {
 
     @Binds
     @DisplayAware
+    fun statusBarWindowController(impl: StatusBarWindowControllerImpl): StatusBarWindowController
+
+    @Binds
+    @DisplayAware
     fun statusBarWindowStateController(
         controller: StatusBarWindowStateController
     ): StatusBarWindowStateController
@@ -63,6 +86,7 @@ interface PerDisplayStatusBarModule {
     ): StatusBarContentInsetsProvider
 
     @Binds
+    @DisplayAware
     @IntoSet
     fun statusBarContentInsetsProviderAsLifecycleListener(
         impl: StatusBarContentInsetsProviderImpl
@@ -79,7 +103,44 @@ interface PerDisplayStatusBarModule {
     @DisplayAware
     fun homeStatusBarInteractor(interactor: HomeStatusBarInteractor): HomeStatusBarInteractor
 
+    @Binds
+    @DisplayAware
+    fun swipeStatusBarAwayGestureHandler(
+        impl: SwipeStatusBarAwayGestureHandler
+    ): SwipeStatusBarAwayGestureHandler
+
     companion object {
+        @Provides
+        @PerDisplaySingleton
+        @DisplayAware
+        fun disableFlagsRepo(
+            factory: DisableFlagsRepositoryImpl.Factory,
+            @DisplayAware actualDisplayId: Int,
+            @DisplayAware displayScope: CoroutineScope,
+            @Default defaultRepositoryLazy: Lazy<DisableFlagsRepository>,
+        ): DisableFlagsRepository {
+            return if (Flags.disableFlagsPerDisplay()) {
+                factory.create(actualDisplayId, displayScope)
+            } else {
+                defaultRepositoryLazy.get()
+            }
+        }
+
+        @Provides
+        @PerDisplaySingleton
+        @DisplayAware
+        fun disableFlagsInteractor(
+            factory: DisableFlagsInteractor.Factory,
+            @DisplayAware repo: DisableFlagsRepository,
+            @Default defaultInteractorLazy: Lazy<DisableFlagsInteractor>,
+        ): DisableFlagsInteractor {
+            return if (Flags.disableFlagsPerDisplay()) {
+                factory.create(repo)
+            } else {
+                defaultInteractorLazy.get()
+            }
+        }
+
         /**
          * Ideally StatusBarConfigurationControllerStore should be moved to [PerDisplaySingleton] in
          * the future, and the [StatusBarConfigurationControllerStore] return the instance from the
@@ -119,6 +180,43 @@ interface PerDisplayStatusBarModule {
             @DisplayAware context: Context,
         ): ConfigurationState {
             return configStateFactory.create(context, configurationController)
+        }
+
+        /**
+         * Status Bar specific per display [Context]. For the default display it uses the default
+         * application [Context], which is all that is needed.
+         *
+         * For external displays, it will be a [WindowContext], which is tied to the display and
+         * also window type [TYPE_STATUS_BAR].
+         */
+        @Provides
+        @PerDisplaySingleton
+        @DisplayAwareStatusBar
+        fun provideStatusBarWindowContext(
+            display: Display,
+            @Application context: Context,
+        ): Context {
+            return if (display.displayId == Display.DEFAULT_DISPLAY) {
+                // No need to create a new context, if we already have one.
+                context
+            } else {
+                context
+                    .createWindowContext(display, TYPE_STATUS_BAR, /* options= */ Bundle.EMPTY)
+                    .also { it.setTheme(R.style.Theme_SystemUI) }
+            }
+        }
+
+        @Provides
+        @ElementsIntoSet
+        @DisplayAware
+        fun ongoingCallStatusBarInteractorAsLifecycleListener(
+            interactorLazy: Lazy<OngoingCallStatusBarInteractor>
+        ): Set<SystemUIDisplaySubcomponent.LifecycleListener> {
+            return if (PerDisplayOngoingCallStatusBarVisibility.isEnabled) {
+                setOf(interactorLazy.get())
+            } else {
+                emptySet()
+            }
         }
     }
 }

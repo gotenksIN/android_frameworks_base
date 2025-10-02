@@ -59,10 +59,6 @@ public class DisplayManagerFlags {
             Flags.FLAG_ENABLE_CONNECTED_DISPLAY_ERROR_HANDLING,
             Flags::enableConnectedDisplayErrorHandling);
 
-    private final FlagState mBackUpSmoothDisplayAndForcePeakRefreshRateFlagState = new FlagState(
-            Flags.FLAG_BACK_UP_SMOOTH_DISPLAY_AND_FORCE_PEAK_REFRESH_RATE,
-            Flags::backUpSmoothDisplayAndForcePeakRefreshRate);
-
     private final FlagState mPowerThrottlingClamperFlagState = new FlagState(
             Flags.FLAG_ENABLE_POWER_THROTTLING_CLAMPER,
             Flags::enablePowerThrottlingClamper);
@@ -82,14 +78,6 @@ public class DisplayManagerFlags {
     private final FlagState mResolutionBackupRestore = new FlagState(
             Flags.FLAG_RESOLUTION_BACKUP_RESTORE,
             Flags::resolutionBackupRestore);
-
-    private final FlagState mBrightnessWearBedtimeModeClamperFlagState = new FlagState(
-            Flags.FLAG_BRIGHTNESS_WEAR_BEDTIME_MODE_CLAMPER,
-            Flags::brightnessWearBedtimeModeClamper);
-
-    private final FlagState mAutoBrightnessModesFlagState = new FlagState(
-            Flags.FLAG_AUTO_BRIGHTNESS_MODES,
-            Flags::autoBrightnessModes);
 
     private final FlagState mFastHdrTransitions = new FlagState(
             Flags.FLAG_FAST_HDR_TRANSITIONS,
@@ -114,21 +102,6 @@ public class DisplayManagerFlags {
             Flags.FLAG_USE_FUSION_PROX_SENSOR,
             Flags::useFusionProxSensor
     );
-
-    private final FlagState mPeakRefreshRatePhysicalLimit = new FlagState(
-            Flags.FLAG_ENABLE_PEAK_REFRESH_RATE_PHYSICAL_LIMIT,
-            Flags::enablePeakRefreshRatePhysicalLimit
-    );
-
-    private final FlagState mSynthetic60hzModes = new FlagState(
-            Flags.FLAG_ENABLE_SYNTHETIC_60HZ_MODES,
-            Flags::enableSynthetic60hzModes
-    );
-
-    private final FlagState mOffloadSessionCancelBlockScreenOn = new FlagState(
-            Flags.FLAG_OFFLOAD_SESSION_CANCEL_BLOCK_SCREEN_ON,
-            Flags::offloadSessionCancelBlockScreenOn);
-
     private final FlagState mNormalBrightnessForDozeParameter = new FlagState(
             Flags.FLAG_NORMAL_BRIGHTNESS_FOR_DOZE_PARAMETER,
             Flags::normalBrightnessForDozeParameter
@@ -291,10 +264,6 @@ public class DisplayManagerFlags {
         return mConnectedDisplayErrorHandlingFlagState.isEnabled();
     }
 
-    public boolean isBackUpSmoothDisplayAndForcePeakRefreshRateEnabled() {
-        return mBackUpSmoothDisplayAndForcePeakRefreshRateFlagState.isEnabled();
-    }
-
     /** Returns whether brightness range is allowed to extend below traditional range. */
     public boolean isEvenDimmerEnabled() {
         return mEvenDimmerFlagState.isEnabled();
@@ -310,17 +279,6 @@ public class DisplayManagerFlags {
 
     public boolean isResolutionBackupRestoreEnabled() {
         return mResolutionBackupRestore.isEnabled();
-    }
-
-    public boolean isBrightnessWearBedtimeModeClamperEnabled() {
-        return mBrightnessWearBedtimeModeClamperFlagState.isEnabled();
-    }
-
-    /**
-     * @return Whether generic auto-brightness modes are enabled
-     */
-    public boolean areAutoBrightnessModesEnabled() {
-        return mAutoBrightnessModesFlagState.isEnabled();
     }
 
     public boolean isFastHdrTransitionsEnabled() {
@@ -345,18 +303,6 @@ public class DisplayManagerFlags {
 
     public String getUseFusionProxSensorFlagName() {
         return mUseFusionProxSensor.getName();
-    }
-
-    public boolean isPeakRefreshRatePhysicalLimitEnabled() {
-        return mPeakRefreshRatePhysicalLimit.isEnabled();
-    }
-
-    public boolean isOffloadSessionCancelBlockScreenOnEnabled() {
-        return mOffloadSessionCancelBlockScreenOn.isEnabled();
-    }
-
-    public boolean isSynthetic60HzModesEnabled() {
-        return mSynthetic60hzModes.isEnabled();
     }
 
     /**
@@ -530,7 +476,6 @@ public class DisplayManagerFlags {
     public void dump(PrintWriter pw) {
         pw.println("DisplayManagerFlags:");
         pw.println("--------------------");
-        pw.println(" " + mBackUpSmoothDisplayAndForcePeakRefreshRateFlagState);
         pw.println(" " + mConnectedDisplayErrorHandlingFlagState);
         pw.println(" " + mDisplayOffloadFlagState);
         pw.println(" " + mDisplayTopology);
@@ -539,17 +484,12 @@ public class DisplayManagerFlags {
         pw.println(" " + mEvenDimmerFlagState);
         pw.println(" " + mSmallAreaDetectionFlagState);
         pw.println(" " + mSyncedResolutionSwitch);
-        pw.println(" " + mBrightnessWearBedtimeModeClamperFlagState);
-        pw.println(" " + mAutoBrightnessModesFlagState);
         pw.println(" " + mFastHdrTransitions);
         pw.println(" " + mSensorBasedBrightnessThrottling);
         pw.println(" " + mRefactorDisplayPowerController);
         pw.println(" " + mDozeBrightnessStrategy);
         pw.println(" " + mResolutionBackupRestore);
         pw.println(" " + mUseFusionProxSensor);
-        pw.println(" " + mPeakRefreshRatePhysicalLimit);
-        pw.println(" " + mSynthetic60hzModes);
-        pw.println(" " + mOffloadSessionCancelBlockScreenOn);
         pw.println(" " + mNormalBrightnessForDozeParameter);
         pw.println(" " + mEnableBatteryStatsForAllDisplays);
         pw.println(" " + mBlockAutobrightnessChangesOnStylusUsage);
@@ -624,8 +564,9 @@ public class DisplayManagerFlags {
 
         @Override
         public String toString() {
-            // remove "com.android.server.display.feature.flags." from the beginning of the name.
-            String shortName = TextUtils.substring(mName, 41, mName.length());
+            // remove the flag package from the beginning of the name.
+            String shortName = TextUtils.substring(mName, mName.lastIndexOf('.') + 1,
+                    mName.length());
 
             // align all isEnabled() values.
             return String.format("%-53s %b (def:%b)",

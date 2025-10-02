@@ -320,20 +320,30 @@ private fun ContentScope.SingleShade(
                     },
                     media =
                         @Composable {
-                            if (viewModel.isQsEnabled && viewModel.showMedia) {
-                                Element(key = Media.Elements.mediaCarousel, modifier = Modifier) {
-                                    Media(
-                                        viewModelFactory = viewModel.mediaViewModelFactory,
-                                        presentationStyle =
-                                            if (mediaInRow) {
-                                                MediaPresentationStyle.Compressed
-                                            } else {
-                                                MediaPresentationStyle.Default
-                                            },
-                                        behavior = ShadeSceneContentViewModel.qqsMediaUiBehavior,
-                                        onDismissed = viewModel::onMediaSwipeToDismiss,
-                                    )
+                            if (isAlwaysComposedContentVisible()) {
+                                if (viewModel.isQsEnabled && viewModel.showMedia) {
+                                    Element(
+                                        key = Media.Elements.mediaCarousel,
+                                        modifier = Modifier,
+                                    ) {
+                                        Media(
+                                            viewModelFactory = viewModel.mediaViewModelFactory,
+                                            presentationStyle =
+                                                if (mediaInRow) {
+                                                    MediaPresentationStyle.Compressed
+                                                } else {
+                                                    MediaPresentationStyle.Default
+                                                },
+                                            behavior =
+                                                ShadeSceneContentViewModel.qqsMediaUiBehavior,
+                                            onDismissed = viewModel::onMediaSwipeToDismiss,
+                                        )
+                                    }
                                 }
+                            } else {
+                                // Add an empty box when QQS content is not visible to keep the same
+                                // number of elements.
+                                Box(modifier = Modifier)
                             }
                         },
                     mediaInRow = mediaInRow,
@@ -346,6 +356,7 @@ private fun ContentScope.SingleShade(
                     jankMonitor = jankMonitor,
                     maxScrimTop = { maxNotifScrimTop.toFloat() },
                     shouldPunchHoleBehindScrim = shouldPunchHoleBehindScrim,
+                    isTransparencyEnabled = viewModel.isTransparencyEnabled,
                     stackTopPadding = notificationStackPadding,
                     stackBottomPadding = navBarHeight,
                     supportNestedScrolling = true,
@@ -547,6 +558,7 @@ private fun ContentScope.SplitShade(
                     stackTopPadding = notificationStackPadding,
                     stackBottomPadding = notificationStackPadding,
                     shouldPunchHoleBehindScrim = false,
+                    isTransparencyEnabled = viewModel.isTransparencyEnabled,
                     supportNestedScrolling = false,
                     onEmptySpaceClick =
                         viewModel::onEmptySpaceClicked.takeIf { viewModel.isEmptySpaceClickable },

@@ -98,7 +98,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -170,12 +169,6 @@ public class MediaSwitchingController
     private boolean mInAudioSharing = false;
     @Nullable private Job mAudioShareJob = null;
 
-    private Optional<MediaDevice> mCurrentInputDevice;
-
-    public Optional<MediaDevice> getCurrentInputDevice() {
-        return mCurrentInputDevice;
-    }
-
     @VisibleForTesting
     final InputRouteManager.InputDeviceCallback mInputDeviceCallback =
             new InputRouteManager.InputDeviceCallback() {
@@ -183,8 +176,6 @@ public class MediaSwitchingController
                 public void onInputDeviceListUpdated(@NonNull List<MediaDevice> devices) {
                     synchronized (mInputMediaDevicesLock) {
                         buildInputMediaItems(devices);
-                        mCurrentInputDevice =
-                                devices.stream().filter(MediaDevice::isSelected).findFirst();
                         mCallback.onDeviceListChanged();
                     }
                 }
@@ -670,13 +661,6 @@ public class MediaSwitchingController
         }
     }
 
-    private void attachConnectNewDeviceItemIfNeeded(List<MediaItem> mediaItems) {
-        MediaItem connectNewDeviceItem = getConnectNewDeviceItem();
-        if (connectNewDeviceItem != null) {
-            mediaItems.add(connectNewDeviceItem);
-        }
-    }
-
     @NonNull
     MediaItem getConnectedSpeakersExpandableGroupDivider() {
         return MediaItem.createExpandableGroupDividerMediaItem(
@@ -693,12 +677,9 @@ public class MediaSwitchingController
                         false)).toList();
     }
 
-    @Nullable
-    MediaItem getConnectNewDeviceItem() {
-        // Attach "Connect a device" item only when current output is not remote and not a group
-        return (!isCurrentConnectedDeviceRemote() && !hasGroupPlayback())
-                ? MediaItem.createPairNewDeviceMediaItem()
-                : null;
+    boolean hasConnectDeviceButton() {
+        // Show the "Connect Device" button only when current output is not remote and not a group.
+        return !isCurrentConnectedDeviceRemote() && !hasGroupPlayback();
     }
 
     private void attachRangeInfo(List<MediaDevice> devices) {
@@ -740,14 +721,11 @@ public class MediaSwitchingController
         );
     }
 
-    private List<MediaItem> getOutputDeviceList(boolean addConnectDeviceButton) {
+    private List<MediaItem> getOutputDeviceList() {
         List<MediaItem> mediaItems = new ArrayList<>(
                 mOutputMediaItemListProxy.getOutputMediaItemList());
         addSeparatorForTheFirstGroupDivider(mediaItems);
         coalesceSelectedDevices(mediaItems);
-        if (addConnectDeviceButton) {
-            attachConnectNewDeviceItemIfNeeded(mediaItems);
-        }
         return mediaItems;
     }
 
@@ -788,34 +766,25 @@ public class MediaSwitchingController
         mediaItems.addAll(mInputMediaItemList);
     }
 
-    private void addOutputDevices(List<MediaItem> mediaItems, boolean addConnectDeviceButton) {
+    private void addOutputDevices(List<MediaItem> mediaItems) {
         mediaItems.add(
                 MediaItem.createGroupDividerMediaItem(
                         mContext.getString(R.string.media_output_group_title)));
-        mediaItems.addAll(getOutputDeviceList(addConnectDeviceButton));
-    }
-
-    /**
-     * Returns a list of media items to be rendered in the device list. For backward compatibility
-     * reasons, adds a "Connect a device" button by default.
-     */
-    public List<MediaItem> getMediaItemList() {
-        return getMediaItemList(true /* addConnectDeviceButton */);
+        mediaItems.addAll(getOutputDeviceList());
     }
 
     /**
      * Returns a list of media items to be rendered in the device list.
-     * @param addConnectDeviceButton Whether to add a "Connect a device" button to the list.
      */
-    public List<MediaItem> getMediaItemList(boolean addConnectDeviceButton) {
+    public List<MediaItem> getMediaItemList() {
         // If input routing is not enabled, only return output media items.
         if (!enableInputRouting()) {
-            return getOutputDeviceList(addConnectDeviceButton);
+            return getOutputDeviceList();
         }
 
         // If input routing is enabled, return both output and input media items.
         List<MediaItem> mediaItems = new ArrayList<>();
-        addOutputDevices(mediaItems, addConnectDeviceButton);
+        addOutputDevices(mediaItems);
         addInputDevices(mediaItems);
         return mediaItems;
     }

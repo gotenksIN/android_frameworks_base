@@ -20,6 +20,8 @@ import android.annotation.UserIdInt
 import android.app.admin.DevicePolicyManager
 import android.content.IntentFilter
 import android.os.UserHandle
+import android.security.Flags.lockscreenIndicateDuplicateGuesses
+import android.security.Flags.manageLockoutEndTimeInService
 import android.security.Flags.secureLockDevice
 import android.util.Log
 import com.android.app.tracing.coroutines.launchTraced as launch
@@ -49,6 +51,7 @@ import java.util.function.Function
 import javax.inject.Inject
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.toKotlinDuration
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -194,8 +197,17 @@ interface AuthenticationRepository {
      */
     suspend fun getMaximumTimeToLock(): Long
 
-    /** Returns `true` if the power button should instantly lock the device, `false` otherwise. */
-    suspend fun getPowerButtonInstantlyLocks(): Boolean
+    /**
+     * Returns true if the power button should instantly lock the device, false otherwise.
+     *
+     * If the device is not secure, return true - this is a quirk of the settings app. If you have
+     * swipe security set, you can no longer access the "power button locks instantly" setting in
+     * the UI and it defaults to true, so the swipe lockscreen will always show up after pressing
+     * the power button.
+     *
+     * WARNING: This causes a blocking IPC to LockPatternUtils (b/446735679).
+     */
+    fun getPowerButtonInstantlyLocks(): Boolean
 }
 
 @SysUISingleton
@@ -265,9 +277,12 @@ constructor(
 
     override val lockoutEndTime: Duration?
         get() =
-            lockPatternUtils.getLockoutAttemptDeadline(selectedUserId).milliseconds.takeIf {
-                clock.elapsedRealtime().milliseconds < it
-            }
+            if (manageLockoutEndTimeInService()) {
+                    lockPatternUtils.getLockoutEndTime(selectedUserId).toKotlinDuration()
+                } else {
+                    lockPatternUtils.getLockoutAttemptDeadline(selectedUserId).milliseconds
+                }
+                .takeIf { clock.elapsedRealtime().milliseconds < it }
 
     private val _hasLockoutOccurred = MutableStateFlow(false)
     override val hasLockoutOccurred: StateFlow<Boolean> = _hasLockoutOccurred.asStateFlow()
@@ -291,6 +306,15 @@ constructor(
         credential: LockscreenCredential
     ): AuthenticationResultModel {
         return withContext(backgroundDispatcher) {
+            if (lockscreenIndicateDuplicateGuesses()) {
+                val response =
+                    lockPatternUtils.checkCredentialWithResponse(credential, selectedUserId) {}
+                return@withContext AuthenticationResultModel(
+                    isSuccessful = response.isMatched,
+                    lockoutDurationMs = response.timeout,
+                    isDuplicate = response.isCredAlreadyTried,
+                )
+            }
             try {
                 val matched = lockPatternUtils.checkCredential(credential, selectedUserId) {}
                 AuthenticationResultModel(isSuccessful = matched, lockoutDurationMs = 0)
@@ -367,11 +391,9 @@ constructor(
         }
     }
 
-    /** Returns `true` if the power button should instantly lock the device, `false` otherwise. */
-    override suspend fun getPowerButtonInstantlyLocks(): Boolean {
-        return withContext(backgroundDispatcher) {
+    override fun getPowerButtonInstantlyLocks(): Boolean {
+        return !lockPatternUtils.isSecure(selectedUserId) ||
             lockPatternUtils.getPowerButtonInstantlyLocks(selectedUserId)
-        }
     }
 
     private val selectedUserId: Int

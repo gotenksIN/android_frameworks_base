@@ -184,15 +184,7 @@ flag {
     }
 }
 
-flag {
-    name: "push_broadcast_state_to_oomadjuster"
-    namespace: "backstage_power"
-    description: "Migrate OomAdjuster pulled broadcast state to a push model"
-    bug: "401350498"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
+
 
 flag {
     name: "push_activity_state_to_oomadjuster"
@@ -278,6 +270,13 @@ flag {
     namespace: "system_performance"
     description: "Use process name to lookup ProcessRecord."
     bug: "443136429"
+}
+
+flag {
+    name: "service_check_calling_pkg"
+    namespace: "backstage_power"
+    description: "Throw security exception on service APIs if calling package doesn't match calling uid."
+    bug: "308138385"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

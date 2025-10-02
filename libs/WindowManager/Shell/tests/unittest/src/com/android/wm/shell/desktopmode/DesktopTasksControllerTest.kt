@@ -138,6 +138,7 @@ import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFullscreenTask
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.createHomeTask
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.createSplitScreenTask
 import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler.FULLSCREEN_ANIMATION_DURATION
+import com.android.wm.shell.desktopmode.clientfullscreenrequest.ClientFullscreenRequestTransitionHandler
 import com.android.wm.shell.desktopmode.common.ToggleTaskSizeInteraction
 import com.android.wm.shell.desktopmode.data.DesktopRepository
 import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer
@@ -262,6 +263,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     lateinit var toggleResizeDesktopTaskTransitionHandler: ToggleResizeDesktopTaskTransitionHandler
     @Mock lateinit var dragToDesktopTransitionHandler: DragToDesktopTransitionHandler
     @Mock lateinit var mMockDesktopImmersiveController: DesktopImmersiveController
+    @Mock
+    lateinit var clientFullscreenRequestTransitionHandler: ClientFullscreenRequestTransitionHandler
     @Mock lateinit var splitScreenController: SplitScreenController
     @Mock lateinit var recentsTransitionHandler: RecentsTransitionHandler
     @Mock lateinit var dragAndDropController: DragAndDropController
@@ -518,6 +521,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             toggleResizeDesktopTaskTransitionHandler,
             dragToDesktopTransitionHandler,
             mMockDesktopImmersiveController,
+            clientFullscreenRequestTransitionHandler,
             userRepositories,
             repositoryInitializer,
             recentsTransitionHandler,
@@ -1885,12 +1889,16 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 )
             )
             .thenReturn(Binder())
+        val pendingIntent =
+            PendingIntent.getActivity(
+                context,
+                /* requestCode= */ 0,
+                freeformTask.baseIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT,
+                /* options= */ null,
+            )
 
-        controller.startLaunchIntentTransition(
-            freeformTask.baseIntent,
-            Bundle.EMPTY,
-            DEFAULT_DISPLAY,
-        )
+        controller.startLaunchIntentTransition(pendingIntent, Bundle.EMPTY, DEFAULT_DISPLAY)
 
         val wct = getLatestDesktopMixedTaskWct(type = TRANSIT_OPEN)
         assertThat(wct.hierarchyOps).hasSize(1)
@@ -1917,8 +1925,16 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 )
             )
             .thenReturn(Binder())
+        val pendingIntent =
+            PendingIntent.getActivity(
+                context,
+                /* requestCode= */ 0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT,
+                /* options= */ null,
+            )
 
-        controller.startLaunchIntentTransition(intent, Bundle.EMPTY, SECOND_DISPLAY)
+        controller.startLaunchIntentTransition(pendingIntent, Bundle.EMPTY, SECOND_DISPLAY)
 
         val wct = getLatestDesktopMixedTaskWct(type = TRANSIT_OPEN)
         // We expect two actions: open the app and open the wallpaper.
@@ -1942,7 +1958,15 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         taskRepository.setTopTransparentFullscreenTaskData(DEFAULT_DISPLAY, topTransparentTask)
 
         val task = setUpFreeformTask()
-        controller.startLaunchIntentTransition(task.baseIntent, Bundle.EMPTY, DEFAULT_DISPLAY)
+        val pendingIntent =
+            PendingIntent.getActivity(
+                context,
+                /* requestCode= */ 0,
+                task.baseIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT,
+                /* options= */ null,
+            )
+        controller.startLaunchIntentTransition(pendingIntent, Bundle.EMPTY, DEFAULT_DISPLAY)
 
         verify(desktopMixedTransitionHandler)
             .startLaunchTransition(
@@ -10596,7 +10620,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @EnableFlags(
         Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_MINIMIZE_ANIMATION_BUGFIX,
         Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS,
-        )
+    )
     @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION)
     fun onUnhandledDrag_newFreeformIntent_tabTearingAnimationBugfixFlagEnabled_tabTearingLaunchAnimationFlagDisabled() {
         testOnUnhandledDrag(
@@ -10612,7 +10636,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @EnableFlags(
         Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION,
         Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS,
-        )
+    )
     @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_MINIMIZE_ANIMATION_BUGFIX)
     fun onUnhandledDrag_newFreeformIntent_tabTearingAnimationBugfixFlagDisabled_tabTearingLaunchAnimationFlagEnabled() {
         testOnUnhandledDrag(
@@ -11626,8 +11650,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             val wct = wctCaptor.firstValue
             assertThat(findBoundsChange(wct, firstTask)).isEqualTo(firstTaskBounds)
             assertThat(findBoundsChange(wct, secondTask)).isEqualTo(secondTaskBounds)
-            wct.assertReorder(task = firstTask, toTop = true, includingParents = true)
-            wct.assertReorder(task = secondTask, toTop = true, includingParents = true)
             verify(desksOrganizer).moveTaskToDesk(any(), anyInt(), eq(firstTask), eq(false))
             verify(desksOrganizer).moveTaskToDesk(any(), anyInt(), eq(secondTask), eq(false))
             val deskIds = taskRepository.getDeskIds(SECOND_DISPLAY_ON_RECONNECT)

@@ -2466,6 +2466,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         mHandler = new MainHandler(handlerThread.getLooper());
         mHandlerThread = handlerThread;
         mConstants = new ActivityManagerConstants(mContext, this, mHandler);
+        final OomAdjuster.Constants oomConstants = mConstants.createOomConstants();
         final ActiveUids activeUids = new ActiveUids(null);
         mPlatformCompat = null;
         mProcessList = injector.getProcessList(this);
@@ -2475,7 +2476,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         mCachedAppOptimizer = new CachedAppOptimizer(this);
         mProcessStateController = new ProcessStateController
-                .Builder(this, mProcessList, activeUids, new OomAdjusterCallback())
+                .Builder(this, mProcessList, activeUids, oomConstants, new OomAdjusterCallback())
                 .setHandlerThread(handlerThread)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
@@ -2533,6 +2534,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         mProcStartHandler = new ProcStartHandler(this, mProcStartHandlerThread.getLooper());
 
         mConstants = new ActivityManagerConstants(mContext, this, mHandler);
+        final OomAdjuster.Constants oomConstants = mConstants.createOomConstants();
         mAtmInternal = LocalServices.getService(ActivityTaskManagerInternal.class);
         final ActiveUids activeUids = new ActiveUids(mAtmInternal);
         mPlatformCompat = (PlatformCompat) ServiceManager.getService(
@@ -2545,7 +2547,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         final Looper activityTaskLooper = DisplayThread.get().getLooper();
         mCachedAppOptimizer = new CachedAppOptimizer(this);
         mProcessStateController = new ProcessStateController
-                .Builder(this, mProcessList, activeUids, new OomAdjusterCallback())
+                .Builder(this, mProcessList, activeUids, oomConstants, new OomAdjusterCallback())
                 .setLockObject(this)
                 .setTopProcessChangeCallback(this::updateTopAppListeners)
                 .setProcessLruUpdater(mProcessList)
@@ -3175,6 +3177,18 @@ public class ActivityManagerService extends IActivityManager.Stub
      * @throws SecurityException if the calling uid doesn't match uid of the package.
      */
     private void enforceCallingPackage(String packageName, int callingUid) {
+        if (packageName == null) {
+            throw new IllegalArgumentException("callingPackage cannot be null");
+        }
+        if (callingUid == ROOT_UID || callingUid == SYSTEM_UID) {
+            // System and Root are always allowed
+            return;
+        }
+        if (Process.isSdkSandboxUid(callingUid)) {
+            // Sdk sandbox uids are expected to call on behalf of other uids and have their own
+            // checks and restrictions
+            return;
+        }
         final int userId = UserHandle.getUserId(callingUid);
         final int packageUid = getPackageManagerInternal().getPackageUid(packageName,
                 /*flags=*/ 0, userId);
@@ -13966,6 +13980,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             throws TransactionTooLargeException {
         enforceNotIsolatedCaller("startService");
         enforceAllowedToStartOrBindServiceIfSdkSandbox(service);
+        if (com.android.server.am.Flags.serviceCheckCallingPkg()) {
+            enforceCallingPackage(callingPackage, Binder.getCallingUid());
+        } else {
+            if (callingPackage == null) {
+                throw new IllegalArgumentException("callingPackage cannot be null");
+            }
+        }
         addCreatorToken(service, callingPackage);
         if (service != null) {
             // Refuse possible leaked file descriptors
@@ -13974,10 +13995,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             // Remove existing mismatch flag so it can be properly updated later
             service.removeExtendedFlags(Intent.EXTENDED_FLAG_FILTER_MISMATCH);
-        }
-
-        if (callingPackage == null) {
-            throw new IllegalArgumentException("callingPackage cannot be null");
         }
 
         if (isSdkSandboxService && instanceName == null) {
@@ -14061,13 +14078,16 @@ public class ActivityManagerService extends IActivityManager.Stub
     @Override
     public IBinder peekService(Intent service, String resolvedType, String callingPackage) {
         enforceNotIsolatedCaller("peekService");
+        if (com.android.server.am.Flags.serviceCheckCallingPkg()) {
+            enforceCallingPackage(callingPackage, Binder.getCallingUid());
+        } else {
+            if (callingPackage == null) {
+                throw new IllegalArgumentException("callingPackage cannot be null");
+            }
+        }
         // Refuse possible leaked file descriptors
         if (service != null && service.hasFileDescriptors() == true) {
             throw new IllegalArgumentException("File descriptors passed in Intent");
-        }
-
-        if (callingPackage == null) {
-            throw new IllegalArgumentException("callingPackage cannot be null");
         }
 
         synchronized(this) {
@@ -14210,6 +14230,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             throws TransactionTooLargeException {
         enforceNotIsolatedCaller("bindService");
         enforceAllowedToStartOrBindServiceIfSdkSandbox(service);
+        if (com.android.server.am.Flags.serviceCheckCallingPkg()) {
+            enforceCallingPackage(callingPackage, Binder.getCallingUid());
+        } else {
+            if (callingPackage == null) {
+                throw new IllegalArgumentException("callingPackage cannot be null");
+            }
+        }
 
         if (service != null) {
             // Refuse possible leaked file descriptors
@@ -14218,10 +14245,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             // Remove existing mismatch flag so it can be properly updated later
             service.removeExtendedFlags(Intent.EXTENDED_FLAG_FILTER_MISMATCH);
-        }
-
-        if (callingPackage == null) {
-            throw new IllegalArgumentException("callingPackage cannot be null");
         }
 
         if (isSdkSandboxService && instanceName == null) {
@@ -19693,8 +19716,36 @@ public class ActivityManagerService extends IActivityManager.Stub
                         forceUpdatePssTime);
             }
         }
+
+        @Override
+        public void onProcessGroupUpdated(ProcessRecordInternal app, int group) {
+            setProcessGroup(app.getPid(), group, app.processName);
+            mPhantomProcessList.setProcessGroupForPhantomProcessOfApp((ProcessRecord) app, group);
+        }
     }
 
+    static void setProcessGroup(int pid, int group, String processName) {
+        if (pid == ActivityManagerService.MY_PID) {
+            // Skip setting the process group for system_server, keep it as default.
+            return;
+        }
+        final boolean traceEnabled = Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+        if (traceEnabled) {
+            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "setProcessGroup "
+                    + processName + " to " + group);
+        }
+        try {
+            android.os.Process.setProcessGroup(pid, group);
+        } catch (Exception e) {
+            if (DEBUG_ALL) {
+                Slog.w(TAG, "Failed setting process group of " + pid + " to " + group, e);
+            }
+        } finally {
+            if (traceEnabled) {
+                Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+            }
+        }
+    }
 
     CachedAppOptimizer getCachedAppOptimizer() {
         return mCachedAppOptimizer;

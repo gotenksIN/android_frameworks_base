@@ -887,20 +887,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         handlers.add(
                 new PolicyHandler<Integer>(PolicyIdentifier.SCREEN_CAPTURE) {
                     @Override
-                    protected void checkPermissions(CallerIdentity caller, int scope) {
-                        super.checkPermissions(caller, scope);
-
-                        int callerDpcType = getDelegate().getDpcType(caller);
-                        if (scope == POLICY_SCOPE_DEVICE && callerDpcType != DEFAULT_DEVICE_OWNER
-                                && callerDpcType != PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE) {
-                            throw new SecurityException(
-                                    "Caller must be a device owner or profile owner of an "
-                                            + "organization-owned managed profile to be able"
-                                            + " to set the policy with POLICY_SCOPE_DEVICE.");
-                        }
-                    }
-
-                    @Override
                     protected void storePolicyValue(
                             CallerIdentity caller, int scope, Integer value) {
                         dpms.setScreenCaptureUnchecked(caller, scope, value);
@@ -25144,6 +25130,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (!mHasFeature) {
             return;
         }
+        if (!Flags.policyStreamlining()) {
+            throw new UnsupportedOperationException("Policy streamlining is not enabled");
+        }
+
         setPolicy(getCallerIdentity(callerPackageName), id, scope, value);
     }
 

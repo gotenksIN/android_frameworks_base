@@ -167,13 +167,7 @@ public final class MessageQueue {
         // used by tests.
         // For now, we limit it to system processes to avoid breaking apps and their tests.
         if (UserHandle.isCore(Process.myUid())) {
-            // Some platform tests run in core UIDs.
-            // Use this awful heuristic to detect them.
-            if (processName.contains("test") || processName.contains("Test")) {
-                return false;
-            } else {
-                return true;
-            }
+            return true;
         }
 
         // Also explicitly allow SystemUI processes.
@@ -724,6 +718,11 @@ public final class MessageQueue {
         }
     }
 
+    @UnsupportedAppUsage(
+            maxTargetSdk = Build.VERSION_CODES.BAKLAVA,
+            publicAlternatives =
+                    "To manipulate the queue in Instrumentation tests, use {@link"
+                        + " android.os.TestLooperManager}")
     Message next() {
         if (sUseDeliQueue) {
             return nextDeliQueue();

@@ -100,7 +100,6 @@ import androidx.annotation.Nullable;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.statusbar.IStatusBarService;
-import com.android.internal.util.CollectionUtils;
 import com.android.launcher3.icons.BubbleIconFactory;
 import com.android.wm.shell.Flags;
 import com.android.wm.shell.R;
@@ -113,7 +112,6 @@ import com.android.wm.shell.bubbles.logging.BubbleLogger;
 import com.android.wm.shell.bubbles.logging.BubbleProtoLog;
 import com.android.wm.shell.bubbles.logging.BubbleSessionTracker;
 import com.android.wm.shell.bubbles.logging.BubbleSessionTracker.SessionEvent;
-import com.android.wm.shell.bubbles.shortcut.BubbleShortcutHelper;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayImeController;
 import com.android.wm.shell.common.DisplayInsetsController;
@@ -214,6 +212,11 @@ public class BubbleController implements ConfigurationChangeListener,
         void bubbleOverflowChanged(boolean hasBubbles);
         /** Called when the visibility of bubble views should be updated. */
         void updateVisibility(boolean visible);
+        /**
+         * Called when the provided bubble is jumpcut closing. This is different from
+         * {@link #removeBubble} as the Bubble TaskView may not be ready to be removed yet.
+         */
+        void hideJumpcutClosingBubble(Bubble closingBubble);
     }
 
     private final Context mContext;
@@ -613,10 +616,6 @@ public class BubbleController implements ConfigurationChangeListener,
             userProfiles.put(user.id, user);
         }
         mCurrentProfiles = userProfiles;
-
-        if (Flags.enableRetrievableBubbles()) {
-            registerShortcutBroadcastReceiver();
-        }
 
         mShellController.addConfigurationChangeListener(this);
         mShellController.addExternalInterface(IBubbles.DESCRIPTOR,
@@ -1311,27 +1310,6 @@ public class BubbleController implements ConfigurationChangeListener,
         }
         return false;
     }
-
-    private void registerShortcutBroadcastReceiver() {
-        IntentFilter shortcutFilter = new IntentFilter();
-        shortcutFilter.addAction(BubbleShortcutHelper.ACTION_SHOW_BUBBLES);
-        BubbleLog.d("BubbleController.registerShortcutBroadcastReceiver()");
-        mContext.registerReceiver(mShortcutBroadcastReceiver, shortcutFilter,
-                Context.RECEIVER_NOT_EXPORTED);
-    }
-
-    private final BroadcastReceiver mShortcutBroadcastReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            BubbleLog.v(
-                    "BubbleController.mShortcutBroadcastReceiver received broadcast to show "
-                            + "bubbles with intent action=%s",
-                    intent.getAction());
-            if (BubbleShortcutHelper.ACTION_SHOW_BUBBLES.equals(intent.getAction())) {
-                mMainExecutor.execute(() -> showBubblesFromShortcut());
-            }
-        }
-    };
 
     /**
      * Called by the view displaying bubbles once all bubbles have finished animating out.
@@ -2658,6 +2636,13 @@ public class BubbleController implements ConfigurationChangeListener,
                 mStackView.setVisibility(visible ? VISIBLE : INVISIBLE);
             }
         }
+
+        @Override
+        public void hideJumpcutClosingBubble(Bubble closingBubble) {
+            if (mStackView != null) {
+                mStackView.hideJumpcutClosingBubble(closingBubble);
+            }
+        }
     };
 
     /** When bubbles are in the bubble bar, this will be used to notify bubble bar views. */
@@ -2764,6 +2749,11 @@ public class BubbleController implements ConfigurationChangeListener,
                 mLayerView.setVisibility(visible ? VISIBLE : INVISIBLE);
             }
         }
+
+        @Override
+        public void hideJumpcutClosingBubble(Bubble closingBubble) {
+            // Nothing to do for our views, handled by launcher / in the bubble bar.
+        }
     };
 
     @SuppressWarnings("FieldCanBeLocal")
@@ -2845,6 +2835,12 @@ public class BubbleController implements ConfigurationChangeListener,
                 }
             }
             mDataRepository.removeBubbles(mCurrentUserId, bubblesToBeRemovedFromRepository);
+
+            if (update.jumpcutBubbleSwitchClosingBubble != null) {
+                // We want to hide the bubble icon now, but not yet ready to remove the task bubble
+                mBubbleViewCallback.hideJumpcutClosingBubble(
+                        update.jumpcutBubbleSwitchClosingBubble);
+            }
 
             if (update.addedBubble != null) {
                 mDataRepository.addBubble(mCurrentUserId, update.addedBubble);
@@ -3104,34 +3100,6 @@ public class BubbleController implements ConfigurationChangeListener,
     public void isNotificationPanelExpanded(Consumer<Boolean> callback) {
         mSysuiProxy.isNotificationPanelExpand(expanded ->
                 mMainExecutor.execute(() -> callback.accept(expanded)));
-    }
-
-    /**
-     * Show bubbles UI when triggered via shortcut.
-     *
-     * <p>When there are bubbles visible, expands the top-most bubble. When there are no bubbles
-     * visible, opens the bubbles overflow UI.
-     */
-    public void showBubblesFromShortcut() {
-        if (isStackExpanded()) {
-            BubbleLog.v("BubbleController.showBubblesFromShortcut() stack visible, skip");
-            return;
-        }
-        if (mBubbleData.getSelectedBubble() != null) {
-            BubbleLog.v("BubbleController.showBubblesFromShortcut() open selected bubble");
-            expandStackWithSelectedBubble();
-            return;
-        }
-        BubbleViewProvider bubbleToSelect = CollectionUtils.firstOrNull(mBubbleData.getBubbles());
-        if (bubbleToSelect == null) {
-            BubbleLog.v("BubbleController.showBubblesFromShortcut() no bubbles");
-            // make sure overflow bubbles are loaded
-            loadOverflowBubblesFromDisk();
-            bubbleToSelect = mBubbleData.getOverflow();
-        }
-        BubbleLog.v("BubbleController.showBubblesFromShortcut() select and open %s",
-                bubbleToSelect.getKey());
-        mBubbleData.setSelectedBubbleAndExpandStack(bubbleToSelect);
     }
 
     private void moveDraggedBubbleToFullscreen(String key, Point dropLocation) {

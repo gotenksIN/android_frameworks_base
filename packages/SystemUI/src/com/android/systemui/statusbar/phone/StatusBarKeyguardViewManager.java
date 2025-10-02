@@ -1482,6 +1482,7 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     private Runnable mMakeNavigationBarVisibleRunnable = new Runnable() {
         @Override
         public void run() {
+            SceneContainerFlag.assertInLegacyMode();
             NavigationBarView view = mCentralSurfaces.getNavigationBarView();
             if (view != null) {
                 view.setVisibility(View.VISIBLE);
@@ -1555,6 +1556,12 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
      * Updates the visibility of the nav bar window (which will cause insets changes).
      */
     protected void updateNavigationBarVisibility(boolean navBarVisible) {
+        if (SceneContainerFlag.isEnabled()) {
+            // When the scene container is enabled, navigation bar visibility is controlled from the
+            // SceneContainer composable.
+            return;
+        }
+
         if (mCentralSurfaces.getNavigationBarView() != null
                 || (mTaskbarDelegate != null && mTaskbarDelegate.isInitialized())) {
             if (navBarVisible) {
@@ -1581,11 +1588,8 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
                 && mBiometricUnlockController.getMode() == MODE_WAKE_AND_UNLOCK_PULSING;
         boolean keyguardVisible = mKeyguardStateController.isVisible();
         boolean hideWhileDozing = mDozing && !isWakeAndUnlockPulsing;
-        boolean showNavBarForPulsing = !com.android.systemui.Flags.newDozingKeyguardStates()
-                && mPulsing && !mIsDocked;
-        boolean keyguardWithGestureNav = (keyguardVisible && !mDozing && !mScreenOffAnimationPlaying
-                || showNavBarForPulsing)
-                && mGesturalNav;
+        boolean keyguardWithGestureNav = (keyguardVisible && !mDozing
+                && !mScreenOffAnimationPlaying) && mGesturalNav;
         return (!keyguardVisible && !hideWhileDozing && !mScreenOffAnimationPlaying
                 || primaryBouncerIsShowing()
                 || mRemoteInputActive

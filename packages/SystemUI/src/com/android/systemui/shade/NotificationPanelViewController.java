@@ -895,12 +895,6 @@ public final class NotificationPanelViewController implements
         mShadeHeadsUpTracker.addTrackingHeadsUpListener(
                 mNotificationStackScrollLayoutController::setTrackingHeadsUp);
         mWakeUpCoordinator.setStackScroller(mNotificationStackScrollLayoutController);
-        mWakeUpCoordinator.addListener(new NotificationWakeUpCoordinator.WakeUpListener() {
-            @Override
-            public void onFullyHiddenChanged(boolean isFullyHidden) {
-                mKeyguardStatusBarViewController.updateForHeadsUp();
-            }
-        });
 
         mView.setRtlChangeListener(layoutDirection -> {
             if (layoutDirection != mOldLayoutDirection) {
@@ -2395,10 +2389,6 @@ public final class NotificationPanelViewController implements
         if (isLaunchingActivity()) {
             return false;
         }
-        if (mHeadsUpAppearanceController != null
-                && mHeadsUpAppearanceController.shouldHeadsUpStatusBarBeVisible()) {
-            return false;
-        }
         return !mShowIconsWhenExpanded;
     }
 
@@ -3503,7 +3493,6 @@ public final class NotificationPanelViewController implements
             updateGestureExclusionRect();
             mHeadsUpPinnedMode = inPinnedMode;
             updateVisibility();
-            mKeyguardStatusBarViewController.updateForHeadsUp();
         }
 
         @Override
@@ -3621,7 +3610,6 @@ public final class NotificationPanelViewController implements
                     mQsController.hideQsImmediately();
                 }
             }
-            mKeyguardStatusBarViewController.updateForHeadsUp();
             if (keyguardShowing) {
                 updateDozingVisibilities(false /* animate */);
             }
@@ -3644,12 +3632,6 @@ public final class NotificationPanelViewController implements
                 @Override
                 public float getPanelViewExpandedHeight() {
                     return getExpandedHeight();
-                }
-
-                @Override
-                public boolean shouldHeadsUpBeVisible() {
-                    return mHeadsUpAppearanceController != null &&
-                            mHeadsUpAppearanceController.shouldHeadsUpStatusBarBeVisible();
                 }
 
                 @Override

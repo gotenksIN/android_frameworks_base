@@ -10557,6 +10557,13 @@ public class CarrierConfigManager {
             "supports_video_back_tone_bool";
 
     /**
+     * Indicates if the carrier supports a unidirectional video service call (UVS).
+     */
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_IS_USING_UNIDIRECTIONAL_VIDEO_SERVICE)
+    public static final String KEY_SUPPORTS_UNIDIRECTIONAL_VIDEO_SERVICE_BOOL =
+            "supports_unidirectional_video_service_bool";
+
+    /**
      * Determines the default RTT mode.
      *
      * Upon first boot, when the user has not yet set a value for their preferred RTT mode,
@@ -11218,6 +11225,47 @@ public class CarrierConfigManager {
      */
     public static final String KEY_OPP_AUTO_DATA_SWITCH_POLICY_INT =
             "opp_auto_data_switch_policy_int";
+
+    /**
+     * Default value indicating that the low battery alert feature is disabled.
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_LOW_BATTERY_ALERT)
+    public static final int LOW_BATTERY_ALERT_DISABLED = -1;
+
+    /**
+     * Battery level threshold (in percentage) to trigger an audio alert.
+     * <p>
+     * This flag defines the minimum battery percentage at which an audio alert will be played.
+     * When the device battery level falls below this threshold, a tone or audio warning
+     * may be triggered to notify the user.
+     * </p>
+     * <p>Type: Integer</p>
+     * <p>Valid values: 0–100</p>
+     * <p>Default value: {@link #LOW_BATTERY_ALERT_DISABLED} (feature disabled)</p>
+     * <p>If the value is set to {@link #LOW_BATTERY_ALERT_DISABLED}, the audio alert for low
+     * battery is not enabled.</p>
+     *
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_LOW_BATTERY_ALERT)
+    public static final String KEY_LOW_BATTERY_ALERT_THRESHOLD_INT =
+            "low_battery_alert_threshold_int";
+
+    /**
+     * Interval between consecutive battery alert tones, in seconds.
+     * <p>
+     * This flag controls how frequently (in seconds) an alert tone should be played
+     * after the battery level drops below the defined threshold.
+     * A shorter interval means more frequent alerts.
+     * </p>
+     * <p>Type: Integer</p>
+     * <p>Valid values: 0 or greater</p>
+     * <p>Default value: {@link #LOW_BATTERY_ALERT_DISABLED} (feature disabled)</p>
+     * <p>If set to {@link #LOW_BATTERY_ALERT_DISABLED}, the alert tone is disabled entirely.</p>
+     *
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_LOW_BATTERY_ALERT)
+    public static final String KEY_LOW_BATTERY_ALERT_INTERVAL_INT =
+            "low_battery_alert_interval_int";
 
     /** The default value for every variable. */
     private static final PersistableBundle sDefaults;
@@ -11989,6 +12037,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_SUPPORTS_CALL_COMPOSER_BOOL, false);
         sDefaults.putBoolean(KEY_SUPPORTS_BUSINESS_CALL_COMPOSER_BOOL, false);
         sDefaults.putBoolean(KEY_SUPPORTS_VIDEO_RINGBACK_BOOL, false);
+        sDefaults.putBoolean(KEY_SUPPORTS_UNIDIRECTIONAL_VIDEO_SERVICE_BOOL, false);
         sDefaults.putString(KEY_CALL_COMPOSER_PICTURE_SERVER_URL_STRING, "");
         sDefaults.putBoolean(KEY_USE_ACS_FOR_RCS_BOOL, false);
         sDefaults.putBoolean(KEY_NETWORK_TEMP_NOT_METERED_SUPPORTED_BOOL, true);
@@ -12109,6 +12158,11 @@ public class CarrierConfigManager {
             sDefaults.putBoolean(KEY_SHOW_AVOID_BAD_WIFI_TOGGLE_BOOL, false);
         }
         sDefaults.putInt(KEY_OPP_AUTO_DATA_SWITCH_POLICY_INT, 0);
+
+        // Default value for low battery alert.
+        sDefaults.putInt(KEY_LOW_BATTERY_ALERT_THRESHOLD_INT, LOW_BATTERY_ALERT_DISABLED);
+        sDefaults.putInt(KEY_LOW_BATTERY_ALERT_INTERVAL_INT,
+                LOW_BATTERY_ALERT_DISABLED);
     }
 
     /**

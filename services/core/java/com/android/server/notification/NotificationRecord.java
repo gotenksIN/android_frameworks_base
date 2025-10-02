@@ -349,9 +349,17 @@ public final class NotificationRecord {
             }
         }
 
-        final long[] vibrationPattern = channel.getVibrationPattern();
-        if (vibrationPattern != null) {
-            return helper.createWaveformVibration(vibrationPattern, insistent);
+        if (com.android.server.notification.Flags.channelVibrationIgnoreInvalidPattern()) {
+            VibrationEffect vibrationFromPattern = VibratorHelper.createWaveformVibration(
+                    channel.getVibrationPattern(), insistent);
+            if (vibrationFromPattern != null) {
+                return vibrationFromPattern;
+            }
+        } else {
+            final long[] vibrationPattern = channel.getVibrationPattern();
+            if (vibrationPattern != null) {
+                return helper.createWaveformVibration(vibrationPattern, insistent);
+            }
         }
 
         if (com.android.server.notification.Flags.notificationVibrationInSoundUriForChannel()) {
@@ -1435,18 +1443,13 @@ public final class NotificationRecord {
 
     /** Run when the notification is direct replied. */
     public void recordDirectReplied() {
-        if (Flags.lifetimeExtensionRefactor()) {
-            // Mark the NotificationRecord as lifetime extended.
-            Notification notification = getSbn().getNotification();
-            notification.flags |= Notification.FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
-        }
+        Notification notification = getSbn().getNotification();
+        notification.flags |= Notification.FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
 
         mStats.setDirectReplied();
     }
 
-
     /** Run when the notification is smart replied. */
-    @FlaggedApi(Flags.FLAG_LIFETIME_EXTENSION_REFACTOR)
     public void recordSmartReplied() {
         Notification notification = getSbn().getNotification();
         notification.flags |= Notification.FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;

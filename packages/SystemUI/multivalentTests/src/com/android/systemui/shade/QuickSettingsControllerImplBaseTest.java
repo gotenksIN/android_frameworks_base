@@ -48,7 +48,7 @@ import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.power.domain.interactor.PowerInteractor;
-import com.android.systemui.qs.QSFragmentLegacy;
+import com.android.systemui.qs.composefragment.QSFragmentCompose;
 import com.android.systemui.res.R;
 import com.android.systemui.screenrecord.ScreenRecordUxController;
 import com.android.systemui.shade.data.repository.FakeShadeRepository;
@@ -109,7 +109,7 @@ public class QuickSettingsControllerImplBaseTest extends SysuiTestCase {
     @Mock protected KeyguardBottomAreaView mQsFrame;
     @Mock protected KeyguardStatusBarView mKeyguardStatusBar;
     @Mock protected QS mQs;
-    @Mock protected QSFragmentLegacy mQSFragment;
+    @Mock protected QSFragmentCompose mQSFragment;
     @Mock protected Lazy<NotificationPanelViewController> mPanelViewControllerLazy;
     @Mock protected NotificationPanelViewController mNotificationPanelViewController;
     @Mock protected NotificationPanelView mPanelView;
@@ -187,7 +187,6 @@ public class QuickSettingsControllerImplBaseTest extends SysuiTestCase {
         mShadeInteractor = new ShadeInteractorImpl(
                 mTestScope.getBackgroundScope(),
                 mKosmos.getDeviceProvisioningInteractor(),
-                mKosmos.getDisableFlagsInteractor(),
                 mDozeParameters,
                 mKeyguardRepository,
                 keyguardTransitionInteractor,
@@ -200,7 +199,8 @@ public class QuickSettingsControllerImplBaseTest extends SysuiTestCase {
                         mShadeRepository,
                         mKosmos.getShadeConfigRepository()
                 ),
-                mKosmos.getSceneInteractor());
+                mKosmos.getSceneInteractor(),
+                mKosmos.getShadeStatusBarComponentsInteractor());
 
         when(mResources.getDimensionPixelSize(
                 R.dimen.lockscreen_shade_qs_transition_distance)).thenReturn(DEFAULT_HEIGHT);

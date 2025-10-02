@@ -186,6 +186,16 @@ flag {
 }
 
 flag {
+  name: "app_compat_ui_restart_on_full_transparency"
+  namespace: "large_screen_experiences_app_compat"
+  description: "Whether restart button should be hidden for completely transparent activities."
+  bug: "444422899"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
   name: "vdm_force_app_universal_resizable_api"
   namespace: "large_screen_experiences_app_compat"
   description: "Whether the API for forcing apps to be universal resizable on virtual display is available"
@@ -207,6 +217,16 @@ flag {
   description: "Whether a system service should handle setting restored user aspect ratio settings for apps that install after SUW is complete."
   bug: "413014252"
   is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "add_surface_insets_for_crop"
+  namespace: "large_screen_experiences_app_compat"
+  description: "Accounts for surface insets when applying window crop for rounded corners."
+  bug: "425184002"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

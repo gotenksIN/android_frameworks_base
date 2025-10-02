@@ -57,16 +57,6 @@ flag {
 }
 
 flag {
-    name: "scrypt_parameter_change"
-    namespace: "security"
-    description: "Use n=9 instead of n=11 for scrypt for lock screen knowledge factors"
-    bug: "416772194"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "software_ratelimiter"
     namespace: "security"
     description: "Enable support for SoftwareRateLimiter in LockSettingsService"
@@ -191,6 +181,13 @@ flag {
 }
 
 flag {
+    name: "lockscreen_timeout_deactivate_pin_pad"
+    namespace: "security"
+    description: "Deactivate pin pad buttons when lockscreen is timed out"
+    bug: "445769118"
+}
+
+flag {
     name: "manage_lockout_end_time_in_service"
     namespace: "security"
     description: "Manage lockout end time in LockSettingsService rather than LockPatternUtils"
@@ -198,4 +195,11 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "lockscreen_indicate_duplicate_guesses"
+    namespace: "security"
+    description: "Indicate explicitly that duplicate failed lockscreen guesses are duplicates"
+    bug: "322014085"
 }

@@ -318,7 +318,6 @@ public class AudioSystem
                      return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE;
             case AUDIO_FORMAT_APTX_TWSP:
                      return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_TWSP;
-            case AUDIO_FORMAT_LC3: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_LC3;
             case AUDIO_FORMAT_OPUS: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS;
             case VX_AUDIO_FORMAT_APTX_ADAPTIVE_QLEA:
                  return BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE_LE;
@@ -374,8 +373,6 @@ public class AudioSystem
                 return AudioSystem.AUDIO_FORMAT_APTX_ADAPTIVE;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_TWSP:
                 return AudioSystem.AUDIO_FORMAT_APTX_TWSP;
-            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_LC3:
-                return AudioSystem.AUDIO_FORMAT_LC3;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS:
                 return AudioSystem.AUDIO_FORMAT_OPUS;
             default:

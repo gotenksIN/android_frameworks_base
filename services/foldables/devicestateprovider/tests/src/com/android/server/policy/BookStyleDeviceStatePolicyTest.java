@@ -20,6 +20,10 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.STATE_OFF;
 import static android.view.Display.STATE_ON;
 
+import static com.android.server.policy.BookStyleDeviceStatePolicy.DEVICE_STATE_CLOSED;
+import static com.android.server.policy.BookStyleDeviceStatePolicy.DEVICE_STATE_HALF_OPENED;
+import static com.android.server.policy.BookStyleDeviceStatePolicy.DEVICE_STATE_OPENED;
+
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
@@ -48,6 +52,7 @@ import android.hardware.input.InputSensorInfo;
 import android.os.Handler;
 import android.os.PowerManager;
 import android.os.PowerManager.ScreenTimeoutPolicyListener;
+import android.os.PowerManagerInternal;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableContext;
 import android.view.Display;
@@ -56,6 +61,7 @@ import android.view.Surface;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import com.android.server.LocalServices;
 import com.android.server.devicestate.DeviceStateProvider;
 import com.android.server.devicestate.DeviceStateProvider.Listener;
 import com.android.server.policy.feature.flags.FakeFeatureFlagsImpl;
@@ -85,9 +91,6 @@ import java.util.Map;
 @RunWith(AndroidTestingRunner.class)
 public final class BookStyleDeviceStatePolicyTest {
 
-    private static final int DEVICE_STATE_CLOSED = 0;
-    private static final int DEVICE_STATE_HALF_OPENED = 1;
-    private static final int DEVICE_STATE_OPENED = 2;
     private static final int EXTERNAL_DISPLAY_ID = 17;
     private static final int DEVICE_STATE_CONCURRENT_INNER_DEFAULT = 4;
     private static final int DEVICE_STATE_REAR_DISPLAY_OUTER_DEFAULT = 5;
@@ -133,7 +136,6 @@ public final class BookStyleDeviceStatePolicyTest {
     public void setup() {
         MockitoAnnotations.initMocks(this);
 
-        mFakeFeatureFlags.setFlag(Flags.FLAG_ENABLE_FOLDABLES_POSTURE_BASED_CLOSED_STATE, true);
         mFakeFeatureFlags.setFlag(Flags.FLAG_ENABLE_DUAL_DISPLAY_BLOCKING, true);
         mFakeFeatureFlags.setFlag(Flags.FLAG_FORCE_FOLDABLES_TENT_MODE_WITH_SCREEN_WAKELOCK, true);
 
@@ -158,6 +160,10 @@ public final class BookStyleDeviceStatePolicyTest {
         when(mDisplayManager.getDisplay(eq(DEFAULT_DISPLAY))).thenReturn(mDisplay);
         mContext.addMockSystemService(DisplayManager.class, mDisplayManager);
         mContext.addMockSystemService(PowerManager.class, mPowerManager);
+
+        // it's all static so we need to clear state between tests
+        LocalServices.removeServiceForTest(PowerManagerInternal.class);
+        LocalServices.addService(PowerManagerInternal.class, mock(PowerManagerInternal.class));
 
         mContext.ensureTestableResources();
         when(mContext.getResources().getConfiguration()).thenReturn(mConfiguration);
@@ -231,23 +237,12 @@ public final class BookStyleDeviceStatePolicyTest {
     }
 
     @Test
-    public void test_postureBasedClosedState_createPolicy_doesNotRegisterHallSensor() {
-        mFakeFeatureFlags.setFlag(Flags.FLAG_ENABLE_FOLDABLES_POSTURE_BASED_CLOSED_STATE, true);
+    public void test_createPolicy_doesNotRegisterHallSensor() {
         clearInvocations(mSensorManager);
 
         mInstrumentation.runOnMainSync(() -> mProvider = createProvider());
 
         verify(mSensorManager, never()).registerListener(any(), eq(mHallSensor), anyInt());
-    }
-
-    @Test
-    public void test_postureBasedClosedStateDisabled_createPolicy_registersHallSensor() {
-        mFakeFeatureFlags.setFlag(Flags.FLAG_ENABLE_FOLDABLES_POSTURE_BASED_CLOSED_STATE, false);
-        clearInvocations(mSensorManager);
-
-        mInstrumentation.runOnMainSync(() -> mProvider = createProvider());
-
-        verify(mSensorManager).registerListener(any(), eq(mHallSensor), anyInt());
     }
 
     @Test
@@ -904,8 +899,7 @@ public final class BookStyleDeviceStatePolicyTest {
 
     private DeviceStateProvider createProvider() {
         mPolicy = new BookStyleDeviceStatePolicy(mFakeFeatureFlags, mContext, mHingeAngleSensor,
-                mHallSensor, mLeftAccelerometer, mRightAccelerometer,
-                /* closeAngleDegrees= */ null);
+                mLeftAccelerometer, mRightAccelerometer, /* closeAngleDegrees= */ null);
         return mPolicy.getDeviceStateProvider();
     }
 

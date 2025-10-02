@@ -345,6 +345,7 @@ package android {
     field @Deprecated public static final String USE_FINGERPRINT = "android.permission.USE_FINGERPRINT";
     field public static final String USE_FULL_SCREEN_INTENT = "android.permission.USE_FULL_SCREEN_INTENT";
     field public static final String USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER = "android.permission.USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER";
+    field @FlaggedApi("com.android.window.flags.enable_interactive_picture_in_picture") public static final String USE_PINNED_WINDOWING_LAYER = "android.permission.USE_PINNED_WINDOWING_LAYER";
     field public static final String USE_SIP = "android.permission.USE_SIP";
     field public static final String UWB_RANGING = "android.permission.UWB_RANGING";
     field public static final String VIBRATE = "android.permission.VIBRATE";
@@ -6695,14 +6696,19 @@ package android.app {
     method public int describeContents();
     method public boolean getAllowGeneratedReplies();
     method public android.app.RemoteInput[] getDataOnlyRemoteInputs();
+    method @FlaggedApi("android.app.api_notification_action_custom") public int getEmphasisHint();
     method public android.os.Bundle getExtras();
     method public android.graphics.drawable.Icon getIcon();
     method public android.app.RemoteInput[] getRemoteInputs();
     method public int getSemanticAction();
+    method @FlaggedApi("android.app.api_notification_action_custom") public int getStyleHint();
     method public boolean isAuthenticationRequired();
     method public boolean isContextual();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.app.Notification.Action> CREATOR;
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int EMPHASIS_AUTO = 0; // 0x0
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int EMPHASIS_PRIMARY = 1; // 0x1
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int EMPHASIS_SECONDARY = 2; // 0x2
     field public static final int SEMANTIC_ACTION_ARCHIVE = 5; // 0x5
     field public static final int SEMANTIC_ACTION_CALL = 10; // 0xa
     field public static final int SEMANTIC_ACTION_DELETE = 4; // 0x4
@@ -6714,6 +6720,10 @@ package android.app {
     field public static final int SEMANTIC_ACTION_THUMBS_DOWN = 9; // 0x9
     field public static final int SEMANTIC_ACTION_THUMBS_UP = 8; // 0x8
     field public static final int SEMANTIC_ACTION_UNMUTE = 7; // 0x7
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int STYLE_AUTO = 0; // 0x0
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int STYLE_ICON_AND_TEXT = 2; // 0x2
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int STYLE_ICON_ONLY = 3; // 0x3
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int STYLE_TEXT_ONLY = 1; // 0x1
     field public android.app.PendingIntent actionIntent;
     field @Deprecated public int icon;
     field public CharSequence title;
@@ -6731,7 +6741,9 @@ package android.app {
     method @NonNull public android.app.Notification.Action.Builder setAllowGeneratedReplies(boolean);
     method @NonNull public android.app.Notification.Action.Builder setAuthenticationRequired(boolean);
     method @NonNull public android.app.Notification.Action.Builder setContextual(boolean);
+    method @FlaggedApi("android.app.api_notification_action_custom") @NonNull public android.app.Notification.Action.Builder setEmphasisHint(int);
     method @NonNull public android.app.Notification.Action.Builder setSemanticAction(int);
+    method @FlaggedApi("android.app.api_notification_action_custom") @NonNull public android.app.Notification.Action.Builder setStyleHint(int);
   }
 
   public static interface Notification.Action.Extender {
@@ -7029,9 +7041,9 @@ package android.app {
     method public int getValue();
   }
 
-  public static final class Notification.Metric.FixedString extends android.app.Notification.Metric.MetricValue {
-    ctor public Notification.Metric.FixedString(@NonNull CharSequence);
-    ctor public Notification.Metric.FixedString(@NonNull CharSequence, @Nullable CharSequence);
+  public static final class Notification.Metric.FixedText extends android.app.Notification.Metric.MetricValue {
+    ctor public Notification.Metric.FixedText(@NonNull CharSequence);
+    ctor public Notification.Metric.FixedText(@NonNull CharSequence, @Nullable CharSequence);
     method @Nullable public CharSequence getUnit();
     method @NonNull public CharSequence getValue();
   }
@@ -10284,6 +10296,7 @@ package android.companion {
     method @Nullable public android.net.MacAddress getDeviceMacAddress();
     method @Nullable public String getDeviceProfile();
     method @Nullable public CharSequence getDisplayName();
+    method @FlaggedApi("android.companion.association_extra_permission") @NonNull public java.util.Set<java.lang.String> getExtraPermissions();
     method public int getId();
     method public int getSystemDataSyncFlags();
     method public boolean isSelfManaged();
@@ -10296,6 +10309,7 @@ package android.companion {
     method @FlaggedApi("android.companion.association_device_icon") @Nullable public android.graphics.drawable.Icon getDeviceIcon();
     method @Nullable public String getDeviceProfile();
     method @Nullable public CharSequence getDisplayName();
+    method @FlaggedApi("android.companion.association_extra_permission") @NonNull public java.util.Set<java.lang.String> getExtraPermissions();
     method public boolean isForceConfirmation();
     method public boolean isSelfManaged();
     method public boolean isSingleDevice();
@@ -10310,6 +10324,7 @@ package android.companion {
     field @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_NEARBY_DEVICE_STREAMING) public static final String DEVICE_PROFILE_NEARBY_DEVICE_STREAMING = "android.app.role.COMPANION_DEVICE_NEARBY_DEVICE_STREAMING";
     field @FlaggedApi("android.companion.virtualdevice.flags.enable_limited_vdm_role") @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_VIRTUAL_DEVICE) public static final String DEVICE_PROFILE_VIRTUAL_DEVICE = "android.app.role.COMPANION_DEVICE_VIRTUAL_DEVICE";
     field public static final String DEVICE_PROFILE_WATCH = "android.app.role.COMPANION_DEVICE_WATCH";
+    field @FlaggedApi("android.companion.association_extra_permission") public static final String PERMISSION_NEARBY = "NEARBY_DEVICES";
   }
 
   public static final class AssociationRequest.Builder {
@@ -10319,6 +10334,7 @@ package android.companion {
     method @FlaggedApi("android.companion.association_device_icon") @NonNull @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED) public android.companion.AssociationRequest.Builder setDeviceIcon(@NonNull android.graphics.drawable.Icon);
     method @NonNull public android.companion.AssociationRequest.Builder setDeviceProfile(@NonNull String);
     method @NonNull public android.companion.AssociationRequest.Builder setDisplayName(@NonNull CharSequence);
+    method @FlaggedApi("android.companion.association_extra_permission") @NonNull public android.companion.AssociationRequest.Builder setExtraPermissions(@NonNull java.util.Set<java.lang.String>);
     method @NonNull @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED) public android.companion.AssociationRequest.Builder setForceConfirmation(boolean);
     method @NonNull @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED) public android.companion.AssociationRequest.Builder setSelfManaged(boolean);
     method @NonNull public android.companion.AssociationRequest.Builder setSingleDevice(boolean);
@@ -13801,6 +13817,7 @@ package android.content.pm {
     field public static final String FEATURE_MANAGED_USERS = "android.software.managed_users";
     field public static final String FEATURE_MICROPHONE = "android.hardware.microphone";
     field public static final String FEATURE_MIDI = "android.software.midi";
+    field @FlaggedApi("com.android.npumanager.npumanager_enabled") public static final String FEATURE_NEURAL_PROCESSING_UNIT = "android.hardware.npu";
     field public static final String FEATURE_NFC = "android.hardware.nfc";
     field public static final String FEATURE_NFC_BEAM = "android.sofware.nfc.beam";
     field @FlaggedApi("android.nfc.enable_nfc_charging") public static final String FEATURE_NFC_CHARGING = "android.hardware.nfc.charging";
@@ -37216,6 +37233,7 @@ package android.provider {
     field public static final String FEATURES = "features";
     field public static final int FEATURES_ASSISTED_DIALING_USED = 16; // 0x10
     field public static final int FEATURES_HD_CALL = 4; // 0x4
+    field @FlaggedApi("com.android.server.telecom.flags.hd_plus_call") public static final int FEATURES_HD_PLUS_CALL = 128; // 0x80
     field public static final int FEATURES_PULLED_EXTERNALLY = 2; // 0x2
     field public static final int FEATURES_RTT = 32; // 0x20
     field public static final int FEATURES_VIDEO = 1; // 0x1
@@ -44454,6 +44472,8 @@ package android.telephony {
     field public static final String KEY_IS_IMS_CONFERENCE_SIZE_ENFORCED_BOOL = "is_ims_conference_size_enforced_bool";
     field public static final String KEY_IS_OPPORTUNISTIC_SUBSCRIPTION_BOOL = "is_opportunistic_subscription_bool";
     field @FlaggedApi("com.android.internal.telephony.flags.log_calls_answered_elsewhere") public static final String KEY_LOG_CALLS_ANSWERED_ELSEWHERE_BOOL = "log_calls_answered_elsewhere_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.support_low_battery_alert") public static final String KEY_LOW_BATTERY_ALERT_INTERVAL_INT = "low_battery_alert_interval_int";
+    field @FlaggedApi("com.android.internal.telephony.flags.support_low_battery_alert") public static final String KEY_LOW_BATTERY_ALERT_THRESHOLD_INT = "low_battery_alert_threshold_int";
     field public static final String KEY_LTE_ENABLED_BOOL = "lte_enabled_bool";
     field public static final String KEY_LTE_RSRQ_THRESHOLDS_INT_ARRAY = "lte_rsrq_thresholds_int_array";
     field public static final String KEY_LTE_RSSNR_THRESHOLDS_INT_ARRAY = "lte_rssnr_thresholds_int_array";
@@ -44589,6 +44609,7 @@ package android.telephony {
     field public static final String KEY_SUPPORTS_DEVICE_TO_DEVICE_COMMUNICATION_USING_DTMF_BOOL = "supports_device_to_device_communication_using_dtmf_bool";
     field public static final String KEY_SUPPORTS_DEVICE_TO_DEVICE_COMMUNICATION_USING_RTP_BOOL = "supports_device_to_device_communication_using_rtp_bool";
     field public static final String KEY_SUPPORTS_SDP_NEGOTIATION_OF_D2D_RTP_HEADER_EXTENSIONS_BOOL = "supports_sdp_negotiation_of_d2d_rtp_header_extensions_bool";
+    field @FlaggedApi("com.android.server.telecom.flags.is_using_unidirectional_video_service") public static final String KEY_SUPPORTS_UNIDIRECTIONAL_VIDEO_SERVICE_BOOL = "supports_unidirectional_video_service_bool";
     field @FlaggedApi("com.android.server.telecom.flags.is_using_video_ringback") public static final String KEY_SUPPORTS_VIDEO_RINGBACK_BOOL = "supports_video_back_tone_bool";
     field public static final String KEY_SUPPORT_3GPP_CALL_FORWARDING_WHILE_ROAMING_BOOL = "support_3gpp_call_forwarding_while_roaming_bool";
     field public static final String KEY_SUPPORT_ADD_CONFERENCE_PARTICIPANTS_BOOL = "support_add_conference_participants_bool";
@@ -44633,6 +44654,7 @@ package android.telephony {
     field public static final String KEY_WFC_EMERGENCY_ADDRESS_CARRIER_APP_STRING = "wfc_emergency_address_carrier_app_string";
     field public static final String KEY_WORLD_MODE_ENABLED_BOOL = "world_mode_enabled_bool";
     field public static final String KEY_WORLD_PHONE_BOOL = "world_phone_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.support_low_battery_alert") public static final int LOW_BATTERY_ALERT_DISABLED = -1; // 0xffffffff
     field public static final String REMOVE_GROUP_UUID_STRING = "00000000-0000-0000-0000-000000000000";
     field @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") public static final int SATELLITE_DATA_SUPPORT_ALL = 2; // 0x2
     field @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") public static final int SATELLITE_DATA_SUPPORT_BANDWIDTH_CONSTRAINED = 1; // 0x1
@@ -46720,6 +46742,7 @@ package android.telephony {
     method public int getCarrierIdFromSimMccMnc();
     method @RequiresPermission(anyOf={android.Manifest.permission.READ_BASIC_PHONE_STATE, android.Manifest.permission.READ_PHONE_STATE}) public void getCarrierRestrictionStatus(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
     method @Deprecated @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public android.telephony.CellLocation getCellLocation();
+    method @FlaggedApi("com.android.server.telecom.flags.move_get_tty_mode_to_telephony_manager") @RequiresPermission("android.permission.READ_PRIVILEGED_PHONE_STATE") public int getCurrentTtyMode();
     method public int getDataActivity();
     method @RequiresPermission(anyOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.READ_BASIC_PHONE_STATE}) public int getDataNetworkType();
     method public int getDataState();
@@ -46759,6 +46782,7 @@ package android.telephony {
     method @NonNull public String getPrimaryImei();
     method @Nullable @RequiresPermission(allOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.ACCESS_COARSE_LOCATION}) public android.telephony.ServiceState getServiceState();
     method @Nullable @RequiresPermission(allOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.ACCESS_COARSE_LOCATION}) public android.telephony.ServiceState getServiceState(int);
+    method @FlaggedApi("com.android.internal.telephony.flags.get_service_state_for_slot") @Nullable @RequiresPermission(allOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.ACCESS_COARSE_LOCATION}) public android.telephony.ServiceState getServiceStateForSlot(int);
     method @Nullable public android.telephony.SignalStrength getSignalStrength();
     method public int getSimCarrierId();
     method @Nullable public CharSequence getSimCarrierIdName();

@@ -29,6 +29,7 @@ import static android.os.PowerManager.FLAG_AMBIENT_SUPPRESSION_NONE;
 import static android.os.PowerManager.SCREEN_TIMEOUT_KEEP_DISPLAY_ON;
 import static android.os.PowerManager.SCREEN_TIMEOUT_ACTIVE;
 import static android.os.PowerManager.USER_ACTIVITY_EVENT_BUTTON;
+import static android.os.PowerManagerInternal.UserActivityListener;
 import static android.os.PowerManagerInternal.WAKEFULNESS_ASLEEP;
 import static android.os.PowerManagerInternal.WAKEFULNESS_AWAKE;
 import static android.os.PowerManagerInternal.WAKEFULNESS_DOZING;
@@ -65,15 +66,18 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import android.app.ActivityManagerInternal;
 import android.attention.AttentionManagerInternal;
 import android.compat.testing.PlatformCompatChangeRule;
 import android.content.AttributionSource;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
@@ -2304,6 +2308,7 @@ public class PowerManagerServiceTest {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_WAIT_FOR_USER_BOOT_COMPLETE)
     public void testSuspendBlockerHeldDuringBoot() {
         final String suspendBlockerName = "PowerManagerService.Booting";
 
@@ -3406,6 +3411,60 @@ public class PowerManagerServiceTest {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_INTERACTIVE_DOZE_EXPERIENCE)
+    public void testUserActivity_notifiesListeners() {
+        createService();
+        startSystem();
+        advanceTime(1500);
+
+        UserActivityListener listener1 = mock(UserActivityListener.class);
+        UserActivityListener listener2 = mock(UserActivityListener.class);
+        mService.getLocalServiceInstance().registerUserActivityListener(listener1);
+        mService.getLocalServiceInstance().registerUserActivityListener(listener2);
+        mService.getBinderServiceInstance().userActivity(Display.DEFAULT_DISPLAY, mClock.now(),
+                PowerManager.USER_ACTIVITY_EVENT_OTHER, PowerManager.USER_ACTIVITY_FLAG_INDIRECT);
+        // Check that all listeners have been notified.
+        verify(listener1).onUserActivity(mClock.now(), PowerManager.USER_ACTIVITY_EVENT_OTHER,
+                PowerManager.USER_ACTIVITY_FLAG_INDIRECT);
+        verify(listener2).onUserActivity(mClock.now(), PowerManager.USER_ACTIVITY_EVENT_OTHER,
+                PowerManager.USER_ACTIVITY_FLAG_INDIRECT);
+
+        reset(listener1, listener2);
+        advanceTime(1000);
+        mService.getLocalServiceInstance().unregisterUserActivityListener(listener2);
+        mService.getBinderServiceInstance().userActivity(Display.DEFAULT_DISPLAY, mClock.now(),
+                PowerManager.USER_ACTIVITY_EVENT_BUTTON, /* flags= */ 0);
+        // Check that only listener1 is notified, because listener2 is unregistered.
+        verify(listener1).onUserActivity(
+                mClock.now(), PowerManager.USER_ACTIVITY_EVENT_BUTTON, /* flags= */ 0);
+        verifyNoInteractions(listener2);
+
+        reset(listener1, listener2);
+        advanceTime(1000);
+        mService.getLocalServiceInstance().unregisterUserActivityListener(listener1);
+        mService.getBinderServiceInstance().userActivity(Display.DEFAULT_DISPLAY, mClock.now(),
+                PowerManager.USER_ACTIVITY_EVENT_BUTTON, /* flags= */ 0);
+        // Check that no listener has been notified since they all have been removed.
+        verifyNoInteractions(listener1);
+        verifyNoInteractions(listener2);
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_INTERACTIVE_DOZE_EXPERIENCE)
+    public void testUserActivity_interactiveDozeFlagOff_doesNotNotifyListeners() {
+        createService();
+        startSystem();
+        advanceTime(1500);
+
+        UserActivityListener listener = mock(UserActivityListener.class);
+        mService.getLocalServiceInstance().registerUserActivityListener(listener);
+        mService.getBinderServiceInstance().userActivity(Display.DEFAULT_DISPLAY, mClock.now(),
+                PowerManager.USER_ACTIVITY_EVENT_OTHER, PowerManager.USER_ACTIVITY_FLAG_INDIRECT);
+
+        verifyNoInteractions(listener);
+    }
+
+    @Test
     public void testMultiDisplay_onlyOneDisplaySleeps_onWakefulnessChangedEventsFire() {
         createService();
         startSystem();
@@ -3972,7 +4031,6 @@ public class PowerManagerServiceTest {
      * Test IPowerManager.updateWakeLockUids() updates the workchain with the new uids
      */
     @Test
-    @RequiresFlagsEnabled({Flags.FLAG_WAKELOCK_ATTRIBUTION_VIA_WORKCHAIN})
     public void test_updateWakelockUids_updatesWorkchain() {
         createService();
         startSystem();
@@ -4694,6 +4752,95 @@ public class PowerManagerServiceTest {
         verify(mWindowManagerInternalMock, never()).lockNow();
     }
 
+    @EnableFlags(Flags.FLAG_WAIT_FOR_USER_BOOT_COMPLETE)
+    @Test
+    public void testBootSuspendBlocker_HeldUntilUserBootCompletedBroadcast() {
+        ArgumentCaptor<BroadcastReceiver> bootCompletedCaptor =
+                ArgumentCaptor.forClass(BroadcastReceiver.class);
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BOOT_COMPLETED);
+        filter.setPriority(IntentFilter.SYSTEM_LOW_PRIORITY);
+
+        createService();
+        // BootingSuspendBlocker is acquired in the constructor
+        verify(mNativeWrapperMock).nativeAcquireSuspendBlocker("PowerManagerService.Booting");
+        clearInvocations(mNativeWrapperMock);
+
+        // This calls onBootPhase(READY) and onBootPhase(BOOT_COMPLETED)
+        startSystem();
+
+        // Verify the new receiver was registered during systemReady() with the new flag
+        verify(mContextSpy)
+                .registerReceiver(
+                        bootCompletedCaptor.capture(),
+                        argThat(new IntentFilterMatcher(filter)),
+                        isNull(),
+                        isA(Handler.class),
+                        eq(Context.RECEIVER_NOT_EXPORTED));
+
+        // In the OLD code, the blocker would be released by startSystem() (which calls
+        // onBootPhase(BOOT_COMPLETED)).
+        // Verify NEW behavior: the blocker is NOT released, because mUserBootCompleted is still
+        // false.
+        verify(mNativeWrapperMock, never())
+                .nativeReleaseSuspendBlocker("PowerManagerService.Booting");
+
+        // Now, simulate the ACTION_BOOT_COMPLETED broadcast being received by our new receiver
+        BroadcastReceiver bootCompletedReceiver = bootCompletedCaptor.getValue();
+        bootCompletedReceiver.onReceive(mContextSpy, new Intent(Intent.ACTION_BOOT_COMPLETED));
+        advanceTime(1); // Allow handler msg (updateSuspendBlockerLocked) to be processed
+
+        // Verify the blocker is NOW released.
+        verify(mNativeWrapperMock, times(1))
+                .nativeReleaseSuspendBlocker("PowerManagerService.Booting");
+    }
+
+    @EnableFlags(Flags.FLAG_WAIT_FOR_USER_BOOT_COMPLETE)
+    @Test
+    public void testQuiescentBoot_HoldsSuspendBlockerUntilUserBootCompletedBroadcast() {
+        when(mSystemPropertiesMock.get(eq(SYSTEM_PROPERTY_QUIESCENT), anyString()))
+                .thenReturn("1");
+
+        ArgumentCaptor<BroadcastReceiver> bootCompletedCaptor =
+                ArgumentCaptor.forClass(BroadcastReceiver.class);
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BOOT_COMPLETED);
+        filter.setPriority(IntentFilter.SYSTEM_LOW_PRIORITY);
+
+        createService();
+        // BootingSuspendBlocker is acquired in constructor
+        verify(mNativeWrapperMock).nativeAcquireSuspendBlocker("PowerManagerService.Booting");
+        clearInvocations(mNativeWrapperMock);
+
+        startSystem();
+
+        // Verify we are in quiescent (asleep) mode
+        assertThat(mService.getGlobalWakefulnessLocked()).isEqualTo(WAKEFULNESS_ASLEEP);
+
+        // Verify the new receiver was registered with the new flag
+        verify(mContextSpy)
+                .registerReceiver(
+                        bootCompletedCaptor.capture(),
+                        argThat(new IntentFilterMatcher(filter)),
+                        isNull(),
+                        isA(Handler.class),
+                        eq(Context.RECEIVER_NOT_EXPORTED));
+
+        // Verify blocker is still held, even though boot completed and device wakefulness is ASLEEP
+        // This is the key fix: it prevents the CPU from suspending before the broadcast.
+        verify(mNativeWrapperMock, never())
+                .nativeReleaseSuspendBlocker("PowerManagerService.Booting");
+
+        // Simulate the ACTION_BOOT_COMPLETED broadcast
+        BroadcastReceiver bootCompletedReceiver = bootCompletedCaptor.getValue();
+        bootCompletedReceiver.onReceive(mContextSpy, new Intent(Intent.ACTION_BOOT_COMPLETED));
+        advanceTime(1); // Allow handler msg to be processed
+
+        // Verify blocker is NOW released
+        verify(mNativeWrapperMock, times(1))
+                .nativeReleaseSuspendBlocker("PowerManagerService.Booting");
+
+        // Device should remain asleep since it was a quiescent boot
+        assertThat(mService.getGlobalWakefulnessLocked()).isEqualTo(WAKEFULNESS_ASLEEP);
+    }
 
     // Default adjacent groups that are awake, should prevent the device from locking.
     @RequiresFlagsEnabled({FLAG_SEPARATE_TIMEOUTS,
@@ -4754,7 +4901,6 @@ public class PowerManagerServiceTest {
         verify(mNotifierMock).clearScreenTimeoutPolicyListeners(displayInAdjacentDefaultGroup);
         verify(mWindowManagerInternalMock, never()).lockNow();
     }
-
     private void setCachedUidProcState(int uid) {
         mService.updateUidProcStateInternal(uid, PROCESS_STATE_TOP_SLEEPING);
     }

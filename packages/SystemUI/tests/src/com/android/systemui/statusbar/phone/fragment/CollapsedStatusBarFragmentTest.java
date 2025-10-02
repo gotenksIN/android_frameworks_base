@@ -81,7 +81,6 @@ import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBar
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.StatusBarOperatorNameViewModel;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
-import com.android.systemui.statusbar.window.StatusBarWindowControllerStore;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
 import com.android.systemui.statusbar.window.StatusBarWindowStateListener;
 import com.android.systemui.util.CarrierConfigTracker;
@@ -141,7 +140,6 @@ public class CollapsedStatusBarFragmentTest extends SysuiBaseFragmentTest {
     private StatusBarWindowStateController mStatusBarWindowStateController;
     @Mock
     private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
-    @Mock private StatusBarWindowControllerStore mStatusBarWindowControllerStore;
     @Mock private StatusBarWindowController mStatusBarWindowController;
     @Mock private StatusBarConfigurationControllerStore mStatusBarConfigurationControllerStore;
     @Mock private StatusBarConfigurationController mStatusBarConfigurationController;
@@ -157,8 +155,6 @@ public class CollapsedStatusBarFragmentTest extends SysuiBaseFragmentTest {
 
     @Before
     public void setup() {
-        when(mStatusBarWindowControllerStore.forDisplay(anyInt()))
-                .thenReturn(mStatusBarWindowController);
         when(mStatusBarConfigurationControllerStore.forDisplay(anyInt()))
                 .thenReturn(mStatusBarConfigurationController);
         injectLeakCheckedDependencies(ALL_SUPPORTED_CLASSES);
@@ -620,28 +616,6 @@ public class CollapsedStatusBarFragmentTest extends SysuiBaseFragmentTest {
         assertEquals(View.GONE, getSecondaryOngoingActivityChipView().getVisibility());
     }
 
-    
-
-  
-
-    @Test
-    @EnableFlags({PromotedNotificationUi.FLAG_NAME})
-    @DisableFlags({StatusBarRootModernization.FLAG_NAME, StatusBarChipsModernization.FLAG_NAME})
-    public void hasOngoingActivitiesButAlsoHun_chipsNotHidden() {
-        CollapsedStatusBarFragment fragment = resumeAndGetFragment();
-
-        mCollapsedStatusBarViewBinder.getListener().onOngoingActivityStatusChanged(
-              /* hasPrimaryOngoingActivity= */ true,
-              /* hasSecondaryOngoingActivity= */ true,
-              /* shouldAnimate= */ false);
-        when(mHeadsUpAppearanceController.shouldHeadsUpStatusBarBeVisible()).thenReturn(true);
-
-        fragment.disable(DEFAULT_DISPLAY, 0, 0, false);
-
-        assertEquals(View.VISIBLE, getPrimaryOngoingActivityChipView().getVisibility());
-        assertEquals(View.VISIBLE, getSecondaryOngoingActivityChipView().getVisibility());
-    }
-
   @Test
   @DisableFlags({
     PromotedNotificationUi.FLAG_NAME,
@@ -929,17 +903,6 @@ public class CollapsedStatusBarFragmentTest extends SysuiBaseFragmentTest {
     }
 
     @Test
-    @DisableFlags({StatusBarRootModernization.FLAG_NAME, StatusBarChipsModernization.FLAG_NAME})
-    public void disable_shouldHeadsUpStatusBarBeVisibleTrue_clockNotDisabled() {
-        CollapsedStatusBarFragment fragment = resumeAndGetFragment();
-        when(mHeadsUpAppearanceController.shouldHeadsUpStatusBarBeVisible()).thenReturn(true);
-
-        fragment.disable(DEFAULT_DISPLAY, 0, 0, false);
-
-        assertEquals(View.VISIBLE, getClockView().getVisibility());
-    }
-
-    @Test
     public void setUp_fragmentCreatesDaggerComponent() {
         CollapsedStatusBarFragment fragment = resumeAndGetFragment();
 
@@ -1113,12 +1076,11 @@ public class CollapsedStatusBarFragmentTest extends SysuiBaseFragmentTest {
                 mStatusBarWindowStateController,
                 mKeyguardUpdateMonitor,
                 mock(DemoModeController.class),
-                mStatusBarWindowControllerStore,
                 mStatusBarConfigurationControllerStore);
     }
 
     private void setUpDaggerComponent() {
-        when(mStatusBarFragmentComponentFactory.create(any(), any(), any()))
+        when(mStatusBarFragmentComponentFactory.create(any(), any()))
                 .thenReturn(mHomeStatusBarComponent);
         when(mHomeStatusBarComponent.getHeadsUpAppearanceController())
                 .thenReturn(mHeadsUpAppearanceController);

@@ -252,7 +252,7 @@ public class OomAdjusterImpl extends OomAdjuster {
 
     /**
      * A container node in the {@link LinkedProcessRecordList},
-     * holding the references to {@link ProcessRecord}.
+     * holding the references to {@link ProcessRecordInternal}.
      * TODO(b/425766486): Change to package-private after moving the class to the psc package.
      */
     public static class ProcessRecordNode {
@@ -270,9 +270,9 @@ public class OomAdjusterImpl extends OomAdjuster {
 
         @Nullable ProcessRecordNode mPrev;
         @Nullable ProcessRecordNode mNext;
-        final @Nullable ProcessRecord mApp;
+        final @Nullable ProcessRecordInternal mApp;
 
-        ProcessRecordNode(@Nullable ProcessRecord app) {
+        ProcessRecordNode(@Nullable ProcessRecordInternal app) {
             mApp = app;
         }
 
@@ -351,7 +351,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             }
         }
 
-        ProcessRecord poll() {
+        ProcessRecordInternal poll() {
             ProcessRecordNode node = null;
             final int size = mProcessRecordNodes.length;
             // Find the next node.
@@ -616,9 +616,10 @@ public class OomAdjusterImpl extends OomAdjuster {
             new ComputeConnectionsConsumer();
 
     OomAdjusterImpl(ActivityManagerService service, ProcessList processList,
-            ActiveUids activeUids, ServiceThread adjusterThread, GlobalState globalState,
-            Injector injector, Callback callback) {
-        super(service, processList, activeUids, adjusterThread, globalState, injector, callback);
+            ActiveUids activeUids, ServiceThread adjusterThread, Constants oomConstants,
+            GlobalState globalState, Injector injector, Callback callback) {
+        super(service, processList, activeUids, adjusterThread, oomConstants, globalState, injector,
+                callback);
 
         if(mPerfBoost != null) {
             mIsTopAppRenderThreadBoostEnabled = Boolean.parseBoolean(mPerfBoost.perfGetProp("vendor.perf.topAppRenderThreadBoost.enable", "false"));
@@ -691,7 +692,8 @@ public class OomAdjusterImpl extends OomAdjuster {
 
     @GuardedBy({"mService", "mProcLock"})
     @Override
-    protected boolean performUpdateOomAdjLSP(ProcessRecord app, @OomAdjReason int oomAdjReason) {
+    protected boolean performUpdateOomAdjLSP(ProcessRecordInternal app,
+            @OomAdjReason int oomAdjReason) {
         mPendingProcessSet.add(app);
         performUpdateOomAdjPendingTargetsLocked(oomAdjReason);
         return true;
@@ -767,7 +769,7 @@ public class OomAdjusterImpl extends OomAdjuster {
     @GuardedBy({"mService", "mProcLock"})
     private void computeConnectionsLSP() {
         // 1st pass, iterate all nodes in order of procState importance.
-        ProcessRecord proc = mProcessRecordProcStateNodes.poll();
+        ProcessRecordInternal proc = mProcessRecordProcStateNodes.poll();
         while (proc != null) {
             mTmpOomAdjusterArgs.mApp = proc;
             mComputeConnectionsConsumer.accept(mTmpOomAdjusterArgs);
@@ -856,7 +858,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             final UidRecord ur = activeUids.valueAt(i);
             ur.reset();
             for (int j = ur.getNumOfProcs() - 1; j >= 0; j--) {
-                final ProcessRecord proc = ur.getProcessRecordByIndex(j);
+                final ProcessRecordInternal proc = ur.getProcessRecordByIndex(j);
                 updateAppUidRecIfNecessaryLSP(proc);
             }
         }
@@ -1305,12 +1307,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             // It's placed in a sched group based on the nature of the
             // broadcast as reflected by which queue it's active in.
             adj = FOREGROUND_APP_ADJ;
-            if (Flags.pushBroadcastStateToOomadjuster()) {
-                schedGroup = app.getReceivers().getBroadcastReceiverSchedGroup();
-            } else {
-                /// Priority was stored in mTmpSchedGroup by {@link #isReceivingBroadcast)
-                schedGroup = mTmpSchedGroup[0];
-            }
+            schedGroup = app.getReceivers().getBroadcastReceiverSchedGroup();
             app.setAdjType("broadcast");
             procState = ActivityManager.PROCESS_STATE_RECEIVER;
             if (reportDebugMsgs) {

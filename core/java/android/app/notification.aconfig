@@ -43,6 +43,14 @@ flag {
 }
 
 flag {
+  name: "api_notification_action_custom"
+  is_exported: true
+  namespace: "notifications"
+  description: "Adds APIs to control Notification Action emphasis and style (for RONs)"
+  bug: "440125908"
+}
+
+flag {
   name: "metric_style_unit_in_label"
   namespace: "notifications"
   description: "In MetricStyle, concatenate the unit of the MetricValue to the label, instead of displaying it next to the value. This flag is only for prototyping; either the flag-on or flag-off path will be inlined once the behavior is decided."
@@ -201,6 +209,9 @@ flag {
   namespace: "systemui"
   description: "Skips #setNotificationBackgroundColor when unnecessary."
   bug: "442592454"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 # Start: exported flags that cannot be removed

@@ -441,6 +441,13 @@
       ]
     },
     {
+      "name": "FunctionalTestsDesktopMode-keyboardshortcuts-CloseTaskViaKeyboardShortcutTest",
+      "keywords": [
+        "device",
+        "desktop"
+      ]
+    },
+    {
       "name": "FunctionalTestsDesktopMode-keyboardshortcuts-EnterDesktopFromKeyboardShortcutTest",
       "keywords": [
         "device",
@@ -504,6 +511,13 @@
       ]
     },
     {
+      "name": "FunctionalTestsDesktopMode-mediaprojection-StartAppScreenRecordingFromNotificationTest",
+      "keywords": [
+        "device",
+        "desktop"
+      ]
+    },
+    {
       "name": "FunctionalTestsDesktopMode-mediaprojection-StartScreenMediaProjectionWithMaxDesktopWindowsTest",
       "keywords": [
         "device",
@@ -539,7 +553,21 @@
       ]
     },
     {
+      "name": "FunctionalTestsDesktopMode-multiinstance-LaunchNewInstanceFromAppWindowMenuTest",
+      "keywords": [
+        "device",
+        "desktop"
+      ]
+    },
+    {
       "name": "FunctionalTestsDesktopMode-multiinstance-ManageOpenInstancesTest",
+      "keywords": [
+        "device",
+        "desktop"
+      ]
+    },
+    {
+      "name": "FunctionalTestsDesktopMode-overview-ClearOpenAppsFromOverviewTest",
       "keywords": [
         "device",
         "desktop"

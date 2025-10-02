@@ -76,7 +76,6 @@ import static android.content.pm.ActivityInfo.FLAG_NO_HISTORY;
 import static android.content.pm.ActivityInfo.FLAG_SHOW_FOR_ALL_USERS;
 import static android.content.pm.ActivityInfo.FLAG_STATE_NOT_NEEDED;
 import static android.content.pm.ActivityInfo.FLAG_TURN_SCREEN_ON;
-import static android.content.pm.ActivityInfo.INSETS_DECOUPLED_CONFIGURATION_ENFORCED;
 import static android.content.pm.ActivityInfo.LAUNCH_MULTIPLE;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_TASK;
@@ -85,7 +84,6 @@ import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_ALWAYS;
 import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_DEFAULT;
 import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_IF_ALLOWLISTED;
 import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_NEVER;
-import static android.content.pm.ActivityInfo.OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION;
 import static android.content.pm.ActivityInfo.PERSIST_ACROSS_REBOOTS;
 import static android.content.pm.ActivityInfo.PERSIST_ROOT_ONLY;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_FORCE_RESIZEABLE;
@@ -618,9 +616,6 @@ public final class ActivityRecord extends WindowToken {
     private boolean mLaunchedFromBubble;
 
     private SizeConfigurationBuckets mSizeConfigurations;
-
-    @VisibleForTesting
-    final ConfigOverrideHint mResolveConfigHint;
 
     final boolean mOptOutEdgeToEdge;
 
@@ -1904,13 +1899,6 @@ public final class ActivityRecord extends WindowToken {
         // Don't move below setOrientation(info.screenOrientation) since it triggers
         // getOverrideOrientation that requires having mAppCompatController initialised.
         mAppCompatController = new AppCompatController(mWmService, this);
-        mResolveConfigHint = new ConfigOverrideHint();
-        // When the stable configuration is the default behavior, override for the legacy apps
-        // without forward override flag.
-        mResolveConfigHint.mUseOverrideInsetsForConfig =
-                !info.isChangeEnabled(INSETS_DECOUPLED_CONFIGURATION_ENFORCED)
-                        && !info.isChangeEnabled(
-                                OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION);
 
         mTargetSdk = info.applicationInfo.targetSdkVersion;
 
@@ -6606,7 +6594,7 @@ public final class ActivityRecord extends WindowToken {
         } else {
             mAtmService.updatePreviousProcess(this);
         }
-        mTaskSupervisor.checkReadyForSleepLocked(true /* allowDelay */);
+        mTaskSupervisor.checkReadyForSleepLocked();
     }
 
     void addToStopping(boolean scheduleIdle, boolean idleDelayed, String reason) {
@@ -7857,9 +7845,9 @@ public final class ActivityRecord extends WindowToken {
                 shouldApplyLegacyInsets &= !task.mLaunchNextToBubble;
             }
         }
-        mResolveConfigHint.resolveTmpOverrides(mDisplayContent, newParentConfiguration,
+        mAppCompatController.getSandboxingPolicy().resolveTmpOverrides(newParentConfiguration,
                 isFixedRotationTransforming(), safeRegionPolicy.getLatestSafeRegionBounds(),
-                shouldApplyLegacyInsets);
+                shouldApplyLegacyInsets, getAppCompatDisplayInsets());
 
         // Can't use resolvedConfig.windowConfiguration.getWindowingMode() because it can be
         // different from windowing mode of the task (PiP) during transition from fullscreen to PiP
@@ -7986,7 +7974,7 @@ public final class ActivityRecord extends WindowToken {
                 hasFixedRotationTransform(),
                 getAppCompatDisplayInsets() != null,
                 task);
-        mResolveConfigHint.resetTmpOverrides();
+        mAppCompatController.getSandboxingPolicy().resetTmpOverrides();
 
         logAppCompatState();
     }
@@ -8000,16 +7988,13 @@ public final class ActivityRecord extends WindowToken {
         return sConstrainDisplayApisConfig;
     }
 
-    @Nullable Rect getParentAppBoundsOverride() {
-        return Rect.copyOrNull(mResolveConfigHint.mParentAppBoundsOverride);
-    }
-
     void computeConfigByResolveHint(@NonNull Configuration resolvedConfig,
             @NonNull Configuration parentConfig) {
-        task.computeConfigResourceOverrides(resolvedConfig, parentConfig, mResolveConfigHint);
+        final ConfigOverrideHint resolveConfigHint =
+                mAppCompatController.getSandboxingPolicy().getResolveConfigHint();
+        task.computeConfigResourceOverrides(resolvedConfig, parentConfig, resolveConfigHint);
         // Reset the temp info which should only take effect for the specified computation.
-        mResolveConfigHint.mTmpCompatInsets = null;
-        mResolveConfigHint.mTmpOverrideDisplayInfo = null;
+        mAppCompatController.getSandboxingPolicy().resetDisplayInfoOverride();
     }
 
     /**
@@ -8115,8 +8100,10 @@ public final class ActivityRecord extends WindowToken {
         final AppCompatSizeCompatModePolicy scmPolicy =
                 mAppCompatController.getSizeCompatModePolicy();
         final Rect screenResolvedBounds = scmPolicy.replaceResolvedBoundsIfNeeded(resolvedBounds);
-        final Rect parentAppBounds = mResolveConfigHint.mParentAppBoundsOverride;
-        final Rect parentBounds = mResolveConfigHint.mParentBoundsOverride;
+        final ConfigOverrideHint overrideHint =
+                mAppCompatController.getSandboxingPolicy().getResolveConfigHint();
+        final Rect parentAppBounds = overrideHint.getParentAppBoundsOverride();
+        final Rect parentBounds = overrideHint.getParentBoundsOverride();
         final float screenResolvedBoundsWidth = screenResolvedBounds.width();
         final float parentAppBoundsWidth = parentAppBounds.width();
         final boolean isImmersiveMode = isImmersiveMode(parentBounds);
@@ -8196,7 +8183,8 @@ public final class ActivityRecord extends WindowToken {
     }
 
     boolean isImmersiveMode(@NonNull Rect parentBounds) {
-        if (!mResolveConfigHint.mUseOverrideInsetsForConfig) {
+        if (!mAppCompatController.getSandboxingPolicy().getResolveConfigHint()
+                .shouldUseOverrideInsetsForConfig()) {
             return false;
         }
         final Insets navBarInsets = mDisplayContent.getInsetsStateController()
@@ -8249,7 +8237,9 @@ public final class ActivityRecord extends WindowToken {
         if (mDisplayContent == null) {
             return true;
         }
-        if (!mResolveConfigHint.mUseOverrideInsetsForConfig) {
+        final boolean useOverrideInsetsForConfig = mAppCompatController.getSandboxingPolicy()
+                .getResolveConfigHint().shouldUseOverrideInsetsForConfig();
+        if (!useOverrideInsetsForConfig) {
             // No insets should be considered any more.
             return true;
         }
@@ -8268,7 +8258,7 @@ public final class ActivityRecord extends WindowToken {
         final Task task = getTask();
         task.calculateInsetFrames(outNonDecorBounds /* outNonDecorBounds */,
                 outStableBounds /* outStableBounds */, parentBounds /* bounds */, di,
-                mResolveConfigHint.mUseOverrideInsetsForConfig);
+                useOverrideInsetsForConfig);
         final int orientationWithInsets = outStableBounds.height() >= outStableBounds.width()
                 ? ORIENTATION_PORTRAIT : ORIENTATION_LANDSCAPE;
         // If orientation does not match the orientation with insets applied, then a
@@ -8301,7 +8291,9 @@ public final class ActivityRecord extends WindowToken {
      * in this method.
      */
     private void resolveFixedOrientationConfiguration(@NonNull Configuration newParentConfig) {
-        final Rect parentBounds = mResolveConfigHint.mParentBoundsOverride;
+        final ConfigOverrideHint overrideHint =
+                mAppCompatController.getSandboxingPolicy().getResolveConfigHint();
+        final Rect parentBounds = overrideHint.getParentBoundsOverride();
         final Rect stableBounds = new Rect();
         final Rect outNonDecorBounds = mTmpBounds;
         // If orientation is respected when insets are applied, then stableBounds will be empty.
@@ -8325,7 +8317,7 @@ public final class ActivityRecord extends WindowToken {
                 getResolvedOverrideConfiguration().windowConfiguration.getBounds();
         final int stableBoundsOrientation = stableBounds.width() > stableBounds.height()
                 ? ORIENTATION_LANDSCAPE : ORIENTATION_PORTRAIT;
-        final int parentOrientation = mResolveConfigHint.mUseOverrideInsetsForConfig
+        final int parentOrientation = overrideHint.shouldUseOverrideInsetsForConfig()
                 ? stableBoundsOrientation : newParentConfig.orientation;
 
         // If the activity requires a different orientation (either by override or activityInfo),
@@ -8340,8 +8332,6 @@ public final class ActivityRecord extends WindowToken {
             return;
         }
         final AppCompatDisplayInsets appCompatDisplayInsets = getAppCompatDisplayInsets();
-        final AppCompatSizeCompatModePolicy scmPolicy =
-                mAppCompatController.getSizeCompatModePolicy();
 
         if (appCompatDisplayInsets != null
                 && !appCompatDisplayInsets.mIsInFixedOrientationOrAspectRatioLetterbox) {
@@ -8352,7 +8342,7 @@ public final class ActivityRecord extends WindowToken {
             return;
         }
 
-        final Rect parentAppBounds = mResolveConfigHint.mUseOverrideInsetsForConfig
+        final Rect parentAppBounds = overrideHint.shouldUseOverrideInsetsForConfig()
                 ? outNonDecorBounds : newParentConfig.windowConfiguration.getAppBounds();
         // TODO(b/182268157): Explore using only one type of parentBoundsWithInsets, either app
         // bounds or stable bounds to unify aspect ratio logic.
@@ -8422,7 +8412,6 @@ public final class ActivityRecord extends WindowToken {
 
         // Calculate app bounds using fixed orientation bounds because they will be needed later
         // for comparison with size compat app bounds in {@link resolveSizeCompatModeConfiguration}.
-        mResolveConfigHint.mTmpCompatInsets = appCompatDisplayInsets;
         computeConfigByResolveHint(getResolvedOverrideConfiguration(), newParentConfig);
         aspectRatioPolicy.setLetterboxBoundsForFixedOrientationAndAspectRatio(
                 new Rect(resolvedBounds));
@@ -8695,13 +8684,6 @@ public final class ActivityRecord extends WindowToken {
      *         can't or the app handles the specific configuration that is changing.
      */
     boolean ensureActivityConfiguration(boolean ignoreVisibility) {
-        final Task rootTask = getRootTask();
-        if (rootTask.mConfigWillChange) {
-            ProtoLog.v(WM_DEBUG_CONFIGURATION, "Skipping config check "
-                    + "(will change): %s", this);
-            return true;
-        }
-
         // We don't worry about activities that are finishing.
         if (finishing) {
             ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration doesn't matter "

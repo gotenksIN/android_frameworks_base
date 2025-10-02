@@ -25,17 +25,18 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertThrows;
 
 import android.content.ComponentName;
+import android.content.Context;
 import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.IDisplayManager;
 import android.hardware.display.IVirtualDisplayCallback;
-import android.hardware.input.VirtualKeyEvent;
-import android.hardware.input.VirtualTouchEvent;
 import android.os.RemoteException;
+import android.util.Size;
 import android.view.DisplayInfo;
-import android.view.KeyEvent;
-import android.view.Surface;
+import android.view.accessibility.AccessibilityManager;
+import android.view.accessibility.IAccessibilityManager;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Before;
@@ -58,9 +59,11 @@ public class ComputerControlSessionTest {
     @Mock
     private IDisplayManager mDisplayManager;
     @Mock
+    private IAccessibilityManager mAccessibilityManager;
+    @Mock
     private IVirtualDisplayCallback mVirtualDisplayCallback;
     @Mock
-    private IInteractiveMirrorDisplay mMockInteractiveMirrorDisplay;
+    private IInteractiveMirror mMockInteractiveMirror;
 
     private ComputerControlSession mSession;
 
@@ -73,34 +76,18 @@ public class ComputerControlSessionTest {
         displayInfo.logicalWidth = WIDTH;
         displayInfo.logicalHeight = HEIGHT;
         when(mDisplayManager.getDisplayInfo(DISPLAY_ID)).thenReturn(displayInfo);
+
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        AccessibilityManager accessibilityManager = new AccessibilityManager(
+                context, context.getMainThreadHandler(), mAccessibilityManager, 0, true);
+
         mSession = new ComputerControlSession(DISPLAY_ID, mVirtualDisplayCallback, mMockSession,
-                new DisplayManagerGlobal(mDisplayManager));
+                accessibilityManager, new DisplayManagerGlobal(mDisplayManager));
     }
 
     @After
     public void tearDown() throws Exception {
         mMockitoSession.close();
-    }
-
-    @Test
-    public void setsVirtualDisplaySurface() throws RemoteException {
-        verify(mDisplayManager).setVirtualDisplaySurface(eq(mVirtualDisplayCallback), any());
-    }
-
-    @Test
-    public void getVirtualDisplayId_returnsId() throws RemoteException {
-        when(mMockSession.getVirtualDisplayId()).thenReturn(DISPLAY_ID);
-        assertThat(mSession.getVirtualDisplayId()).isEqualTo(DISPLAY_ID);
-    }
-
-    @Test
-    public void sendKeyEvent_sendsEvent() throws RemoteException {
-        VirtualKeyEvent keyEvent = new VirtualKeyEvent.Builder()
-                .setAction(VirtualKeyEvent.ACTION_DOWN)
-                .setKeyCode(KeyEvent.KEYCODE_A)
-                .build();
-        mSession.sendKeyEvent(keyEvent);
-        verify(mMockSession).sendKeyEvent(eq(keyEvent));
     }
 
     @Test
@@ -116,25 +103,16 @@ public class ComputerControlSessionTest {
     }
 
     @Test
-    public void sendTouchEvent_sendsEvent() throws RemoteException {
-        VirtualTouchEvent touchEvent = new VirtualTouchEvent.Builder()
-                .setPointerId(0)
-                .setToolType(VirtualTouchEvent.TOOL_TYPE_FINGER)
-                .setAction(VirtualTouchEvent.ACTION_DOWN)
-                .setX(0)
-                .setY(0)
-                .build();
-        mSession.sendTouchEvent(touchEvent);
-        verify(mMockSession).sendTouchEvent(eq(touchEvent));
+    public void createInteractiveMirror_returns() throws RemoteException {
+        when(mMockSession.createInteractiveMirror(any()))
+                .thenReturn(mMockInteractiveMirror);
+        InteractiveMirror mirror = mSession.createInteractiveMirror();
+        assertThat(mirror).isNotNull();
     }
 
     @Test
-    public void createInteractiveMirrorDisplay_returnsDisplay() throws RemoteException {
-        when(mMockSession.createInteractiveMirrorDisplay(eq(WIDTH), eq(HEIGHT), any()))
-                .thenReturn(mMockInteractiveMirrorDisplay);
-        InteractiveMirrorDisplay display =
-                mSession.createInteractiveMirrorDisplay(WIDTH, HEIGHT, new Surface());
-        assertThat(display).isNotNull();
+    public void getDisplaySize_returns() {
+        assertThat(mSession.getDisplaySize()).isEqualTo(new Size(WIDTH, HEIGHT));
     }
 
     @Test
@@ -153,6 +131,12 @@ public class ComputerControlSessionTest {
     public void launchApplication_withComponentName_launchesApplication() throws RemoteException {
         mSession.launchApplication(new ComponentName(TARGET_PACKAGE, TARGET_CLASS));
         verify(mMockSession).launchApplication(TARGET_PACKAGE, TARGET_CLASS);
+    }
+
+    @Test
+    public void handOverApplications_handsOverApplications() throws RemoteException {
+        mSession.handOverApplications();
+        verify(mMockSession).handOverApplications();
     }
 
     @Test

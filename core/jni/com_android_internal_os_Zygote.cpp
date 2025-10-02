@@ -2394,12 +2394,7 @@ jlong zygote::CalculateCapabilities(JNIEnv* env, jint uid, jint gid, jintArray g
     capabilities |= (1LL << CAP_SETPCAP);
   }
 
-  /*
-   * Containers run without some capabilities, so drop any caps that are not
-   * available.
-   */
-
-  return capabilities & GetEffectiveCapabilityMask(env);
+  return capabilities;
 }
 
 jlong zygote::CalculateBoundingCapabilities(JNIEnv* env, jint uid, jint gid, jintArray gids) {
@@ -2613,7 +2608,9 @@ static jint com_android_internal_os_Zygote_nativeForkAndSpecialize(
         jstring instruction_set, jstring app_data_dir, jboolean is_top_app, jboolean use_fifo_ui,
         jobjectArray pkg_data_info_list, jobjectArray allowlisted_data_info_list,
         jboolean mount_data_dirs, jboolean mount_storage_dirs, jboolean mount_sysprop_overrides) {
-    jlong capabilities = zygote::CalculateCapabilities(env, uid, gid, gids, is_child_zygote);
+    // Containers run without some capabilities, so drop any caps that are not available.
+    jlong capabilities = zygote::CalculateCapabilities(env, uid, gid, gids, is_child_zygote) &
+            GetEffectiveCapabilityMask(env);
     jlong bounding_capabilities = zygote::CalculateBoundingCapabilities(env, uid, gid, gids);
 
     if (UNLIKELY(managed_fds_to_close == nullptr)) {
@@ -2843,7 +2840,9 @@ static void com_android_internal_os_Zygote_nativeSpecializeAppProcess(
         jboolean is_top_app, jobjectArray pkg_data_info_list,
         jobjectArray allowlisted_data_info_list, jboolean mount_data_dirs,
         jboolean mount_storage_dirs, jboolean mount_sysprop_overrides) {
-    jlong capabilities = zygote::CalculateCapabilities(env, uid, gid, gids, is_child_zygote);
+    // Containers run without some capabilities, so drop any caps that are not available.
+    jlong capabilities = zygote::CalculateCapabilities(env, uid, gid, gids, is_child_zygote) &
+            GetEffectiveCapabilityMask(env);
     jlong bounding_capabilities = zygote::CalculateBoundingCapabilities(env, uid, gid, gids);
 
     SpecializeCommon(env, uid, gid, gids, runtime_flags, rlimits, capabilities, capabilities,

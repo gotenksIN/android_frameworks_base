@@ -444,6 +444,8 @@ public class BubbleTransitions {
         default void continueExpand() {}
         default void skip() {}
         default void continueCollapse() {}
+        /** Called when the given Bubble's expanded TaskView has bounds changed. */
+        default void onTaskViewBoundsChanged(Bubble bubble) {}
         /** Continues the conversion transition. */
         default void continueConvert() {}
         /** Merge this transition with the unfold transition. */
@@ -816,9 +818,11 @@ public class BubbleTransitions {
 
         private void cleanup() {
             BubbleLog.d("LaunchNewTaskBubbleForExistingTransition.cleanup()");
+            mBubble.setCurrentTransition(null);
+            // Trigger finishCb after reset current transition as it will immediately kick off
+            // the next transition, which may set transition to the previous Bubble.
             mFinishCb.onTransitionFinished(mFinishWct);
             mFinishCb = null;
-            mBubble.setCurrentTransition(null);
         }
     }
 
@@ -834,7 +838,8 @@ public class BubbleTransitions {
      * TODO(b/408328557): To be consolidated with LaunchOrConvertToBubble and ConvertToBubble
      */
     @VisibleForTesting
-    class JumpcutBubbleSwitchTransition implements TransitionHandler, BubbleTransition {
+    class JumpcutBubbleSwitchTransition implements TransitionHandler, BubbleTransition,
+            View.OnLayoutChangeListener {
         private final BubbleExpandedViewTransitionAnimator mExpandedViewAnimator;
         private final TransitionProgress mTransitionProgress;
         private final Bubble mOpeningBubble;
@@ -850,6 +855,9 @@ public class BubbleTransitions {
 
         private SurfaceControl.Transaction mFinishT;
         private SurfaceControl mTaskLeash;
+        private boolean mShouldWaitForRelayout;
+        @VisibleForTesting
+        boolean mHasPlayed;
 
         JumpcutBubbleSwitchTransition(Bubble openingBubble, Bubble closingBubble, Context context,
                 BubbleExpandedViewManager expandedViewManager, BubbleTaskViewFactory factory,
@@ -870,6 +878,7 @@ public class BubbleTransitions {
             mTransitionProgress = new TransitionProgress();
             mOpeningBubble.setInflateSynchronously(inflateSync);
             mOpeningBubble.setCurrentTransition(this);
+            mClosingBubble.setCurrentTransition(this);
             // Still need the inflate to update the app icon in Bubble.
             mOpeningBubble.inflate(
                     b -> {
@@ -905,6 +914,8 @@ public class BubbleTransitions {
             // inflation (the task view will be in the right bounds)
             mTaskViewTransitions.removePendingTransitions(tv.getController());
             mTaskViewTransitions.enqueueExternal(tv.getController(), () -> mTransition);
+            // To listen on TaskView relayout
+            tv.addOnLayoutChangeListener(this);
         }
 
         @Override
@@ -983,9 +994,7 @@ public class BubbleTransitions {
             } else if (mExpandedViewAnimator.isExpanded()) {
                 mTransitionProgress.setReadyToExpand();
             }
-            if (mTransitionProgress.isReadyToAnimate()) {
-                animateJumpcut();
-            }
+            startAnimationIfReady();
 
             return true;
         }
@@ -1004,10 +1013,35 @@ public class BubbleTransitions {
                 final TaskViewRepository.TaskViewState state = mRepository.byTaskView(tvc);
                 if (state == null) return;
                 state.mVisible = true;
-                if (mTransitionProgress.isReadyToAnimate()) {
-                    animateJumpcut();
-                }
+                startAnimationIfReady();
             });
+        }
+
+        @Override
+        public void onTaskViewBoundsChanged(Bubble bubble) {
+            if (!mHasPlayed && mOpeningBubble == bubble) {
+                // There is a pending relayout on the opening Bubble's TaskView. We should wait
+                // for the #onLayoutChange before starting the animation.
+                mShouldWaitForRelayout = true;
+            }
+        }
+
+        @Override
+        public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft,
+                int oldTop, int oldRight, int oldBottom) {
+            mShouldWaitForRelayout = false;
+            mMainExecutor.execute(this::startAnimationIfReady);
+        }
+
+        private void startAnimationIfReady() {
+            if (mHasPlayed || mShouldWaitForRelayout || !mTransitionProgress.isReadyToAnimate()) {
+                // Not yet ready.
+                return;
+            }
+            mHasPlayed = true;
+            // Remove since we don't need to wait for relayout anymore.
+            mOpeningBubble.getTaskView().removeOnLayoutChangeListener(this);
+            animateJumpcut();
         }
 
         private void animateJumpcut() {
@@ -1042,12 +1076,18 @@ public class BubbleTransitions {
         }
 
         private void cleanup() {
+            mOpeningBubble.setCurrentTransition(null);
+            mClosingBubble.setCurrentTransition(null);
+            if (mOpeningBubble.getTaskView() != null) {
+                mOpeningBubble.getTaskView().removeOnLayoutChangeListener(this);
+            }
             if (mFinishCb != null) {
+                // Trigger finishCb after reset current transition as it will immediately kick off
+                // the next transition, which may set transition to the previous Bubble.
                 ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "JumpcutBubbleSwitchTransition.cleanup()");
                 mFinishCb.onTransitionFinished(mFinishWct);
                 mFinishCb = null;
             }
-            mOpeningBubble.setCurrentTransition(null);
         }
     }
 
@@ -1390,11 +1430,13 @@ public class BubbleTransitions {
         private void cleanup() {
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "LaunchOrConvertToBubble.cleanup(): removeCookie=%s",
                     mLaunchCookie.binder);
+            mBubble.setCurrentTransition(null);
+            // Trigger finishCb after reset current transition as it will immediately kick off
+            // the next transition, which may set transition to the previous Bubble.
             mFinishCb.onTransitionFinished(mFinishWct);
             mFinishCb = null;
             mPendingEnterTransitions.remove(mLaunchCookie.binder);
             mEnterTransitions.remove(mPlayingTransition);
-            mBubble.setCurrentTransition(null);
         }
     }
 
@@ -1668,11 +1710,13 @@ public class BubbleTransitions {
 
         private void cleanup() {
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "ConvertToBubble.cleanup()");
+            mBubble.setCurrentTransition(null);
             if (mFinishCb != null) {
+                // Trigger finishCb after reset current transition as it will immediately kick off
+                // the next transition, which may set transition to the previous Bubble.
                 mFinishCb.onTransitionFinished(mFinishWct);
                 mFinishCb = null;
             }
-            mBubble.setCurrentTransition(null);
         }
     }
 
@@ -1852,11 +1896,13 @@ public class BubbleTransitions {
 
         private void cleanup() {
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "ConvertFromBubble.cleanup()");
+            mBubble.setCurrentTransition(null);
             if (mFinishCb != null) {
+                // Trigger finishCb after reset current transition as it will immediately kick off
+                // the next transition, which may set transition to the previous Bubble.
                 mFinishCb.onTransitionFinished(mFinishWct);
                 mFinishCb = null;
             }
-            mBubble.setCurrentTransition(null);
         }
     }
 
@@ -2012,11 +2058,13 @@ public class BubbleTransitions {
 
         private void cleanup() {
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "DraggedBubbleIconToFullscreen.cleanup()");
+            mBubble.setCurrentTransition(null);
             if (mFinishCb != null) {
+                // Trigger finishCb after reset current transition as it will immediately kick off
+                // the next transition, which may set transition to the previous Bubble.
                 mFinishCb.onTransitionFinished(null);
                 mFinishCb = null;
             }
-            mBubble.setCurrentTransition(null);
         }
     }
 
@@ -2093,8 +2141,8 @@ public class BubbleTransitions {
                     mBubble.getTaskView().getController();
             if (taskViewTaskController == null) {
                 mTaskViewTransitions.onExternalDone(transition);
-                finishCallback.onTransitionFinished(null);
                 cleanup();
+                finishCallback.onTransitionFinished(null);
                 return true;
             }
 
@@ -2104,8 +2152,8 @@ public class BubbleTransitions {
                         + "one, cleaning up the task view");
                 taskViewTaskController.setTaskNotFound();
                 mTaskViewTransitions.onExternalDone(transition);
-                finishCallback.onTransitionFinished(null);
                 cleanup();
+                finishCallback.onTransitionFinished(null);
                 return true;
             }
 

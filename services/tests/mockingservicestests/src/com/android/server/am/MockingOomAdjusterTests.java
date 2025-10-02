@@ -304,7 +304,8 @@ public class MockingOomAdjusterTests {
 
         mCallback = spy(mService.new OomAdjusterCallback());
         mProcessStateController = new ProcessStateController.Builder(mService,
-                mService.mProcessList, mActiveUids, mCallback)
+                mService.mProcessList, mActiveUids, mService.mConstants.createOomConstants(),
+                mCallback)
                 .setProcessLruUpdater(lruUpdater)
                 .setOomAdjusterInjector(mInjector)
                 .build();
@@ -4784,16 +4785,11 @@ public class MockingOomAdjusterTests {
     @SuppressWarnings("GuardedBy")
     private void setIsReceivingBroadcast(ProcessRecord app, boolean isReceivingBroadcast,
             int schedGroup) {
-        if (Flags.pushBroadcastStateToOomadjuster()) {
             if (isReceivingBroadcast) {
                 mProcessStateController.noteBroadcastDeliveryStarted(app, schedGroup);
             } else {
                 mProcessStateController.noteBroadcastDeliveryEnded(app);
             }
-        } else {
-            doReturn(isReceivingBroadcast).when(mService).isReceivingBroadcastLocked(
-                    any(ProcessRecord.class), any(int[].class));
-        }
     }
 
 

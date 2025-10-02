@@ -63,13 +63,6 @@ flag {
 }
 
 flag {
-    name: "enable_retrievable_bubbles"
-    namespace: "multitasking"
-    description: "Allow opening bubbles overflow UI without bubbles being visible"
-    bug: "340337839"
-}
-
-flag {
     name: "enable_bubble_stashing"
     namespace: "multitasking"
     description: "Allow the floating bubble stack to stash on the edge of the screen"
@@ -201,16 +194,6 @@ flag {
     namespace: "multitasking"
     description: "Fixes a bug where clicking the rotation button would open the bubble."
     bug: "424165276"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "split_disable_child_task_bounds"
-    namespace: "multitasking"
-    description: "Fixes a bug where split task can keep bounds from previous multitasking mode."
-    bug: "427245857"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

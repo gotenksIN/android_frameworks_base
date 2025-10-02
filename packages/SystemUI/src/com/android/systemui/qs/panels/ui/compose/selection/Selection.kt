@@ -83,6 +83,7 @@ import com.android.systemui.qs.panels.ui.compose.selection.SelectionDefaults.Bad
 import com.android.systemui.qs.panels.ui.compose.selection.SelectionDefaults.SelectedBorderWidth
 import com.android.systemui.qs.panels.ui.compose.selection.SelectionDefaults.decoration
 import com.android.systemui.qs.panels.ui.compose.selection.TileState.GreyedOut
+import com.android.systemui.qs.panels.ui.compose.selection.TileState.New
 import com.android.systemui.qs.panels.ui.compose.selection.TileState.None
 import com.android.systemui.qs.panels.ui.compose.selection.TileState.Placeable
 import com.android.systemui.qs.panels.ui.compose.selection.TileState.Removable
@@ -128,8 +129,9 @@ fun InteractiveTileContainer(
 
     Box(
         modifier.resizable(tileState == Selected, resizingState).selectionBorder(
-            MaterialTheme.colorScheme.primary,
-            SelectedBorderWidth,
+            selectionColor = MaterialTheme.colorScheme.primary,
+            selectionBorderWidth = SelectedBorderWidth,
+            cornerRadius = InactiveCornerRadius,
         ) {
             selectionBorderAlpha
         }
@@ -195,6 +197,7 @@ fun InteractiveTileContainer(
 private fun Modifier.selectionBorder(
     selectionColor: Color,
     selectionBorderWidth: Dp,
+    cornerRadius: Dp,
     selectionAlpha: () -> Float = { 0f },
 ): Modifier {
     return drawWithContent {
@@ -204,7 +207,7 @@ private fun Modifier.selectionBorder(
         val borderWidth = selectionBorderWidth.toPx()
         drawRoundRect(
             SolidColor(selectionColor),
-            cornerRadius = CornerRadius(InactiveCornerRadius.toPx()),
+            cornerRadius = CornerRadius(cornerRadius.toPx()),
             topLeft = Offset(borderWidth / 2, borderWidth / 2),
             size = Size(size.width - borderWidth, size.height - borderWidth),
             style = Stroke(borderWidth),
@@ -309,6 +312,8 @@ private fun Modifier.resizable(selected: Boolean, state: ResizingState): Modifie
 }
 
 enum class TileState {
+    /** Tile is newly composed. This should not be assigned manually afterwards. */
+    New,
     /** Tile is displayed as-is, no additional decoration needed. */
     None,
     /** Tile can be removed by the user. This is displayed by a badge in the upper end corner. */
@@ -320,7 +325,7 @@ enum class TileState {
     Selected,
     /**
      * Tile placeable. This state means that the grid is in placement mode and this tile is
-     * selected. It should be highlighted to stand out in the grid.
+     * selected. It should have an highlighted border to stand out in the grid.
      */
     Placeable,
     /**
@@ -424,8 +429,9 @@ private object SelectionDefaults {
         return when (this) {
             Removable -> removalBadge()
             Selected -> resizingHandle()
+            Placeable -> placeable()
+            New,
             None,
-            Placeable,
             GreyedOut -> NoDecoration
         }
     }
@@ -458,5 +464,18 @@ private object SelectionDefaults {
                 offset = Offset(-SelectedBorderWidth.toPx(), 0f),
             )
         }
+    }
+
+    @Composable
+    @ReadOnlyComposable
+    fun placeable(): VisibleDecoration {
+        return VisibleDecoration(
+            iconAlpha = 0f,
+            borderAlpha = 1f,
+            color = MaterialTheme.colorScheme.primary,
+            size = Size.Zero,
+            angle = 0f,
+            offset = Offset.Zero,
+        )
     }
 }

@@ -42,6 +42,7 @@ import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Application;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFingerprintAuthInteractor;
+import com.android.systemui.display.DisplayExtensionsKt;
 import com.android.systemui.doze.DozeHost;
 import com.android.systemui.doze.DozeLog;
 import com.android.systemui.doze.DozeReceiver;
@@ -204,14 +205,12 @@ public final class DozeServiceHost implements DozeHost {
             callback.onPowerSaveChanged(active);
         }
 
-        if (com.android.systemui.Flags.newDozingKeyguardStates()) {
-            if (active) {
-                // listen for screen off fingerprint pulse events when battery saver
-                // is suppressing AOD
-                startCollectingScreenOffFingerprintPulseEvents();
-            } else if (!listenForScreenOffFingerprintPulseEvents()) {
-                stopCollectingUsUdfpsScreenOffPulseEvents();
-            }
+        if (active) {
+            // listen for screen off fingerprint pulse events when battery saver
+            // is suppressing AOD
+            startCollectingScreenOffFingerprintPulseEvents();
+        } else if (!listenForScreenOffFingerprintPulseEvents()) {
+            stopCollectingUsUdfpsScreenOffPulseEvents();
         }
     }
 
@@ -441,6 +440,11 @@ public final class DozeServiceHost implements DozeHost {
     @Override
     public void onSlpiTap(float screenX, float screenY) {
         if (screenX < 0 || screenY < 0) return;
+        // Coordinates are reported in the highest resolution;
+        // scale the coordinates to the current resolution
+        float scaleFactor = DisplayExtensionsKt.getDisplayScaleFactor(mContext.getDisplay());
+        screenX *= scaleFactor;
+        screenY *= scaleFactor;
         dispatchTouchEventToAmbientIndicationContainer(screenX, screenY);
 
         mDozeInteractor.setLastTapToWakePosition(new Point((int) screenX, (int) screenY));
@@ -600,21 +604,18 @@ public final class DozeServiceHost implements DozeHost {
     }
 
     private void startCollectingScreenOffFingerprintPulseEvents() {
-        if (com.android.systemui.Flags.newDozingKeyguardStates()) {
-            if (listenForScreenOffFingerprintPulseEvents()) {
-                if (mUdfpsScreenOffFingerprintPulseEventCollectingJob != null) return;
-                mUdfpsScreenOffFingerprintPulseEventCollectingJob = JavaAdapterKt.collectFlow(
-                        mScope,
-                        mScope.getCoroutineContext(),
-                        mDeviceEntryFingerprintAuthInteractor.getFingerprintHelp(),
-                        state -> {
-                            for (Callback callback : mCallbacks) {
-                                callback.onFingerprintPulseWhileScreenOff(state);
-                            }
+        if (listenForScreenOffFingerprintPulseEvents()) {
+            if (mUdfpsScreenOffFingerprintPulseEventCollectingJob != null) return;
+            mUdfpsScreenOffFingerprintPulseEventCollectingJob = JavaAdapterKt.collectFlow(
+                    mScope,
+                    mScope.getCoroutineContext(),
+                    mDeviceEntryFingerprintAuthInteractor.getFingerprintHelp(),
+                    state -> {
+                        for (Callback callback : mCallbacks) {
+                            callback.onFingerprintPulseWhileScreenOff(state);
                         }
-                );
-            }
-            return;
+                    }
+            );
         }
     }
 

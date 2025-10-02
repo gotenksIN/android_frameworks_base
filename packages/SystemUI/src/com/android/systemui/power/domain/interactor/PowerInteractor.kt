@@ -76,8 +76,8 @@ constructor(
     /**
      * A stricter version of [isAwake] intended for triggering animations.
      *
-     * This flow only emits `true` when the device is fully [WakefulnessState.AWAKE],
-     * excluding the [WakefulnessState.STARTING_TO_WAKE] state.
+     * This flow only emits `true` when the device is fully [WakefulnessState.AWAKE], excluding the
+     * [WakefulnessState.STARTING_TO_WAKE] state.
      */
     val isAwakeForAnimations =
         repository.wakefulness
@@ -231,7 +231,10 @@ constructor(
 
     fun onCameraLaunchGestureDetected() {
         if (!isPowerButtonGestureSuppressed()) {
-            repository.updateWakefulness(powerButtonLaunchGestureTriggered = true)
+            repository.updateWakefulness(
+                powerButtonLaunchGestureTriggered = true,
+                lastSleepReason = WakeSleepReason.POWER_BUTTON,
+            )
         }
     }
 
@@ -295,13 +298,14 @@ constructor(
         @JvmOverloads
         fun PowerInteractor.setAwakeForTest(
             @PowerManager.WakeReason reason: Int = PowerManager.WAKE_REASON_UNKNOWN,
+            powerButtonGestureTriggered: Boolean = false,
             forceEmit: Boolean = false,
         ) {
             emitDuplicateWakefulnessValue = forceEmit
 
             this.onStartedWakingUp(
                 reason = reason,
-                powerButtonLaunchGestureTriggeredOnWakeUp = false,
+                powerButtonLaunchGestureTriggeredOnWakeUp = powerButtonGestureTriggered,
             )
             this.onFinishedWakingUp()
         }
@@ -321,12 +325,15 @@ constructor(
         @JvmOverloads
         fun PowerInteractor.setAsleepForTest(
             @PowerManager.GoToSleepReason sleepReason: Int = PowerManager.GO_TO_SLEEP_REASON_MIN,
+            powerButtonGestureTriggered: Boolean = false,
             forceEmit: Boolean = false,
         ) {
             emitDuplicateWakefulnessValue = forceEmit
 
             this.onStartedGoingToSleep(reason = sleepReason)
-            this.onFinishedGoingToSleep(powerButtonLaunchGestureTriggeredDuringSleep = false)
+            this.onFinishedGoingToSleep(
+                powerButtonLaunchGestureTriggeredDuringSleep = powerButtonGestureTriggered
+            )
         }
 
         /** Helper method for tests to simulate the device screen state change event. */

@@ -217,6 +217,7 @@ import com.android.server.os.instrumentation.DynamicInstrumentationManagerServic
 import com.android.server.pdb.PersistentDataBlockService;
 import com.android.server.people.PeopleService;
 import com.android.server.permission.access.AccessCheckingService;
+import com.android.server.personalcontext.PersonalContextManagerService;
 import com.android.server.pinner.PinnerService;
 import com.android.server.pm.ApexManager;
 import com.android.server.pm.ApexSystemServiceInfo;
@@ -2670,6 +2671,12 @@ public final class SystemServer implements Dumpable {
                     new GraphicsStatsService(context));
             t.traceEnd();
 
+            if (android.service.personalcontext.Flags.enablePersonalContextService()) {
+                t.traceBegin("StartPersonalContextService");
+                mSystemServiceManager.startService(PersonalContextManagerService.class);
+                t.traceEnd();
+            }
+
             if (CoverageService.ENABLED) {
                 t.traceBegin("AddCoverageService");
                 ServiceManager.addService(CoverageService.COVERAGE_SERVICE, new CoverageService());
@@ -3478,7 +3485,11 @@ public final class SystemServer implements Dumpable {
                         Intent intent = new Intent();
                         intent.setComponent(wearServiceComponentName);
                         intent.addFlags(Intent.FLAG_DIRECT_BOOT_AUTO);
-                        context.startServiceAsUser(intent, UserHandle.SYSTEM);
+                        try {
+                            context.startServiceAsUser(intent, UserHandle.SYSTEM);
+                        } catch (Throwable e) {
+                            reportWtf("Starting WearServices: ", e);
+                        }
                     } else {
                         Slog.d(TAG, "Null wear service component name.");
                     }
@@ -3506,7 +3517,7 @@ public final class SystemServer implements Dumpable {
                     networkManagementF.systemReady();
                 }
             } catch (Throwable e) {
-                reportWtf("making Network Managment Service ready", e);
+                reportWtf("making Network Management Service ready", e);
             }
             CountDownLatch networkPolicyInitReadySignal = null;
             if (networkPolicyF != null) {

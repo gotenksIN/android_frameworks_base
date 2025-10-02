@@ -74,17 +74,6 @@ flag {
 }
 
 flag {
-  name: "do_not_force_wallpaper_for_freeform_task"
-  namespace: "windowing_frontend"
-  description: "Remove legacy condition to reduce overhead"
-  bug: "433694978"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "rank_task_layer_with_window_layout"
   namespace: "windowing_frontend"
   description: "Reduce lock contention of display thread"
@@ -253,6 +242,16 @@ flag {
 }
 
 flag {
+  name: "prevent_scheduling_redundant_frame"
+  namespace: "windowing_frontend"
+  description: "Prevent scheduling redundant frames for insets animation"
+  bug: "446575234"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
     name: "reduce_changed_exclusion_rects_msgs"
     namespace: "windowing_frontend"
     description: "Don't send MSG_SYSTEM_GESTURE_EXCLUSION_CHANGED when there is no change"
@@ -325,16 +324,6 @@ flag {
 }
 
 flag {
-    name: "predictive_back_delay_wm_transition"
-    namespace: "windowing_frontend"
-    description: "Separate the predictive back transition request from start navigation"
-    bug: "301195601"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "predictive_back_intercept_transition"
     namespace: "windowing_frontend"
     description: "Allows back gesture to intercept a running transition."
@@ -394,16 +383,6 @@ flag {
 }
 
 flag {
-    name: "predictive_back_callback_cancellation_fix"
-    namespace: "windowing_frontend"
-    description: "Fixes a bug that caused the wrong callback to receive onBackCancelled sometimes"
-    bug: "420650888"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "excluding_layer_from_task_snapshot"
     namespace: "windowing_frontend"
     description: "Supports excluding non-window layers from being included in a task snapshot."
@@ -418,16 +397,6 @@ flag {
     namespace: "windowing_frontend"
     description: "Use a fallback transition-player while sysui is starting or crashed."
     bug: "365884835"
-}
-
-flag {
-    name: "update_task_crop_in_sync"
-    namespace: "windowing_frontend"
-    description: "Fixes a bug where we fail to update task crops during transitions"
-    bug: "410684072"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -469,6 +438,16 @@ flag {
     namespace: "windowing_frontend"
     description: "Allow invisible containers to be in a transition if gone or created"
     bug: "445874680"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "sleep_wake_transitions"
+    namespace: "windowing_frontend"
+    description: "Make the rest of sleep/wake situations into transitions."
+    bug: "423701190"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

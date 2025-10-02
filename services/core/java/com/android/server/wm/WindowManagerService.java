@@ -7745,22 +7745,15 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
+    /**
+     * This method should be no longer used. Preserve the declaration because it has the
+     * UnsupportedAppUsage annotation.
+     *
+     * @deprecated Use {@link WindowManager#getCurrentWindowMetrics()} instead.
+     */
     @Override
     public void getStableInsets(int displayId, Rect outInsets) throws RemoteException {
-        synchronized (mGlobalLock) {
-            getStableInsetsLocked(displayId, outInsets);
-        }
-    }
-
-    /** This is used when there's no app info available and shall return the system default.*/
-    void getStableInsetsLocked(int displayId, Rect outInsets) {
         outInsets.setEmpty();
-        final DisplayContent dc = mRoot.getDisplayContent(displayId);
-        if (dc != null) {
-            final DisplayInfo di = dc.getDisplayInfo();
-            outInsets.set(dc.getDisplayPolicy().getDecorInsetsInfo(
-                    di.rotation, di.logicalWidth, di.logicalHeight).mConfigInsets);
-        }
     }
 
     /**
@@ -8576,6 +8569,26 @@ public class WindowManagerService extends IWindowManager.Stub
             }
             synchronized (mGlobalLock) {
                 mDisplayWindowSettingsProvider.setOverrideSettingsForUser(userId);
+            }
+        }
+
+        @Override
+        public SurfaceControl createMirrorForDisplayContent(int displayId) {
+            synchronized (mGlobalLock) {
+                final DisplayContent dc = mRoot.getDisplayContent(displayId);
+                if (dc == null) {
+                    Slog.e(TAG, "Failed to create mirror for display: "
+                            + displayId + " - DisplayContent not found.");
+                    return null;
+                }
+                final SurfaceControl sc = dc.getSurfaceControl();
+                if (sc == null) {
+                    Slog.e(TAG, "Failed to create mirror for display: " + displayId
+                            + " - SurfaceControl is not initialized.");
+                    return null;
+                }
+                // Return the mirror surface to avoid leaking the display surface outside of WM.
+                return SurfaceControl.mirrorSurface(sc);
             }
         }
 

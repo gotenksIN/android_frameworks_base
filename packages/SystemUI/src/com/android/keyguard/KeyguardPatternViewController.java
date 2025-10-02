@@ -16,6 +16,9 @@
 
 package com.android.keyguard;
 
+import static android.security.Flags.lockscreenIndicateDuplicateGuesses;
+import static android.security.Flags.manageLockoutEndTimeInService;
+
 import static com.android.internal.util.LatencyTracker.ACTION_CHECK_CREDENTIAL;
 import static com.android.internal.util.LatencyTracker.ACTION_CHECK_CREDENTIAL_UNLOCKED;
 import static com.android.systemui.flags.Flags.LOCKSCREEN_ENABLE_LANDSCAPE;
@@ -35,6 +38,7 @@ import com.android.internal.widget.LockPatternUtils;
 import com.android.internal.widget.LockPatternView;
 import com.android.internal.widget.LockPatternView.Cell;
 import com.android.internal.widget.LockscreenCredential;
+import com.android.internal.widget.VerifyCredentialResponse;
 import com.android.keyguard.EmergencyButtonController.EmergencyButtonCallback;
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
 import com.android.systemui.Flags;
@@ -149,7 +153,21 @@ public class KeyguardPatternViewController
                         }
 
                         @Override
+                        public void onChecked(VerifyCredentialResponse response) {
+                            handleChecked(
+                                    response.isMatched(),
+                                    response.getTimeout(),
+                                    lockscreenIndicateDuplicateGuesses()
+                                            && response.isCredAlreadyTried());
+                        }
+
+                        @Override
                         public void onChecked(boolean matched, int timeoutMs) {
+                            handleChecked(matched, timeoutMs, false /* assume not a duplicate */);
+                        }
+
+                        private void handleChecked(
+                                boolean matched, int timeoutMs, boolean isDuplicate) {
                             mLatencyTracker.onActionEnd(ACTION_CHECK_CREDENTIAL_UNLOCKED);
                             mLockPatternView.enableInput();
                             mPendingLockCheck = null;
@@ -159,7 +177,7 @@ public class KeyguardPatternViewController
                                         false /* matched */,
                                         timeoutMs,
                                         true /* isValidPattern */,
-                                        false /* isDuplicate */);
+                                        isDuplicate);
                             }
                         }
 
@@ -204,13 +222,22 @@ public class KeyguardPatternViewController
                     getKeyguardSecurityCallback().reportUnlockAttempt(userId, false, timeoutMs,
                             isDuplicate);
                     if (timeoutMs > 0) {
-                        Duration lockoutEndTime = Duration.ofMillis(
-                                mLockPatternUtils.setLockoutAttemptDeadline(userId, timeoutMs));
+                        Duration lockoutEndTime;
+                        if (manageLockoutEndTimeInService()) {
+                            lockoutEndTime = mLockPatternUtils.getLockoutEndTime(userId);
+                        } else {
+                            lockoutEndTime = Duration.ofMillis(
+                                    mLockPatternUtils.setLockoutAttemptDeadline(userId, timeoutMs));
+                        }
                         handleAttemptLockout(lockoutEndTime);
                     }
                 }
                 if (timeoutMs == 0) {
-                    mMessageAreaController.setMessage(R.string.kg_wrong_pattern);
+                    int wrongPatternStringId =
+                            isDuplicate
+                                    ? R.string.kg_primary_auth_duplicate_guess_pattern
+                                    : R.string.kg_wrong_pattern;
+                    mMessageAreaController.setMessage(wrongPatternStringId);
                     mLockPatternView.postDelayed(mCancelPatternRunnable, PATTERN_CLEAR_TIMEOUT_MS);
                 }
             }
@@ -277,8 +304,15 @@ public class KeyguardPatternViewController
         mView.onDevicePostureChanged(mPostureController.getDevicePosture());
         mPostureController.addCallback(mPostureCallback);
         // if the user is currently locked out, enforce it.
-        Duration lockoutEndTime = Duration.ofMillis(mLockPatternUtils.getLockoutAttemptDeadline(
-                mSelectedUserInteractor.getSelectedUserId()));
+        Duration lockoutEndTime;
+        if (manageLockoutEndTimeInService()) {
+            lockoutEndTime =
+                    mLockPatternUtils.getLockoutEndTime(
+                            mSelectedUserInteractor.getSelectedUserId());
+        } else {
+            lockoutEndTime = Duration.ofMillis(mLockPatternUtils.getLockoutAttemptDeadline(
+                    mSelectedUserInteractor.getSelectedUserId()));
+        }
         if (!lockoutEndTime.isZero()) {
             handleAttemptLockout(lockoutEndTime);
         }

@@ -22,7 +22,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.screencapture.common.ui.viewmodel.RecentTaskViewModel
 import com.android.systemui.screencapture.sharescreen.largescreen.ui.viewmodel.ShareContentListViewModel
@@ -60,11 +59,11 @@ fun ShareContentList(
     recentTaskViewModelFactory: RecentTaskViewModel.Factory,
     selectedRecentTaskViewModel: RecentTaskViewModel?,
 ) {
-    val recentTasks by viewModel.recentTasks.collectAsStateWithLifecycle(initialValue = null)
+    val recentTasks by viewModel.targets
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceBright,
-        modifier = modifier.height(224.dp).width(286.dp),
+        modifier = modifier.heightIn(min = 24.dp, max = 224.dp).width(286.dp),
     ) {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             // Use the real list of recent tasks, handling the nullable case.
@@ -80,7 +79,7 @@ fun ShareContentList(
                     SelectorItem(
                         currentRecentTaskViewModel = currentRecentTaskViewModel,
                         isSelected =
-                            currentRecentTaskViewModel.task == selectedRecentTaskViewModel?.task,
+                            currentRecentTaskViewModel.model == selectedRecentTaskViewModel?.model,
                         onItemSelected = {
                             viewModel.selectedRecentTaskViewModel = currentRecentTaskViewModel
                         },
@@ -110,7 +109,7 @@ private fun SelectorItem(
     val label = currentRecentTaskViewModel.label?.getOrNull()
 
     Surface(
-        shape = RoundedCornerShape(4.dp),
+        shape = if (isSelected) RoundedCornerShape(20.dp) else RoundedCornerShape(4.dp),
         color =
             if (isSelected) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.surfaceContainer,
@@ -132,11 +131,13 @@ private fun SelectorItem(
                     Image(bitmap = icon.asImageBitmap(), contentDescription = label?.toString())
                 }
             }
-            Text(
-                text = label?.toString() ?: "Title",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.weight(1f),
-            )
+            if (label != null) {
+                Text(
+                    text = label.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }

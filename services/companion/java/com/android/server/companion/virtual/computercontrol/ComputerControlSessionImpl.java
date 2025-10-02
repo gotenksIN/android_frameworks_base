@@ -33,8 +33,8 @@ import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.computercontrol.ComputerControlSession;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IComputerControlSession;
-import android.companion.virtual.computercontrol.IComputerControlStabilityListener;
-import android.companion.virtual.computercontrol.IInteractiveMirrorDisplay;
+import android.companion.virtual.computercontrol.IInteractiveMirror;
+import android.companion.virtual.computercontrol.InteractiveMirror;
 import android.companion.virtualdevice.flags.Flags;
 import android.content.AttributionSource;
 import android.content.ComponentName;
@@ -49,7 +49,6 @@ import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.IVirtualDisplayCallback;
 import android.hardware.display.VirtualDisplayConfig;
 import android.hardware.input.IVirtualInputDevice;
-import android.hardware.input.VirtualDpad;
 import android.hardware.input.VirtualDpadConfig;
 import android.hardware.input.VirtualKeyEvent;
 import android.hardware.input.VirtualKeyboardConfig;
@@ -60,15 +59,13 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.Slog;
-import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
-import android.view.Surface;
+import android.view.SurfaceControl;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
 
-import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.inputmethod.IRemoteComputerControlInputConnection;
 import com.android.internal.inputmethod.InputConnectionCommandHeader;
@@ -86,7 +83,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 /**
  * A computer control session that encapsulates a {@link IVirtualDevice}. The device is created and
@@ -97,7 +94,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     private static final String TAG = "ComputerControlSession";
 
-    public static final long GLOBAL_SESSION_TIMEOUT_DURATION_MS =
+    private static final long DEFAULT_GLOBAL_SESSION_TIMEOUT_DURATION_MS =
             TimeUnit.MILLISECONDS.convert(360, TimeUnit.MINUTES);
 
     private static final String CUSTOM_BLOCKED_APP_PACKAGE = "com.android.virtualdevicemanager";
@@ -136,9 +133,14 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @VisibleForTesting
     static final int PRODUCT_ID_TOUCHSCREEN = 0xCC03;
 
+    private final Context mContext;
     private final IBinder mAppToken;
     private final ComputerControlSessionParams mParams;
+
+    private final UserHandle mOwnerUser;
+    private final Context mOwnerContext;
     private final String mOwnerPackageName;
+
     private final OnClosedListener mOnClosedListener;
     private final IVirtualDevice mVirtualDevice;
     private final int mVirtualDisplayId;
@@ -148,55 +150,70 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final IVirtualInputDevice mVirtualTouchscreen;
     private final IVirtualInputDevice mVirtualDpad;
     private final IVirtualInputDevice mVirtualKeyboard;
-    private final AtomicInteger mMirrorDisplayCounter = new AtomicInteger(0);
     private final ScheduledExecutorService mScheduler =
             Executors.newSingleThreadScheduledExecutor();
-    private final Object mStabilityCalculatorLock = new Object();
-    private final Set<UserHandle> mAllowedUsers;
-    private final Injector mInjector;
+
+    private final WindowManagerInternal mWindowManagerInternal;
+    private final InputMethodManagerInternal mInputMethodManagerInternal;
+    private final UserManagerInternal mUserManagerInternal;
+    private final ActivityTaskManagerInternal mActivityTaskManagerInternal;
+    private final ViewConfiguration mViewConfiguration;
+    private final long mGlobalSessionTimeoutDurationMs;
+    private final Supplier<SurfaceControl.Transaction> mTransactionSupplier;
 
     private ScheduledFuture<?> mSwipeFuture;
     private ScheduledFuture<?> mInsertTextFuture;
     private ScheduledFuture<?> mCloseSessionFuture;
 
-    @GuardedBy("mStabilityCalculatorLock")
-    private StabilityCalculator mStabilityCalculator;
-
     ComputerControlSessionImpl(Context context, IBinder appToken,
             ComputerControlSessionParams params, AttributionSource attributionSource,
             ComputerControlSessionProcessor.VirtualDeviceFactory virtualDeviceFactory,
             Set<UserHandle> allowedUsers, OnClosedListener onClosedListener) {
-        this(
+        this(context, DisplayManagerGlobal.getInstance(), ViewConfiguration.get(context),
+                DEFAULT_GLOBAL_SESSION_TIMEOUT_DURATION_MS, SurfaceControl.Transaction::new,
                 appToken, params, attributionSource, virtualDeviceFactory, allowedUsers,
-                onClosedListener, new Injector(context));
+                onClosedListener);
     }
 
     @VisibleForTesting
-    ComputerControlSessionImpl(IBinder appToken,
+    ComputerControlSessionImpl(Context context, DisplayManagerGlobal displayManagerGlobal,
+            ViewConfiguration viewConfiguration, long globalSessionTimeoutDurationMs,
+            Supplier<SurfaceControl.Transaction> transactionSupplier, IBinder appToken,
             ComputerControlSessionParams params, AttributionSource attributionSource,
             ComputerControlSessionProcessor.VirtualDeviceFactory virtualDeviceFactory,
-            Set<UserHandle> allowedUsers, OnClosedListener onClosedListener, Injector injector) {
+            Set<UserHandle> allowedUsers, OnClosedListener onClosedListener) {
+        mContext = context;
+        mViewConfiguration = viewConfiguration;
+        mGlobalSessionTimeoutDurationMs = globalSessionTimeoutDurationMs;
+        mTransactionSupplier = transactionSupplier;
         mAppToken = appToken;
         mParams = params;
+
+        mOwnerUser = UserHandle.getUserHandleForUid(attributionSource.getUid());
+        mOwnerContext = context.createContextAsUser(mOwnerUser, /* flags = */ 0);
         mOwnerPackageName = attributionSource.getPackageName();
+
         mOnClosedListener = onClosedListener;
-        mAllowedUsers = allowedUsers;
-        mInjector = injector;
+        mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
+        mInputMethodManagerInternal = LocalServices.getService(
+                InputMethodManagerInternal.class);
+        mUserManagerInternal = LocalServices.getService(UserManagerInternal.class);
+        mActivityTaskManagerInternal = LocalServices.getService(
+                ActivityTaskManagerInternal.class);
+
         // TODO(b/440005498): Consider using the display from the app's context instead.
-        mMainDisplayId = injector.getMainDisplayIdForUser(
-                UserHandle.getUserId(attributionSource.getUid()));
+        mMainDisplayId = mUserManagerInternal.getMainDisplayAssignedToUser(
+                mOwnerUser.getIdentifier());
 
         final VirtualDeviceParams virtualDeviceParams = new VirtualDeviceParams.Builder()
                 .setName(mParams.getName())
                 .setDevicePolicy(POLICY_TYPE_BLOCKED_ACTIVITY, DEVICE_POLICY_CUSTOM)
-                .setAllowedUsers(mAllowedUsers)
+                .setAllowedUsers(allowedUsers)
                 .build();
 
         int displayFlags = DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED
                 | DisplayManager.VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED;
-        if (mParams.isDisplayAlwaysUnlocked()) {
-            displayFlags |= DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
-        }
 
         // This is used as a death detection token to release the display upon app death. We're in
         // the system process, so this won't happen, but this is OK because we already do death
@@ -206,32 +223,14 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         // used as a map key for the virtual input devices.
         mVirtualDisplayToken = new DisplayManagerGlobal.VirtualDisplayCallback(null, null);
 
-        final int displayWidth;
-        final int displayHeight;
-        // If the client didn't provide a surface, use the default display dimensions and enable
-        // the screenshot API.
-        // TODO(b/439774796): Do not allow client-provided surface and dimensions.
-        final VirtualDisplayConfig virtualDisplayConfig;
-        if (params.getDisplaySurface() == null) {
-            displayFlags |= DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
-            final DisplayInfo defaultDisplayInfo = mInjector.getDisplayInfo(mMainDisplayId);
-            displayWidth = defaultDisplayInfo.logicalWidth;
-            displayHeight = defaultDisplayInfo.logicalHeight;
-            virtualDisplayConfig = new VirtualDisplayConfig.Builder(
-                    mParams.getName() + "-display", displayWidth, displayHeight,
-                    defaultDisplayInfo.logicalDensityDpi)
-                    .setFlags(displayFlags)
-                    .build();
-        } else {
-            displayWidth = mParams.getDisplayWidthPx();
-            displayHeight = mParams.getDisplayHeightPx();
-            virtualDisplayConfig = new VirtualDisplayConfig.Builder(
-                    mParams.getName() + "-display", displayWidth, displayHeight,
-                    mParams.getDisplayDpi())
-                    .setSurface(mParams.getDisplaySurface())
-                    .setFlags(displayFlags)
-                    .build();
-        }
+        final DisplayInfo mainDisplayInfo = displayManagerGlobal.getDisplayInfo(mMainDisplayId);
+        final int displayWidth = mainDisplayInfo.logicalWidth;
+        final int displayHeight = mainDisplayInfo.logicalHeight;
+        final VirtualDisplayConfig virtualDisplayConfig = new VirtualDisplayConfig.Builder(
+                mParams.getName() + "-display", displayWidth, displayHeight,
+                mainDisplayInfo.logicalDensityDpi)
+                .setFlags(displayFlags)
+                .build();
 
         try {
             mVirtualDevice = virtualDeviceFactory.createVirtualDevice(mAppToken, attributionSource,
@@ -244,7 +243,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mVirtualDisplayId = Binder.withCleanCallingIdentity(() -> {
                 int displayId = mVirtualDevice.createVirtualDisplay(virtualDisplayConfig,
                         mVirtualDisplayToken);
-                mInjector.disableAnimationsForDisplay(displayId);
+                mWindowManagerInternal.setAnimationsDisabledForDisplay(displayId, true);
                 return displayId;
             });
 
@@ -307,9 +306,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             exemptedPackageNames.addAll(mParams.getTargetPackageNames());
             exemptedPackageNames.add(CUSTOM_BLOCKED_APP_PACKAGE);
         } else {
-            // TODO(b/439774796): Remove once v0 API is removed and the flag is rolled out.
             // This legacy policy allows all apps other than PermissionController to be automated.
-            String permissionControllerPackage = mInjector.getPermissionControllerPackageName();
+            String permissionControllerPackage =
+                    mContext.getPackageManager().getPermissionControllerPackageName();
             exemptedPackageNames.add(permissionControllerPackage);
         }
         for (int i = 0; i < exemptedPackageNames.size(); i++) {
@@ -321,7 +320,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         }
     }
 
-    @Override
     public int getVirtualDisplayId() {
         return mVirtualDisplayId;
     }
@@ -343,9 +341,10 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     }
 
     @Override
+    @SuppressLint("AndroidFrameworkRequiresPermission")
     public void launchApplication(@NonNull String packageName, @Nullable String className)
             throws RemoteException {
-        final Intent intent = mInjector.getLaunchIntent(packageName, className);
+        final Intent intent = getLaunchIntent(packageName, className);
         if (intent == null) {
             throw new IllegalArgumentException(
                     "Could not find launcher activity for " + packageName + "/" + className);
@@ -356,16 +355,16 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mVirtualDevice.addActivityPolicyExemption(
                     new ActivityPolicyExemption.Builder().setPackageName(packageName).build());
         }
-        final UserHandle user = Binder.getCallingUserHandle();
-        Binder.withCleanCallingIdentity(() -> mInjector.launchApplicationOnDisplayAsUser(
-                intent, mVirtualDisplayId, user));
-        notifyApplicationLaunchToStabilityCalculator();
+        Binder.withCleanCallingIdentity(() ->
+                mContext.startActivityAsUser(intent,
+                        ActivityOptions.makeBasic()
+                                .setLaunchDisplayId(mVirtualDisplayId).toBundle(), mOwnerUser));
     }
 
     @Override
     public void handOverApplications() {
         Binder.withCleanCallingIdentity(
-                () -> mInjector.moveAllTasks(mVirtualDisplayId, mMainDisplayId));
+                () -> moveAllTasks(mVirtualDisplayId, mMainDisplayId));
     }
 
     @Override
@@ -373,7 +372,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         cancelOngoingTouchGestures();
         mVirtualTouchscreen.sendTouchEvent(createTouchEvent(x, y, VirtualTouchEvent.ACTION_DOWN));
         mVirtualTouchscreen.sendTouchEvent(createTouchEvent(x, y, VirtualTouchEvent.ACTION_UP));
-        notifyNonContinuousInputToStabilityCalculator();
     }
 
     @Override
@@ -384,7 +382,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mVirtualTouchscreen.sendTouchEvent(
                 createTouchEvent(fromX, fromY, VirtualTouchEvent.ACTION_DOWN));
         performSwipeStep(fromX, fromY, toX, toY, /* step= */ 0, SWIPE_STEPS);
-        notifyContinuousInputToStabilityCalculator();
     }
 
     @Override
@@ -395,23 +392,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 createTouchEvent(x, y, VirtualTouchEvent.ACTION_DOWN));
         int longPressStepCount =
                 (int) Math.ceil(
-                        (double) mInjector.getLongPressTimeoutMillis() / TOUCH_EVENT_DELAY_MS);
+                        (double) mViewConfiguration.getLongPressTimeoutMillis() *
+                                LONG_PRESS_TIMEOUT_MULTIPLIER / TOUCH_EVENT_DELAY_MS);
         performSwipeStep(x, y, x, y, /* step= */ 0, longPressStepCount);
-        notifyContinuousInputToStabilityCalculator();
-    }
-
-    @Override
-    public void sendTouchEvent(@NonNull VirtualTouchEvent event) throws RemoteException {
-        mVirtualTouchscreen.sendTouchEvent(Objects.requireNonNull(event));
-    }
-
-    @Override
-    public void sendKeyEvent(@NonNull VirtualKeyEvent event) throws RemoteException {
-        if (VirtualDpad.isKeyCodeSupported(Objects.requireNonNull(event).getKeyCode())) {
-            mVirtualDpad.sendKeyEvent(event);
-        } else {
-            mVirtualKeyboard.sendKeyEvent(event);
-        }
     }
 
     @Override
@@ -422,32 +405,25 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                     createKeyEvent(KeyEvent.KEYCODE_BACK, VirtualKeyEvent.ACTION_DOWN));
             mVirtualDpad.sendKeyEvent(
                     createKeyEvent(KeyEvent.KEYCODE_BACK, VirtualKeyEvent.ACTION_UP));
-            notifyNonContinuousInputToStabilityCalculator();
         } else {
             Slog.e(TAG, "Invalid action code for performAction: " + actionCode);
-            notifyInteractionFailedToStabilityCalculator();
         }
     }
 
     @Override
     @Nullable
-    public IInteractiveMirrorDisplay createInteractiveMirrorDisplay(
-            int width, int height, @NonNull Surface surface) throws RemoteException {
-        Objects.requireNonNull(surface);
-        DisplayInfo displayInfo = mInjector.getDisplayInfo(mVirtualDisplayId);
-        if (displayInfo == null) {
-            // The display we're trying to mirror is gone; likely the session is already closed.
+    public IInteractiveMirror createInteractiveMirror(SurfaceControl outMirrorSurface)
+            throws RemoteException {
+        final var mirrorSurface =
+                mWindowManagerInternal.createMirrorForDisplayContent(mVirtualDisplayId);
+        if (mirrorSurface == null) {
             return null;
         }
-        String name =
-                mParams.getName() + "-display-mirror-" + mMirrorDisplayCounter.getAndIncrement();
-        VirtualDisplayConfig virtualDisplayConfig =
-                new VirtualDisplayConfig.Builder(name, width, height, displayInfo.logicalDensityDpi)
-                        .setSurface(surface)
-                        .setDisplayIdToMirror(mVirtualDisplayId)
-                        .setFlags(DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR)
-                        .build();
-        return new InteractiveMirrorDisplayImpl(virtualDisplayConfig, mVirtualDevice);
+        outMirrorSurface.copyFrom(mirrorSurface,
+                "ComputerControlSessionImpl#createInteractiveMirrorDisplay");
+        final var mirror = new InteractiveMirrorImpl(mirrorSurface, mTransactionSupplier);
+        mirror.setInteractive(InteractiveMirror.DEFAULT_INTERACTIVE);
+        return mirror;
     }
 
     @SuppressLint("WrongConstant")
@@ -455,11 +431,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     public void insertText(@NonNull String text, boolean replaceExisting, boolean commit) {
         cancelOngoingKeyGestures();
         if (android.companion.virtualdevice.flags.Flags.computerControlTyping()) {
-            IRemoteComputerControlInputConnection ic = mInjector.getInputConnection(
-                    mVirtualDisplayId);
+            IRemoteComputerControlInputConnection ic = getInputConnection(mVirtualDisplayId);
             if (ic == null) {
                 Slog.e(TAG, "Unable to insert text: No input connection found!");
-                notifyInteractionFailedToStabilityCalculator();
                 return;
             }
             // TODO(b/422134565): Implement client invoker logic to pass the correct session id when
@@ -515,21 +489,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             }
             performKeyStep(keysToSend, 0);
         }
-        notifyNonContinuousInputToStabilityCalculator();
-    }
-
-    @Override
-    public void setStabilityListener(IComputerControlStabilityListener listener) {
-        synchronized (mStabilityCalculatorLock) {
-            if (listener == null) {
-                clearStabilityCalculatorLocked();
-                return;
-            }
-            if (mStabilityCalculator != null) {
-                throw new IllegalStateException("Stability listener already set");
-            }
-            mStabilityCalculator = new StabilityCalculator(listener, mScheduler);
-        }
     }
 
     @Override
@@ -537,7 +496,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         cancelOngoingKeyGestures();
         cancelOngoingTouchGestures();
         cancelPendingCloseSession();
-        clearStabilityCalculator();
         mVirtualDevice.close();
         mAppToken.unlinkToDeath(this, 0);
         mOnClosedListener.onClosed(this);
@@ -620,13 +578,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     private void startSessionCloseGlobalTimeout() {
         mCloseSessionFuture = mScheduler.schedule(() -> {
-            try {
-                close();
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
-            }
-        },
-        mInjector.getMaxSessionDurationMillis(), TimeUnit.MILLISECONDS);
+                    try {
+                        close();
+                    } catch (RemoteException e) {
+                        throw e.rethrowFromSystemServer();
+                    }
+                },
+                mGlobalSessionTimeoutDurationMs, TimeUnit.MILLISECONDS);
     }
 
     private void cancelOngoingKeyGestures() {
@@ -657,55 +615,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 : prefix;
     }
 
-    private void clearStabilityCalculator() {
-        synchronized (mStabilityCalculatorLock) {
-            clearStabilityCalculatorLocked();
-        }
-    }
-
-    private void clearStabilityCalculatorLocked() {
-        if (mStabilityCalculator != null) {
-            mStabilityCalculator.close();
-            mStabilityCalculator = null;
-        }
-    }
-
-    // TODO(b/428957982): Remove once we implement actual stability signals from the framework.
-    private void notifyContinuousInputToStabilityCalculator() {
-        synchronized (mStabilityCalculatorLock) {
-            if (mStabilityCalculator != null) {
-                mStabilityCalculator.onContinuousInputEvent();
-            }
-        }
-    }
-
-    // TODO(b/428957982): Remove once we implement actual stability signals from the framework.
-    private void notifyNonContinuousInputToStabilityCalculator() {
-        synchronized (mStabilityCalculatorLock) {
-            if (mStabilityCalculator != null) {
-                mStabilityCalculator.onNonContinuousInputEvent();
-            }
-        }
-    }
-
-    // TODO(b/428957982): Remove once we implement actual stability signals from the framework.
-    private void notifyApplicationLaunchToStabilityCalculator() {
-        synchronized (mStabilityCalculatorLock) {
-            if (mStabilityCalculator != null) {
-                mStabilityCalculator.onApplicationLaunch();
-            }
-        }
-    }
-
-    // TODO(b/428957982): Remove once we implement actual stability signals from the framework.
-    private void notifyInteractionFailedToStabilityCalculator() {
-        synchronized (mStabilityCalculatorLock) {
-            if (mStabilityCalculator != null) {
-                mStabilityCalculator.onInteractionFailed();
-            }
-        }
-    }
-
     private class ComputerControlActivityListener extends IVirtualDeviceActivityListener.Stub {
         @Override
         public void onTopActivityChanged(int displayId, ComponentName topActivity,
@@ -715,6 +624,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         public void onDisplayEmpty(int displayId) {}
 
         @Override
+        @SuppressLint("AndroidFrameworkRequiresPermission")
         public void onActivityLaunchBlocked(int displayId, ComponentName componentName,
                 UserHandle user, IntentSender intentSender) {
             Slog.d(TAG, "Blocked activity launch for " + componentName + " on session "
@@ -725,7 +635,11 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             Intent intent = new Intent()
                     .setComponent(CUSTOM_BLOCKED_APP_ACTIVITY)
                     .putExtra(Intent.EXTRA_COMPONENT_NAME, componentName);
-            mInjector.startCustomBlockedActivityOnDisplay(intent, displayId);
+            mContext.startActivityAsUser(
+                    intent.addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                    ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle(),
+                    UserHandle.SYSTEM);
         }
 
         @Override
@@ -741,95 +655,30 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         void onClosed(@NonNull ComputerControlSessionImpl session);
     }
 
-    @VisibleForTesting
-    public static class Injector {
-        private final Context mContext;
-        private final PackageManager mPackageManager;
-        private final WindowManagerInternal mWindowManagerInternal;
-        private final InputMethodManagerInternal mInputMethodManagerInternal;
-        private final UserManagerInternal mUserManagerInternal;
-        private final ActivityTaskManagerInternal mActivityTaskManagerInternal;
-
-        Injector(Context context) {
-            mContext = context;
-            mPackageManager = mContext.getPackageManager();
-            mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
-            mInputMethodManagerInternal = LocalServices.getService(
-                    InputMethodManagerInternal.class);
-            mUserManagerInternal = LocalServices.getService(UserManagerInternal.class);
-            mActivityTaskManagerInternal = LocalServices.getService(
-                    ActivityTaskManagerInternal.class);
+    private Intent getLaunchIntent(String packageName, String className) {
+        if (className == null) {
+            return mOwnerContext.getPackageManager().getLaunchIntentForPackage(packageName);
         }
-
-        public String getPermissionControllerPackageName() {
-            return mPackageManager.getPermissionControllerPackageName();
+        final Intent intent = new Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_LAUNCHER)
+                .setClassName(packageName, className);
+        final List<ResolveInfo> resolveInfos = mOwnerContext.getPackageManager()
+                .queryIntentActivities(intent, ResolveInfoFlags.of(PackageManager.MATCH_ALL));
+        if (resolveInfos.isEmpty()) {
+            return null;
         }
+        return intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    }
 
-        public void launchApplicationOnDisplayAsUser(Intent intent, int displayId,
-                UserHandle user) {
-            mContext.startActivityAsUser(intent,
-                    ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle(), user);
-        }
+    private IRemoteComputerControlInputConnection getInputConnection(int displayId) {
+        // getUserAssignedToDisplay returns the main userId, if we want to support cross
+        // profile CC interactions and typing on CC display, we need to find the right user
+        // profile here for the CC input connection
+        return mInputMethodManagerInternal.getComputerControlInputConnection(
+                mUserManagerInternal.getUserAssignedToDisplay(displayId), displayId);
+    }
 
-        public Intent getLaunchIntent(String packageName, String className) {
-            if (className == null) {
-                return mPackageManager.getLaunchIntentForPackage(packageName);
-            }
-            final Intent intent = new Intent(Intent.ACTION_MAIN)
-                    .addCategory(Intent.CATEGORY_LAUNCHER)
-                    .setClassName(packageName, className);
-            final List<ResolveInfo> resolveInfos = mPackageManager.queryIntentActivities(
-                    intent, ResolveInfoFlags.of(PackageManager.MATCH_ALL));
-            if (resolveInfos.isEmpty()) {
-                return null;
-            }
-            return intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
-
-        public void startCustomBlockedActivityOnDisplay(Intent intent, int displayId) {
-            mContext.startActivityAsUser(
-                    intent.addFlags(
-                            Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK),
-                    ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle(),
-                    UserHandle.SYSTEM);
-        }
-
-        public DisplayInfo getDisplayInfo(int displayId) {
-            final Display display = DisplayManagerGlobal.getInstance().getRealDisplay(displayId);
-            if (display == null) {
-                return null;
-            }
-            final DisplayInfo displayInfo = new DisplayInfo();
-            display.getDisplayInfo(displayInfo);
-            return displayInfo;
-        }
-
-        public void disableAnimationsForDisplay(int displayId) {
-            mWindowManagerInternal.setAnimationsDisabledForDisplay(displayId, /* disabled= */ true);
-        }
-
-        public long getLongPressTimeoutMillis() {
-            return (long) (ViewConfiguration.getLongPressTimeout() * LONG_PRESS_TIMEOUT_MULTIPLIER);
-        }
-
-        public int getMainDisplayIdForUser(@UserIdInt int user) {
-            return mUserManagerInternal.getMainDisplayAssignedToUser(user);
-        }
-
-        public IRemoteComputerControlInputConnection getInputConnection(int displayId) {
-            // getUserAssignedToDisplay returns the main userId, if we want to support cross
-            // profile CC interactions and typing on CC display, we need to find the right user
-            // profile here for the CC input connection
-            return mInputMethodManagerInternal.getComputerControlInputConnection(
-                    mUserManagerInternal.getUserAssignedToDisplay(displayId), displayId);
-        }
-
-        public void moveAllTasks(int fromDisplayId, int toDisplayId) {
-            mActivityTaskManagerInternal.moveAllTasks(fromDisplayId, toDisplayId);
-        }
-
-        public long getMaxSessionDurationMillis() {
-            return GLOBAL_SESSION_TIMEOUT_DURATION_MS;
-        }
+    private void moveAllTasks(int fromDisplayId, int toDisplayId) {
+        mActivityTaskManagerInternal.moveAllTasks(fromDisplayId, toDisplayId);
     }
 }

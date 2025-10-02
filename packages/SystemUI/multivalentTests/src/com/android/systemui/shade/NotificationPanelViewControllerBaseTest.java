@@ -100,7 +100,7 @@ import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.power.domain.interactor.PowerInteractor;
-import com.android.systemui.qs.QSFragmentLegacy;
+import com.android.systemui.qs.composefragment.QSFragmentCompose;
 import com.android.systemui.res.R;
 import com.android.systemui.screenrecord.ScreenRecordUxController;
 import com.android.systemui.settings.brightness.data.repository.BrightnessMirrorShowingRepository;
@@ -255,7 +255,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock protected NotificationListContainer mNotificationListContainer;
     @Mock protected UnlockedScreenOffAnimationController mUnlockedScreenOffAnimationController;
     @Mock protected QS mQs;
-    @Mock protected QSFragmentLegacy mQSFragment;
+    @Mock protected QSFragmentCompose mQSFragment;
     @Mock protected ViewGroup mQsHeader;
     @Mock protected ViewParent mViewParent;
     @Mock protected ViewTreeObserver mViewTreeObserver;
@@ -303,8 +303,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     protected View.OnLayoutChangeListener mLayoutChangeListener;
     protected ShadeRepository mShadeRepository;
     protected FakeMSDLPlayer mMSDLPlayer = mKosmos.getMsdlPlayer();
-    protected WindowRootViewBlurInteractor mWindowRootViewBlurInteractor =
-            mKosmos.getWindowRootViewBlurInteractor();
+    protected WindowRootViewBlurInteractor mWindowRootViewBlurInteractor;
 
     protected BrightnessMirrorShowingRepository mBrightnessMirrorShowingRepository =
             mKosmos.getBrightnessMirrorShowingRepository();
@@ -329,6 +328,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         mFeatureFlags.set(Flags.QS_USER_DETAIL_SHORTCUT, false);
 
         mMainDispatcher = getMainDispatcher();
+        mWindowRootViewBlurInteractor = mKosmos.getWindowRootViewBlurInteractor();
         mFakeKeyguardRepository = mKosmos.getKeyguardRepository();
         mFakeKeyguardClockRepository = new FakeKeyguardClockRepository();
         mKeyguardClockInteractor = mKosmos.getKeyguardClockInteractor();
@@ -351,7 +351,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         mShadeInteractor = new ShadeInteractorImpl(
                 mTestScope.getBackgroundScope(),
                 mKosmos.getDeviceProvisioningInteractor(),
-                mKosmos.getDisableFlagsInteractor(),
                 mDozeParameters,
                 mFakeKeyguardRepository,
                 mKeyguardTransitionInteractor,
@@ -364,7 +363,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                         mShadeRepository,
                         mKosmos.getShadeConfigRepository()
                 ),
-                mKosmos.getSceneInteractor());
+                mKosmos.getSceneInteractor(),
+                mKosmos.getShadeStatusBarComponentsInteractor());
         SystemClock systemClock = new FakeSystemClock();
         mStatusBarStateController = new StatusBarStateControllerImpl(
                 mUiEventLogger,
@@ -411,7 +411,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         when(mFragmentService.getFragmentHostManager(mView)).thenReturn(mFragmentHostManager);
         FlingAnimationUtils.Builder flingAnimationUtilsBuilder = new FlingAnimationUtils.Builder(
                 mDisplayMetrics);
-        when(mScreenOffAnimationController.shouldAnimateClockChange()).thenReturn(true);
         when(mQs.getView()).thenReturn(mView);
         when(mQSFragment.getView()).thenReturn(mView);
         when(mNaturalScrollingSettingObserver.isNaturalScrollingEnabled()).thenReturn(true);

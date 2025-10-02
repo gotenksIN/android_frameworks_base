@@ -486,7 +486,6 @@ package android.app {
     method @NonNull @RequiresPermission(android.Manifest.permission.READ_WALLPAPER_INTERNAL) public android.util.SparseArray<android.graphics.Rect> getBitmapCrops(int);
     method @FlaggedApi("com.android.window.flags.multi_crop") @NonNull public java.util.List<android.graphics.Rect> getBitmapCrops(@NonNull android.graphics.Point, @NonNull java.util.List<android.graphics.Point>, @Nullable java.util.Map<android.graphics.Point,android.graphics.Rect>);
     method public static int getOrientation(@NonNull android.graphics.Point);
-    method public boolean isLockscreenLiveWallpaperEnabled();
     method @Nullable public android.graphics.Rect peekBitmapDimensions();
     method @Nullable public android.graphics.Rect peekBitmapDimensions(int);
     method @FlaggedApi("com.android.window.flags.multi_crop") @RequiresPermission(android.Manifest.permission.SET_WALLPAPER) public int setBitmapWithCrops(@Nullable android.graphics.Bitmap, @NonNull java.util.Map<android.graphics.Point,android.graphics.Rect>, boolean, int) throws java.io.IOException;
@@ -910,6 +909,7 @@ package android.companion {
     method @NonNull public android.companion.AssociationInfo.Builder setDeviceMacAddress(@Nullable android.net.MacAddress);
     method @NonNull public android.companion.AssociationInfo.Builder setDeviceProfile(@Nullable String);
     method @NonNull public android.companion.AssociationInfo.Builder setDisplayName(@Nullable CharSequence);
+    method @FlaggedApi("android.companion.association_extra_permission") @NonNull public android.companion.AssociationInfo.Builder setExtraPermissions(@NonNull java.util.Set<java.lang.String>);
     method @NonNull public android.companion.AssociationInfo.Builder setLastTimeConnected(long);
     method @FlaggedApi("android.companion.enable_data_sync") @NonNull public android.companion.AssociationInfo.Builder setMetadata(@NonNull android.os.PersistableBundle);
     method @NonNull public android.companion.AssociationInfo.Builder setNotifyOnDeviceNearby(boolean);
@@ -2696,6 +2696,7 @@ package android.os {
     method @FlaggedApi("android.multiuser.support_communal_profile") @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS}) public android.os.UserHandle getCommunalProfile();
     method public int getMainDisplayIdAssignedToUser();
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public java.util.Set<java.lang.String> getPreInstallableSystemPackages(@NonNull String);
+    method @FlaggedApi("android.multiuser.user_removal_minor_apis_2026") @RequiresPermission(anyOf={android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS}) public int getUserRemovability(int);
     method @NonNull @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS}) public String getUserType();
     method @NonNull @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public java.util.List<android.content.pm.UserInfo> getUsers();
     method @Deprecated @NonNull @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public java.util.List<android.content.pm.UserInfo> getUsers(boolean, boolean, boolean);
@@ -2704,6 +2705,7 @@ package android.os {
     method public boolean isVisibleBackgroundUsersOnDefaultDisplaySupported();
     method public boolean isVisibleBackgroundUsersSupported();
     method @Deprecated @NonNull @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo preCreateUser(@NonNull String) throws android.os.UserManager.UserOperationException;
+    field @FlaggedApi("android.multiuser.user_removal_minor_apis_2026") public static final int REMOVE_RESULT_USER_IS_REMOVABLE = 3; // 0x3
   }
 
   public final class VibrationAttributes implements android.os.Parcelable {

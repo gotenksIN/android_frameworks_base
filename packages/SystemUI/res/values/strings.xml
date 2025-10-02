@@ -415,8 +415,12 @@
     <string name="screen_share_toolbar_share_button">Share</string>
     <!-- Text for app screen sharing thumbnail when no app is selected. [CHAR LIMIT=35] -->
     <string name="screen_share_no_select_app_thumbnail">Select an app to share</string>
-    <!-- Text for share app audio. [CHAR LIMIT=35] -->
-    <string name="screen_share_app_audio_sharing">Share window audio</string>
+    <!-- Text for share audio. [CHAR LIMIT=35] -->
+    <string name="screen_share_audio_sharing_text">Share audio</string>
+    <!-- Text for app sharing title [CHAR LIMIT=35] -->
+    <string name="screen_share_app_window_sharing_title">Share app window</string>
+    <!-- Text diclaimer that tells a user that they're currently sharing screen [CHAR LIMIT=100] -->
+    <string name="screen_share_disclaimer">When sharing, the contents of your screen are visible</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "screenshot". [CHAR LIMIT=NONE] -->
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y">Take screenshot of window</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "record". [CHAR LIMIT=NONE] -->
@@ -1910,10 +1914,13 @@
     <string name="monitoring_description_vpn_settings">Open VPN settings</string>
 
     <!-- Dialog that a user can access via Quick Settings. [CHAR LIMIT=NONE]-->
-    <string name="monitoring_description_parental_controls">This device is managed by your parent. Your parent can see and manage information such as the apps you use, your location, and your screen time.</string>
+    <string name="monitoring_description_parental_controls_legacy">This device is managed by your parent. Your parent can see and manage information such as the apps you use, your location, and your screen time.</string>
 
     <!-- Dialog that a user can access via Quick Settings. [CHAR LIMIT=NONE]-->
     <string name="monitoring_description_pin_protection">Some controls on your device, like daily limits \u0026 downtime, can only be changed with a PIN.</string>
+
+    <!-- Monitoring dialog: Description of a device supervised by a parent. [CHAR LIMIT=NONE]-->
+    <string name="monitoring_description_parental_controls">Some controls can only be changed by your parent</string>
 
     <!-- Name for a generic legacy VPN connection [CHAR LIMIT=20] -->
     <string name="legacy_vpn_name">VPN</string>
@@ -2802,12 +2809,6 @@
     <!-- SysUI Tuner: Settings to change nav bar icon [CHAR LIMIT=30] -->
     <string name="right_icon">Right icon</string>
 
-    <!-- Label for area where tiles can be dragged out of [CHAR LIMIT=60] -->
-    <string name="drag_to_add_tiles">Hold and drag to add tiles</string>
-
-    <!-- Label for header of customize QS [CHAR LIMIT=60] -->
-    <string name="drag_to_rearrange_tiles">Hold and drag to rearrange tiles</string>
-
     <!-- Label for header of customize QS to indicate that tiles can be selected to be edited [CHAR LIMIT=60] -->
     <string name="select_to_rearrange_tiles">Select tiles to rearrange and resize</string>
 
@@ -2825,15 +2826,6 @@
 
     <!-- Label for placing tiles in edit mode for QS [CHAR LIMIT=60] -->
     <string name="tap_to_position_tile">Tap to position tile</string>
-
-    <!-- Label for area where tiles can be dragged in to [CHAR LIMIT=60] -->
-    <string name="drag_to_remove_tiles">Drag here to remove</string>
-
-    <!-- Label to indicate to users that additional tiles cannot be removed. [CHAR LIMIT=60] -->
-    <string name="drag_to_remove_disabled">You need at least <xliff:g id="min_num_tiles" example="6">%1$d</xliff:g> tiles</string>
-
-    <!-- Button to edit the tile ordering of quick settings [CHAR LIMIT=60] -->
-    <string name="qs_edit">Edit</string>
 
     <!-- Title for QS Edit mode screen [CHAR LIMIT=30] -->
     <string name="qs_edit_tiles">Edit tiles</string>
@@ -2885,26 +2877,8 @@
     <!-- Accessibility description of action to toggle the QS tile selection. It will read as "Double-tap to toggle selection" in screen readers [CHAR LIMIT=NONE] -->
     <string name="accessibility_qs_edit_toggle_selection">toggle selection</string>
 
-    <!-- Accessibility action of action to add QS tile to end. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_qs_edit_tile_add_action">Add tile to the last position</string>
-
     <!-- Accessibility action of action to add a named QS tile to the end. [CHAR LIMIT=NONE] -->
     <string name="accessibility_qs_edit_named_tile_add_action">Add <xliff:g id="name" example="Internet">%1$s</xliff:g> to the last position</string>
-
-    <!-- Accessibility action for context menu to move QS tile [CHAR LIMIT=NONE] -->
-    <string name="accessibility_qs_edit_tile_start_move">Move tile</string>
-
-    <!-- Accessibility action for context menu to add QS tile to a position [CHAR LIMIT=NONE] -->
-    <string name="accessibility_qs_edit_tile_start_add">Add tile to desired position</string>
-
-    <!-- Accessibility description when QS tile is to be moved, indicating the destination position [CHAR LIMIT=NONE] -->
-    <string name="accessibility_qs_edit_tile_move_to_position">Move to <xliff:g id="position" example="5">%1$d</xliff:g></string>
-
-    <!-- Accessibility description when QS tile is to be added, indicating the destination position [CHAR LIMIT=NONE] -->
-    <string name="accessibility_qs_edit_tile_add_to_position">Add to position <xliff:g id="position" example="5">%1$d</xliff:g></string>
-
-    <!-- Accessibility description when QS tile would be added or moved, but the current position is not valid for adding or moving to [CHAR LIMIT=NONE] -->
-    <string name="accessibilit_qs_edit_tile_add_move_invalid_position">Position invalid.</string>
 
     <!-- Accessibility description indicating the currently selected tile's position. Only used for tiles that are currently in use [CHAR LIMIT=NONE] -->
     <string name="accessibility_qs_edit_position">Position <xliff:g id="position" example="5">%1$d</xliff:g></string>
@@ -2964,10 +2938,6 @@
     <string name="accessibility_key_gesture_dialog_title">Turn on <xliff:g name="feature_name" example="Magnification">%1$s</xliff:g>?</string>
     <!-- Text for showing inside the dialog. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_dialog_content">Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="M">^2</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="TalkBack">^3</xliff:g>. <xliff:g name="feature_intro" example="TalkBack intro">^4</xliff:g></string>
-    <!-- The text for the TalkBack introduction. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_key_gesture_dialog_talkback_intro"><xliff:g name="feature_name" example="TalkBack">%1$s</xliff:g> is a screen reader that allows you to hear items spoken aloud. It can be helpful for people who have difficulty seeing the screen.</string>
-    <!-- Positive button text for the dialog. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_key_gesture_dialog_positive_button_text">Turn on</string>
 
     <!-- Text for the dialog title when keyboard shortcut has not yet been enabled. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title">Turn on <xliff:g name="feature_name" example="Voice Access">%1$s</xliff:g> keyboard shortcut?</string>
@@ -2985,8 +2955,11 @@
     <!-- Positive button text for the Magnification dialog when the keyboard shortcut is enabled. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text">Keep on</string>
 
+    <!-- Text for showing inside the screen reader dialog. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_key_gesture_screen_reader_dialog_content">Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="T">^2</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="TalkBack">^3</xliff:g>. <xliff:g name="feature_name" example="TalkBack">^3</xliff:g> is a screen reader that allows you to hear items spoken aloud. It can be helpful for people who have difficulty seeing the screen. This may change how your device works.</string>
+
     <!-- Text for showing inside the Voice Access dialog. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_key_gesture_voice_access_dialog_content">Pressing Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="M">^2</xliff:g> turns on <xliff:g name="feature_name" example="Voice Access">^3</xliff:g>, an accessibility feature. This lets you control your device hands-free.</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content">Pressing Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="V">^2</xliff:g> turns on <xliff:g name="feature_name" example="Voice Access">^3</xliff:g>, an accessibility feature. This lets you control your device hands-free.</string>
 
     <!-- Plugin control section of the tuner. Non-translatable since it should
          not appear on production builds ever. -->
@@ -3599,14 +3572,8 @@
     <!-- Controls menu, remove app [CHAR_LIMIT=30] -->
     <string name="controls_menu_remove">Remove app</string>
 
-    <!-- Title for the media output dialog with media related devices [CHAR LIMIT=50] -->
-    <string name="media_output_dialog_add_output">Add outputs</string>
     <!-- Title for the media output slice with group devices [CHAR LIMIT=50] -->
     <string name="media_output_dialog_group">Group</string>
-    <!-- Summary for media output group with only one device which is active [CHAR LIMIT=NONE] -->
-    <string name="media_output_dialog_single_device">1 device selected</string>
-    <!-- Summary for media output group with the active device count [CHAR LIMIT=NONE] -->
-    <string name="media_output_dialog_multiple_devices"><xliff:g id="count" example="2">%1$d</xliff:g> devices selected</string>
     <!-- Accessibility label for media output item connected state [CHAR LIMIT=50] -->
     <string name="media_output_item_connected_state">Connected</string>
     <!-- Summary for connecting error message [CHAR LIMIT=NONE] -->
@@ -3646,8 +3613,6 @@
 
     <!-- Label for clip data when copying the build number off QS [CHAR LIMIT=NONE]-->
     <string name="build_number_clip_data_label">Build number</string>
-    <!-- Text to display when copying the build number off QS [CHAR LIMIT=NONE]-->
-    <string name="build_number_copy_toast">Build number copied to clipboard.</string>
 
     <!-- Text for accessibility action for copying content to clipboard [CHAR LIMIT=NONE]-->
     <string name="copy_to_clipboard_a11y_action">copy to clipboard.</string>

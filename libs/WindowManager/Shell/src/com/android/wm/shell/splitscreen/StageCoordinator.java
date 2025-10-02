@@ -40,7 +40,7 @@ import static com.android.window.flags.Flags.enableMultiDisplaySplit;
 import static com.android.window.flags.Flags.enableNonDefaultDisplaySplit;
 import static com.android.wm.shell.Flags.enableFlexibleSplit;
 import static com.android.wm.shell.Flags.enableFlexibleTwoAppSplit;
-import static com.android.wm.shell.Flags.splitDisableChildTaskBounds;
+
 import static com.android.wm.shell.Flags.splitToFullSetWindowMode;
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_ALIGN_CENTER;
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_FLEX_HYBRID;
@@ -348,6 +348,11 @@ public class StageCoordinator extends StageCoordinatorAbstract {
                         true /* onTop */);
             }
         }
+    }
+
+    /** Returns true if a divider fling animation is currently playing. */
+    public boolean isDividerFlinging() {
+        return mSplitLayout.isCurrentlyDividerFlinging();
     }
 
     class SplitRequest {
@@ -2654,11 +2659,9 @@ public class StageCoordinator extends StageCoordinatorAbstract {
             wct.reparent(mSideStage.mRootTaskInfo.token, rootTaskInfo.token, true);
         }
 
-        if (splitDisableChildTaskBounds()) {
-            // Disallow child tasks to override bounds and always inherits from the stage root tasks
-            wct.setDisallowOverrideBoundsForChildren(mMainStage.mRootTaskInfo.token, true);
-            wct.setDisallowOverrideBoundsForChildren(mSideStage.mRootTaskInfo.token, true);
-        }
+        // Disallow child tasks to override bounds and always inherits from the stage root tasks
+        wct.setDisallowOverrideBoundsForChildren(mMainStage.mRootTaskInfo.token, true);
+        wct.setDisallowOverrideBoundsForChildren(mSideStage.mRootTaskInfo.token, true);
 
         setRootForceTranslucent(true, wct);
         if (!enableFlexibleSplit()) {
@@ -3142,7 +3145,12 @@ public class StageCoordinator extends StageCoordinatorAbstract {
      */
     public void onDisplayChange(int displayId, int fromRotation, int toRotation,
             @Nullable DisplayAreaInfo newDisplayAreaInfo, WindowContainerTransaction wct) {
-        if (displayId != DEFAULT_DISPLAY || !isSplitActive()) {
+        final RunningTaskInfo rootTaskInfo =
+                mSplitMultiDisplayHelper.getDisplayRootTaskInfo(DEFAULT_DISPLAY);
+        boolean splitDisplayRotationAllowed = enableNonDefaultDisplaySplit()
+                ? rootTaskInfo.displayId == displayId
+                : true;
+        if (displayId != DEFAULT_DISPLAY || !isSplitActive() || !splitDisplayRotationAllowed) {
             return;
         }
 
@@ -3269,7 +3277,12 @@ public class StageCoordinator extends StageCoordinatorAbstract {
             @Nullable TransitionRequestInfo request) {
         final RunningTaskInfo triggerTask = request.getTriggerTask();
         if (triggerTask == null) {
-            if (isSplitActive()) {
+            final RunningTaskInfo rootTaskInfo =
+                    mSplitMultiDisplayHelper.getDisplayRootTaskInfo(DEFAULT_DISPLAY);
+            boolean splitDisplayRotationAllowed = enableNonDefaultDisplaySplit()
+                    ? rootTaskInfo.displayId == DEFAULT_DISPLAY
+                    : true;
+            if (isSplitActive() && splitDisplayRotationAllowed) {
                 ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "handleRequest: transition=%d display rotation",
                         request.getDebugId());
                 // Check if the display is rotating.

@@ -29,8 +29,10 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.fail
 
 import org.junit.Test
+import javax.tools.JavaFileObject
 
 class PolicyProcessorTest {
+    private val mCompilerWithoutProcessor = Compiler.javac()
     private val mCompiler = Compiler.javac().withProcessors(PolicyProcessor())
 
     private companion object {
@@ -39,13 +41,6 @@ class PolicyProcessorTest {
         const val POLICY_IDENTIFIER = "$RESOURCE_ROOT/PolicyIdentifier"
         const val POLICY_IDENTIFIER_JAVA = "$POLICY_IDENTIFIER.java"
         const val POLICY_IDENTIFIER_TEXTPROTO = "$POLICY_IDENTIFIER.textproto"
-
-        const val OTHER_CLASS_JAVA = "$RESOURCE_ROOT/OtherClass.java"
-        const val POLICY_IDENTIFIER_INVALID_TYPE_JAVA = "$RESOURCE_ROOT/invalidtype/PolicyIdentifier.java"
-        const val POLICY_IDENTIFIER_DIRECT_DEFINITION_JAVA = "$RESOURCE_ROOT/directPolicyDefinition/PolicyIdentifier.java"
-        const val POLICY_IDENTIFIER_MISSING_DOCUMENTATION_JAVA = "$RESOURCE_ROOT/missingDocumentation/PolicyIdentifier.java"
-        const val POLICY_IDENTIFIER_SCOPE_VALIDATION_JAVA = "$RESOURCE_ROOT/scopeValidation/PolicyIdentifier.java"
-
 
         /**
          * Comes from the actual IntDef.java in the source, located in a different folder.
@@ -67,10 +62,40 @@ class PolicyProcessorTest {
                 return ""
             }
         }
+
+        fun buildPolicyIdentifier(policies: String): JavaFileObject = JavaFileObjects.forSourceLines(
+            "android.app.admin.PolicyIdentifier",
+            """
+                package android.app.admin;
+
+                import android.annotation.IntDef;
+                import android.processor.devicepolicy.BooleanPolicyDefinition;
+                import android.processor.devicepolicy.EnumPolicyDefinition;
+                import android.processor.devicepolicy.IntegerPolicyDefinition;
+                import android.processor.devicepolicy.PolicyDefinition;
+
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+
+                public final class PolicyIdentifier<T> {
+                    // Allow using the constants without having to build DevicePolicyManager
+                    // in our tests.
+                    public static final int POLICY_SCOPE_USER = 1;
+                    public static final int POLICY_SCOPE_DEVICE = 2;
+                    public static final int POLICY_SCOPE_PARENT_USER = 3;
+                    public static final int RESOURCE_DEVICE_WIDE = 1;
+                    public static final int RESOURCE_PER_USER = 2;
+
+                    // We don't actually do anything with this.
+                    public PolicyIdentifier(String id) {}
+
+                    $policies
+                }
+            """.trimIndent())
     }
 
     @Test
-    fun test_PolicyIdendifierFake_generates() {
+    fun test_policyIdentifierFake_generates() {
         val expectedOutput = loadTextResource(POLICY_IDENTIFIER_TEXTPROTO)
 
         val compilation: Compilation =
@@ -86,70 +111,231 @@ class PolicyProcessorTest {
 
     @Test
     fun test_other_class_failsToCompile() {
-        val compilation: Compilation =
-            mCompiler.compile(
-                JavaFileObjects.forResource(OTHER_CLASS_JAVA),
-                JavaFileObjects.forResource(POLICY_IDENTIFIER_JAVA)
-            )
+        val otherClass = JavaFileObjects.forSourceLines(
+            "android.app.admin.OtherClass",
+            """
+                package android.app.admin;
+
+                import android.processor.devicepolicy.BooleanPolicyDefinition;
+                import android.processor.devicepolicy.PolicyDefinition;
+
+                public final class OtherClass {
+                    public OtherClass(String id) {}
+
+                    /**
+                     * Policies can only be defined in PolicyIdentifier.
+                     */
+                    @BooleanPolicyDefinition(
+                            base = @PolicyDefinition(
+                                    allowedScopes = { 1 },
+                                    affectedResource = 1
+                            )
+                    )
+                    public static final PolicyIdentifier<Boolean> LOST_POLICY =
+                        new PolicyIdentifier<>("LOST_POLICY");
+                }
+            """.trimIndent())
+        val policyIdentifier = JavaFileObjects.forResource(POLICY_IDENTIFIER_JAVA)
+
+        val compilation: Compilation = mCompiler.compile(otherClass, policyIdentifier)
+
+        assertThat(mCompilerWithoutProcessor.compile(otherClass, policyIdentifier)).succeeded()
         assertThat(compilation).failed()
         assertThat(compilation).hadErrorContaining("@PolicyDefinition can only be applied to fields in android.app.admin.PolicyIdentifier")
     }
 
     @Test
     fun test_invalidType_failsToCompile() {
-        val compilation: Compilation = mCompiler.compile(
-            JavaFileObjects.forResource(POLICY_IDENTIFIER_INVALID_TYPE_JAVA)
+        val policyIdentifier = buildPolicyIdentifier(
+        """
+            /**
+             * Type of metadata and identifier must match.
+             */
+            @BooleanPolicyDefinition(
+                    base = @PolicyDefinition(
+                            allowedScopes = { POLICY_SCOPE_DEVICE },
+                            affectedResource = RESOURCE_DEVICE_WIDE
+                    )
+            )
+            public static final PolicyIdentifier<Integer> INVALID_TYPE =
+                new PolicyIdentifier<>("INVALID_TYPE");
+            """.trimIndent()
         )
+
+        val compilation: Compilation = mCompiler.compile(policyIdentifier)
+
+        assertThat(mCompilerWithoutProcessor.compile(policyIdentifier)).succeeded()
         assertThat(compilation).failed()
         assertThat(compilation).hadErrorContaining("booleanValue in @PolicyDefinition can only be applied to policies of type java.lang.Boolean")
     }
 
     @Test
     fun test_directPolicyDefinition_failsToCompile() {
-        val compilation: Compilation = mCompiler.compile(
-            JavaFileObjects.forResource(POLICY_IDENTIFIER_DIRECT_DEFINITION_JAVA)
+        val policyIdentifier = buildPolicyIdentifier(
+            """
+            /**
+             * Don't use @PolicyDefinition
+             */
+            @PolicyDefinition(
+                    allowedScopes = { POLICY_SCOPE_DEVICE },
+                    affectedResource = RESOURCE_DEVICE_WIDE
+            )
+            public static final PolicyIdentifier<Boolean> INVALID_ANNOTATION =
+                new PolicyIdentifier<>("INVALID_ANNOTATION");
+            """.trimIndent()
         )
+
+        val compilation: Compilation = mCompiler.compile(policyIdentifier)
+
+        assertThat(mCompilerWithoutProcessor.compile(policyIdentifier)).succeeded()
         assertThat(compilation).failed()
-        assertThat(compilation).hadErrorContaining("@PolicyDefinition should not be applied to any element")
+        assertThat(compilation).hadErrorContaining("@PolicyDefinition can not be applied to any element, use a type-specific annotation such as @EnumPolicyDefinition instead")
     }
 
     @Test
     fun test_missingDocumentation_failsToCompile() {
-        val compilation: Compilation = mCompiler.compile(
-            JavaFileObjects.forResource(POLICY_IDENTIFIER_MISSING_DOCUMENTATION_JAVA)
+        val policyIdentifier = buildPolicyIdentifier(
+            """
+            @BooleanPolicyDefinition(
+                    base = @PolicyDefinition(
+                            allowedScopes = { POLICY_SCOPE_DEVICE },
+                            affectedResource = RESOURCE_DEVICE_WIDE
+                    )
+            )
+            public static final PolicyIdentifier<Boolean> MISSING_DOCS =
+                new PolicyIdentifier<>("MISSING_DOCS");
+            """.trimIndent()
         )
+
+        val compilation: Compilation = mCompiler.compile(policyIdentifier)
+
+        assertThat(mCompilerWithoutProcessor.compile(policyIdentifier)).succeeded()
         assertThat(compilation).failed()
         assertThat(compilation).hadErrorContaining("Missing JavaDoc")
     }
 
     @Test
-    fun test_scopeValidation_failsToCompile() {
-        val compilation: Compilation = mCompiler.compile(
-            JavaFileObjects.forResource(POLICY_IDENTIFIER_SCOPE_VALIDATION_JAVA)
+    fun test_emptyScope_failsToCompile() {
+        val policyIdentifier = buildPolicyIdentifier(
+            """
+            /**
+             * Empty allowedScopes should fail.
+             */
+            @BooleanPolicyDefinition(
+                    base = @PolicyDefinition(
+                            allowedScopes = {},
+                            affectedResource = RESOURCE_PER_USER
+                    )
+            )
+            public static final PolicyIdentifier<Boolean> EMPTY_SCOPE_POLICY =
+                new PolicyIdentifier<>("EMPTY_SCOPE");
+            """.trimIndent()
         )
+
+        val compilation: Compilation = mCompiler.compile(policyIdentifier)
+
+        assertThat(mCompilerWithoutProcessor.compile(policyIdentifier)).succeeded()
         assertThat(compilation).failed()
         assertThat(compilation).hadErrorContaining("allowedScopes must not be empty")
+    }
+
+    @Test
+    fun test_invalidScopeValue_failsToCompile() {
+        val policyIdentifier = buildPolicyIdentifier(
+            """
+            /**
+             * Invalid scope should fail.
+             */
+            @BooleanPolicyDefinition(
+                    base = @PolicyDefinition(
+                            allowedScopes = { 100 },
+                            affectedResource = RESOURCE_PER_USER
+                    )
+            )
+            public static final PolicyIdentifier<Boolean> EMPTY_SCOPE_POLICY =
+                new PolicyIdentifier<>("INVALID_SCOPE");
+            """.trimIndent()
+        )
+
+        val compilation: Compilation = mCompiler.compile(policyIdentifier)
+
+        assertThat(mCompilerWithoutProcessor.compile(policyIdentifier)).succeeded()
+        assertThat(compilation).failed()
         assertThat(compilation).hadErrorContaining("allowedScopes contains an unknown value")
     }
 
-    /**
-     * Errors should only come from our processor.
-     */
     @Test
-    fun test_invalidTestData_compilesWithoutProcessor() {
-        val plainCompiler = Compiler.javac()
+    fun test_undefinedScope_failsToCompile() {
+        val policyIdentifier = buildPolicyIdentifier(
+            """
+            /**
+             * Unspecified (0) scope should fail.
+             */
+            @BooleanPolicyDefinition(
+                    base = @PolicyDefinition(
+                            allowedScopes = { 0 },
+                            affectedResource = RESOURCE_PER_USER
+                    )
+            )
+            public static final PolicyIdentifier<Boolean> UNDEFINED_SCOPE =
+                new PolicyIdentifier<>("UNDEFINED_SCOPE");
+            """.trimIndent()
+        )
 
-        fun checkCompileSucceeds(vararg files: String) {
-            val resources = files.map { JavaFileObjects.forResource(it) }
+        val compilation: Compilation = mCompiler.compile(policyIdentifier)
 
-            val compilation = plainCompiler.compile(*resources.toTypedArray())
-            assertThat(compilation).succeeded()
-        }
+        assertThat(mCompilerWithoutProcessor.compile(policyIdentifier)).succeeded()
+        assertThat(compilation).failed()
+        assertThat(compilation).hadErrorContaining("allowedScopes contains an unknown value")
+    }
 
-        checkCompileSucceeds(OTHER_CLASS_JAVA, POLICY_IDENTIFIER_JAVA, INT_DEF_JAVA)
-        checkCompileSucceeds(POLICY_IDENTIFIER_INVALID_TYPE_JAVA)
-        checkCompileSucceeds(POLICY_IDENTIFIER_DIRECT_DEFINITION_JAVA)
-        checkCompileSucceeds(POLICY_IDENTIFIER_MISSING_DOCUMENTATION_JAVA)
-        checkCompileSucceeds(POLICY_IDENTIFIER_SCOPE_VALIDATION_JAVA)
+    @Test
+    fun test_invalidAffectedResource_failsToCompile() {
+        val policyIdentifier = buildPolicyIdentifier(
+            """
+            /**
+             * Invalid resource should fail.
+             */
+            @BooleanPolicyDefinition(
+                    base = @PolicyDefinition(
+                            allowedScopes = { POLICY_SCOPE_USER },
+                            affectedResource = 100
+                    )
+            )
+            public static final PolicyIdentifier<Boolean> INVALID_AFFECTED_RESOURCE_POLICY =
+                new PolicyIdentifier<>("INVALID_AFFECTED_RESOURCE");
+            """.trimIndent()
+        )
+
+        val compilation: Compilation = mCompiler.compile(policyIdentifier)
+
+        assertThat(mCompilerWithoutProcessor.compile(policyIdentifier)).succeeded()
+        assertThat(compilation).failed()
+        assertThat(compilation).hadErrorContaining("affectedResource is set to an unknown value")
+    }
+
+    @Test
+    fun test_undefinedAffectedResource_failsToCompile() {
+        val policyIdentifier = buildPolicyIdentifier(
+            """
+            /**
+             * Unspecified (0) resource should fail.
+             */
+            @BooleanPolicyDefinition(
+                    base = @PolicyDefinition(
+                            allowedScopes = { POLICY_SCOPE_USER },
+                            affectedResource = 0
+                    )
+            )
+            public static final PolicyIdentifier<Boolean> UNSPECIFIED_AFFECTED_RESOURCE_POLICY =
+                new PolicyIdentifier<>("UNSPECIFIED_AFFECTED_RESOURCE");
+            """.trimIndent()
+        )
+
+        val compilation: Compilation = mCompiler.compile(policyIdentifier)
+
+        assertThat(mCompilerWithoutProcessor.compile(policyIdentifier)).succeeded()
+        assertThat(compilation).failed()
+        assertThat(compilation).hadErrorContaining("affectedResource is set to an unknown value")
     }
 }

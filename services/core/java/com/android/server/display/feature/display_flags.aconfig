@@ -69,14 +69,6 @@ flag {
 }
 
 flag {
-    name: "back_up_smooth_display_and_force_peak_refresh_rate"
-    namespace: "display_manager"
-    description: "Feature flag for backing up Smooth Display and Force Peak Refresh Rate"
-    bug: "299552529"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "even_dimmer"
     namespace: "display_manager"
     description: "Feature flag for extending the brightness below traditional range"
@@ -89,22 +81,6 @@ flag {
     namespace: "display_manager"
     description: "Specify the default doze values in config.xml"
     bug: "279161929"
-}
-
-flag {
-    name: "brightness_wear_bedtime_mode_clamper"
-    namespace: "display_manager"
-    description: "Feature flag for the Wear Bedtime mode brightness clamper"
-    bug: "293613040"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "auto_brightness_modes"
-    namespace: "display_manager"
-    description: "Feature flag for generic auto-brightness modes"
-    bug: "293613040"
-    is_fixed_read_only: true
 }
 
 flag {
@@ -153,36 +129,6 @@ flag {
     namespace: "wear_frameworks"
     description: "Feature flag for the parameter specifying whether brightness should be adjusted while dozing."
     bug: "343283838"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "enable_peak_refresh_rate_physical_limit"
-    namespace: "display_manager"
-    description: "Flag for adding physical refresh rate limit if smooth display setting is on "
-    bug: "332413475"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_synthetic_60hz_modes"
-    namespace: "display_manager"
-    description: "Feature flag for DisplayManager to enable synthetic 60Hz modes for vrr displays"
-    bug: "338183249"
-    is_fixed_read_only: true
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "offload_session_cancel_block_screen_on"
-    namespace: "wear_frameworks"
-    description: "Flag for DisplayPowerController to start notifying DisplayOffloadSession about cancelling screen on blocker."
-    bug: "331725519"
     is_fixed_read_only: true
 }
 
@@ -475,4 +421,14 @@ flag {
     namespace: "display_manager"
     description: "Enables app dynamic resolution change configuration"
     bug: "414654227"
+}
+
+flag {
+    name: "force_color_fade"
+    namespace: "wear_systems"
+    description: "Force Color Fade."
+    bug: "420507333"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }

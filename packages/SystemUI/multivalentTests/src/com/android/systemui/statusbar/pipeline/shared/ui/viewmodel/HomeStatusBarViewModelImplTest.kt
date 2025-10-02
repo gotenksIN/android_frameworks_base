@@ -92,6 +92,7 @@ import com.android.systemui.statusbar.notification.data.model.activeNotification
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationsStore
 import com.android.systemui.statusbar.notification.data.repository.UnconfinedFakeHeadsUpRowRepository
 import com.android.systemui.statusbar.notification.data.repository.activeNotificationListRepository
+import com.android.systemui.statusbar.notification.data.repository.getPopulatedActiveNotificationsStore
 import com.android.systemui.statusbar.notification.headsup.PinnedStatus
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi
 import com.android.systemui.statusbar.notification.shared.ActiveNotificationModel
@@ -299,6 +300,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
+    @DisableSceneContainer
     fun transitionFromLockscreenToDreamStartedEvent_started_emitted() =
         kosmos.runTest {
             val emissions by collectValues(underTest.transitionFromLockscreenToDreamStartedEvent)
@@ -316,6 +318,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
+    @DisableSceneContainer
     fun transitionFromLockscreenToDreamStartedEvent_startedMultiple_emittedMultiple() =
         kosmos.runTest {
             val emissions by collectValues(underTest.transitionFromLockscreenToDreamStartedEvent)
@@ -351,6 +354,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
+    @DisableSceneContainer
     fun transitionFromLockscreenToDreamStartedEvent_startedThenRunning_emittedOnlyOne() =
         kosmos.runTest {
             val emissions by collectValues(underTest.transitionFromLockscreenToDreamStartedEvent)
@@ -417,6 +421,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
+    @DisableSceneContainer
     fun transitionFromLockscreenToDreamStartedEvent_irrelevantTransitionState_notEmitted() =
         kosmos.runTest {
             val emissions by collectValues(underTest.transitionFromLockscreenToDreamStartedEvent)
@@ -1738,6 +1743,17 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
             underTest.onNotificationIconChipClicked()
 
             assertThat(currentOverlays).contains(Overlays.NotificationsShade)
+        }
+
+    @Test
+    fun hasStatusBarNotifications_ifNotificationsExist_isTrue() =
+        kosmos.runTest {
+            assertThat(underTest.hasStatusBarNotifications).isFalse()
+
+            activeNotificationListRepository.activeNotifications.value =
+                kosmos.getPopulatedActiveNotificationsStore()
+
+            assertThat(underTest.hasStatusBarNotifications).isTrue()
         }
 
     private fun activeNotificationsStore(notifications: List<ActiveNotificationModel>) =

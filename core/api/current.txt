@@ -255,6 +255,7 @@ package android {
     field @FlaggedApi("android.security.aapm_api") public static final String QUERY_ADVANCED_PROTECTION_MODE = "android.permission.QUERY_ADVANCED_PROTECTION_MODE";
     field public static final String QUERY_ALL_PACKAGES = "android.permission.QUERY_ALL_PACKAGES";
     field @FlaggedApi("android.media.audio.guard_stream_volume_apis") public static final String QUERY_AUDIO_VOLUME = "android.permission.QUERY_AUDIO_VOLUME";
+    field @FlaggedApi("android.view.inputmethod.guard_input_method_list_apis") public static final String QUERY_INPUT_METHOD = "android.permission.QUERY_INPUT_METHOD";
     field @FlaggedApi("android.permission.flags.ranging_permission_enabled") public static final String RANGING = "android.permission.RANGING";
     field public static final String READ_ASSISTANT_APP_SEARCH_DATA = "android.permission.READ_ASSISTANT_APP_SEARCH_DATA";
     field public static final String READ_BASIC_PHONE_STATE = "android.permission.READ_BASIC_PHONE_STATE";
@@ -4835,11 +4836,13 @@ package android.app {
     method @RequiresPermission(android.Manifest.permission.KILL_BACKGROUND_PROCESSES) public void killBackgroundProcesses(String);
     method @RequiresPermission(android.Manifest.permission.REORDER_TASKS) public void moveTaskToFront(int, int);
     method @RequiresPermission(android.Manifest.permission.REORDER_TASKS) public void moveTaskToFront(int, int, android.os.Bundle);
+    method @FlaggedApi("com.android.window.flags.enable_task_move_allowed_listener_api") public void registerTaskDisplayPolicyStateListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.util.List<android.app.TaskDisplayPolicyState>>);
     method public void removeApplicationStartInfoCompletionListener(@NonNull java.util.function.Consumer<android.app.ApplicationStartInfo>);
     method @Deprecated public void restartPackage(String);
     method public void setProcessStateSummary(@Nullable byte[]);
     method public static void setVrThread(int);
     method public void setWatchHeapLimit(long);
+    method @FlaggedApi("com.android.window.flags.enable_task_move_allowed_listener_api") public void unregisterTaskDisplayPolicyStateListener(@NonNull java.util.function.Consumer<java.util.List<android.app.TaskDisplayPolicyState>>);
     field public static final String ACTION_REPORT_HEAP_LIMIT = "android.app.action.REPORT_HEAP_LIMIT";
     field public static final int LOCK_TASK_MODE_LOCKED = 1; // 0x1
     field public static final int LOCK_TASK_MODE_NONE = 0; // 0x0
@@ -6525,6 +6528,7 @@ package android.app {
     ctor @Deprecated public Notification(int, CharSequence, long);
     ctor public Notification(android.os.Parcel);
     method public android.app.Notification clone();
+    method @FlaggedApi("android.app.api_notification_semantic_style") @NonNull public static android.text.Annotation createSemanticStyleAnnotation(int);
     method public int describeContents();
     method @Nullable public android.util.Pair<android.app.RemoteInput,android.app.Notification.Action> findRemoteInputActionPair(boolean);
     method public boolean getAllowSystemGeneratedContextualActions();
@@ -6655,6 +6659,11 @@ package android.app {
     field @Deprecated public static final int PRIORITY_LOW = -1; // 0xffffffff
     field @Deprecated public static final int PRIORITY_MAX = 2; // 0x2
     field @Deprecated public static final int PRIORITY_MIN = -2; // 0xfffffffe
+    field @FlaggedApi("android.app.api_notification_semantic_style") public static final int SEMANTIC_STYLE_CAUTION = 3; // 0x3
+    field @FlaggedApi("android.app.api_notification_semantic_style") public static final int SEMANTIC_STYLE_DANGER = 4; // 0x4
+    field @FlaggedApi("android.app.api_notification_semantic_style") public static final int SEMANTIC_STYLE_INFO = 1; // 0x1
+    field @FlaggedApi("android.app.api_notification_semantic_style") public static final int SEMANTIC_STYLE_SAFE = 2; // 0x2
+    field @FlaggedApi("android.app.api_notification_semantic_style") public static final int SEMANTIC_STYLE_UNSPECIFIED = 0; // 0x0
     field @Deprecated public static final int STREAM_DEFAULT = -1; // 0xffffffff
     field public static final int VISIBILITY_PRIVATE = 0; // 0x0
     field public static final int VISIBILITY_PUBLIC = 1; // 0x1
@@ -7010,7 +7019,9 @@ package android.app {
 
   @FlaggedApi("android.app.api_metric_style") public static final class Notification.Metric {
     ctor public Notification.Metric(@NonNull android.app.Notification.Metric.MetricValue, @NonNull CharSequence);
+    ctor @FlaggedApi("android.app.api_notification_semantic_style") public Notification.Metric(@NonNull android.app.Notification.Metric.MetricValue, @NonNull CharSequence, int);
     method @NonNull public CharSequence getLabel();
+    method @FlaggedApi("android.app.api_notification_semantic_style") public int getSemanticStyle();
     method @NonNull public android.app.Notification.Metric.MetricValue getValue();
   }
 
@@ -7108,8 +7119,10 @@ package android.app {
     method @ColorInt public int getColor();
     method public int getId();
     method @IntRange(from=1) public int getPosition();
+    method @FlaggedApi("android.app.api_notification_semantic_style") public int getSemanticStyle();
     method @NonNull public android.app.Notification.ProgressStyle.Point setColor(@ColorInt int);
     method @NonNull public android.app.Notification.ProgressStyle.Point setId(int);
+    method @FlaggedApi("android.app.api_notification_semantic_style") @NonNull public android.app.Notification.ProgressStyle.Point setSemanticStyle(int);
   }
 
   public static final class Notification.ProgressStyle.Segment {
@@ -7117,8 +7130,10 @@ package android.app {
     method @ColorInt public int getColor();
     method public int getId();
     method @IntRange(from=1) public int getLength();
+    method @FlaggedApi("android.app.api_notification_semantic_style") public int getSemanticStyle();
     method @NonNull public android.app.Notification.ProgressStyle.Segment setColor(@ColorInt int);
     method @NonNull public android.app.Notification.ProgressStyle.Segment setId(int);
+    method @FlaggedApi("android.app.api_notification_semantic_style") @NonNull public android.app.Notification.ProgressStyle.Segment setSemanticStyle(int);
   }
 
   public abstract static class Notification.Style {
@@ -7813,6 +7828,14 @@ package android.app {
     method @Deprecated public android.widget.TabWidget getTabWidget();
     method @Deprecated public void setDefaultTab(String);
     method @Deprecated public void setDefaultTab(int);
+  }
+
+  @FlaggedApi("com.android.window.flags.enable_task_move_allowed_listener_api") public final class TaskDisplayPolicyState {
+    method public int getDisplayId();
+    method public int getTaskMoveState();
+    field public static final int TASK_MOVE_ALLOWED = 1; // 0x1
+    field public static final int TASK_MOVE_DISALLOWED = 2; // 0x2
+    field public static final int TASK_MOVE_UNKNOWN = 0; // 0x0
   }
 
   public class TaskInfo {

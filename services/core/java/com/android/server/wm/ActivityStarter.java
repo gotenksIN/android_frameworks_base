@@ -1737,7 +1737,7 @@ class ActivityStarter {
      */
     private @Nullable Task handleStartResult(@NonNull ActivityRecord started,
             ActivityOptions options, int result, boolean isIndependentLaunch,
-            RemoteTransition remoteTransition, @NonNull Transition transition) {
+            RemoteTransition remoteTransition, Transition transition) {
         final boolean userLeaving = mSupervisor.mUserLeaving;
         mSupervisor.mUserLeaving = false;
         final Task currentRootTask = started.getRootTask();

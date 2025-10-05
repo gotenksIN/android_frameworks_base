@@ -145,6 +145,7 @@ import com.android.systemui.communal.domain.interactor.CommunalSettingsInteracto
 import com.android.systemui.communal.ui.viewmodel.CommunalTransitionViewModel;
 import com.android.systemui.dagger.qualifiers.Application;
 import com.android.systemui.dagger.qualifiers.UiBackground;
+import com.android.systemui.display.flags.DisplayComponentRepositoryFlag;
 import com.android.systemui.dreams.DreamOverlayStateController;
 import com.android.systemui.dreams.ui.viewmodel.DreamViewModel;
 import com.android.systemui.dump.DumpManager;
@@ -740,7 +741,8 @@ public class KeyguardViewMediator implements CoreStartable,
         @Override
         public void onSimStateChanged(int subId, int slotId, int simState) {
             Log.d(TAG, "onSimStateChanged(subId=" + subId + ", slotId=" + slotId
-                    + ",state=" +  TelephonyManager.simStateToString(simState) + ")");
+                    + ",state=" +  TelephonyManager.simStateToString(simState) + ")"
+                    + ", keyguardShowing: " + mShowing);
 
             int size = mKeyguardStateCallbacks.size();
             boolean simPinSecure = mUpdateMonitor.isSimPinSecure();
@@ -793,9 +795,8 @@ public class KeyguardViewMediator implements CoreStartable,
                     synchronized (KeyguardViewMediator.this) {
                         if (shouldWaitForProvisioning()) {
                             if (!mShowing) {
-                                Log.d(TAG, "ICC_ABSENT isn't showing,"
-                                        + " we need to show the keyguard since the "
-                                        + "device isn't provisioned yet.");
+                                Log.d(TAG, "ICC_ABSENT isn't showing, we need to show the keyguard "
+                                        + "since the device isn't provisioned yet.");
                                 doKeyguardLocked(null);
                             } else {
                                 resetStateLocked();
@@ -805,8 +806,7 @@ public class KeyguardViewMediator implements CoreStartable,
                             // MVNO SIMs can become transiently NOT_READY when switching networks,
                             // so we should only lock when they are ABSENT.
                             if (lastSimStateWasLocked) {
-                                Log.d(TAG, "SIM moved to ABSENT when the "
-                                        + "previous state was locked. Reset the state.");
+                                Log.d(TAG, "ABSENT when the previous SIM state was locked");
                                 resetStateLocked();
                             }
                             mSimWasLocked.append(slotId, false);
@@ -815,8 +815,7 @@ public class KeyguardViewMediator implements CoreStartable,
                                 // Support eSIM disablement, and do not clear `mSimWasLocked`.
                                 // NOT_READY could just be a temporary state
                                 if (lastSimStateWasLocked) {
-                                    Log.d(TAG, "SIM moved to NOT_READY when the "
-                                            + "previous state was locked. Reset the state.");
+                                    Log.d(TAG, "NOT_READY when the previous SIM state was locked");
                                     resetStateLocked();
                                 }
                             }
@@ -828,9 +827,6 @@ public class KeyguardViewMediator implements CoreStartable,
                     synchronized (KeyguardViewMediator.this) {
                         mSimWasLocked.append(slotId, true);
                         if (!mShowing) {
-                            Log.d(TAG,
-                                    "INTENT_VALUE_ICC_LOCKED and keygaurd isn't "
-                                    + "showing; need to show keyguard so user can enter sim pin");
                             doKeyguardLocked(null);
                         } else {
                             resetStateLocked();
@@ -840,22 +836,15 @@ public class KeyguardViewMediator implements CoreStartable,
                 case TelephonyManager.SIM_STATE_PERM_DISABLED:
                     synchronized (KeyguardViewMediator.this) {
                         if (!mShowing) {
-                            Log.d(TAG, "PERM_DISABLED and "
-                                  + "keygaurd isn't showing.");
                             doKeyguardLocked(null);
                         } else {
-                            Log.d(TAG, "PERM_DISABLED, resetStateLocked to"
-                                  + "show permanently disabled message in lockscreen.");
                             resetStateLocked();
                         }
                     }
                     break;
                 case TelephonyManager.SIM_STATE_READY:
                     synchronized (KeyguardViewMediator.this) {
-                        Log.d(TAG, "READY, reset state? " + mShowing);
                         if (mShowing && mSimWasLocked.get(slotId, false)) {
-                            Log.d(TAG, "SIM moved to READY when the "
-                                    + "previously was locked. Reset the state.");
                             mSimWasLocked.append(slotId, false);
                             resetStateLocked();
                         }
@@ -2812,13 +2801,20 @@ public class KeyguardViewMediator implements CoreStartable,
         }
     };
 
+    private Looper getHandlerLooper() {
+        if (DisplayComponentRepositoryFlag.INSTANCE.isEagerInitializationEnabled()) {
+            return Looper.getMainLooper();
+        }
+        return Looper.myLooper();
+    }
+
     /**
      * This handler will be associated with the policy thread, which will also be the UI thread of
      * the keyguard.  Since the apis of the policy, and therefore this class, can be called by other
      * threads, any action that directly interacts with the keyguard ui should be posted to this
      * handler, rather than called directly.
      */
-    private final Handler mHandler = new Handler(Looper.myLooper(), null, true /*async*/) {
+    private final Handler mHandler = new Handler(getHandlerLooper(), null, true /*async*/) {
         @Override
         public void handleMessage(Message msg) {
             String message = "";
@@ -3966,6 +3962,7 @@ public class KeyguardViewMediator implements CoreStartable,
      */
     private void handleReset(boolean hideBouncer) {
         synchronized (KeyguardViewMediator.this) {
+            mIsKeyguardExitAnimationCanceled = true;
             if (DEBUG) Log.d(TAG, "handleReset");
             mKeyguardViewControllerLazy.get().reset(hideBouncer);
         }

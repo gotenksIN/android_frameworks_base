@@ -333,6 +333,7 @@
   <java-symbol type="bool" name="config_enableBurnInProtection" />
   <java-symbol type="bool" name="config_hotswapCapable" />
   <java-symbol type="integer" name="config_hsumBootStrategy" />
+  <java-symbol type="array" name="config_hsu_allowlist_activitivies" />
   <java-symbol type="bool" name="config_mms_content_disposition_support" />
   <java-symbol type="bool" name="config_networkSamplingWakesDevice" />
   <java-symbol type="bool" name="config_showMenuShortcutsWhenKeyboardPresent" />
@@ -2729,6 +2730,7 @@
   <java-symbol type="string" name="websearch" />
   <java-symbol type="drawable" name="ic_media_video_poster" />
   <java-symbol type="xml" name="config_webview_packages" />
+  <java-symbol type="string" name="config_webViewSelectionActionMenuClientPackage"/>
 
   <!-- From SubtitleView -->
   <java-symbol type="dimen" name="subtitle_corner_radius" />
@@ -5074,6 +5076,7 @@
   <java-symbol type="bool" name="config_isWindowManagerCameraCompatTreatmentEnabled" />
   <java-symbol type="bool" name="config_isWindowManagerCameraCompatSplitScreenAspectRatioEnabled" />
   <java-symbol type="bool" name="config_isCameraCompatSimulateRequestedOrientationTreatmentEnabled" />
+  <java-symbol type="bool" name="config_isCameraCompatSimReqOrientationLandscapeTreatmentEnabled" />
   <java-symbol type="bool" name="config_skipActivityRelaunchWhenDocking" />
 
   <java-symbol type="bool" name="config_hideDisplayCutoutWithDisplayArea" />

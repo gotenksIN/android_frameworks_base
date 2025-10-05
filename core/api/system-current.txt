@@ -3583,9 +3583,15 @@ package android.companion.datatransfer.continuity {
   }
 
   @FlaggedApi("android.companion.enable_task_continuity") public class TaskContinuityManager {
+    method public void enableHandoffForDevice(boolean);
+    method public void registerHandoffFeatureStateListener(@NonNull java.util.concurrent.Executor, @NonNull android.companion.datatransfer.continuity.TaskContinuityManager.HandoffFeatureStateListener);
     method @RequiresPermission(android.Manifest.permission.READ_REMOTE_TASKS) public void registerRemoteTaskListener(@NonNull java.util.concurrent.Executor, @NonNull android.companion.datatransfer.continuity.TaskContinuityManager.RemoteTaskListener);
     method @RequiresPermission(android.Manifest.permission.REQUEST_TASK_HANDOFF) public void requestHandoff(int, int, @NonNull java.util.concurrent.Executor, @NonNull android.companion.datatransfer.continuity.TaskContinuityManager.HandoffRequestCallback);
+    method public void unregisterHandoffFeatureStateListener(@NonNull android.companion.datatransfer.continuity.TaskContinuityManager.HandoffFeatureStateListener);
     method @RequiresPermission(android.Manifest.permission.READ_REMOTE_TASKS) public void unregisterRemoteTaskListener(@NonNull android.companion.datatransfer.continuity.TaskContinuityManager.RemoteTaskListener);
+    field public static final int HANDOFF_AVAILABILITY_STATUS_AVAILABLE = 0; // 0x0
+    field public static final int HANDOFF_AVAILABILITY_STATUS_DISABLED_BY_POLICY = 1; // 0x1
+    field public static final int HANDOFF_AVAILABILITY_STATUS_UNSUPPORTED_HARDWARE = 2; // 0x2
     field public static final int HANDOFF_REQUEST_RESULT_FAILURE_DEVICE_NOT_FOUND = 5; // 0x5
     field public static final int HANDOFF_REQUEST_RESULT_FAILURE_NO_DATA_PROVIDED_BY_TASK = 2; // 0x2
     field public static final int HANDOFF_REQUEST_RESULT_FAILURE_OTHER_INTERNAL_ERROR = 6; // 0x6
@@ -3593,6 +3599,10 @@ package android.companion.datatransfer.continuity {
     field public static final int HANDOFF_REQUEST_RESULT_FAILURE_TASK_NOT_FOUND = 1; // 0x1
     field public static final int HANDOFF_REQUEST_RESULT_FAILURE_TIMEOUT = 4; // 0x4
     field public static final int HANDOFF_REQUEST_RESULT_SUCCESS = 0; // 0x0
+  }
+
+  public static interface TaskContinuityManager.HandoffFeatureStateListener {
+    method public void onHandoffFeatureStateChanged(int, boolean);
   }
 
   public static interface TaskContinuityManager.HandoffRequestCallback {
@@ -19293,6 +19303,29 @@ package android.webkit {
     method public boolean setProxyScript(@NonNull String);
   }
 
+  @FlaggedApi("android.webkit.selection_action_menu_client") public class SelectionActionMenuClient {
+    ctor public SelectionActionMenuClient();
+    method @NonNull public java.util.List<android.content.pm.ResolveInfo> filterTextProcessingActivities(@NonNull android.content.Context, @android.webkit.SelectionActionMenuClient.MenuType int, @NonNull java.util.List<android.content.pm.ResolveInfo>);
+    method @NonNull public java.util.List<android.view.MenuItem> getAdditionalMenuItems(@NonNull android.content.Context, @android.webkit.SelectionActionMenuClient.MenuType int, boolean, boolean, @NonNull String);
+    method @android.webkit.SelectionActionMenuClient.DefaultItem @NonNull public int[] getDefaultMenuItemOrder(@android.webkit.SelectionActionMenuClient.MenuType int);
+    method public boolean handleMenuItemClick(@NonNull android.content.Context, @NonNull android.view.MenuItem, @NonNull android.view.ViewGroup);
+  }
+
+  @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) @java.lang.annotation.Target(java.lang.annotation.ElementType.TYPE_USE) public static @interface SelectionActionMenuClient.DefaultItem {
+    field public static final int COPY = 2; // 0x2
+    field public static final int CUT = 1; // 0x1
+    field public static final int PASTE = 3; // 0x3
+    field public static final int PASTE_AS_PLAIN_TEXT = 4; // 0x4
+    field public static final int SELECT_ALL = 6; // 0x6
+    field public static final int SHARE = 5; // 0x5
+    field public static final int WEB_SEARCH = 7; // 0x7
+  }
+
+  @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) public static @interface SelectionActionMenuClient.MenuType {
+    field public static final int DROPDOWN = 1; // 0x1
+    field public static final int FLOATING = 0; // 0x0
+  }
+
   public class SslErrorHandler extends android.os.Handler {
     ctor public SslErrorHandler();
   }
@@ -19403,6 +19436,7 @@ package android.webkit {
     method public String getDataDirectorySuffix();
     method public String getErrorString(android.content.Context, int);
     method public int getPackageId(android.content.res.Resources, String);
+    method @FlaggedApi("android.webkit.selection_action_menu_client") @NonNull public android.webkit.SelectionActionMenuClient getSelectionActionMenuClient(@NonNull android.content.Context);
     method @NonNull public android.webkit.WebViewFactory.StartupTimestamps getStartupTimestamps();
     method @Deprecated public void invokeDrawGlFunctor(android.view.View, long, boolean);
     method public boolean isMultiProcessEnabled();

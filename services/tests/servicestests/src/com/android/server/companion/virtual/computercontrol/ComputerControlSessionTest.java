@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 The Android Open Source Project
+ * Copyright 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_ACTIVITY;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_RECENTS;
+import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_CALLER_INITIATED;
+import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_SESSION_TIMED_OUT;
 
 import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionImpl.KEY_EVENT_DELAY_MS;
 import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionImpl.LONG_PRESS_TIMEOUT_MULTIPLIER;
@@ -50,6 +52,7 @@ import android.companion.virtual.IVirtualDevice;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.computercontrol.ComputerControlSession;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
+import android.companion.virtual.computercontrol.IComputerControlLifecycleCallback;
 import android.companion.virtual.computercontrol.IInteractiveMirror;
 import android.companion.virtualdevice.flags.Flags;
 import android.content.AttributionSource;
@@ -90,6 +93,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.internal.inputmethod.IRemoteComputerControlInputConnection;
 import com.android.server.LocalServices;
+import com.android.server.input.InputManagerInternal;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.testutils.StubTransaction;
@@ -154,9 +158,13 @@ public class ComputerControlSessionTest {
     @Mock
     private InputMethodManagerInternal mInputMethodManagerInternal;
     @Mock
+    private InputManagerInternal mInputManagerInternal;
+    @Mock
     private ViewConfiguration mViewConfiguration;
     @Mock
     private ComputerControlSessionProcessor.VirtualDeviceFactory mVirtualDeviceFactory;
+    @Mock
+    private IComputerControlLifecycleCallback mLifecycleCallback;
     @Mock
     private ComputerControlSessionImpl.OnClosedListener mOnClosedListener;
     @Mock
@@ -208,6 +216,7 @@ public class ComputerControlSessionTest {
         LocalServices.addService(WindowManagerInternal.class, mWindowManagerInternal);
         LocalServices.addService(UserManagerInternal.class, mUserManagerInternal);
         LocalServices.addService(InputMethodManagerInternal.class, mInputMethodManagerInternal);
+        LocalServices.addService(InputManagerInternal.class, mInputManagerInternal);
         ViewConfiguration.setInstanceForTesting(mContext, mViewConfiguration);
 
         when(mUserManagerInternal.getMainDisplayAssignedToUser(anyInt()))
@@ -327,6 +336,14 @@ public class ComputerControlSessionTest {
         mSession.close();
         verify(mVirtualDevice).close();
         verify(mOnClosedListener).onClosed(mSession);
+        verify(mLifecycleCallback).onClosed(eq(CLOSE_REASON_CALLER_INITIATED));
+    }
+
+    @Test
+    public void closeSessionInternal_closesWithProvidedReason() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        mSession.close(123);
+        verify(mLifecycleCallback).onClosed(eq(123));
     }
 
     @Test
@@ -339,6 +356,13 @@ public class ComputerControlSessionTest {
     public void createSession_disablesAnimationsOnDisplay() {
         createComputerControlSession(mDefaultParams);
         verify(mWindowManagerInternal).setAnimationsDisabledForDisplay(VIRTUAL_DISPLAY_ID, true);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_SHOW_TOUCHES)
+    public void createSession_setsShowTouchesOnDisplay() {
+        createComputerControlSession(mDefaultParams);
+        verify(mInputManagerInternal).setForceShowTouchesOnDisplay(VIRTUAL_DISPLAY_ID, true);
     }
 
     @Test
@@ -547,7 +571,7 @@ public class ComputerControlSessionTest {
     public void sessionCloses_afterGlobalTimeout() throws Exception {
         createComputerControlSession(mDefaultParams, /* globalSessionTimeoutDurationMs = */ 100L);
 
-        verify(mOnClosedListener, timeout(2 * 100L)).onClosed(mSession);
+        verify(mLifecycleCallback, timeout(2 * 100L)).onClosed(eq(CLOSE_REASON_SESSION_TIMED_OUT));
     }
 
     @Test
@@ -592,6 +616,7 @@ public class ComputerControlSessionTest {
                 () -> mTransaction, mAppToken, params,
                 new AttributionSource(UserHandle.getUid(USER_ID, 0), "com.package", "tag"),
                 mVirtualDeviceFactory, ALLOWED_USERS, mOnClosedListener);
+        mSession.setLifecycleCallback(mLifecycleCallback);
     }
 
     @SuppressLint("MissingPermission")

@@ -139,6 +139,7 @@ aconfig_declarations_group {
         "sdk_sandbox_exported_flags_lib",
         "surfaceflinger_flags_java_lib",
         "telecom_flags_core_java_lib",
+        "telecom_module_flags-export-java",
         "telephony_flags_core_java_lib",
         "timezone_flags_core_java_lib",
         // !!! KEEP THIS LIST ALPHABETICAL !!!
@@ -502,6 +503,7 @@ java_aconfig_library {
     min_sdk_version: "30",
     apex_available: [
         "//apex_available:platform",
+        "com.android.conscrypt",
         "com.android.tethering",
         "com.android.wifi",
     ],
@@ -1749,6 +1751,12 @@ java_aconfig_library {
     aconfig_declarations: "android.hardware.usb.flags-aconfig",
     host_supported: true,
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+cc_aconfig_library {
+    name: "android.hardware.usb.flags-aconfig-cc-lib",
+    aconfig_declarations: "android.hardware.usb.flags-aconfig",
+    vendor_available: true,
 }
 
 // WindowingTools

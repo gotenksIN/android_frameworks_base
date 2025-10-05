@@ -90,8 +90,8 @@ public enum DesktopExperienceFlags {
     ENABLE_BLOCK_NON_DESKTOP_DISPLAY_WINDOW_DRAG_BUGFIX(
             Flags::enableBlockNonDesktopDisplayWindowDragBugfix, false,
             Flags.FLAG_ENABLE_BLOCK_NON_DESKTOP_DISPLAY_WINDOW_DRAG_BUGFIX),
-    ENABLE_BOUNDS_RESTORING_ON_TILING_EXIT(Flags::enableBoundsRestoringOnTilingExit, false,
-            Flags.FLAG_ENABLE_BOUNDS_RESTORING_ON_TILING_EXIT),
+    ENABLE_BOUNDS_RESTORING_ON_DRAG_EXIT(Flags::enableBoundsRestoringOnDragExit, false,
+            Flags.FLAG_ENABLE_BOUNDS_RESTORING_ON_DRAG_EXIT),
     ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY(Flags::enableBugFixesForSecondaryDisplay, true,
             Flags.FLAG_ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY),
     ENABLE_CAMERA_COMPAT_EXTERNAL_DISPLAY_ROTATION_BUGFIX(
@@ -316,6 +316,8 @@ public enum DesktopExperienceFlags {
     ENABLE_TASKBAR_RUNNING_TASKS_IN_SPLITSCREEN_SELECT_BUGFIX(
             Flags::taskbarRunningTasksInSplitscreenSelect, false,
             Flags.FLAG_TASKBAR_RUNNING_TASKS_IN_SPLITSCREEN_SELECT),
+    ENABLE_TASK_MOVE_ALLOWED_LISTENER_API(Flags::enableTaskMoveAllowedListenerApi, false,
+            Flags.FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API),
     ENABLE_TILE_RESIZING(Flags::enableTileResizing, true, Flags.FLAG_ENABLE_TILE_RESIZING),
     ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG(Flags::enableUpdatedDisplayConnectionDialog, false,
             Flags.FLAG_ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG),

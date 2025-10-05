@@ -1183,6 +1183,11 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             if (to.isPreCreated()) return;
             mService.handleOnUserSwitching(from.getUserIdentifier(), to.getUserIdentifier());
         }
+
+        // NOTE: called by SystemServer on boot
+        public boolean isDeviceManaged() {
+            return mService.isDeviceManagedUnchecked();
+        }
     }
 
     @GuardedBy("getLockObject()")
@@ -6674,11 +6679,19 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 mInjector.binderRestoreCallingIdentity(ident);
             }
         }
-        DevicePolicyEventLogger
-                .createEvent(DevicePolicyEnums.LOCK_NOW)
-                .setAdmin(adminComponent)
-                .setInt(flags)
-                .write();
+        if (Flags.lockNowCoexistence()) {
+            DevicePolicyEventLogger
+                    .createEvent(DevicePolicyEnums.LOCK_NOW)
+                    .setAdmin(caller.getPackageName())
+                    .setInt(flags)
+                    .write();
+        } else {
+            DevicePolicyEventLogger
+                    .createEvent(DevicePolicyEnums.LOCK_NOW)
+                    .setAdmin(adminComponent)
+                    .setInt(flags)
+                    .write();
+        }
     }
 
     @Override
@@ -10178,7 +10191,13 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 || canManageUsers(caller)
                 || isFinancedDeviceOwner(caller)
                 || hasCallingOrSelfPermission(MANAGE_PROFILE_AND_DEVICE_OWNERS));
-        return mOwners.isDeviceManaged() || mOwners.hasDeviceOwner();
+        return isDeviceManagedUnchecked();
+    }
+
+    private boolean isDeviceManagedUnchecked() {
+        return Flags.multiUserManagementDeviceProvisioning()
+                ? mStateCache.isDeviceManaged() || mOwners.hasDeviceOwner()
+                : mOwners.hasDeviceOwner();
     }
 
     @Override

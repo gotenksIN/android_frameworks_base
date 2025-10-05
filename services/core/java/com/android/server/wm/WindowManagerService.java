@@ -612,8 +612,6 @@ public class WindowManagerService extends IWindowManager.Stub
     @VisibleForTesting
     WindowManagerPolicy mPolicy;
 
-    final WindowManagerFlags mFlags;
-
     final IActivityManager mActivityManager;
     final ActivityManagerInternal mAmInternal;
     final UserManagerInternal mUmInternal;
@@ -1315,7 +1313,6 @@ public class WindowManagerService extends IWindowManager.Stub
         mGlobalLock = atm.getGlobalLock();
         mAtmService = atm;
         mContext = context;
-        mFlags = new WindowManagerFlags();
         mIsPc = mContext.getPackageManager().hasSystemFeature(FEATURE_PC);
         mAlwaysSeqId = mContext.getPackageManager().hasSystemFeature(FEATURE_WATCH)
                 ? Flags.alwaysSeqIdLayoutWear() : Flags.alwaysSeqIdLayout();
@@ -2393,7 +2390,7 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized (mGlobalLock) {
             if (a11yControllerInternal.hasWindowManagerEventDispatcher()) {
                 WindowState window = mWindowMap.get(token);
-                if (window != null) {
+                if (window != null && window.isFocused()) {
                     a11yControllerInternal.onRectangleOnScreenRequested(
                             window.getDisplayId(), rectangle, source);
                 }

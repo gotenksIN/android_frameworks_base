@@ -85,6 +85,7 @@ import android.window.TransitionInfo
 import android.window.TransitionInfo.Change
 import android.window.TransitionRequestInfo
 import android.window.WindowContainerTransaction
+import android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_PENDING_INTENT
 import androidx.annotation.BinderThread
 import com.android.app.tracing.traceSection
 import com.android.internal.annotations.VisibleForTesting
@@ -152,6 +153,8 @@ import com.android.wm.shell.desktopmode.multidesks.OnDeskRemovedListener
 import com.android.wm.shell.desktopmode.multidesks.PreserveDisplayRequestHandler
 import com.android.wm.shell.draganddrop.DragAndDropController
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter
+import com.android.wm.shell.pip2.phone.PipScheduler
+import com.android.wm.shell.pip2.phone.PipTransitionState
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.recents.RecentTasksController
 import com.android.wm.shell.recents.RecentsTransitionHandler
@@ -165,6 +168,7 @@ import com.android.wm.shell.shared.annotations.ExternalThread
 import com.android.wm.shell.shared.annotations.ShellDesktopThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
+import com.android.wm.shell.shared.bubbles.logging.BubbleLog
 import com.android.wm.shell.shared.desktopmode.DesktopConfig
 import com.android.wm.shell.shared.desktopmode.DesktopFirstListener
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource
@@ -266,6 +270,7 @@ class DesktopTasksController(
     private val desktopFirstListenerManager: Optional<DesktopFirstListenerManager>,
     private val taskSnapshotManager: TaskSnapshotManager,
     private val transactionPool: TransactionPool,
+    private val pipTransitionState: Optional<PipTransitionState>,
 ) :
     RemoteCallable<DesktopTasksController>,
     TransitionHandler,
@@ -280,6 +285,7 @@ class DesktopTasksController(
 
     private val mOnAnimationFinishedCallback = { releaseVisualIndicator() }
     private lateinit var snapEventHandler: SnapEventHandler
+    private lateinit var mPipScheduler: PipScheduler
     private val dragToDesktopStateListener =
         object : DragToDesktopStateListener {
             override fun onCommitToDesktopAnimationStart() {
@@ -401,6 +407,11 @@ class DesktopTasksController(
     fun setSnapEventHandler(handler: SnapEventHandler) {
         snapEventHandler = handler
         desktopTasksLimiter.ifPresent { it.snapEventHandler = snapEventHandler }
+    }
+
+    /** Setter for PiP scheduler */
+    fun setPipScheduler(pipScheduler: PipScheduler) {
+        mPipScheduler = pipScheduler
     }
 
     /** Returns the transition type for the given remote transition. */
@@ -2299,6 +2310,7 @@ class DesktopTasksController(
         userId: Int,
         unminimizeReason: UnminimizeReason = UnminimizeReason.UNKNOWN,
         dragEvent: DragEvent? = null,
+        bounds: Rect? = null,
     ): IBinder {
         logV(
             "startLaunchTransition type=%s launchingTaskId=%d deskId=%d displayId=%d",
@@ -2360,6 +2372,36 @@ class DesktopTasksController(
                 )
             }
         }
+
+        val pipTaskComponent = pipTransitionState.getOrNull()?.pipTaskInfo?.baseIntent?.component
+        // If a task was previously in PiP and is being launched in freeform in Desktop mode,
+        // return early to let PipScheduler handle exiting PiP via expand in Shell.
+        if (
+            DesktopExperienceFlags.ENABLE_DENSITY_RESET_ON_CROSS_DISPLAYS_PIP_LAUNCH.isTrue &&
+                pipTaskComponent != null
+        ) {
+            for (op in wct.hierarchyOps) {
+                if (
+                    op.type == HIERARCHY_OP_TYPE_PENDING_INTENT &&
+                        op.activityIntent?.component == pipTaskComponent
+                ) {
+                    if (deskId != null && launchingTaskId != null) {
+                        shellTaskOrganizer.getRunningTaskInfo(launchingTaskId)?.let {
+                            addMoveToDeskTaskChanges(wct, it, deskId)
+                        }
+                    }
+                    logV("Scheduling exit PiP via expand on app launch for $pipTaskComponent")
+                    mPipScheduler.scheduleExitPipViaExpand(
+                        /* wasVisible= */ true,
+                        displayId,
+                        bounds,
+                        WINDOWING_MODE_FREEFORM,
+                    )
+                    return Binder()
+                }
+            }
+        }
+
         // Remove top transparent fullscreen task if needed.
         val closingTopTransparentTaskId =
             deskId?.let {
@@ -2537,6 +2579,7 @@ class DesktopTasksController(
             deskId = deskId,
             displayId = displayId,
             userId = userId,
+            bounds = bounds,
         )
     }
 
@@ -2799,7 +2842,8 @@ class DesktopTasksController(
             // The desktop task is at the maximized width and/or height of the stable bounds.
             // If the task's pre-maximize stable bounds were saved, toggle the task to those bounds.
             // Otherwise, toggle to the default bounds.
-            val taskBoundsBeforeMaximize = repository.removeBoundsBeforeMaximize(taskInfo.taskId)
+            val taskBoundsBeforeMaximize =
+                repository.removeBoundsBeforeSnapOrMaximize(taskInfo.taskId)
             if (taskBoundsBeforeMaximize != null) {
                 destinationBounds.set(taskBoundsBeforeMaximize)
             } else {
@@ -2813,7 +2857,7 @@ class DesktopTasksController(
             // Save current bounds so that task can be restored back to original bounds if necessary
             // and toggle to the stable bounds.
             snapEventHandler.removeTaskIfTiled(taskInfo.displayId, taskInfo.taskId)
-            repository.saveBoundsBeforeMaximize(taskInfo.taskId, currentTaskBounds)
+            repository.saveBoundsBeforeSnapOrMaximize(taskInfo.taskId, currentTaskBounds)
             destinationBounds.set(calculateMaximizeBounds(displayLayout, taskInfo))
         }
 
@@ -5852,6 +5896,7 @@ class DesktopTasksController(
             dragToDesktopTransitionHandler.cancelDragToDesktopTransition(cancelState)
         } else {
             bubbleController.ifPresent {
+                BubbleLog.d("DesktopTaskController.requestFloat() DROP taskInfo=%s", taskInfo)
                 it.expandStackAndSelectBubble(taskInfo, /* dragData= */ null)
             }
         }
@@ -6080,33 +6125,44 @@ class DesktopTasksController(
                     destinationBounds,
                     validDragArea,
                 )
-
-                if (destinationBounds == dragStartBounds) {
-                    // There's no actual difference between the start and end bounds, so while a
-                    // WCT change isn't needed, the dragged surface still needs to be snapped back
-                    // to its original location. This is as long as it moved some in the first
-                    // place, if it didn't and |currentDragBounds| is already at destination then
-                    // there's no need to animate.
-                    if (destinationBounds != currentDragBounds) {
-                        returnToDragStartAnimator.start(
-                            taskInfo.taskId,
-                            taskSurface,
-                            startBounds = currentDragBounds,
-                            endBounds = dragStartBounds,
-                        )
-                    }
-                    releaseVisualIndicator()
-                    return true
-                }
-
                 val newDisplayId = motionEvent.displayId
                 val displayAreaInfo = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(newDisplayId)
                 val isCrossDisplayDrag =
                     DesktopExperienceFlags.ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG.isTrue &&
                         newDisplayId != taskInfo.getDisplayId() &&
                         displayAreaInfo != null
-                val prevCaptionInsets = taskInfo.freeformCaptionInsets
 
+                if (!isCrossDisplayDrag && destinationBounds == dragStartBounds) {
+                    // There's no actual difference between the start and end bounds, so while a
+                    // WCT change isn't needed, the dragged surface still needs to be snapped back
+                    // to its original location.
+                    if (destinationBounds != currentDragBounds) {
+                        // If task's position needs to be changed from the current bounds, animate
+                        // the bounds change
+                        returnToDragStartAnimator.start(
+                            taskInfo.taskId,
+                            taskSurface,
+                            startBounds = currentDragBounds,
+                            endBounds = dragStartBounds,
+                        )
+                    } else {
+                        // Set the task bounds even if there is no difference between the current
+                        // bounds and destination bounds in case that task surface was moved off
+                        // screen during the drag
+                        val t = transactionPool.acquire()
+                        t.setPosition(
+                            taskSurface,
+                            destinationBounds.left.toFloat(),
+                            destinationBounds.top.toFloat(),
+                        )
+                        t.apply()
+                        transactionPool.release(t)
+                    }
+                    releaseVisualIndicator()
+                    return true
+                }
+
+                val prevCaptionInsets = taskInfo.freeformCaptionInsets
                 if (isCrossDisplayDrag) {
                     val captionInsetsDp =
                         displayController

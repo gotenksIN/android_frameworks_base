@@ -18,6 +18,10 @@ package android.processor.devicepolicy
 
 import android.processor.devicepolicy.protos.PolicyMetadata
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata
+import com.sun.source.tree.LiteralTree
+import com.sun.source.tree.NewClassTree
+import com.sun.source.tree.VariableTree
+import com.sun.source.util.Trees
 import javax.annotation.processing.ProcessingEnvironment
 import javax.lang.model.element.Element
 import javax.lang.model.element.ElementKind
@@ -25,6 +29,7 @@ import javax.lang.model.element.TypeElement
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.TypeMirror
 import javax.tools.Diagnostic
+import javax.lang.model.element.Modifier
 
 abstract class Processor<T : Annotation>(protected val processingEnv: ProcessingEnvironment) {
     private companion object {
@@ -102,6 +107,8 @@ abstract class Processor<T : Annotation>(protected val processingEnv: Processing
             return null
         }
 
+        checkPolicyFieldStructure(element)
+
         val (metadata, policyDefinition) = processMetadata(element) ?: return null
 
         return loadPolicyDefinition(element, policyDefinition, metadata)
@@ -148,6 +155,84 @@ abstract class Processor<T : Annotation>(protected val processingEnv: Processing
         return valid
     }
 
+    /**
+     * Make sure that policy fields look like:
+     * {@code private static final POLICY_NAME = new PolicyIdentifier<>("POLICY_NAME"); }
+     */
+    private fun checkPolicyFieldStructure(element: Element) {
+        checkPolicyFieldModifiers(element)
+
+        val expectedName = element.simpleName
+        val expectedInitializer = "'new PolicyIdentifier<>($expectedName)'"
+
+        fun error(cause: String) {
+            printError(
+                element,
+                "Policy must be initialized to $expectedInitializer: $cause."
+            )
+        }
+
+        val trees = Trees.instance(processingEnv)
+
+        val tree = trees.getTree(element)
+        if (tree !is VariableTree) {
+            throw IllegalStateException("Element $element Tree $tree is not an assignment")
+        }
+
+        val initializer = tree.initializer
+        if (initializer !is NewClassTree) {
+            error("initializer is not a call to new")
+            return
+        }
+
+        if (initializer.identifier.toString() != "PolicyIdentifier<>") {
+            error("found type ${initializer.identifier} instead")
+            return
+        }
+
+        check(initializer.arguments.size == 1)
+        val argument = initializer.arguments[0]
+
+        if (argument !is LiteralTree) {
+            error("the argument to the constructor is not a literal, found $argument")
+            return
+        }
+
+        val value = argument.value
+        if (value !is String) {
+            error("the argument to the constructor is not a string, found $value")
+            return
+        }
+
+        if (value != element.simpleName.toString()) {
+            error("the argument to the constructor should be \"$expectedName\", found $value")
+            return
+        }
+    }
+
+    private fun checkPolicyFieldModifiers(element: Element) {
+        if (!element.modifiers.contains(Modifier.STATIC)) {
+            printError(
+                element,
+                "Field must be static"
+            )
+        }
+
+        if (!element.modifiers.contains(Modifier.FINAL)) {
+            printError(
+                element,
+                "Field must be final"
+            )
+        }
+
+        if (!element.modifiers.contains(Modifier.PUBLIC)) {
+            printError(
+                element,
+                "Field must be public"
+            )
+        }
+    }
+
     private fun loadPolicyDefinition(
         element: Element, definition: PolicyDefinition, typeSpecificMetadata: TypeSpecificPolicyMetadata
     ): PolicyMetadata? {
@@ -163,7 +248,10 @@ abstract class Processor<T : Annotation>(protected val processingEnv: Processing
             printError(element, "Missing JavaDoc")
         }
 
-        return PolicyMetadata
+        val requiredPermission = definition.requiredPermission
+        val requiredCrossUserPermission = definition.requiredCrossUserPermission
+
+        val builder = PolicyMetadata
             .newBuilder()
             .setName(name)
             .setType(type)
@@ -171,7 +259,29 @@ abstract class Processor<T : Annotation>(protected val processingEnv: Processing
             .setTypeSpecificMetadata(typeSpecificMetadata)
             .addAllAllowedScopes(allowedScopes)
             .setAffectedResource(affectedResource)
-            .build()
+
+        if (!requiredPermission.isEmpty()) {
+            builder.setRequiredPermission(requiredPermission)
+        }
+        if (!requiredCrossUserPermission.isEmpty()) {
+            validateRequiredCrossUserPermission(element, requiredCrossUserPermission)
+            builder.setRequiredCrossUserPermission(requiredCrossUserPermission)
+        }
+
+        return builder.build()
+    }
+
+    private fun validateRequiredCrossUserPermission(element: Element, requiredCrossUserPermission: String) {
+        if (requiredCrossUserPermission !in setOf(
+            "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS",
+            "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL",
+            "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_SECURITY_CRITICAL"
+        )) {
+            printError(
+                element,
+                "requiredCrossUserPermission was set to '$requiredCrossUserPermission', but can only be set to android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS, android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL, android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_SECURITY_CRITICAL or left empty."
+            )
+        }
     }
 
     private fun convertScopes(element: Element, allowedScopes: List<Int>): List<PolicyMetadata.PolicyScope> {

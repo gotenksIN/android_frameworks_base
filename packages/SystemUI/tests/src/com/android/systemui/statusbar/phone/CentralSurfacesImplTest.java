@@ -138,7 +138,6 @@ import com.android.systemui.res.R;
 import com.android.systemui.scene.domain.interactor.WindowRootViewVisibilityInteractor;
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.settings.UserTracker;
-import com.android.systemui.settings.brightness.BrightnessSliderController;
 import com.android.systemui.settings.brightness.data.repository.BrightnessMirrorShowingRepository;
 import com.android.systemui.shade.CameraLauncher;
 import com.android.systemui.shade.GlanceableHubContainerController;
@@ -198,6 +197,7 @@ import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserInfoControllerImpl;
 import com.android.systemui.statusbar.policy.domain.interactor.DeviceProvisioningInteractor;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
+import com.android.systemui.statusbar.window.StatusBarWindowControllerStore;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
 import com.android.systemui.topui.TopUiController;
 import com.android.systemui.util.FakeEventLog;
@@ -312,6 +312,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     @Mock private KeyguardBypassController mKeyguardBypassController;
     @Mock private AutoHideController mAutoHideController;
     @Mock private StatusBarWindowController mStatusBarWindowController;
+    @Mock private StatusBarWindowControllerStore mStatusBarWindowControllerStore;
     @Mock private Provider<CollapsedStatusBarFragment> mCollapsedStatusBarFragmentProvider;
     @Mock private StatusBarWindowStateController mStatusBarWindowStateController;
     @Mock private SystemUIDisplaySubcomponent mSystemUIDisplaySubcomponent;
@@ -339,7 +340,6 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     @Mock private PhoneStatusBarPolicy mPhoneStatusBarPolicy;
     @Mock private DemoModeController mDemoModeController;
     @Mock private Lazy<NotificationShadeDepthController> mNotificationShadeDepthControllerLazy;
-    @Mock private BrightnessSliderController.Factory mBrightnessSliderFactory;
     @Mock private WallpaperController mWallpaperController;
     @Mock private StatusBarHideIconsForBouncerManager mStatusBarHideIconsForBouncerManager;
     @Mock private LockscreenShadeTransitionController mLockscreenTransitionController;
@@ -407,6 +407,9 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
         mFakeGlobalSettings.putInt(HEADS_UP_NOTIFICATIONS_ENABLED, HEADS_UP_ON);
 
         when(mBubbles.canShowBubbleNotification()).thenReturn(true);
+
+        when(mStatusBarWindowControllerStore.getDefaultDisplay())
+                .thenReturn(mStatusBarWindowController);
 
         when(mSystemUIDisplaySubcomponent.getStatusBarWindowStateController())
                 .thenReturn(mStatusBarWindowStateController);
@@ -497,7 +500,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                     mKeyguardStateController,
                     mStatusBarStateController,
                     mStatusBarKeyguardViewManager,
-                    mPerDisplaySubcomponentRepository,
+                    mStatusBarWindowControllerStore,
                     mDeviceProvisionedController,
                     mNotificationShadeWindowController,
                     0,
@@ -546,6 +549,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                         mock(StatusBarRootFactory.class),
                         mock(HomeStatusBarComponent.Factory.class),
                         emptySet()),
+                mStatusBarWindowControllerStore,
                 mPerDisplaySubcomponentRepository,
                 new FakeStatusBarModeRepository(),
                 mKeyguardUpdateMonitor,
@@ -617,7 +621,6 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 mDemoModeController,
                 mNotificationShadeDepthControllerLazy,
                 mShadeTouchableRegionManager,
-                mBrightnessSliderFactory,
                 mScreenOffAnimationController,
                 mWallpaperController,
                 mStatusBarHideIconsForBouncerManager,

@@ -111,6 +111,7 @@ import com.android.systemui.statusbar.notification.BundleInteractionLogger;
 import com.android.systemui.statusbar.notification.ColorUpdateLogger;
 import com.android.systemui.statusbar.notification.FeedbackIcon;
 import com.android.systemui.statusbar.notification.LaunchAnimationParameters;
+import com.android.systemui.statusbar.notification.NmSummarizationAllFlag;
 import com.android.systemui.statusbar.notification.NmSummarizationUiFlag;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
 import com.android.systemui.statusbar.notification.NotificationFadeAware;
@@ -929,8 +930,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             }
         } else if (isCallLayout) {
             smallHeight = maxExpandedHeight;
-        } else if (NmSummarizationUiFlag.isEnabled()
-                && isMessagingLayout
+        } else if ((isMessagingLayout || NmSummarizationAllFlag.isEnabled())
                 && !TextUtils.isEmpty(summarization)) {
             smallHeight = mMaxSmallHeightWithSummarization;
         } else if (android.app.Flags.nmCollapsedLines()) {
@@ -2938,13 +2938,19 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     @Override
     public boolean onRequestSendAccessibilityEventInternal(View child, AccessibilityEvent event) {
         if (super.onRequestSendAccessibilityEventInternal(child, event)) {
-            // Add a record for the entire layout since its content is somehow small.
-            // The event comes from a leaf view that is interacted with.
-            AccessibilityEvent record = AccessibilityEvent.obtain();
-            onInitializeAccessibilityEvent(record);
-            dispatchPopulateAccessibilityEvent(record);
-            event.appendRecord(record);
-            return true;
+            try {
+                // Add a record for the entire layout since its content is somehow small.
+                // The event comes from a leaf view that is interacted with.
+                AccessibilityEvent record = AccessibilityEvent.obtain();
+                onInitializeAccessibilityEvent(record);
+                dispatchPopulateAccessibilityEvent(record);
+                event.appendRecord(record);
+                return true;
+            } catch (IllegalArgumentException e) {
+                // view is already detached
+                Log.e(TAG, "Failed to record accessibility event", e);
+                return false;
+            }
         }
         return false;
     }

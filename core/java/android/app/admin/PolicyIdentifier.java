@@ -20,6 +20,8 @@ import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_DEVICE;
 import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_USER;
 import static android.app.admin.DevicePolicyManager.RESOURCE_PER_USER;
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_SCREEN_CAPTURE;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS;
 
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
@@ -108,8 +110,6 @@ public final class PolicyIdentifier<T> {
     })
     public @interface ScreenCaptureValue {}
 
-    private static final String SCREEN_CAPTURE_KEY = "screenCapture";
-
     /**
      * Policy that controls whether the screen capture is allowed or disallowed. Disallowing
      * screen capture also prevents the content from being shown on display devices that do not have
@@ -125,11 +125,13 @@ public final class PolicyIdentifier<T> {
     @EnumPolicyDefinition(
             base = @PolicyDefinition(
                     allowedScopes = {POLICY_SCOPE_USER, POLICY_SCOPE_DEVICE},
-                    affectedResource = RESOURCE_PER_USER
+                    affectedResource = RESOURCE_PER_USER,
+                    requiredPermission = MANAGE_DEVICE_POLICY_SCREEN_CAPTURE,
+                    requiredCrossUserPermission = MANAGE_DEVICE_POLICY_ACROSS_USERS
             ),
             intDef = ScreenCaptureValue.class,
             defaultValue = SCREEN_CAPTURE_ALLOWED
     )
-    public static final PolicyIdentifier<Integer> SCREEN_CAPTURE = new PolicyIdentifier<>(
-            SCREEN_CAPTURE_KEY);
+    public static final PolicyIdentifier<Integer> SCREEN_CAPTURE =
+            new PolicyIdentifier<>("SCREEN_CAPTURE");
 }

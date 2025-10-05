@@ -16,6 +16,7 @@
 
 package com.android.systemui.qs.ui.composable
 
+import android.platform.test.annotations.EnableFlags
 import android.testing.TestableLooper
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertHeightIsEqualTo
@@ -26,6 +27,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.TestContentScope
 import com.android.compose.theme.PlatformTheme
+import com.android.systemui.Flags.FLAG_QS_TILE_DETAILED_VIEW
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.compose.modifiers.resIdToTestTag
 import com.android.systemui.flags.EnableSceneContainer
@@ -36,6 +38,7 @@ import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.qs.pipeline.domain.interactor.currentTilesInteractor
 import com.android.systemui.qs.pipeline.shared.TileSpec
+import com.android.systemui.res.R
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.statusbar.phone.ui.tintedIconManagerFactory
 import com.android.systemui.testKosmos
@@ -82,5 +85,28 @@ class QuickSettingsShadeOverlayTest : SysuiTestCase() {
 
         composeTestRule.onNodeWithTag(resIdToTestTag("qs_tile_icon"), useUnmergedTree = true)
             .assertHeightIsEqualTo(32.dp)
+    }
+
+    @Test
+    @EnableFlags(FLAG_QS_TILE_DETAILED_VIEW)
+    fun testVolumeSlider() = kosmos.runTest {
+        overrideResource(R.bool.config_enableDesktopAudioTileDetailsView, true)
+
+        composeTestRule.setContent {
+            PlatformTheme {
+                WithStatusIconContext(kosmos.tintedIconManagerFactory) {
+                    with(quickSettingsShadeOverlay) {
+                        TestContentScope { Content(Modifier) }
+                    }
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+
+        // Verify the slider's height. "Media" is the tag of the volume slider.
+        composeTestRule
+            .onNodeWithTag(resIdToTestTag("Media"))
+            .assertHeightIsEqualTo(52.dp)
     }
 }

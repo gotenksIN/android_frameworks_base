@@ -2225,8 +2225,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 mHandler.removeMessages(LAUNCH_TIMEOUT_MSG);
             }
         }
-
-        mRootWindowContainer.applySleepTokens(false /* applyToRootTasks */);
+        mRootWindowContainer.sleepAllDisplays();
     }
 
     boolean shutdownLocked(int timeout) {
@@ -2735,6 +2734,12 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             mTopResumedActivityWaitingForPrev = false;
         }
         scheduleTopResumedActivityStateIfNeeded();
+    }
+
+    /** Returns {@code true} if there will be a RESUMED state change of top app. */
+    boolean hasPendingTopResumedSwitch() {
+        return mTopResumedActivity == null
+                && (mWaitingTopResumedLostActivity != null || mTopResumedActivityWaitingForPrev);
     }
 
     void removeIdleTimeoutForActivity(ActivityRecord r) {

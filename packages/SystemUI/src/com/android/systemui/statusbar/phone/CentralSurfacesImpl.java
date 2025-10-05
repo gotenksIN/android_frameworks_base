@@ -158,7 +158,6 @@ import com.android.systemui.scene.domain.interactor.WindowRootViewVisibilityInte
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.scrim.ScrimView;
 import com.android.systemui.settings.UserTracker;
-import com.android.systemui.settings.brightness.BrightnessSliderController;
 import com.android.systemui.settings.brightness.data.repository.BrightnessMirrorShowingRepository;
 import com.android.systemui.shade.CameraLauncher;
 import com.android.systemui.shade.GlanceableHubContainerController;
@@ -209,7 +208,6 @@ import com.android.systemui.statusbar.notification.stack.NotificationStackScroll
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
 import com.android.systemui.statusbar.phone.dagger.StatusBarPhoneModule;
 import com.android.systemui.statusbar.policy.BatteryController;
-import com.android.systemui.statusbar.policy.BrightnessMirrorController;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
@@ -217,6 +215,7 @@ import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceP
 import com.android.systemui.statusbar.policy.ExtensionController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserInfoControllerImpl;
+import com.android.systemui.statusbar.window.StatusBarWindowControllerStore;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
 import com.android.systemui.surfaceeffects.ripple.RippleShader.RippleShape;
 import com.android.systemui.topui.TopUiController;
@@ -361,7 +360,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final PhoneStatusBarPolicy mIconPolicy;
 
     private final VolumeComponent mVolumeComponent;
-    private BrightnessMirrorController mBrightnessMirrorController;
     private boolean mBrightnessMirrorVisible;
     private BiometricUnlockController mBiometricUnlockController;
     private final LightBarController mLightBarController;
@@ -375,8 +373,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final NotificationShadeWindowController mNotificationShadeWindowController;
     private final TopUiController mTopUiController;
     private final StatusBarInitializer mStatusBarInitializer;
-    private final PerDisplayRepository<SystemUIDisplaySubcomponent>
-            mPerDisplaySubcomponentRepository;
+    private final StatusBarWindowControllerStore mStatusBarWindowControllerStore;
     private final StatusBarModeRepositoryStore mStatusBarModeRepository;
     private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
     @VisibleForTesting
@@ -436,7 +433,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final NotificationGutsManager mGutsManager;
     private final ShadeExpansionStateManager mShadeExpansionStateManager;
     private final KeyguardViewMediator mKeyguardViewMediator;
-    private final BrightnessSliderController.Factory mBrightnessSliderFactory;
     private final FeatureFlags mFeatureFlags;
     private final FragmentService mFragmentService;
     private final ScreenOffAnimationController mScreenOffAnimationController;
@@ -604,6 +600,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             LightBarController lightBarController,
             AutoHideController autoHideController,
             StatusBarInitializer statusBarInitializer,
+            StatusBarWindowControllerStore statusBarWindowControllerStore,
             PerDisplayRepository<SystemUIDisplaySubcomponent> perDisplaySubcomponentRepository,
             StatusBarModeRepositoryStore statusBarModeRepository,
             KeyguardUpdateMonitor keyguardUpdateMonitor,
@@ -678,7 +675,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             DemoModeController demoModeController,
             Lazy<NotificationShadeDepthController> notificationShadeDepthControllerLazy,
             ShadeTouchableRegionManager shadeTouchableRegionManager,
-            BrightnessSliderController.Factory brightnessSliderFactory,
             ScreenOffAnimationController screenOffAnimationController,
             WallpaperController wallpaperController,
             StatusBarHideIconsForBouncerManager statusBarHideIconsForBouncerManager,
@@ -711,7 +707,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mLightBarController = lightBarController;
         mAutoHideController = autoHideController;
         mStatusBarInitializer = statusBarInitializer;
-        mPerDisplaySubcomponentRepository = perDisplaySubcomponentRepository;
+        mStatusBarWindowControllerStore = statusBarWindowControllerStore;
         mStatusBarModeRepository = statusBarModeRepository;
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
         mPulseExpansionHandler = pulseExpansionHandler;
@@ -782,7 +778,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mUserInfoControllerImpl = userInfoControllerImpl;
         mIconPolicy = phoneStatusBarPolicy;
         mDemoModeController = demoModeController;
-        mBrightnessSliderFactory = brightnessSliderFactory;
         mWallpaperController = wallpaperController;
         mStatusBarSignalPolicy = statusBarSignalPolicy;
         mStatusBarHideIconsForBouncerManager = statusBarHideIconsForBouncerManager;
@@ -1287,12 +1282,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                             .withPlugin(QS.class)
                             .withDefault(this::createDefaultQSFragment)
                             .build());
-            mBrightnessMirrorController = new BrightnessMirrorController(
-                    getNotificationShadeWindowView(),
-                    mShadeSurface,
-                    mNotificationShadeDepthControllerLazy.get(),
-                    mBrightnessSliderFactory,
-                    this::setBrightnessMirrorShowing);
         }
 
         mReportRejectedTouch = getNotificationShadeWindowView()
@@ -1831,10 +1820,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         // When the StatusBarConnectedDisplays flag is enabled, this logic will be done in
         // StatusBarOrchestrator
         if (!StatusBarConnectedDisplays.isEnabled()) {
-            mPerDisplaySubcomponentRepository
-                    .get(Display.DEFAULT_DISPLAY)
-                    .getStatusBarWindowController()
-                    .attach();
+            mStatusBarWindowControllerStore.getDefaultDisplay().attach();
         }
     }
 
@@ -1931,9 +1917,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             if (mShadeSurface != null) {
                 mShadeSurface.updateResources();
             }
-        }
-        if (mBrightnessMirrorController != null) {
-            mBrightnessMirrorController.updateResources();
         }
         if (mStatusBarKeyguardViewManager != null) {
             mStatusBarKeyguardViewManager.updateResources();
@@ -2959,19 +2942,12 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
         @Override
         public void onDensityOrFontScaleChanged() {
-            // TODO: Remove this.
-            if (mBrightnessMirrorController != null) {
-                mBrightnessMirrorController.onDensityOrFontScaleChanged();
-            }
             // TODO: Bring these out of CentralSurfaces.
             mUserInfoControllerImpl.onDensityOrFontScaleChanged();
         }
 
         @Override
         public void onThemeChanged() {
-            if (mBrightnessMirrorController != null) {
-                mBrightnessMirrorController.onOverlayChanged();
-            }
             // We need the new R.id.keyguard_indication_area before recreating
             // mKeyguardIndicationController
             mShadeSurface.onThemeChanged();
@@ -2981,13 +2957,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             }
             if (mAmbientIndicationContainer instanceof AutoReinflateContainer) {
                 ((AutoReinflateContainer) mAmbientIndicationContainer).inflateLayout();
-            }
-        }
-
-        @Override
-        public void onUiModeChanged() {
-            if (mBrightnessMirrorController != null) {
-                mBrightnessMirrorController.onUiModeChanged();
             }
         }
     };

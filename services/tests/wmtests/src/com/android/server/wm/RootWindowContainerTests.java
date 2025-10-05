@@ -697,10 +697,11 @@ public class RootWindowContainerTests extends WindowTestsBase {
         doReturn(isFocusedTask ? task : null).when(display).getFocusedRootTask();
         TaskDisplayArea defaultTaskDisplayArea = display.getDefaultTaskDisplayArea();
         doReturn(isFocusedTask ? task : null).when(defaultTaskDisplayArea).getFocusedRootTask();
-        mRootWindowContainer.applySleepTokens(true);
+        mRootWindowContainer.applySleepTokens(ActionChain.test());
         verify(task, times(expectWakeFromSleep ? 1 : 0)).awakeFromSleeping();
         verify(task, times(expectResumeTopActivity ? 1 : 0)).resumeTopActivityUncheckedLocked(
                 isNull() /* target */, isNull() /* targetOptions */, eq(false) /* deferPause */);
+        waitHandlerIdle(mAtm.mH);
     }
 
     @Test
@@ -725,7 +726,7 @@ public class RootWindowContainerTests extends WindowTestsBase {
         doReturn(false).when(display).shouldSleep();
         // Allow to resume when awaking.
         setBooted(mAtm);
-        mRootWindowContainer.applySleepTokens(true);
+        mRootWindowContainer.applySleepTokens(ActionChain.test());
 
         // The display orientation should be changed by the activity so there is no relaunch.
         verify(activity, never()).relaunchActivityLocked(anyBoolean(), anyInt());
@@ -1615,6 +1616,22 @@ public class RootWindowContainerTests extends WindowTestsBase {
         assertEquals(2, result.size());
         assertEquals(activity1.token, result.get(0).getActivityToken());
         assertEquals(activity0.token, result.get(1).getActivityToken());
+    }
+
+    @Test
+    public void testOnDisplayAddedOrRemovedNotifiesTmaChanged() {
+        final DisplayInfo displayInfo = new DisplayInfo();
+        displayInfo.copyFrom(mDisplayInfo);
+        final DisplayContent dc = createNewDisplay(displayInfo);
+        final int displayId = dc.getDisplayId();
+
+        mRootWindowContainer.onDisplayAdded(displayId);
+
+        verify(mAtm).onTaskMoveAllowedChanged();
+
+        mRootWindowContainer.onDisplayRemoved(displayId);
+
+        verify(mAtm, times(2)).onTaskMoveAllowedChanged();
     }
 
     /**

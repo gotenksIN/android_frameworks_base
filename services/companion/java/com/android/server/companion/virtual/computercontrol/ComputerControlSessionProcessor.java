@@ -19,6 +19,7 @@ package com.android.server.companion.virtual.computercontrol;
 import static android.app.PendingIntent.FLAG_CANCEL_CURRENT;
 import static android.app.PendingIntent.FLAG_IMMUTABLE;
 import static android.app.PendingIntent.FLAG_ONE_SHOT;
+import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_USER_INITIATED;
 
 import android.annotation.NonNull;
 import android.app.Activity;
@@ -74,7 +75,7 @@ public class ComputerControlSessionProcessor {
     private final KeyguardManager mKeyguardManager;
     private final AppOpsManager mAppOpsManager;
     private final PackageManager mPackageManager;
-    private final ComputerControlAccessManager mAccessManager;
+    private final ComputerControlUserAccessController mUserAccessController;
     private final VirtualDeviceFactory mVirtualDeviceFactory;
     private final PendingIntentFactory mPendingIntentFactory;
 
@@ -101,7 +102,7 @@ public class ComputerControlSessionProcessor {
         mKeyguardManager = context.getSystemService(KeyguardManager.class);
         mAppOpsManager = context.getSystemService(AppOpsManager.class);
         mPackageManager = context.getPackageManager();
-        mAccessManager = new ComputerControlAccessManager(context);
+        mUserAccessController = new ComputerControlUserAccessController(context);
     }
 
     /**
@@ -116,7 +117,8 @@ public class ComputerControlSessionProcessor {
             @NonNull ComputerControlSessionParams params,
             @NonNull IComputerControlSessionCallback callback) {
         validateParams(attributionSource, params);
-        Set<UserHandle> allowedUsers = mAccessManager.validateAndGetAllowedUsers(attributionSource);
+        Set<UserHandle> allowedUsers =
+                mUserAccessController.validateAndGetAllowedUsers(attributionSource);
         startHandlerThreadIfNeeded();
 
         final boolean canCreateWithoutConsent;
@@ -231,7 +233,11 @@ public class ComputerControlSessionProcessor {
             Slog.d(TAG, "Creating ComputerControlSession " + params.getName());
             session = new ComputerControlSessionImpl(
                     mContext, callback.asBinder(), params, attributionSource, mVirtualDeviceFactory,
-                    allowedUsers, new OnSessionClosedListener(params.getName(), callback));
+                    allowedUsers, (closedSession) -> {
+                synchronized (mSessions) {
+                    mSessions.remove(closedSession);
+                }
+            });
             mSessions.add(session);
         }
 
@@ -245,7 +251,7 @@ public class ComputerControlSessionProcessor {
     }
 
     /** Closes the session with the given ID. */
-    public void closeSession(int deviceId) {
+    public void closeSessionByUserIntent(int deviceId) {
         synchronized (mSessions) {
             for (int i = 0; i < mSessions.size(); i++) {
                 ComputerControlSessionImpl session = mSessions.valueAt(i);
@@ -253,7 +259,7 @@ public class ComputerControlSessionProcessor {
                     continue;
                 }
                 try {
-                    session.close();
+                    session.close(CLOSE_REASON_USER_INITIATED);
                 } catch (RemoteException e) {
                     Slog.w(TAG, "Failed to close ComputerControlSession for deviceId "
                             + deviceId, e);
@@ -348,41 +354,6 @@ public class ComputerControlSessionProcessor {
             parcel.recycle();
 
             return ipcFriendly;
-        }
-    }
-
-    /**
-     * Listener for when a {@link ComputerControlSessionImpl} is closed.
-     *
-     * <p>Removes the session from the set of active sessions and notifies the client.
-     */
-    private class OnSessionClosedListener implements ComputerControlSessionImpl.OnClosedListener {
-        @NonNull
-        private final String mSessionName;
-        @NonNull
-        private final IComputerControlSessionCallback mAppCallback;
-
-        OnSessionClosedListener(@NonNull String sessionName,
-                @NonNull IComputerControlSessionCallback appCallback) {
-            mSessionName = sessionName;
-            mAppCallback = appCallback;
-        }
-
-        @Override
-        public void onClosed(@NonNull ComputerControlSessionImpl session) {
-            synchronized (mSessions) {
-                if (!mSessions.remove(session)) {
-                    // The session was already removed, which can happen if close() is called
-                    // multiple times.
-                    return;
-                }
-            }
-            try {
-                mAppCallback.onSessionClosed();
-            } catch (RemoteException e) {
-                Slog.w(TAG, "Failed to notify ComputerControlSession " + mSessionName
-                        + " about session closure");
-            }
         }
     }
 

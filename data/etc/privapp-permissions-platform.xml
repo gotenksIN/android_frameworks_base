@@ -462,6 +462,8 @@ applications that come with the platform
         <permission name="android.permission.REQUEST_COMPANION_SELF_MANAGED" />
         <permission name="android.permission.REQUEST_OBSERVE_DEVICE_UUID_PRESENCE" />
         <permission name="android.permission.ACCESS_COMPANION_INFO" />
+        <permission name="android.permission.READ_REMOTE_TASKS" />
+        <permission name="android.permission.REQUEST_TASK_HANDOFF" />
 
         <!-- Permission required for testing registering pull atom callbacks. -->
         <permission name="android.permission.REGISTER_STATS_PULL_ATOM"/>
@@ -736,5 +738,9 @@ applications that come with the platform
 
     <privapp-permissions package="com.android.wm.shell">
         <permission name="android.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE" />
+    </privapp-permissions>
+
+    <privapp-permissions package="com.android.crossdevicesync">
+        <permission name="android.permission.INTERACT_ACROSS_USERS" />
     </privapp-permissions>
 </permissions>

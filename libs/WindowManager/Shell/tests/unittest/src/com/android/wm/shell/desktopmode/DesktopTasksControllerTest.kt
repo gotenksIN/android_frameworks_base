@@ -78,6 +78,7 @@ import android.view.WindowManager.TRANSIT_START_LOCK_TASK_MODE
 import android.view.WindowManager.TRANSIT_TO_BACK
 import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.widget.Toast
+import android.window.DesktopExperienceFlags
 import android.window.DisplayAreaInfo
 import android.window.IWindowContainerToken
 import android.window.RemoteTransition
@@ -157,6 +158,8 @@ import com.android.wm.shell.desktopmode.multidesks.DesksTransitionObserver
 import com.android.wm.shell.desktopmode.multidesks.PreserveDisplayRequestHandler
 import com.android.wm.shell.draganddrop.DragAndDropController
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter
+import com.android.wm.shell.pip2.phone.PipScheduler
+import com.android.wm.shell.pip2.phone.PipTransitionState
 import com.android.wm.shell.recents.RecentTasksController
 import com.android.wm.shell.recents.RecentsTransitionHandler
 import com.android.wm.shell.recents.RecentsTransitionStateListener
@@ -272,6 +275,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @Mock lateinit var desktopModeVisualIndicator: DesktopModeVisualIndicator
     @Mock lateinit var recentTasksController: RecentTasksController
     @Mock lateinit var snapEventHandler: SnapEventHandler
+    @Mock lateinit var pipScheduler: PipScheduler
     @Mock private lateinit var mockInteractionJankMonitor: InteractionJankMonitor
     @Mock private lateinit var mockSurface: SurfaceControl
     @Mock private lateinit var taskbarDesktopTaskListener: TaskbarDesktopTaskListener
@@ -309,6 +313,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @Mock private lateinit var desktopFirstListenerManager: DesktopFirstListenerManager
     @Mock private lateinit var taskSnapshotManager: TaskSnapshotManager
     @Mock private lateinit var transactionPool: TransactionPool
+    @Mock private lateinit var pipTransitionState: PipTransitionState
     @Mock private lateinit var surfaceControlTransaction: SurfaceControl.Transaction
 
     private lateinit var controller: DesktopTasksController
@@ -489,6 +494,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         controller.taskbarDesktopTaskListener = taskbarDesktopTaskListener
         controller.setSnapEventHandler(snapEventHandler)
+        controller.setPipScheduler(pipScheduler)
 
         taskRepository = userRepositories.current
         taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = DEFAULT_DISPLAY)
@@ -553,6 +559,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             Optional.of(desktopFirstListenerManager),
             taskSnapshotManager,
             transactionPool,
+            Optional.of(pipTransitionState),
         )
 
     @After
@@ -9104,6 +9111,53 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG)
+    fun onDesktopDragEnd_noBoundsChangeAndMoveToNewDisplay_reparentWct() {
+        val task = setUpFreeformTask()
+        val spyController = spy(controller)
+        val mockSurface = mock(SurfaceControl::class.java)
+        val mockDisplayLayout = mock(DisplayLayout::class.java)
+        taskRepository.addDesk(displayId = SECONDARY_DISPLAY_ID, deskId = SECONDARY_DISPLAY_ID)
+        taskRepository.setActiveDesk(
+            displayId = SECONDARY_DISPLAY_ID,
+            deskId = SECONDARY_DISPLAY_ID,
+        )
+        whenever(displayController.getDisplayLayout(task.displayId)).thenReturn(mockDisplayLayout)
+        whenever(mockDisplayLayout.stableInsets()).thenReturn(Rect(0, 100, 2000, 2000))
+
+        val currentDragBounds = Rect(100, 200, 500, 1000)
+        whenever(spyController.getVisualIndicator()).thenReturn(desktopModeVisualIndicator)
+        whenever(desktopModeVisualIndicator.updateIndicatorType(any(), anyOrNull()))
+            .thenReturn(DesktopModeVisualIndicator.IndicatorType.NO_INDICATOR)
+        whenever(motionEvent.displayId).thenReturn(SECONDARY_DISPLAY_ID)
+
+        spyController.onDragPositioningEnd(
+            taskInfo = task,
+            taskSurface = mockSurface,
+            displayId = SECONDARY_DISPLAY_ID,
+            inputCoordinate = PointF(200f, 300f),
+            currentDragBounds = currentDragBounds,
+            validDragArea = Rect(0, 50, 2000, 2000),
+            dragStartBounds = currentDragBounds,
+            motionEvent = motionEvent,
+        )
+
+        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
+            verify(transitions)
+                .startTransition(
+                    eq(TRANSIT_CHANGE),
+                    Mockito.argThat { wct ->
+                        return@argThat wct.hierarchyOps[0].isReparent
+                    },
+                    eq(windowDragTransitionHandler),
+                )
+        } else {
+            verify(desksOrganizer)
+                .moveTaskToDesk(any(), eq(SECONDARY_DISPLAY_ID), eq(task), eq(false))
+        }
+    }
+
+    @Test
     @EnableFlags(Flags.FLAG_ENABLE_WINDOW_DROP_SMOOTH_TRANSITION)
     fun onDesktopDragEnd_fullscreenIndicator_dragToExitDesktop() {
         val task = setUpFreeformTask(bounds = Rect(0, 0, 100, 100))
@@ -9473,7 +9527,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    fun onDesktopDragEnd_noIndicator_noBoundsMovement_noReturnToStartAnimation_noWct() {
+    fun onDesktopDragEnd_noIndicator_noBoundsMovement_noReturnToStartAnimation_noWct_setPosition() {
         val task = setUpFreeformTask(bounds = STABLE_BOUNDS)
         val spyController = spy(controller)
         val mockSurface = mock(SurfaceControl::class.java)
@@ -9516,6 +9570,13 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             .start(eq(task.taskId), eq(mockSurface), any(), any(), anyOrNull())
         // Verify no WCT is started.
         verify(transitions, never()).startTransition(any(), any(), any())
+        // Verify the task position is finalized to current bounds
+        verify(surfaceControlTransaction)
+            .setPosition(
+                mockSurface,
+                currentDragBounds.left.toFloat(),
+                currentDragBounds.top.toFloat(),
+            )
     }
 
     @Test
@@ -10348,7 +10409,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             ),
         )
 
-        assertThat(taskRepository.removeBoundsBeforeMaximize(task.taskId)).isEqualTo(bounds)
+        assertThat(taskRepository.removeBoundsBeforeSnapOrMaximize(task.taskId)).isEqualTo(bounds)
         verify(desktopModeEventLogger)
             .logTaskResizingEnded(
                 resizeTrigger = ResizeTrigger.MAXIMIZE_BUTTON,
@@ -10523,7 +10584,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         )
 
         // Assert last bounds before maximize removed after use
-        assertThat(taskRepository.removeBoundsBeforeMaximize(task.taskId)).isNull()
+        assertThat(taskRepository.removeBoundsBeforeSnapOrMaximize(task.taskId)).isNull()
         verify(desktopModeEventLogger, times(1))
             .logTaskResizingEnded(
                 resizeTrigger = ResizeTrigger.MAXIMIZE_BUTTON,

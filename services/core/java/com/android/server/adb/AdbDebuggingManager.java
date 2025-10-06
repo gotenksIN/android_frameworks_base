@@ -180,6 +180,11 @@ public class AdbDebuggingManager {
         mHandler = new AdbDebuggingHandler(FgThread.get().getLooper(), adbDebuggingThread);
     }
 
+    void onDeviceNameChanged() {
+        Message msg = mHandler.obtainMessage(AdbDebuggingHandler.MSG_DEVICE_NAME_CHANGED);
+        mHandler.sendMessage(msg);
+    }
+
     static void sendBroadcastWithDebugPermission(
             @NonNull Context context, @NonNull Intent intent, @NonNull UserHandle userHandle) {
         context.sendBroadcastAsUser(
@@ -299,7 +304,7 @@ public class AdbDebuggingManager {
                         continue;
                     }
 
-                    Slog.d(TAG, "Recv packet: " + messageType);
+                    Slog.d(TAG, "Recv packet: " + messageType.get());
 
                     // TODO, convert all these tests to check with messageType.
                     if (buffer[0] == 'P' && buffer[1] == 'K') {
@@ -451,10 +456,7 @@ public class AdbDebuggingManager {
                                         AdbDebuggingHandler.MSG_UNREGISTER_SERVICE,
                                         bundle));
                     } else {
-                        Slog.e(
-                                TAG,
-                                "Wrong message: " + (new String(Arrays.copyOfRange(buffer, 0, 2))));
-                        break;
+                        Slog.e(TAG, "Skipping unknown message type: " + messageType.get());
                     }
                 }
             } finally {
@@ -504,7 +506,7 @@ public class AdbDebuggingManager {
 
     // We need to know if ADBd will have access to the version of adbdauth which allows
     // to send ADB Wifi TSL port and ADBWifi lifecycle management over methods.
-    private static boolean wifiLifeCycleOverAdbdauthSupported() {
+    static boolean wifiLifeCycleOverAdbdauthSupported() {
         return Flags.useTlsLifecycle()
                 && (Build.VERSION.SDK_INT >= 37
                         || (Build.VERSION.SDK_INT == 36 && isAtLeastPreReleaseCodename("Baklava")));
@@ -617,11 +619,13 @@ public class AdbDebuggingManager {
         // Notification when adbd socket is disconnected.
         static final int MSG_ADBD_SOCKET_DISCONNECTED = 27;
 
-        // === Messages from other parts of the system
         private static final int MESSAGE_KEY_FILES_UPDATED = 28;
 
         private static final int MSG_REGISTER_SERVICE = 29;
         private static final int MSG_UNREGISTER_SERVICE = 30;
+
+        // Event sent when the framework device name was been changed by the user.
+        static final int MSG_DEVICE_NAME_CHANGED = 31;
 
         // === Messages we can send to adbd ===========
         static final String MSG_DISCONNECT_DEVICE = "DD";
@@ -1048,6 +1052,12 @@ public class AdbDebuggingManager {
                     String instanceName = bundle.getString("instanceName");
                     String serviceType = bundle.getString("serviceType");
                     mAdbdServicesManager.unregisterService(instanceName, serviceType);
+                }
+                case MSG_DEVICE_NAME_CHANGED -> {
+                    if (!mAdbWifiEnabled) {
+                        return;
+                    }
+                    mAdbdServicesManager.onAttributeChanged();
                 }
             }
         }

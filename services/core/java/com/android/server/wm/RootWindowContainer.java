@@ -37,7 +37,6 @@ import static android.view.WindowManager.LayoutParams.TYPE_NOTIFICATION_SHADE;
 import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION;
 import static android.view.WindowManager.TRANSIT_FLAG_KEYGUARD_OCCLUDING;
-import static android.view.WindowManager.TRANSIT_NONE;
 import static android.view.WindowManager.TRANSIT_PIP;
 import static android.view.WindowManager.TRANSIT_SLEEP;
 import static android.view.WindowManager.TRANSIT_WAKE;
@@ -1018,7 +1017,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     break;
                 case MSG_SEND_SLEEP_TRANSITION:
                     synchronized (mService.mGlobalLock) {
-                        sendSleepTransition((DisplayContent) msg.obj);
+                        sendSleepTransition();
                     }
                     break;
                 default:
@@ -2723,39 +2722,39 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         return result;
     }
 
-    void sendSleepTransition(final DisplayContent display) {
+    void sendSleepTransition() {
         // We don't actually care about collecting anything here. We really just want
         // this as a signal to the transition-player.
         final Transition transition = new Transition(TRANSIT_SLEEP, 0 /* flags */,
-                display.mTransitionController, mWmService.mSyncEngine);
+                mTransitionController, mWmService.mSyncEngine);
         final TransitionController.OnStartCollect sendSleepTransition = (deferred) -> {
-            if (deferred && !display.shouldSleep()) {
+            if (deferred && !mService.isSleepingOrShuttingDownLocked()) {
                 transition.abort();
             } else {
-                mService.mChainTracker.start("enterPip1", transition);
-                display.mTransitionController.requestStartTransition(transition,
+                mService.mChainTracker.start("deferredSleep", transition);
+                mTransitionController.requestStartTransition(transition,
                         null /* trigger */, null /* remote */, null /* display */);
                 mService.mChainTracker.end();
                 // Force playing immediately so that unrelated ops can't be collected.
                 transition.playNow();
             }
         };
-        if (!display.mTransitionController.isCollecting()) {
+        if (!mTransitionController.isCollecting()) {
             // Since this bypasses sync, submit directly ignoring whether sync-engine
             // is active.
             if (mWindowManager.mSyncEngine.hasActiveSync()) {
                 Slog.w(TAG, "Ongoing sync outside of a transition.");
             }
-            display.mTransitionController.moveToCollecting(transition);
+            mTransitionController.moveToCollecting(transition);
             sendSleepTransition.onCollectStarted(false /* deferred */);
         } else {
-            display.mTransitionController.startCollectOrQueue(transition,
-                    sendSleepTransition);
+            mTransitionController.startCollectOrQueue(transition, sendSleepTransition);
         }
     }
 
-    void applySleepTokens(boolean applyToRootTasks) {
-        boolean scheduledSleepTransition = false;
+    void applySleepTokens(@NonNull ActionChain chain) {
+        boolean scheduleSleepTransition = false;
+        Transition newWakeTransition = null;
 
         for (int displayNdx = getChildCount() - 1; displayNdx >= 0; --displayNdx) {
             // Set the sleeping state of the display.
@@ -2764,44 +2763,21 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (displayShouldSleep == display.isSleeping()) {
                 continue;
             }
-            final boolean wasSleeping = display.isSleeping();
             display.setIsSleeping(displayShouldSleep);
+            scheduleSleepTransition |= displayShouldSleep && display.isScreenSleeping();
 
-            if (display.mTransitionController.isShellTransitionsEnabled()
-                    && !scheduledSleepTransition
-                    // Only care if there are actual sleep states.
-                    && displayShouldSleep && display.isScreenSleeping()) {
-                scheduledSleepTransition = true;
-
-                if (!mHandler.hasMessages(MSG_SEND_SLEEP_TRANSITION)) {
-                    mHandler.sendMessageDelayed(
-                            mHandler.obtainMessage(MSG_SEND_SLEEP_TRANSITION, display),
-                            SLEEP_TRANSITION_WAIT_MILLIS);
-                }
-            }
-
-            if (!applyToRootTasks) {
-                continue;
-            }
-
-            final ActionChain chain = mService.mChainTracker.startTransit("sleepTokens");
             // Prepare transition before resume top activity, so it can be collected.
             if (!displayShouldSleep && display.mTransitionController.isShellTransitionsEnabled()
                     && !chain.isCollecting()) {
-                // Use NONE if keyguard is not showing.
-                int transit = TRANSIT_NONE;
                 Task startTask = null;
                 int flags = 0;
                 if (display.isKeyguardOccluded()) {
                     startTask = display.getTaskOccludingKeyguard();
                     flags = TRANSIT_FLAG_KEYGUARD_OCCLUDING;
-                    transit = WindowManager.TRANSIT_KEYGUARD_OCCLUDE;
-                }
-                if (wasSleeping) {
-                    transit = TRANSIT_WAKE;
                 }
                 chain.attachTransition(
-                        display.mTransitionController.createTransition(transit, flags));
+                        display.mTransitionController.createTransition(TRANSIT_WAKE, flags));
+                newWakeTransition = chain.getTransition();
                 display.mTransitionController.requestStartTransition(chain.getTransition(),
                         startTask, null /* remoteTransition */, null /* displayChange */);
             }
@@ -2830,11 +2806,35 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     rootTask.ensureActivitiesVisible(null /* starting */);
                 }
             });
-            mService.mChainTracker.endPartial();
         }
-
-        if (!scheduledSleepTransition) {
+        if (newWakeTransition != null) {
+            newWakeTransition.setAllReady();
+        }
+        if (scheduleSleepTransition) {
+            scheduleSleepTransition();
+        } else {
             mHandler.removeMessages(MSG_SEND_SLEEP_TRANSITION);
+        }
+    }
+
+    private void scheduleSleepTransition() {
+        if (!mService.getTransitionController().isShellTransitionsEnabled()) return;
+        if (mHandler.hasMessages(MSG_SEND_SLEEP_TRANSITION)) return;
+        mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_SEND_SLEEP_TRANSITION),
+                SLEEP_TRANSITION_WAIT_MILLIS);
+    }
+
+    void sleepAllDisplays() {
+        boolean scheduleSleepTransition = false;
+        for (int displayNdx = getChildCount() - 1; displayNdx >= 0; --displayNdx) {
+            // Set the sleeping state of the display.
+            final DisplayContent display = getChildAt(displayNdx);
+            if (display.isSleeping()) continue;
+            display.setIsSleeping(true);
+            scheduleSleepTransition |= display.isScreenSleeping();
+        }
+        if (scheduleSleepTransition) {
+            scheduleSleepTransition();
         }
     }
 
@@ -2970,6 +2970,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // Drop any cached DisplayInfos associated with this display id - the values are now
             // out of date given this display added event.
             mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(displayId);
+
+            // We serve a map from display IDs to respective values, so we need to notify client
+            // when the display is added.
+            mService.onTaskMoveAllowedChanged();
         }
     }
 
@@ -3031,6 +3035,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             } else {
                 removeDisplayContent(displayContent);
             }
+
+            // We serve a map from display IDs to respective values, so we need to notify client
+            // when the display is removed.
+            mService.onTaskMoveAllowedChanged();
         }
     }
 

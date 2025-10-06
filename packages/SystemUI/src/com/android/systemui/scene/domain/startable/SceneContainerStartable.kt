@@ -307,13 +307,13 @@ constructor(
                                 val visibilityForTransitionState =
                                     when (transitionState) {
                                         is ObservableTransitionState.Idle -> {
-                                            if (transitionState.currentScene == Scenes.Dream) {
-                                                false to "dream is showing"
-                                            } else if (
+                                            if (
                                                 transitionState.currentScene != Scenes.Gone &&
-                                                    transitionState.currentScene != Scenes.Occluded
+                                                    transitionState.currentScene !=
+                                                        Scenes.Occluded &&
+                                                    transitionState.currentScene != Scenes.Dream
                                             ) {
-                                                true to "scene is not Gone and not Occluded"
+                                                true to "scene is not Gone, Occluded, or Dream"
                                             } else if (
                                                 transitionState.currentOverlays.isNotEmpty()
                                             ) {
@@ -862,9 +862,16 @@ constructor(
         }
 
         applicationScope.launch {
-            deviceEntryInteractor.isDeviceEntered.collect { isDeviceEntered ->
-                windowController.setKeyguardShowing(!isDeviceEntered)
-            }
+            combine(deviceEntryInteractor.isDeviceEntered, sceneInteractor.transitionState, ::Pair)
+                .map { (isDeviceEntered, transitionState) ->
+                    !isDeviceEntered ||
+                        transitionState.isTransitioningSets(
+                            from = setOf(Scenes.Lockscreen, Scenes.Occluded, Overlays.Bouncer),
+                            to = setOf(Scenes.Gone),
+                        )
+                }
+                .distinctUntilChanged()
+                .collect { windowController.setKeyguardShowing(it) }
         }
 
         applicationScope.launch {
@@ -1002,19 +1009,23 @@ constructor(
 
     private fun handleOcclusion() {
         applicationScope.launch {
-            occlusionInteractor.isKeyguardOccluded.collect { occluded ->
-                // This does not use the scene family to resolve, as there is a race condition when
-                // they both update state based off of the isKeyguardOccluded value.
-                if (occluded) {
-                    switchToScene(Scenes.Occluded, "isKeyguardOccluded == true")
-                } else if (sceneInteractor.currentScene.value == Scenes.Occluded) {
-                    if (deviceEntryInteractor.isDeviceEntered.value) {
-                        switchToScene(Scenes.Gone, "unoccluded and device entered")
-                    } else {
-                        switchToScene(Scenes.Lockscreen, "unoccluded and device not entered")
+            occlusionInteractor.isKeyguardOccluded
+                .sample(sceneBackInteractor.backScene, ::Pair)
+                .collect { (occluded, backScene) ->
+                    // This does not use the scene family to resolve, as there is a race condition
+                    // when they both update state based off of the isKeyguardOccluded value.
+                    if (occluded) {
+                        switchToScene(Scenes.Occluded, "isKeyguardOccluded == true")
+                    } else if (sceneInteractor.currentScene.value == Scenes.Occluded) {
+                        if (backScene == Scenes.Communal) {
+                            switchToScene(Scenes.Communal, "unoccluded and previously on communal")
+                        } else if (deviceEntryInteractor.isDeviceEntered.value) {
+                            switchToScene(Scenes.Gone, "unoccluded and device entered")
+                        } else {
+                            switchToScene(Scenes.Lockscreen, "unoccluded and device not entered")
+                        }
                     }
                 }
-            }
         }
     }
 

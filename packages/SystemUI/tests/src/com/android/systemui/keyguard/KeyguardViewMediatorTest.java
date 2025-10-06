@@ -293,7 +293,9 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
                 mKosmos.getNotificationShadeWindowModel(),
                 mKosmos::getCommunalInteractor,
                 mKosmos.getShadeLayoutParams(),
-                mKosmos.getTopUiController());
+                mKosmos.getTopUiController(),
+                mKosmos.getKeyguardSurfaceBehindInteractor(),
+                mKosmos.getJavaAdapter());
         mFeatureFlags = new FakeFeatureFlags();
         mSetFlagsRule.disableFlags(FLAG_KEYGUARD_WM_STATE_REFACTOR);
 
@@ -1532,6 +1534,37 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
 
         assertTrue(mViewMediator.isShowingAndNotOccluded());
         verify(mStatusBarKeyguardViewManager, never()).hide(anyLong(), anyLong());
+    }
+
+    @Test
+    @TestableLooper.RunWithLooper(setAsMainLooper = true)
+    public void testKeyguardExitAnimationCanceledIfSimLocked() {
+        int currentUser = 55;
+        // Mock an  insecure user
+        setCurrentUser(currentUser, false);
+
+        // Setup keyguard
+        mViewMediator.onSystemReady();
+        processAllMessagesAndBgExecutorMessages();
+        captureKeyguardUpdateMonitorCallback();
+        mViewMediator.setShowingLocked(true, "");
+
+        startMockKeyguardExitAnimation();
+        assertTrue(mViewMediator.isShowingAndNotOccluded());
+
+        // Issue a SIM lock
+        mKeyguardUpdateMonitorCallbackCaptor.getValue().onSimStateChanged(
+                /* subId= */1, /* slotId= */0, TelephonyManager.SIM_STATE_PIN_REQUIRED);
+        processAllMessagesAndBgExecutorMessages();
+
+        // Attempt to process the exit animation, but it should fail
+        mViewMediator.mViewMediatorCallback.keyguardDonePending(currentUser);
+        mViewMediator.mViewMediatorCallback.readyForKeyguardDone();
+        TestableLooper.get(this).processAllMessages();
+
+        assertTrue(mViewMediator.isShowingAndNotOccluded());
+        verify(mKeyguardUnlockAnimationController, never())
+                .notifyFinishedKeyguardExitAnimation(false);
     }
 
     private void createAndStartViewMediator() {

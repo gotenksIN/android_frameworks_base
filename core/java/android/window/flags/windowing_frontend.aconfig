@@ -12,16 +12,6 @@ flag {
 }
 
 flag {
-  name: "remove_get_dimmer"
-  namespace: "windowing_frontend"
-  description: "Clean up old usages of dimmer"
-  bug: "435301249"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "release_all_transition_surfaces"
   namespace: "windowing_frontend"
   description: "Reduce offscreen layers which rely on GC to release"
@@ -106,6 +96,16 @@ flag {
   namespace: "windowing_frontend"
   description: "The orientation, aspect ratio, resizability of activity will follow system behavior by default"
   bug: "357141415"
+}
+
+flag {
+  name: "disable_opt_out_universal_resizable_by_default"
+  namespace: "windowing_frontend"
+  description: "Disable opt out universal resizability on large screen since target SDK 37"
+  bug: "447301631"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {

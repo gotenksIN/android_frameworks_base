@@ -1806,20 +1806,14 @@ public class DisplayRotation {
         if (!isDeviceStateRotationLockEnabled(context)) {
             return null;
         }
-        if (!Flags.enableDeviceStateAutoRotateSettingLogging()
-                && !Flags.enableDeviceStateAutoRotateSettingRefactor()) {
-            return null;
-        }
 
         DeviceStateAutoRotateSettingController deviceStateAutoRotateSettingController = null;
 
         final SecureSettings secureSettings = new AndroidSecureSettings(
                 context.getContentResolver());
 
-        if (Flags.enableDeviceStateAutoRotateSettingLogging()) {
-            new DeviceStateAutoRotateSettingIssueLogger(SystemClock::elapsedRealtime,
-                    secureSettings, deviceStateController, wmService.mH);
-        }
+        new DeviceStateAutoRotateSettingIssueLogger(SystemClock::elapsedRealtime, secureSettings,
+                deviceStateController, wmService.mH);
 
         if (Flags.enableDeviceStateAutoRotateSettingRefactor()) {
             final DeviceStateManager deviceStateManager = context.getSystemService(

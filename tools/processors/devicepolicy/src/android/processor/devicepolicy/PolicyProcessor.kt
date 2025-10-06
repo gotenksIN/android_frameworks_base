@@ -19,6 +19,7 @@ package android.processor.devicepolicy
 import android.processor.devicepolicy.protos.PolicyMetadataList
 import android.processor.devicepolicy.protos.PolicyMetadata
 import com.google.protobuf.TextFormat
+import com.squareup.javapoet.JavaFile
 import java.io.Writer
 import javax.annotation.processing.AbstractProcessor
 import javax.annotation.processing.FilerException
@@ -71,7 +72,7 @@ class PolicyProcessor : AbstractProcessor() {
         ).flatten()
 
         try {
-            writePolicies(roundEnvironment, policies)
+            writePolicies(policies)
         } catch (e: FilerException) {
             processingEnv.messager.printMessage(
                 Diagnostic.Kind.WARNING,
@@ -85,7 +86,7 @@ class PolicyProcessor : AbstractProcessor() {
     }
 
     private fun reportUnexpectedAnnotations(roundEnvironment: RoundEnvironment) {
-        roundEnvironment.getElementsAnnotatedWith(PolicyDefinition::class.java).mapNotNull {
+        roundEnvironment.getElementsAnnotatedWith(PolicyDefinition::class.java).forEach {
             printError(it, "@PolicyDefinition can not be applied to any element, use a type-specific annotation such as @EnumPolicyDefinition instead")
         }
     }
@@ -98,21 +99,42 @@ class PolicyProcessor : AbstractProcessor() {
         }
     }
 
-    fun writePolicies(roundEnvironment: RoundEnvironment, policies: List<PolicyMetadata>) {
-        val writer = createWriter(roundEnvironment)
+    fun writePolicies(policies: List<PolicyMetadata>) {
+        val policyMetadata = PolicyMetadataList.newBuilder().addAllPolicyMetadata(policies).build()
+
+        val protoWriter = createResourceWriter("policies.textproto")
         try {
-            val output = PolicyMetadataList.newBuilder().addAllPolicyMetadata(policies).build()
-            TextFormat.printer().print(output, writer)
+            TextFormat.printer().print(policyMetadata, protoWriter)
         } finally {
-            writer.close()
+            protoWriter.close()
+        }
+
+        val policiesClass = PolicyMetadataCodeGenerator.generate(policyMetadata)
+        val policiesWriter = createSourceWriter(policiesClass)
+
+        try {
+            PolicyMetadataCodeGenerator.addLicense(policiesWriter)
+            policiesClass.writeTo(policiesWriter)
+        } finally {
+            policiesWriter.close()
         }
     }
 
-    fun createWriter(roundEnvironment: RoundEnvironment): Writer {
-        return processingEnv.filer.createResource(
-            StandardLocation.SOURCE_OUTPUT, "android.processor.devicepolicy", "policies.textproto"
-        ).openWriter()
-    }
+    fun createResourceWriter(name: String): Writer =
+        processingEnv
+            .filer
+            .createResource(
+                StandardLocation.SOURCE_OUTPUT,
+                "android.processor.devicepolicy",
+                name
+            )
+            .openWriter()
+
+    fun createSourceWriter(file: JavaFile): Writer =
+        processingEnv
+            .filer
+            .createSourceFile("${file.packageName}.${file.typeSpec.name}")
+            .openWriter()
 
     private fun printError(element: Element, message: String) {
         processingEnv.messager.printMessage(

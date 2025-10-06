@@ -336,16 +336,6 @@ flag {
 }
 
 flag {
-    name: "status_bar_universal_battery_data_source"
-    namespace: "systemui"
-    description: "Refactors SysUI to always use the battery data source in status bar"
-    bug: "434194794"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
   name: "status_bar_system_status_icons_in_compose"
   namespace: "systemui"
   description: "Use compose for displaying icons in the status bar system status area"
@@ -440,16 +430,6 @@ flag {
     namespace: "systemui"
     description: "Fix DarkIconInteractor#toIsAreaDark result for mixed status bar lightness, for icons that do not overlap with the dark icon area."
     bug: "423390143"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "status_bar_battery_no_conflation"
-    namespace: "systemui"
-    description: "Use callbackFlow instead of conflatedCallbackFlow in BatteryRepository"
-    bug: "433239990"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -598,6 +578,13 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "status_bar_assistant_icon"
+    namespace: "systemui"
+    description: "Feature flag for the assistant icon in desktop status bar"
+    bug: "440281094"
 }
 
 flag {
@@ -1407,6 +1394,13 @@ flag {
 }
 
 flag {
+    name: "expanded_audio_detailed_view"
+    namespace: "systemui"
+    description: "Enables the expanded audio detailed view and entry point."
+    bug: "374173773"
+}
+
+flag {
     name: "bouncer_ui_revamp"
     namespace: "systemui"
     description: "Updates to background (blur) for bouncer"
@@ -1935,16 +1929,6 @@ flag {
 }
 
 flag {
-    name: "screen_off_animation_guard_enabled"
-    namespace: "systemui"
-    description: "Reports Log.wtf statements if animations are running while screen is off."
-    bug: "420685896"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "blur_settings_toggle"
     namespace: "systemui"
     description: "Add a settings toggle to enable/disable blur."
@@ -2129,4 +2113,11 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enable_lockscreen_blur"
+    namespace: "systemui"
+    description: "Enable blur on more lockscreen surfaces"
+    bug: "444141641"
 }

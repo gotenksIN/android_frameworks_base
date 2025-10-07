@@ -46,12 +46,14 @@ import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Region;
 import android.gui.BorderSettings;
 import android.gui.BoxShadowSettings;
 import android.gui.DropInputMode;
 import android.gui.EarlyWakeupInfo;
 import android.gui.StalledTransactionInfo;
+import android.gui.TransactionBarrier;
 import android.gui.TrustedOverlay;
 import android.hardware.DataSpace;
 import android.hardware.DisplayLuts;
@@ -167,8 +169,14 @@ public final class SurfaceControl implements Parcelable {
             float l, float t, float r, float b);
     private static native void nativeSetCornerRadius(long transactionObj, long nativeObject,
             float cornerRadius);
-    private static native void nativeSetClientDrawnCornerRadius(long transactionObj,
-            long nativeObject, float clientDrawnCornerRadius);
+    private static native void nativeSetCornerRadius(
+            long transactionObj, long nativeObject, float topLeft, float topRight,
+                                float bottomLeft, float bottomRight);
+    private static native void nativeSetClientDrawnCornerRadius(
+            long transactionObj, long nativeObject, float topLeft, float topRight,
+                                                float bottomLeft, float bottomRight,
+                                                float cropTop, float cropLeft,
+                                                float cropBottom, float cropRight);
     private static native void nativeSetBackgroundBlurRadius(long transactionObj, long nativeObject,
             int blurRadius);
     private static native void nativeSetBackgroundBlurScale(long transactionObj, long nativeObject,
@@ -261,6 +269,7 @@ public final class SurfaceControl implements Parcelable {
             Parcel data);
     private static native void nativeAddWindowInfosReportedListener(long transactionObj,
             Runnable listener);
+    private static native void nativeAddTransactionBarrier(long transactionObj, Parcel barrier);
     private static native boolean nativeGetDisplayBrightnessSupport(IBinder displayToken);
     private static native boolean nativeSetDisplayBrightness(IBinder displayToken,
             float sdrBrightness, float sdrBrightnessNits, float displayBrightness,
@@ -337,6 +346,8 @@ public final class SurfaceControl implements Parcelable {
             long nativeObject, long pictureProfileId);
     private static native void nativeSetContentPriority(long transactionObj, long nativeObject,
             int priority);
+    private static native void nativeSetSystemContentPriority(
+            long transactionObj, long nativeObject, int priority);
     private static native String nativeGetName(long nativeObject);
 
     /**
@@ -2823,7 +2834,7 @@ public final class SurfaceControl implements Parcelable {
      *
      * @hide
      */
-    public static SurfaceControl mirrorSurface(SurfaceControl mirrorOf) {
+    public static SurfaceControl mirrorSurface(@NonNull SurfaceControl mirrorOf) {
         return mirrorSurface(mirrorOf, null);
     }
 
@@ -2854,7 +2865,8 @@ public final class SurfaceControl implements Parcelable {
      *
      * @hide
      */
-    public static SurfaceControl mirrorSurface(SurfaceControl mirrorOf, SurfaceControl stopAt) {
+    public static SurfaceControl mirrorSurface(@NonNull SurfaceControl mirrorOf,
+            SurfaceControl stopAt) {
         long stopAtObj = stopAt != null ? stopAt.mNativeObject : 0;
         long nativeObj = nativeMirrorSurface(mirrorOf.mNativeObject, stopAtObj);
         SurfaceControl sc = new SurfaceControl();
@@ -3582,6 +3594,23 @@ public final class SurfaceControl implements Parcelable {
         }
 
         /**
+         * Adds a transaction barrier.
+         *
+         * @param barrier Transaction Barrier.
+         *
+         * @hide
+         */
+        @NonNull
+        public Transaction addTransactionBarrier(@NonNull TransactionBarrier barrier) {
+            Parcel barrierParcel = Parcel.obtain();
+            barrier.writeToParcel(barrierParcel, 0);
+            barrierParcel.setDataPosition(0);
+            nativeAddTransactionBarrier(mNativeObject, barrierParcel);
+            return this;
+        }
+
+
+        /**
          * Adds a callback that is called after WindowInfosListeners from the systems server are
          * complete. This is primarily used to ensure that InputDispatcher::setInputWindowsLocked
          * has been called before running the added callback.
@@ -3807,33 +3836,78 @@ public final class SurfaceControl implements Parcelable {
             return this;
         }
 
-
         /**
-         * Disables corner radius of a {@link SurfaceControl}. When the radius set by
-         * {@link Transaction#setCornerRadius(SurfaceControl, float)} is equal to
-         * clientDrawnCornerRadius the corner radius drawn by SurfaceFlinger is disabled.
+         * Sets the corner radius for each corner of a {@link SurfaceControl}. This is applied to
+         * the SurfaceControl and its children. The API expects a crop to be set on the
+         * SurfaceControl to ensure that the corner radius is applied to the correct region. If the
+         * crop does not intersect with the SurfaceControl's visible content, the corner radius will
+         * not be applied.
          *
          * @param sc SurfaceControl
-         * @param clientDrawnCornerRadius Corner radius drawn by the client
-         * @return Itself.
          * @hide
          */
         @NonNull
-        public Transaction setClientDrawnCornerRadius(@NonNull SurfaceControl sc,
-                                                            float clientDrawnCornerRadius) {
+        public Transaction setCornerRadius(
+                SurfaceControl sc, float topLeft, float topRight,
+                float bottomLeft, float bottomRight) {
             checkPreconditions(sc);
             if (SurfaceControlRegistry.sCallStackDebuggingEnabled) {
-                SurfaceControlRegistry.getProcessInstance().checkCallStackDebugging(
-                        "setClientDrawnCornerRadius", this, sc, "clientDrawnCornerRadius="
-                        + clientDrawnCornerRadius);
+                SurfaceControlRegistry.getProcessInstance()
+                        .checkCallStackDebugging(
+                                "setCornerRadius",
+                                this,
+                                sc,
+                                "topLeft=" + topLeft
+                                + " , topRight=" + topRight
+                                + ", bottomLeft=" + bottomLeft
+                                + " , bottomRight=" + bottomRight);
             }
-            if (Flags.ignoreCornerRadiusAndShadows()) {
-                nativeSetClientDrawnCornerRadius(mNativeObject, sc.mNativeObject,
-                                                                clientDrawnCornerRadius);
-            } else {
+
+            if (!com.android.graphics.surfaceflinger.flags.Flags.setClientDrawnCornerRadii()) {
+                Log.w(TAG, "setCornerRadius was called but"
+                           + "set_client_drawn_corner_radii flag is disabled");
+                return this;
+            }
+            nativeSetCornerRadius(mNativeObject, sc.mNativeObject,
+                                        topLeft, topRight, bottomLeft, bottomRight);
+
+            return this;
+        }
+
+        /**
+         * Disables corner radius of a {@link SurfaceControl}. When the radius set by {@link
+         * Transaction#setCornerRadius(SurfaceControl, float)} is equal to clientDrawnCornerRadius
+         * and the crop set by the client matches the bounds in SurfaceFlinger,
+         * the corner radius drawn by SurfaceFlinger is disabled.
+         *
+         * @hide
+         */
+        @NonNull
+        public Transaction setClientDrawnCornerRadius(
+                @NonNull SurfaceControl sc, float topLeft, float topRight,
+                    float bottomLeft, float bottomRight, RectF crop) {
+            checkPreconditions(sc);
+            if (SurfaceControlRegistry.sCallStackDebuggingEnabled) {
+                SurfaceControlRegistry.getProcessInstance()
+                        .checkCallStackDebugging(
+                                "setClientDrawnCornerRadius",
+                                this,
+                                sc,
+                                "topLeft=" + topLeft
+                                + " , topRight=" + topRight
+                                + ", bottomLeft=" + bottomLeft
+                                + " , bottomRight=" + bottomRight
+                                + ", crop=" + crop);
+            }
+            if (!com.android.graphics.surfaceflinger.flags.Flags.setClientDrawnCornerRadii()) {
                 Log.w(TAG, "setClientDrawnCornerRadius was called but"
-                            + "ignore_corner_radius_and_shadows flag is disabled");
+                           + "set_client_drawn_corner_radii flag is disabled");
+                return this;
             }
+
+            nativeSetClientDrawnCornerRadius(mNativeObject, sc.mNativeObject,
+                                            topLeft, topRight, bottomLeft, bottomRight,
+                                            crop.left, crop.top, crop.right, crop.bottom);
 
             return this;
         }
@@ -4978,6 +5052,27 @@ public final class SurfaceControl implements Parcelable {
             checkPreconditions(sc);
 
             nativeSetContentPriority(mNativeObject, sc.mNativeObject, priority);
+            return this;
+        }
+
+        /**
+         * Sets the system-level importance of the window's content.
+         * <p>
+         * This priority is used by the system to make decisions for different use cases where the
+         * resource is limited.
+         * <p>
+         * This is intended for system internal use.
+         *
+         * @param sc       The SurfaceControl of the layer to update.
+         * @param priority The system content priority to assign to this layer. The range of the
+         *                 system priority is [-10. 10]. A window with higher priority value gets
+         *                 preferred access to limited resources.
+         * @hide
+         */
+        public @NonNull Transaction setSystemContentPriority(
+                @NonNull SurfaceControl sc, @IntRange(from = -10, to = 10) int priority) {
+            checkPreconditions(sc);
+            nativeSetSystemContentPriority(mNativeObject, sc.mNativeObject, priority);
             return this;
         }
 

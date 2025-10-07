@@ -16,6 +16,7 @@
 
 package com.android.server;
 
+import static android.app.userrecovery.flags.Flags.enableUserRecoveryManager;
 import static android.media.tv.flags.Flags.mediaQualityFw;
 import static android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
@@ -228,7 +229,6 @@ import com.android.server.pm.DynamicCodeLoggingService;
 import com.android.server.pm.HsumBootUserInitializer;
 import com.android.server.pm.Installer;
 import com.android.server.pm.LauncherAppsService;
-import com.android.server.pm.OtaDexoptService;
 import com.android.server.pm.PackageManagerService;
 import com.android.server.pm.ShortcutService;
 import com.android.server.pm.UserManagerService;
@@ -270,6 +270,7 @@ import com.android.server.selinux.SelinuxAuditLogsService;
 import com.android.server.sensorprivacy.SensorPrivacyService;
 import com.android.server.sensors.SensorService;
 import com.android.server.serial.SerialManagerService;
+import com.android.server.signalcollector.SignalCollectorService;
 import com.android.server.signedconfig.SignedConfigService;
 import com.android.server.slice.SliceManagerService;
 import com.android.server.smartspace.SmartspaceManagerService;
@@ -287,6 +288,7 @@ import com.android.server.testharness.TestHarnessModeService;
 import com.android.server.textclassifier.TextClassificationManagerService;
 import com.android.server.textservices.TextServicesManagerService;
 import com.android.server.texttospeech.TextToSpeechManagerService;
+import com.android.server.theming.ThemeManagerService;
 import com.android.server.timedetector.GnssTimeUpdateService;
 import com.android.server.timedetector.NetworkTimeUpdateService;
 import com.android.server.timedetector.TimeDetectorService;
@@ -304,6 +306,7 @@ import com.android.server.uri.UriGrantsManagerService;
 import com.android.server.usage.StorageStatsService;
 import com.android.server.usage.UsageStatsService;
 import com.android.server.usb.UsbService;
+import com.android.server.userrecovery.UserRecoveryManagerService;
 import com.android.server.utils.TimingsTraceAndSlog;
 import com.android.server.vcn.VcnLocation;
 import com.android.server.vibrator.VibratorManagerService;
@@ -468,6 +471,8 @@ public final class SystemServer implements Dumpable {
             "android.os.profiling.ProfilingService$Lifecycle";
     private static final String PROFILING_SERVICE_JAR_PATH =
             "/apex/com.android.profiling/javalib/service-profiling.jar";
+    private static final String ANOMALY_DETECTOR_SERVICE_CLASS =
+            "com.android.os.profiling.anomaly.AnomalyDetectorService";
 
     private static final String RANGING_APEX_SERVICE_JAR_PATH =
             "/apex/com.android.uwb/javalib/service-ranging.jar";
@@ -561,13 +566,6 @@ public final class SystemServer implements Dumpable {
             "persist.sys.debug.fdtrack_abort_threshold";
     private static final String SYSPROP_FDTRACK_INTERVAL =
             "persist.sys.debug.fdtrack_interval";
-
-    /**
-     * Property used to override (for development purposes, on debuggable builds) the resource
-     * configs used by {@link #designateMainUserOnBoot()}
-     */
-    private static final String SYSPROP_DESIGNATE_MAIN_USER = "fw.designate_main_user_on_boot";
-
 
     private static int getMaxFd() {
         FileDescriptor fd = null;
@@ -739,32 +737,7 @@ public final class SystemServer implements Dumpable {
         pw.print("Runtime start-elapsed time: ");
         TimeUtils.formatDuration(mRuntimeStartElapsedTime, pw); pw.println();
 
-        var res = mSystemContext.getResources();
-        pw.print("Designate main user on boot: ");
-        pw.println(designateMainUserOnBoot());
-        pw.print("  config_designateMainUser: ");
-        pw.print(res.getBoolean(R.bool.config_designateMainUser));
-        pw.print(" config_isMainUserPermanentAdmin: ");
-        pw.print(res.getBoolean(R.bool.config_isMainUserPermanentAdmin));
-        pw.print(" " + SYSPROP_DESIGNATE_MAIN_USER + ": ");
-        pw.println(SystemProperties.get(SYSPROP_DESIGNATE_MAIN_USER, "N/A"));
-
-        pw.print("Create initial user on boot: ");
-        pw.println(createInitialUserOnBoot());
-    }
-
-    private boolean designateMainUserOnBoot() {
-        var res = mSystemContext.getResources();
-        boolean defaultValue = res.getBoolean(R.bool.config_designateMainUser)
-                || res.getBoolean(R.bool.config_isMainUserPermanentAdmin);
-        if (!Build.isDebuggable()) {
-            return defaultValue;
-        }
-        return SystemProperties.getBoolean(SYSPROP_DESIGNATE_MAIN_USER, defaultValue);
-    }
-
-    private boolean createInitialUserOnBoot() {
-        return mSystemContext.getResources().getBoolean(R.bool.config_createInitialUser);
+        HsumBootUserInitializer.dump(pw, mSystemContext);
     }
 
     /**
@@ -844,11 +817,9 @@ public final class SystemServer implements Dumpable {
     private void run() {
         TimingsTraceAndSlog t = new TimingsTraceAndSlog();
         try {
-            if (android.tracing.Flags.systemServerLargePerfettoShmemBuffer()) {
-                // Explicitly initialize a 4 MB shmem buffer for Perfetto producers (b/382369925)
-                android.tracing.perfetto.Producer.init(new InitArguments(
-                        InitArguments.PERFETTO_BACKEND_SYSTEM, 4 * 1024));
-            }
+            // Explicitly initialize a 4 MB shmem buffer for Perfetto producers (b/382369925)
+            android.tracing.perfetto.Producer.init(new InitArguments(
+                    InitArguments.PERFETTO_BACKEND_SYSTEM, 4 * 1024));
 
             t.traceBegin("InitBeforeStartServices");
 
@@ -1339,21 +1310,17 @@ public final class SystemServer implements Dumpable {
         if (SystemProperties.getBoolean("config.enable_display_offload", false)) {
             mSystemServiceManager.startService(WEAR_DISPLAYOFFLOAD_SERVICE_CLASS);
         }
-// QTI_BEGIN: 2024-11-22: Wearables: Adding QTI display offload service
         // start the OffloadManagerService
         if (SystemProperties.getBoolean("config.enable_qti_display_offload", false)) {
             mSystemServiceManager.startService("com.qualcomm.qti.server.offloadservice.OffloadManagerService");
         }
-// QTI_END: 2024-11-22: Wearables: Adding QTI display offload service
         t.traceEnd();
 
-// QTI_BEGIN: 2024-11-27: Wearables: Adding QTI suspend manager service
         // Start the suspend manager
         t.traceBegin("StartSuspendManagerService");
         if (SystemProperties.getBoolean("config.enable_qti_suspend_manager", false)) {
             mSystemServiceManager.startService("com.qualcomm.qti.server.suspendservice.SuspendManagerService");
         }
-// QTI_END: 2024-11-27: Wearables: Adding QTI suspend manager service
         t.traceEnd();
 
         // Display manager is needed to provide display metrics before package manager
@@ -1407,21 +1374,6 @@ public final class SystemServer implements Dumpable {
                     FrameworkStatsLog
                             .BOOT_TIME_EVENT_ELAPSED_TIME__EVENT__PACKAGE_MANAGER_INIT_READY,
                     SystemClock.elapsedRealtime());
-        }
-        // Manages A/B OTA dexopting. This is a bootstrap service as we need it to rename
-        // A/B artifacts after boot, before anything else might touch/need them.
-        boolean disableOtaDexopt = SystemProperties.getBoolean("config.disable_otadexopt", false);
-        if (!disableOtaDexopt) {
-            t.traceBegin("StartOtaDexOptService");
-            try {
-                Watchdog.getInstance().pauseWatchingCurrentThread("moveab");
-                OtaDexoptService.main(mSystemContext, mPackageManagerService);
-            } catch (Throwable e) {
-                reportWtf("starting OtaDexOptService", e);
-            } finally {
-                Watchdog.getInstance().resumeWatchingCurrentThread("moveab");
-                t.traceEnd();
-            }
         }
 
         if (Build.IS_ARC) {
@@ -1816,10 +1768,8 @@ public final class SystemServer implements Dumpable {
                 Slog.i(TAG, "No Bluetooth Service (Bluetooth Hardware Not Present)");
             } else {
                 t.traceBegin("StartBluetoothService");
-// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
                 mSystemServiceManager.startServiceFromJar(BLUETOOTH_SERVICE_CLASS,
                     BLUETOOTH_APEX_SERVICE_JAR_PATH);
-// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
                 t.traceEnd();
             }
 
@@ -1869,6 +1819,12 @@ public final class SystemServer implements Dumpable {
             if (AppFunctionManagerConfiguration.isSupported(context)) {
                 t.traceBegin("StartAppFunctionManager");
                 mSystemServiceManager.startService(AppFunctionManagerService.class);
+                t.traceEnd();
+            }
+
+            if (enableUserRecoveryManager()) {
+                t.traceBegin("StartUserRecoveryManager");
+                mSystemServiceManager.startService(UserRecoveryManagerService.class);
                 t.traceEnd();
             }
 
@@ -2360,21 +2316,14 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-// QTI_BEGIN: 2019-03-26: WIGIG: frameworks/base: fix wigig service initialization
             if (enableWigig) {
                 try {
                     Slog.i(TAG, "Wigig Service");
                     String wigigClassPath =
-// QTI_END: 2019-03-26: WIGIG: frameworks/base: fix wigig service initialization
-// QTI_BEGIN: 2020-02-12: WIGIG: Update wigig-service path
                         "/system/system_ext/framework/wigig-service.jar" + ":" +
-// QTI_END: 2020-02-12: WIGIG: Update wigig-service path
-// QTI_BEGIN: 2020-01-20: WIGIG: Service: Update path location for Wigig service binaries
                         "/system/system_ext/framework/vendor.qti.hardware.wigig.supptunnel-V1.0-java.jar" + ":" +
                         "/system/system_ext/framework/vendor.qti.hardware.wigig.netperftuner-V1.0-java.jar" + ":" +
                         "/system/system_ext/framework/vendor.qti.hardware.capabilityconfigstore-V1.0-java.jar";
-// QTI_END: 2020-01-20: WIGIG: Service: Update path location for Wigig service binaries
-// QTI_BEGIN: 2019-03-26: WIGIG: frameworks/base: fix wigig service initialization
                     PathClassLoader wigigClassLoader =
                             new PathClassLoader(wigigClassPath, getClass().getClassLoader());
                     Class wigigP2pClass = wigigClassLoader.loadClass(
@@ -2395,7 +2344,6 @@ public final class SystemServer implements Dumpable {
                 }
             }
 
-// QTI_END: 2019-03-26: WIGIG: frameworks/base: fix wigig service initialization
             t.traceBegin("StartSystemUpdateManagerService");
             try {
                 ServiceManager.addService(Context.SYSTEM_UPDATE_SERVICE,
@@ -2504,6 +2452,10 @@ public final class SystemServer implements Dumpable {
                 Slog.i(TAG, "Wallpaper service disabled by config");
             }
 
+            t.traceBegin("StartThemeService");
+            mSystemServiceManager.startService(ThemeManagerService.class);
+            t.traceEnd();
+
             // WallpaperEffectsGeneration manager service
             if (deviceHasConfigString(context,
                 R.string.config_defaultWallpaperEffectsGenerationService)) {
@@ -2544,13 +2496,11 @@ public final class SystemServer implements Dumpable {
 
             if (isWatch) {
                 t.traceBegin("StartThermalObserver");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
                 try {
                     mSystemServiceManager.startService(THERMAL_OBSERVER_CLASS);
                 } catch (Throwable e) {
                     reportWtf("starting StartThermalObserver", e);
                 }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
                 t.traceEnd();
             }
 
@@ -2592,7 +2542,7 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (android.hardware.serial.flags.Flags.enableSerialApi()) {
+            if (android.hardware.serial.flags.Flags.enableWiredSerialApi()) {
                 t.traceBegin("StartSerialManagerService");
                 mSystemServiceManager.startService(SerialManagerService.Lifecycle.class);
                 t.traceEnd();
@@ -2692,8 +2642,7 @@ public final class SystemServer implements Dumpable {
                 reportWtf("starting RuntimeService", e);
             }
             t.traceEnd();
-            if (!disableNetworkTime && (!isWatch || (isWatch
-                    && android.server.Flags.allowNetworkTimeUpdateService()))) {
+            if (!disableNetworkTime) {
                 t.traceBegin("StartNetworkTimeUpdateService");
                 try {
                     networkTimeUpdater = new NetworkTimeUpdateService(context);
@@ -2945,95 +2894,77 @@ public final class SystemServer implements Dumpable {
         if (isWatch) {
             // Must be started before services that depend it, e.g. WearConnectivityService
             t.traceBegin("StartWearPowerService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_POWER_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearPowerService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartHealthService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(HEALTH_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartHealthService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartSystemStateDisplayService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(SYSTEM_STATE_DISPLAY_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartSystemStateDisplayService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartWearConnectivityService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_CONNECTIVITY_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearConnectivityService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartWearDisplayService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearDisplayService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             if (Build.IS_DEBUGGABLE) {
                 t.traceBegin("StartWearDebugService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
                 try {
                     mSystemServiceManager.startService(WEAR_DEBUG_SERVICE_CLASS);
                 } catch (Throwable e) {
                     reportWtf("starting StartWearDebugService", e);
                 }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
                 t.traceEnd();
             }
 
             t.traceBegin("StartWearTimeService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearTimeService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartWearSettingsService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_SETTINGS_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearSettingsService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             t.traceBegin("StartWearModeService");
-// QTI_BEGIN: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             try {
                 mSystemServiceManager.startService(WEAR_MODE_SERVICE_CLASS);
             } catch (Throwable e) {
                 reportWtf("starting StartWearModeService", e);
             }
-// QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
             boolean enableWristOrientationService =
@@ -3119,10 +3050,15 @@ public final class SystemServer implements Dumpable {
         }
 
         // Profiling
-        if (android.server.Flags.telemetryApisService()) {
-            t.traceBegin("StartProfilingCompanion");
-            mSystemServiceManager.startServiceFromJar(PROFILING_SERVICE_LIFECYCLE_CLASS,
-                    PROFILING_SERVICE_JAR_PATH);
+        t.traceBegin("StartProfilingCompanion");
+        mSystemServiceManager.startServiceFromJar(PROFILING_SERVICE_LIFECYCLE_CLASS,
+                PROFILING_SERVICE_JAR_PATH);
+        t.traceEnd();
+
+        // Anomaly Detector
+        if (android.os.profiling.anomaly.flags.Flags.anomalyDetectorCore()) {
+            t.traceBegin("StartAnomalyDetectorService");
+            mSystemServiceManager.startService(ANOMALY_DETECTOR_SERVICE_CLASS);
             t.traceEnd();
         }
 
@@ -3148,13 +3084,9 @@ public final class SystemServer implements Dumpable {
                     DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_CREDENTIAL,
                     CredentialManager.DEVICE_CONFIG_ENABLE_CREDENTIAL_MANAGER, true);
             if (credentialManagerEnabled) {
-                if (isWatch && !android.credentials.flags.Flags.wearCredentialManagerEnabled()) {
-                    Slog.d(TAG, "CredentialManager disabled on wear.");
-                } else {
-                    t.traceBegin("StartCredentialManagerService");
-                    mSystemServiceManager.startService(CredentialManagerService.class);
-                    t.traceEnd();
-                }
+                t.traceBegin("StartCredentialManagerService");
+                mSystemServiceManager.startService(CredentialManagerService.class);
+                t.traceEnd();
             } else {
                 Slog.d(TAG, "CredentialManager disabled.");
             }
@@ -3174,7 +3106,7 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startService(ClipboardService.class);
         t.traceEnd();
 
-        if (!isTv) {
+        if (!isTv && !isWatch) {
             // Selection toolbar service
             t.traceBegin("StartSelectionToolbarManagerService");
             mSystemServiceManager.startService(SelectionToolbarManagerService.class);
@@ -3218,8 +3150,7 @@ public final class SystemServer implements Dumpable {
         // on it in their setup, but likely needs to be done after LockSettingsService is ready.
         final HsumBootUserInitializer hsumBootUserInitializer =
                 HsumBootUserInitializer.createInstance(mUserManagerService, mActivityManagerService,
-                        mPackageManagerService, mContentResolver,
-                        designateMainUserOnBoot(), createInitialUserOnBoot());
+                        mPackageManagerService, mContentResolver, mSystemContext);
         if (hsumBootUserInitializer != null) {
             t.traceBegin("HsumBootUserInitializer.init");
             hsumBootUserInitializer.init(t);
@@ -3708,6 +3639,19 @@ public final class SystemServer implements Dumpable {
             reportWtf("starting System UI", e);
         }
         t.traceEnd();
+
+        // TODO(b/421229308): The collector service should only be running if
+        // the anomaly detection service APIs are enabled.
+        // Replace this flag with the exported API flag after it's ready.
+        if (com.android.server.signalcollector.Flags.enableBinderCallSignalCollector()) {
+            t.traceBegin("StartSignalCollectorService");
+            try {
+                mSystemServiceManager.startService(SignalCollectorService.class);
+            } catch (Throwable e) {
+                reportWtf("starting SignalCollectorService", e);
+            }
+            t.traceEnd();
+        }
 
         t.traceEnd(); // startOtherServices
     }

@@ -731,6 +731,9 @@ public class Vpn {
             case CONNECTED:
                 if (null != mNetworkAgent) {
                     mNetworkAgent.markConnected();
+                    if (mVpnConnectivityMetrics != null) {
+                        mVpnConnectivityMetrics.notifyVpnConnected();
+                    }
                 }
                 break;
             case DISCONNECTED:
@@ -738,6 +741,11 @@ public class Vpn {
                 if (null != mNetworkAgent) {
                     mNetworkAgent.unregister();
                     mNetworkAgent = null;
+                    if (mVpnConnectivityMetrics != null) {
+                        mVpnConnectivityMetrics.notifyVpnDisconnected();
+                        // Clear the metrics since the NetworkAgent is disconnected.
+                        mVpnConnectivityMetrics.resetMetrics();
+                    }
                 }
                 break;
             case CONNECTING:
@@ -1806,6 +1814,10 @@ public class Vpn {
             config.interfaze = mInterface;
             config.startTime = SystemClock.elapsedRealtime();
             mConfig = config;
+            // Log VPN service events for connection establishment
+            if (mVpnConnectivityMetrics != null) {
+                mVpnConnectivityMetrics.setVpnType(VpnManager.TYPE_VPN_SERVICE);
+            }
 
             // Set up forwarding and DNS rules.
             // First attempt to do a seamless handover that only changes the interface name and
@@ -2289,7 +2301,7 @@ public class Vpn {
         return success;
     }
 
-    private void setMtu(int mtu) {
+    private void setMtuAndMetrics(int mtu) {
         synchronized (Vpn.this) {
             mConfig.mtu = mtu;
             if (mVpnConnectivityMetrics != null) {
@@ -2302,7 +2314,7 @@ public class Vpn {
         synchronized (Vpn.this) {
             mConfig.underlyingNetworks = networks;
             if (mVpnConnectivityMetrics != null) {
-                mVpnConnectivityMetrics.setUnderlyingNetwork(mConfig.underlyingNetworks);
+                mVpnConnectivityMetrics.updateUnderlyingNetworkTypes(mConfig.underlyingNetworks);
             }
         }
     }
@@ -2993,7 +3005,8 @@ public class Vpn {
             // in onChildMigrated
             mIkeConnectionInfo = ikeConnectionInfo;
             if (mVpnConnectivityMetrics != null) {
-                mVpnConnectivityMetrics.setServerIpProtocol(ikeConnectionInfo.getRemoteAddress());
+                mVpnConnectivityMetrics.updateServerIpProtocol(
+                        ikeConnectionInfo.getRemoteAddress());
             }
         }
 
@@ -3058,14 +3071,21 @@ public class Vpn {
                     // Ignore stale runner.
                     if (mVpnRunner != this) return;
 
+                    if (mVpnConnectivityMetrics != null) {
+                        mVpnConnectivityMetrics.setVpnType(VpnManager.TYPE_VPN_PLATFORM);
+                        mVpnConnectivityMetrics.setVpnProfileType(mProfile.toVpnProfile().type);
+                        mVpnConnectivityMetrics.setAllowedAlgorithms(
+                                mProfile.getAllowedAlgorithms());
+                    }
+
                     mInterface = interfaceName;
-                    setMtu(vpnMtu);
+                    setMtuAndMetrics(vpnMtu);
                     mConfig.interfaze = mInterface;
 
                     mConfig.addresses.clear();
                     mConfig.addresses.addAll(internalAddresses);
                     if (mVpnConnectivityMetrics != null) {
-                        mVpnConnectivityMetrics.setVpnNetworkIpProtocol(mConfig.addresses);
+                        mVpnConnectivityMetrics.updateVpnNetworkIpProtocol(mConfig.addresses);
                     }
 
                     mConfig.routes.clear();
@@ -3169,7 +3189,7 @@ public class Vpn {
                     final LinkProperties oldLp = makeLinkProperties();
 
                     setUnderlyingNetworksAndMetrics(new Network[] {network});
-                    setMtu(calculateVpnMtu());
+                    setMtuAndMetrics(calculateVpnMtu());
                     final LinkProperties newLp = makeLinkProperties();
 
                     // If MTU is < 1280, IPv6 addresses will be removed. If there are no addresses
@@ -4274,11 +4294,6 @@ public class Vpn {
             config.allowBypass = profile.isBypassable;
             config.disallowedApplications = getAppExclusionList(mPackage);
             mConfig = config;
-            if (mVpnConnectivityMetrics != null) {
-                mVpnConnectivityMetrics.setVpnType(VpnManager.TYPE_VPN_PLATFORM);
-                mVpnConnectivityMetrics.setVpnProfileType(profile.type);
-                mVpnConnectivityMetrics.setAllowedAlgorithms(profile.getAllowedAlgorithms());
-            }
 
             switch (profile.type) {
                 case VpnProfile.TYPE_IKEV2_IPSEC_USER_PASS:

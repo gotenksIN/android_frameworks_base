@@ -19,19 +19,25 @@
     android:id="@+id/keep_data_layout"
     android:layout_height="wrap_content"
     android:layout_width="match_parent"
-    android:layout_marginTop="@dimen/dialog_inter_element_margin"
+    android:layout_marginTop="8dp"
+    android:paddingTop="8dp"
+    android:clickable="true"
+    android:focusable="true"
     android:orientation="horizontal"
     android:visibility="gone" >
 
     <FrameLayout
         android:layout_width="40dp"
-        android:layout_height="40dp">
+        android:layout_height="40dp"
+        android:layout_gravity="center_vertical">
 
         <CheckBox
             android:id="@+id/keep_data_checkbox"
             android:layout_height="wrap_content"
             android:layout_width="wrap_content"
-            android:layout_gravity="center" />
+            android:layout_gravity="center"
+            android:clickable="false"
+            android:focusable="false" />
 
     </FrameLayout>
 

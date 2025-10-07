@@ -16,28 +16,30 @@
 
 package com.android.server.companion.datatransfer.continuity.handoff;
 
-import static android.companion.CompanionDeviceManager.MESSAGE_ONEWAY_TASK_CONTINUITY;
+import static android.companion.datatransfer.continuity.TaskContinuityManager.HANDOFF_REQUEST_RESULT_FAILURE_DEVICE_NOT_FOUND;
 import static android.companion.datatransfer.continuity.TaskContinuityManager.HANDOFF_REQUEST_RESULT_FAILURE_NO_DATA_PROVIDED_BY_TASK;
 import static android.companion.datatransfer.continuity.TaskContinuityManager.HANDOFF_REQUEST_RESULT_SUCCESS;
+import static android.companion.datatransfer.continuity.TaskContinuityManager.HANDOFF_REQUEST_RESULT_FAILURE_OTHER_INTERNAL_ERROR;
 
+import com.android.server.companion.datatransfer.continuity.connectivity.TaskContinuityMessenger;
 import com.android.server.companion.datatransfer.continuity.messages.HandoffRequestMessage;
 import com.android.server.companion.datatransfer.continuity.messages.HandoffRequestResultMessage;
-import com.android.server.companion.datatransfer.continuity.messages.TaskContinuityMessage;
+import com.android.server.companion.datatransfer.continuity.handoff.HandoffActivityStarter;
+import com.android.server.companion.datatransfer.continuity.handoff.HandoffRequestCallbackHolder;
+import com.android.server.companion.datatransfer.continuity.tasks.RemoteTaskStore;
 
+import android.annotation.NonNull;
 import android.app.HandoffActivityData;
 import android.content.Context;
-import android.content.Intent;
-import android.companion.CompanionDeviceManager;
 import android.companion.datatransfer.continuity.IHandoffRequestCallback;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.util.Slog;
+import android.os.UserHandle;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Objects;
 
 /**
  * Controller for outbound handoff requests.
@@ -49,42 +51,69 @@ public class OutboundHandoffRequestController {
 
     private static final String TAG = "OutboundHandoffRequestController";
 
-    private final Context mContext;
-    private final CompanionDeviceManager mCompanionDeviceManager;
-    private final Map<Integer, Map<Integer, List<IHandoffRequestCallback>>> mPendingCallbacks
-        = new HashMap<>();
+    private record PendingHandoffRequest(int associationId, int taskId) {}
 
-    public OutboundHandoffRequestController(Context context) {
+    private final Context mContext;
+    private final TaskContinuityMessenger mTaskContinuityMessenger;
+    private final RemoteTaskStore mRemoteTaskStore;
+    private final HandoffRequestCallbackHolder mHandoffRequestCallbackHolder
+        = new HandoffRequestCallbackHolder();
+    private final Set<PendingHandoffRequest> mPendingHandoffRequests = new HashSet<>();
+
+    public OutboundHandoffRequestController(
+        @NonNull Context context,
+        @NonNull TaskContinuityMessenger taskContinuityMessenger,
+        @NonNull RemoteTaskStore remoteTaskStore) {
+
+        Objects.requireNonNull(context);
+        Objects.requireNonNull(taskContinuityMessenger);
+        Objects.requireNonNull(remoteTaskStore);
+
         mContext = context;
-        mCompanionDeviceManager = context.getSystemService(CompanionDeviceManager.class);
+        mTaskContinuityMessenger = taskContinuityMessenger;
+        mRemoteTaskStore = remoteTaskStore;
     }
 
     public void requestHandoff(int associationId, int taskId, IHandoffRequestCallback callback) {
-        synchronized (mPendingCallbacks) {
-            if (!mPendingCallbacks.containsKey(associationId)) {
-                mPendingCallbacks.put(associationId, new HashMap<>());
-            }
-
-            if (mPendingCallbacks.get(associationId).containsKey(taskId)) {
-                mPendingCallbacks.get(associationId).get(taskId).add(callback);
+        synchronized (mPendingHandoffRequests) {
+            PendingHandoffRequest request = new PendingHandoffRequest(associationId, taskId);
+            boolean isNewRequest = !mPendingHandoffRequests.contains(request);
+            mHandoffRequestCallbackHolder.registerCallback(associationId, taskId, callback);
+            if (!isNewRequest) {
                 return;
             }
 
-            List<IHandoffRequestCallback> callbacks = new ArrayList<>();
-            callbacks.add(callback);
-            mPendingCallbacks.get(associationId).put(taskId, callbacks);
-            HandoffRequestMessage handoffRequestMessage = new HandoffRequestMessage(taskId);
-            TaskContinuityMessage taskContinuityMessage = new TaskContinuityMessage.Builder()
-                .setData(handoffRequestMessage)
-                .build();
+            mPendingHandoffRequests.add(request);
+            TaskContinuityMessenger.SendMessageResult result
+                = mTaskContinuityMessenger.sendMessage(
+                    associationId,
+                    new HandoffRequestMessage(taskId));
 
-            try {
-                mCompanionDeviceManager.sendMessage(
-                    CompanionDeviceManager.MESSAGE_ONEWAY_TASK_CONTINUITY,
-                    taskContinuityMessage.toBytes(),
-                    new int[] {associationId});
-            } catch (IOException e) {
-                Slog.e(TAG, "Failed to send handoff request message to device " + associationId, e);
+            switch (result) {
+                case TaskContinuityMessenger.SendMessageResult.SUCCESS:
+                    Slog.i(TAG, "Successfully sent handoff request message.");
+                    break;
+                case TaskContinuityMessenger.SendMessageResult.FAILURE_MESSAGE_SERIALIZATION_FAILED:
+                    Slog.e(TAG, "Failed to serialize handoff request message.");
+                    finishHandoffRequest(
+                        associationId,
+                        taskId,
+                        HANDOFF_REQUEST_RESULT_FAILURE_OTHER_INTERNAL_ERROR);
+                    break;
+                case TaskContinuityMessenger.SendMessageResult.FAILURE_ASSOCIATION_NOT_FOUND:
+                    Slog.w(TAG, "Association " + associationId + " is not connected.");
+                    finishHandoffRequest(
+                        associationId,
+                        taskId,
+                        HANDOFF_REQUEST_RESULT_FAILURE_DEVICE_NOT_FOUND);
+                    break;
+                case TaskContinuityMessenger.SendMessageResult.FAILURE_INTERNAL_ERROR:
+                    Slog.e(TAG, "Failed to send handoff request message - internal error.");
+                    finishHandoffRequest(
+                        associationId,
+                        taskId,
+                        HANDOFF_REQUEST_RESULT_FAILURE_OTHER_INTERNAL_ERROR);
+                    break;
             }
         }
     }
@@ -93,65 +122,47 @@ public class OutboundHandoffRequestController {
         int associationId,
         HandoffRequestResultMessage handoffRequestResultMessage) {
 
-        synchronized (mPendingCallbacks) {
+        synchronized (mPendingHandoffRequests) {
+            PendingHandoffRequest request
+                = new PendingHandoffRequest(associationId, handoffRequestResultMessage.taskId());
+            if (!mPendingHandoffRequests.contains(request)) {
+                return;
+            }
+
             if (handoffRequestResultMessage.statusCode() != HANDOFF_REQUEST_RESULT_SUCCESS) {
                 finishHandoffRequest(
                     associationId,
                     handoffRequestResultMessage.taskId(),
                     handoffRequestResultMessage.statusCode());
+                return;
             }
 
-            if (handoffRequestResultMessage.activities().isEmpty()) {
+            if (!HandoffActivityStarter.start(mContext, handoffRequestResultMessage.activities())) {
                 finishHandoffRequest(
                     associationId,
                     handoffRequestResultMessage.taskId(),
-                    HANDOFF_REQUEST_RESULT_FAILURE_NO_DATA_PROVIDED_BY_TASK);
+                    HANDOFF_REQUEST_RESULT_FAILURE_OTHER_INTERNAL_ERROR);
                 return;
+            } else {
+                finishHandoffRequest(
+                    associationId,
+                    handoffRequestResultMessage.taskId(),
+                    HANDOFF_REQUEST_RESULT_SUCCESS);
             }
-
-            launchHandoffTask(
-                associationId,
-                handoffRequestResultMessage.taskId(),
-                handoffRequestResultMessage.activities());
         }
     }
 
-    private void launchHandoffTask(
-        int associationId,
-        int taskId,
-        List<HandoffActivityData> activities) {
-
-        HandoffActivityData topActivity = activities.get(0);
-        Intent intent = new Intent();
-        intent.setComponent(topActivity.getComponentName());
-        intent.putExtras(new Bundle(topActivity.getExtras()));
-        // TODO (joeantonetti): Handle failures here and fall back to a web URL.
-        mContext.startActivity(intent);
-        finishHandoffRequest(associationId, taskId, HANDOFF_REQUEST_RESULT_SUCCESS);
-    }
-
     private void finishHandoffRequest(int associationId, int taskId, int statusCode) {
-        synchronized (mPendingCallbacks) {
-            if (!mPendingCallbacks.containsKey(associationId)) {
+        synchronized (mPendingHandoffRequests) {
+            PendingHandoffRequest request = new PendingHandoffRequest(associationId, taskId);
+            if (!mPendingHandoffRequests.contains(request)) {
                 return;
             }
 
-            Map<Integer, List<IHandoffRequestCallback>> pendingCallbacksForAssociation =
-                mPendingCallbacks.get(associationId);
-
-            if (!pendingCallbacksForAssociation.containsKey(taskId)) {
-                return;
-            }
-
-            for (IHandoffRequestCallback callback : pendingCallbacksForAssociation.get(taskId)) {
-                try {
-                    callback.onHandoffRequestFinished(associationId, taskId, statusCode);
-                } catch (RemoteException e) {
-                    Slog.e(TAG, "Failed to notify callback of handoff request result", e);
-                }
-            }
-
-            pendingCallbacksForAssociation.remove(taskId);
+            mPendingHandoffRequests.remove(request);
+            mHandoffRequestCallbackHolder
+                .notifyAndRemoveCallbacks(associationId, taskId, statusCode);
+            mRemoteTaskStore.removeTask(associationId, taskId);
         }
     }
 }

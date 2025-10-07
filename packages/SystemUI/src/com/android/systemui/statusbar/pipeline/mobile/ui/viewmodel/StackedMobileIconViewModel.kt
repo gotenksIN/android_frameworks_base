@@ -38,11 +38,17 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 
 interface StackedMobileIconViewModel {
+    val primaryViewModel: MobileIconViewModelCommon? get() = null
+    val secondaryViewModel: MobileIconViewModelCommon? get() = null
     val dualSim: DualSim?
     val contentDescription: String?
     val networkTypeIcon: Icon.Resource?
+    val activityInVisible: Boolean
+    val activityOutVisible: Boolean
+    val activityContainerVisible: Boolean
     /** [Context] to use when loading the [networkTypeIcon] */
     val mobileContext: Context?
     val roaming: Boolean
@@ -121,6 +127,26 @@ constructor(
             initialValue = null,
         )
 
+    override val primaryViewModel: MobileIconViewModelCommon? by
+    hydrator.hydratedStateOf(
+        traceName = "primaryViewModel",
+        source =
+        iconViewModelFlow.mapLatest { viewModels ->
+            viewModels.firstOrNull()
+        },
+        initialValue = null,
+    )
+
+    override val secondaryViewModel: MobileIconViewModelCommon? by
+    hydrator.hydratedStateOf(
+        traceName = "secondaryViewModel",
+        source =
+        iconViewModelFlow.mapLatest { viewModels ->
+            viewModels.lastOrNull()
+        },
+        initialValue = null,
+    )
+
     override val networkTypeIcon: Icon.Resource? by
         hydrator.hydratedStateOf(
             traceName = "networkTypeIcon",
@@ -131,6 +157,45 @@ constructor(
                     }
                 ),
             initialValue = null,
+        )
+
+    override val activityInVisible: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "activityInVisible",
+            source =
+                flowIfIconIsVisible(
+                        iconViewModelFlow.flatMapLatest { viewModels ->
+                            viewModels.firstOrNull()?.activityInVisible ?: flowOf(false)
+                        }
+                    )
+                    .map { it == true },
+            initialValue = false,
+        )
+
+    override val activityOutVisible: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "activityOutVisible",
+            source =
+                flowIfIconIsVisible(
+                        iconViewModelFlow.flatMapLatest { viewModels ->
+                            viewModels.firstOrNull()?.activityOutVisible ?: flowOf(false)
+                        }
+                    )
+                    .map { it == true },
+            initialValue = false,
+        )
+
+    override val activityContainerVisible: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "activityContainerVisible",
+            source =
+                flowIfIconIsVisible(
+                        iconViewModelFlow.flatMapLatest { viewModels ->
+                            viewModels.firstOrNull()?.activityContainerVisible ?: flowOf(false)
+                        }
+                    )
+                    .map { it == true },
+            initialValue = false,
         )
 
     override val mobileContext: Context? by

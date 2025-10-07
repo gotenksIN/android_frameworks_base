@@ -24,6 +24,7 @@ import android.content.Context;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Bundle;
+import android.os.Trace;
 import android.util.ArrayMap;
 import android.view.SurfaceControl;
 import android.view.SurfaceControl.Transaction;
@@ -142,8 +143,9 @@ public class PipDisplayTransferHandler implements
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
                         "%s Animating PiP display change to=%d", TAG, mTargetDisplayId);
 
-                SurfaceControl pipLeash = mPipTransitionState.getPinnedTaskLeash();
-                TaskInfo taskInfo = mPipTransitionState.getPipTaskInfo();
+                final SurfaceControl pipLeash = mPipTransitionState.getPinnedTaskLeash();
+                final TaskInfo pipTaskInfo = mPipTransitionState.getPipTaskInfo();
+                final TaskInfo pipCandidateTaskInfo = mPipTransitionState.getPipCandidateTaskInfo();
                 final int duration = extra.getInt(ANIMATING_BOUNDS_CHANGE_DURATION,
                         PipTransition.BOUNDS_CHANGE_JUMPCUT_DURATION);
                 final Transaction startTx = extra.getParcelable(
@@ -152,6 +154,9 @@ public class PipDisplayTransferHandler implements
                         PipTransition.PIP_FINISH_TX, Transaction.class);
                 final Rect pipBounds = extra.getParcelable(
                         PIP_DESTINATION_BOUNDS, Rect.class);
+
+                Trace.instant(Trace.TRACE_TAG_WINDOW_MANAGER,
+                        "PipDisplayTransferHandler#changingPipBounds");
 
                 mPipDisplayLayoutState.setDisplayId(mTargetDisplayId);
                 mPipDisplayLayoutState.setDisplayLayout(
@@ -165,8 +170,10 @@ public class PipDisplayTransferHandler implements
                 mPipTransitionState.setState(PipTransitionState.EXITING_PIP);
                 mPipTransitionState.setState(PipTransitionState.EXITED_PIP);
 
+                // Set PiP task states to make sure they're not null after we exited PiP
                 mPipTransitionState.setPinnedTaskLeash(pipLeash);
-                mPipTransitionState.setPipTaskInfo(taskInfo);
+                mPipTransitionState.setPipTaskInfo(pipTaskInfo);
+                mPipTransitionState.setPipCandidateTaskInfo(pipCandidateTaskInfo);
 
                 final PipResizeAnimator animator = mPipResizeAnimatorSupplier.get(mContext,
                         mPipSurfaceTransactionHelper, pipLeash, startTx, finishTx,

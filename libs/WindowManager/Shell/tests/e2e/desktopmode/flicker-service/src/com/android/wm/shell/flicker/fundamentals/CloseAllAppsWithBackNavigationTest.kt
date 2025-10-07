@@ -16,13 +16,14 @@
 
 package com.android.wm.shell.flicker.fundamentals
 
-import android.platform.test.annotations.RequiresDevice
+import android.platform.test.annotations.Postsubmit
+import android.platform.test.annotations.RequiresDesktopDevice
 import android.tools.NavBar
-import android.tools.flicker.assertions.FlickerTest
 import android.tools.flicker.junit.FlickerParametersRunnerFactory
-import android.tools.flicker.legacy.FlickerBuilder
-import android.tools.flicker.legacy.LegacyFlickerTest
-import android.tools.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.flicker.FlickerBuilder
+import android.tools.flicker.FlickerTest
+import android.tools.flicker.FlickerTestFactory
+import android.tools.flicker.assertions.FlickerChecker
 import android.tools.traces.component.ComponentNameMatcher
 import android.tools.traces.component.ComponentNameMatcher.Companion.DESKTOP_WALLPAPER_ACTIVITY
 import com.android.wm.shell.Utils
@@ -40,10 +41,11 @@ import org.junit.runners.Parameterized
  *
  * To run this test: atest CloseAllAppsWithBackNavigationTest
  */
-@RequiresDevice
+@RequiresDesktopDevice
 @RunWith(Parameterized::class)
+@Postsubmit
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
-class CloseAllAppsWithBackNavigationTest(flicker: LegacyFlickerTest) : DesktopModeBaseTest(flicker) {
+class CloseAllAppsWithBackNavigationTest(flicker: FlickerTest) : DesktopModeBaseTest(flicker) {
     inner class CloseAllAppsWithBackNavigationScenario :
         CloseAllAppsWithBackNavigation(
             navigationMode = flicker.scenario.navBarMode,
@@ -85,8 +87,8 @@ class CloseAllAppsWithBackNavigationTest(flicker: LegacyFlickerTest) : DesktopMo
     companion object {
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
-        fun getParams(): Collection<FlickerTest> {
-            return LegacyFlickerTestFactory.nonRotationTests()
+        fun getParams(): Collection<FlickerChecker> {
+            return FlickerTestFactory.nonRotationTests()
         }
     }
 }

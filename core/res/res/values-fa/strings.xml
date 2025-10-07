@@ -71,13 +71,18 @@
     <string name="CLIRDefaultOnNextCallOff" msgid="5036749051007098105">"پیش‌فرض شناسه تماس‌گیرنده روی محدود است. تماس بعدی: بدون محدودیت"</string>
     <string name="CLIRDefaultOffNextCallOn" msgid="1022781126694885017">"پیش‌فرض شناسه تماس‌گیرنده روی غیرمحدود است. تماس بعدی: محدود"</string>
     <string name="CLIRDefaultOffNextCallOff" msgid="2491576172356463443">"پیش‌فرض شناسه تماس‌گیرنده روی غیرمحدود است. تماس بعدی: بدون محدودیت"</string>
-    <string name="page_size_compat_apk_warning" msgid="2982396798449041224">"‏این برنامه با صفحه ۱۶ کیلوبایتی سازگار نیست. بررسی تراز APK ناموفق بود. این برنامه بااستفاده از حالت سازگار اندازه صفحه اجرا خواهد شد. برای بهترین سازگاری، لطفاً برنامه را با پشتیبانی از صفحه ۱۶ کیلوبایتی دوباره ترجمه کنید. برای اطلاعات بیشتر، به &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; مراجعه کنید"</string>
-    <string name="page_size_compat_elf_warning" msgid="6753874059564812651">"‏این برنامه با صفحه ۱۶ کیلوبایتی سازگار نیست. بررسی تراز ELF ناموفق بود. این برنامه بااستفاده از حالت سازگار اندازه صفحه اجرا خواهد شد. برای بهترین سازگاری، لطفاً برنامه را با پشتیبانی از صفحه ۱۶ کیلوبایتی دوباره ترجمه کنید. برای اطلاعات بیشتر، به &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; مراجعه کنید"</string>
-    <string name="page_size_compat_apk_and_elf_warning" msgid="7628675779500605390">"‏این برنامه با صفحه ۱۶ کیلوبایتی سازگار نیست. بررسی‌های تراز APK و ELF ناموفق بود. این برنامه بااستفاده از حالت سازگار اندازه صفحه اجرا خواهد شد. برای بهترین سازگاری، لطفاً برنامه را با پشتیبانی از صفحه ۱۶ کیلوبایتی دوباره ترجمه کنید. برای اطلاعات بیشتر، به &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; مراجعه کنید"</string>
-    <string name="page_size_compat_apk_warning_4kb" msgid="2104642120436642689">"‏این هشدار نشان داده شده است زیرا این یک برنامه قابل‌اشکال‌زدایی است که درحال آزمایش شدن است. اگر شما توسعه‌دهنده نیستید، لطفاً این موضوع را به توسعه‌دهنده گزارش کنید و برنامه غیرقابل‌اشکال‌زدایی درخواست کنید. این برنامه با حالت ۱۶ کیلوبایتی سازگار نیست. بررسی تراز APK ناموفق بود. لطفاً مراحل ارائه‌شده در &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; را دنبال کنید"</string>
-    <string name="page_size_compat_elf_warning_4kb" msgid="8038334656395476900">"‏این هشدار نشان داده شده است زیرا این یک برنامه قابل‌اشکال‌زدایی است که درحال آزمایش شدن است. اگر شما توسعه‌دهنده نیستید، لطفاً این موضوع را به توسعه‌دهنده گزارش کنید و برنامه غیرقابل‌اشکال‌زدایی درخواست کنید. این برنامه با حالت ۱۶ کیلوبایتی سازگار نیست. بررسی تراز ELF ناموفق بود. لطفاً مراحل ارائه‌شده در &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; را دنبال کنید"</string>
-    <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="5417036941497610850">"‏این هشدار نشان داده شده است زیرا این یک برنامه قابل‌اشکال‌زدایی است که درحال آزمایش شدن است. اگر شما توسعه‌دهنده نیستید، لطفاً این موضوع را به توسعه‌دهنده گزارش کنید و برنامه غیرقابل‌اشکال‌زدایی درخواست کنید. این برنامه با حالت ۱۶ کیلوبایتی سازگار نیست. بررسی‌های تراز APK و ELF ناموفق بود. لطفاً مراحل ارائه‌شده در &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; را دنبال کنید"</string>
+    <string name="page_size_compat_apk_warning" msgid="2297836366674721648">"‏این برنامه با اندازه صفحه ۱۶ کیلوبایتی سازگار نیست. بررسی تراز APK ناموفق بود. این برنامه بااستفاده از حالت سازگار اندازه صفحه اجرا خواهد شد. برای بهترین سازگاری، لطفاً برنامه را با پشتیبانی از اندازه صفحه ۱۶ کیلوبایتی دوباره ترجمه کنید. برای اطلاعات بیشتر، به &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; مراجعه کنید &lt;br&gt;&lt;br&gt; کتابخانه‌های زیر با اندازه صفحه ۱۶ کیلوبایتی تراز نیستند: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_elf_warning" msgid="8613720928493005883">"‏این برنامه با اندازه صفحه ۱۶ کیلوبایتی سازگار نیست. بررسی تراز ELF ناموفق بود. این برنامه بااستفاده از حالت سازگار اندازه صفحه اجرا خواهد شد. برای بهترین سازگاری، لطفاً برنامه را با پشتیبانی از اندازه صفحه ۱۶ کیلوبایتی دوباره ترجمه کنید. برای اطلاعات بیشتر، به &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; مراجعه کنید &lt;br&gt;&lt;br&gt; کتابخانه‌های زیر با اندازه صفحه ۱۶ کیلوبایتی تراز نیستند: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_warning" msgid="9034695801295605229">"‏این برنامه با اندازه صفحه ۱۶ کیلوبایتی سازگار نیست. بررسی‌های تراز APK و ELF ناموفق بود. این برنامه بااستفاده از حالت سازگار اندازه صفحه اجرا خواهد شد. برای بهترین سازگاری، لطفاً برنامه را با پشتیبانی از اندازه صفحه ۱۶ کیلوبایتی دوباره ترجمه کنید. برای اطلاعات بیشتر، به &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; مراجعه کنید &lt;br&gt;&lt;br&gt; کتابخانه‌های زیر با اندازه صفحه ۱۶ کیلوبایتی تراز نیستند: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_warning_4kb" msgid="5676451039424864495">"‏این هشدار به‌دلیل قابل‌اشکال‌زدایی بودن برنامه‌ای که درحال آزمایش شدن است نشان داده می‌شود. اگر شما توسعه‌دهنده نیستید، لطفاً این موضوع را به توسعه‌دهنده گزارش کنید و یک برنامه غیرقابل‌اشکال‌زدایی درخواست کنید. &lt;br&gt;&lt;br&gt; این برنامه با اندازه صفحه ۱۶ کیلوبایتی سازگار نیست. بررسی تراز APK ناموفق بود. لطفاً مراحل ارائه‌شده در &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&amp;gt را دنبال کنید &lt;br&gt;&lt;br&gt; کتابخانه‌های زیر با اندازه صفحه ۱۶ کیلوبایتی تراز نیستند: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_elf_warning_4kb" msgid="5005239480522831311">"‏این هشدار به‌دلیل قابل‌اشکال‌زدایی بودن برنامه‌ای که درحال آزمایش شدن است نشان داده می‌شود. اگر شما توسعه‌دهنده نیستید، لطفاً این موضوع را به توسعه‌دهنده گزارش کنید و یک برنامه غیرقابل‌اشکال‌زدایی درخواست کنید. &lt;br&gt;&lt;br&gt; این برنامه با اندازه صفحه ۱۶ کیلوبایتی سازگار نیست. بررسی تراز ELF ناموفق بود. لطفاً مراحل ارائه‌شده در &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&amp;gt را دنبال کنید &lt;br&gt;&lt;br&gt; کتابخانه‌های زیر با اندازه صفحه ۱۶ کیلوبایتی تراز نیستند: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="997926487776340721">"‏این هشدار به‌دلیل قابل‌اشکال‌زدایی بودن برنامه‌ای که درحال آزمایش شدن است نشان داده می‌شود. اگر شما توسعه‌دهنده نیستید، لطفاً این موضوع را به توسعه‌دهنده گزارش کنید و یک برنامه غیرقابل‌اشکال‌زدایی درخواست کنید. &lt;br&gt;&lt;br&gt; این برنامه با اندازه صفحه ۱۶ کیلوبایتی سازگار نیست. بررسی‌های تراز APK و ELF ناموفق بود. لطفاً مراحل ارائه‌شده در &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; را دنبال کنید. &lt;br&gt;&lt;br&gt; کتابخانه‌های زیر با اندازه صفحه ۱۶ کیلوبایتی تراز نیستند: &lt;br&gt;&lt;br&gt;"</string>
     <string name="page_size_compat_never_show" msgid="3391282612422783097">"دوباره نشان داده نشود"</string>
+    <string name="page_size_compat_title" msgid="6497719153872572204">"‏سازگاری برنامه Android"</string>
+    <string name="page_size_compat_elf_not_aligned" msgid="4404128993555194313">"‏&amp;#8226; %1$s : بخش «بار کردن» تراز نیست&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_not_aligned" msgid="1434875607880657092">"‏&amp;#8226; %1$s : کتابخانه فشرده‌نشده تراز نیست&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_not_aligned" msgid="7140216083697701972">"‏&amp;#8226; %1$s : بخش «بار کردن» و کتابخانه فشرده‌نشده تراز نیستند&lt;br&gt;"</string>
+    <string name="page_size_compat_unknown" msgid="5183026525148169891">"‏&amp;#8226; %1$s : خطای نامشخص&lt;br&gt;"</string>
     <string name="serviceNotProvisioned" msgid="8289333510236766193">"سرویس دارای مجوز نیست."</string>
     <string name="CLIRPermanent" msgid="166443681876381118">"‏شما می‎توانید تنظیم شناسه تماس‌گیرنده را تغییر دهید."</string>
     <string name="auto_data_switch_title" msgid="3286350716870518297">"داده به <xliff:g id="CARRIERDISPLAY">%s</xliff:g> تغییر کرد"</string>
@@ -164,14 +169,10 @@
     <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"امنیت شبکه تلفن همراه"</string>
     <string name="scCellularNetworkSecuritySummary" msgid="7042036754550545005">"رمزگذاری، اعلان‌های شبکه‌های رمزگذاری‌نشده"</string>
     <string name="scIdentifierDisclosureIssueTitle" msgid="2898888825129970328">"شناسه دستگاه  مورددسترس قرار گرفت"</string>
-    <!-- no translation found for scIDIssueSummaryNotificationWithCellularID (8371590113242615316) -->
-    <skip />
-    <!-- no translation found for scIdentifierDisclosureIssueSummaryNotification (7106922007150754222) -->
-    <skip />
-    <!-- no translation found for scIDIssueSummaryWithCellularID (1189965658392583067) -->
-    <skip />
-    <!-- no translation found for scIdentifierDisclosureIssueSummary (4362014471570210380) -->
-    <skip />
+    <string name="scIDIssueSummaryNotificationWithCellularID" msgid="8371590113242615316">"ساعت <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>، یکی از شبکه‌های نزدیکتان شناسه یکتای دستگاهتان (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>) را هنگام استفاده از سیم‌کارت <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> ضبط کرد"</string>
+    <string name="scIdentifierDisclosureIssueSummaryNotification" msgid="7106922007150754222">"ساعت <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>، یکی از شبکه‌های نزدیکتان شناسه یکتای دستگاهتان را هنگام استفاده از سیم‌کارت <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> ضبط کرد"</string>
+    <string name="scIDIssueSummaryWithCellularID" msgid="1189965658392583067">"ساعت <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>، یکی از شبکه‌های نزدیکتان شناسه یکتای دستگاهتان (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>) را هنگام استفاده از سیم‌کارت <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> ضبط کرد.\n\nاین یعنی مکان، فعالیت، یا هویت شما ثبت شده است. این رویکردی عادی است اما ممکن است برای افرادی که نگران حریم خصوصی‌شان هستند مشکل محسوب شود."</string>
+    <string name="scIdentifierDisclosureIssueSummary" msgid="4362014471570210380">"ساعت <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>، یکی از شبکه‌های نزدیکتان شناسه یکتای دستگاهتان را هنگام استفاده از سیم‌کارت <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> ضبط کرد.\n\nاین یعنی مکان، فعالیت، یا هویت شما ثبت شده است. این رویکردی عادی است اما ممکن است برای افرادی که نگران حریم خصوصی‌شان هستند مشکل محسوب شود."</string>
     <string name="scNullCipherIssueEncryptedTitle" msgid="234717016411824969">"به شبکه رمزگذاری‌شده <xliff:g id="NETWORK_NAME">%1$s</xliff:g> متصل‌اید"</string>
     <string name="scNullCipherIssueEncryptedSummary" msgid="8577510708842150475">"اتصال سیم‌کارت <xliff:g id="NETWORK_NAME">%1$s</xliff:g> اکنون ایمن‌تر است"</string>
     <string name="scNullCipherIssueNonEncryptedTitle" msgid="3978071464929453915">"به شبکه رمزگذاری‌نشده متصل‌اید"</string>
@@ -299,6 +300,7 @@
     <string name="global_action_assist" msgid="2517047220311505805">"دستیار"</string>
     <string name="global_action_voice_assist" msgid="6655788068555086695">"دستیار صوتی"</string>
     <string name="global_action_lockdown" msgid="2475471405907902963">"قفل همه"</string>
+    <string name="global_action_unrestricted_lock" msgid="7933224393323064116">"قفل کردن"</string>
     <string name="status_bar_notification_info_overflow" msgid="3330152558746563475">"۹۹۹+"</string>
     <string name="notification_compact_heads_up_reply" msgid="2425293958371284340">"پاسخ دادن"</string>
     <string name="notification_hidden_text" msgid="2835519769868187223">"اعلان جدید"</string>
@@ -364,12 +366,12 @@
     <string name="permgroupdesc_sensors" msgid="2610631290633747752">"دسترسی به داده‌های حسگر در رابطه با علائم حیاتی شما"</string>
     <string name="permgrouplab_notifications" msgid="5472972361980668884">"اعلان‌ها"</string>
     <string name="permgroupdesc_notifications" msgid="4608679556801506580">"نمایش اعلان"</string>
-    <string name="permgrouplab_xr_eye_sensitive" msgid="2099659100156643683">"داده‌های حساس ردگیری چشم واقعیت گسترده"</string>
-    <string name="permgroupdesc_xr_eye_sensitive" msgid="1414121516133760271">"دسترسی به داده‌های حساس جهت نگاه"</string>
-    <string name="permgrouplab_xr_tracking" msgid="7418994009794287471">"داده‌های ردگیری واقعیت گسترده"</string>
-    <string name="permgroupdesc_xr_tracking" msgid="6777198859446500821">"دسترسی به داده‌های واقعیت گسترده درباره شما و محیط اطرافتان"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="2993940754322250652">"داده‌های حساس ردگیری واقعیت گسترده"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="8498501397939308918">"دسترسی به داده‌های حساس ردگیری درباره شما و محیط اطرافتان"</string>
+    <string name="permgrouplab_xr_eye_sensitive" msgid="1709596126334620353">"داده‌های ردگیری چشم"</string>
+    <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"ردگیری دقیق حرکت چشم"</string>
+    <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"داده‌های حرکت و ناحیه"</string>
+    <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"ردگیری چشم‌ها، چهره، بدن، و ناحیه اسکن"</string>
+    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"داده‌های دقیق حرکت سر و ناحیه"</string>
+    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"ردگیری دقیق سر و ناحیه اسکن"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"محتوای پنجره را بازیابی کند"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"محتوای پنجره‌ای را که درحال تعامل با آن هستید بررسی می‌کند."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"فعال‌سازی کاوش لمسی"</string>
@@ -667,29 +669,31 @@
     <string name="permdesc_imagesWrite" msgid="5195054463269193317">"به برنامه اجازه می‌دهد مجموعه عکستان را تغییر دهد."</string>
     <string name="permlab_mediaLocation" msgid="7368098373378598066">"خواندن مکان‌ها از مجموعه رسانه شما"</string>
     <string name="permdesc_mediaLocation" msgid="597912899423578138">"به برنامه اجازه می‌دهد مکان‌ها را از مجموعه رسانه‌تان بخواند."</string>
-    <string name="permlab_eye_tracking_coarse" msgid="7989596289790269059">"ردگیری جهت تقریبی نگاه شما"</string>
-    <string name="permdesc_eye_tracking_coarse" msgid="870510233930553355">"به برنامه اجازه می‌دهد جهت تقریبی نگاه شما را ردگیری کند."</string>
-    <string name="permlab_eye_tracking_fine" msgid="6914457357027049512">"ردگیری جایی که به آن نگاه می‌کنید"</string>
-    <string name="permdesc_eye_tracking_fine" msgid="5788889152304524730">"به برنامه اجازه می‌دهد به داده‌های دقیق جهت نگاه دسترسی داشته باشد."</string>
-    <string name="permlab_face_tracking" msgid="2272048395128283324">"ردگیری چهره شما"</string>
-    <string name="permdesc_face_tracking" msgid="2622783922311211866">"به برنامه اجازه می‌دهد به داده‌های ردگیری چهره دسترسی داشته باشد."</string>
-    <string name="permlab_hand_tracking" msgid="6478233866595566940">"ردگیری دست‌های شما"</string>
-    <string name="permdesc_hand_tracking" msgid="8639715900104966456">"به برنامه اجازه می‌دهد به داده‌های ردگیری دست دسترسی داشته باشد."</string>
-    <string name="permlab_head_tracking" msgid="1309731456372087270">"ردگیری سر شما"</string>
-    <string name="permdesc_head_tracking" msgid="231597390513699188">"به برنامه اجازه می‌دهد به داده‌های ردگیری سر دسترسی داشته باشد."</string>
-    <string name="permlab_scene_understanding_coarse" msgid="6518646430502858641">"پی بردن به محیط مجاور شما"</string>
-    <string name="permdesc_scene_understanding_coarse" msgid="4508880777646198656">"به برنامه اجازه می‌دهد به داده‌های ردگیری مربوط به محیط مجاور شما دسترسی داشته باشد."</string>
-    <string name="permlab_scene_understanding_fine" msgid="409126403264393251">"پی بردن به محیط مجاور شما با جزئیات بالا"</string>
-    <string name="permdesc_scene_understanding_fine" msgid="6223368011593524179">"به برنامه اجازه می‌دهد به داده‌های ردگیری مربوط به محیط مجاور شما با جزئیات بسیار بالا دسترسی داشته باشد."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="7117098718465619023">"دسترسی به داده‌های واقعیت گسترده هنگام اجرا نشدن در پیش‌زمینه"</string>
-    <string name="permdesc_xr_tracking_in_background" msgid="939504041387836853">"به برنامه اجازه می‌دهد هنگام اجرا نشدن در پیش‌زمینه به داده‌های واقعیت گسترده دسترسی داشته باشد."</string>
+    <string name="permlab_eye_tracking_coarse" msgid="1266477998416112440">"ردگیری حرکت چشم"</string>
+    <string name="permdesc_eye_tracking_coarse" msgid="1652112796672085320">"به برنامه اجازه می‌دهد جهت تقریبی نگاه شما را ردگیری کند."</string>
+    <string name="permlab_eye_tracking_fine" msgid="6208991021186455002">"ردگیری کردن دقیق حرکت چشم"</string>
+    <string name="permdesc_eye_tracking_fine" msgid="9215360948852654836">"به برنامه اجازه می‌دهد جهت نگاه شما را ردگیری کند."</string>
+    <string name="permlab_face_tracking" msgid="6052126246676474909">"ردگیری کردن حرکات صورت"</string>
+    <string name="permdesc_face_tracking" msgid="185815778490412574">"به برنامه اجازه می‌دهد حرکات صورت و حالات چهره‌تان را ردگیری کند."</string>
+    <string name="permlab_hand_tracking" msgid="21944950887649088">"ردگیری کردن حرکات دست"</string>
+    <string name="permdesc_hand_tracking" msgid="8083783248481460669">"به برنامه اجازه می‌دهد حرکات دستتان را ردگیری کند."</string>
+    <string name="permlab_head_tracking" msgid="4304699038992159853">"ردگیری کردن حرکات سر"</string>
+    <string name="permdesc_head_tracking" msgid="2232184518548944223">"به برنامه اجازه می‌دهد حرکات سرتان را ردگیری کند."</string>
+    <string name="permlab_scene_understanding_coarse" msgid="8765236119358852920">"اسکن کردن محیط اطراف"</string>
+    <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"به برنامه اجازه می‌دهد محیط اطرافتان را اسکن کند."</string>
+    <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"اسکن کردن دقیق محیط اطراف"</string>
+    <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"به برنامه اجازه می‌دهد محیط اطرافتان را بادقت اسکن کند."</string>
+    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"ردگیری کردن داده‌های واقعیت گسترده در پس‌زمینه"</string>
+    <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"به برنامه اجازه می‌دهد در پس‌زمینه به داده‌های واقعیت گسترده دسترسی داشته باشد."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"ضبط کلیدها"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"به برنامه امکان می‌دهد پیش‌از آنکه سیستم بتواند کنش‌ها و میان‌برهای سیستم را پردازش کند، کلیدها را ضبط کند."</string>
     <string name="biometric_app_setting_name" msgid="3339209978734534457">"استفاده از داده‌های زیست‌سنجشی"</string>
     <string name="biometric_or_screen_lock_app_setting_name" msgid="5348462421758257752">"استفاده از داده‌های زیست‌سنجشی یا قفل صفحه"</string>
-    <string name="biometric_dialog_default_title" msgid="55026799173208210">"تأیید کنید این شمایید"</string>
+    <string name="biometric_dialog_default_title" msgid="55026799173208210">"هویتتان را درستی‌سنجی کنید"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"برای ادامه، از زیست‌سنجشی استفاده کنید"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"برای ادامه، از زیست‌سنجشی یا قفل صفحه استفاده کنید"</string>
+    <string name="biometric_dialog_secondary_display_toast" product="default" msgid="256544327174107086">"برای ادامه دادن، هویتتان را در تلفن درستی‌سنجی کنید"</string>
+    <string name="biometric_dialog_secondary_display_toast" product="tablet" msgid="2855203015454795660">"برای ادامه دادن، هویتتان را در رایانه لوحی درستی‌سنجی کنید"</string>
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"سخت‌افزار زیست‌سنجی دردسترس نیست"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"اصالت‌سنجی لغو شد"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"شناسایی نشد"</string>
@@ -913,6 +917,7 @@
     <string name="policydesc_disableCamera" msgid="3204405908799676104">"جلوگیری از استفاده از همه دوربین‌های دستگاه."</string>
     <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"غیرفعال کردن ویژگی‌های قفل صفحه"</string>
     <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"مانع استفاده از برخی ویژگی‌های قفل صفحه می‌شود."</string>
+    <string name="exit_toast_on_long_press_escape" msgid="2983932499112557277">"برای بستن این برنامه، «کلید گریز» را طولانی فشار دهید"</string>
   <string-array name="phoneTypes">
     <item msgid="8996339953292723951">"خانه"</item>
     <item msgid="7740243458912727194">"تلفن همراه"</item>
@@ -1123,6 +1128,7 @@
     <string name="keyguard_accessibility_sim_pin_unlock" msgid="4895939120871890557">"قفل پین سیم‌کارت باز شد."</string>
     <string name="keyguard_accessibility_sim_puk_unlock" msgid="3459003464041899101">"‏قفل Puk سیم‌کارت باز شد."</string>
     <string name="keyguard_accessibility_password_unlock" msgid="6130186108581153265">"باز کردن قفل با گذرواژه."</string>
+    <string name="keyguard_accessibility_secure_lock_device_biometric_unlock" msgid="1884638289137214044">"باز کردن قفل بیومتریک برای دستگاه قفل ایمن."</string>
     <string name="keyguard_accessibility_pattern_area" msgid="1419570880512350689">"ناحیه الگو."</string>
     <string name="keyguard_accessibility_slide_area" msgid="4331399051142520176">"ناحیه کشیدن انگشت روی صفحه."</string>
     <string name="password_keyboard_label_symbol_key" msgid="2716255580853511949">"?123"</string>
@@ -1480,8 +1486,6 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"نپذیرفتن"</string>
     <string name="select_input_method" msgid="3971267998568587025">"انتخاب روش ورودی"</string>
     <string name="input_method_language_settings" msgid="8069089418056819437">"تنظیمات زبان"</string>
-    <string name="show_ime" msgid="6406112007347443383">"وقتی صفحه‌کلید فیزیکی فعال است این ویرایشگر را روی صفحه نگه‌می‌دارد"</string>
-    <string name="hardware" msgid="3611039921284836033">"استفاده از صفحه‌کلید مجازی"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"پیکربندی <xliff:g id="DEVICE_NAME">%s</xliff:g>"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"پیکربندی صفحه‌کلیدهای فیزیکی"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"برای انتخاب زبان و چیدمان تک‌ضرب بزنید"</string>
@@ -1834,11 +1838,12 @@
     <string name="hearing_device_switch_hearing_mic_notification_text" msgid="8288368365767284208">"برای تماس دست‌آزاد می‌توانید از میکروفون سمعک خود استفاده کنید. این کار فقط درطول تماس میکروفون شما را عوض می‌کند."</string>
     <string name="hearing_device_notification_switch_button" msgid="3619524619430941300">"عوض کردن"</string>
     <string name="hearing_device_notification_settings_button" msgid="6673651052880279178">"تنظیمات"</string>
-    <string name="user_switching_message" msgid="1912993630661332336">"در حالت تغییر به <xliff:g id="NAME">%1$s</xliff:g>…"</string>
+    <string name="user_switching_message" msgid="1912993630661332336">"درحال رفتن به <xliff:g id="NAME">%1$s</xliff:g>…"</string>
     <string name="user_logging_out_message" msgid="7216437629179710359">"در حال خروج از سیستم <xliff:g id="NAME">%1$s</xliff:g>…"</string>
     <string name="owner_name" msgid="8713560351570795743">"مالک"</string>
     <string name="guest_name" msgid="8502103277839834324">"مهمان"</string>
     <string name="headless_system_user_name" msgid="1849150903255530049">"کاربر سیستم"</string>
+    <string name="unnamed_user_name" msgid="6096699110534542980">"کاربر"</string>
     <string name="error_message_title" msgid="4082495589294631966">"خطا"</string>
     <string name="error_message_change_not_allowed" msgid="843159705042381454">"سرپرست سیستم شما این تغییر را مجاز نمی‌داند"</string>
     <string name="app_not_found" msgid="3429506115332341800">"برنامه‌ای برای انجام این عملکرد موجود نیست"</string>
@@ -2042,6 +2047,12 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"بزرگ کردن"</string>
     <string name="close_button_text" msgid="10603510034455258">"بستن"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>:‏ <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
+    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
+    <skip />
+    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
+    <skip />
+    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
+    <skip />
     <string name="call_notification_answer_action" msgid="5999246836247132937">"پاسخ دادن"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"ویدیو"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"رد کردن"</string>
@@ -2510,7 +2521,7 @@
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"به‌دلایل امنیتی، محتوای برنامه پس‌از هم‌رسانی صفحه‌نمایش پنهان می‌شود"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"به‌طور خودکار به ماهواره متصل شد"</string>
     <string name="satellite_notification_summary" msgid="5207364139430767162">"‏می‌توانید بدون شبکه تلفن همراه یا Wi-Fi پیام ارسال و دریافت کنید"</string>
-    <string name="satellite_notification_summary_with_data" msgid="6486843676720429049">"ازطریق ماهواره می‌توانید پیام ارسال و دریافت کنید و از داده‌های محدود استفاده کنید"</string>
+    <string name="satellite_notification_summary_with_data" msgid="8290202758586475712">"ازطریق ماهواره می‌توانید پیام ارسال و دریافت کنید و از برنامه‌های منتخب استفاده کنید"</string>
     <string name="satellite_notification_manual_title" msgid="1097504441849466279">"از «پیام‌رسانی ماهواره‌ای» استفاده شود؟"</string>
     <string name="satellite_notification_manual_summary" msgid="901206289846283445">"‏ارسال و دریافت پیام بدون شبکه تلفن همراه یا Wi-Fi"</string>
     <string name="satellite_notification_open_message" msgid="4149234979688273729">"باز کردن «پیام‌نگار»"</string>
@@ -2565,23 +2576,37 @@
     <string name="keyboard_shortcut_group_applications_calendar" msgid="3571770335653387606">"تقویم"</string>
     <string name="keyboard_shortcut_group_applications_calculator" msgid="6753209559716091507">"ماشین‌حساب"</string>
     <string name="keyboard_shortcut_group_applications_maps" msgid="7950000659522589471">"نقشه"</string>
+    <string name="keyboard_shortcut_group_applications_files" msgid="863938400765838051">"Files"</string>
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"برنامه‌ها"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"اثر انگشتانتان دیگر قابل‌شناسایی نیست. «قفل‌گشایی با اثر انگشت» را دوباره راه‌اندازی کنید."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"امنیت و حریم خصوصی"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="7202983697003493711">"ابتدا قفل صفحه را باز کنید"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="2648733588653060170">"قفل صفحه را باز کنید و دوباره متصل شوید"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_text" msgid="1628936399413661929">"‏«حفاظت پیشرفته» برای انتقال داده‌های USB نیاز دارد قفل صفحه با روش معمول باز شود"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="608846071408348658">"‏«حفاظت پیشرفته» برای انتقال داده‌های USB نیاز دارد قفل صفحه با روش معمول باز شود"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_low_power_charge_notification_text" msgid="1240936298914360256">"‏«حفاظت پیشرفته» برای انتقال داده USB یا شارژ سریع نیاز دارد قفل صفحه باز شود"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_low_power_charge_replug_notification_text" msgid="6370672468652821937">"‏«حفاظت پیشرفته» برای انتقال داده USB یا شارژ سریع نیاز دارد قفل صفحه باز شود"</string>
-    <string name="usb_apm_usb_plugged_in_for_power_brick_notification_text" msgid="1673711307740787848">"‏«حفاظت پیشرفته» برای شارژ سریع USB نیاز دارد قفل صفحه با روش معمول باز شود"</string>
-    <string name="usb_apm_usb_plugged_in_for_power_brick_replug_notification_text" msgid="1244847752922938852">"‏«حفاظت پیشرفته» برای شارژ سریع USB نیاز دارد قفل صفحه با روش معمول باز شود"</string>
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
+    <skip />
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"بی‌صدا کردن"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"اعلان‌ها بی‌صدا شده است"</string>
-    <string name="usb_apm_usb_notification_silenced_text" msgid="6414815636131602513">"‏اعلان‌های «حفاظت پیشرفته» USB تا زمان راه‌اندازی مجدد دستگاه بی‌صدا شده است"</string>
+    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
+    <skip />
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"‏فعالیت مشکوک USB"</string>
-    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="6537085605929303187">"‏نشانِ داده USB غیرفعال شده است."</string>
+    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
+    <skip />
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"برای «قفل‌گشایی با اثر انگشت» با مشکل روبرو هستید؟"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"برای بازبینی نکات مربوط به بهبود تجربه قفل‌گشایی، تک‌ضرب بزنید"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"چشمک نزدن"</string>
+    <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"«دکمه روشن/خاموش» را طولانی فشار دهید تا تلویزیون خاموش شود"</string>
+    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
+    <skip />
+    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
+    <skip />
+    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
+    <skip />
 </resources>

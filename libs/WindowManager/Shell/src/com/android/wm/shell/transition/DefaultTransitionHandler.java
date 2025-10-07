@@ -347,7 +347,8 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
         }
 
         // Early check if the transition doesn't warrant an animation.
-        if (TransitionUtil.isAllNoAnimation(info) || TransitionUtil.isAllOrderOnly(info)
+        if (isAnimationsDisabledForAnyDisplay(info) || TransitionUtil.isAllNoAnimation(info)
+                || TransitionUtil.isAllOrderOnly(info)
                 || (info.getFlags() & WindowManager.TRANSIT_FLAG_INVISIBLE) != 0) {
             startTransaction.apply();
             // As a contract, finishTransaction should only be applied in Transitions#onFinish
@@ -371,7 +372,7 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
                 mInteractionJankMonitor.end(CUJ_DEFAULT_TASK_TO_TASK_ANIMATION);
             }
             mAnimations.remove(transition);
-            if (Flags.releaseSurfaceOnTransitionFinish()) {
+            if (!Flags.releaseAllTransitionSurfaces()) {
                 info.releaseAllSurfaces();
             }
             finishCallback.onTransitionFinished(null /* wct */);
@@ -383,6 +384,14 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
         final boolean isDreamTransition = isDreamTransition(info);
         final boolean isOnlyTranslucent = isOnlyTranslucent(info);
         final boolean isActivityLevel = isActivityLevelOnly(info);
+
+        // Don't create a background color layer if there is only one change in the transition.
+        // This is to avoid incorrectly occluding other layers when a transition only contains a
+        // single "close" change, for example. With only one change, there are no other layers
+        // within the transition to interact with, so a background is unnecessary.
+        final boolean allowBackground =
+                !com.android.window.flags.Flags.polishCloseWallpaperIncludesOpenChange()
+                        || info.getChanges().size() > 1;
 
         for (int i = info.getChanges().size() - 1; i >= 0; --i) {
             final TransitionInfo.Change change = info.getChanges().get(i);
@@ -513,7 +522,8 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
                     final boolean isTranslucent = (change.getFlags() & FLAG_TRANSLUCENT) != 0;
                     if (!isTranslucent && TransitionUtil.isOpenOrCloseMode(mode)
                             && TransitionUtil.isOpenOrCloseMode(info.getType())
-                            && wallpaperTransit == WALLPAPER_TRANSITION_NONE) {
+                            && wallpaperTransit == WALLPAPER_TRANSITION_NONE
+                            && allowBackground) {
                         // Use the overview background as the background for the animation
                         final Context uiContext = ActivityThread.currentActivityThread()
                                 .getSystemUiContext();
@@ -568,8 +578,10 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
                     cornerRadius = 0;
                 }
 
-                backgroundColorForTransition = getTransitionBackgroundColorIfSet(change, a,
-                        backgroundColorForTransition);
+                if (allowBackground) {
+                    backgroundColorForTransition = getTransitionBackgroundColorIfSet(change, a,
+                            backgroundColorForTransition);
+                }
 
                 final Rect clipRect = TransitionUtil.isClosingType(mode)
                         ? new Rect(mRotator.getEndBoundsInStartRotation(change))
@@ -664,6 +676,15 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
             onAnimFinish.run();
         }
         return true;
+    }
+
+    private boolean isAnimationsDisabledForAnyDisplay(@NonNull TransitionInfo info) {
+        boolean disabled = false;
+        int rootCount = info.getRootCount();
+        for (int i = 0; i < rootCount; i++) {
+            disabled |= mDisplayController.isAnimationsDisabled(info.getRoot(i).getDisplayId());
+        }
+        return disabled;
     }
 
     private void addBackgroundColor(@NonNull TransitionInfo info,
@@ -1032,7 +1053,7 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
 
     /**
      * Returns {@code true} if the default transition handler can run the override animation.
-     * @see #loadAnimation(TransitionInfo, TransitionInfo.Change, int, boolean)
+     * @see #loadAnimation(int, TransitionInfo, TransitionInfo.Change, int, boolean)
      */
     public static boolean isSupportedOverrideAnimation(
             @NonNull TransitionInfo.AnimationOptions options) {

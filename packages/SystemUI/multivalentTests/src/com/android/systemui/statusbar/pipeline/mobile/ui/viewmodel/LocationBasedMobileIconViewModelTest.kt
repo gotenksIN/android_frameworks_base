@@ -55,7 +55,6 @@ import org.mockito.MockitoAnnotations
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")
 @SmallTest
 @RunWith(AndroidJUnit4::class)
-@android.platform.test.annotations.EnabledOnRavenwood
 class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
     private val kosmos = testKosmos()
 
@@ -117,7 +116,9 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 context,
                 flags,
+// QTI_BEGIN: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
                 mock(),
+// QTI_END: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
             )
 
         interactor =
@@ -135,6 +136,7 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 repository,
                 context,
                 MobileIconCarrierIdOverridesFake(),
+// QTI_BEGIN: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
                 mock(),
                 mock(),
                 mock(),
@@ -144,6 +146,7 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 mock(),
                 mock(),
                 mock(),
+// QTI_END: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
             )
 
         commonImpl =

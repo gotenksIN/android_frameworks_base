@@ -2988,10 +2988,10 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
 
             final boolean longClickable = isLongClickable();
             Drawable d = selector.getCurrent();
+            final int longPressTimeoutMillis = getLongPressTimeoutMillis();
             if (d != null && d instanceof TransitionDrawable) {
                 if (longClickable) {
-                    ((TransitionDrawable) d).startTransition(
-                            ViewConfiguration.getLongPressTimeout());
+                    ((TransitionDrawable) d).startTransition(longPressTimeoutMillis);
                 } else {
                     ((TransitionDrawable) d).resetTransition();
                 }
@@ -3001,7 +3001,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                     mPendingCheckForKeyLongPress = new CheckForKeyLongPress();
                 }
                 mPendingCheckForKeyLongPress.rememberWindowAttachCount();
-                postDelayed(mPendingCheckForKeyLongPress, ViewConfiguration.getLongPressTimeout());
+                postDelayed(mPendingCheckForKeyLongPress, longPressTimeoutMillis);
             }
         }
     }
@@ -3603,14 +3603,14 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                         positionSelector(mMotionPosition, child);
                         refreshDrawableState();
 
-                        final int longPressTimeout = ViewConfiguration.getLongPressTimeout();
                         final boolean longClickable = isLongClickable();
-
+                        final int longPressTimeoutMillis = getLongPressTimeoutMillis();
                         if (mSelector != null) {
                             final Drawable d = mSelector.getCurrent();
                             if (d != null && d instanceof TransitionDrawable) {
                                 if (longClickable) {
-                                    ((TransitionDrawable) d).startTransition(longPressTimeout);
+                                    ((TransitionDrawable) d).startTransition(
+                                            longPressTimeoutMillis);
                                 } else {
                                     ((TransitionDrawable) d).resetTransition();
                                 }
@@ -3624,7 +3624,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                             }
                             mPendingCheckForLongPress.setCoords(x, y);
                             mPendingCheckForLongPress.rememberWindowAttachCount();
-                            postDelayed(mPendingCheckForLongPress, longPressTimeout);
+                            postDelayed(mPendingCheckForLongPress, longPressTimeoutMillis);
                         } else {
                             mTouchMode = TOUCH_MODE_DONE_WAITING;
                         }
@@ -3643,9 +3643,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
         final int distance = Math.abs(deltaY);
         final boolean overscroll = mScrollY != 0;
 
-// QTI_BEGIN: 2023-11-01: Performance: Cleaned up OPTS_INPUT related codes.
         if ((overscroll || distance > mTouchSlop) &&
-// QTI_END: 2023-11-01: Performance: Cleaned up OPTS_INPUT related codes.
                 (getNestedScrollAxes() & SCROLL_AXIS_VERTICAL) == 0) {
             createScrollingCache();
             if (overscroll) {
@@ -3653,10 +3651,8 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                 mMotionCorrection = 0;
             } else {
                 mTouchMode = TOUCH_MODE_SCROLL;
-// QTI_BEGIN: 2023-11-01: Performance: Cleaned up OPTS_INPUT related codes.
                 mMotionCorrection = deltaY > 0 ? mTouchSlop : -mTouchSlop;
 
-// QTI_END: 2023-11-01: Performance: Cleaned up OPTS_INPUT related codes.
             }
             removeCallbacks(mPendingCheckForLongPress);
             setPressed(false);
@@ -4261,13 +4257,13 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                                     }
                                     mSelector.setHotspot(x, ev.getY());
                                 }
-// QTI_BEGIN: 2023-05-30: Performance: Optimize AbsListView to reduce click operation latency
+// QTI_BEGIN: 2023-05-30: Core: Optimize AbsListView to reduce click operation latency
                                 /* QTI_OPT: Move performClick from delayed runnable */
                                 if (!mDataChanged && !mIsDetaching
                                         && isAttachedToWindow()) {
                                     performClick.run();
                                 }
-// QTI_END: 2023-05-30: Performance: Optimize AbsListView to reduce click operation latency
+// QTI_END: 2023-05-30: Core: Optimize AbsListView to reduce click operation latency
                                 if (mTouchModeReset != null) {
                                     removeCallbacks(mTouchModeReset);
                                 }
@@ -4852,9 +4848,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
                         break;
                 }
                 break;
-// QTI_BEGIN: 2018-03-01: Performance: touch response optimizations.
             }
-// QTI_END: 2018-03-01: Performance: touch response optimizations.
 
             case MotionEvent.ACTION_CANCEL:
             case MotionEvent.ACTION_UP: {
@@ -4869,9 +4863,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
             case MotionEvent.ACTION_POINTER_UP: {
                 onSecondaryPointerUp(ev);
                 break;
-// QTI_BEGIN: 2018-03-01: Performance: touch response optimizations.
             }
-// QTI_END: 2018-03-01: Performance: touch response optimizations.
         }
 
         return false;

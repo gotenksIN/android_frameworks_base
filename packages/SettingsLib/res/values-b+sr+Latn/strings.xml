@@ -266,7 +266,7 @@
     <string name="enable_adb_summary" msgid="3711526030096574316">"Režim otklanjanja grešaka kada je USB povezan"</string>
     <string name="clear_adb_keys" msgid="3010148733140369917">"Opozivanje odobrenja za uklanjanje USB grešaka"</string>
     <string name="enable_adb_wireless" msgid="6973226350963971018">"Bežično otklanjanje grešaka"</string>
-    <string name="enable_adb_wireless_summary" msgid="7344391423657093011">"Režim za otklanjanje grešaka kada je Wi‑Fi povezan"</string>
+    <string name="enable_adb_wireless_summary" msgid="7344391423657093011">"Režim za otklanjanje grešaka kada je WiFi povezan"</string>
     <string name="adb_wireless_error" msgid="721958772149779856">"Greška"</string>
     <string name="adb_wireless_settings" msgid="2295017847215680229">"Bežično otklanjanje grešaka"</string>
     <string name="adb_wireless_list_empty_off" msgid="1713707973837255490">"Da biste videli i koristili dostupne uređaje, uključite bežično otklanjanje grešaka"</string>
@@ -340,7 +340,7 @@
     <string name="private_dns_mode_provider_hostname_hint" msgid="6564868953748514595">"Unesite ime hosta dobavljača usluge DNS-a"</string>
     <string name="private_dns_mode_provider_failure" msgid="8356259467861515108">"Povezivanje nije uspelo"</string>
     <string name="wifi_display_certification_summary" msgid="8111151348106907513">"Prikazuje opcije za sertifikaciju bežičnog ekrana"</string>
-    <string name="wifi_verbose_logging_summary" msgid="4993823188807767892">"Povećava nivo evidentiranja za Wi‑Fi. Prikaz po SSID RSSI-u u biraču Wi‑Fi mreže"</string>
+    <string name="wifi_verbose_logging_summary" msgid="4993823188807767892">"Povećava nivo evidentiranja za Wi‑Fi. Prikaz po SSID RSSI-u u biraču WiFi mreže"</string>
     <string name="wifi_scan_throttling_summary" msgid="2577105472017362814">"Smanjuje potrošnju baterije i poboljšava učinak mreže"</string>
     <string name="wifi_non_persistent_mac_randomization_summary" msgid="2159794543105053930">"Kada je ovaj režim omogućen, MAC adresa ovog uređaja može da se promeni svaki put kada se poveže sa mrežom na kojoj je omogućeno nasumično razvrstavanje MAC adresa."</string>
     <string name="wifi_metered_label" msgid="8737187690304098638">"Sa ograničenjem"</string>
@@ -356,7 +356,7 @@
     <string name="allow_mock_location" msgid="2102650981552527884">"Dozvoli lažne lokacije"</string>
     <string name="allow_mock_location_summary" msgid="179780881081354579">"Dozvoli lažne lokacije"</string>
     <string name="debug_view_attributes" msgid="3539609843984208216">"Omogući proveru atributa za pregled"</string>
-    <string name="mobile_data_always_on_summary" msgid="1112156365594371019">"Mobilni podaci su uvek aktivni, čak i kada je Wi‑Fi aktivan (radi brze promene mreže)."</string>
+    <string name="mobile_data_always_on_summary" msgid="1112156365594371019">"Mobilni podaci su uvek aktivni, čak i kada je WiFi aktivan (radi brze promene mreže)."</string>
     <string name="tethering_hardware_offload_summary" msgid="7801345335142803029">"Koristi se hardversko ubrzanje privezivanja ako je dostupno"</string>
     <string name="adb_warning_title" msgid="7708653449506485728">"Dozvoli otklanjanje USB grešaka?"</string>
     <string name="adb_warning_message" msgid="8145270656419669221">"Otklanjanje USB grešaka namenjeno je samo za svrhe programiranja. Koristite ga za kopiranje podataka sa računara na uređaj i obratno, instaliranje aplikacija na uređaju bez obaveštenja i čitanje podataka iz evidencije."</string>
@@ -398,7 +398,7 @@
     <string name="pointer_location_summary" msgid="957120116989798464">"Preklopni element sa trenutnim podacima o dodiru"</string>
     <string name="show_touches" msgid="8437666942161289025">"Prikazuj dodire"</string>
     <string name="show_touches_summary" msgid="3692861665994502193">"Prikazuje vizuelne povratne informacije za dodire"</string>
-    <string name="show_key_presses" msgid="6360141722735900214">"Prikazuj pritiske tastera"</string>
+    <string name="show_key_presses" msgid="6360141722735900214">"Prikaži pritiske tastera"</string>
     <string name="show_key_presses_summary" msgid="725387457373015024">"Prikazuje povratne informacije za pritiske tastera"</string>
     <string name="touchpad_visualizer" msgid="3707916068870825115">"Prikaži unos na tačpedu"</string>
     <string name="touchpad_visualizer_summary" msgid="4056080018119847449">"Element koji prekriva sadržaj ekrana prikazuje podatke iz unosa na tačpedu i prepoznaje pokrete"</string>
@@ -436,10 +436,10 @@
     <string name="verbose_vendor_logging_notification_action" msgid="1190831050259046071">"Omogući još jedan dan"</string>
     <string name="verbose_vendor_logging_preference_summary_will_disable" msgid="6175431593394522553">"Onemogućeno posle jednog dana"</string>
     <string name="verbose_vendor_logging_preference_summary_on" msgid="9017757242481762036">"Omogućeno neograničeno"</string>
-    <string name="window_animation_scale_title" msgid="5236381298376812508">"Razmera animacije prozora"</string>
-    <string name="transition_animation_scale_title" msgid="1278477690695439337">"Razmera animacije prelaza"</string>
-    <string name="animator_duration_scale_title" msgid="7082913931326085176">"Animatorova razmera trajanja"</string>
-    <string name="overlay_display_devices_title" msgid="5411894622334469607">"Simuliraj sekundarne ekrane"</string>
+    <string name="window_animation_scale_title" msgid="5236381298376812508">"Brzina animacije prozora"</string>
+    <string name="transition_animation_scale_title" msgid="1278477690695439337">"Brzina animacije prelaza"</string>
+    <string name="animator_duration_scale_title" msgid="7082913931326085176">"Brzina generisanja animacije"</string>
+    <string name="overlay_display_devices_title" msgid="5411894622334469607">"Simulacija sekundarnih ekrana"</string>
     <string name="shade_display_awareness_title" msgid="8000009404669495876">"Položaj senke na ekranu"</string>
     <string name="debug_applications_category" msgid="5394089406638954196">"Aplikacije"</string>
     <string name="immediately_destroy_activities" msgid="1826287490705167403">"Ne čuvaj aktivnosti"</string>

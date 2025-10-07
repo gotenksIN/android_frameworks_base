@@ -21,6 +21,7 @@ import android.app.Activity
 import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Insets
 import android.graphics.Outline
 import android.graphics.Rect
@@ -149,9 +150,12 @@ class BubbleBarAnimationHelperTest {
     @Test
     fun animateSwitch_bubbleToBubble_handleColorTransferred() {
         val fromBubble = createBubble(key = "from").initialize(container)
+        val uiMode =
+            context.getResources().getConfiguration().uiMode and Configuration.UI_MODE_NIGHT_MASK
+        val isSystemDark = uiMode.toInt() == Configuration.UI_MODE_NIGHT_YES
         fromBubble.bubbleBarExpandedView!!
             .handleView
-            .updateHandleColor(/* isRegionDark= */ true, /* animated= */ false)
+            .updateHandleColor(/* isRegionDark= */ isSystemDark, /* animated= */ false)
         val toBubble = createBubble(key = "to").initialize(container)
 
         activityScenario.onActivity {
@@ -300,6 +304,42 @@ class BubbleBarAnimationHelperTest {
 
         assertThat(semaphore.tryAcquire(5, TimeUnit.SECONDS)).isTrue()
         assertThat(afterCalled).isTrue()
+    }
+
+    @Test
+    fun animateExpansion_withPendingAnimation() {
+        val bubble = createBubble("key").initialize(container)
+        val bbev = bubble.bubbleBarExpandedView!!
+
+        val semaphore = Semaphore(0)
+        var afterCalled = false
+        val after = Runnable {
+            afterCalled = true
+            semaphore.release()
+        }
+
+        var expandedViewWithPendingAnimationBefore: BubbleBarExpandedView? = null
+        var expandedViewWithPendingAnimationAfter: BubbleBarExpandedView? = null
+
+        activityScenario.onActivity {
+            bbev.onTaskCreated()
+            // Make the TaskView invisible so that the animation waits on TaskView visibility.
+            bbev.bubbleTaskView!!.listener
+                .onTaskVisibilityChanged(0, false /* visible */)
+            animationHelper.animateExpansion(bubble, after)
+            expandedViewWithPendingAnimationBefore =
+                animationHelper.expandedViewWithPendingAnimation
+
+            animationHelper.cancelAnimations()
+            expandedViewWithPendingAnimationAfter =
+                animationHelper.expandedViewWithPendingAnimation
+        }
+        getInstrumentation().waitForIdleSync()
+
+        assertThat(semaphore.tryAcquire(5, TimeUnit.SECONDS)).isTrue()
+        assertThat(afterCalled).isTrue()
+        assertThat(expandedViewWithPendingAnimationBefore).isEqualTo(bbev)
+        assertThat(expandedViewWithPendingAnimationAfter).isNull()
     }
 
     @Test

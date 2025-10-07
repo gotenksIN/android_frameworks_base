@@ -289,15 +289,6 @@ public interface RILConstants {
     int IMS_PHONE = 5;
     int CDMA_LTE_PHONE = 6;
 
-    int LTE_ON_CDMA_UNKNOWN = -1;
-    int LTE_ON_CDMA_FALSE = 0;
-    int LTE_ON_CDMA_TRUE = 1;
-
-    int SETUP_DATA_AUTH_NONE      = 0;
-    int SETUP_DATA_AUTH_PAP       = 1;
-    int SETUP_DATA_AUTH_CHAP      = 2;
-    int SETUP_DATA_AUTH_PAP_CHAP  = 3;
-
     /**
      * No restriction at all including voice/SMS/USSD/SS/AV64
      * and packet data.
@@ -492,11 +483,9 @@ public interface RILConstants {
     int RIL_REQUEST_ENABLE_MODEM = 146;
     int RIL_REQUEST_GET_MODEM_STATUS = 147;
     int RIL_REQUEST_CDMA_SEND_SMS_EXPECT_MORE = 148;
-// QTI_BEGIN: 2021-05-18: Telephony: Optimize SIM phonebook feature with new APIs
     int RIL_REQUEST_GET_SIM_PHONEBOOK_CAPACITY = 149;
     int RIL_REQUEST_GET_SIM_PHONEBOOK_RECORDS = 150;
     int RIL_REQUEST_UPDATE_SIM_PHONEBOOK_RECORD = 151;
-// QTI_END: 2021-05-18: Telephony: Optimize SIM phonebook feature with new APIs
     int RIL_REQUEST_DEVICE_IMEI = 152;
     /* The following requests are not defined in RIL.h */
     int RIL_REQUEST_HAL_NON_RIL_BASE = 200;
@@ -558,12 +547,12 @@ public interface RILConstants {
     int RIL_REQUEST_SET_USER_DATA_ROAMING_ENABLED = 255;
     int RIL_REQUEST_UPDATE_ALLOWED_IMS_SERVICES = 256;
     int RIL_REQUEST_NOTIFY_IMS_DATA_NETWORK = 257;
+    int RIL_REQUEST_SET_SIM_TYPE = 258;
+    int RIL_REQUEST_GET_SIM_TYPE_INFO = 259;
 
-// QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /* RIL Request to get newly supported radio
        capabilities include 5G SA*/
     int RIL_REQUEST_GET_ENHANCED_RADIO_CAPABILITY = 600;
-// QTI_END: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /* Responses begin */
     int RIL_RESPONSE_ACKNOWLEDGEMENT = 800;
 
@@ -621,13 +610,12 @@ public interface RILConstants {
     int RIL_UNSOL_NETWORK_SCAN_RESULT = 1049;
     int RIL_UNSOL_KEEPALIVE_STATUS = 1050;
     int RIL_UNSOL_UNTHROTTLE_APN = 1052;
-// QTI_BEGIN: 2021-05-18: Telephony: Optimize SIM phonebook feature with new APIs
     int RIL_UNSOL_RESPONSE_SIM_PHONEBOOK_CHANGED = 1053;
     int RIL_UNSOL_RESPONSE_SIM_PHONEBOOK_RECORDS_RECEIVED = 1054;
-// QTI_END: 2021-05-18: Telephony: Optimize SIM phonebook feature with new APIs
     int RIL_UNSOL_SLICING_CONFIG_CHANGED = 1055;
     int RIL_UNSOL_CELLULAR_IDENTIFIER_DISCLOSED = 1056;
     int RIL_UNSOL_SECURITY_ALGORITHMS_UPDATED = 1057;
+    int RIL_UNSOL_DISPLAY_NETWORK_TYPE_CHANGED = 1058;
 
     /* The following unsols are not defined in RIL.h */
     int RIL_UNSOL_HAL_NON_RIL_BASE = 1100;

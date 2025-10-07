@@ -77,7 +77,6 @@ import android.os.IBinder;
 import android.os.PowerExemptionManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
-import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.util.ArrayMap;
 import android.util.Log;
@@ -325,7 +324,6 @@ public class BroadcastQueueTest extends BaseBroadcastQueueTest {
         final boolean dead = (behavior == ProcessBehavior.DEAD);
 
         final ProcessRecord r = spy(new ProcessRecord(mAms, ai, processName, ai.uid));
-        r.mState = spy(r.mState);
         r.setPid(mNextPid.getAndIncrement());
         ProcessRecord.updateProcessRecordNodes(r);
         mActiveProcesses.add(r);
@@ -775,7 +773,7 @@ public class BroadcastQueueTest extends BaseBroadcastQueueTest {
         }) {
             // Confirm expected OOM adjustments; we were invoked once to upgrade
             // and once to downgrade
-            verify(receiverApp.mState, times(1).description(String.valueOf(receiverApp)))
+            verify(receiverApp, times(1).description(String.valueOf(receiverApp)))
                     .setReportedProcState(ActivityManager.PROCESS_STATE_RECEIVER);
             verify(mAms, times(2)).enqueueOomAdjTargetLocked(eq(receiverApp));
 
@@ -930,7 +928,6 @@ public class BroadcastQueueTest extends BaseBroadcastQueueTest {
      * responds with {@link DeadObjectException} even after restarting.
      */
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_AVOID_REPEATED_BCAST_RE_ENQUEUES)
     public void testRepeatedDead_Manifest() throws Exception {
         final ProcessRecord callerApp = makeActiveProcessRecord(PACKAGE_RED);
         mNewProcessBehaviors.put(PACKAGE_GREEN, ProcessBehavior.DEAD);
@@ -1144,7 +1141,6 @@ public class BroadcastQueueTest extends BaseBroadcastQueueTest {
      * it doesn't get stuck.
      */
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_AVOID_REPEATED_BCAST_RE_ENQUEUES)
     public void testRepeatedKillWithoutNotify() throws Exception {
         final ProcessRecord callerApp = makeActiveProcessRecord(PACKAGE_RED);
         final ProcessRecord receiverBlueApp = makeActiveProcessRecord(PACKAGE_BLUE);
@@ -2289,7 +2285,6 @@ public class BroadcastQueueTest extends BaseBroadcastQueueTest {
      * Verify that we skip broadcasts at enqueue if {@link BroadcastSkipPolicy} decides it
      * should be skipped.
      */
-    @EnableFlags(Flags.FLAG_AVOID_NOTE_OP_AT_ENQUEUE)
     @Test
     public void testSkipPolicy_atEnqueueTime() throws Exception {
         final ProcessRecord callerApp = makeActiveProcessRecord(PACKAGE_RED);

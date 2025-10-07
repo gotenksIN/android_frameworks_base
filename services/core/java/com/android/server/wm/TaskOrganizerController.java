@@ -46,17 +46,21 @@ import android.view.Display;
 import android.view.SurfaceControl;
 import android.window.ITaskOrganizer;
 import android.window.ITaskOrganizerController;
+import android.window.ITransitionPlayer;
 import android.window.IWindowlessStartingSurfaceCallback;
 import android.window.SplashScreenView;
 import android.window.StartingWindowInfo;
 import android.window.StartingWindowRemovalInfo;
 import android.window.TaskAppearedInfo;
 import android.window.TaskSnapshot;
+import android.window.TransitionInfo;
+import android.window.TransitionRequestInfo;
 import android.window.WindowContainerToken;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.ArrayUtils;
+import com.android.window.flags.Flags;
 
 import java.io.PrintWriter;
 import java.util.ArrayDeque;
@@ -68,6 +72,8 @@ import java.util.WeakHashMap;
 /**
  * Stores the TaskOrganizers associated with a given windowing mode and
  * their associated state.
+ *
+ * Current tests can be found in WindowOrganizerTests.
  */
 class TaskOrganizerController extends ITaskOrganizerController.Stub {
     private static final String TAG = "TaskOrganizerController";
@@ -115,11 +121,19 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
         void onTaskAppeared(Task task) {
             ProtoLog.v(WM_DEBUG_WINDOW_ORGANIZER, "Task appeared taskId=%d", task.mTaskId);
             final RunningTaskInfo taskInfo = task.getTaskInfo();
+            final SurfaceControl leash = prepareLeash(task,
+                    "TaskOrganizerController.onTaskAppeared");
             try {
-                mTaskOrganizer.onTaskAppeared(taskInfo, prepareLeash(task,
-                        "TaskOrganizerController.onTaskAppeared"));
+                mTaskOrganizer.onTaskAppeared(taskInfo, leash);
             } catch (RemoteException e) {
                 Slog.e(TAG, "Exception sending onTaskAppeared callback", e);
+
+                // In the rare case that onTaskAppeared() fails to notify, then we should prevent
+                // subsequent lifecycle calls to shell to prevent it from getting an inconsistent
+                // set of calls
+                task.mTaskAppearedSent = false;
+            } finally {
+                leash.release();
             }
         }
 
@@ -389,7 +403,7 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
                 t.mTaskAppearedSent = false;
             }
             if (removeFromSystem) {
-                mService.removeTask(t);
+                mService.removeTask(t, "remove-by-organizer");
             }
             return taskAppearedSent;
         }
@@ -474,6 +488,8 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
     // Set of organized tasks (by taskId) that dispatch back pressed to their organizers
     private final HashSet<Integer> mInterceptBackPressedOnRootTasks = new HashSet<>();
 
+    public final ITransitionPlayer mAsTransitionPlayer = new AsTransitionPlayer();
+
     TaskOrganizerController(ActivityTaskManagerService atm) {
         mService = atm;
         mGlobalLock = atm.mGlobalLock;
@@ -495,6 +511,8 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
     @Override
     public ParceledListSlice<TaskAppearedInfo> registerTaskOrganizer(ITaskOrganizer organizer) {
         enforceTaskPermission("registerTaskOrganizer()");
+        final int callerPid = Binder.getCallingPid();
+        final int callerUid = Binder.getCallingUid();
         final int uid = Binder.getCallingUid();
         final long origId = Binder.clearCallingIdentity();
         try {
@@ -520,6 +538,12 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
                         taskInfos.add(new TaskAppearedInfo(task.getTaskInfo(), taskLeash));
                     }
                 });
+                if (Flags.unifyShellBinders()) {
+                    final WindowProcessController wpc =
+                            mService.getProcessController(callerPid, callerUid);
+                    mService.getTransitionController().registerTransitionPlayer(
+                            mAsTransitionPlayer, wpc);
+                }
             };
             if (mService.getTransitionController().isShellTransitionsEnabled()) {
                 mService.getTransitionController().mRunningLock.runWhenIdle(1000, withGlobalLock);
@@ -541,6 +565,10 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
         final long origId = Binder.clearCallingIdentity();
         try {
             final Runnable withGlobalLock = () -> {
+                if (Flags.unifyShellBinders()) {
+                    mService.getTransitionController().unregisterTransitionPlayer(
+                            mAsTransitionPlayer);
+                }
                 final TaskOrganizerState state = mTaskOrganizerStates.get(organizer.asBinder());
                 if (state == null) {
                     return;
@@ -616,9 +644,7 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
             return null;
         }
         t.setPosition(leash, window.mSurfacePosition.x, window.mSurfacePosition.y);
-        if (com.android.window.flags.Flags.splashScreenViewSyncTransaction()) {
-            t.apply();
-        }
+        t.apply();
         return leash;
     }
 
@@ -1221,5 +1247,31 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
     @VisibleForTesting
     TaskOrganizerPendingEventsQueue getTaskOrganizerPendingEvents(IBinder taskOrganizer) {
         return mTaskOrganizerStates.get(taskOrganizer).mPendingEventsQueue;
+    }
+
+    class AsTransitionPlayer implements ITransitionPlayer {
+        @Override
+        public void onTransitionReady(IBinder transitionToken, TransitionInfo info,
+                SurfaceControl.Transaction t, SurfaceControl.Transaction finishT)
+                throws RemoteException {
+            mTaskOrganizers.getLast().onTransitionReady(transitionToken, info, t, finishT);
+        }
+
+        @Override
+        public void requestStartTransition(IBinder transitionToken, TransitionRequestInfo request)
+                throws RemoteException {
+            mTaskOrganizers.getLast().requestStartTransition(transitionToken, request);
+        }
+
+        @Override
+        public void removeStartingWindow(StartingWindowRemovalInfo removalInfo)
+                throws RemoteException {
+            mTaskOrganizers.getLast().removeStartingWindow(removalInfo);
+        }
+
+        @Override
+        public IBinder asBinder() {
+            return mTaskOrganizers.getLast().asBinder();
+        }
     }
 }

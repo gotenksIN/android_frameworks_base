@@ -51,7 +51,7 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.data.repository.ShadeRepository
 import com.android.systemui.util.kotlin.sample
-import com.android.systemui.wallpapers.data.repository.WallpaperFocalAreaRepository
+import com.android.systemui.wallpapers.domain.interactor.WallpaperFocalAreaInteractor
 import javax.inject.Inject
 import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
@@ -88,7 +88,7 @@ class KeyguardInteractor
 constructor(
     private val repository: KeyguardRepository,
     bouncerRepository: KeyguardBouncerRepository,
-    private val wallpaperFocalAreaRepository: WallpaperFocalAreaRepository,
+    private val wallpaperFocalAreaInteractor: WallpaperFocalAreaInteractor,
     @ShadeDisplayAware configurationInteractor: ConfigurationInteractor,
     shadeRepository: ShadeRepository,
     private val keyguardTransitionInteractor: KeyguardTransitionInteractor,
@@ -112,7 +112,7 @@ constructor(
                 keyguardTransitionInteractor.isInTransition(
                     edge = Edge.create(from = LOCKSCREEN, to = AOD)
                 ),
-                shadeRepository.isShadeLayoutWide,
+                shadeRepository.legacyUseSplitShade,
                 configurationInteractor.dimensionPixelSize(R.dimen.keyguard_split_shade_top_margin),
             ) { bounds, isTransitioningToAod, useSplitShade, keyguardSplitShadeTopMargin ->
                 if (isTransitioningToAod) {
@@ -278,21 +278,17 @@ constructor(
     /** Whether the primary bouncer is showing or about to show soon. */
     @JvmField
     val primaryBouncerShowing: StateFlow<Boolean> =
-        if (com.android.systemui.Flags.newDozingKeyguardStates()) {
-            combine(
-                    bouncerRepository.primaryBouncerShow,
-                    bouncerRepository.primaryBouncerShowingSoon,
-                ) { showing, showingSoon ->
-                    showing || showingSoon
-                }
-                .stateIn(
-                    scope = applicationScope,
-                    started = SharingStarted.WhileSubscribed(),
-                    initialValue = false,
-                )
-        } else {
-            bouncerRepository.primaryBouncerShow
-        }
+        combine(
+                bouncerRepository.primaryBouncerShow,
+                bouncerRepository.primaryBouncerShowingSoon,
+            ) { showing, showingSoon ->
+                showing || showingSoon
+            }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.WhileSubscribed(),
+                initialValue = false,
+            )
 
     /** Whether the alternate bouncer is showing or not. */
     val alternateBouncerShowing: StateFlow<Boolean> = bouncerRepository.alternateBouncerVisible
@@ -556,7 +552,7 @@ constructor(
     }
 
     fun setShortcutAbsoluteTop(top: Float) {
-        wallpaperFocalAreaRepository.setShortcutAbsoluteTop(top)
+        wallpaperFocalAreaInteractor.setShortcutTop(top)
     }
 
     fun setIsKeyguardGoingAway(isGoingAway: Boolean) {
@@ -564,7 +560,7 @@ constructor(
     }
 
     fun setNotificationStackAbsoluteBottom(bottom: Float) {
-        wallpaperFocalAreaRepository.setNotificationStackAbsoluteBottom(bottom)
+        wallpaperFocalAreaInteractor.setNotificationStackAbsoluteBottom(bottom)
     }
 
     fun notifyWatchDisconnected() {

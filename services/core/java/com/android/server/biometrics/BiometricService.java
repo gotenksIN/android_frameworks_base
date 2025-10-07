@@ -139,6 +139,11 @@ public class BiometricService extends SystemService {
     @VisibleForTesting
     IGateKeeperService mGateKeeper;
 
+    //Initialized only after authenticate is called.
+    @VisibleForTesting
+    @Nullable
+    AuthenticationPolicyManager mAuthenticationPolicyManager;
+
     // Get and cache the available biometric authenticators and their associated info.
     final CopyOnWriteArrayList<BiometricSensor> mSensors = new CopyOnWriteArrayList<>();
 
@@ -900,11 +905,16 @@ public class BiometricService extends SystemService {
             for (BiometricSensor sensor : mSensors) {
                 // Explicitly re-create as the super class, since AIDL doesn't play nicely with
                 // "List<? extends SensorPropertiesInternal> ...
-                final SensorPropertiesInternal prop = SensorPropertiesInternal
-                        .from(sensor.impl.getSensorProperties(opPackageName));
-                sensors.add(prop);
+                SensorPropertiesInternal sensorProperties =
+                        sensor.impl.getSensorProperties(opPackageName);
+                if (sensorProperties != null) {
+                    final SensorPropertiesInternal prop = SensorPropertiesInternal.from(
+                            sensorProperties);
+                    if (prop != null) {
+                      sensors.add(prop);
+                    }
+                }
             }
-
             return sensors;
         }
 
@@ -1874,6 +1884,14 @@ public class BiometricService extends SystemService {
             mAuthSession = null;
         }
 
+        if (mAuthenticationPolicyManager == null) {
+            mAuthenticationPolicyManager = mInjector.getAuthenticationPolicyManager(getContext());
+            //Log error if authentication policy manager is still null
+            if (mAuthenticationPolicyManager == null) {
+                Slog.e(TAG, "AuthenticationPolicyManager is null");
+            }
+        }
+
         final boolean debugEnabled = mInjector.isDebugEnabled(getContext(), userId);
         mAuthSession = new AuthSession(getContext(), mBiometricContext, mStatusBarService,
                 createSysuiReceiver(requestId), mKeyStoreAuthorization, mRandom,
@@ -1881,8 +1899,7 @@ public class BiometricService extends SystemService {
                 operationId, userId, createBiometricSensorReceiver(requestId), receiver,
                 opPackageName, promptInfo, debugEnabled,
                 mInjector.getFingerprintSensorProperties(getContext()), new WatchRangingHelper(
-                requestId,
-                mInjector.getAuthenticationPolicyManager(getContext()), mHandler,
+                requestId, mAuthenticationPolicyManager, mHandler,
                 this::onWatchRangingStateChange));
 
         try {

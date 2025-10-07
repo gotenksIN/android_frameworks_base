@@ -110,9 +110,9 @@ extern int register_android_media_audio_common_AidlConversion(JNIEnv* env);
 extern int register_android_media_midi(JNIEnv *env);
 
 namespace android {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
 extern int register_android_util_SeempLog(JNIEnv* env);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
 
 /*
  * JNI-based registration functions.  Note these are properly contained in
@@ -233,9 +233,9 @@ extern int register_com_android_internal_util_VirtualRefBasePtr(JNIEnv *env);
 extern int register_android_window_WindowInfosListener(JNIEnv* env);
 extern int register_android_window_ScreenCapture(JNIEnv* env);
 extern int register_jni_common(JNIEnv* env);
-// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 extern int register_com_android_internal_app_ActivityTrigger(JNIEnv *env);
-// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
 extern int register_android_tracing_PerfettoDataSource(JNIEnv* env);
 extern int register_android_tracing_PerfettoDataSourceInstance(JNIEnv* env);
 extern int register_android_tracing_PerfettoProducer(JNIEnv* env);
@@ -269,6 +269,9 @@ static const char* DISABLE_LOCK_PROFILING = "disable_lock_profiling";
 static const char* kLockProfThresholdRuntimeOption = "-Xlockprofthreshold:0";
 
 static AndroidRuntime* gCurRuntime = NULL;
+
+//The kernel's TASK_COMM_LEN minus one for the terminating NUL == 15.
+static constexpr int THREAD_NAME_TRUNCATION_LEN = 15;
 
 /*
  * Code written in the Java Programming Language calls here from main().
@@ -348,13 +351,12 @@ AndroidRuntime::~AndroidRuntime()
 
 void AndroidRuntime::setArgv0(const char* argv0, bool setProcName) {
     // Set the kernel's task name, for as much of the name as we can fit.
-    // The kernel's TASK_COMM_LEN minus one for the terminating NUL == 15.
     if (setProcName) {
         int len = strlen(argv0);
-        if (len < 15) {
+        if (len < THREAD_NAME_TRUNCATION_LEN) {
             pthread_setname_np(pthread_self(), argv0);
         } else {
-            pthread_setname_np(pthread_self(), argv0 + len - 15);
+            pthread_setname_np(pthread_self(), argv0 + len - THREAD_NAME_TRUNCATION_LEN);
         }
     }
 
@@ -662,6 +664,9 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv, bool zygote, bool p
     char heapgrowthlimitOptsBuf[sizeof("-XX:HeapGrowthLimit=")-1 + PROPERTY_VALUE_MAX];
     char heapminfreeOptsBuf[sizeof("-XX:HeapMinFree=")-1 + PROPERTY_VALUE_MAX];
     char heapmaxfreeOptsBuf[sizeof("-XX:HeapMaxFree=")-1 + PROPERTY_VALUE_MAX];
+    char enableTimeBasedGcTriggerBuf[sizeof("-XX:EnableTimeBasedGcTrigger=") - 1 +
+                                     PROPERTY_VALUE_MAX];
+    char heapMemoryGcCostFactorBuf[sizeof("-XX:HeapMemoryGcCostFactor=") - 1 + PROPERTY_VALUE_MAX];
     char usejitOptsBuf[sizeof("-Xusejit:")-1 + PROPERTY_VALUE_MAX];
     char jitpthreadpriorityOptsBuf[sizeof("-Xjitpthreadpriority:")-1 + PROPERTY_VALUE_MAX];
     char jitmaxsizeOptsBuf[sizeof("-Xjitmaxsize:")-1 + PROPERTY_VALUE_MAX];
@@ -857,6 +862,11 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv, bool zygote, bool p
     parseRuntimeOption("dalvik.vm.heaptargetutilization",
                        heaptargetutilizationOptsBuf,
                        "-XX:HeapTargetUtilization=");
+
+    parseRuntimeOption("dalvik.vm.enable_time_based_gc_trigger", enableTimeBasedGcTriggerBuf,
+                       "-XX:EnableTimeBasedGcTrigger=");
+    parseRuntimeOption("dalvik.vm.heap-memory-gc-cost-factor", heapMemoryGcCostFactorBuf,
+                       "-XX:HeapMemoryGcCostFactor=");
 
     /* Foreground heap growth multiplier option */
     parseRuntimeOption("dalvik.vm.foreground-heap-growth-multiplier",

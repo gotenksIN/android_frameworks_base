@@ -24,8 +24,10 @@ import android.os.Binder
 import android.view.WindowInsets
 import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
-import com.android.window.flags.Flags
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
+import com.android.wm.shell.splitscreen.SplitScreenController
+import dagger.Lazy
+import java.util.Optional
 
 object BubbleUtils {
 
@@ -63,9 +65,7 @@ object BubbleUtils {
             // Always reset everything when exit bubble.
             wct.setLaunchNextToBubble(token, toBubble /* launchNextToBubble */)
         }
-        if (Flags.excludeTaskFromRecents()) {
-            wct.setTaskForceExcludedFromRecents(token, toBubble /* forceExcluded */)
-        }
+        wct.setTaskForceExcludedFromRecents(token, toBubble /* forceExcluded */)
         wct.setDisablePip(token, toBubble /* disablePip */)
         if (BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
             wct.setDisableLaunchAdjacent(token, toBubble /* disableLaunchAdjacent */)
@@ -74,7 +74,7 @@ object BubbleUtils {
                 wct.setBounds(token, Rect())
             }
         }
-        if (BubbleAnythingFlagHelper.enableCreateAnyBubbleWithAppCompatFixes()) {
+        if (BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
             if (!toBubble && captionInsetsOwner != null) {
                 wct.removeInsetsSource(
                     token, captionInsetsOwner, 0 /* index */, WindowInsets.Type.captionBar()
@@ -129,13 +129,24 @@ object BubbleUtils {
 
     /** Returns true if the task is valid for Bubble. */
     @JvmStatic
-    fun isValidToBubble(taskInfo: ActivityManager.RunningTaskInfo?): Boolean {
-        return taskInfo != null && taskInfo.supportsMultiWindow
+    fun ActivityManager.RunningTaskInfo?.isValidToBubble(): Boolean {
+        return this?.supportsMultiWindow == true
     }
 
     /** Determines if a bubble task is moving to fullscreen based on its windowing mode. */
-    fun isBubbleToFullscreen(task: ActivityManager.RunningTaskInfo?): Boolean {
-        return BubbleAnythingFlagHelper.enableCreateAnyBubbleWithForceExcludedFromRecents()
-                && task?.windowingMode == WINDOWING_MODE_FULLSCREEN
+    @JvmStatic
+    fun ActivityManager.RunningTaskInfo?.isBubbleToFullscreen(): Boolean {
+        return BubbleAnythingFlagHelper.enableCreateAnyBubble()
+                && this?.windowingMode == WINDOWING_MODE_FULLSCREEN
+    }
+
+    /** Determines if a bubble task is moving to split-screen based on its parent task. */
+    @JvmStatic
+    fun ActivityManager.RunningTaskInfo?.isBubbleToSplit(
+        splitScreenController: Lazy<Optional<SplitScreenController>>,
+    ): Boolean {
+        return this?.hasParentTask() == true && splitScreenController.get()
+            .map { it.isTaskRootOrStageRoot(parentTaskId) }
+            .orElse(false)
     }
 }

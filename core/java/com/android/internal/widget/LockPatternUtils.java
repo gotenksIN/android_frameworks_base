@@ -24,7 +24,7 @@ import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_SOMETHING;
 import static android.app.admin.DevicePolicyManager.PASSWORD_QUALITY_UNSPECIFIED;
 import static android.security.Flags.shouldTrustManagerListenForPrimaryAuth;
 
-import static com.android.internal.widget.flags.Flags.hideLastCharWithPhysicalInput;
+import static com.android.internal.widget.flags.Flags.useDefaultVisibilityForSensitiveInputs;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -42,7 +42,6 @@ import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.pm.UserInfo;
-import android.hardware.input.InputManagerGlobal;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -60,7 +59,6 @@ import android.util.Log;
 import android.util.SparseBooleanArray;
 import android.util.SparseIntArray;
 import android.util.SparseLongArray;
-import android.view.InputDevice;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.ArrayUtils;
@@ -788,7 +786,7 @@ public class LockPatternUtils {
         return true;
     }
 
-// QTI_BEGIN: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_BEGIN: 2018-05-29: Core: frameworks: base: Port password retention feature
     /**
      * clears stored password.
      */
@@ -800,7 +798,7 @@ public class LockPatternUtils {
         }
     }
 
-// QTI_END: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
+// QTI_END: 2018-05-29: Core: frameworks: base: Port password retention feature
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public void setOwnerInfo(String info, int userId) {
         setString(LOCK_SCREEN_OWNER_INFO, info, userId);
@@ -1078,18 +1076,17 @@ public class LockPatternUtils {
         return type == CREDENTIAL_TYPE_PATTERN;
     }
 
-    private boolean hasActivePointerDeviceAttached() {
-        return !getEnabledNonTouchInputDevices(InputDevice.SOURCE_CLASS_POINTER).isEmpty();
-    }
-
     /**
      * @return Whether the visible pattern is enabled.
      */
     @UnsupportedAppUsage
     public boolean isVisiblePatternEnabled(int userId) {
         boolean defaultValue = true;
-        if (hideLastCharWithPhysicalInput()) {
-            defaultValue = !hasActivePointerDeviceAttached();
+        if (useDefaultVisibilityForSensitiveInputs()) {
+            defaultValue =
+                    mContext.getResources()
+                            .getBoolean(
+                                    com.android.internal.R.bool.config_lockPatternVisibleDefault);
         }
         return getBoolean(Settings.Secure.LOCK_PATTERN_VISIBLE, defaultValue, userId);
     }
@@ -1105,37 +1102,17 @@ public class LockPatternUtils {
         return getString(Settings.Secure.LOCK_PATTERN_VISIBLE, userId) != null;
     }
 
-    private List<InputDevice> getEnabledNonTouchInputDevices(int source) {
-        final InputManagerGlobal inputManager = InputManagerGlobal.getInstance();
-        final int[] inputIds = inputManager.getInputDeviceIds();
-        List<InputDevice> matchingDevices = new ArrayList<InputDevice>();
-        for (final int deviceId : inputIds) {
-            final InputDevice inputDevice = inputManager.getInputDevice(deviceId);
-            if (!inputDevice.isEnabled()) continue;
-            if (inputDevice.supportsSource(InputDevice.SOURCE_TOUCHSCREEN)) continue;
-            if (inputDevice.isVirtual()) continue;
-            if (!inputDevice.supportsSource(source)) continue;
-            matchingDevices.add(inputDevice);
-        }
-        return matchingDevices;
-    }
-
-    private boolean hasPhysicalKeyboardActive() {
-        final List<InputDevice> keyboards =
-                getEnabledNonTouchInputDevices(InputDevice.SOURCE_KEYBOARD);
-        for (final InputDevice keyboard : keyboards) {
-            if (keyboard.isFullKeyboard()) return true;
-        }
-        return false;
-    }
-
     /**
      * @return Whether enhanced pin privacy is enabled.
      */
     public boolean isPinEnhancedPrivacyEnabled(int userId) {
         boolean defaultValue = false;
-        if (hideLastCharWithPhysicalInput()) {
-            defaultValue = hasPhysicalKeyboardActive();
+        if (useDefaultVisibilityForSensitiveInputs()) {
+            defaultValue =
+                    mContext.getResources()
+                            .getBoolean(
+                                    com.android.internal.R.bool
+                                            .config_lockPinEnhancedPrivacyDefault);
         }
         return getBoolean(LOCK_PIN_ENHANCED_PRIVACY, defaultValue, userId);
     }
@@ -1560,7 +1537,10 @@ public class LockPatternUtils {
                         STRONG_AUTH_REQUIRED_AFTER_NON_STRONG_BIOMETRICS_TIMEOUT,
                         SOME_AUTH_REQUIRED_AFTER_TRUSTAGENT_EXPIRED,
                         SOME_AUTH_REQUIRED_AFTER_ADAPTIVE_AUTH_REQUEST,
-                        SOME_AUTH_REQUIRED_AFTER_WATCH_DISCONNECTED})
+                        SOME_AUTH_REQUIRED_AFTER_WATCH_DISCONNECTED,
+                        PRIMARY_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE,
+                        STRONG_BIOMETRIC_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE
+                })
         @Retention(RetentionPolicy.SOURCE)
         public @interface StrongAuthFlags {}
 
@@ -1636,6 +1616,19 @@ public class LockPatternUtils {
         public static final int SOME_AUTH_REQUIRED_AFTER_WATCH_DISCONNECTED = 0x400;
 
         /**
+         * Primary authentication is required as the first factor in Secure Lock Device
+         * authentication - all biometric authentication is disabled.
+         */
+        public static final int PRIMARY_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE = 0x800;
+
+        /**
+         * Class 3 biometric-only authentication is required as the second factor
+         * in Secure Lock Device authentication - primary authentication and non strong biometric
+         * authentication are disabled.
+         */
+        public static final int STRONG_BIOMETRIC_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE = 0x1000;
+
+        /**
          * Strong auth flags that do not prevent biometric methods from being accepted as auth.
          * If any other flags are set, biometric authentication is disabled.
          */
@@ -1643,7 +1636,8 @@ public class LockPatternUtils {
                 | SOME_AUTH_REQUIRED_AFTER_USER_REQUEST
                 | SOME_AUTH_REQUIRED_AFTER_TRUSTAGENT_EXPIRED
                 | SOME_AUTH_REQUIRED_AFTER_ADAPTIVE_AUTH_REQUEST
-                | SOME_AUTH_REQUIRED_AFTER_WATCH_DISCONNECTED;
+                | SOME_AUTH_REQUIRED_AFTER_WATCH_DISCONNECTED
+                | STRONG_BIOMETRIC_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE;
 
         private final SparseIntArray mStrongAuthRequiredForUser = new SparseIntArray();
         private final H mHandler;

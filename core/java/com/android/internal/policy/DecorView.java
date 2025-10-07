@@ -42,7 +42,6 @@ import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_
 import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION_ALWAYS;
 
 import static com.android.internal.policy.PhoneWindow.FEATURE_OPTIONS_PANEL;
-import static com.android.window.flags.Flags.interceptMotionFromMoveToCancel;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -66,6 +65,7 @@ import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.RecordingCanvas;
 import android.graphics.Rect;
+import android.graphics.RenderNode;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.InsetDrawable;
@@ -446,9 +446,6 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
     }
 
     private boolean interceptBackProgress(MotionEvent ev) {
-        if (!interceptMotionFromMoveToCancel()) {
-            return false;
-        }
         final ViewRootImpl viewRootImpl = getViewRootImpl();
         if (viewRootImpl == null) {
             return false;
@@ -547,16 +544,6 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
         }
 
         ViewRootImpl viewRootImpl = getViewRootImpl();
-        if (!interceptMotionFromMoveToCancel()) {
-            if (viewRootImpl != null) {
-                viewRootImpl.getOnBackInvokedDispatcher().onMotionEvent(event);
-                // Intercept touch if back gesture is in progress.
-                if (viewRootImpl.getOnBackInvokedDispatcher().isBackGestureInProgress()) {
-                    return true;
-                }
-            }
-        }
-
         if (viewRootImpl != null && mWearGestureInterceptionDetector != null) {
             boolean wasIntercepting = mWearGestureInterceptionDetector.isIntercepting();
             boolean intercepting = mWearGestureInterceptionDetector
@@ -1203,6 +1190,11 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
                 if (viewRoot != null) {
                     viewRoot.requestInvalidateRootRenderNode();
                 }
+            }
+            if (android.view.accessibility.Flags.forceInvertColor()
+                    && mNavigationColorViewState.view != null) {
+                mNavigationColorViewState.view.setUsageHint(
+                        RenderNode.USAGE_NAVIGATION_BAR_BACKGROUND);
             }
 
             boolean statusBarNeedsRightInset = navBarToRightEdge

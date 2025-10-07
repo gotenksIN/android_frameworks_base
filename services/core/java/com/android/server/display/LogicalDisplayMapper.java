@@ -24,7 +24,6 @@ import static android.view.Display.DEFAULT_DISPLAY;
 
 import static com.android.server.display.DisplayGroupAllocator.GROUP_TYPE_PRIMARY;
 import static com.android.server.display.DisplayGroupAllocator.REASON_EXTENDED;
-import static com.android.server.display.DisplayGroupAllocator.REASON_NON_DESKTOP;
 import static com.android.server.display.DisplayGroupAllocator.REASON_PROJECTED;
 import static com.android.server.display.DisplayGroupAllocator.calculateGroupId;
 
@@ -1139,8 +1138,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
             if (groupId != Display.DEFAULT_DISPLAY_GROUP
                     && (displayDeviceInfo.type == Display.TYPE_INTERNAL
                             || displayDeviceInfo.type == Display.TYPE_EXTERNAL)
-                    && (reason == REASON_PROJECTED || reason == REASON_EXTENDED
-                    || reason == REASON_NON_DESKTOP)) {
+                    && (reason == REASON_PROJECTED || reason == REASON_EXTENDED)) {
                 newGroup.setFlags(DisplayGroup.FLAG_DEFAULT_GROUP_ADJACENT);
             }
         }
@@ -1316,8 +1314,6 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
     private LogicalDisplay createNewLogicalDisplayLocked(DisplayDevice device, int displayId) {
         final int layerStack = assignLayerStackLocked(displayId);
         final LogicalDisplay display = new LogicalDisplay(displayId, layerStack, device,
-                mFlags.isPixelAnisotropyCorrectionInLogicalDisplayEnabled(),
-                mFlags.isAlwaysRotateDisplayDeviceEnabled(),
                 mFlags.isSyncedResolutionSwitchEnabled());
         display.updateLocked(mDisplayDeviceRepo, mSyntheticModeManager);
 

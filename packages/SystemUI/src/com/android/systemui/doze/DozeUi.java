@@ -104,9 +104,11 @@ public class DozeUi implements DozeMachine.Part {
                             }
 
                             if (com.android.systemui.Flags.newDozingKeyguardStates()) {
-                                if (reason == DozeLog.REASON_SENSOR_UDFPS_LONG_PRESS) {
+                                if (reason == DozeLog.REASON_SENSOR_UDFPS_LONG_PRESS
+                                        || reason == DozeLog.REASON_SENSOR_QUICK_PICKUP) {
                                     requestState = DozeMachine.State.DOZE_PULSING_WITHOUT_UI;
-                                } else if (reason == DozeLog.PULSE_REASON_FINGERPRINT_PULSE) {
+                                } else if (reason
+                                        == DozeLog.PULSE_REASON_FINGERPRINT_PULSE_SHOW_AUTH_UI) {
                                     requestState = DozeMachine.State.DOZE_PULSING_AUTH_UI;
                                 }
                             }

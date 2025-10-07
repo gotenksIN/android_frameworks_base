@@ -16,10 +16,12 @@
 
 package android.telecom;
 
+import android.Manifest;
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.compat.annotation.UnsupportedAppUsage;
@@ -319,6 +321,16 @@ public final class Call {
             "android.telecom.extra.ASSERTED_DISPLAY_NAME";
 
     /**
+     * Boolean indicating that the call is a video
+     * ring back tone call. {@link Connection#setExtras(Bundle)} or
+     * {@link Connection#putExtras(Bundle)} should be used to notify
+     * Telecom this extra has been set.
+     */
+    @FlaggedApi(Flags.FLAG_IS_USING_VIDEO_RINGBACK)
+    public static final String EXTRA_IS_USING_VIDEO_RINGBACK =
+                      "android.telecom.extra.IS_USING_VIDEO_RINGBACK";
+
+    /**
      * Reject reason used with {@link #reject(int)} to indicate that the user is rejecting this
      * call because they have declined to answer it.  This typically means that they are unable
      * to answer the call at this time and would prefer it be sent to voicemail.
@@ -558,7 +570,9 @@ public final class Call {
 
         /**
          * Whether the call is made while the device is in emergency callback mode.
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
          */
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
         public static final int PROPERTY_EMERGENCY_CALLBACK_MODE = 0x00000004;
 
         /**
@@ -681,8 +695,19 @@ public final class Call {
         @FlaggedApi(Flags.FLAG_VOIP_APP_ACTIONS_SUPPORT)
         public static final int PROPERTY_IS_TRANSACTIONAL = 0x00008000;
 
+        /**
+         * Set by the framework to indicate that a {@link Conference} or {@link Connection} is
+         * hosted on device other than the current one.  Used in scenarios where the conference
+         * originator is the remote device and the current device is a participant of that
+         * conference.
+         * <p>
+         * This property is specific to IMS conference calls originating in Telephony.
+         */
+        @FlaggedApi(Flags.FLAG_REMOTELY_HOSTED_PROPERTY)
+        public static final int PROPERTY_REMOTELY_HOSTED = 0x00010000;
+
         //******************************************************************************************
-        // Next PROPERTY value: 0x00010000
+        // Next PROPERTY value: 0x00020000
         //******************************************************************************************
 
         private final @CallState int mState;
@@ -784,9 +809,11 @@ public final class Call {
             if (can(capabilities, CAPABILITY_SPEED_UP_MT_AUDIO)) {
                 builder.append(" CAPABILITY_SPEED_UP_MT_AUDIO");
             }
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
             if (can(capabilities, CAPABILITY_CAN_UPGRADE_TO_VIDEO)) {
                 builder.append(" CAPABILITY_CAN_UPGRADE_TO_VIDEO");
             }
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
             if (can(capabilities, CAPABILITY_CAN_PAUSE_VIDEO)) {
                 builder.append(" CAPABILITY_CAN_PAUSE_VIDEO");
             }
@@ -883,6 +910,9 @@ public final class Call {
             }
             if (hasProperty(properties, PROPERTY_IS_TRANSACTIONAL)) {
                 builder.append(" PROPERTY_IS_TRANSACTIONAL");
+            }
+            if (hasProperty(properties, PROPERTY_REMOTELY_HOSTED)) {
+                builder.append(" PROPERTY_REMOTELY_HOSTED");
             }
             builder.append("]");
             return builder.toString();
@@ -1113,9 +1143,9 @@ public final class Call {
          * Gets the user that originated the call
          * @return The user
          *
-         * @hide
          */
-        public UserHandle getAssociatedUser() {
+        @FlaggedApi(Flags.FLAG_CALL_DETAILS_GET_ASSOCIATED_USER_API)
+        public @NonNull UserHandle getAssociatedUser() {
             return mAssociatedUser;
         }
 
@@ -1867,8 +1897,10 @@ public final class Call {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(allOf = {Manifest.permission.CAPTURE_AUDIO_OUTPUT,
+        Manifest.permission.MODIFY_AUDIO_ROUTING})
     @FlaggedApi(Flags.FLAG_ENABLE_AUDIO_PROCESSING_USE_CASE)
-    public void enterBackgroundAudioProcessing(int useCase) {
+    public void enterBackgroundAudioProcessing(@AudioProcessingUseCase int useCase) {
         if (mState != STATE_ACTIVE && mState != STATE_RINGING) {
             throw new IllegalStateException("Call must be active or ringing");
         }
@@ -2532,20 +2564,26 @@ public final class Call {
         }
     }
 
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     /** {@hide} */
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     Call(Phone phone, String telecomCallId, InCallAdapter inCallAdapter, int state,
             String callingPackage, int targetSdkVersion) {
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
         mPhone = phone;
         mTelecomCallId = telecomCallId;
         mInCallAdapter = inCallAdapter;
         mState = state;
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
         mCallingPackage = callingPackage;
         mTargetSdkVersion = targetSdkVersion;
         if (Flags.enableAudioProcessingUseCase()) {
             mAudioProcessingUseCase = AUDIO_PROCESSING_USE_CASE_UNKNOWN;
         }
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     }
 
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     /** {@hide} */
     final String internalGetCallId() {
         return mTelecomCallId;

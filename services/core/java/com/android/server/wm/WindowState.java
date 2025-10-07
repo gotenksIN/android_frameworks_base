@@ -152,6 +152,7 @@ import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_STARTING_W
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_SYNC_ENGINE;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_WINDOW_INSETS;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_SHOW_TRANSACTIONS;
+import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_LAYOUT;
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_WALLPAPER;
 import static com.android.server.policy.WindowManagerPolicy.TRANSIT_ENTER;
 import static com.android.server.policy.WindowManagerPolicy.TRANSIT_EXIT;
@@ -181,7 +182,6 @@ import static com.android.server.wm.WindowStateAnimator.DRAW_PENDING;
 import static com.android.server.wm.WindowStateAnimator.HAS_DRAWN;
 import static com.android.server.wm.WindowStateAnimator.PRESERVED_SURFACE_LAYER;
 import static com.android.server.wm.WindowStateAnimator.READY_TO_SHOW;
-import static com.android.window.flags.Flags.surfaceTrustedOverlay;
 
 import android.annotation.CallSuper;
 import android.annotation.NonNull;
@@ -392,6 +392,20 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      * This is only used when flag always_seq_id_layout is disabled.
      */
     int mPrepareSyncSeqId = 0;
+
+    /**
+     * The latest (or future) seqId requiring a buffer from the client. If this is > mSyncSeqId, it
+     * means that a BLAST sync is pending but hasn't been sent to client yet.
+     */
+    int mBufferSeqId = 0;
+
+    /**
+     * This is {@code true} when a client resize-request was queued (in WMS.mResizingWindows)
+     * while the associated SyncGroup was "open" (not ready). This is needed because actual dispatch
+     * of resized messages is posted to surface-placement which runs after the associated SyncGroup
+     * has been closed.
+     */
+    private boolean mPendingSyncResize = false;
 
     /**
      * Special mode that is intended only for the rounded corner overlay: during rotation
@@ -1062,9 +1076,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mInputWindowHandle.setName(getName());
         mInputWindowHandle.setPackageName(mAttrs.packageName);
         mInputWindowHandle.setLayoutParamsType(mAttrs.type);
-        if (!surfaceTrustedOverlay()) {
-            mInputWindowHandle.setTrustedOverlay(isWindowTrustedOverlay());
-        }
         if (DEBUG) {
             Slog.v(TAG, "Window " + this + " client=" + c.asBinder()
                             + " token=" + token + " (" + mAttrs.token + ")" + " params=" + a);
@@ -1127,9 +1138,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     @Override
     void setInitialSurfaceControlProperties(SurfaceControl.Builder b) {
         super.setInitialSurfaceControlProperties(b);
-        if (surfaceTrustedOverlay() && isWindowTrustedOverlay()) {
-            getPendingTransaction().setTrustedOverlay(mSurfaceControl, true);
-        }
+        getPendingTransaction().setTrustedOverlay(mSurfaceControl, isWindowTrustedOverlay());
         getPendingTransaction().setSecure(mSurfaceControl, isSecureLocked());
         // All apps should be considered as occluding when computing TrustedPresentation Thresholds.
         final boolean canOccludePresentation = !mSession.mCanAddInternalSystemWindow;
@@ -1151,7 +1160,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             return true;
         }
         if (((mAttrs.privateFlags & PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY) != 0
-                && mSession.mCanCreateSystemApplicationOverlay)) {
+                && mSession.canCreateSystemApplicationOverlay())) {
             return true;
         }
         return false;
@@ -1305,7 +1314,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             final Rect lastFrame = windowFrames.mLastFrame;
             final Rect frame = windowFrames.mFrame;
             if (lastFrame.width() != frame.width() || lastFrame.height() != frame.height()) {
-                mDisplayContent.mWallpaperController.updateWallpaperOffset(this, false /* sync */);
+                mDisplayContent.mWallpaperController.updateWallpaperOffset(this);
             }
         }
 
@@ -1396,9 +1405,14 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
         final WindowStateAnimator winAnimator = mWinAnimator;
         final boolean didFrameInsetsChange = setReportResizeHints();
-        // The latest configuration will be returned by the out parameter of relayout, so it is
-        // unnecessary to report resize if this window is running relayout.
-        final boolean configChanged = !mInRelayout && !isLastConfigReportedToClient();
+        final boolean configChanged;
+        if (mWmService.mAlwaysSeqId) {
+            configChanged = !mLastConfigReportedToClient;
+        } else {
+            // The latest configuration will be returned by the out parameter of relayout, so it is
+            // unnecessary to report resize if this window is running relayout.
+            configChanged = !mInRelayout && !isLastConfigReportedToClient();
+        }
         if (DEBUG_CONFIGURATION && configChanged) {
             Slog.v(TAG_WM, "Win " + this + " config changed: " + getConfiguration());
         }
@@ -1413,15 +1427,20 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
         final boolean contentChanged = didFrameInsetsChange || configChanged
                 || dragResizingChanged || attachedFrameChanged;
-        // Cancel unchanged non-sync-buffer redraw request to avoid unnecessary reportResized().
-        if (!contentChanged && !mRedrawForSyncReported && mPrepareSyncSeqId <= 0
-                && mDrawHandlers.isEmpty()) {
-            mRedrawForSyncReported = true;
+
+        if (!mWmService.mAlwaysSeqId) {
+            // Cancel unchanged non-sync-buffer redraw request to avoid unnecessary reportResized().
+            if (!contentChanged && !mRedrawForSyncReported && mPrepareSyncSeqId <= 0
+                    && mDrawHandlers.isEmpty()) {
+                mRedrawForSyncReported = true;
+            }
         }
 
-        // Add a window that is using blastSync to the resizing list if it hasn't been reported
-        // already. This because the window is waiting on a finishDrawing from the client.
-        if (contentChanged || insetsChanged || shouldSendRedrawForSync()) {
+        // If a buffer is requested (BLAST) then we must redraw to produce that buffer.
+        final boolean requireRedraw = mWmService.mAlwaysSeqId ? mBufferSeqId > mSyncSeqId
+                : shouldSendRedrawForSync();
+
+        if (contentChanged || insetsChanged || requireRedraw) {
             ProtoLog.v(WM_DEBUG_RESIZE,
                         "Resize reasons for w=%s:  %s configChanged=%b didFrameInsetsChange=%b",
                         this, mWindowFrames.getInsetsChangedInfo(),
@@ -1445,6 +1464,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             if (!mWmService.mResizingWindows.contains(this)) {
                 ProtoLog.v(WM_DEBUG_RESIZE, "Resizing window %s", this);
                 mWmService.mResizingWindows.add(this);
+                if (mWmService.mAlwaysSeqId) {
+                    if (mSyncState != SYNC_STATE_NONE && !getSyncGroup().mReady) {
+                        mPendingSyncResize = true;
+                    }
+                }
             }
         }
     }
@@ -1455,10 +1479,29 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     @Override
     void onDisplayChanged(DisplayContent dc) {
-        if (dc != null && mDisplayContent != null && dc != mDisplayContent
-                && mDisplayContent.getImeInputTarget() == this) {
-            dc.updateImeInputAndControlTarget(getImeInputTarget());
-            mDisplayContent.setImeInputTarget(null /* target */);
+        if (mDisplayContent != null && dc != mDisplayContent) {
+            if (mInsetsSourceProviders != null && mInsetsSourceProviders.size() > 0) {
+                boolean notifyInsetsChange = false;
+                for (int i = mInsetsSourceProviders.size() - 1; i >= 0; i--) {
+                    if (mInsetsSourceProviders.valueAt(i).isServerVisible()) {
+                        notifyInsetsChange = true;
+                        break;
+                    }
+                }
+                mDisplayContent.getInsetsStateController().updateAboveInsetsState(
+                        notifyInsetsChange);
+            }
+            if (dc != null) {
+                dc.getInsetsStateController().updateAboveInsetsState(
+                        // This window doesn't have a frame yet. Don't let this window cause the
+                        // insets change.
+                        false /* notifyInsetsChange */);
+
+                if (mDisplayContent.getImeInputTarget() == this) {
+                    dc.updateImeInputAndControlTarget(getImeInputTarget());
+                    mDisplayContent.setImeInputTarget(null /* target */);
+                }
+            }
         }
         super.onDisplayChanged(dc);
         // Window was not laid out for this display yet, so make sure mLayoutSeq does not match.
@@ -1697,11 +1740,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (mInsetsSourceProviders == null) {
             return false;
         }
-        final @InsetsType int decorInsetsTypes =
-                mWmService.mConfigTypes | mWmService.mOverrideConfigTypes;
         for (int i = mInsetsSourceProviders.size() - 1; i >= 0; i--) {
             final InsetsSource source = mInsetsSourceProviders.valueAt(i).getSource();
-            if ((source.getType() & decorInsetsTypes) != 0) {
+            if ((source.getType() & DisplayPolicy.DecorInsets.OVERRIDE_CONFIG_TYPES) != 0) {
                 return true;
             }
         }
@@ -2059,6 +2100,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (mHasSurface && !isGoneForLayout() && !resizingWindows.contains(this)) {
             ProtoLog.d(WM_DEBUG_RESIZE, "onResize: Resizing %s", this);
             resizingWindows.add(this);
+            if (mWmService.mAlwaysSeqId) {
+                if (mSyncState != SYNC_STATE_NONE && !getSyncGroup().mReady) {
+                    mPendingSyncResize = true;
+                }
+            }
         }
         if (mControllableInsetProvider != null) {
             mControllableInsetProvider.onWindowBoundsChanged();
@@ -2161,6 +2207,21 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return mLastConfigReportedToClient;
     }
 
+    /**
+     * Increments the seqId for cases where we are expecting/requiring the client to call
+     * relayout (adding or making a window visible). This relies on the fact that relayout still
+     * sends the latest configuration so we can "pretend" that we already sent the configuration
+     * (to prevent additional resize messages).
+     *
+     * @return the seqId.
+     */
+    int incrementSeqForRelayout() {
+        if (!mWmService.mAlwaysSeqId) return -1;
+        ++mSyncSeqId;
+        mLastConfigReportedToClient = true;
+        return mSyncSeqId;
+    }
+
     @Override
     public void onConfigurationChanged(Configuration newParentConfig) {
         // Get from super to avoid using the updated global config from the override method.
@@ -2209,6 +2270,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
 
         mRemoved = true;
+        if (mWmService.mAlwaysSeqId) {
+            mPendingSyncResize = false;
+        }
         // Destroy surface before super call. The general pattern is that the children need
         // to be removed before the parent (so that the sync-engine tracking works). Since
         // WindowStateAnimator is a "virtual" child, we have to do it manually here.
@@ -2219,10 +2283,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         super.removeImmediately();
 
         final DisplayContent dc = getDisplayContent();
-        if (isImeOverlayLayeringTarget()) {
-            mWmService.dispatchImeOverlayLayeringTargetVisibilityChanged(mClient.asBinder(),
-                    mAttrs.type, false /* visible */, true /* removed */, dc.getDisplayId());
-        }
         if (isImeLayeringTarget()) {
             // Remove the attached IME screenshot.
             dc.removeImeScreenshotByTarget(this);
@@ -2313,8 +2373,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     mActivityRecord != null && mActivityRecord.inTransition(),
                     Debug.getCallers(6));
 
-            if (Flags.excludeNonMainWindowFromSnapshot()
-                    && mAttrs.type != TYPE_BASE_APPLICATION && mHasSurface
+            if (mAttrs.type != TYPE_BASE_APPLICATION && mHasSurface
                     && mActivityRecord != null && !mActivityRecord.isVisibleRequested()
                     && mWinAnimator.getShown()) {
                 // Only remove the activity snapshot, because the user might still want to see the
@@ -2970,6 +3029,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (doAnimation) {
             mWinAnimator.applyAnimationLocked(TRANSIT_ENTER, true);
         }
+        if (mControllableInsetProvider != null) {
+            mDisplayContent.pendingLayoutChanges |= FINISH_LAYOUT_REDO_LAYOUT;
+        }
         if (requestAnim) {
             mWmService.scheduleAnimationLocked();
         }
@@ -3015,6 +3077,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 mWmService.mFocusMayChange = true;
             }
         }
+        if (mControllableInsetProvider != null) {
+            mDisplayContent.pendingLayoutChanges |= FINISH_LAYOUT_REDO_LAYOUT;
+        }
         if (requestAnim) {
             mWmService.scheduleAnimationLocked();
         }
@@ -3036,7 +3101,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
 
         if (baseType == TYPE_APPLICATION_OVERLAY && mAttrs.isSystemApplicationOverlay()
-                && mSession.mCanCreateSystemApplicationOverlay) {
+                && mSession.canCreateSystemApplicationOverlay()) {
             return;
         }
 
@@ -3179,7 +3244,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         try {
             if (DEBUG_VISIBILITY) Slog.v(TAG,
                     "Setting visibility of " + this + ": " + clientVisible);
-            final int seqId = -1;
+            final int seqId = clientVisible ? incrementSeqForRelayout() : -1;
+            if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "wm.sendAppVis_" + getWindowTag()
+                        + " id=" + seqId + " vis=" + clientVisible + " surf=" + mHasSurface);
+            }
             mClient.dispatchAppVisibility(clientVisible, seqId);
         } catch (RemoteException e) {
             // The remote client fails to process the visibility message. That means it is in a
@@ -3591,7 +3660,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 outActivityWindowInfo.set(mLastReportedActivityWindowInfo);
             }
         }
-        mLastConfigReportedToClient = true;
+        if (!mWmService.mAlwaysSeqId) {
+            mLastConfigReportedToClient = true;
+        }
+    }
+
+    void setLastConfigReportedToClientForTest(boolean reported) {
+        mLastConfigReportedToClient = reported;
     }
 
     void fillInsetsState(@NonNull InsetsState outInsetsState, boolean copySources) {
@@ -3642,13 +3717,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             ProtoLog.i(WM_DEBUG_ORIENTATION, "Resizing %s WITH DRAW PENDING", this);
         }
 
-        // Always reset these states first, so if {@link IWindow#resized} fails, this
-        // window won't be added to {@link WindowManagerService#mResizingWindows} and set
-        // {@link #mOrientationChanging} to true again by {@link #updateResizingWindowIfNeeded}
-        // that may cause WINDOW_FREEZE_TIMEOUT because resizing the client keeps failing.
-        mDragResizingChangeReported = true;
-        mWindowFrames.clearReportResizeHints();
-
         final int prevRotation = mLastReportedConfiguration
                 .getMergedConfiguration().windowConfiguration.getRotation();
         fillClientWindowFramesAndConfiguration(mLastReportedFrames, mLastReportedConfiguration,
@@ -3658,10 +3726,41 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         final boolean syncWithBuffers;
         final boolean reportDraw;
         final int seqIdToSend;
-        final boolean syncRedraw = shouldSendRedrawForSync();
-        syncWithBuffers = syncRedraw && shouldSyncWithBuffers();
-        reportDraw = syncRedraw || drawPending;
-        seqIdToSend = syncWithBuffers ? mSyncSeqId : -1;
+        if (!mWmService.mAlwaysSeqId) {
+            final boolean syncRedraw = shouldSendRedrawForSync();
+            syncWithBuffers = syncRedraw && shouldSyncWithBuffers();
+            reportDraw = syncRedraw || drawPending;
+            seqIdToSend = syncWithBuffers ? mSyncSeqId : -1;
+        } else {
+            reportDraw = false;
+            // If a sync is open (not-ready), or was open when this resize was queued, then we need
+            // now wait for this new resize to report back.
+            if (mSyncState == SYNC_STATE_READY && (mPendingSyncResize || !getSyncGroup().mReady)) {
+                mSyncState = SYNC_STATE_WAITING_FOR_DRAW;
+            }
+            syncWithBuffers = mBufferSeqId > mSyncSeqId;
+            if (syncWithBuffers) {
+                if (mSyncState != SYNC_STATE_NONE) {
+                    // We are about to request a new buffer, so drop the existing buffer (if it
+                    // exists) since we won't use it and it occupies one of the available buffers
+                    // in the buffer-queue which, if exhausted, will cause a deadlock.
+                    ProtoLog.d(WM_DEBUG_SYNC_ENGINE, "Requesting a new buffer for a window that "
+                            + "may already be holding one, so try dropping it. win=%s", this);
+                    dropBufferFrom(mSyncTransaction);
+                }
+                mSyncSeqId = mBufferSeqId;
+            } else if (!mLastConfigReportedToClient
+                    || mWindowFrames.isForceReportingResized()
+                    || mSyncState == SYNC_STATE_WAITING_FOR_DRAW) {
+                ++mSyncSeqId;
+            }
+            mPendingSyncResize = false;
+            seqIdToSend = mSyncSeqId;
+            if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "wm.reportResized_" + getWindowTag()
+                        + " id=" + mSyncSeqId + " buf=" + syncWithBuffers);
+            }
+        }
         final boolean isDragResizeChanged = isDragResizeChanged();
         final boolean forceRelayout = syncWithBuffers || isDragResizeChanged;
         final DisplayContent displayContent = getDisplayContent();
@@ -3672,13 +3771,20 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
         final boolean isDragResizing = isDragResizing();
 
-        markRedrawForSyncReported();
+        mDragResizingChangeReported = true;
+        mWindowFrames.clearReportResizeHints();
+        if (!mWmService.mAlwaysSeqId) {
+            markRedrawForSyncReported();
+        }
         getProcess().scheduleClientTransactionItem(
                 new WindowStateResizeItem(mClient, mLastReportedFrames, reportDraw,
                         mLastReportedConfiguration, mLastReportedInsetsState, forceRelayout,
                         displayId, seqIdToSend, syncWithBuffers, isDragResizing,
                         mLastReportedActivityWindowInfo));
         onResizePostDispatched(drawPending, prevRotation, displayId);
+        if (mWmService.mAlwaysSeqId) {
+            mLastConfigReportedToClient = true;
+        }
         Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
     }
 
@@ -3985,7 +4091,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             }
         }
         proto.write(SYNC_SEQ_ID, mSyncSeqId);
-        proto.write(BUFFER_SEQ_ID, mPrepareSyncSeqId);
+        if (mWmService.mAlwaysSeqId) {
+            proto.write(BUFFER_SEQ_ID, mBufferSeqId);
+        } else {
+            proto.write(BUFFER_SEQ_ID, mPrepareSyncSeqId);
+        }
         proto.end(token);
     }
 
@@ -4161,6 +4271,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
 
         pw.println(prefix + "mPrepareSyncSeqId=" + mPrepareSyncSeqId);
+        pw.println(prefix + "mBufferSeqId=" + mBufferSeqId);
     }
 
     @Override
@@ -4277,14 +4388,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     /** Makes the surface of drawn window (COMMIT_DRAW_PENDING) to be visible. */
-    boolean commitFinishDrawing(SurfaceControl.Transaction t) {
-        boolean committed = mWinAnimator.commitFinishDrawingLocked();
-        if (committed) {
+    void commitFinishDrawing(SurfaceControl.Transaction t) {
+        if (mWinAnimator.commitFinishDrawingLocked()) {
             // Ensure that the visibility of buffer layer is set.
             mWinAnimator.prepareSurfaceLocked(t);
         }
         for (int i = mChildren.size() - 1; i >= 0; i--) {
-            committed |= mChildren.get(i).commitFinishDrawing(t);
+            mChildren.get(i).commitFinishDrawing(t);
         }
 
         // When a new activity is showing, update dim in this transaction
@@ -4302,7 +4412,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (getAnimationLeash() != null) {
             t.merge(getSyncTransaction());
         }
-        return committed;
     }
 
     // This must be called while inside a transaction.
@@ -4389,7 +4498,10 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             windowInfo.activityToken = mActivityRecord.token;
         }
         windowInfo.accessibilityIdOfAnchor = mAttrs.accessibilityIdOfAnchor;
-        windowInfo.focused = isFocused();
+        // TODO(b/378565144): Remove with Flags.useInputReportedFocusForAccessibility()
+        if (!Flags.useInputReportedFocusForAccessibility()) {
+            windowInfo.focused = isFocused();
+        }
         Task task = getTask();
         windowInfo.inPictureInPicture = (task != null) && task.inPinnedWindowingMode();
         windowInfo.taskId = task == null ? ActivityTaskManager.INVALID_TASK_ID : task.mTaskId;
@@ -4808,7 +4920,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     void startAnimation(Animation anim) {
-
         // If we are an inset provider, all our animations are driven by the inset client.
         if (mControllableInsetProvider != null) {
             return;
@@ -4818,7 +4929,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         anim.initialize(mWindowFrames.mFrame.width(), mWindowFrames.mFrame.height(),
                 displayInfo.appWidth, displayInfo.appHeight);
         anim.restrictDuration(MAX_ANIMATION_DURATION);
-        anim.scaleCurrentDuration(mWmService.getWindowAnimationScaleLocked());
+        anim.scaleCurrentDuration(mDisplayContent.getWindowAnimationScaleLocked());
         final Point position = new Point();
         transformFrameToSurfacePosition(mWindowFrames.mFrame.left, mWindowFrames.mFrame.top,
                 position);
@@ -4996,18 +5107,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // If the window is visible from surface flinger perspective (mWinAnimator.getShown())
             // but not window manager visible (!isVisibleNow()), it can still be the parent of the
             // dim, but can not create a new surface or continue a dim alone.
-            Dimmer dimmer;
-            WindowContainer<?> geometryParent = null;
-            if (Flags.useTasksDimOnly()) {
-                geometryParent = getDimParent();
-                dimmer = getDimController();
-                if (dimmer == null) {
-                    ProtoLog.e(WM_DEBUG_DIMMER, "WindowState %s does not have task or"
-                            + " display area for dimming", this);
-                    return;
-                }
-            } else {
-                dimmer = getDimmer();
+            final Dimmer dimmer = getDimController();
+            final WindowContainer<?> geometryParent = getDimParent();
+            if (dimmer == null) {
+                ProtoLog.e(WM_DEBUG_DIMMER, "WindowState %s does not have task or"
+                        + " display area for dimming", this);
+                return;
             }
 
             if (isVisibleNow()) {
@@ -5024,7 +5129,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
         RootDisplayArea displayArea = getRootDisplayArea();
         if (displayArea != null) {
-            return displayArea.getDimmer();
+            return displayArea.mDimmer;
         }
         return null;
     }
@@ -5162,7 +5267,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
 
         if (!mSurfaceAnimator.hasLeash() && !mLastSurfacePosition.equals(mSurfacePosition)) {
-            final boolean frameSizeChanged = mWindowFrames.isFrameSizeChangeReported();
+            final boolean frameSizeChanged = mWindowFrames.isFrameSizeChanged();
             final boolean surfaceInsetsChanged = surfaceInsetsChanging();
             final boolean surfaceSizeChanged = frameSizeChanged || surfaceInsetsChanged;
             mLastSurfacePosition.set(mSurfacePosition.x, mSurfacePosition.y);
@@ -5235,19 +5340,19 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         outPos.y = (int) (surfaceInsets.top * mGlobalScale + 0.5f);
     }
 
+    /**
+     * Whether the layer of this window should be relatively above IME.
+     * @see DisplayContent#assignRelativeLayerForImeLayeringTargetChild
+     */
     boolean needsRelativeLayeringToIme() {
+        if (!mDisplayContent.getImeContainer().isVisible()) {
+            return false;
+        }
         // We use the relative layering when IME isn't attached to the app. Such as part of
         // elevating the IME and windows above it's target above the docked divider in
         // split-screen, or make the popupMenu to be above the IME when the parent window is the
         // IME layering target in bubble/freeform mode.
         if (mDisplayContent.shouldImeAttachedToApp()) {
-            return false;
-        }
-
-        // We don't need to set the window to be relatively above IME if the IME is not visible.
-        // In case seeing the window is animating above the app transition layer because its
-        // relative layer is above the IME container on the display area but actually not necessary.
-        if (!getDisplayContent().getImeContainer().isVisible()) {
             return false;
         }
 
@@ -5513,15 +5618,15 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     private final class MoveAnimationSpec implements AnimationSpec {
 
         private final long mDuration;
-        private Interpolator mInterpolator;
-        private Point mFrom = new Point();
-        private Point mTo = new Point();
+        private final Interpolator mInterpolator;
+        private final Point mFrom = new Point();
+        private final Point mTo = new Point();
 
         private MoveAnimationSpec(int fromX, int fromY, int toX, int toY) {
             final Animation anim = AnimationUtils.loadAnimation(mContext,
                     com.android.internal.R.anim.window_move_from_decor);
             mDuration = (long)
-                    (anim.computeDurationHint() * mWmService.getWindowAnimationScaleLocked());
+                    (anim.computeDurationHint() * mDisplayContent.getWindowAnimationScaleLocked());
             mInterpolator = anim.getInterpolator();
             mFrom.set(fromX, fromY);
             mTo.set(toX, toY);
@@ -5624,22 +5729,26 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // in WAITING state rather than READY.
         mSyncState = SYNC_STATE_WAITING_FOR_DRAW;
 
-        if (mPrepareSyncSeqId > 0) {
-            // another prepareSync during existing sync (eg. reparented), so pre-emptively
-            // drop buffer (if exists). If the buffer hasn't been received yet, it will be
-            // dropped in finishDrawing.
-            ProtoLog.d(WM_DEBUG_SYNC_ENGINE, "Preparing to sync a window that was already in the"
-                            + " sync, so try dropping buffer. win=%s", this);
-            dropBufferFrom(mSyncTransaction);
-        }
+        if (!mWmService.mAlwaysSeqId) {
+            if (mPrepareSyncSeqId > 0) {
+                // another prepareSync during existing sync (eg. reparented), so pre-emptively
+                // drop buffer (if exists). If the buffer hasn't been received yet, it will be
+                // dropped in finishDrawing.
+                ProtoLog.d(WM_DEBUG_SYNC_ENGINE, "Preparing to sync a window that was already in "
+                                + "the sync, so try dropping buffer. win=%s", this);
+                dropBufferFrom(mSyncTransaction);
+            }
 
-        mSyncSeqId++;
-        if (getSyncMethod() == BLASTSyncEngine.METHOD_BLAST) {
-            mPrepareSyncSeqId = mSyncSeqId;
-            requestRedrawForSync();
-        } else if (mHasSurface && mWinAnimator.mDrawState != DRAW_PENDING) {
-            // Only need to request redraw if the window has reported draw.
-            requestRedrawForSync();
+            mSyncSeqId++;
+            if (getSyncMethod() == BLASTSyncEngine.METHOD_BLAST) {
+                mPrepareSyncSeqId = mSyncSeqId;
+                requestRedrawForSync();
+            } else if (mHasSurface && mWinAnimator.mDrawState != DRAW_PENDING) {
+                // Only need to request redraw if the window has reported draw.
+                requestRedrawForSync();
+            }
+        } else if (mBufferSeqId <= mSyncSeqId && getSyncMethod() == BLASTSyncEngine.METHOD_BLAST) {
+            mBufferSeqId = mSyncSeqId + 1;
         }
         return true;
     }
@@ -5652,7 +5761,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             return true;
         }
         if (mSyncState == SYNC_STATE_WAITING_FOR_DRAW && mLastConfigReportedToClient && isDrawn()
-                && mPrepareSyncSeqId <= 0) {
+                && (mWmService.mAlwaysSeqId
+                        ? mBufferSeqId <= mSyncSeqId : mPrepareSyncSeqId <= 0)) {
             // Complete the sync state immediately for a drawn window that doesn't need to redraw.
             onSyncFinishedDrawing();
         }
@@ -5663,7 +5773,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     void finishSync(Transaction outMergedTransaction, BLASTSyncEngine.SyncGroup group,
             boolean cancel) {
         if (isDifferentSyncGroup(group)) return;
-        mPrepareSyncSeqId = 0;
+        if (!mWmService.mAlwaysSeqId) {
+            mPrepareSyncSeqId = 0;
+        }
         if (cancel) {
             // This is leaving sync so any buffers left in the sync have a chance of
             // being applied out-of-order and can also block the buffer queue for this
@@ -5691,15 +5803,32 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     .notifyStartingWindowDrawn(mActivityRecord);
         }
 
-        final boolean syncActive = mPrepareSyncSeqId > 0;
-        final boolean syncStillPending = syncActive && mPrepareSyncSeqId > syncSeqId;
-        if (syncStillPending && postDrawTransaction != null) {
-            ProtoLog.d(WM_DEBUG_SYNC_ENGINE, "Got a buffer for request id=%d but latest request is"
-                    + " id=%d. Since the buffer is out-of-date, drop it. win=%s", syncSeqId,
-                    mPrepareSyncSeqId, this);
-            // sync is waiting for a newer seqId, so this buffer is obsolete and can be dropped
-            // to free up the buffer queue.
-            dropBufferFrom(postDrawTransaction);
+        final boolean syncActive;
+        final boolean syncStillPending;
+        if (mWmService.mAlwaysSeqId) {
+            syncStillPending = false;
+            syncActive = mSyncState == SYNC_STATE_WAITING_FOR_DRAW;
+            final boolean syncBuffersPending = syncActive && mBufferSeqId > syncSeqId;
+            if (syncBuffersPending && postDrawTransaction != null) {
+                ProtoLog.d(WM_DEBUG_SYNC_ENGINE,
+                        "Got a buffer for request id=%d but latest request is"
+                                + " id=%d. Since the buffer is out-of-date, drop it. win=%s",
+                        syncSeqId, mBufferSeqId, this);
+                // sync is waiting for a newer seqId, so this buffer is obsolete and can be dropped
+                // to free up the buffer queue.
+                dropBufferFrom(postDrawTransaction);
+            }
+        } else {
+            syncActive = mPrepareSyncSeqId > 0;
+            syncStillPending = syncActive && mPrepareSyncSeqId > syncSeqId;
+            if (syncStillPending && postDrawTransaction != null) {
+                ProtoLog.d(WM_DEBUG_SYNC_ENGINE, "Got a buffer for request id=%d but latest request"
+                                + " is id=%d. Since the buffer is out-of-date, drop it. win=%s",
+                        syncSeqId, mPrepareSyncSeqId, this);
+                // sync is waiting for a newer seqId, so this buffer is obsolete and can be dropped
+                // to free up the buffer queue.
+                dropBufferFrom(postDrawTransaction);
+            }
         }
 
         final boolean hasSyncHandlers = executeDrawHandlers(postDrawTransaction, syncSeqId);
@@ -5716,16 +5845,18 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             postDrawTransaction = null;
             skipLayout = true;
         } else if (syncActive) {
-            // Currently in a Sync that is using BLAST.
-            if (!syncStillPending) {
+            // Currently in a Sync.
+            if (mWmService.mAlwaysSeqId ? syncSeqId >= mSyncSeqId : !syncStillPending) {
                 layoutNeeded = onSyncFinishedDrawing();
             }
-            if (postDrawTransaction != null) {
+            if (postDrawTransaction != null
+                    && (!mWmService.mAlwaysSeqId
+                            || getSyncMethod() == BLASTSyncEngine.METHOD_BLAST)) {
                 mSyncTransaction.merge(postDrawTransaction);
                 // Consume the transaction because the sync group will merge it.
                 postDrawTransaction = null;
             }
-        } else if (syncNextBuffer()) {
+        } else if (!mWmService.mAlwaysSeqId && syncNextBuffer()) {
             // Sync that is not using BLAST
             layoutNeeded = onSyncFinishedDrawing();
         }
@@ -5813,6 +5944,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      * See {@link WindowState#mDrawHandlers}
      */
     boolean syncNextBuffer() {
+        if (mWmService.mAlwaysSeqId) {
+            return (mSyncState == SYNC_STATE_WAITING_FOR_DRAW) || !mDrawHandlers.isEmpty();
+        }
         return mSyncState != SYNC_STATE_NONE || !mDrawHandlers.isEmpty();
     }
 
@@ -5832,10 +5966,18 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             Slog.w(TAG, "applyWithNextDraw with mSyncState=" + mSyncState + ", " + this
                     + ", " + Debug.getCallers(8));
         }
-        mSyncSeqId++;
-        mDrawHandlers.add(new DrawHandler(mSyncSeqId, consumer));
+        if (mWmService.mAlwaysSeqId) {
+            // Draw handlers require buffer.
+            if (mBufferSeqId <= mSyncSeqId) {
+                mBufferSeqId = mSyncSeqId + 1;
+            }
+            mDrawHandlers.add(new DrawHandler(mBufferSeqId, consumer));
+        } else {
+            mSyncSeqId++;
+            mDrawHandlers.add(new DrawHandler(mSyncSeqId, consumer));
 
-        requestRedrawForSync();
+            requestRedrawForSync();
+        }
 
         mWmService.mH.sendNewMessageDelayed(WINDOW_STATE_BLAST_SYNC_TIMEOUT, this,
             BLAST_TIMEOUT_DURATION);
@@ -5911,13 +6053,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     boolean isTrustedOverlay() {
-        if (surfaceTrustedOverlay()) {
-            WindowState parentWindow = getParentWindow();
-            return isWindowTrustedOverlay() || (parentWindow != null
-                    && parentWindow.isWindowTrustedOverlay());
-        } else {
-            return mInputWindowHandle.isTrustedOverlay();
-        }
+        WindowState parentWindow = getParentWindow();
+        return isWindowTrustedOverlay() || (parentWindow != null
+                && parentWindow.isWindowTrustedOverlay());
     }
 
     public boolean receiveFocusFromTapOutside() {
@@ -5969,7 +6107,15 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     public boolean cancelAndRedraw(int seqId) {
         // Cancel any draw requests during a sync.
-        return mPrepareSyncSeqId > 0;
+        if (!mWmService.mAlwaysSeqId) {
+            return mPrepareSyncSeqId > 0;
+        }
+        final boolean cancel = Math.max(mSyncSeqId, mBufferSeqId) > seqId;
+        if (cancel) {
+            Trace.instant(TRACE_TAG_WINDOW_MANAGER, "cancelDraw clientSeqId=" + seqId
+                    + " serverSeqId=" + mSyncSeqId + " bufferSeqId=" + mBufferSeqId);
+        }
+        return cancel;
     }
 
     public boolean isActivityWindow() {

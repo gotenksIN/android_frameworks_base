@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 #include "Bitmap.h"
 
 #include <android-base/file.h>
@@ -80,13 +82,13 @@ constexpr bool bitmap_ashmem_long_name() { return false; }
 }
 #endif
 
-/* QTI_BEGIN */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 #include <cutils/properties.h>
 extern const char* __progname;
 #define UI_PERFMODE "debug.ui.perfmode.enable"
 #define UI_PERFMODE_PROCESS "debug.ui.perfmode.process"
-/* QTI_END */
 
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 namespace android {
 
 #ifdef __ANDROID__
@@ -537,6 +539,24 @@ private:
     int mCount = 0;
 };
 
+template <int N>
+class Histogram {
+public:
+    // Expects values between 0f and 1f
+    void add(float sample) {
+        if (sample >= 0.f && sample <= 1.f) {
+            buckets[std::min(N - 1, static_cast<int>(sample * N))]++;
+        }
+    }
+
+    int size() { return N; }
+
+    int operator[](int i) const { return buckets[i]; }
+
+private:
+    std::array<int, N> buckets;
+};
+
 BitmapPalette Bitmap::computePalette(const SkImageInfo& info, const void* addr, size_t rowBytes) {
     ATRACE_CALL();
 
@@ -548,6 +568,7 @@ BitmapPalette Bitmap::computePalette(const SkImageInfo& info, const void* addr, 
 
     MinMaxAverage hue, saturation, value;
     int sampledCount = 0;
+    Histogram<10> valueHistogram;
 
     // Sample a grid of 100 pixels to get an overall estimation of the colors in play
     const int x_step = std::max(1, pixmap.width() / 10);
@@ -564,7 +585,9 @@ BitmapPalette Bitmap::computePalette(const SkImageInfo& info, const void* addr, 
             SkColorToHSV(color, hsv);
             hue.add(hsv[0]);
             saturation.add(hsv[1]);
-            value.add(hsv[2]);
+            float val = hsv[2];
+            value.add(val);
+            valueHistogram.add(val);
         }
     }
 
@@ -582,6 +605,21 @@ BitmapPalette Bitmap::computePalette(const SkImageInfo& info, const void* addr, 
           saturation.average(), info.width(), info.height());
 
     if (CC_UNLIKELY(view_accessibility_flags::force_invert_color())) {
+        // The following palettes only apply when the app is applying Force Invert and are not
+        // used by classic Force Dark.
+        // TODO: b/411725862 - Improve the barcode heuristic by incorporating actual barcode specs
+        if (sampledCount > 80) {
+            // The image should be majority pure black and white, but not entirely one color.
+            int expectedBlackAndWhiteSamples = sampledCount * 0.9;
+            int expectedBlackOrWhiteSamples = sampledCount * 0.25;
+            int blackSamples = valueHistogram[0];
+            int whiteSamples = valueHistogram[valueHistogram.size() - 1];
+            if (blackSamples + whiteSamples >= expectedBlackAndWhiteSamples &&
+                blackSamples >= expectedBlackOrWhiteSamples &&
+                whiteSamples >= expectedBlackOrWhiteSamples) {
+                return BitmapPalette::Barcode;
+            }
+        }
         if (saturation.delta() > 0.1f ||
             (hue.delta() > 20 && saturation.average() > 0.2f && value.average() < 0.9f)) {
             return BitmapPalette::Colorful;
@@ -646,7 +684,7 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
         return false;
     }
 
-    /* QTI_BEGIN */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
     bool ui_perf_enabled = false;
     char value[PROPERTY_VALUE_MAX];
     memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
@@ -658,25 +696,27 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
             ui_perf_enabled = true;
         }
     }
-    /* QTI_END */
 
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
     switch (format) {
         case JavaCompressFormat::Jpeg: {
             SkJpegEncoder::Options options;
             options.fQuality = quality;
             return SkJpegEncoder::Encode(stream, bitmap.pixmap(), options);
         }
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
         case JavaCompressFormat::Png: {
-            /* QTI_BEGIN */
             if (ui_perf_enabled) {
                 SkPngEncoder::Options options;
                 options.fZLibLevel = 0;
                 options.fFilterFlags = SkPngEncoder::FilterFlag::kNone;
                 return SkPngEncoder::Encode(stream, bitmap.pixmap(), options);
             }
-            /* QTI_END */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
             return SkPngEncoder::Encode(stream, bitmap.pixmap(), {});
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
             }
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
         case JavaCompressFormat::Webp: {
             SkWebpEncoder::Options options;
             if (quality >= 100) {
@@ -694,11 +734,11 @@ bool Bitmap::compress(const SkBitmap& bitmap, JavaCompressFormat format,
             options.fQuality = quality;
             options.fCompression = format == JavaCompressFormat::WebpLossy ?
                     SkWebpEncoder::Compression::kLossy : SkWebpEncoder::Compression::kLossless;
-            /* QTI_BEGIN */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
             if (ui_perf_enabled) {
                 options.fCompression = SkWebpEncoder::Compression::kLossless;
             }
-            /* QTI_END */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
             return SkWebpEncoder::Encode(stream, bitmap.pixmap(), options);
         }
     }
@@ -732,7 +772,7 @@ void Bitmap::traceBitmapCreate() {
 void Bitmap::traceBitmapDelete() {
     size_t bytes = getAllocationByteCount();
     std::lock_guard lock{mLock};
-    mTotalBitmapBytes -= getAllocationByteCount();
+    mTotalBitmapBytes -= bytes;
     mTotalBitmapCount--;
     if (ATRACE_ENABLED()) {
         ATRACE_INT64("Bitmap Memory", mTotalBitmapBytes);

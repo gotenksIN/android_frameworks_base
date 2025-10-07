@@ -60,6 +60,7 @@ import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.RO
 import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.SURFACE_HEIGHT;
 import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.SURFACE_WIDTH;
 import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.TASK_FRAGMENT;
+import static android.internal.perfetto.protos.Windowmanagerservice.TaskProto.TASK_NAME;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerChildProto.TASK;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.provider.Settings.Secure.USER_SETUP_COMPLETE;
@@ -155,9 +156,9 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.service.voice.IVoiceInteractionSession;
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
 import android.util.BoostFramework;
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
 import android.util.DisplayMetrics;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
@@ -535,6 +536,11 @@ class Task extends TaskFragment {
     private boolean mForceNonResizeOverride;
 
     /**
+     * Whether the child tasks can have override bounds.
+     */
+    private boolean mDisallowOverrideBoundsForChildren;
+
+    /**
      * If the window is allowed to be repositioned by {@link
      * android.app.ActivityManager.AppTask#moveTaskTo}.
      */
@@ -543,10 +549,10 @@ class Task extends TaskFragment {
     private static final int TRANSLUCENT_TIMEOUT_MSG = FIRST_ACTIVITY_TASK_MSG + 1;
 
     private final Handler mHandler;
-// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
     private static final ActivityPluginDelegate mQtiActivityPluginDelegate =
+// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
         new ActivityPluginDelegate();
-// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
     private class ActivityTaskHandler extends Handler {
 
         ActivityTaskHandler(Looper looper) {
@@ -700,9 +706,6 @@ class Task extends TaskFragment {
         mResizeMode = resizeMode;
         if (info != null) {
             setIntent(_intent, info);
-            if (!Flags.updateTaskMinDimensionsWithRootActivity()) {
-                setMinDimensions(info);
-            }
         } else {
             intent = _intent;
             mMinWidth = minWidth;
@@ -733,9 +736,6 @@ class Task extends TaskFragment {
         voiceSession = _voiceSession;
         voiceInteractor = _voiceInteractor;
         setIntent(activity, intent, info);
-        if (!Flags.updateTaskMinDimensionsWithRootActivity()) {
-            setMinDimensions(info);
-        }
         // Before we began to reuse a root task as the leaf task, we used to
         // create a leaf task in this case. Therefore now we won't send out the task created
         // notification when we decide to reuse it here, so we send out the notification below.
@@ -1069,10 +1069,8 @@ class Task extends TaskFragment {
             mResizeMode = info.resizeMode;
             shouldUpdateTaskDescription = true;
         }
-        if (Flags.updateTaskMinDimensionsWithRootActivity()) {
-            if (setMinDimensions(info)) {
-                shouldUpdateTaskDescription = true;
-            }
+        if (setMinDimensions(info)) {
+            shouldUpdateTaskDescription = true;
         }
         if (shouldUpdateTaskDescription) {
             updateTaskDescription();
@@ -1105,14 +1103,12 @@ class Task extends TaskFragment {
         }
         mMinWidth = minWidth;
         mMinHeight = minHeight;
-        if (Flags.updateTaskMinDimensionsWithRootActivity()) {
-            // Only update for pure TaskFragment.
-            forAllTaskFragments(tf -> {
-                if (tf.asTask() == null) {
-                    tf.setMinDimensions(minWidth, minHeight);
-                }
-            });
-        }
+        // Only update for pure TaskFragment.
+        forAllTaskFragments(tf -> {
+            if (tf.asTask() == null) {
+                tf.setMinDimensions(minWidth, minHeight);
+            }
+        });
         return true;
     }
 
@@ -1242,7 +1238,23 @@ class Task extends TaskFragment {
             setInitialBoundsIfNeeded();
         }
 
+        // Clear the override bounds if any ancestor requested to.
+        if (!isOverrideBoundsAllowed()) {
+            setBounds(null);
+        }
+
         mRootWindowContainer.updateUIDsPresentOnDisplay();
+    }
+
+    private boolean isOverrideBoundsAllowed() {
+        Task parentTask = getParent() != null ? getParent().asTask() : null;
+        while (parentTask != null) {
+            if (parentTask.mDisallowOverrideBoundsForChildren) {
+                return false;
+            }
+            parentTask = parentTask.getParent().asTask();
+        }
+        return true;
     }
 
     @Override
@@ -1341,13 +1353,19 @@ class Task extends TaskFragment {
                 // Pausing the resumed activity because it is occluded by other task fragment, or
                 // should not be remained in resumed state.
                 if (startPausing(false /* uiSleeping*/, resuming, reason)) {
-// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
                     if (mQtiActivityPluginDelegate != null && top != null && top.info != null
+// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                             && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
+// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
+// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
                         mQtiActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
+// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                                 getWindowingMode() == WINDOWING_MODE_FULLSCREEN, true);
                     }
-// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                     someActivityPaused[0]++;
                 }
             }
@@ -1355,18 +1373,24 @@ class Task extends TaskFragment {
 
         forAllLeafTaskFragments((taskFrag) -> {
             final ActivityRecord resumedActivity = taskFrag.getResumedActivity();
-// QTI_BEGIN: 2024-04-04: Data: Update ActivityPluginDelegate notifications for V
+// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
             final ActivityRecord top = topRunningActivity();
-// QTI_END: 2024-04-04: Data: Update ActivityPluginDelegate notifications for V
+// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
             if (resumedActivity != null && !taskFrag.canBeResumed(resuming)) {
                 if (taskFrag.startPausing(false /* uiSleeping*/, resuming, reason)) {
-// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
                     if (mQtiActivityPluginDelegate != null && top != null && top.info != null
+// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                             && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
+// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
+// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
                         mQtiActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
+// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                                 getWindowingMode() == WINDOWING_MODE_FULLSCREEN, true);
                     }
-// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                     someActivityPaused[0]++;
                 }
             }
@@ -1449,7 +1473,12 @@ class Task extends TaskFragment {
 
     /** Returns the user id associated with the current task. */
     int getUserId() {
-        return isLeafTask() ? mUserId : mCurrentUser;
+        if (!isLeafTask()) return mCurrentUser;
+        if (DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()
+                && showForAllUsers()) {
+            return mCurrentUser;
+        }
+        return mUserId;
     }
 
     /**
@@ -1545,10 +1574,6 @@ class Task extends TaskFragment {
         if (mTaskOrganizer != null && mCreatedByOrganizer && child.asTask() != null) {
             getDisplayArea().addRootTaskReferenceIfNeeded((Task) child);
         }
-
-        // Make sure the list of display UID allowlists is updated
-        // now that this record is in a new task.
-        mRootWindowContainer.updateUIDsPresentOnDisplay();
 
         // Only pass minimum dimensions for pure TaskFragment. Task's minimum dimensions must be
         // passed from Task constructor.
@@ -1939,13 +1964,26 @@ class Task extends TaskFragment {
                 -1 /* don't check PID */, -1 /* don't check UID */, this);
     }
 
+    /**
+     * Update task's force resize overrides if the system full-screen override cache has
+     * been invalidated due to activity restart.
+     */
+    void updateForceResizeOverridesIfNeeded(@NonNull ActivityRecord r) {
+        final AppCompatAspectRatioOverrides aspectRatioOverrides =
+                r.mAppCompatController.getAspectRatioOverrides();
+        if (aspectRatioOverrides.hasSystemFullscreenOverrideCache()) {
+            updateForceResizeOverrides(r);
+        }
+    }
+
     private void updateForceResizeOverrides(@NonNull ActivityRecord r) {
         final AppCompatResizeOverrides resizeOverrides = r.mAppCompatController
                 .getResizeOverrides();
+        // Pass task's displayContent as activity's displayContent is not attached yet.
         mForceResizeOverride = resizeOverrides.shouldOverrideForceResizeApp()
                 || r.isUniversalResizeable()
                 || r.mAppCompatController.getAspectRatioOverrides()
-                    .hasFullscreenOverride();
+                    .hasFullscreenOverride(mDisplayContent);
         mForceNonResizeOverride = resizeOverrides.shouldOverrideForceNonResizeApp();
     }
 
@@ -2026,7 +2064,7 @@ class Task extends TaskFragment {
 
     private static boolean setTaskDescriptionFromActivityAboveRoot(
             ActivityRecord r, ActivityRecord root, TaskDescription td) {
-        if (!r.isTaskOverlay() && r.taskDescription != null) {
+        if (!r.isTaskOverlay() && !r.isNoDisplay() && r.taskDescription != null) {
             final TaskDescription atd = r.taskDescription;
             if (td.getLabel() == null) {
                 td.setLabel(atd.getLabel());
@@ -2101,7 +2139,10 @@ class Task extends TaskFragment {
         nextPersistTaskBounds &=
                 (getRequestedOverrideConfiguration().windowConfiguration.getBounds() == null
                 || getRequestedOverrideConfiguration().windowConfiguration.getBounds().isEmpty());
-        if (!prevPersistTaskBounds && nextPersistTaskBounds
+
+        final boolean disableRestoreNonFullscreenBounds =
+                Flags.disableRestoreNonFullscreenBoundsOnConfigurationChange();
+        if (!disableRestoreNonFullscreenBounds && !prevPersistTaskBounds && nextPersistTaskBounds
                 && mLastNonFullscreenBounds != null && !mLastNonFullscreenBounds.isEmpty()) {
             // Bypass onRequestedOverrideConfigurationChanged here to avoid infinite loop.
             getRequestedOverrideConfiguration().windowConfiguration
@@ -2412,14 +2453,19 @@ class Task extends TaskFragment {
     }
 
     void updateSurfaceSize(SurfaceControl.Transaction transaction) {
-        if (mSurfaceControl == null || isOrganized()) {
+        final boolean inSync = mSyncState != SYNC_STATE_NONE;
+        if (mSurfaceControl == null
+                // Organized tasks are controlled by shell, so only manipulate those surfaces
+                // during syncs
+                || (isOrganized() && (!Flags.updateTaskCropInSync() || !inSync))) {
             return;
         }
 
         // Apply crop to root tasks only and clear the crops of the descendant tasks.
         int width = 0;
         int height = 0;
-        if (isRootTask() && !mTransitionController.mIsWaitingForDisplayEnabled) {
+        if ((isRootTask() || (Flags.updateTaskCropInSync() && !fillsParentBounds()))
+                && !mTransitionController.mIsWaitingForDisplayEnabled) {
             final Rect taskBounds = getBounds();
             width = taskBounds.width();
             height = taskBounds.height();
@@ -2481,10 +2527,7 @@ class Task extends TaskFragment {
      * persist task bounds if needed.
      */
     void setInitialBoundsIfNeeded() {
-        if (!com.android.window.flags.Flags.respectLeafTaskBounds()) {
-            updateOverrideConfigurationFromLaunchBounds();
-        } else if (persistTaskBounds(getWindowConfiguration())
-                && getRequestedOverrideBounds().isEmpty()) {
+        if (persistTaskBounds(getWindowConfiguration()) && getRequestedOverrideBounds().isEmpty()) {
             // Sets the Task bounds to the non-fullscreen bounds persisted last time if the Task
             // has no override bounds set.
             setBounds(mLastNonFullscreenBounds);
@@ -2867,6 +2910,8 @@ class Task extends TaskFragment {
 
         super.removeImmediately();
         mDisplayContent = null;
+        // Reset in case the Task may be reused by apps.
+        setHasBeenVisible(false);
         mRemoving = false;
     }
 
@@ -2898,6 +2943,11 @@ class Task extends TaskFragment {
     public int setBounds(Rect bounds) {
         if (isRootTask()) {
             return setBounds(getRequestedOverrideBounds(), bounds);
+        }
+
+        if (!isOverrideBoundsAllowed() && bounds != null && !bounds.isEmpty()) {
+            Slog.w(TAG, "Not allowed to set override bounds " + bounds + " for " + this);
+            return BOUNDS_CHANGE_NONE;
         }
 
         final int boundsChange = super.setBounds(bounds);
@@ -3182,12 +3232,23 @@ class Task extends TaskFragment {
     }
 
     void onSnapshotChanged(TaskSnapshot snapshot) {
-        mAtmService.getTaskChangeNotificationController().notifyTaskSnapshotChanged(
-                mTaskId, snapshot);
+        if (Flags.reduceTaskSnapshotMemoryUsage()) {
+            // No local listener.
+            mWmService.mSnapshotController.notifySnapshotChanged(mTaskId, snapshot);
+        } else {
+            mAtmService.getTaskChangeNotificationController().notifyTaskSnapshotChanged(
+                    mTaskId, snapshot);
+        }
     }
 
     void onSnapshotInvalidated() {
-        mAtmService.getTaskChangeNotificationController().notifyTaskSnapshotInvalidated(mTaskId);
+        if (Flags.reduceTaskSnapshotMemoryUsage()) {
+            // No local listener.
+            mWmService.mSnapshotController.notifySnapshotInvalidate(mTaskId);
+        } else {
+            mAtmService.getTaskChangeNotificationController()
+                    .notifyTaskSnapshotInvalidated(mTaskId);
+        }
     }
 
 
@@ -3313,6 +3374,7 @@ class Task extends TaskFragment {
         return "Task=" + mTaskId + (mName != null ? "(" + mName + ")" : "");
     }
 
+    // It is replaced by WindowState#getDimController().
     @Deprecated
     @Override
     Dimmer getDimmer() {
@@ -3327,9 +3389,7 @@ class Task extends TaskFragment {
         // Once at the root task level, we want to check {@link #isTranslucent(ActivityRecord)}.
         // If true, we want to get the Dimmer from the level above since we don't want to animate
         // the dim with the Task.
-        if (!isRootTask() || isTranslucentAndVisible()
-                || (Flags.getDimmerOnClosing() ? isTranslucentForTransition()
-                                                : isTranslucent(null))) {
+        if (!isRootTask() || isTranslucentAndVisible() || isTranslucentForTransition()) {
             return super.getDimmer();
         }
 
@@ -3348,25 +3408,7 @@ class Task extends TaskFragment {
         mDimmer.resetDimStates();
         super.prepareSurfaces();
 
-        Rect dimBounds = null;
-        if (!Flags.useTasksDimOnly()) {
-            dimBounds = mDimmer.getDimBounds();
-            if (dimBounds != null) {
-                getDimBounds(dimBounds);
-
-                // Bounds need to be relative, as the dim layer is a child.
-                if (inFreeformWindowingMode()) {
-                    getBounds(mTmpRect);
-                    dimBounds.offset(-mTmpRect.left, -mTmpRect.top);
-                } else {
-                    dimBounds.offsetTo(0, 0);
-                }
-            }
-        }
-
-        final SurfaceControl.Transaction t = getSyncTransaction();
-
-        if (mDimmer.hasDimState() && mDimmer.updateDims(t)) {
+        if (mDimmer.hasDimState() && mDimmer.updateDims(getSyncTransaction())) {
             scheduleAnimation();
         }
     }
@@ -4552,7 +4594,9 @@ class Task extends TaskFragment {
      */
     void setMainWindowSizeChangeTransaction(SurfaceControl.Transaction t) {
         setMainWindowSizeChangeTransaction(t, this);
-        forAllWindows(WindowState::requestRedrawForSync, true);
+        if (!mWmService.mAlwaysSeqId) {
+            forAllWindows(WindowState::requestRedrawForSync, true);
+        }
     }
 
     private void setMainWindowSizeChangeTransaction(SurfaceControl.Transaction t, Task origin) {
@@ -4643,10 +4687,6 @@ class Task extends TaskFragment {
      * @param excluded {@code true} to exclude the task, {@code false} otherwise.
      */
     void setForceExcludedFromRecents(boolean excluded) {
-        if (!Flags.excludeTaskFromRecents()) {
-            Slog.w(TAG, "Flag " + Flags.FLAG_EXCLUDE_TASK_FROM_RECENTS + " is not enabled");
-            return;
-        }
         mForceExcludedFromRecents = excluded;
     }
 
@@ -4885,8 +4925,12 @@ class Task extends TaskFragment {
                     if (!isPip2ExperimentEnabled) {
                         final ActivityRecord ar = mAtmService.mLastResumedActivity;
                         if (ar != null && ar.getTask() != null) {
-                            mAtmService.takeTaskSnapshot(ar.getTask().mTaskId,
-                                    true /* updateCache */);
+                            if (com.android.window.flags.Flags.reduceTaskSnapshotMemoryUsage()) {
+                                mWmService.mTaskSnapshotController.recordSnapshot(ar.getTask());
+                            } else {
+                                mAtmService.takeTaskSnapshot(ar.getTask().mTaskId,
+                                        true /* updateCache */);
+                            }
                         }
                     }
                 }
@@ -5340,13 +5384,19 @@ class Task extends TaskFragment {
         }
         final boolean[] resumed = new boolean[1];
         final TaskFragment topFragment = topActivity.getTaskFragment();
-// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
         if (mQtiActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED
+// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2024-05-29: Core: Update pauseActivityIfNeeded to avoid NullPointerException
                     && topActivity.info != null) {
+// QTI_END: 2024-05-29: Core: Update pauseActivityIfNeeded to avoid NullPointerException
+// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
             mQtiActivityPluginDelegate.activityInvokeNotification(
+// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                     topActivity.info.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN);
         }
-// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
         forAllLeafTaskFragments(f -> {
             if (topFragment == f) {
                 return;
@@ -5410,15 +5460,16 @@ class Task extends TaskFragment {
         }
 
         // Slot the activity into the history root task and proceed
-        ProtoLog.i(WM_DEBUG_ADD_REMOVE, "Adding activity %s to task %s callers: %s", r,
-                activityTask, new RuntimeException("here"));
+        ProtoLog.i(WM_DEBUG_ADD_REMOVE, "Adding activity %s to task %s", r, activityTask);
 
-// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
         if (mQtiActivityPluginDelegate != null) {
             mQtiActivityPluginDelegate.activityInvokeNotification
+// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
+// QTI_BEGIN: 2021-02-05: Core: Update ActivityPluginDelegate notifications for S
                 (r.info.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN);
         }
-// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
+// QTI_END: 2021-02-05: Core: Update ActivityPluginDelegate notifications for S
         if (isActivityTypeHomeOrRecents() && getActivityBelow(r) == null) {
             // If this is the first activity, don't do any fancy animations,
             // because there is nothing for it to animate on top of.
@@ -6013,7 +6064,7 @@ class Task extends TaskFragment {
 
     private void moveTaskToBackInner(@NonNull Task task, @Nullable Transition transition) {
         final Transition.ReadyCondition movedToBack =
-                new Transition.ReadyCondition("moved-to-back", task);
+                new Transition.ReadyCondition("moved-to-back", task, true /* newTrackerOnly */);
         if (transition != null) {
             // Preventing from update surface position for WindowState if configuration changed,
             // because the position is depends on WindowFrame, so update the position before
@@ -6093,6 +6144,9 @@ class Task extends TaskFragment {
         }
         if (mDisablePip) {
             pw.println(prefix + "  mDisablePip=true");
+        }
+        if (mDisallowOverrideBoundsForChildren) {
+            pw.println(prefix + "  mDisallowOverrideBoundsForChildren=true");
         }
         if (mLastNonFullscreenBounds != null) {
             pw.print(prefix); pw.print("  mLastNonFullscreenBounds=");
@@ -6227,7 +6281,7 @@ class Task extends TaskFragment {
         // cases, we can just request that the root task is put at top here.
         // Don't bother moving task to top if this task is force hidden and invisible to user.
         if (!isForceHidden()) {
-            getDisplayArea().positionChildAt(POSITION_TOP, this, false /* includingParents */);
+            getParent().positionChildAt(POSITION_TOP, this, false /* includingParents */);
         }
     }
 
@@ -6315,6 +6369,12 @@ class Task extends TaskFragment {
     void onChildPositionChanged(WindowContainer child) {
         if (!mChildren.contains(child)) {
             dispatchTaskInfoChangedIfNeeded(false /* force */);
+            if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue()
+                    && mCreatedByOrganizer && mChildren.isEmpty() && getDisplayArea() != null
+                    && getDisplayArea().mPreferredTopFocusableRootTask == this) {
+                // An empty task cannot be focusable.
+                getDisplayArea().clearPreferredTopFocusableRootTask();
+            }
             return;
         }
         if (child.asTask() != null) {
@@ -6426,14 +6486,14 @@ class Task extends TaskFragment {
     public DisplayInfo getDisplayInfo() {
         return mDisplayContent.getDisplayInfo();
     }
-// QTI_BEGIN: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
     public void onARStopTriggered(ActivityRecord r) {
+// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
         if (mQtiActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
                             mQtiActivityPluginDelegate.activitySuspendNotification
+// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
                                 (r.info.applicationInfo.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN, false);
                         }
     }
-// QTI_END: 2025-04-10: Data : Add Qti Marking for ActivityPluginDelegate
     private Rect getRawBounds() {
         return super.getBounds();
     }
@@ -6501,6 +6561,31 @@ class Task extends TaskFragment {
         return mSelfMovable;
     }
 
+    /**
+     * Sets whether the child tasks can have override bounds.
+     *
+     * @param disallowOverrideBoundsForChildren whether to disallow the override bounds
+     * @return a bitmask representing the types of bounds changes made to the child tasks.
+     */
+    int setDisallowOverrideBoundsForChildren(boolean disallowOverrideBoundsForChildren) {
+        if (!mCreatedByOrganizer) {
+            Slog.w(TAG, "Can only disable child bounds override on tasks created by organizer");
+            return BOUNDS_CHANGE_NONE;
+        }
+        mDisallowOverrideBoundsForChildren = disallowOverrideBoundsForChildren;
+
+        final int[] boundsChange = new int[1];
+        if (disallowOverrideBoundsForChildren) {
+            forAllTasks(task -> {
+                if (task == this) {
+                    return;
+                }
+                boundsChange[0] |= task.setBounds(null);
+            });
+        }
+        return boundsChange[0];
+    }
+
     @Override
     public void dumpDebug(ProtoOutputStream proto, long fieldId,
             @WindowTracingLogLevel int logLevel) {
@@ -6524,6 +6609,9 @@ class Task extends TaskFragment {
         }
         proto.write(RESIZE_MODE, mResizeMode);
         proto.write(FILLS_PARENT, matchParentBounds());
+        if (mName != null) {
+            proto.write(TASK_NAME, mName);
+        }
         getRawBounds().dumpDebug(proto, BOUNDS);
 
         if (mLastNonFullscreenBounds != null) {
@@ -6922,7 +7010,9 @@ class Task extends TaskFragment {
             // Set activity type before adding the root task to TaskDisplayArea, so home task can
             // be cached, see TaskDisplayArea#addRootTaskReferenceIfNeeded().
             if (mActivityType != ACTIVITY_TYPE_UNDEFINED) {
-                task.setActivityType(mActivityType);
+                // Set directly because onParentChanged will propagate it.
+                task.getRequestedOverrideConfiguration().windowConfiguration.setActivityType(
+                        mActivityType);
             }
 
             if (mParent != null) {

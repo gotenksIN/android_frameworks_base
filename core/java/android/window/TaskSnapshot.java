@@ -19,9 +19,11 @@ package android.window;
 import android.annotation.IntDef;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ComponentName;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
 import android.graphics.ColorSpace;
 import android.graphics.GraphicBuffer;
 import android.graphics.Point;
@@ -30,13 +32,17 @@ import android.hardware.HardwareBuffer;
 import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.view.Surface;
+import android.view.SurfaceControl;
 import android.view.WindowInsetsController;
+
+import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.policy.TransitionAnimation;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.ref.WeakReference;
 import java.util.function.Consumer;
 
 /**
@@ -46,8 +52,8 @@ import java.util.function.Consumer;
 public class TaskSnapshot implements Parcelable {
     // Identifier of this snapshot
     private final long mId;
-    // The elapsed real time (in nanoseconds) when this snapshot was captured, not intended for use outside the
-    // process in which the snapshot was taken (ie. this is not parceled)
+    // The elapsed real time (in nanoseconds) when this snapshot was captured or loaded from disk
+    // since boot.
     private final long mCaptureTime;
     // Top activity in task when snapshot was taken
     private final ComponentName mTopActivityComponent;
@@ -80,6 +86,7 @@ public class TaskSnapshot implements Parcelable {
     private int mInternalReferences;
     private int mWriteToParcelCount;
     private Consumer<HardwareBuffer> mSafeSnapshotReleaser;
+    private WeakReference<TaskSnapshotManager.SnapshotTracker> mSnapshotTracker;
 
     /** Keep in cache, doesn't need reference. */
     public static final int REFERENCE_NONE = 0;
@@ -94,13 +101,17 @@ public class TaskSnapshot implements Parcelable {
     /** This snapshot object will be passing to external process. Keep the snapshot reference after
      * writeToParcel*/
     public static final int REFERENCE_WRITE_TO_PARCEL = 1 << 4;
+    /** This snapshot object is being used to convert resolution . */
+    public static final int REFERENCE_CONVERT_RESOLUTION = 1 << 5;
+
     @IntDef(flag = true, prefix = { "REFERENCE_" }, value = {
             REFERENCE_NONE,
             REFERENCE_BROADCAST,
             REFERENCE_CACHE,
             REFERENCE_PERSIST,
             REFERENCE_CONTENT_SUGGESTION,
-            REFERENCE_WRITE_TO_PARCEL
+            REFERENCE_WRITE_TO_PARCEL,
+            REFERENCE_CONVERT_RESOLUTION
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ReferenceFlags {}
@@ -135,7 +146,6 @@ public class TaskSnapshot implements Parcelable {
 
     private TaskSnapshot(Parcel source) {
         mId = source.readLong();
-        mCaptureTime = SystemClock.elapsedRealtimeNanos();
         mTopActivityComponent = ComponentName.readFromParcel(source);
         mSnapshot = source.readTypedObject(HardwareBuffer.CREATOR);
         int colorSpaceId = source.readInt();
@@ -156,6 +166,7 @@ public class TaskSnapshot implements Parcelable {
         mUiMode = source.readInt();
         int densityDpi = source.readInt();
         mDensityDpi = densityDpi > 0 ? densityDpi : DisplayMetrics.DENSITY_DEVICE_STABLE;
+        mCaptureTime = source.readLong();
     }
 
     /**
@@ -185,17 +196,127 @@ public class TaskSnapshot implements Parcelable {
      *
      * Note: Prefer {@link #getHardwareBuffer}, which returns the internal object. This version
      * creates a new object.
+     *
+     * @deprecated Do not access hardware buffer directly.
      */
     @UnsupportedAppUsage
+    @Deprecated
     public GraphicBuffer getSnapshot() {
         return GraphicBuffer.createFromHardwareBuffer(mSnapshot);
     }
 
     /**
      * @return The hardware buffer representing the screenshot.
+     * @deprecated Do not access hardware buffer directly.
      */
+    @Deprecated
     public HardwareBuffer getHardwareBuffer() {
         return mSnapshot;
+    }
+
+    /**
+     * Returns the width from the hardware buffer.
+     */
+    public int getHardwareBufferWidth() {
+        return mSnapshot.getWidth();
+    }
+
+    /**
+     * Returns the height from the hardware buffer.
+     */
+    public int getHardwareBufferHeight() {
+        return mSnapshot.getHeight();
+    }
+
+    /**
+     * Returns the format from the hardware buffer.
+     */
+    public @HardwareBuffer.Format int getHardwareBufferFormat() {
+        return mSnapshot.getFormat();
+    }
+
+    /**
+     * Sets hardware buffer to a SurfaceControl.
+     */
+    public void setBufferToSurface(SurfaceControl.Transaction t,
+            SurfaceControl surface) {
+        if (!isBufferValid()) {
+            return;
+        }
+        t.setBuffer(surface, mSnapshot);
+    }
+
+    /**
+     * Creates a bitmap from the hardware buffer, this can return null if the hardware buffer is
+     * closed or not exists.
+     */
+    public Bitmap wrapToBitmap() {
+        if (!isBufferValid()) {
+            return null;
+        }
+        return Bitmap.wrapHardwareBuffer(mSnapshot, mColorSpace);
+    }
+
+    /**
+     * Creates a bitmap from the hardware buffer with specific ColorSpace. This can return null if
+     * the hardware buffer is closed or not exists.
+     */
+    public Bitmap wrapToBitmap(@Nullable ColorSpace colorSpace) {
+        if (!isBufferValid()) {
+            return null;
+        }
+        return Bitmap.wrapHardwareBuffer(mSnapshot, colorSpace);
+    }
+
+    /**
+     * Actively close hardware buffer.
+     */
+    public void closeBuffer() {
+        if (isBufferValid()) {
+            if (mSnapshotTracker != null) {
+                final TaskSnapshotManager.SnapshotTracker tracker = mSnapshotTracker.get();
+                if (tracker != null) {
+                    TaskSnapshotManager.getInstance().removeTracker(tracker);
+                }
+            } else {
+                mSnapshot.close();
+            }
+        }
+    }
+
+    /**
+     * Returns whether the hardware buffer is valid.
+     */
+    public boolean isBufferValid() {
+        return mSnapshot != null && !mSnapshot.isClosed();
+    }
+
+    /**
+     * Returns whether the hardware buffer has protected content.
+     */
+    public boolean hasProtectedContent() {
+        if (!isBufferValid()) {
+            return false;
+        }
+        return TransitionAnimation.hasProtectedContent(mSnapshot);
+    }
+
+    /**
+     * Attach the hardware buffer and color space to a Surface.
+     */
+    public void attachAndQueueBufferWithColorSpace(@NonNull Surface surface) {
+        if (!isBufferValid()) {
+            return;
+        }
+        surface.attachAndQueueBufferWithColorSpace(mSnapshot, mColorSpace);
+    }
+
+    /**
+     * Test only
+     */
+    @VisibleForTesting
+    public boolean isSameHardwareBuffer(@NonNull HardwareBuffer buffer) {
+        return buffer == mSnapshot;
     }
 
     /**
@@ -331,6 +452,7 @@ public class TaskSnapshot implements Parcelable {
         dest.writeBoolean(mHasImeSurface);
         dest.writeInt(mUiMode);
         dest.writeInt(mDensityDpi);
+        dest.writeLong(mCaptureTime);
         synchronized (this) {
             if ((mInternalReferences & REFERENCE_WRITE_TO_PARCEL) != 0) {
                 mWriteToParcelCount--;
@@ -373,6 +495,14 @@ public class TaskSnapshot implements Parcelable {
                 + " mWriteToParcelCount=" + mWriteToParcelCount
                 + " mUiMode=" + Integer.toHexString(mUiMode)
                 + " mDensityDpi=" + mDensityDpi;
+    }
+
+    void setSnapshotTracker(TaskSnapshotManager.SnapshotTracker tracker) {
+        if (tracker == null) {
+            mSnapshotTracker = null;
+        } else {
+            mSnapshotTracker = new WeakReference<>(tracker);
+        }
     }
 
     /**

@@ -16,6 +16,7 @@
 
 package com.android.systemui.ambientcue.ui.compose
 
+import android.view.Surface.ROTATION_90
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.animateFloat
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -41,14 +43,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.IconButtonColors
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -75,9 +74,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
-import com.android.compose.PlatformIconButton
 import com.android.compose.ui.graphics.painter.rememberDrawablePainter
 import com.android.systemui.ambientcue.ui.compose.modifier.animatedActionBorder
+import com.android.systemui.ambientcue.ui.utils.AmbientCueAnimationState
 import com.android.systemui.ambientcue.ui.utils.FilterUtils
 import com.android.systemui.ambientcue.ui.viewmodel.ActionType
 import com.android.systemui.ambientcue.ui.viewmodel.ActionViewModel
@@ -90,15 +89,24 @@ fun ShortPill(
     horizontal: Boolean = true,
     visible: Boolean = true,
     expanded: Boolean = false,
+    rotation: Int = 0,
     onClick: () -> Unit = {},
     onCloseClick: () -> Unit = {},
+    onAnimationStateChange: (Int, AmbientCueAnimationState) -> Unit = { _, _ -> },
 ) {
     val outlineColor = if (isSystemInDarkTheme()) Color.White else Color.Black
     val backgroundColor = if (isSystemInDarkTheme()) Color.Black else Color.White
-    val scrimColor = MaterialTheme.colorScheme.primary
+    val scrimColor = MaterialTheme.colorScheme.primaryFixedDim
     val minSize = 48.dp
     val closeButtonSize = 28.dp
+    // (shortPillBoxWidth, shortPillBoxLength) is the smallest size to fully cover recent app area.
+    val shortPillBoxWidth = 48.dp
+    val shortPillBoxLength = 68.dp
     val transitionTween: TweenSpec<Float> = tween(250, delayMillis = 200)
+    val showAnimationInProgress = remember { mutableStateOf(false) }
+    val hideAnimationInProgress = remember { mutableStateOf(false) }
+    val expandAnimationInProgress = remember { mutableStateOf(false) }
+    val collapseAnimationInProgress = remember { mutableStateOf(false) }
 
     val visibleState = remember { MutableTransitionState(false) }
     visibleState.targetState = visible
@@ -127,7 +135,7 @@ fun ShortPill(
                         0f at 0
                         0.2f at 500
                         0.2f at 1500
-                        0f at 2000
+                        0.4f at 2000
                     }
                 } else {
                     tween(500)
@@ -135,18 +143,36 @@ fun ShortPill(
             },
             label = "smartScrimAlphaBoost",
         ) {
-            if (it) 0f else 0f
+            if (it) 0.4f else 0f
         }
+
+    AmbientCueJankMonitorComposable(
+        visibleTargetState = visibleState.targetState,
+        enterProgress = enterProgress,
+        expanded = expanded,
+        expansionAlpha = expansionAlpha,
+        showAnimationInProgress = showAnimationInProgress,
+        hideAnimationInProgress = hideAnimationInProgress,
+        expandAnimationInProgress = expandAnimationInProgress,
+        collapseAnimationInProgress = collapseAnimationInProgress,
+        onAnimationStateChange = onAnimationStateChange,
+    )
 
     // State variables to store the measured size and position of the main pill.
     var pillContentSize by remember { mutableStateOf(IntSize.Zero) }
     var pillContentPosition by remember { mutableStateOf(Offset.Zero) }
 
+    val density = LocalDensity.current
     val config = LocalConfiguration.current
     val isBoldTextEnabled by remember { derivedStateOf { config.fontWeightAdjustment > 0 } }
+    val fontScale = config.fontScale
     val actionTextStyle =
         MaterialTheme.typography.labelMedium.copy(
-            fontWeight = if (isBoldTextEnabled) FontWeight.Bold else FontWeight.Medium
+            fontWeight = if (isBoldTextEnabled) FontWeight.Bold else FontWeight.Medium,
+            fontSize =
+                with(density) {
+                    (MaterialTheme.typography.labelMedium.fontSize.value * fontScale).dp.toSp()
+                },
         )
 
     Box(
@@ -163,7 +189,11 @@ fun ShortPill(
                         radius = if (horizontal) halfWidth else halfHeight,
                     )
                 translate(
-                    left = if (horizontal) halfWidth else size.width,
+                    left =
+                        if (horizontal) halfWidth
+                        else {
+                            if (rotation == ROTATION_90) size.width else 0f
+                        },
                     top = if (horizontal) size.height else halfHeight,
                 ) {
                     scale(
@@ -192,10 +222,10 @@ fun ShortPill(
                 .background(backgroundColor)
                 .animatedActionBorder(strokeWidth = 1.dp, cornerRadius = 16.dp, visible = visible)
                 .widthIn(0.dp, minSize * 2)
-                .then(if (expanded) Modifier else Modifier.clickable { onClick() })
                 .padding(4.dp)
 
         val filteredActions = FilterUtils.filterActions(actions)
+        val expandActionLabel = stringResource(id = R.string.ambient_cue_expand_action)
 
         // The layout for the un-expanded state (pill + side button)
         if (horizontal) {
@@ -204,30 +234,75 @@ fun ShortPill(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = fadeOutModifier.then(scaleAnimationModifier),
             ) {
-                Spacer(modifier = Modifier.size(closeButtonSize))
+                Spacer(modifier = Modifier.size(closeButtonTouchTargetSize))
 
-                Row(
-                    horizontalArrangement =
-                        Arrangement.spacedBy(-4.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically,
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier =
-                        pillModifier.defaultMinSize(minWidth = minSize).onGloballyPositioned {
-                            coordinates ->
-                            pillContentSize = coordinates.size
-                            pillContentPosition = coordinates.positionInParent()
-                        },
-                ) {
-                    filteredActions.take(3).fastForEach { action ->
-                        Icon(action, backgroundColor)
-                        if (actions.size == 1) {
-                            Text(
-                                text = action.label,
-                                color = outlineColor,
-                                style = actionTextStyle,
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 8.dp),
+                        Modifier.widthIn(shortPillBoxLength, minSize * 2)
+                            .height(shortPillBoxWidth)
+                            .then(
+                                if (expanded) Modifier
+                                else
+                                    Modifier.clickable(
+                                        indication = null,
+                                        interactionSource = null,
+                                        // Set expand action when the action is not one-tap action.
+                                        onClickLabel =
+                                            if (
+                                                filteredActions.size == 1 &&
+                                                    filteredActions[0].actionType ==
+                                                        ActionType.MA &&
+                                                    filteredActions[0].oneTapEnabled
+                                            )
+                                                null
+                                            else expandActionLabel,
+                                    ) {
+                                        onClick()
+                                    }
                             )
+                            .onGloballyPositioned { coordinates ->
+                                pillContentSize = coordinates.size
+                                pillContentPosition = coordinates.positionInParent()
+                            },
+                ) {
+                    Row(
+                        horizontalArrangement =
+                            Arrangement.spacedBy(-4.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = pillModifier.defaultMinSize(minWidth = minSize),
+                    ) {
+                        filteredActions.take(3).fastForEach { action ->
+                            Icon(action, backgroundColor)
+                            if (actions.size == 1) {
+                                Text(
+                                    text = action.label,
+                                    color = outlineColor,
+                                    style = actionTextStyle,
+                                    overflow = TextOverflow.Ellipsis,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 8.dp),
+                                )
+                            } else if (
+                                filteredActions.size == 1 &&
+                                    action.actionType == ActionType.MR &&
+                                    action.icon.repeatCount > 0
+                            ) {
+                                Text(
+                                    text = action.label,
+                                    color = outlineColor,
+                                    style = actionTextStyle,
+                                    overflow = TextOverflow.Ellipsis,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(start = 8.dp).weight(1f),
+                                )
+                                Text(
+                                    text = "+${action.icon.repeatCount}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 6.dp, end = 3.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -242,16 +317,26 @@ fun ShortPill(
             ) {
                 Spacer(modifier = Modifier.size(closeButtonSize))
 
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(-4.dp, Alignment.CenterVertically),
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier =
-                        pillModifier.defaultMinSize(minHeight = minSize).onGloballyPositioned {
-                            coordinates ->
-                            pillContentSize = coordinates.size
-                            pillContentPosition = coordinates.positionInParent()
-                        },
+                        Modifier.widthIn(shortPillBoxWidth, minSize * 2)
+                            .height(shortPillBoxLength)
+                            .then(if (expanded) Modifier else Modifier.clickable { onClick() })
+                            .onGloballyPositioned { coordinates ->
+                                pillContentSize = coordinates.size
+                                pillContentPosition = coordinates.positionInParent()
+                            },
                 ) {
-                    filteredActions.take(3).fastForEach { action -> Icon(action, backgroundColor) }
+                    Column(
+                        verticalArrangement =
+                            Arrangement.spacedBy(-4.dp, Alignment.CenterVertically),
+                        modifier = pillModifier.defaultMinSize(minHeight = minSize),
+                    ) {
+                        filteredActions.take(3).fastForEach { action ->
+                            Icon(action, backgroundColor)
+                        }
+                    }
                 }
 
                 CloseButton(onCloseClick = onCloseClick, modifier = Modifier.size(closeButtonSize))
@@ -260,13 +345,13 @@ fun ShortPill(
 
         // The layout for the expanded state (a single, centered button)
         if (expansionAlpha < 1f && pillContentSize != IntSize.Zero) {
-            with(LocalDensity.current) {
+            with(density) {
                 val offsetX =
                     pillContentPosition.x.toDp() + (pillContentSize.width.toDp() / 2) -
-                        (closeButtonSize / 2)
+                        (closeButtonTouchTargetSize / 2)
                 val offsetY =
                     pillContentPosition.y.toDp() + (pillContentSize.height.toDp() / 2) -
-                        (closeButtonSize / 2)
+                        (closeButtonTouchTargetSize / 2)
 
                 CloseButton(
                     onCloseClick = onCloseClick,
@@ -283,19 +368,20 @@ fun ShortPill(
 
 @Composable
 private fun CloseButton(onCloseClick: () -> Unit, modifier: Modifier = Modifier) {
-    // Remove default padding and size.
-    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+    // Expand the clickable area.
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier =
+            Modifier.size(closeButtonTouchTargetSize)
+                .clickable(onClick = onCloseClick, interactionSource = null, indication = null),
+    ) {
         // Close button
         FilledIconButton(
             onClick = onCloseClick,
-            modifier =
-                modifier
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer),
+            modifier = modifier,
             colors =
                 IconButtonDefaults.filledIconButtonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
                 ),
         ) {
             Icon(
@@ -312,7 +398,7 @@ private fun CloseButton(onCloseClick: () -> Unit, modifier: Modifier = Modifier)
 @Composable
 private fun Icon(action: ActionViewModel, backgroundColor: Color, modifier: Modifier = Modifier) {
     Image(
-        painter = rememberDrawablePainter(action.icon.drawable),
+        painter = rememberDrawablePainter(action.icon.small),
         contentDescription = stringResource(id = R.string.ambient_cue_icon_content_description),
         modifier =
             modifier
@@ -328,8 +414,9 @@ private fun Icon(action: ActionViewModel, backgroundColor: Color, modifier: Modi
                             )
                     }
                 )
-                .padding(1.dp)
                 .clip(CircleShape)
                 .background(backgroundColor),
     )
 }
+
+private val closeButtonTouchTargetSize = 36.dp

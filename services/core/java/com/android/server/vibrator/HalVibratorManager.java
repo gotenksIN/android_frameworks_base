@@ -17,12 +17,19 @@
 package com.android.server.vibrator;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.util.IndentingPrintWriter;
+
+import com.android.tools.r8.keepanno.annotations.KeepItemKind;
+import com.android.tools.r8.keepanno.annotations.UsedByNative;
 
 /** Handles interactions with a vibrator manager HAL. */
 interface HalVibratorManager {
 
     /** Callbacks from the vibrator manager HAL. */
+    @UsedByNative(
+            description = "Called from JNI in jni/VibratorManagerService.cpp",
+            kind = KeepItemKind.CLASS_AND_MEMBERS)
     interface Callbacks {
         /** Callback triggered when synced vibration is complete. */
         void onSyncedVibrationComplete(long vibrationId);
@@ -31,8 +38,8 @@ interface HalVibratorManager {
         void onVibrationSessionComplete(long sessionId);
     }
 
-    /** Initializes the HAL and set the callback instance for future interactions. */
-    void init(@NonNull Callbacks callbacks);
+    /** Initializes the HAL and set callback instances for future interactions. */
+    void init(@NonNull Callbacks callbacks, @NonNull HalVibrator.Callbacks vibratorCallbacks);
 
     /** Notifies the boot phase system ready. This might load some HAL static data. */
     void onSystemReady();
@@ -47,6 +54,10 @@ interface HalVibratorManager {
 
     /** Return the IDs of the vibrators controlled by this manager. */
     @NonNull int[] getVibratorIds();
+
+    /** Return the vibrator with given ID controlled by this manager. */
+    @Nullable
+    HalVibrator getVibrator(int id);
 
     /** Prepare vibrators for triggering vibrations in sync. */
     boolean prepareSynced(@NonNull int[] vibratorIds);

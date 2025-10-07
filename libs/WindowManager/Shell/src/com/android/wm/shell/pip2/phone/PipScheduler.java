@@ -24,6 +24,7 @@ import android.content.Context;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.SystemProperties;
+import android.os.Trace;
 import android.view.SurfaceControl;
 import android.window.DisplayAreaInfo;
 import android.window.WindowContainerToken;
@@ -168,7 +169,7 @@ public class PipScheduler implements PipTransitionState.PipTransitionStateChange
     /**
      * Schedules exit PiP via expand transition.
      */
-    public void scheduleExitPipViaExpand() {
+    public void scheduleExitPipViaExpand(boolean wasVisible) {
         mMainExecutor.execute(() -> {
             if (!mPipTransitionState.isInPip()) return;
 
@@ -186,7 +187,7 @@ public class PipScheduler implements PipTransitionState.PipTransitionStateChange
             });
             boolean toSplit = !wct.isEmpty();
             wct.merge(expandWct, true /* transfer */);
-            mPipTransitionController.startExpandTransition(wct, toSplit);
+            mPipTransitionController.startExpandTransition(wct, toSplit, wasVisible);
         });
     }
 
@@ -241,6 +242,8 @@ public class PipScheduler implements PipTransitionState.PipTransitionStateChange
      * @param targetDisplayId the target display ID where the PiP window should be parented to.
      */
     public void scheduleMoveToDisplay(int targetDisplayId, Rect pipBounds) {
+        Trace.instant(Trace.TRACE_TAG_WINDOW_MANAGER,
+                "PipScheduler#scheduleMoveToDisplay: " + targetDisplayId);
         WindowContainerToken pipTaskToken = mPipTransitionState.getPipTaskToken();
         DisplayAreaInfo displayAreaInfo =
                 mPipDesktopState.getRootTaskDisplayAreaOrganizer().getDisplayAreaInfo(

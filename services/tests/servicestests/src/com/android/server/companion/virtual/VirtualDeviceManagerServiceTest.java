@@ -19,6 +19,7 @@ package com.android.server.companion.virtual;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_INVALID;
+import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_ACTIVITY;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_RECENTS;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_SENSORS;
 import static android.content.Context.DEVICE_ID_DEFAULT;
@@ -72,6 +73,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
+import android.content.res.Configuration;
 import android.hardware.Sensor;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerGlobal;
@@ -115,6 +117,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import com.android.internal.app.BlockedAppStreamingActivity;
 import com.android.internal.os.BackgroundThread;
 import com.android.server.LocalServices;
+import com.android.server.UiModeManagerInternal;
 import com.android.server.companion.virtual.camera.VirtualCameraController;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.sensors.SensorManagerInternal;
@@ -248,6 +251,8 @@ public class VirtualDeviceManagerServiceTest {
     @Mock
     private SensorManagerInternal mSensorManagerInternalMock;
     @Mock
+    private UiModeManagerInternal mUiModeManagerInternalMock;
+    @Mock
     private VirtualSensorCallback mSensorCallback;
     @Mock
     private IVirtualDeviceActivityListener mActivityListener;
@@ -279,7 +284,7 @@ public class VirtualDeviceManagerServiceTest {
     private Intent createRestrictedActivityBlockedIntent(Set<String> displayCategories,
             String targetDisplayCategory) {
         when(mDisplayManagerInternalMock.createVirtualDisplay(any(), any(), any(), any(),
-                eq(VIRTUAL_DEVICE_OWNER_PACKAGE)))
+                eq(VIRTUAL_DEVICE_OWNER_PACKAGE), eq(DEVICE_OWNER_UID_1)))
                 .thenAnswer(inv -> {
                     mLocalService.onVirtualDisplayCreated(
                             mDeviceImpl, DISPLAY_ID_1, inv.getArgument(1), inv.getArgument(3));
@@ -332,6 +337,9 @@ public class VirtualDeviceManagerServiceTest {
 
         LocalServices.removeServiceForTest(SensorManagerInternal.class);
         LocalServices.addService(SensorManagerInternal.class, mSensorManagerInternalMock);
+
+        LocalServices.removeServiceForTest(UiModeManagerInternal.class);
+        LocalServices.addService(UiModeManagerInternal.class, mUiModeManagerInternalMock);
 
         final DisplayInfo displayInfo = new DisplayInfo();
         displayInfo.uniqueId = UNIQUE_ID;
@@ -433,11 +441,21 @@ public class VirtualDeviceManagerServiceTest {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_HANDLE_INVALID_DEVICE_ID)
     public void getDevicePolicy_invalidDeviceId_returnsDefault() {
         assertThat(mVdm.getDevicePolicy(DEVICE_ID_INVALID, POLICY_TYPE_SENSORS))
                 .isEqualTo(DEVICE_POLICY_DEFAULT);
         assertThat(mVdmNative.getDevicePolicy(DEVICE_ID_INVALID, POLICY_TYPE_SENSORS))
                 .isEqualTo(DEVICE_POLICY_DEFAULT);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_HANDLE_INVALID_DEVICE_ID)
+    public void getDevicePolicy_invalidDeviceId_returnsInvalid() {
+        assertThat(mVdm.getDevicePolicy(DEVICE_ID_INVALID, POLICY_TYPE_SENSORS))
+                .isEqualTo(DEVICE_POLICY_INVALID);
+        assertThat(mVdmNative.getDevicePolicy(DEVICE_ID_INVALID, POLICY_TYPE_SENSORS))
+                .isEqualTo(DEVICE_POLICY_INVALID);
     }
 
     @Test
@@ -526,6 +544,71 @@ public class VirtualDeviceManagerServiceTest {
         GenericWindowPolicyController gwpc =
                 mDeviceImpl.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_1);
         assertThat(gwpc.canShowTasksInHostDeviceRecents()).isTrue();
+    }
+
+    @Test
+    public void getDevicePolicyForDisplayId() {
+        VirtualDeviceParams params = new VirtualDeviceParams.Builder()
+                .setDevicePolicy(POLICY_TYPE_RECENTS, DEVICE_POLICY_CUSTOM)
+                .setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM)
+                .setDevicePolicy(POLICY_TYPE_SENSORS, DEVICE_POLICY_CUSTOM)
+                .build();
+        mDeviceImpl.close();
+        mDeviceImpl = createVirtualDevice(VIRTUAL_DEVICE_ID_1, DEVICE_OWNER_UID_1, params);
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1, Display.FLAG_TRUSTED);
+
+        assertThat(mVdm.getDevicePolicyForDisplayId(DISPLAY_ID_1, POLICY_TYPE_RECENTS))
+                .isEqualTo(DEVICE_POLICY_CUSTOM);
+        assertThat(mVdm.getDevicePolicyForDisplayId(DISPLAY_ID_1, POLICY_TYPE_ACTIVITY))
+                .isEqualTo(DEVICE_POLICY_CUSTOM);
+        assertThat(mVdm.getDevicePolicyForDisplayId(DISPLAY_ID_1, POLICY_TYPE_SENSORS))
+                .isEqualTo(DEVICE_POLICY_CUSTOM);
+
+        mDeviceImpl.setDevicePolicyForDisplay(
+            DISPLAY_ID_1, POLICY_TYPE_RECENTS, DEVICE_POLICY_DEFAULT);
+        mDeviceImpl.setDevicePolicyForDisplay(
+            DISPLAY_ID_1, POLICY_TYPE_ACTIVITY, DEVICE_POLICY_DEFAULT);
+
+        // Device-level policy is unchanged.
+        assertThat(mVdm.getDevicePolicy(mDeviceImpl.getDeviceId(), POLICY_TYPE_RECENTS))
+                .isEqualTo(DEVICE_POLICY_CUSTOM);
+        assertThat(mVdm.getDevicePolicy(mDeviceImpl.getDeviceId(), POLICY_TYPE_ACTIVITY))
+                .isEqualTo(DEVICE_POLICY_CUSTOM);
+
+        // Display-level policy is changed.
+        assertThat(mVdm.getDevicePolicyForDisplayId(DISPLAY_ID_1, POLICY_TYPE_RECENTS))
+                .isEqualTo(DEVICE_POLICY_DEFAULT);
+        assertThat(mVdm.getDevicePolicyForDisplayId(DISPLAY_ID_1, POLICY_TYPE_ACTIVITY))
+                .isEqualTo(DEVICE_POLICY_DEFAULT);
+        assertThat(mVdm.getDevicePolicyForDisplayId(DISPLAY_ID_1, POLICY_TYPE_SENSORS))
+                .isEqualTo(DEVICE_POLICY_CUSTOM);
+    }
+
+    @Test
+    public void getDevicePolicyForDisplayId_unownedDisplay() {
+        VirtualDeviceParams params = new VirtualDeviceParams.Builder()
+                .setDevicePolicy(POLICY_TYPE_RECENTS, DEVICE_POLICY_CUSTOM)
+                .setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM)
+                .setDevicePolicy(POLICY_TYPE_SENSORS, DEVICE_POLICY_CUSTOM)
+                .build();
+        mDeviceImpl.close();
+        mDeviceImpl = createVirtualDevice(VIRTUAL_DEVICE_ID_1, DEVICE_OWNER_UID_1, params);
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1, Display.FLAG_TRUSTED);
+
+        assertThat(mVdm.getDevicePolicyForDisplayId(Display.DEFAULT_DISPLAY, POLICY_TYPE_RECENTS))
+                .isEqualTo(DEVICE_POLICY_DEFAULT);
+        assertThat(mVdm.getDevicePolicyForDisplayId(Display.DEFAULT_DISPLAY, POLICY_TYPE_ACTIVITY))
+                .isEqualTo(DEVICE_POLICY_DEFAULT);
+        assertThat(mVdm.getDevicePolicyForDisplayId(Display.DEFAULT_DISPLAY, POLICY_TYPE_SENSORS))
+                .isEqualTo(DEVICE_POLICY_DEFAULT);
+
+        // Non-existent display.
+        assertThat(mVdm.getDevicePolicyForDisplayId(DISPLAY_ID_2, POLICY_TYPE_RECENTS))
+                .isEqualTo(DEVICE_POLICY_DEFAULT);
+        assertThat(mVdm.getDevicePolicyForDisplayId(DISPLAY_ID_2, POLICY_TYPE_ACTIVITY))
+                .isEqualTo(DEVICE_POLICY_DEFAULT);
+        assertThat(mVdm.getDevicePolicyForDisplayId(DISPLAY_ID_2, POLICY_TYPE_SENSORS))
+                .isEqualTo(DEVICE_POLICY_DEFAULT);
     }
 
     @Test
@@ -1204,6 +1287,48 @@ public class VirtualDeviceManagerServiceTest {
         verify(mInputManagerInternalMock, times(0)).setPointerIconVisible(eq(false), anyInt());
     }
 
+    @EnableFlags(Flags.FLAG_DEVICE_AWARE_UI_MODE)
+    @Test
+    public void setDisplayUiMode_untrustedDisplay_throws() {
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
+        assertThrows(SecurityException.class, () -> mDeviceImpl.setDisplayUiMode(
+                DISPLAY_ID_1, Configuration.UI_MODE_NIGHT_YES));
+    }
+
+    @EnableFlags(Flags.FLAG_DEVICE_AWARE_UI_MODE)
+    @Test
+    public void setDisplayUiMode_unownedDisplay_throws() {
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
+        assertThrows(SecurityException.class, () -> mDeviceImpl.setDisplayUiMode(
+                Display.DEFAULT_DISPLAY, Configuration.UI_MODE_NIGHT_YES));
+    }
+
+    @EnableFlags(Flags.FLAG_DEVICE_AWARE_UI_MODE)
+    @Test
+    public void setDisplayUiMode_displayReleased_resetUiMode() {
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1, Display.FLAG_TRUSTED);
+        mDeviceImpl.setDisplayUiMode(DISPLAY_ID_1, Configuration.UI_MODE_NIGHT_YES);
+        verify(mUiModeManagerInternalMock).setDisplayUiMode(
+                DISPLAY_ID_1, Configuration.UI_MODE_NIGHT_YES);
+
+        mDeviceImpl.onVirtualDisplayRemoved(DISPLAY_ID_1);
+        verify(mUiModeManagerInternalMock).setDisplayUiMode(
+                DISPLAY_ID_1, Configuration.UI_MODE_TYPE_UNDEFINED);
+    }
+
+    @EnableFlags(Flags.FLAG_DEVICE_AWARE_UI_MODE)
+    @Test
+    public void setDisplayUiMode_deviceClosed_resetUiMode() {
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1, Display.FLAG_TRUSTED);
+        mDeviceImpl.setDisplayUiMode(DISPLAY_ID_1, Configuration.UI_MODE_NIGHT_YES);
+        verify(mUiModeManagerInternalMock).setDisplayUiMode(
+                DISPLAY_ID_1, Configuration.UI_MODE_NIGHT_YES);
+
+        mDeviceImpl.close();
+        verify(mUiModeManagerInternalMock).setDisplayUiMode(
+                DISPLAY_ID_1, Configuration.UI_MODE_TYPE_UNDEFINED);
+    }
+
     @Test
     public void openNonBlockedAppOnVirtualDisplay_succeeds() {
         addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
@@ -1551,7 +1676,7 @@ public class VirtualDeviceManagerServiceTest {
         }).when(mDisplayManagerInternalMock).getDisplayInfo(eq(displayId));
 
         when(mDisplayManagerInternalMock.createVirtualDisplay(any(), eq(mVirtualDisplayCallback),
-                eq(virtualDevice), any(), any())).thenAnswer(inv -> {
+                eq(virtualDevice), any(), any(), anyInt())).thenAnswer(inv -> {
                     mLocalService.onVirtualDisplayCreated(
                             virtualDevice, displayId, mVirtualDisplayCallback, inv.getArgument(3));
                     return displayId;

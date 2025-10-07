@@ -16,6 +16,8 @@
 package com.android.wm.shell.desktopmode.multidesks
 
 import android.app.ActivityManager
+import android.app.ActivityOptions
+import android.app.TaskInfo
 import android.window.TransitionInfo
 import android.window.WindowContainerTransaction
 
@@ -47,7 +49,7 @@ interface DesksOrganizer {
     fun moveTaskToDesk(
         wct: WindowContainerTransaction,
         deskId: Int,
-        task: ActivityManager.RunningTaskInfo,
+        task: TaskInfo,
         minimized: Boolean = false,
     )
 
@@ -103,6 +105,9 @@ interface DesksOrganizer {
         displayId: Int,
         onTop: Boolean,
     )
+
+    /** Adds launch root task token to activity options to reparent task to desk after reboot. */
+    fun addLaunchDeskToActivityOptions(activityOptions: ActivityOptions, deskId: Int)
 
     /** A callback that is invoked when the desk container is created. */
     fun interface OnCreateCallback {

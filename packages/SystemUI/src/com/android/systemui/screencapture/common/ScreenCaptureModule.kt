@@ -16,12 +16,17 @@
 
 package com.android.systemui.screencapture.common
 
+import android.app.Activity
+import com.android.systemui.CoreStartable
+import com.android.systemui.screencapture.ScreenCaptureUiStartable
 import com.android.systemui.screencapture.cast.ScreenCaptureCastComponent
-import com.android.systemui.screencapture.common.data.ScreenCaptureType
+import com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
 import com.android.systemui.screencapture.record.ScreenCaptureRecordComponent
+import com.android.systemui.screencapture.record.smallscreen.ui.SmallScreenPostRecordingActivity
 import com.android.systemui.screencapture.sharescreen.ScreenCaptureShareScreenComponent
 import dagger.Binds
 import dagger.Module
+import dagger.multibindings.ClassKey
 import dagger.multibindings.IntoMap
 
 /**
@@ -60,4 +65,16 @@ interface ScreenCaptureModule {
     fun bindShareScreenComponentBuilder(
         impl: ScreenCaptureShareScreenComponent.Builder
     ): ScreenCaptureComponent.Builder
+
+    @Binds
+    @IntoMap
+    @ClassKey(ScreenCaptureUiStartable::class)
+    fun bindScreenCaptureUiStartable(impl: ScreenCaptureUiStartable): CoreStartable
+
+    @Binds
+    @IntoMap
+    @ClassKey(SmallScreenPostRecordingActivity::class)
+    fun provideSmallScreenPostRecordingActivity(
+        activity: SmallScreenPostRecordingActivity
+    ): Activity
 }

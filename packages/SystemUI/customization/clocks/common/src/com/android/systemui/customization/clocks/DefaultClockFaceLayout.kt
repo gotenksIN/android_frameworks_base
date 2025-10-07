@@ -18,6 +18,15 @@ package com.android.systemui.customization.clocks
 
 import android.util.DisplayMetrics
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.constraintlayout.widget.ConstraintSet.BOTTOM
 import androidx.constraintlayout.widget.ConstraintSet.END
@@ -25,16 +34,89 @@ import androidx.constraintlayout.widget.ConstraintSet.PARENT_ID
 import androidx.constraintlayout.widget.ConstraintSet.START
 import androidx.constraintlayout.widget.ConstraintSet.TOP
 import androidx.constraintlayout.widget.ConstraintSet.WRAP_CONTENT
-import com.android.systemui.customization.clocks.ContextUtil.getSafeStatusBarHeight
+import com.android.compose.animation.scene.ContentScope
 import com.android.systemui.customization.clocks.R as clocksR
-import com.android.systemui.plugins.clocks.AodClockBurnInModel
-import com.android.systemui.plugins.clocks.ClockFaceLayout
-import com.android.systemui.plugins.clocks.ClockPreviewConfig
-import com.android.systemui.plugins.clocks.ClockViewIds
+import com.android.systemui.customization.clocks.utils.ContextUtils.getSafeStatusBarHeight
+import com.android.systemui.plugins.keyguard.ui.clocks.AodClockBurnInModel
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockFaceLayout
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockPreviewConfig
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockViewIds
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementContext
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
+import kotlin.collections.List
 
 /** A ClockFaceLayout that applies the default lockscreen layout to a single view */
 open class DefaultClockFaceLayout(val view: View) : ClockFaceLayout {
     override val views = listOf(view)
+
+    override val elements: List<LockscreenElement> by lazy {
+        if (view.id == ClockViewIds.LOCKSCREEN_CLOCK_VIEW_LARGE) {
+            listOf(largeClockElement)
+        } else {
+            listOf(smallClockElement)
+        }
+    }
+
+    private val smallClockElement =
+        object : LockscreenElement {
+            override val key = LockscreenElementKeys.Clock.Small
+            override val context = view.context
+
+            @Composable
+            override fun ContentScope.LockscreenElement(
+                factory: LockscreenElementFactory,
+                context: LockscreenElementContext,
+            ) {
+                clockView(
+                    view = view,
+                    modifier =
+                        Modifier.height(dimensionResource(clocksR.dimen.small_clock_height))
+                            .then(context.burnInModifier),
+                )
+            }
+        }
+
+    private val largeClockElement =
+        object : LockscreenElement {
+            override val key = LockscreenElementKeys.Clock.Large
+            override val context = view.context
+
+            @Composable
+            override fun ContentScope.LockscreenElement(
+                factory: LockscreenElementFactory,
+                context: LockscreenElementContext,
+            ) {
+                // TODO(b/418824686): Migrate stepping animation to compose
+                clockView(view, Modifier.wrapContentSize().then(context.burnInModifier))
+            }
+        }
+
+    companion object {
+        @Composable
+        fun clockView(view: View?, modifier: Modifier = Modifier) {
+            AndroidView(
+                factory = {
+                    FrameLayout(it).apply {
+                        // Clip nothing. The clock views at times render outside their bounds.
+                        // Compose does not clip by default, so only this layer needs clipping
+                        // to be explicitly disabled.
+                        clipChildren = false
+                        clipToPadding = false
+                    }
+                },
+                update = { parent ->
+                    view?.let {
+                        parent.removeAllViews()
+                        (view.parent as? ViewGroup)?.removeView(view)
+                        parent.addView(view)
+                    } ?: run { parent.removeAllViews() }
+                },
+                modifier = modifier,
+            )
+        }
+    }
 
     override fun applyConstraints(constraints: ConstraintSet): ConstraintSet {
         if (views.size != 1) {

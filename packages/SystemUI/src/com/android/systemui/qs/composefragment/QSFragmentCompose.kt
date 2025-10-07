@@ -127,6 +127,11 @@ import com.android.systemui.lifecycle.setSnapshotBinding
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.media.controls.ui.controller.MediaViewLogger
 import com.android.systemui.media.controls.ui.view.MediaHost
+import com.android.systemui.media.remedia.shared.flag.MediaControlsInComposeFlag
+import com.android.systemui.media.remedia.ui.compose.Media
+import com.android.systemui.media.remedia.ui.compose.MediaPresentationStyle
+import com.android.systemui.media.remedia.ui.compose.MediaUiBehavior
+import com.android.systemui.media.remedia.ui.viewmodel.MediaViewModel
 import com.android.systemui.plugins.qs.QS
 import com.android.systemui.plugins.qs.QSContainerController
 import com.android.systemui.qs.composefragment.SceneKeys.QuickQuickSettings
@@ -144,11 +149,14 @@ import com.android.systemui.qs.panels.shared.model.QSFragmentComposeClippingTabl
 import com.android.systemui.qs.panels.ui.compose.EditMode
 import com.android.systemui.qs.panels.ui.compose.QuickQuickSettings
 import com.android.systemui.qs.panels.ui.compose.TileGrid
-import com.android.systemui.qs.shared.ui.ElementKeys
+import com.android.systemui.qs.shared.ui.QuickSettings.Elements
 import com.android.systemui.qs.ui.composable.QuickSettingsShade
 import com.android.systemui.qs.ui.composable.QuickSettingsShade.systemGestureExclusionInShade
 import com.android.systemui.qs.ui.composable.QuickSettingsTheme
 import com.android.systemui.res.R
+import com.android.systemui.shade.ShadeDisplayAware
+import com.android.systemui.statusbar.policy.ConfigurationController
+import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener
 import com.android.systemui.util.LifecycleFragment
 import com.android.systemui.util.animation.MeasurementInput
 import com.android.systemui.util.animation.UniqueObjectHostView
@@ -180,6 +188,7 @@ constructor(
     private val dumpManager: DumpManager,
     @Background private val backgroundDispatcher: CoroutineDispatcher,
     private val mediaLogger: MediaViewLogger,
+    @ShadeDisplayAware private val configurationController: ConfigurationController,
 ) : LifecycleFragment(), QS, Dumpable {
 
     private val scrollListener = MutableStateFlow<QS.ScrollListener?>(null)
@@ -640,6 +649,13 @@ constructor(
         bottomContentPadding = padding
     }
 
+    private val configurationListener =
+        object : ConfigurationListener {
+            override fun onConfigChanged(newConfig: Configuration) {
+                view?.dispatchConfigurationChanged(newConfig)
+            }
+        }
+
     private fun setListenerCollections() {
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -666,6 +682,14 @@ constructor(
                         viewModel.containerViewModel.editModeViewModel.isEditing,
                     ) {
                         setCustomizerShowing(it, EDIT_MODE_TIME_MILLIS.toLong())
+                    }
+                }
+                launch {
+                    try {
+                        configurationController.addCallback(configurationListener)
+                        awaitCancellation()
+                    } finally {
+                        configurationController.removeCallback(configurationListener)
                     }
                 }
             }
@@ -748,6 +772,15 @@ constructor(
                                 modifier = Modifier.requiredHeightIn(max = Dp.Infinity),
                                 mediaHost = viewModel.qqsMediaHost,
                                 mediaLogger = mediaLogger,
+                                mediaPresentationStyle =
+                                    if (viewModel.qqsMediaInRow) {
+                                        MediaPresentationStyle.Compressed
+                                    } else {
+                                        MediaPresentationStyle.Default
+                                    },
+                                onSwipeToDismiss = viewModel::onMediaSwipeToDismiss,
+                                mediaViewModelFactory = viewModel.mediaViewModelFactory,
+                                behavior = viewModel.qqsMediaUiBehavior,
                             )
                         }
                     }
@@ -785,7 +818,7 @@ constructor(
                 )
         ) {
             if (viewModel.isQsEnabled) {
-                Element(ElementKeys.QuickSettingsContent, modifier = Modifier.weight(1f)) {
+                Element(Elements.QuickSettingsContent, modifier = Modifier.weight(1f)) {
                     if (alwaysCompose) {
                         // scrollState never changes
                         LaunchedEffect(Unit) {
@@ -904,6 +937,10 @@ constructor(
                                     MediaObject(
                                         mediaHost = viewModel.qsMediaHost,
                                         mediaLogger = mediaLogger,
+                                        mediaViewModelFactory = viewModel.mediaViewModelFactory,
+                                        mediaPresentationStyle = MediaPresentationStyle.Default,
+                                        onSwipeToDismiss = viewModel::onMediaSwipeToDismiss,
+                                        behavior = viewModel.qsMediaUiBehavior,
                                         update = { translationY = viewModel.qsMediaTranslationY },
                                     )
                                 }
@@ -934,7 +971,7 @@ constructor(
                 }
                 QuickSettingsTheme {
                     Element(
-                        ElementKeys.FooterActions,
+                        Elements.FooterActions,
                         Modifier.sysuiResTag(ResIdTags.qsFooterActions),
                     ) {
                         FooterActions(
@@ -1072,7 +1109,7 @@ object SceneKeys {
         object : ElementMatcher {
             override fun matches(key: ElementKey, content: ContentKey): Boolean {
                 return content == SceneKeys.QuickQuickSettings &&
-                    ElementKeys.TileElementMatcher.matches(key, content)
+                    Elements.TileElementMatcher.matches(key, content)
             }
         }
 }
@@ -1179,6 +1216,8 @@ private class FrameLayoutTouchPassthrough(
     private val backgroundDispatcher: CoroutineDispatcher,
     private val isInBottomReservedArea: (Float, Float) -> Boolean,
 ) : FrameLayout(context) {
+
+    private val lastConfig = Configuration(context.resources.configuration)
 
     init {
         repeatWhenAttached {
@@ -1320,6 +1359,12 @@ private class FrameLayoutTouchPassthrough(
         return super.onTouchEvent(event)
     }
 
+    override fun dispatchConfigurationChanged(newConfig: Configuration) {
+        if (lastConfig.updateFrom(newConfig) != 0) {
+            super.dispatchConfigurationChanged(newConfig)
+        }
+    }
+
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         // If there's a touch on this view and we can scroll down, we don't want to be intercepted
         val action = ev.actionMasked
@@ -1380,43 +1425,66 @@ private fun Modifier.gesturesDisabled(disabled: Boolean) =
     }
 
 @Composable
-private fun MediaObject(
+private fun ContentScope.MediaObject(
     mediaHost: MediaHost,
     modifier: Modifier = Modifier,
     mediaLogger: MediaViewLogger,
+    mediaViewModelFactory: MediaViewModel.Factory,
+    mediaPresentationStyle: MediaPresentationStyle,
+    onSwipeToDismiss: () -> Unit,
+    behavior: MediaUiBehavior,
     update: UniqueObjectHostView.() -> Unit = {},
 ) {
-    Box {
-        AndroidView(
-            modifier = modifier,
-            factory = {
-                mediaHost.hostView.apply {
-                    layoutParams =
-                        FrameLayout.LayoutParams(
-                            FrameLayout.LayoutParams.MATCH_PARENT,
-                            FrameLayout.LayoutParams.WRAP_CONTENT,
-                        )
-                }
-            },
-            update = { view ->
-                view.update()
-                // Update layout params if host view bounds are higher than its child.
-                val height = mediaHost.hostView.height
-                val width = mediaHost.hostView.width
-                var measure = false
-                mediaHost.hostView.children.forEach { child ->
-                    if (child is FrameLayout && (height > child.height || width > child.width)) {
-                        measure = true
-                        child.layoutParams = FrameLayout.LayoutParams(width, height)
+    if (MediaControlsInComposeFlag.isEnabled) {
+        Element(key = Media.Elements.mediaCarousel, modifier = modifier) {
+            Media(
+                viewModelFactory = mediaViewModelFactory,
+                presentationStyle = mediaPresentationStyle,
+                behavior = behavior,
+                onDismissed = onSwipeToDismiss,
+                modifier = Modifier,
+            )
+        }
+    } else {
+        Box {
+            AndroidView(
+                modifier = modifier,
+                factory = {
+                    mediaHost.hostView.apply {
+                        layoutParams =
+                            FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.WRAP_CONTENT,
+                            )
                     }
-                }
-                if (measure) {
-                    mediaHost.hostView.measurementManager.onMeasure(MeasurementInput(width, height))
-                    mediaLogger.logMediaSize("update size in compose", width, height)
-                }
-            },
-            onReset = {},
-        )
+                },
+                update = { view ->
+                    view.update()
+                    if (!Flags.mediaFrameDimensionsFix()) {
+                        // Update layout params if host view bounds are higher than its child.
+                        val height = mediaHost.hostView.height
+                        val width = mediaHost.hostView.width
+                        var measure = false
+                        mediaHost.hostView.children.forEach { child ->
+                            if (
+                                child is FrameLayout &&
+                                    (height > child.height || width > child.width)
+                            ) {
+                                measure = true
+                                child.layoutParams = FrameLayout.LayoutParams(width, height)
+                            }
+                        }
+                        if (measure) {
+                            mediaHost.hostView.measurementManager.onMeasure(
+                                MeasurementInput(width, height)
+                            )
+                            mediaLogger.logMediaSize("update size in compose", width, height)
+                        }
+                    }
+                },
+                onReset = {},
+            )
+        }
     }
 }
 

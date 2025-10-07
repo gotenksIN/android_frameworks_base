@@ -26,6 +26,7 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.ambientcue.data.repository.ambientCueRepository
 import com.android.systemui.ambientcue.data.repository.fake
 import com.android.systemui.ambientcue.domain.interactor.ambientCueInteractor
+import com.android.systemui.ambientcue.shared.logger.ambientCueLogger
 import com.android.systemui.ambientcue.shared.model.ActionModel
 import com.android.systemui.ambientcue.shared.model.IconModel
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
@@ -44,10 +45,10 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.launch
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.verify
 
 @RunWith(AndroidJUnit4::class)
 @SmallTest
-@android.platform.test.annotations.EnabledOnRavenwood
 class AmbientCueViewModelTest : SysuiTestCase() {
     private val kosmos = testKosmos()
     private val viewModel = kosmos.ambientCueViewModelFactory.create()
@@ -295,16 +296,32 @@ class AmbientCueViewModelTest : SysuiTestCase() {
             assertThat(viewModel.showLongPressEducation).isFalse()
         }
 
+    @Test
+    fun hide_setsClickedClosedButtonStatus() =
+        kosmos.runTest {
+            viewModel.activateIn(kosmos.testScope)
+            viewModel.hide()
+            runCurrent()
+
+            verify(kosmos.ambientCueLogger).setClickedCloseButtonStatus()
+        }
+
     private fun testActions(applicationContext: Context) =
         listOf(
             ActionModel(
                 icon =
                     IconModel(
-                        applicationContext.resources.getDrawable(
-                            R.drawable.ic_content_paste_spark,
-                            applicationContext.theme,
-                        ),
-                        "test.icon",
+                        small =
+                            applicationContext.resources.getDrawable(
+                                R.drawable.ic_content_paste_spark,
+                                applicationContext.theme,
+                            ),
+                        large =
+                            applicationContext.resources.getDrawable(
+                                R.drawable.ic_content_paste_spark,
+                                applicationContext.theme,
+                            ),
+                        iconId = "test.icon",
                     ),
                 label = "Sunday Morning",
                 attribution = null,

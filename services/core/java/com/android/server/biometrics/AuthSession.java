@@ -83,7 +83,7 @@ import java.util.function.Function;
  */
 public final class AuthSession implements IBinder.DeathRecipient {
     private static final String TAG = "BiometricService/AuthSession";
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
 
     /*
@@ -692,7 +692,8 @@ public final class AuthSession implements IBinder.DeathRecipient {
             return;
         }
 
-        if (mState != STATE_AUTH_PAUSED && mState != STATE_SHOWING_DEVICE_CREDENTIAL) {
+        if (mState != STATE_AUTH_PAUSED && mState != STATE_SHOWING_DEVICE_CREDENTIAL
+                && mState != STATE_AUTH_STARTED_UI_SHOWING) {
             Slog.w(TAG, "onResumeAuthentication, state: " + mState);
             return;
         }

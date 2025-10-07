@@ -99,6 +99,7 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.InputConfig;
 import android.os.RemoteException;
+import android.os.UserHandle;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
@@ -127,6 +128,7 @@ import androidx.test.filters.SmallTest;
 
 import com.android.compatibility.common.util.SystemUtil;
 import com.android.internal.R;
+import com.android.server.am.UserState;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.testutils.StubTransaction;
 import com.android.server.wm.SensitiveContentPackages.PackageInfo;
@@ -932,7 +934,7 @@ public class WindowStateTests extends WindowTestsBase {
         Settings.Secure.putIntForUser(cr,
                 Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MAGNIFY_NAV_AND_IME, 0, 1);
 
-        mWm.setCurrentUser(1);
+        mWm.setCurrentUser(1, new UserState(UserHandle.of(1)));
 
         assertFalse(mWm.isMagnifyImeEnabled());
     }
@@ -945,7 +947,7 @@ public class WindowStateTests extends WindowTestsBase {
         Settings.Secure.putIntForUser(cr,
                 Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MAGNIFY_NAV_AND_IME, 1, 2);
 
-        mWm.setCurrentUser(2);
+        mWm.setCurrentUser(2, new UserState(UserHandle.of(2)));
 
         assertTrue(mWm.isMagnifyImeEnabled());
     }
@@ -1121,19 +1123,21 @@ public class WindowStateTests extends WindowTestsBase {
         win.updateResizingWindowIfNeeded();
         assertThat(mWm.mResizingWindows).doesNotContain(win);
 
-        // Non blast sync doesn't require to force resizing, because it won't use syncSeqId.
-        // And if the window is already drawn, it can report sync finish immediately so that the
-        // sync group won't be blocked.
-        win.finishSync(mTransaction, syncGroup, false /* cancel */);
-        syncGroup.mSyncMethod = BLASTSyncEngine.METHOD_NONE;
-        win.mSyncGroup = syncGroup;
-        win.mWinAnimator.mDrawState = WindowStateAnimator.HAS_DRAWN;
-        win.prepareSync();
-        assertEquals(SYNC_STATE_WAITING_FOR_DRAW, win.mSyncState);
-        win.updateResizingWindowIfNeeded();
-        assertThat(mWm.mResizingWindows).doesNotContain(win);
-        assertTrue(win.isSyncFinished(syncGroup));
-        assertEquals(WindowContainer.SYNC_STATE_READY, win.mSyncState);
+        if (!mWm.mAlwaysSeqId) {
+            // Non blast sync doesn't require to force resizing, because it won't use syncSeqId.
+            // And if the window is already drawn, it can report sync finish immediately so that the
+            // sync group won't be blocked.
+            win.finishSync(mTransaction, syncGroup, false /* cancel */);
+            syncGroup.mSyncMethod = BLASTSyncEngine.METHOD_NONE;
+            win.mSyncGroup = syncGroup;
+            win.mWinAnimator.mDrawState = WindowStateAnimator.HAS_DRAWN;
+            win.prepareSync();
+            assertEquals(SYNC_STATE_WAITING_FOR_DRAW, win.mSyncState);
+            win.updateResizingWindowIfNeeded();
+            assertThat(mWm.mResizingWindows).doesNotContain(win);
+            assertTrue(win.isSyncFinished(syncGroup));
+            assertEquals(WindowContainer.SYNC_STATE_READY, win.mSyncState);
+        }
     }
 
     @Test
@@ -1478,6 +1482,9 @@ public class WindowStateTests extends WindowTestsBase {
         mDisplayContent.setImeLayeringTarget(appWin2);
         assertEquals("appWin2 is the IME control target",
                 appWin2, mDisplayContent.getImeControlTarget());
+        if (android.view.inputmethod.Flags.setServerVisibilityOnprelayout()) {
+            controller.getImeSourceProvider().onPreLayout();
+        }
         controller.getImeSourceProvider().onPostLayout();
 
         // Expect all windows behind IME can receive IME insets visible.
@@ -1521,6 +1528,9 @@ public class WindowStateTests extends WindowTestsBase {
         appWin2.setRequestedVisibleTypes(ime(), ime());
         mDisplayContent.setImeInputTarget(appWin2);
         mDisplayContent.setImeLayeringTarget(appWin2);
+        if (android.view.inputmethod.Flags.setServerVisibilityOnprelayout()) {
+            controller.getImeSourceProvider().onPreLayout();
+        }
         controller.getImeSourceProvider().onPostLayout();
 
         assertFalse("appWin1 does not have IME insets visible, as it is in background",

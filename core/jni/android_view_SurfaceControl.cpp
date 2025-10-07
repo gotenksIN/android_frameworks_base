@@ -24,6 +24,7 @@
 #include <android/gui/BnWindowInfosReportedListener.h>
 #include <android/gui/EdgeExtensionParameters.h>
 #include <android/gui/JankData.h>
+#include <android/gui/TransactionBarrier.h>
 #include <android/hardware/display/IDeviceProductInfoConstants.h>
 #include <android/os/IInputConstants.h>
 #include <android_runtime/AndroidRuntime.h>
@@ -61,6 +62,7 @@
 #include <ui/StaticDisplayInfo.h>
 #include <utils/LightRefBase.h>
 #include <utils/Log.h>
+#include <utils/String16.h>
 
 #include <memory>
 
@@ -865,6 +867,13 @@ static void nativeSetContentPriority(JNIEnv* env, jclass clazz, jlong transactio
     transaction->setContentPriority(surfaceControl, priority);
 }
 
+static void nativeSetSystemContentPriority(JNIEnv* env, jclass clazz, jlong transactionObj,
+                                           jlong surfaceControlObj, jint priority) {
+    auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
+    auto surfaceControl = SpFromRawPtr<SurfaceControl>(surfaceControlObj);
+    transaction->setSystemContentPriority(surfaceControl, priority);
+}
+
 static void nativeSetCachingHint(JNIEnv* env, jclass clazz, jlong transactionObj,
                                  jlong nativeObject, jint cachingHint) {
     auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
@@ -1046,6 +1055,26 @@ static void nativeSetInputWindowInfo(JNIEnv* env, jclass clazz, jlong transactio
     transaction->setInputWindowInfo(ctrl, std::move(info));
 }
 
+static void nativeAddTransactionBarrier(JNIEnv* env, jclass clazz, jlong transactionObj,
+                                        jobject barrierObj) {
+    Parcel* barrierParcel = parcelForJavaObject(env, barrierObj);
+    if (barrierParcel == NULL) {
+        doThrowNPE(env);
+        return;
+    }
+    gui::TransactionBarrier barrier;
+    status_t err = barrier.readFromParcel(barrierParcel);
+    if (err != NO_ERROR) {
+        jniThrowException(env, "java/lang/IllegalArgumentException",
+                          "TransactionBarrier parcel has wrong format");
+        return;
+    }
+
+    auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
+
+    transaction->addTransactionBarrier(std::move(barrier));
+}
+
 static void nativeAddWindowInfosReportedListener(JNIEnv* env, jclass clazz, jlong transactionObj,
                                                  jobject runnable) {
     auto listener = sp<WindowInfosReportedListenerWrapper>::make(env, runnable);
@@ -1141,12 +1170,23 @@ static void nativeSetCornerRadius(JNIEnv* env, jclass clazz, jlong transactionOb
     transaction->setCornerRadius(ctrl, cornerRadius);
 }
 
-static void nativeSetClientDrawnCornerRadius(JNIEnv* env, jclass clazz, jlong transactionObj,
-                                             jlong nativeObject, jfloat clientDrawnCornerRadius) {
+static void nativeSetCornerRadius(JNIEnv* env, jclass clazz, jlong transactionObj,
+                                  jlong nativeObject, jfloat tl, jfloat tr, jfloat bl, jfloat br) {
     auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
 
     auto ctrl = SpFromRawPtr<SurfaceControl>(nativeObject);
-    transaction->setClientDrawnCornerRadius(ctrl, clientDrawnCornerRadius);
+    transaction->setCornerRadius(ctrl, gui::CornerRadii(tl, tr, bl, br));
+}
+
+static void nativeSetClientDrawnCornerRadius(JNIEnv* env, jclass clazz, jlong transactionObj,
+                                             jlong nativeObject, jfloat tl, jfloat tr, jfloat bl,
+                                             jfloat br, jfloat cropTop, jfloat cropLeft,
+                                             jfloat cropRight, jfloat cropBottom) {
+    auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
+
+    auto ctrl = SpFromRawPtr<SurfaceControl>(nativeObject);
+    FloatRect crop(cropLeft, cropTop, cropRight, cropBottom);
+    transaction->setClientDrawnCornerRadius(ctrl, gui::CornerRadii(tl, tr, bl, br), crop);
 }
 
 static void nativeSetBackgroundBlurRadius(JNIEnv* env, jclass clazz, jlong transactionObj,
@@ -2136,7 +2176,9 @@ static jlong nativeMirrorSurface(JNIEnv* env, jclass clazz, jlong mirrorOfObj, j
     SurfaceControl *mirrorOf = reinterpret_cast<SurfaceControl*>(mirrorOfObj);
     SurfaceControl* stopAt = reinterpret_cast<SurfaceControl*>(stopAtObj);
     sp<SurfaceControl> surface = client->mirrorSurface(mirrorOf, stopAt);
-
+    if (surface == nullptr) {
+        return 0;
+    }
     surface->incStrong((void *)nativeCreate);
     return reinterpret_cast<jlong>(surface.get());
 }
@@ -2641,9 +2683,14 @@ static const JNINativeMethod sSurfaceControlMethods[] = {
     {"nativeSetCrop", "(JJFFFF)V",
             (void*)nativeSetCrop },
     {"nativeSetCornerRadius", "(JJF)V",
-            (void*)nativeSetCornerRadius },
-    {"nativeSetClientDrawnCornerRadius", "(JJF)V",
-            (void*) nativeSetClientDrawnCornerRadius },
+            (void*)(void (*)(JNIEnv*, jclass, jlong, jlong, jfloat))nativeSetCornerRadius },
+    {"nativeSetCornerRadius", "(JJFFFF)V",
+            (void*)(void (*)(JNIEnv*, jclass, jlong, jlong, jfloat, jfloat,
+                                        jfloat, jfloat))nativeSetCornerRadius },
+    {"nativeSetClientDrawnCornerRadius", "(JJFFFFFFFF)V",
+            (void*)(void (*)(JNIEnv*, jclass, jlong, jlong, jfloat, jfloat, jfloat, jfloat,
+                                        jfloat, jfloat, jfloat, jfloat))
+                                        nativeSetClientDrawnCornerRadius },
     {"nativeSetBackgroundBlurRadius", "(JJI)V",
             (void*)nativeSetBackgroundBlurRadius },
     {"nativeSetBackgroundBlurScale", "(JJF)V",
@@ -2752,6 +2799,8 @@ static const JNINativeMethod sSurfaceControlMethods[] = {
             (void*)nativeSetDesiredHdrHeadroom },
     {"nativeSetCachingHint", "(JJI)V",
             (void*)nativeSetCachingHint },
+    {"nativeAddTransactionBarrier", "(JLandroid/os/Parcel;)V",
+            (void*)nativeAddTransactionBarrier },
     {"nativeAddWindowInfosReportedListener", "(JLjava/lang/Runnable;)V",
             (void*)nativeAddWindowInfosReportedListener },
     {"nativeGetDisplayBrightnessSupport", "(Landroid/os/IBinder;)Z",
@@ -2836,6 +2885,7 @@ static const JNINativeMethod sSurfaceControlMethods[] = {
     {"nativeEnableDebugLogCallPoints", "(J)V", (void*)nativeEnableDebugLogCallPoints },
     {"nativeSetPictureProfileId", "(JJJ)V", (void*)nativeSetPictureProfileId },
     {"nativeSetContentPriority", "(JJI)V", (void*)nativeSetContentPriority },
+    {"nativeSetSystemContentPriority", "(JJI)V", (void*)nativeSetSystemContentPriority },
         // clang-format on
 };
 

@@ -130,5 +130,8 @@ public class GlobalSettings {
         Settings.Global.REMOVE_GUEST_ON_EXIT,
         Settings.Global.USER_SWITCHER_ENABLED,
         Settings.Global.GLOBAL_ACTIONS_TIMEOUT_MILLIS,
+        Settings.Global.WATCH_RANGING_SUPPORTED_BY_PRIMARY_DEVICE,
+        Settings.Global.MINMODE_ACTIVE,
+        Settings.Global.WATCH_RANGING_AVAILABLE,
     };
 }

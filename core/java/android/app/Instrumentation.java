@@ -54,6 +54,8 @@ import android.ravenwood.annotation.RavenwoodIgnore;
 import android.ravenwood.annotation.RavenwoodKeep;
 import android.ravenwood.annotation.RavenwoodKeepPartialClass;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
+import android.ravenwood.annotation.RavenwoodRedirect;
+import android.ravenwood.annotation.RavenwoodRedirectionClass;
 import android.ravenwood.annotation.RavenwoodReplace;
 import android.util.AndroidRuntimeException;
 import android.util.Log;
@@ -87,6 +89,7 @@ import java.util.concurrent.TimeoutException;
  * &lt;instrumentation&gt; tag.
  */
 @RavenwoodKeepPartialClass
+@RavenwoodRedirectionClass("Instrumentation_ravenwood")
 public class Instrumentation {
 
     /**
@@ -150,6 +153,10 @@ public class Instrumentation {
 
     @RavenwoodKeep
     public Instrumentation() {
+    }
+
+    @RavenwoodRedirect
+    private static void checkPendingExceptionOnRavenwood() {
     }
 
     /**
@@ -467,6 +474,7 @@ public class Instrumentation {
         mMessageQueue.addIdleHandler(idler);
         mMainHandler.post(new EmptyRunnable());
         idler.waitForIdle();
+        checkPendingExceptionOnRavenwood();
     }
 
     /**
@@ -482,6 +490,7 @@ public class Instrumentation {
         SyncRunnable sr = new SyncRunnable(runner);
         mMainHandler.post(sr);
         sr.waitForComplete();
+        checkPendingExceptionOnRavenwood();
     }
 
     boolean isSdkSandboxAllowedToStartActivities() {
@@ -585,9 +594,9 @@ public class Instrumentation {
      */
     @NonNull
     public Activity startActivitySync(@NonNull Intent intent, @Nullable Bundle options) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(376, intent.toString());
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (DEBUG_START_ACTIVITY) {
             Log.d(TAG, "startActivity: intent=" + intent + " options=" + options, new Throwable());
         }
@@ -1346,6 +1355,7 @@ public class Instrumentation {
      * 
      * @return The newly instantiated Application object.
      */
+    @RavenwoodKeep
     public Application newApplication(ClassLoader cl, String className, Context context)
             throws InstantiationException, IllegalAccessException, 
             ClassNotFoundException {
@@ -1364,6 +1374,7 @@ public class Instrumentation {
      * 
      * @return The newly instantiated Application object.
      */
+    @RavenwoodKeep
     static public Application newApplication(Class<?> clazz, Context context)
             throws InstantiationException, IllegalAccessException, 
             ClassNotFoundException {
@@ -1383,6 +1394,7 @@ public class Instrumentation {
      *
      * @param app The application being created.
      */
+    @RavenwoodKeep
     public void callApplicationOnCreate(Application app) {
         app.onCreate();
     }
@@ -1449,6 +1461,7 @@ public class Instrumentation {
         return getFactory(pkg).instantiateActivity(cl, className, intent);
     }
 
+    @RavenwoodReplace(reason = "Custom AppComponentFactory not supported")
     private AppComponentFactory getFactory(String pkg) {
         if (pkg == null) {
             Log.e(TAG, "No pkg specified, disabling AppComponentFactory");
@@ -1463,6 +1476,10 @@ public class Instrumentation {
         // This is in the case of starting up "android".
         if (apk == null) apk = mThread.getSystemContext().mPackageInfo;
         return apk.getAppFactory();
+    }
+
+    private AppComponentFactory getFactory$ravenwood(String pkg) {
+        return AppComponentFactory.DEFAULT;
     }
 
     /**
@@ -1957,9 +1974,9 @@ public class Instrumentation {
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, Activity target,
             Intent intent, int requestCode, Bundle options) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(377, intent.toString());
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (DEBUG_START_ACTIVITY) {
             Log.d(TAG, "startActivity: who=" + who + " source=" + target + " intent=" + intent
                     + " requestCode=" + requestCode + " options=" + options, new Throwable());
@@ -2044,9 +2061,9 @@ public class Instrumentation {
     public int execStartActivitiesAsUser(Context who, IBinder contextThread,
             IBinder token, Activity target, Intent[] intents, Bundle options,
             int userId) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(378, intents.toString());
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (DEBUG_START_ACTIVITY) {
             StringJoiner joiner = new StringJoiner(", ");
             for (Intent i : intents) {
@@ -2139,9 +2156,9 @@ public class Instrumentation {
     public ActivityResult execStartActivity(
         Context who, IBinder contextThread, IBinder token, String target,
         Intent intent, int requestCode, Bundle options) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(377, intent.toString());
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (DEBUG_START_ACTIVITY) {
             Log.d(TAG, "startActivity: who=" + who + " target=" + target
                     + " intent=" + intent + " requestCode=" + requestCode
@@ -2222,9 +2239,9 @@ public class Instrumentation {
     public ActivityResult execStartActivity(
             Context who, IBinder contextThread, IBinder token, String resultWho,
             Intent intent, int requestCode, Bundle options, @CanBeCURRENT UserHandle user) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(377, intent.toString());
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (DEBUG_START_ACTIVITY) {
             Log.d(TAG, "startActivity: who=" + who + " user=" + user + " intent=" + intent
                     + " requestCode=" + requestCode + " resultWho=" + resultWho
@@ -2345,9 +2362,9 @@ public class Instrumentation {
     public void execStartActivityFromAppTask(
             Context who, IBinder contextThread, IAppTask appTask,
             Intent intent, Bundle options) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(380, intent.toString());
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (DEBUG_START_ACTIVITY) {
             Log.d(TAG, "startActivity: who=" + who + " intent=" + intent
                     + " options=" + options, new Throwable());
@@ -2436,6 +2453,9 @@ public class Instrumentation {
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public static void checkStartActivityResult(int res, Object intent) {
         if (!ActivityManager.isStartResultFatalError(res)) {
+            if (res == ActivityManager.START_ABORTED && Build.isDebuggable()) {
+                Log.w(TAG, new StackTrace("Activity start aborted"));
+            }
             return;
         }
 

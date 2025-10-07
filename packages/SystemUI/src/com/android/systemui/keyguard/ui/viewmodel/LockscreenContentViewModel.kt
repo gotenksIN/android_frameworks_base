@@ -16,31 +16,17 @@
 
 package com.android.systemui.keyguard.ui.viewmodel
 
-import android.content.res.Resources
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import com.android.app.tracing.coroutines.launchTraced as launch
-import com.android.systemui.biometrics.AuthController
-import com.android.systemui.customization.clocks.R as clocksR
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryBypassInteractor
-import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardBlueprintInteractor
-import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor
-import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
-import com.android.systemui.keyguard.shared.model.ClockSize
-import com.android.systemui.keyguard.shared.model.ClockSizeSetting
-import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.transition.KeyguardTransitionAnimationCallback
 import com.android.systemui.keyguard.shared.transition.KeyguardTransitionAnimationCallbackDelegator
-import com.android.systemui.keyguard.ui.composable.layout.LockscreenLayoutViewModel
-import com.android.systemui.keyguard.ui.composable.layout.UnfoldTranslations
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.Hydrator
-import com.android.systemui.plugins.clocks.ClockController
-import com.android.systemui.res.R
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
-import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor
-import com.android.systemui.unfold.domain.interactor.UnfoldTransitionInteractor
+import com.android.systemui.wallpapers.domain.interactor.WallpaperFocalAreaInteractor
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -52,52 +38,27 @@ import kotlinx.coroutines.flow.map
 class LockscreenContentViewModel
 @AssistedInject
 constructor(
-    private val clockInteractor: KeyguardClockInteractor,
     interactor: KeyguardBlueprintInteractor,
-    private val authController: AuthController,
     val touchHandlingFactory: KeyguardTouchHandlingViewModel.Factory,
     shadeModeInteractor: ShadeModeInteractor,
-    unfoldTransitionInteractor: UnfoldTransitionInteractor,
     deviceEntryBypassInteractor: DeviceEntryBypassInteractor,
-    transitionInteractor: KeyguardTransitionInteractor,
+    deviceEntryUdfpsInteractor: DeviceEntryUdfpsInteractor,
     private val keyguardTransitionAnimationCallbackDelegator:
         KeyguardTransitionAnimationCallbackDelegator,
-    keyguardMediaViewModelFactory: KeyguardMediaViewModel.Factory,
-    keyguardSmartspaceViewModel: KeyguardSmartspaceViewModel,
-    activeNotificationsInteractor: ActiveNotificationsInteractor,
     @Assisted private val keyguardTransitionAnimationCallback: KeyguardTransitionAnimationCallback,
+    private val wallpaperFocalAreaInteractor: WallpaperFocalAreaInteractor,
 ) : ExclusiveActivatable() {
 
     private val hydrator = Hydrator("LockscreenContentViewModel.hydrator")
-    private val keyguardMediaViewModel: KeyguardMediaViewModel by lazy {
-        keyguardMediaViewModelFactory.create()
-    }
 
-    /** Whether the content of the scene UI should be shown. */
-    val isContentVisible: Boolean by
+    /** @see ShadeModeInteractor.isFullWidthShade */
+    val isFullWidthShade: Boolean by
         hydrator.hydratedStateOf(
-            traceName = "isContentVisible",
-            initialValue = true,
-            // Content is visible unless we're OCCLUDED. Currently, we don't have nice animations
-            // into and out of OCCLUDED, so the lockscreen/AOD content is hidden immediately upon
-            // entering/exiting OCCLUDED.
-            source = transitionInteractor.transitionValue(KeyguardState.OCCLUDED).map { it == 0f },
+            traceName = "isFullWidthShade",
+            source = shadeModeInteractor.isFullWidthShade,
         )
 
-    /**
-     * Whether the shade layout should be wide (true) or narrow (false).
-     *
-     * In a wide layout, notifications and quick settings each take up only half the screen width
-     * (whether they are shown at the same time or not). In a narrow layout, they can each be as
-     * wide as the entire screen.
-     */
-    val isShadeLayoutWide: Boolean by
-        hydrator.hydratedStateOf(
-            traceName = "isShadeLayoutWide",
-            source = shadeModeInteractor.isShadeLayoutWide,
-        )
-
-    /** @see DeviceEntryInteractor.isBypassEnabled */
+    /** @see DeviceEntryBypassInteractor.isBypassEnabled */
     val isBypassEnabled: Boolean by
         hydrator.hydratedStateOf(
             traceName = "isBypassEnabled",
@@ -111,66 +72,13 @@ constructor(
             source = interactor.blueprint.map { it.id }.distinctUntilChanged(),
         )
 
-    val layout: LockscreenLayoutViewModel =
-        object : LockscreenLayoutViewModel {
-            override val isDynamicClockEnabled: Boolean by
-                hydrator.hydratedStateOf(
-                    traceName = "isDynamicClockEnabled",
-                    source =
-                        clockInteractor.selectedClockSize.map { it == ClockSizeSetting.DYNAMIC },
-                    initialValue =
-                        clockInteractor.selectedClockSize.value == ClockSizeSetting.DYNAMIC,
-                )
-
-            override val isDateAndWeatherVisibleWithLargeClock: Boolean by
-                hydrator.hydratedStateOf(
-                    traceName = "isDateAndWeatherVisibleWithLargeClock",
-                    source =
-                        clockInteractor.currentClock.map {
-                            it.isDateAndWeatherVisibleWithLargeClock()
-                        },
-                    initialValue =
-                        clockInteractor.currentClock.value.isDateAndWeatherVisibleWithLargeClock(),
-                )
-
-            private fun ClockController?.isDateAndWeatherVisibleWithLargeClock(): Boolean {
-                return this?.largeClock?.config?.hasCustomWeatherDataDisplay == false
-            }
-
-            override val isSmartSpaceVisible: Boolean
-                get() = keyguardSmartspaceViewModel.isSmartspaceEnabled
-
-            override val isMediaVisible: Boolean = keyguardMediaViewModel.isMediaVisible
-
-            override val isNotificationsVisible: Boolean by
-                hydrator.hydratedStateOf(
-                    traceName = "isNotificationsVisible",
-                    source = activeNotificationsInteractor.areAnyNotificationsPresent,
-                    initialValue = activeNotificationsInteractor.areAnyNotificationsPresentValue,
-                )
-
-            override val isAmbientIndicationVisible: Boolean
-                get() = !authController.isUdfpsSupported
-
-            override val unfoldTranslations: UnfoldTranslations =
-                object : UnfoldTranslations {
-                    override val start: Float by
-                        hydrator.hydratedStateOf(
-                            traceName = "unfoldTranslations.start",
-                            initialValue = 0f,
-                            source =
-                                unfoldTransitionInteractor.unfoldTranslationX(isOnStartSide = true),
-                        )
-
-                    override val end: Float by
-                        hydrator.hydratedStateOf(
-                            traceName = "unfoldTranslations.ebd",
-                            initialValue = 0f,
-                            source =
-                                unfoldTransitionInteractor.unfoldTranslationX(isOnStartSide = false),
-                        )
-                }
-        }
+    /** Whether udfps is supported. */
+    val isUdfpsSupported: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "isUdfpsSupported",
+            source = deviceEntryUdfpsInteractor.isUdfpsSupported,
+            initialValue = deviceEntryUdfpsInteractor.isUdfpsSupported.value,
+        )
 
     override suspend fun onActivated(): Nothing {
         coroutineScope {
@@ -180,8 +88,6 @@ constructor(
                 keyguardTransitionAnimationCallbackDelegator.delegate =
                     keyguardTransitionAnimationCallback
 
-                launch { keyguardMediaViewModel.activate() }
-
                 awaitCancellation()
             } finally {
                 keyguardTransitionAnimationCallbackDelegator.delegate = null
@@ -189,22 +95,20 @@ constructor(
         }
     }
 
-    fun getSmartSpacePaddingTop(resources: Resources): Int {
-        return if (clockInteractor.clockSize.value == ClockSize.LARGE) {
-            resources.getDimensionPixelSize(clocksR.dimen.keyguard_smartspace_top_offset) +
-                resources.getDimensionPixelSize(R.dimen.keyguard_clock_top_margin)
-        } else {
-            0
-        }
+    fun setMediaPlayerBottom(bottom: Float) {
+        wallpaperFocalAreaInteractor.setMediaPlayerBottom(bottom)
     }
 
-    /** Where to place the notifications stack on the lockscreen. */
-    sealed interface NotificationsPlacement {
-        /** Show notifications below the lockscreen clock. */
-        data object BelowClock : NotificationsPlacement
+    fun setShortcutTop(top: Float) {
+        wallpaperFocalAreaInteractor.setShortcutTop(top)
+    }
 
-        /** Show notifications side-by-side with the clock. */
-        data class BesideClock(val alignment: Alignment) : NotificationsPlacement
+    fun setSmallClockBottom(bottom: Float) {
+        wallpaperFocalAreaInteractor.setSmallClockBottom(bottom)
+    }
+
+    fun setSmartspaceCardBottom(bottom: Float) {
+        wallpaperFocalAreaInteractor.setSmartspaceCardBottom(bottom)
     }
 
     @AssistedFactory

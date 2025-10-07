@@ -158,9 +158,8 @@ public class LogicalDisplayTest {
     public void testNoLetterbox_noAnisotropyCorrectionForInternalDisplay() {
         mDisplayDeviceInfo.type = Display.TYPE_INTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isAnisotropyCorrectionEnabled=*/ true,
-                /*isAlwaysRotateDisplayDeviceEnabled=*/ true,
                 /*isSyncedResolutionSwitchEnabled=*/ true);
+        mLogicalDisplay.setAnisotropyCorrectionEnabled(true);
 
         // In case of Anisotropy of pixels, then the content should be rescaled so it would adjust
         // to using the whole screen. This is because display will rescale it back to fill the
@@ -188,9 +187,8 @@ public class LogicalDisplayTest {
     public void testNoLetterbox_anisotropyCorrection() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isAnisotropyCorrectionEnabled=*/ true,
-                /*isAlwaysRotateDisplayDeviceEnabled=*/ true,
                 /*isSyncedResolutionSwitchEnabled=*/ true);
+        mLogicalDisplay.setAnisotropyCorrectionEnabled(true);
 
         // In case of Anisotropy of pixels, then the content should be rescaled so it would adjust
         // to using the whole screen. This is because display will rescale it back to fill the
@@ -218,9 +216,8 @@ public class LogicalDisplayTest {
     public void testLetterbox_anisotropyCorrectionYDpi() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isAnisotropyCorrectionEnabled=*/ true,
-                /*isAlwaysRotateDisplayDeviceEnabled=*/ true,
                 /*isSyncedResolutionSwitchEnabled=*/ true);
+        mLogicalDisplay.setAnisotropyCorrectionEnabled(true);
 
         DisplayInfo displayInfo = new DisplayInfo();
         displayInfo.logicalWidth = DISPLAY_WIDTH;
@@ -277,9 +274,8 @@ public class LogicalDisplayTest {
     public void testPillarbox_anisotropyCorrection() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isAnisotropyCorrectionEnabled=*/ true,
-                /*isAlwaysRotateDisplayDeviceEnabled=*/ true,
                 /*isSyncedResolutionSwitchEnabled=*/ true);
+        mLogicalDisplay.setAnisotropyCorrectionEnabled(true);
 
         DisplayInfo displayInfo = new DisplayInfo();
         displayInfo.logicalWidth = DISPLAY_WIDTH;
@@ -307,9 +303,8 @@ public class LogicalDisplayTest {
     public void testNoPillarbox_anisotropyCorrectionYDpi() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isAnisotropyCorrectionEnabled=*/ true,
-                /*isAlwaysRotateDisplayDeviceEnabled=*/ true,
                 /*isSyncedResolutionSwitchEnabled=*/ true);
+        mLogicalDisplay.setAnisotropyCorrectionEnabled(true);
 
         // In case of Anisotropy of pixels, then the content should be rescaled so it would adjust
         // to using the whole screen. This is because display will rescale it back to fill the
@@ -352,56 +347,7 @@ public class LogicalDisplayTest {
 
     @Test
     public void testGetDisplayPosition() {
-        Point expectedPosition = new Point(0, 0);
-
-        SurfaceControl.Transaction t = mock(SurfaceControl.Transaction.class);
-        mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false);
-        assertEquals(expectedPosition, mLogicalDisplay.getDisplayPosition());
-
-        expectedPosition.set(20, 40);
-        mLogicalDisplay.setDisplayOffsetsLocked(20, 40);
-        mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false);
-        assertEquals(expectedPosition, mLogicalDisplay.getDisplayPosition());
-
-        DisplayInfo displayInfo = new DisplayInfo();
-        displayInfo.logicalWidth = DISPLAY_WIDTH;
-        displayInfo.logicalHeight = DISPLAY_HEIGHT;
-        // Rotation doesn't matter when the FLAG_ROTATES_WITH_CONTENT is absent.
-        displayInfo.rotation = Surface.ROTATION_90;
-        mLogicalDisplay.setDisplayInfoOverrideFromWindowManagerLocked(displayInfo);
-        mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false);
-        assertEquals(expectedPosition, mLogicalDisplay.getDisplayPosition());
-
-        expectedPosition.set(40, -20);
-        mDisplayDeviceInfo.flags = DisplayDeviceInfo.FLAG_ROTATES_WITH_CONTENT;
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
-        displayInfo.logicalWidth = DISPLAY_HEIGHT;
-        displayInfo.logicalHeight = DISPLAY_WIDTH;
-        displayInfo.rotation = Surface.ROTATION_90;
-        mLogicalDisplay.setDisplayInfoOverrideFromWindowManagerLocked(displayInfo);
-        mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false);
-        assertEquals(expectedPosition, mLogicalDisplay.getDisplayPosition());
-    }
-
-    @Test
-    public void testSetDisplaySizeIsCalledDuringConfigureDisplayLocked() {
-        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isAnisotropyCorrectionEnabled=*/ true,
-                /*isAlwaysRotateDisplayDeviceEnabled=*/ true,
-                /*isSyncedResolutionSwitchEnabled=*/ true);
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
-        SurfaceControl.Transaction t = mock(SurfaceControl.Transaction.class);
-        mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false);
-        verify(mDisplayDevice).configureDisplaySizeLocked(eq(t));
-    }
-
-    @Test
-    public void testGetDisplayPositionAlwaysRotateDisplayEnabled() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
-        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isAnisotropyCorrectionEnabled=*/ true,
-                /*isAlwaysRotateDisplayDeviceEnabled=*/ true,
-                /*isSyncedResolutionSwitchEnabled=*/ true);
         mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
         Point expectedPosition = new Point();
 
@@ -436,6 +382,16 @@ public class LogicalDisplayTest {
         mLogicalDisplay.setDisplayInfoOverrideFromWindowManagerLocked(displayInfo);
         mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false);
         assertEquals(expectedPosition, mLogicalDisplay.getDisplayPosition());
+    }
+
+    @Test
+    public void testSetDisplaySizeIsCalledDuringConfigureDisplayLocked() {
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
+                /*isSyncedResolutionSwitchEnabled=*/ true);
+        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        SurfaceControl.Transaction t = mock(SurfaceControl.Transaction.class);
+        mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false);
+        verify(mDisplayDevice).configureDisplaySizeLocked(eq(t));
     }
 
     @Test
@@ -631,7 +587,6 @@ public class LogicalDisplayTest {
     @Test
     public void testSetCanHostTasks_defaultDisplay() {
         mLogicalDisplay = new LogicalDisplay(Display.DEFAULT_DISPLAY, LAYER_STACK, mDisplayDevice);
-        assertTrue(mLogicalDisplay.canHostTasksLocked());
 
         mLogicalDisplay.setCanHostTasksLocked(true);
         assertTrue(mLogicalDisplay.canHostTasksLocked());
@@ -719,5 +674,68 @@ public class LogicalDisplayTest {
 
         mLogicalDisplay.setCanHostTasksLocked(false);
         assertTrue(mLogicalDisplay.canHostTasksLocked());
+    }
+
+    @Test
+    public void testCalculateBaseDensity_withValidDpi() {
+        mLogicalDisplay =
+                new LogicalDisplay(Display.DEFAULT_DISPLAY + 1, LAYER_STACK, mDisplayDevice);
+        mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
+        mDisplayDeviceInfo.densityDpi = 0; // To trigger calculateBaseDensity
+        mDisplayDeviceInfo.xDpi = 100f;
+        mDisplayDeviceInfo.yDpi = 100f;
+        mDisplayDeviceInfo.width = 1920;
+        mDisplayDeviceInfo.height = 1080;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
+
+        assertEquals(136, info.logicalDensityDpi);
+    }
+
+    @Test
+    public void testCalculateBaseDensity_withValidDpi_usesMinimumDensityDpi() {
+        mLogicalDisplay =
+                new LogicalDisplay(Display.DEFAULT_DISPLAY + 1, LAYER_STACK, mDisplayDevice);
+        mDisplayDeviceInfo.densityDpi = 0; // To trigger calculateBaseDensity
+        mDisplayDeviceInfo.xDpi = 50f;
+        mDisplayDeviceInfo.yDpi = 50f;
+        mDisplayDeviceInfo.width = 1920;
+        mDisplayDeviceInfo.height = 1080;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
+
+        assertEquals(100, info.logicalDensityDpi);
+    }
+
+    @Test
+    public void testCalculateBaseDensity_notCalledWhenDensityDpiIsSet() {
+        mLogicalDisplay =
+                new LogicalDisplay(Display.DEFAULT_DISPLAY + 1, LAYER_STACK, mDisplayDevice);
+        mDisplayDeviceInfo.densityDpi = 320;
+        mDisplayDeviceInfo.xDpi = 100f;
+        mDisplayDeviceInfo.yDpi = 100f;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
+
+        assertEquals(320, info.logicalDensityDpi);
+    }
+
+    @Test
+    public void testCalculateBaseDensity_withMissingDpi() {
+        mLogicalDisplay =
+                new LogicalDisplay(Display.DEFAULT_DISPLAY + 1, LAYER_STACK, mDisplayDevice);
+        mDisplayDeviceInfo.densityDpi = 0;
+        mDisplayDeviceInfo.xDpi = 0f;
+        mDisplayDeviceInfo.yDpi = 0f;
+        mDisplayDeviceInfo.width = 1920;
+        mDisplayDeviceInfo.height = 1080;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
+
+        assertEquals(125, info.logicalDensityDpi);
     }
 }

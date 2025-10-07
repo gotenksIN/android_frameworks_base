@@ -44,6 +44,7 @@ import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.res.R;
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
+import com.android.systemui.util.wrapper.LockPatternCheckerWrapper;
 
 public class KeyguardSimPukViewController
         extends KeyguardPinBasedInputViewController<KeyguardSimPukView> {
@@ -97,11 +98,14 @@ public class KeyguardSimPukViewController
             KeyguardKeyboardInteractor keyguardKeyboardInteractor,
             BouncerHapticPlayer bouncerHapticPlayer,
             UserActivityNotifier userActivityNotifier,
-            InputManager inputManager) {
+            InputManager inputManager,
+            LockPatternCheckerWrapper lockPatternCheckerWrapper
+    ) {
         super(view, keyguardUpdateMonitor, securityMode, lockPatternUtils, keyguardSecurityCallback,
                 messageAreaControllerFactory, latencyTracker,
                 emergencyButtonController, falsingCollector, featureFlags, selectedUserInteractor,
-                keyguardKeyboardInteractor, bouncerHapticPlayer, userActivityNotifier, inputManager
+                keyguardKeyboardInteractor, bouncerHapticPlayer, userActivityNotifier, inputManager,
+                lockPatternCheckerWrapper
         );
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
         mTelephonyManager = telephonyManager;
@@ -247,9 +251,7 @@ public class KeyguardSimPukViewController
                 else {
                     Log.d(TAG, "onSimCheckResponse " + " empty One result "
                             + result.toString());
-// QTI_BEGIN: 2023-01-18: Telephony: Fix incorrect text shown at PUK lock screen
                     if (result.getAttemptsRemaining() > 0) {
-// QTI_END: 2023-01-18: Telephony: Fix incorrect text shown at PUK lock screen
                         mRemainingAttempts = result.getAttemptsRemaining();
                         mMessageAreaController.setMessage(
                                 mView.getPukPasswordErrorMessage(

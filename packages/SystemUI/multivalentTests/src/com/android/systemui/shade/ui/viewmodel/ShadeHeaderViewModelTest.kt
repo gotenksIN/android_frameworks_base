@@ -1,6 +1,8 @@
 package com.android.systemui.shade.ui.viewmodel
 
 import android.content.Intent
+import android.content.res.Configuration
+import android.content.testableContext
 import android.provider.AlarmClock
 import android.provider.Settings
 import android.telephony.SubscriptionManager.PROFILE_CLASS_UNSET
@@ -32,8 +34,10 @@ import com.android.systemui.shade.data.repository.fakePrivacyChipRepository
 import com.android.systemui.shade.domain.interactor.disableDualShade
 import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.shade.domain.interactor.enableSingleShade
+import com.android.systemui.shade.ui.composable.ChipHighlightModel
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.fakeMobileIconsInteractor
+import com.android.systemui.statusbar.policy.configurationController
 import com.android.systemui.testKosmos
 import com.android.systemui.util.mockito.argThat
 import com.google.common.truth.Truth.assertThat
@@ -73,8 +77,7 @@ class ShadeHeaderViewModelTest : SysuiTestCase() {
     @Test
     fun onClockClicked_enableDesktopFeatureSetFalse_launchesClock() =
         kosmos.runTest {
-            overrideResource(R.bool.config_enableDesktopFeatureSet, false)
-
+            setEnableDesktopFeatureSet(enable = false)
             underTest.onClockClicked()
 
             verify(activityStarter)
@@ -87,7 +90,7 @@ class ShadeHeaderViewModelTest : SysuiTestCase() {
     @Test
     fun onClockClicked_enableDesktopFeatureSetTrueAndSingleShade_launchesClock() =
         kosmos.runTest {
-            overrideResource(R.bool.config_enableDesktopFeatureSet, true)
+            setEnableDesktopFeatureSet(enable = true)
             enableSingleShade()
 
             underTest.onClockClicked()
@@ -102,7 +105,7 @@ class ShadeHeaderViewModelTest : SysuiTestCase() {
     @Test
     fun onClockClicked_enableDesktopFeatureSetTrueAndDualShade_openNotifShade() =
         kosmos.runTest {
-            overrideResource(R.bool.config_enableDesktopFeatureSet, true)
+            setEnableDesktopFeatureSet(enable = true)
             enableDualShade()
             setDeviceEntered(true)
             val currentScene by collectLastValue(sceneInteractor.currentScene)
@@ -118,7 +121,7 @@ class ShadeHeaderViewModelTest : SysuiTestCase() {
     @Test
     fun onClockClicked_enableDesktopFeatureSetTrueOnNotifShade_closesShade() =
         kosmos.runTest {
-            overrideResource(R.bool.config_enableDesktopFeatureSet, true)
+            setEnableDesktopFeatureSet(enable = true)
             enableDualShade()
             setDeviceEntered(true)
             setOverlay(Overlays.NotificationsShade)
@@ -134,7 +137,7 @@ class ShadeHeaderViewModelTest : SysuiTestCase() {
     @Test
     fun onClockClicked_enableDesktopFeatureSetTrueOnQSShade_openNotifShade() =
         kosmos.runTest {
-            overrideResource(R.bool.config_enableDesktopFeatureSet, true)
+            setEnableDesktopFeatureSet(enable = true)
             enableDualShade()
             setDeviceEntered(true)
             setOverlay(Overlays.QuickSettingsShade)
@@ -146,6 +149,22 @@ class ShadeHeaderViewModelTest : SysuiTestCase() {
             assertThat(currentScene).isEqualTo(Scenes.Gone)
             assertThat(currentOverlays).contains(Overlays.NotificationsShade)
             assertThat(currentOverlays).doesNotContain(Overlays.QuickSettingsShade)
+        }
+
+    @Test
+    fun enableDesktopFeatureSetTrue_inactiveChipHighlightReturnsTransparent() =
+        kosmos.runTest {
+            setEnableDesktopFeatureSet(enable = true)
+
+            assertThat(underTest.inactiveChipHighlight).isEqualTo(ChipHighlightModel.Transparent)
+        }
+
+    @Test
+    fun enableDesktopFeatureSetTrue_inactiveChipHighlightReturnsWeak() =
+        kosmos.runTest {
+            setEnableDesktopFeatureSet(enable = false)
+
+            assertThat(underTest.inactiveChipHighlight).isEqualTo(ChipHighlightModel.Weak)
         }
 
     @Test
@@ -416,6 +435,14 @@ class ShadeHeaderViewModelTest : SysuiTestCase() {
         }
         setScene(if (isEntered) Scenes.Gone else Scenes.Lockscreen)
         assertThat(deviceEntryInteractor.isDeviceEntered.value).isEqualTo(isEntered)
+    }
+
+    private fun Kosmos.setEnableDesktopFeatureSet(enable: Boolean) {
+        testableContext.orCreateTestableResources.addOverride(
+            R.bool.config_enableDesktopFeatureSet,
+            enable,
+        )
+        configurationController.onConfigurationChanged(Configuration())
     }
 }
 

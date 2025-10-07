@@ -21,14 +21,15 @@ import android.content.Context
 import android.content.pm.ShortcutInfo
 import android.os.UserHandle
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.annotation.VisibleForTesting
 import com.android.wm.shell.bubbles.BubbleController
-import com.android.wm.shell.bubbles.BubblePositioner
 import com.android.wm.shell.draganddrop.DragAndDropController.DragAndDropListener
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.bubbles.ContextUtils.isRtl
+import com.android.wm.shell.shared.bubbles.DeviceConfig
 import com.android.wm.shell.shared.bubbles.DragToBubblesZoneChangeListener
 import com.android.wm.shell.shared.bubbles.DragZone
 import com.android.wm.shell.shared.bubbles.DragZoneFactory
@@ -40,7 +41,6 @@ import com.android.wm.shell.shared.bubbles.DropTargetManager
 /** Handles scenarios when launcher icon is being dragged to the bubble bar drop zones. */
 class DragToBubbleController(
     val context: Context,
-    val bubblePositioner: BubblePositioner,
     val bubbleController: BubbleController,
 ) : DragAndDropListener {
 
@@ -62,7 +62,8 @@ class DragToBubbleController(
         )
 
     @VisibleForTesting
-    val dragZoneFactory = createDragZoneFactory()
+    var dragZoneFactory = createDragZoneFactory()
+        private set
     @VisibleForTesting
     var isDropHandled = false
     private var lastDragZone: DragZone? = null
@@ -70,13 +71,17 @@ class DragToBubbleController(
     /** Returns the container view in which drop targets are added. */
     fun getDropTargetContainer(): ViewGroup = containerView
 
+    override fun onConfigurationChanged() {
+        dragZoneFactory = createDragZoneFactory()
+    }
+
     /** Called when the drag is tarted. */
     override fun onDragStarted() {
         if (!BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
             return
         }
         isDropHandled = false
-        val draggedObject = LauncherIcon(bubbleBarHasBubbles = true) {}
+        val draggedObject = LauncherIcon(showBubbleBarPillowDropTarget = false)
         val dragZones = dragZoneFactory.createSortedDragZones(draggedObject)
         dropTargetManager.onDragStarted(draggedObject, dragZones)
     }
@@ -89,6 +94,11 @@ class DragToBubbleController(
     fun onDragUpdate(x: Int, y: Int): Boolean {
         lastDragZone = dropTargetManager.onDragUpdated(x, y)
         return lastDragZone != null
+    }
+
+    /** Called when drop targets should be hidden. */
+    fun hideDropTargets() {
+        dropTargetManager.hideDropTargets()
     }
 
     /** Called when the item with the [ShortcutInfo] is dropped over the bubble bar drop target. */
@@ -114,9 +124,11 @@ class DragToBubbleController(
     }
 
     private fun createDragZoneFactory(): DragZoneFactory {
+        val deviceConfig =
+            DeviceConfig.create(context, context.getSystemService(WindowManager::class.java)!!)
         return DragZoneFactory(
             context,
-            bubblePositioner.currentConfig,
+            deviceConfig,
             { SplitScreenMode.UNSUPPORTED },
             { false },
             object : BubbleBarPropertiesProvider {},

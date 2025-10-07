@@ -16,7 +16,7 @@
 
 package com.android.server.wm;
 
-import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_FREEFORM_PORTRAIT_DEVICE_IN_LANDSCAPE;
+import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_PORTRAIT_DEVICE_IN_LANDSCAPE;
 import static android.view.Surface.ROTATION_270;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
@@ -30,9 +30,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import android.annotation.Nullable;
-import android.app.CameraCompatTaskInfo.FreeformCameraCompatMode;
+import android.app.CameraCompatTaskInfo;
+import android.app.CameraCompatTaskInfo.CameraCompatMode;
 import android.app.TaskInfo;
 import android.graphics.Rect;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.view.DisplayInfo;
@@ -209,6 +211,7 @@ public class AppCompatUtilsTest extends WindowTestsBase {
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
+    @DisableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_COMPATIBILITY_INFO_ROTATE_AND_CROP_BUGFIX)
     public void getTaskInfoPropagatesCameraCompatMode() {
         runTestScenario((robot) -> {
             robot.dw().allowEnterDesktopMode(/* isAllowed= */ true);
@@ -216,22 +219,23 @@ public class AppCompatUtilsTest extends WindowTestsBase {
                     AppCompatActivityRobot::createActivityWithComponentInNewTaskAndDisplay);
             robot.setCameraCompatTreatmentEnabledForActivity(/* enabled= */ true);
 
-            robot.setFreeformCameraCompatMode(CAMERA_COMPAT_FREEFORM_PORTRAIT_DEVICE_IN_LANDSCAPE);
-            robot.checkTaskInfoFreeformCameraCompatMode(
-                    CAMERA_COMPAT_FREEFORM_PORTRAIT_DEVICE_IN_LANDSCAPE);
+            robot.setCameraCompatMode(CAMERA_COMPAT_PORTRAIT_DEVICE_IN_LANDSCAPE);
+            robot.checkTaskInfoCameraCompatMode(
+                    CAMERA_COMPAT_PORTRAIT_DEVICE_IN_LANDSCAPE);
         });
     }
 
     @Test
     @EnableFlags({Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING,
             Flags.FLAG_ENABLE_CAMERA_COMPAT_CHECK_DEVICE_ROTATION_BUGFIX})
+    @DisableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_COMPATIBILITY_INFO_ROTATE_AND_CROP_BUGFIX)
     public void testTopActivityInCameraCompatMode_rotationFlagEnabled_rotationSet() {
         runTestScenario((robot) -> {
             robot.dw().allowEnterDesktopMode(/* isAllowed= */ true);
             robot.applyOnActivity(
                     AppCompatActivityRobot::createActivityWithComponentInNewTaskAndDisplay);
             robot.setCameraCompatTreatmentEnabledForActivity(/* enabled= */ true);
-            robot.setFreeformCameraCompatMode(CAMERA_COMPAT_FREEFORM_PORTRAIT_DEVICE_IN_LANDSCAPE);
+            robot.setCameraCompatMode(CAMERA_COMPAT_PORTRAIT_DEVICE_IN_LANDSCAPE);
 
             final int expectedDisplayRotation = ROTATION_270;
             robot.activity().rotateDisplayForTopActivity(expectedDisplayRotation);
@@ -306,7 +310,7 @@ public class AppCompatUtilsTest extends WindowTestsBase {
      * Runs a test scenario providing a Robot.
      */
     void runTestScenario(@NonNull Consumer<AppCompatUtilsRobotTest> consumer) {
-        final AppCompatUtilsRobotTest robot = new AppCompatUtilsRobotTest(mWm, mAtm, mSupervisor);
+        final AppCompatUtilsRobotTest robot = new AppCompatUtilsRobotTest(this);
         consumer.accept(robot);
     }
 
@@ -319,10 +323,8 @@ public class AppCompatUtilsTest extends WindowTestsBase {
         @Nullable
         private AppCompatTransitionInfo mAppCompatTransitionInfo;
 
-        AppCompatUtilsRobotTest(@NonNull WindowManagerService wm,
-                @NonNull ActivityTaskManagerService atm,
-                @NonNull ActivityTaskSupervisor supervisor) {
-            super(wm, atm, supervisor);
+        AppCompatUtilsRobotTest(@NonNull WindowTestsBase windowTestBase) {
+            super(windowTestBase);
             mTransparentActivityRobot = new AppCompatTransparentActivityRobot(activity());
             mWindowState = Mockito.mock(WindowState.class);
         }
@@ -339,8 +341,8 @@ public class AppCompatUtilsTest extends WindowTestsBase {
         void onPostDisplayContentCreation(@NonNull DisplayContent displayContent) {
             super.onPostDisplayContentCreation(displayContent);
             mockPortraitDisplay(displayContent);
-            if (displayContent.mAppCompatCameraPolicy.hasCameraCompatFreeformPolicy()) {
-                spyOn(displayContent.mAppCompatCameraPolicy.mCameraCompatFreeformPolicy);
+            if (displayContent.mAppCompatCameraPolicy.hasSimReqOrientationPolicy()) {
+                spyOn(displayContent.mAppCompatCameraPolicy.mSimReqOrientationPolicy);
             }
         }
 
@@ -385,9 +387,9 @@ public class AppCompatUtilsTest extends WindowTestsBase {
                     .isLetterboxedForSafeRegionOnlyAllowed()).thenReturn(safeRegionOnly);
         }
 
-        void setFreeformCameraCompatMode(@FreeformCameraCompatMode int mode) {
+        void setCameraCompatMode(@CameraCompatMode int mode) {
             doReturn(mode).when(activity().top().mDisplayContent.mAppCompatCameraPolicy
-                    .mCameraCompatFreeformPolicy).getCameraCompatMode(activity().top());
+                    .mSimReqOrientationPolicy).getCameraCompatMode(activity().top());
         }
 
         void checkTopActivityLetterboxReason(@NonNull String expected) {
@@ -422,9 +424,9 @@ public class AppCompatUtilsTest extends WindowTestsBase {
                     .eligibleForUserAspectRatioButton());
         }
 
-        void checkTaskInfoFreeformCameraCompatMode(@FreeformCameraCompatMode int mode) {
-            Assert.assertEquals(mode, getTopTaskInfo().appCompatTaskInfo
-                    .cameraCompatTaskInfo.freeformCameraCompatMode);
+        void checkTaskInfoCameraCompatMode(@CameraCompatTaskInfo.CameraCompatMode int mode) {
+            Assert.assertEquals(mode, getTopTaskInfo().appCompatTaskInfo.cameraCompatTaskInfo
+                    .cameraCompatMode);
         }
 
         void checkTaskInfoCameraCompatDisplayRotationSet(@Surface.Rotation int expectedRotation) {
@@ -439,7 +441,7 @@ public class AppCompatUtilsTest extends WindowTestsBase {
 
         void setCameraCompatTreatmentEnabledForActivity(boolean enabled) {
             doReturn(enabled).when(activity().displayContent().mAppCompatCameraPolicy
-                    .mCameraCompatFreeformPolicy).isTreatmentEnabledForActivity(
+                    .mSimReqOrientationPolicy).isCompatibilityTreatmentEnabledForActivity(
                             eq(activity().top()), anyBoolean());
         }
 

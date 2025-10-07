@@ -22,6 +22,7 @@ import android.graphics.Rect
 import android.testing.AndroidTestingRunner
 import android.util.SparseArray
 import androidx.test.filters.SmallTest
+import com.android.internal.jank.InteractionJankMonitor
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
@@ -30,20 +31,21 @@ import com.android.wm.shell.common.DisplayLayout
 import com.android.wm.shell.common.ShellExecutor
 import com.android.wm.shell.common.SyncTransactionQueue
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger
-import com.android.wm.shell.desktopmode.DesktopRepository
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFreeformTask
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.ReturnToDragStartAnimator
 import com.android.wm.shell.desktopmode.ToggleResizeDesktopTaskTransitionHandler
+import com.android.wm.shell.desktopmode.data.DesktopRepository
 import com.android.wm.shell.shared.desktopmode.FakeDesktopState
 import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.FocusTransitionObserver
 import com.android.wm.shell.transition.Transitions
-import com.android.wm.shell.windowdecor.DesktopModeWindowDecoration
+import com.android.wm.shell.windowdecor.WindowDecorationWrapper
 import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader
 import com.google.common.truth.Truth.assertThat
+import junit.framework.Assert.assertEquals
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainCoroutineDispatcher
 import org.junit.Before
@@ -66,6 +68,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
     private val contextMock: Context = mock()
     private val resourcesMock: Resources = mock()
     private val mainDispatcher: MainCoroutineDispatcher = mock()
+    private val mainScope: CoroutineScope = mock()
     private val bgScope: CoroutineScope = mock()
     private val displayControllerMock: DisplayController = mock()
     private val rootTdaOrganizerMock: RootTaskDisplayAreaOrganizer = mock()
@@ -81,7 +84,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
     private val returnToDragStartAnimatorMock: ReturnToDragStartAnimator = mock()
     private val desktopState = FakeDesktopState()
 
-    private val desktopModeWindowDecorationMock: DesktopModeWindowDecoration = mock()
+    private val windowDecorationMock: WindowDecorationWrapper = mock()
     private val desktopTilingDecoration: DesktopTilingWindowDecoration = mock()
     private val taskResourceLoader: WindowDecorTaskResourceLoader = mock()
     private val focusTransitionObserver: FocusTransitionObserver = mock()
@@ -90,6 +93,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
     private val shellInit: ShellInit = mock()
     private val shellController: ShellController = mock()
     private val configuration: Configuration = mock()
+    private val jankMonitor: InteractionJankMonitor = mock()
     private lateinit var desktopTilingDecorViewModel: DesktopTilingDecorViewModel
     @Captor private lateinit var callbackCaptor: ArgumentCaptor<Runnable>
 
@@ -100,6 +104,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
             DesktopTilingDecorViewModel(
                 contextMock,
                 mainDispatcher,
+                mainScope,
                 bgScope,
                 displayControllerMock,
                 rootTdaOrganizerMock,
@@ -116,6 +121,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
                 desktopState,
                 shellInit,
                 shellController,
+                jankMonitor,
             )
         whenever(contextMock.createContextAsUser(any(), any())).thenReturn(contextMock)
         whenever(displayControllerMock.getDisplayLayout(any())).thenReturn(displayLayout)
@@ -142,14 +148,14 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
         desktopTilingDecorViewModel.currentUserId = 1
         desktopTilingDecorViewModel.snapToHalfScreen(
             task1,
-            desktopModeWindowDecorationMock,
+            windowDecorationMock,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
         )
         assertThat(desktopTilingDecorViewModel.tilingHandlerByUserAndDeskId.size()).isEqualTo(1)
         desktopTilingDecorViewModel.snapToHalfScreen(
             task2,
-            desktopModeWindowDecorationMock,
+            windowDecorationMock,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
         )
@@ -171,7 +177,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
         // Snap task 1 on display 1.
         desktopTilingDecorViewModel.snapToHalfScreen(
             task1,
-            desktopModeWindowDecorationMock,
+            windowDecorationMock,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
         )
@@ -181,7 +187,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
         // Snap task 2 on display 2.
         desktopTilingDecorViewModel.snapToHalfScreen(
             task2,
-            desktopModeWindowDecorationMock,
+            windowDecorationMock,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
         )
@@ -198,7 +204,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
         // Snap a new task after user change.
         desktopTilingDecorViewModel.snapToHalfScreen(
             task2,
-            desktopModeWindowDecorationMock,
+            windowDecorationMock,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
         )
@@ -220,7 +226,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
         // Snap task 1 on display 1.
         desktopTilingDecorViewModel.snapToHalfScreen(
             task1,
-            desktopModeWindowDecorationMock,
+            windowDecorationMock,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
         )
@@ -234,7 +240,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
         // Snap task 2 on desk2 2.
         desktopTilingDecorViewModel.snapToHalfScreen(
             task2,
-            desktopModeWindowDecorationMock,
+            windowDecorationMock,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
         )
@@ -271,9 +277,7 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
         whenever(desktopTilingDecoration.displayId).thenReturn(1)
         desktopTilingDecorViewModel.tilingHandlerByUserAndDeskId.put(1, decorationByDeskId)
 
-        desktopTilingDecorViewModel.onDisplayDisconnected(
-            disconnectedDisplayId = 1,
-        )
+        desktopTilingDecorViewModel.onDisplayDisconnected(disconnectedDisplayId = 1)
 
         // Each tiling session should be reset.
         verify(desktopTilingDecoration, times(1)).resetTilingSession(true)
@@ -291,13 +295,26 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
         whenever(desktopTilingDecoration2.displayId).thenReturn(1)
         desktopTilingDecorViewModel.tilingHandlerByUserAndDeskId.put(1, decorationByDeskId)
 
-        desktopTilingDecorViewModel.onDisplayDisconnected(
-            disconnectedDisplayId = 1,
-        )
+        desktopTilingDecorViewModel.onDisplayDisconnected(disconnectedDisplayId = 1)
 
         // Each tiling session should be reset.
         verify(desktopTilingDecoration, times(1)).resetTilingSession(true)
         verify(desktopTilingDecoration2, times(1)).resetTilingSession(true)
+    }
+
+    @Test
+    fun onDeskActivated_ReturnsTrueIfDeskExistsFalseOtherwise() {
+        desktopTilingDecorViewModel.onUserChange(1)
+        val decorationByDeskId = SparseArray<DesktopTilingWindowDecoration>()
+        decorationByDeskId.put(1, desktopTilingDecoration)
+        whenever(desktopTilingDecoration.displayId).thenReturn(1)
+        desktopTilingDecorViewModel.tilingHandlerByUserAndDeskId.put(1, decorationByDeskId)
+
+        assertEquals(true, desktopTilingDecorViewModel.tilingDeskActive(1))
+
+        desktopTilingDecorViewModel.onDisplayDisconnected(disconnectedDisplayId = 1)
+
+        assertEquals(desktopTilingDecorViewModel.tilingDeskActive(1), false)
     }
 
     @Test
@@ -380,6 +397,15 @@ class DesktopTilingDecorViewModelTest : ShellTestCase() {
         // Left bound of the right app here represents default 8 / 2 + 6 + 2 ( {Left bound} +
         // {width}/ 2 + {divider pixel size})
         assertThat(desktopTilingDecorViewModel.getRightSnapBoundsIfTiled(1))
+            .isEqualTo(Rect(12, 7, 8, 9))
+    }
+
+    @Test
+    fun getTiledAppBounds_NoActiveDesk() {
+        whenever(desktopRepository.getActiveDeskId(any())).thenReturn(null)
+        assertThat(desktopTilingDecorViewModel.getLeftSnapBoundsIfTiled(2))
+            .isEqualTo(Rect(6, 7, 2, 9))
+        assertThat(desktopTilingDecorViewModel.getRightSnapBoundsIfTiled(2))
             .isEqualTo(Rect(12, 7, 8, 9))
     }
 

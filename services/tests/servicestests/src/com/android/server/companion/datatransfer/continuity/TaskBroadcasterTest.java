@@ -21,247 +21,163 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
-import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 
-import static com.android.server.companion.datatransfer.continuity.TaskContinuityTestUtils.createMockContext;
-import static com.android.server.companion.datatransfer.continuity.TaskContinuityTestUtils.createMockCompanionDeviceManager;
-import static com.android.server.companion.datatransfer.continuity.TaskContinuityTestUtils.createAssociationInfo;
-import static com.android.server.companion.datatransfer.continuity.TaskContinuityTestUtils.createRunningTaskInfo;
-
-import android.app.ActivityManager;
 import android.app.ActivityManager.RunningTaskInfo;
 import android.app.ActivityTaskManager;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.ContextWrapper;
-import android.companion.AssociationInfo;
-import android.companion.IOnTransportsChangedListener;
-import android.companion.CompanionDeviceManager;
-import android.companion.ICompanionDeviceManager;
-import android.companion.AssociationInfo;
 import android.companion.datatransfer.continuity.RemoteTask;
+import android.os.RemoteException;
 import android.platform.test.annotations.Presubmit;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 
-import androidx.test.platform.app.InstrumentationRegistry;
+import com.android.server.companion.datatransfer.continuity.connectivity.TaskContinuityMessenger;
 
-import com.android.server.companion.datatransfer.continuity.connectivity.ConnectedAssociationStore;
 import com.android.server.companion.datatransfer.continuity.messages.ContinuityDeviceConnected;
-import com.android.server.companion.datatransfer.continuity.messages.TaskContinuityMessage;
 import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskAddedMessage;
 import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskInfo;
 import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskRemovedMessage;
 import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskUpdatedMessage;
-import com.android.server.companion.datatransfer.continuity.messages.TaskContinuityMessageData;
+import com.android.server.companion.datatransfer.continuity.tasks.RunningTaskFetcher;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Presubmit
 @RunWith(AndroidTestingRunner.class)
 @TestableLooper.RunWithLooper(setAsMainLooper = true)
 public class TaskBroadcasterTest {
 
-    private Context mMockContext;
-
-    @Mock
-    private ActivityTaskManager mMockActivityTaskManager;
-
-    private ICompanionDeviceManager mMockCompanionDeviceManagerService;
-
-    @Mock private ConnectedAssociationStore mMockConnectedAssociationStore;
+    @Mock private ActivityTaskManager mMockActivityTaskManager;
+    @Mock private RunningTaskFetcher mMockRunningTaskFetcher;
+    @Mock private TaskContinuityMessenger mMockTaskContinuityMessenger;
 
     private TaskBroadcaster mTaskBroadcaster;
 
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
-        mMockContext =  createMockContext();
-        mMockCompanionDeviceManagerService = createMockCompanionDeviceManager(mMockContext);
-
-        when(mMockContext.getSystemService(Context.ACTIVITY_TASK_SERVICE))
-            .thenReturn(mMockActivityTaskManager);
-
-        // Create TaskBroadcaster.
         mTaskBroadcaster = new TaskBroadcaster(
-            mMockContext,
-            mMockConnectedAssociationStore);
+            mMockTaskContinuityMessenger,
+            mMockActivityTaskManager,
+            mMockRunningTaskFetcher);
     }
 
     @Test
-    public void testStopBroadcasting_doesNothingIfNotBroadcasting()
-        throws Exception {
-
-        mTaskBroadcaster.stopBroadcasting();
-        verify(mMockConnectedAssociationStore, never())
-            .addObserver(mTaskBroadcaster);
+    public void testOnAllDevicesDisconnected_doesNothingIfNoDeviceConnected() {
+        mTaskBroadcaster.onAllDevicesDisconnected();
+        verify(mMockActivityTaskManager, never()).registerTaskStackListener(mTaskBroadcaster);
     }
 
     @Test
-    public void testStartAndStopBroadcasting_updatesTransportsListener()
-        throws Exception {
+    public void testOnAllDevicesDisconnected_unregistersListener() {
+        // Connect a device, verify the listener is registered.
+        mTaskBroadcaster.onDeviceConnected(1);
+        verify(mMockActivityTaskManager, times(1)).registerTaskStackListener(mTaskBroadcaster);
 
-        // Start broadcasting, verifying an association listener is added.
-        mTaskBroadcaster.startBroadcasting();
-        verify(mMockConnectedAssociationStore, times(1))
-            .addObserver(mTaskBroadcaster);
-        verify(mMockConnectedAssociationStore, times(1))
-            .addObserver(mTaskBroadcaster);
-        verify(mMockActivityTaskManager, times(1))
-            .registerTaskStackListener(mTaskBroadcaster);
-
-        // Stop broadcasting, verifying the association listener is removed.
-        mTaskBroadcaster.stopBroadcasting();
-        verify(mMockConnectedAssociationStore, times(1))
-            .removeObserver(mTaskBroadcaster);
-        verify(mMockActivityTaskManager, times(1))
-            .unregisterTaskStackListener(mTaskBroadcaster);
-        verify(mMockConnectedAssociationStore, times(1))
-            .removeObserver(mTaskBroadcaster);
+        // Disconnect all devices, verify the listener is unregistered.
+        mTaskBroadcaster.onAllDevicesDisconnected();
+        verify(mMockActivityTaskManager, times(1)).unregisterTaskStackListener(mTaskBroadcaster);
     }
 
     @Test
-    public void testStartBroadcasting_startsBroadcasting() throws Exception {
-        // Start broadcasting, verifying a transport listener is added.
-        mTaskBroadcaster.startBroadcasting();
-        verify(mMockConnectedAssociationStore, times(1))
-            .addObserver(mTaskBroadcaster);
+    public void testOnDeviceConnected_sendsMessageToDevice() throws RemoteException {
+        RemoteTaskInfo expectedRemoteTaskInfo = new RemoteTaskInfo(
+            100 /* taskId */,
+            "test" /* label */,
+            100 /* lastActiveTime */,
+            new byte[0] /* icon */);
+        when(mMockRunningTaskFetcher.getRunningTasks())
+            .thenReturn(List.of(expectedRemoteTaskInfo));
 
-        // Setup a fake foreground task.
-        String expectedLabel = "test";
-        ActivityManager.RunningTaskInfo taskInfo = createRunningTaskInfo(1, expectedLabel, 0);
-
-        when(mMockActivityTaskManager.getTasks(Integer.MAX_VALUE, true))
-            .thenReturn(Arrays.asList(taskInfo));
-
-        // Add a new transport
-        AssociationInfo associationInfo = createAssociationInfo(1, "name");
-        mTaskBroadcaster.onTransportConnected(associationInfo);
+        int associationId = 1;
+        mTaskBroadcaster.onDeviceConnected(associationId);
 
         // Verify the message is sent.
-        ArgumentCaptor<byte[]> messageCaptor
-            = ArgumentCaptor.forClass(byte[].class);
-        verify(mMockCompanionDeviceManagerService, times(1)).sendMessage(
-            eq(CompanionDeviceManager.MESSAGE_ONEWAY_TASK_CONTINUITY),
-            messageCaptor.capture(),
-            eq(new int[] {1}));
-        TaskContinuityMessage taskContinuityMessage = new TaskContinuityMessage(
-            messageCaptor.getValue());
-        assertThat(taskContinuityMessage.getData()).isInstanceOf(
-            ContinuityDeviceConnected.class);
-        ContinuityDeviceConnected continuityDeviceConnected
-            = (ContinuityDeviceConnected) taskContinuityMessage.getData();
-        assertThat(continuityDeviceConnected.getCurrentForegroundTaskId())
-            .isEqualTo(taskInfo.taskId);
-        assertThat(continuityDeviceConnected.getRemoteTasks()).hasSize(1);
-        assertThat(continuityDeviceConnected.getRemoteTasks().get(0).getId())
-            .isEqualTo(taskInfo.taskId);
-        assertThat(continuityDeviceConnected.getRemoteTasks().get(0).getLabel())
-            .isEqualTo(expectedLabel);
+        ContinuityDeviceConnected expectedMessage
+            = new ContinuityDeviceConnected(List.of(expectedRemoteTaskInfo));
+        verify(mMockTaskContinuityMessenger, times(1)).sendMessage(
+            eq(associationId),
+            eq(expectedMessage));
+
+        // Verify a listener was registered.
+        verify(mMockActivityTaskManager, times(1)).registerTaskStackListener(mTaskBroadcaster);
     }
 
     @Test
-    public void testOnTaskCreated_sendsMessageToAllAssociations() throws Exception {
-        // Start broadcasting.
-        mTaskBroadcaster.startBroadcasting();
-        verify(mMockConnectedAssociationStore, times(1)).addObserver(mTaskBroadcaster);
-        AssociationInfo associationInfo = createAssociationInfo(1, "name1");
-        when(mMockConnectedAssociationStore.getConnectedAssociations())
-            .thenReturn(Arrays.asList(associationInfo));
-
-        // Define a new task.
-        String taskLabel = "newTask";
-        int taskId = 123;
-        ActivityManager.RunningTaskInfo taskInfo = createRunningTaskInfo(taskId, taskLabel, 0);
-
-        // Mock ActivityTaskManager to return the new task.
-        when(mMockActivityTaskManager.getTasks(Integer.MAX_VALUE, true))
-                .thenReturn(List.of(taskInfo));
+    public void testOnTaskCreated_sendsMessageToAllAssociations() throws RemoteException {
+        RemoteTaskInfo expectedRemoteTaskInfo = new RemoteTaskInfo(
+            123 /* taskId */,
+            "newTask" /* label */,
+            0 /* lastActiveTime */,
+            new byte[0] /* icon */);
+        when(mMockRunningTaskFetcher.getRunningTaskById(expectedRemoteTaskInfo.id()))
+            .thenReturn(expectedRemoteTaskInfo);
 
         // Notify TaskBroadcaster of the new task.
-        mTaskBroadcaster.onTaskCreated(taskId, null);
+        mTaskBroadcaster.onTaskCreated(expectedRemoteTaskInfo.id(), null);
 
         // Verify sendMessage is called
-        ArgumentCaptor<byte[]> messageCaptor = ArgumentCaptor.forClass(byte[].class);
-        verify(mMockCompanionDeviceManagerService, times(1)).sendMessage(
-                eq(CompanionDeviceManager.MESSAGE_ONEWAY_TASK_CONTINUITY),
-                messageCaptor.capture(),
-                any(int[].class));
-        byte[] capturedMessage = messageCaptor.getValue();
-        TaskContinuityMessage taskContinuityMessage = new TaskContinuityMessage(capturedMessage);
-        assertThat(taskContinuityMessage.getData()).isInstanceOf(RemoteTaskAddedMessage.class);
-        RemoteTaskAddedMessage remoteTaskAddedMessage =
-                (RemoteTaskAddedMessage) taskContinuityMessage.getData();
-        assertThat(remoteTaskAddedMessage.getTask().getId()).isEqualTo(taskId);
+        RemoteTaskAddedMessage expectedMessage = new RemoteTaskAddedMessage(expectedRemoteTaskInfo);
+        verify(mMockTaskContinuityMessenger, times(1)).sendMessage(eq(expectedMessage));
     }
 
-        @Test
-    public void testOnTaskRemoved_sendsMessageToAllAssociations() throws Exception {
-        // Start broadcasting.
+    @Test
+    public void testOnTaskCreated_taskNotFound_doesNotSendMessage() throws RemoteException {
         int taskId = 123;
-        mTaskBroadcaster.startBroadcasting();
-        verify(mMockConnectedAssociationStore, times(1)).addObserver(mTaskBroadcaster);
-        AssociationInfo associationInfo = createAssociationInfo(1, "name1");
-        when(mMockConnectedAssociationStore.getConnectedAssociations())
-            .thenReturn(Arrays.asList(associationInfo));
+        when(mMockRunningTaskFetcher.getRunningTaskById(taskId))
+            .thenReturn(null);
+
+        mTaskBroadcaster.onTaskCreated(taskId, null);
+
+        verify(mMockTaskContinuityMessenger, never()).sendMessage(any());
+    }
+
+    @Test
+    public void testOnTaskRemoved_sendsMessageToAllAssociations() throws RemoteException {
+        int taskId = 123;
 
         mTaskBroadcaster.onTaskRemoved(taskId);
 
         // Verify sendMessage is called
-        ArgumentCaptor<byte[]> messageCaptor = ArgumentCaptor.forClass(byte[].class);
-        verify(mMockCompanionDeviceManagerService, times(1)).sendMessage(
-                eq(CompanionDeviceManager.MESSAGE_ONEWAY_TASK_CONTINUITY),
-                messageCaptor.capture(),
-                any(int[].class));
-        byte[] capturedMessage = messageCaptor.getValue();
-        TaskContinuityMessage taskContinuityMessage = new TaskContinuityMessage(capturedMessage);
-        assertThat(taskContinuityMessage.getData()).isInstanceOf(RemoteTaskRemovedMessage.class);
-        RemoteTaskRemovedMessage remoteTaskRemovedMessage =
-                (RemoteTaskRemovedMessage) taskContinuityMessage.getData();
-        assertThat(remoteTaskRemovedMessage.taskId()).isEqualTo(taskId);
+        RemoteTaskRemovedMessage expectedMessage = new RemoteTaskRemovedMessage(taskId);
+        verify(mMockTaskContinuityMessenger, times(1)).sendMessage(eq(expectedMessage));
     }
 
     @Test
-    public void testOnTaskMovedToFront_sendsMessageToAllAssociations() throws Exception {
-        // Setup
-        int associationId = 1;
-        String associationName = "name1";
-        when(mMockConnectedAssociationStore.getConnectedAssociations())
-            .thenReturn(List.of(createAssociationInfo(associationId, associationName)));
-        mTaskBroadcaster.startBroadcasting();
+    public void testOnTaskMovedToFront_sendsMessageToAllAssociations() throws RemoteException {
+        RemoteTaskInfo expectedRemoteTaskInfo = new RemoteTaskInfo(
+            1 /* taskId */,
+            "task" /* label */,
+            100 /* lastActiveTime */,
+            new byte[0] /* icon */);
+        when(mMockRunningTaskFetcher.getRunningTaskById(expectedRemoteTaskInfo.id()))
+            .thenReturn(expectedRemoteTaskInfo);
+        RunningTaskInfo taskInfo = new RunningTaskInfo();
+        taskInfo.taskId = expectedRemoteTaskInfo.id();
 
-        // Simulate a task being moved to front.
-        int taskId = 1;
-        String taskLabel = "newTask";
-        ActivityManager.RunningTaskInfo taskInfo = createRunningTaskInfo(taskId, taskLabel, 0);
         mTaskBroadcaster.onTaskMovedToFront(taskInfo);
 
         // Verify sendMessage is called for each association.
-        ArgumentCaptor<byte[]> messageCaptor = ArgumentCaptor.forClass(byte[].class);
-        verify(mMockCompanionDeviceManagerService, times(1)).sendMessage(
-            eq(CompanionDeviceManager.MESSAGE_ONEWAY_TASK_CONTINUITY),
-            messageCaptor.capture(),
-            eq(new int[] {1}));
-        TaskContinuityMessage actualMessage = new TaskContinuityMessage(messageCaptor.getValue());
-        assertThat(actualMessage.getData()).isInstanceOf(RemoteTaskUpdatedMessage.class);
-        RemoteTaskUpdatedMessage remoteTaskUpdated
-            = (RemoteTaskUpdatedMessage) actualMessage.getData();
-
-        RemoteTask expectedTask = new RemoteTaskInfo(taskInfo)
-            .toRemoteTask(associationId, associationName);
-        assertThat(remoteTaskUpdated.getTask().getId()).isEqualTo(expectedTask.getId());
+        RemoteTaskUpdatedMessage expectedMessage
+            = new RemoteTaskUpdatedMessage(expectedRemoteTaskInfo);
+       verify(mMockTaskContinuityMessenger, times(1)).sendMessage(eq(expectedMessage));
     }
 
+    @Test
+    public void testOnTaskMovedToFront_taskNotFound_doesNotSendMessage() throws RemoteException {
+        RunningTaskInfo taskInfo = new RunningTaskInfo();
+        taskInfo.taskId = 123;
+        when(mMockRunningTaskFetcher.getRunningTaskById(taskInfo.taskId))
+            .thenReturn(null);
+
+        mTaskBroadcaster.onTaskMovedToFront(taskInfo);
+
+        verify(mMockTaskContinuityMessenger, never()).sendMessage(any());
+    }
 }

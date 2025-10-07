@@ -47,8 +47,8 @@ import java.util.Map;
  * Validators for System settings
  */
 public class SystemSettingsValidators {
-    private static final int CV_PREFERRED_INTENSITY_MIN = 0;
-    private static final int CV_PREFERRED_INTENSITY_MAX = 10;
+    private static final float CV_PREFERRED_INTENSITY_MIN = 0.0f;
+    private static final float CV_PREFERRED_INTENSITY_MAX = 1.0f;
 
     @UnsupportedAppUsage
     public static final Map<String, Validator> VALIDATORS = new ArrayMap<>();
@@ -259,9 +259,9 @@ public class SystemSettingsValidators {
         VALIDATORS.put(System.WIFI_STATIC_DNS2, LENIENT_IP_ADDRESS_VALIDATOR);
         VALIDATORS.put(System.SHOW_BATTERY_PERCENT, BOOLEAN_VALIDATOR);
         VALIDATORS.put(System.NOTIFICATION_LIGHT_PULSE, BOOLEAN_VALIDATOR);
-// QTI_BEGIN: 2020-05-15: Telephony: FR30706: Add a playing tone setting.
+// QTI_BEGIN: 2020-05-15: Core: FR30706: Add a playing tone setting.
         VALIDATORS.put(System.CALL_CONNECTED_TONE_ENABLED, BOOLEAN_VALIDATOR);
-// QTI_END: 2020-05-15: Telephony: FR30706: Add a playing tone setting.
+// QTI_END: 2020-05-15: Core: FR30706: Add a playing tone setting.
         VALIDATORS.put(System.WEAR_ACCESSIBILITY_GESTURE_ENABLED, BOOLEAN_VALIDATOR);
         VALIDATORS.put(System.WEAR_ACCESSIBILITY_GESTURE_ENABLED_DURING_OOBE, BOOLEAN_VALIDATOR);
         VALIDATORS.put(System.WEAR_TTS_PREWARM_ENABLED, BOOLEAN_VALIDATOR);
@@ -282,7 +282,7 @@ public class SystemSettingsValidators {
         VALIDATORS.put(System.CV_DYNAMIC_ENABLED, new InclusiveIntegerRangeValidator(0, 1));
         VALIDATORS.put(
                 System.CV_PREFERRED_INTENSITY,
-                new InclusiveIntegerRangeValidator(
+                new InclusiveFloatRangeValidator(
                         CV_PREFERRED_INTENSITY_MIN, CV_PREFERRED_INTENSITY_MAX));
     }
 }

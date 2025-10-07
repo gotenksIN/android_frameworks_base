@@ -14,6 +14,7 @@
 
 package com.android.systemui.statusbar.phone
 
+import android.app.ActivityOptions
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Bundle
@@ -22,6 +23,7 @@ import android.view.View
 import com.android.systemui.animation.ActivityTransitionAnimator
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.plugins.ActivityStartOptions
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
@@ -356,6 +358,10 @@ constructor(
         )
     }
 
+    override fun startActivityDismissingKeyguard(options: ActivityStartOptions) {
+        activityStarterInternal.startActivityDismissingKeyguard(options)
+    }
+
     override fun startActivityDismissingKeyguard(
         intent: Intent,
         onlyProvisioned: Boolean,
@@ -383,6 +389,24 @@ constructor(
             dismissShade = dismissShade,
             customMessage = customMessage,
             callback = callback,
+        )
+    }
+
+    override fun startActivityDismissingKeyguard(
+        intent: Intent,
+        onlyProvisioned: Boolean,
+        dismissShade: Boolean,
+        customMessage: String?,
+        activityOptions: ActivityOptions,
+        callback: ActivityStarter.Callback?,
+    ) {
+        activityStarterInternal.startActivityDismissingKeyguard(
+            intent = intent,
+            onlyProvisioned = onlyProvisioned,
+            dismissShade = dismissShade,
+            customMessage = customMessage,
+            callback = callback,
+            activityOptions = activityOptions,
         )
     }
 

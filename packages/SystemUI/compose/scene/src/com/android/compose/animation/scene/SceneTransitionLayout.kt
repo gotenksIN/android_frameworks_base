@@ -141,6 +141,7 @@ interface SceneTransitionLayoutScope<out CS : ContentScope> {
         alignment: Alignment = Alignment.Center,
         isModal: Boolean = true,
         effectFactory: OverscrollFactory? = null,
+        alwaysCompose: Boolean = false,
         content: @Composable CS.() -> Unit,
     )
 }
@@ -197,7 +198,18 @@ interface BaseContentScope : ElementStateScope {
     /** The key of this content. */
     val contentKey: ContentKey
 
-    /** The state of the [SceneTransitionLayout] in which this content is contained. */
+    /**
+     * The state of the [SceneTransitionLayout] in which this content is contained.
+     *
+     * Important: Inside a [ContentScope.NestedSceneTransitionLayout], this will *not* be the state
+     * passed to [ContentScope.NestedSceneTransitionLayout] but a new one that delegates to it
+     * instead, so that checks on the current state also consider the ancestor STL states.
+     *
+     * @see SceneTransitionLayoutState.isIdle
+     * @see SceneTransitionLayoutState.isTransitioning
+     * @see SceneTransitionLayoutState.isTransitioningBetween
+     * @see SceneTransitionLayoutState.isTransitioningFromOrTo
+     */
     val layoutState: SceneTransitionLayoutState
 
     /** The [LookaheadScope] used by the [SceneTransitionLayout]. */
@@ -378,6 +390,25 @@ interface ContentScope : BaseContentScope {
         modifier: Modifier,
         builder: SceneTransitionLayoutScope<ContentScope>.() -> Unit,
     )
+
+    /**
+     * Whether this content can be considered "visible", i.e. it is either:
+     * - the [current scene][SceneTransitionLayoutState.currentScene]
+     * - one of the [current overlays][SceneTransitionLayoutState.currentOverlays]
+     * - in a transition to become the current scene or one of the current overlays
+     *
+     * Note that this does not actually do any visibility check, a content will be considered
+     * visible even if its alpha is 0, or if it is translated outside the device bounds, or if it is
+     * fully obscured by another content, etc.
+     *
+     * This function takes the ancestor contents from ancestor STLs into account, so that this
+     * returns false if this content OR any ancestor content is not "visible".
+     *
+     * This is meant to be used only by contents that leverage the `alwaysCompose` flag to remain
+     * composed even when not "visible". When `alwaysCompose` is false, you should rely on
+     * composition only as a signal for "visibility".
+     */
+    fun isAlwaysComposedContentVisible(): Boolean
 }
 
 internal interface InternalContentScope : ContentScope {

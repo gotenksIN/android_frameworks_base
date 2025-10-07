@@ -194,6 +194,22 @@ public abstract class UsageStatsManagerInternal {
             @UserIdInt int userId, long nowElapsed);
 
     /**
+     * Returns the app that the app is currently in and bucketing reason code.
+     *
+     * <p>The returned long contains two pieces of information: the standby bucket in the higher 32
+     * bits and the bucketing reason in the lower 32 bits. If the app is unknown for the given
+     * user, the bucket will be {@link UsageStatsManager#STANDBY_BUCKET_NEVER} and the reason
+     * will be {@link UsageStatsManager#REASON_MAIN_DEFAULT}.
+     *
+     * @param packageName The package to query
+     * @param userId The user to which the package belongs.
+     * @param nowElapsed The current time, in the elapsedRealtime time base
+     * @return A long containing the standby bucket and the reason.
+     */
+    public abstract long getAppStandbyBucketAndReason(String packageName,
+            @UserIdInt int userId, long nowElapsed);
+
+    /**
      * Returns all of the uids for a given user where all packages associating with that uid
      * are in the app idle state -- there are no associated apps that are not idle.  This means
      * all of the returned uids can be safely considered app idle.

@@ -398,6 +398,11 @@ public interface WindowManager extends ViewManager {
      * @hide
      */
     int TRANSIT_CLOSE_PREPARE_BACK_NAVIGATION = 14;
+    /**
+     * Lock task mode is starting.
+     * @hide
+     */
+    int TRANSIT_START_LOCK_TASK_MODE = 15;
 
     /**
      * The first slot for custom transition types. Callers (like Shell) can make use of custom
@@ -429,6 +434,7 @@ public interface WindowManager extends ViewManager {
             TRANSIT_SLEEP,
             TRANSIT_PREPARE_BACK_NAVIGATION,
             TRANSIT_CLOSE_PREPARE_BACK_NAVIGATION,
+            TRANSIT_START_LOCK_TASK_MODE,
             TRANSIT_FIRST_CUSTOM
     })
     @Retention(RetentionPolicy.SOURCE)
@@ -841,7 +847,8 @@ public interface WindowManager extends ViewManager {
             ScreenshotSource.SCREENSHOT_OVERVIEW,
             ScreenshotSource.SCREENSHOT_ACCESSIBILITY_ACTIONS,
             ScreenshotSource.SCREENSHOT_OTHER,
-            ScreenshotSource.SCREENSHOT_VENDOR_GESTURE})
+            ScreenshotSource.SCREENSHOT_VENDOR_GESTURE,
+            ScreenshotSource.SCREENSHOT_SCREEN_CAPTURE_UI})
     @interface ScreenshotSource {
         int SCREENSHOT_GLOBAL_ACTIONS = 0;
         int SCREENSHOT_KEY_CHORD = 1;
@@ -850,6 +857,7 @@ public interface WindowManager extends ViewManager {
         int SCREENSHOT_ACCESSIBILITY_ACTIONS = 4;
         int SCREENSHOT_OTHER = 5;
         int SCREENSHOT_VENDOR_GESTURE = 6;
+        int SCREENSHOT_SCREEN_CAPTURE_UI = 7;
     }
 
     /**
@@ -1760,28 +1768,12 @@ public interface WindowManager extends ViewManager {
     }
 
     /**
-     * Sets that the display should show system decors.
-     * <p>
-     * System decors include status bar, navigation bar, launcher.
-     * </p>
-     *
-     * @param displayId The id of the display.
-     * @param shouldShow Indicates that the display should show system decors.
-     * @see #shouldShowSystemDecors(int)
-     * @hide
-     */
-    @TestApi
-    default void setShouldShowSystemDecors(int displayId, boolean shouldShow) {
-    }
-
-    /**
      * Checks if the display supports showing system decors.
      * <p>
      * System decors include status bar, navigation bar, launcher.
      * </p>
      *
      * @param displayId The id of the display.
-     * @see #setShouldShowSystemDecors(int, boolean)
      * @hide
      */
     @TestApi
@@ -6460,7 +6452,6 @@ public interface WindowManager extends ViewManager {
      *                   when entered or exited trusted presentation per the thresholds.
      * @see TrustedPresentationThresholds
      */
-    @FlaggedApi(Flags.FLAG_TRUSTED_PRESENTATION_LISTENER_FOR_WINDOW)
     default void registerTrustedPresentationListener(@NonNull IBinder window,
             @NonNull TrustedPresentationThresholds thresholds,  @NonNull Executor executor,
             @NonNull Consumer<Boolean> listener) {
@@ -6473,7 +6464,6 @@ public interface WindowManager extends ViewManager {
      *
      * @see WindowManager#registerTrustedPresentationListener(IBinder, TrustedPresentationThresholds, Executor, Consumer)
      */
-    @FlaggedApi(Flags.FLAG_TRUSTED_PRESENTATION_LISTENER_FOR_WINDOW)
     default void unregisterTrustedPresentationListener(@NonNull Consumer<Boolean> listener) {
         throw new UnsupportedOperationException();
     }

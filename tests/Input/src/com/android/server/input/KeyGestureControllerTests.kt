@@ -72,6 +72,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -97,9 +98,10 @@ import org.mockito.kotlin.times
 @RunWith(JUnitParamsRunner::class)
 @EnableFlags(
     com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_SHORTCUT_CONTROL,
-    com.android.hardware.input.Flags.FLAG_KEYBOARD_A11Y_MOUSE_KEYS,
+    com.android.hardware.input.Flags.FLAG_ENABLE_SELECT_TO_SPEAK_KEY_GESTURES,
     com.android.hardware.input.Flags.FLAG_ENABLE_TALKBACK_AND_MAGNIFIER_KEY_GESTURES,
     com.android.hardware.input.Flags.FLAG_ENABLE_VOICE_ACCESS_KEY_GESTURES,
+    com.android.window.flags.Flags.FLAG_CLOSE_TASK_KEYBOARD_SHORTCUT,
     com.android.window.flags.Flags.FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT,
     com.android.window.flags.Flags.FLAG_ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS,
     com.android.window.flags.Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS,
@@ -144,6 +146,9 @@ class KeyGestureControllerTests {
         const val RANDOM_PID2 = 12
         const val RANDOM_DISPLAY_ID = 123
         const val SCREENSHOT_CHORD_DELAY: Long = 1000
+        // Current default multi-key press timeout used in KeyCombinationManager
+        const val COMBINE_KEY_DELAY_MILLIS: Long = 150
+        const val LONG_PRESS_DELAY_FOR_ESCAPE_MILLIS: Long = 1000
         // App delegate that consumes all keys that it receives
         val BLOCKING_APP = AppDelegate { _ -> true }
         // App delegate that doesn't consume any keys that it receives
@@ -311,9 +316,7 @@ class KeyGestureControllerTests {
             )
             .thenReturn(true)
         Mockito.`when`(inputManager.appLaunchBookmarks).thenAnswer {
-            keyGestureController.appLaunchBookmarks.map {
-                bookmark -> InputGestureData(bookmark)
-            }
+            keyGestureController.appLaunchBookmarks.map { bookmark -> InputGestureData(bookmark) }
         }
         keyGestureController.systemRunning()
         testLooper.dispatchAll()
@@ -978,6 +981,76 @@ class KeyGestureControllerTests {
     }
 
     @Keep
+    private fun keyCodesUsedForKeyCombinations(): Array<Int> {
+        return arrayOf(
+            KeyEvent.KEYCODE_VOLUME_DOWN,
+            KeyEvent.KEYCODE_VOLUME_UP,
+            KeyEvent.KEYCODE_POWER,
+            KeyEvent.KEYCODE_STEM_PRIMARY,
+        )
+    }
+
+    @Test
+    @Parameters(method = "keyCodesUsedForKeyCombinations")
+    fun testInterceptKeyCombinationForAccessibility_blocksKey_whenOngoingKeyCombination(
+        keyCode: Int
+    ) {
+        setupKeyGestureController()
+
+        val now = SystemClock.uptimeMillis()
+        val downEvent =
+            KeyEvent.obtain(
+                now,
+                now,
+                KeyEvent.ACTION_DOWN,
+                keyCode,
+                /* repeat= */ 0,
+                /* metaState */ 0,
+                DEVICE_ID,
+                /* scanCode= */ 0,
+                /* flags= */ 0,
+                InputDevice.SOURCE_KEYBOARD,
+                /* displayId = */ 0,
+                /* characters= */ "",
+            )
+        keyGestureController.interceptKeyBeforeQueueing(downEvent, FLAG_INTERACTIVE)
+        testLooper.dispatchAll()
+
+        // Assert that interceptKeyCombinationBeforeAccessibility returns the delay to wait
+        // until key can be forwarded to A11y services (should be > 0 if there is ongoing gesture)
+        assertTrue(keyGestureController.interceptKeyCombinationBeforeAccessibility(downEvent) > 0)
+    }
+
+    @Test
+    @Parameters(method = "keyCodesUsedForKeyCombinations")
+    fun testInterceptKeyCombinationForAccessibility_letsKeyPass_whenKeyCombinationTimedOut(
+        keyCode: Int
+    ) {
+        setupKeyGestureController()
+
+        val now = SystemClock.uptimeMillis()
+        val downEvent =
+            KeyEvent.obtain(
+                now - COMBINE_KEY_DELAY_MILLIS,
+                now - COMBINE_KEY_DELAY_MILLIS,
+                KeyEvent.ACTION_DOWN,
+                keyCode,
+                /* repeat= */ 0,
+                /* metaState */ 0,
+                DEVICE_ID,
+                /* scanCode= */ 0,
+                /* flags= */ 0,
+                InputDevice.SOURCE_KEYBOARD,
+                /* displayId = */ 0,
+                /* characters= */ "",
+            )
+        keyGestureController.interceptKeyBeforeQueueing(downEvent, FLAG_INTERACTIVE)
+        testLooper.dispatchAll()
+
+        assertEquals(0, keyGestureController.interceptKeyCombinationBeforeAccessibility(downEvent))
+    }
+
+    @Keep
     private fun screenshotTestArguments(): Array<KeyGestureData> {
         return arrayOf(
             KeyGestureData(
@@ -1270,6 +1343,62 @@ class KeyGestureControllerTests {
                 KeyEvent.META_CTRL_ON,
             )
         assertEquals(-1, keyGestureController.interceptKeyBeforeDispatching(null, event, 0))
+    }
+
+    @Test
+    fun testLongPressEscape_withKeyCapture_exitCalled() {
+        setupKeyGestureController()
+        enableKeyCaptureForFocussedWindow()
+        var callback = 0
+        val handler = KeyGestureHandler { _, _ -> callback++ }
+        keyGestureController.registerKeyGestureHandler(
+            intArrayOf(KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK),
+            handler,
+            TEST_PID,
+        )
+        sendKeys(
+            intArrayOf(KeyEvent.KEYCODE_ESCAPE),
+            timeDelayMs = 2 * LONG_PRESS_DELAY_FOR_ESCAPE_MILLIS,
+        )
+        keyGestureController.unregisterKeyGestureHandler(handler, TEST_PID)
+        assertEquals(1, callback)
+    }
+
+    @Test
+    fun testLongPressEscape_withoutKeyCapture_exitNotCalled() {
+        setupKeyGestureController()
+        var callback = 0
+        val handler = KeyGestureHandler { _, _ -> callback++ }
+        keyGestureController.registerKeyGestureHandler(
+            intArrayOf(KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK),
+            handler,
+            TEST_PID,
+        )
+        sendKeys(
+            intArrayOf(KeyEvent.KEYCODE_ESCAPE),
+            timeDelayMs = 2 * LONG_PRESS_DELAY_FOR_ESCAPE_MILLIS,
+        )
+        keyGestureController.unregisterKeyGestureHandler(handler, TEST_PID)
+        assertEquals(0, callback)
+    }
+
+    @Test
+    fun testLongPressEscape_withKeyCapture_exitNotCalled_insufficientDuration() {
+        setupKeyGestureController()
+        enableKeyCaptureForFocussedWindow()
+        var callback = 0
+        val handler = KeyGestureHandler { _, _ -> callback++ }
+        keyGestureController.registerKeyGestureHandler(
+            intArrayOf(KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK),
+            handler,
+            TEST_PID,
+        )
+        sendKeys(
+            intArrayOf(KeyEvent.KEYCODE_ESCAPE),
+            timeDelayMs = LONG_PRESS_DELAY_FOR_ESCAPE_MILLIS / 2,
+        )
+        keyGestureController.unregisterKeyGestureHandler(handler, TEST_PID)
+        assertEquals(0, callback)
     }
 
     private fun testKeyGestureProduced(test: KeyGestureData, appDelegate: AppDelegate) {

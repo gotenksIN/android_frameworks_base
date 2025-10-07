@@ -28,6 +28,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
 import com.android.internal.logging.UiEventLogger
+import com.android.systemui.Flags
 import com.android.systemui.communal.dagger.CommunalModule.Companion.LAUNCHER_PACKAGE
 import com.android.systemui.communal.data.model.CommunalWidgetCategories
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
@@ -46,13 +47,17 @@ import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.core.Logger
 import com.android.systemui.log.dagger.CommunalLog
+import com.android.systemui.media.controls.domain.pipeline.interactor.MediaCarouselInteractor
 import com.android.systemui.media.controls.ui.controller.MediaCarouselController
 import com.android.systemui.media.controls.ui.view.MediaHost
 import com.android.systemui.media.dagger.MediaModule
+import com.android.systemui.media.remedia.ui.viewmodel.MediaViewModel
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.util.kotlin.BooleanFlowOperators.allOf
 import com.android.systemui.util.kotlin.BooleanFlowOperators.not
+import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Named
 import kotlinx.coroutines.CoroutineDispatcher
@@ -60,6 +65,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withContext
@@ -73,6 +79,7 @@ constructor(
     private val communalInteractor: CommunalInteractor,
     private val communalSettingsInteractor: CommunalSettingsInteractor,
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
+    private val keyguardStateController: KeyguardStateController,
     @Named(MediaModule.COMMUNAL_HUB) mediaHost: MediaHost,
     private val uiEventLogger: UiEventLogger,
     @CommunalLog logBuffer: LogBuffer,
@@ -83,23 +90,32 @@ constructor(
     private val packageManager: PackageManager,
     @Named(LAUNCHER_PACKAGE) private val launcherPackage: String,
     mediaCarouselController: MediaCarouselController,
+    mediaViewModelFactory: MediaViewModel.Factory,
+    mediaCarouselInteractorLazy: Lazy<MediaCarouselInteractor>,
 ) :
     BaseCommunalViewModel(
         communalSceneInteractor,
         communalInteractor,
         mediaHost,
         mediaCarouselController,
+        mediaViewModelFactory,
+        mediaCarouselInteractorLazy,
     ) {
 
     private val logger = Logger(logBuffer, "CommunalEditModeViewModel")
 
     override val isEditMode = true
 
-    override val isCommunalContentVisible: Flow<Boolean> =
+    private val editModeShowing =
         communalSceneInteractor.editModeState.map { it == EditModeState.SHOWING }
 
+    override val isCommunalContentVisible: Flow<Boolean> =
+        if (Flags.hubEditModeTransition()) flowOf(true) else editModeShowing
+
+    override val shouldShowEditModeLayout: Flow<Boolean> = flowOf(true)
+
     val showDisclaimer: Flow<Boolean> =
-        allOf(isCommunalContentVisible, not(communalInteractor.isDisclaimerDismissed))
+        allOf(editModeShowing, not(communalInteractor.isDisclaimerDismissed))
 
     fun onDisclaimerDismissed() {
         communalInteractor.setDisclaimerDismissed()
@@ -229,6 +245,12 @@ constructor(
             false
         }
 
+    /** Called when user is done editing widgets and will return back to hub */
+    fun onEditDone() {
+        // Persist scroll position in edit mode so we go back to the position in glanceable hub.
+        persistScrollPosition("edit done")
+    }
+
     private fun getWidgetPickerActivityIntent(
         resources: Resources,
         excludeList: ArrayList<AppWidgetProviderInfo>,
@@ -276,10 +298,10 @@ constructor(
     /** Called when exiting the edit mode, before transitioning back to the communal scene. */
     fun cleanupEditModeState() {
         communalSceneInteractor.setEditModeState(null)
-
-        // Set the scroll position of the glanceable hub to match where we are now.
-        persistScrollPosition()
     }
+
+    /** Whether screen rotation is allowed. If false, screen orientation should remain portrait. */
+    fun isScreenRotationAllowed(): Boolean = keyguardStateController.isKeyguardScreenRotationAllowed
 
     companion object {
         private const val TAG = "CommunalEditModeViewModel"

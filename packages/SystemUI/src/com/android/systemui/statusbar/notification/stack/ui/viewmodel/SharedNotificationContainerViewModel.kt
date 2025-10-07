@@ -17,10 +17,14 @@
 
 package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.view.WindowInsets.Type.defaultVisible
 import androidx.annotation.VisibleForTesting
 import com.android.app.tracing.coroutines.flow.flowName
+import com.android.systemui.Flags
 import com.android.systemui.Flags.glanceableHubV2
+import com.android.systemui.biometrics.Utils.getInsetsOf
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
 import com.android.systemui.common.shared.model.NotificationContainerBounds
 import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor
@@ -124,7 +128,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.isActive
 
-/** View-model for the shared notification container, used by both the shade and keyguard spaces */
+/** View-model for the shared notification container, used by both the shade and keyguard spaces. */
+@SuppressLint("FlowExposedFromViewModel") // because all flows from this class are bound to Views
 @OptIn(ExperimentalCoroutinesApi::class)
 @SysUISingleton
 class SharedNotificationContainerViewModel
@@ -253,10 +258,10 @@ constructor(
     val configurationBasedDimensions: Flow<ConfigurationBasedDimensions> =
         if (SceneContainerFlag.isEnabled) {
                 combine(
-                    shadeModeInteractor.isShadeLayoutWide,
+                    shadeModeInteractor.isFullWidthShade,
                     shadeModeInteractor.shadeMode,
                     configurationInteractor.onAnyConfigurationChange,
-                ) { isShadeLayoutWide, shadeMode, _ ->
+                ) { isFullWidthShade, shadeMode, _ ->
                     with(context.resources) {
                         val marginHorizontal =
                             getDimensionPixelSize(
@@ -267,31 +272,47 @@ constructor(
                                 }
                             )
 
+                        val (marginStart, marginEnd) =
+                            @Suppress("DEPRECATION") // to handle split shade
+                            when (shadeMode) {
+                                Single -> marginHorizontal to marginHorizontal
+                                Split -> 0 to marginHorizontal
+                                Dual ->
+                                    if (isFullWidthShade) {
+                                        0 to 0
+                                    } else {
+                                        // all insets types combined, except the IME
+                                        val insets = getInsetsOf(context, defaultVisible()).toRect()
+                                        marginHorizontal.coerceAtLeast(insets.left) to 0
+                                    }
+                            }
+
                         val horizontalPosition =
+                            @Suppress("DEPRECATION") // to handle split shade
                             when (shadeMode) {
                                 Single -> HorizontalPosition.EdgeToEdge
                                 Split -> HorizontalPosition.MiddleToEdge(ratio = 0.5f)
                                 Dual ->
-                                    if (isShadeLayoutWide) {
+                                    if (isFullWidthShade) {
+                                        HorizontalPosition.EdgeToEdge
+                                    } else {
                                         HorizontalPosition.EdgeToMiddle(
                                             ratio = 0.5f,
                                             maxWidth =
                                                 getDimensionPixelSize(R.dimen.shade_panel_width),
                                         )
-                                    } else {
-                                        HorizontalPosition.EdgeToEdge
                                     }
                             }
 
                         ConfigurationBasedDimensions(
                             horizontalPosition = horizontalPosition,
-                            marginStart = if (shadeMode is Split) 0 else marginHorizontal,
-                            marginEnd = if (shadeMode is Dual) 0 else marginHorizontal,
-                            marginBottom =
-                                getDimensionPixelSize(R.dimen.notification_panel_margin_bottom),
+                            marginStart = marginStart,
                             // y position of the NSSL in the window needs to be 0 under scene
                             // container
                             marginTop = 0,
+                            marginEnd = marginEnd,
+                            marginBottom =
+                                getDimensionPixelSize(R.dimen.notification_panel_margin_bottom),
                         )
                     }
                 }
@@ -530,6 +551,7 @@ constructor(
     private val alphaForShadeAndQsExpansion: Flow<Float> =
         if (SceneContainerFlag.isEnabled) {
                 shadeModeInteractor.shadeMode.flatMapLatest { shadeMode ->
+                    @Suppress("DEPRECATION") // to handle split shade
                     when (shadeMode) {
                         Single ->
                             combineTransform(
@@ -537,10 +559,8 @@ constructor(
                                 shadeInteractor.qsExpansion,
                                 bouncerInteractor.bouncerExpansion,
                             ) { shadeExpansion, qsExpansion, bouncerExpansion ->
-                                if (bouncerExpansion == 1f) {
-                                    emit(0f)
-                                } else if (bouncerExpansion > 0f) {
-                                    emit(1 - bouncerExpansion)
+                                if (bouncerExpansion > 0f) {
+                                    emit(alphaForBouncerExpansion(bouncerExpansion))
                                 } else if (qsExpansion == 1f) {
                                     // Ensure HUNs will be visible in QS shade (at least while
                                     // unlocked)
@@ -554,33 +574,25 @@ constructor(
                             combineTransform(isAnyExpanded, bouncerInteractor.bouncerExpansion) {
                                 isAnyExpanded,
                                 bouncerExpansion ->
-                                if (bouncerExpansion == 1f) {
-                                    emit(0f)
-                                } else if (bouncerExpansion > 0f) {
-                                    emit(1 - bouncerExpansion)
+                                if (bouncerExpansion > 0f) {
+                                    emit(alphaForBouncerExpansion(bouncerExpansion))
                                 } else if (isAnyExpanded) {
                                     emit(1f)
                                 }
                             }
                         Dual ->
                             combineTransform(
-                                shadeModeInteractor.isShadeLayoutWide,
                                 headsUpNotificationInteractor.get().isHeadsUpOrAnimatingAway,
                                 shadeInteractor.shadeExpansion,
                                 shadeInteractor.qsExpansion,
                                 bouncerInteractor.bouncerExpansion,
                             ) {
-                                isShadeLayoutWide,
                                 isHeadsUpOrAnimatingAway,
                                 shadeExpansion,
                                 qsExpansion,
                                 bouncerExpansion ->
                                 if (bouncerExpansion > 0f) {
-                                    emit(1 - bouncerExpansion)
-                                } else if (isShadeLayoutWide) {
-                                    if (shadeExpansion > 0f) {
-                                        emit(1f)
-                                    }
+                                    emit(alphaForBouncerExpansion(bouncerExpansion))
                                 } else if (isHeadsUpOrAnimatingAway) {
                                     // Ensure HUNs will be visible in QS shade (at least while
                                     // unlocked)
@@ -596,11 +608,31 @@ constructor(
             } else {
                 interactor.configurationBasedDimensions.flatMapLatest { configurationBasedDimensions
                     ->
-                    combineTransform(shadeInteractor.shadeExpansion, shadeInteractor.qsExpansion) {
-                        shadeExpansion,
-                        qsExpansion ->
+                    combineTransform(
+                        shadeInteractor.shadeExpansion,
+                        shadeInteractor.qsExpansion,
+                        keyguardTransitionInteractor.isInTransition(
+                            // This branch is never triggered when scene container is enabled, the
+                            // edge param is unused.
+                            edge = Edge.create(from = LOCKSCREEN, to = Scenes.Dream),
+                            edgeWithoutSceneContainer =
+                                Edge.create(from = LOCKSCREEN, to = DREAMING),
+                        ),
+                    ) { shadeExpansion, qsExpansion, inLockscreenToDreamTransition ->
                         if (shadeExpansion > 0f || qsExpansion > 0f) {
-                            if (configurationBasedDimensions.useSplitShade) {
+                            if (
+                                Flags.lockscreenShadeToDreamTransitionFix() &&
+                                    inLockscreenToDreamTransition
+                            ) {
+                                // Don't show lock screen when transitioning to dream with the shade
+                                // open. The shade is collapsed by ACTION_CLOSE_SYSTEM_DIALOGS that
+                                // the system server sends when starting the dream. Since the shade
+                                // collapse isn't synced with the dream starting, if the collapse
+                                // animation finishes after the LOCKSCREN -> DREAMING transition
+                                // starts, it can cause keyguard to show up again briefly during the
+                                // transition.
+                                emit(0f)
+                            } else if (configurationBasedDimensions.useSplitShade) {
                                 emit(1f)
                             } else if (qsExpansion == 1f) {
                                 // Ensure HUNs will be visible in QS shade (at least while
@@ -616,6 +648,13 @@ constructor(
             }
             .onStart { emit(1f) }
             .dumpWhileCollecting("alphaForShadeAndQsExpansion")
+
+    private fun alphaForBouncerExpansion(bouncerExpansion: Float): Float {
+        // The shade content fades out faster than the bouncer comes in.
+        // See lockscreenToOverlayTransition for the definition of how
+        // the rest of the content behaves during the transition.
+        return maxOf(0f, 1f - bouncerExpansion * 5f)
+    }
 
     val panelAlpha = keyguardInteractor.panelAlpha
 

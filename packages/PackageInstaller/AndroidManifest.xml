@@ -46,7 +46,6 @@
         </receiver>
 
         <activity android:name=".v2.ui.InstallLaunch"
-            android:configChanges="orientation|keyboardHidden|screenSize"
             android:exported="false"/>
 
         <activity android:name=".InstallStart"
@@ -74,7 +73,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <intent-filter android:priority="1">
-                <action android:name="android.content.pm.action.NOTIFY_DEVELOPER_VERIFICATION_INCOMPLETE" />
+                <action android:name="android.content.pm.action.CONFIRM_DEVELOPER_VERIFICATION" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
@@ -88,9 +87,6 @@
         <activity android:name=".PackageInstallerActivity"
                 android:exported="false"
                 android:enableOnBackInvokedCallback="false" />
-
-        <activity android:name=".ConfirmDeveloperVerification"
-            android:exported="false" />
 
         <activity android:name=".InstallInstalling"
                 android:exported="false"
@@ -125,7 +121,6 @@
         </activity>
 
         <activity android:name=".v2.ui.UninstallLaunch"
-            android:configChanges="orientation|keyboardHidden|screenSize"
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:exported="false" />
@@ -184,7 +179,6 @@
         </activity>
 
         <activity android:name=".v2.ui.UnarchiveLaunch"
-            android:configChanges="orientation|keyboardHidden|screenSize"
             android:exported="false"/>
     </application>
 

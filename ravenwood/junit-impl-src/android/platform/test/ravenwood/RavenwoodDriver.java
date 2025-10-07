@@ -16,48 +16,26 @@
 
 package android.platform.test.ravenwood;
 
-import static android.os.Process.FIRST_APPLICATION_UID;
 import static android.os.UserHandle.SYSTEM;
-import static android.platform.test.ravenwood.RavenwoodSystemServer.ANDROID_PACKAGE_NAME;
 
 import static com.android.modules.utils.ravenwood.RavenwoodHelper.RavenwoodInternal.RAVENWOOD_RUNTIME_PATH_JAVA_SYSPROP;
-import static com.android.ravenwood.common.RavenwoodInternalUtils.RAVENWOOD_EMPTY_RESOURCES_APK;
-import static com.android.ravenwood.common.RavenwoodInternalUtils.RAVENWOOD_INST_RESOURCE_APK;
-import static com.android.ravenwood.common.RavenwoodInternalUtils.RAVENWOOD_RESOURCE_APK;
 import static com.android.ravenwood.common.RavenwoodInternalUtils.getRavenwoodRuntimePath;
-import static com.android.ravenwood.common.RavenwoodInternalUtils.parseNullableInt;
-import static com.android.ravenwood.common.RavenwoodInternalUtils.withDefault;
 
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 
 import android.annotation.Nullable;
 import android.app.ActivityManager;
-import android.app.ActivityThread_ravenwood;
 import android.app.AppCompatCallbacks;
-import android.app.Application;
-import android.app.Application_ravenwood;
-import android.app.IUiAutomationConnection;
-import android.app.Instrumentation;
-import android.app.ResourcesManager;
-import android.app.UiAutomation;
+import android.app.RavenwoodAppDriver;
 import android.app.UiAutomation_ravenwood;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
-import android.content.res.Resources;
 import android.graphics.Typeface;
 import android.icu.util.ULocale;
 import android.os.Binder;
 import android.os.Build;
-import android.os.Build.VERSION_CODES;
-import android.os.Bundle;
-import android.os.Environment_ravenwood;
 import android.os.HandlerThread;
-import android.os.Handler_ravenwood;
 import android.os.Looper;
-import android.os.Looper_ravenwood;
-import android.os.Message;
 import android.os.Process_ravenwood;
 import android.os.ServiceManager;
 import android.os.ServiceManager.ServiceNotFoundException;
@@ -67,39 +45,27 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.util.Log;
 import android.util.Log_ravenwood;
-import android.view.DisplayAdjustments;
-
-import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.os.RuntimeInit;
+import com.android.ravenwood.OpenJdkWorkaround;
 import com.android.ravenwood.RavenwoodRuntimeNative;
-import com.android.ravenwood.RavenwoodRuntimeState;
 import com.android.ravenwood.common.RavenwoodInternalUtils;
 import com.android.ravenwood.common.SneakyThrow;
 import com.android.server.LocalServices;
 import com.android.server.compat.PlatformCompat;
 
-import org.junit.AssumptionViolatedException;
 import org.junit.internal.management.ManagementFactory;
 import org.junit.runner.Description;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.nio.file.Files;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -111,12 +77,24 @@ public class RavenwoodDriver {
     private RavenwoodDriver() {
     }
 
-    private static final PrintStream sStdOut = System.out;
-    @SuppressWarnings("UnusedVariable")
-    private static final PrintStream sStdErr = System.err;
+    /**
+     * The following 2 PrintStreams is a backup of the original stdin/stdout streams.
+     * System.out/err will be modified after calling {@link RuntimeInit#redirectLogStreams()}.
+     */
+    public static final PrintStream sRawStdOut = System.out;
+    public static final PrintStream sRawStdErr = System.err;
 
-    private static final String MAIN_THREAD_NAME = "Ravenwood:Main";
-    private static final String TESTS_THREAD_NAME = "Ravenwood:Test";
+    /**
+     * The current directory when the test started.
+     */
+    private static final File sInitialDirectory;
+    static {
+        try {
+            sInitialDirectory = new File(".").getCanonicalFile();
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to get the current directory", e);
+        }
+    }
 
     private static final String LIBRAVENWOOD_INITIALIZER_NAME = "ravenwood_initializer";
     private static final String RAVENWOOD_NATIVE_RUNTIME_NAME = "ravenwood_runtime";
@@ -124,70 +102,13 @@ public class RavenwoodDriver {
     private static final String ANDROID_LOG_TAGS = "ANDROID_LOG_TAGS";
     private static final String RAVENWOOD_ANDROID_LOG_TAGS = "RAVENWOOD_" + ANDROID_LOG_TAGS;
 
-    /**
-     * When enabled, attempt to dump all thread stacks just before we hit the
-     * overall Tradefed timeout, to aid in debugging deadlocks.
-     *
-     * Note, this timeout will _not_ stop the test, as there isn't really a clean way to do it.
-     * It'll merely print stacktraces.
-     */
-    private static final boolean ENABLE_TIMEOUT_STACKS =
-            !"0".equals(System.getenv("RAVENWOOD_ENABLE_TIMEOUT_STACKS"));
-
-    /** RavenwoodCoreTest modifies it, so not final. */
-    public static final boolean TOLERATE_UNHANDLED_ASSERTS =
-            !"0".equals(System.getenv("RAVENWOOD_TOLERATE_UNHANDLED_ASSERTS"));
-
-    /** RavenwoodCoreTest modifies it, so not final. */
-    public static final boolean TOLERATE_UNHANDLED_EXCEPTIONS =
-            !"0".equals(System.getenv("RAVENWOOD_TOLERATE_UNHANDLED_EXCEPTIONS"));
-
-    static final int DEFAULT_TIMEOUT_SECONDS = 10;
-    private static final int TIMEOUT_MILLIS = getTimeoutSeconds() * 1000;
-
-    static int getTimeoutSeconds() {
-        var e = System.getenv("RAVENWOOD_TIMEOUT_SECONDS");
-        if (e == null || e.isEmpty()) {
-            return DEFAULT_TIMEOUT_SECONDS;
-        }
-        return Integer.parseInt(e);
-    }
-
-    private static final ScheduledExecutorService sTimeoutExecutor =
-            Executors.newScheduledThreadPool(1, (Runnable r) -> {
-                Thread t = Executors.defaultThreadFactory().newThread(r);
-                t.setName("Ravenwood:TimeoutMonitor");
-                t.setDaemon(true);
-                return t;
-            });
-
-    private static volatile ScheduledFuture<?> sPendingTimeout;
-
-    /**
-     * When enabled, attempt to detect uncaught exceptions from background threads.
-     */
-    private static final boolean ENABLE_UNCAUGHT_EXCEPTION_DETECTION =
-            !"0".equals(System.getenv("RAVENWOOD_ENABLE_UNCAUGHT_EXCEPTION_DETECTION"));
-
-    private static final boolean DIE_ON_UNCAUGHT_EXCEPTION = false;
-
-    /**
-     * This is a "recoverable" uncaught exception from a BG thread. When we detect one,
-     * we just make the current test failed, but continue running the subsequent tests normally.
-     */
-    private static final AtomicReference<Throwable> sPendingRecoverableUncaughtException =
-            new AtomicReference<>();
-
-    /**
-     * It's an exception detected from a BG thread (which is not recoverable). Once
-     * we detect one, we make the current and all subsequent tests failed.
-     */
-    private static final AtomicReference<Throwable> sUnrecoverableUncaughtException =
-            new AtomicReference<>();
+    /** Do not dump environments matching this pattern. */
+    private static final Pattern sSecretEnvPattern = Pattern.compile(
+            "(KEY|AUTH|API)", Pattern.CASE_INSENSITIVE);
 
     // TODO: expose packCallingIdentity function in libbinder and use it directly
     // See: packCallingIdentity in frameworks/native/libs/binder/IPCThreadState.cpp
-    private static long packBinderIdentityToken(
+    static long packBinderIdentityToken(
             boolean hasExplicitIdentity, int callingUid, int callingPid) {
         long res = ((long) callingUid << 32) | callingPid;
         if (hasExplicitIdentity) {
@@ -198,9 +119,6 @@ public class RavenwoodDriver {
         return res;
     }
 
-    /** Map from path -> resources. */
-    private static final HashMap<File, Resources> sCachedResources = new HashMap<>();
-
     private static final Object sInitializationLock = new Object();
 
     @GuardedBy("sInitializationLock")
@@ -209,39 +127,10 @@ public class RavenwoodDriver {
     @GuardedBy("sInitializationLock")
     private static Throwable sExceptionFromGlobalInit;
 
-    private static Description sCurrentDescription;
-
-    private static final int DEFAULT_TARGET_SDK_LEVEL = VERSION_CODES.CUR_DEVELOPMENT;
-    private static final String DEFAULT_PACKAGE_NAME = "com.android.ravenwoodtests.defaultname";
-    private static final String DEFAULT_INSTRUMENTATION_CLASS =
-            "androidx.test.runner.AndroidJUnitRunner";
-
-    static volatile Thread sTestThread;
-    static volatile HandlerThread sMainThread;
-
-    private static final int sMyPid = new Random().nextInt(100, 32768);
-    private static int sTargetSdkLevel;
-
-    private static String sTestPackageName;
-    private static String sTargetPackageName;
-    private static String sInstrumentationClass;
-
-    static volatile RavenwoodContext sInstContext;
-    static volatile RavenwoodContext sTargetContext;
-    static volatile Application sTargetApplication;
-    private static Instrumentation sInstrumentation;
-    private static final long sCallingIdentity =
-            packBinderIdentityToken(false, FIRST_APPLICATION_UID, sMyPid);
-
-    static volatile File sRootDir;
-    static volatile File sAppDataDir;
-
     /**
      * Initialize the global environment.
      */
     public static void globalInitOnce() {
-        sTestThread = Thread.currentThread();
-        Thread.currentThread().setName(TESTS_THREAD_NAME);
         synchronized (sInitializationLock) {
             if (!sInitialized) {
                 // globalInitOnce() is called from class initializer, which cause
@@ -272,19 +161,23 @@ public class RavenwoodDriver {
                 }
 
                 // If an uncaught exception has been detected, don't run subsequent test classes.
-                maybeThrowUnrecoverableUncaughtExceptionIfDetected();
+                RavenwoodErrorHandler.maybeThrowUnrecoverableUncaughtException();
             }
         }
     }
 
-    private static void globalInitInner() throws IOException {
+    private static void globalInitInner() throws Exception {
         // We haven't initialized liblog yet, so directly write to System.out here.
         RavenwoodInternalUtils.log(TAG, "globalInitInner()");
 
-        if (ENABLE_UNCAUGHT_EXCEPTION_DETECTION) {
-            Thread.setDefaultUncaughtExceptionHandler(
-                    RavenwoodDriver::onUncaughtException);
-        }
+        // Parse ravenwood properties and initialize the "environment".
+        // This also unlocks the ability to use android.util.Log.
+        var mainThread = new HandlerThread(RavenwoodEnvironment.MAIN_THREAD_NAME);
+        RavenwoodEnvironment.init(mainThread);
+        Log_ravenwood.setLogLevels(getLogTags());
+
+        // Set up global error handling infrastructure
+        RavenwoodErrorHandler.init();
 
         // Some process-wide initialization:
         // - maybe redirect stdout/stderr
@@ -296,6 +189,7 @@ public class RavenwoodDriver {
         // Redirect stdout/stdin to the Log API.
         RuntimeInit.redirectLogStreams();
 
+        dumpRavenwoodProperties();
         dumpCommandLineArgs();
         dumpEnvironment();
         dumpJavaProperties();
@@ -307,8 +201,8 @@ public class RavenwoodDriver {
         // Make sure libravenwood_runtime is loaded.
         System.load(RavenwoodInternalUtils.getJniLibraryPath(RAVENWOOD_NATIVE_RUNTIME_NAME));
 
-        Log_ravenwood.setLogLevels(getLogTags());
-        Log_ravenwood.onRavenwoodRuntimeNativeReady();
+        // We can start to use native code
+        Log_ravenwood.sUseRealTid = true;
 
         // Do the basic set up for the android sysprops.
         RavenwoodSystemProperties.initialize();
@@ -336,7 +230,7 @@ public class RavenwoodDriver {
         RavenwoodNativeLoader.loadFrameworkNativeCode();
 
         // Start method logging.
-        RavenwoodMethodCallLogger.enable(sStdOut);
+        RavenwoodMethodCallLogger.getInstance().enable(sRawStdOut);
 
         // Touch some references early to ensure they're <clinit>'ed
         Objects.requireNonNull(Build.TYPE);
@@ -351,117 +245,32 @@ public class RavenwoodDriver {
         System.setProperty("android.junit.runner",
                 "androidx.test.internal.runner.junit4.AndroidJUnit4ClassRunner");
 
-        loadRavenwoodProperties();
-
         assertMockitoVersion();
 
-        sRootDir = Files.createTempDirectory("ravenwood-root-dir-").toFile();
-        sAppDataDir = new File(sRootDir, "data/app/appdatadir/");
-        sAppDataDir.mkdirs();
-        Environment_ravenwood.init(sRootDir);
-
-        Log.i(TAG, "TargetPackageName=" + sTargetPackageName);
-        Log.i(TAG, "TestPackageName=" + sTestPackageName);
-        Log.i(TAG, "TargetSdkLevel=" + sTargetSdkLevel);
-
-        RavenwoodRuntimeState.sUid = FIRST_APPLICATION_UID;
-        RavenwoodRuntimeState.sPid = sMyPid;
-        RavenwoodRuntimeState.sTargetSdkLevel = sTargetSdkLevel;
-
         RavenwoodUtils.sPendingExceptionThrower =
-                RavenwoodDriver::maybeThrowPendingRecoverableUncaughtExceptionNoClear;
-        Handler_ravenwood.sPendingExceptionThrower = (a, b, c) -> {
-            maybeThrowPendingRecoverableUncaughtExceptionNoClear();
-            return null;
-        };
-
-        final var main = new HandlerThread(MAIN_THREAD_NAME);
-        sMainThread = main;
-        main.start();
-        Looper_ravenwood.sDispatcher = RavenwoodDriver::dispatchMessage;
-        Looper.setMainLooperForTest(main.getLooper());
-
+                RavenwoodErrorHandler::maybeThrowPendingRecoverableUncaughtExceptionNoClear;
 
         ServiceManager.init$ravenwood();
         LocalServices.removeAllServicesForTest();
-
         ActivityManager.init$ravenwood(SYSTEM.getIdentifier());
 
-        final boolean isSelfInstrumenting =
-                Objects.equals(sTestPackageName, sTargetPackageName);
+        // Start the main thread.
+        mainThread.start();
+        Looper.setMainLooperForTest(mainThread.getLooper());
 
-        // This will load the resources from the apk set to `resource_apk` in the build file.
-        // This is supposed to be the "target app"'s resources.
-        final Supplier<Resources> targetResourcesLoader = () -> {
-            var file = new File(RAVENWOOD_RESOURCE_APK);
-            return loadResources(file.exists() ? file : null);
-        };
+        // Start app lifecycle.
+        RavenwoodAppDriver.init();
 
-        // Set up test context's (== instrumentation context's) resources.
-        // If the target package name == test package name, then we use the main resources.
-        final Supplier<Resources> instResourcesLoader;
-        if (isSelfInstrumenting) {
-            instResourcesLoader = targetResourcesLoader;
-        } else {
-            instResourcesLoader = () -> {
-                var file = new File(RAVENWOOD_INST_RESOURCE_APK);
-                return loadResources(file.exists() ? file : null);
-            };
-        }
-
-        sInstContext = new RavenwoodContext(
-                sTestPackageName, main, instResourcesLoader);
-        sTargetContext = new RavenwoodContext(
-                sTargetPackageName, main, targetResourcesLoader);
-
-        // Set up app context. App context is always created for the target app.
-        var application = new Application();
-        Application_ravenwood.attach(application, sTargetContext);
-        if (isSelfInstrumenting) {
-            sInstContext.attachApplicationContext(application);
-            sTargetContext.attachApplicationContext(application);
-        } else {
-            // When instrumenting into another APK, the test context doesn't have an app context.
-            sTargetContext.attachApplicationContext(application);
-        }
-        sTargetApplication = application;
-
-        // Set up ActivityThread.currentXxx().
-        // "System context" is _not_ the same thing as the target context, but
-        // the difference doesn't matter at least for now, so we just use the target context.
-        ActivityThread_ravenwood.init(application, sTargetContext);
-
-        final Supplier<Resources> systemResourcesLoader = () -> loadResources(null);
-
-        var systemServerContext =
-                new RavenwoodContext(ANDROID_PACKAGE_NAME, main, systemResourcesLoader);
-
-        var uiAutomation = new UiAutomation(sInstContext, new IUiAutomationConnection.Default());
-
-        var instArgs = Bundle.EMPTY;
-        RavenwoodUtils.runOnMainThreadSync(() -> {
-            var instClassName = withDefault(sInstrumentationClass, DEFAULT_INSTRUMENTATION_CLASS);
-            try {
-                var clazz = Class.forName(instClassName);
-                sInstrumentation = (Instrumentation) clazz.getConstructor().newInstance();
-            } catch (ReflectiveOperationException e) {
-                if (sInstrumentationClass != null) {
-                    // If the class is explicitly set, it is an error if the class is not found
-                    SneakyThrow.sneakyThrow(e);
-                } else {
-                    // Fallback to the platform instrumentation
-                    sInstrumentation = new Instrumentation();
-                }
-            }
-
-            sInstrumentation.basicInit(sInstContext, sTargetContext, uiAutomation);
-            sInstrumentation.onCreate(instArgs);
-        });
-        InstrumentationRegistry.registerInstance(sInstrumentation, instArgs);
-
-        RavenwoodSystemServer.init(systemServerContext);
-
+        // TODO(b/428775903) Make sure nothing would try to access compat-IDs before this call.
+        // We may want to do it within initAppDriver().
         initializeCompatIds();
+
+        // `pkill -USR2 -f tradefed-isolation.jar` will interrupt the test thread.
+        final Thread testThread = Thread.currentThread();
+        OpenJdkWorkaround.registerSignalHandler("USR2", () -> {
+            sRawStdErr.println("-----SIGUSR2 HANDLER-----");
+            testThread.interrupt();
+        });
     }
 
     /**
@@ -476,25 +285,6 @@ public class RavenwoodDriver {
         return logTags;
     }
 
-    private static void loadRavenwoodProperties() {
-        var props = RavenwoodSystemProperties.readProperties("ravenwood.properties");
-
-        sTargetSdkLevel = withDefault(
-                parseNullableInt(props.get("targetSdkVersionInt")), DEFAULT_TARGET_SDK_LEVEL);
-        sTargetPackageName = withDefault(props.get("packageName"), DEFAULT_PACKAGE_NAME);
-        sTestPackageName = withDefault(props.get("instPackageName"), sTargetPackageName);
-        sInstrumentationClass = props.get("instrumentationClass");
-
-        // TODO(b/377765941) Read them from the manifest too?
-    }
-
-    private static void maybeThrowUnrecoverableUncaughtExceptionIfDetected() {
-        var e = sUnrecoverableUncaughtException.get();
-        if (e != null) {
-            SneakyThrow.sneakyThrow(e);
-        }
-    }
-
     /**
      * Partially reset and initialize before each test class invocation
      */
@@ -503,58 +293,21 @@ public class RavenwoodDriver {
         UiAutomation_ravenwood.reset();
         Process_ravenwood.reset();
         DeviceConfig_ravenwood.reset();
-        Binder.restoreCallingIdentity(sCallingIdentity);
+        Binder.restoreCallingIdentity(
+                RavenwoodEnvironment.getInstance().getDefaultCallingIdentity());
 
         SystemProperties.clearChangeCallbacksForTest();
 
-        maybeThrowPendingRecoverableUncaughtExceptionAndClear();
+        RavenwoodErrorHandler.maybeThrowPendingRecoverableUncaughtExceptionAndClear();
     }
 
     /**
      * Called when a test method is about to be started.
      */
     public static void enterTestMethod(Description description) {
-
-        sCurrentDescription = description;
-
-        // If an uncaught exception has been detected, don't run subsequent test methods
-        // in the same test.
-        maybeThrowUnrecoverableUncaughtExceptionIfDetected();
-
         // TODO(b/375272444): this is a hacky workaround to ensure binder identity
-        Binder.restoreCallingIdentity(sCallingIdentity);
-
-        scheduleTimeout();
-    }
-
-    /**
-     * Called when a test method finished.
-     */
-    public static void exitTestMethod(Description description) {
-        cancelTimeout();
-        maybeThrowPendingRecoverableUncaughtExceptionAndClear();
-        maybeThrowUnrecoverableUncaughtExceptionIfDetected();
-    }
-
-    private static void scheduleTimeout() {
-        if (!ENABLE_TIMEOUT_STACKS) {
-            return;
-        }
-        cancelTimeout();
-
-        sPendingTimeout = sTimeoutExecutor.schedule(
-                RavenwoodDriver::onTestTimedOut,
-                TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
-    }
-
-    private static void cancelTimeout() {
-        if (!ENABLE_TIMEOUT_STACKS) {
-            return;
-        }
-        var pt = sPendingTimeout;
-        if (pt != null) {
-            pt.cancel(false);
-        }
+        Binder.restoreCallingIdentity(
+                RavenwoodEnvironment.getInstance().getDefaultCallingIdentity());
     }
 
     private static void initializeCompatIds() {
@@ -563,10 +316,12 @@ public class RavenwoodDriver {
         // Due to the `AppCompatCallbacks.install(new long[0], new long[0] ...` call in
         // SystemServer.
 
+        var env = RavenwoodEnvironment.getInstance();
+
         // Compat framework only uses the package name and the target SDK level.
         ApplicationInfo appInfo = new ApplicationInfo();
-        appInfo.packageName = sTargetPackageName;
-        appInfo.targetSdkVersion = sTargetSdkLevel;
+        appInfo.packageName = env.getTargetPackageName();
+        appInfo.targetSdkVersion = env.getTargetSdkLevel();
 
         PlatformCompat platformCompat = null;
         try {
@@ -580,194 +335,6 @@ public class RavenwoodDriver {
         var loggableChanges = platformCompat.getLoggableChanges(appInfo);
 
         AppCompatCallbacks.install(disabledChanges, loggableChanges, false);
-    }
-
-    /**
-     * Load {@link Resources} from an APK, with cache.
-     */
-    private static Resources loadResources(@Nullable File apkPath) {
-        var cached = sCachedResources.get(apkPath);
-        if (cached != null) {
-            return cached;
-        }
-
-        var fileToLoad = apkPath != null ? apkPath :
-                new File(getRavenwoodRuntimePath() + RAVENWOOD_EMPTY_RESOURCES_APK);
-
-        assertTrue("File " + fileToLoad + " doesn't exist.", fileToLoad.isFile());
-
-        final String path = fileToLoad.getAbsolutePath();
-        final var emptyPaths = new String[0];
-
-        ResourcesManager.getInstance().initializeApplicationPaths(path, emptyPaths);
-
-        final var ret = ResourcesManager.getInstance().getResources(null, path,
-                emptyPaths, emptyPaths, emptyPaths,
-                emptyPaths, null, null,
-                new DisplayAdjustments().getCompatibilityInfo(),
-                RavenwoodDriver.class.getClassLoader(), null);
-
-        assertNotNull(ret);
-
-        sCachedResources.put(apkPath, ret);
-        return ret;
-    }
-
-    /**
-     * Return if an exception is benign and okay to continue running the remaining tests.
-     */
-    private static boolean isThrowableRecoverable(Throwable th) {
-        if (th instanceof RavenwoodRecoverableExceptionWrapper) {
-            return true;
-        }
-        if (TOLERATE_UNHANDLED_EXCEPTIONS) {
-            return true;
-        }
-        if (TOLERATE_UNHANDLED_ASSERTS
-                && (th instanceof AssertionError || th instanceof AssumptionViolatedException)) {
-            return true;
-        }
-        return false;
-    }
-
-    private static class RavenwoodRecoverableExceptionWrapper extends Exception {
-        RavenwoodRecoverableExceptionWrapper(String message, Throwable cause) {
-            super(message, cause);
-        }
-
-        @Override
-        public String getMessage() {
-            return super.getMessage() + " : " + getCause().getMessage();
-        }
-    }
-
-    private static Throwable makeRecoverableExceptionInstance(Throwable th) {
-        if (th instanceof RavenwoodRecoverableExceptionWrapper) {
-            return th;
-        }
-        var outer = new RavenwoodRecoverableExceptionWrapper(
-                "Exception detected on thread " + Thread.currentThread().getName() + ": "
-                + " *** Continuing running the remaining test ***", th);
-        Log.e(TAG, outer.getMessage(), outer);
-        return outer;
-    }
-
-    private static void dispatchMessage(Message msg) {
-        // If there's already an exception caught and pending, don't run any more messages.
-        if (hasPendingRecoverableUncaughtException()) {
-            return;
-        }
-        try {
-            msg.getTarget().dispatchMessage(msg);
-        } catch (Throwable th) {
-            var desc = String.format("Detected %s on looper thread %s", th.getClass().getName(),
-                    Thread.currentThread());
-            sStdErr.println(desc);
-            if (isThrowableRecoverable(th)) {
-                setPendingRecoverableUncaughtException(th);
-                return;
-            }
-            throw th;
-        }
-    }
-
-    /**
-     * A callback when a test class finishes its execution.
-     */
-    public static void exitTestClass() {
-        maybeThrowPendingRecoverableUncaughtExceptionAndClear();
-    }
-
-    private static void setPendingRecoverableUncaughtException(Throwable th) {
-        sPendingRecoverableUncaughtException.compareAndSet(null,
-                makeRecoverableExceptionInstance(th));
-    }
-
-    private static boolean hasPendingRecoverableUncaughtException() {
-        return sPendingRecoverableUncaughtException.get() != null;
-    }
-
-    private static Throwable getPendingRecoverableUncaughtException(boolean clear) {
-        if (clear) {
-            return sPendingRecoverableUncaughtException.getAndSet(null);
-        } else {
-            return sPendingRecoverableUncaughtException.get();
-        }
-    }
-
-    private static void maybeThrowPendingRecoverableUncaughtException(boolean clear) {
-        final Throwable pending = getPendingRecoverableUncaughtException(clear);
-        if (pending != null) {
-            SneakyThrow.sneakyThrow(pending);
-        }
-    }
-
-    private static void maybeThrowPendingRecoverableUncaughtExceptionAndClear() {
-        maybeThrowPendingRecoverableUncaughtException(true);
-    }
-
-    private static void maybeThrowPendingRecoverableUncaughtExceptionNoClear() {
-        maybeThrowPendingRecoverableUncaughtException(false);
-    }
-
-    /**
-     * Prints the stack trace from all threads.
-     */
-    private static void onTestTimedOut() {
-        sStdErr.println("********* SLOW TEST DETECTED ********");
-        dumpStacks(null, null);
-    }
-
-    private static final Object sDumpStackLock = new Object();
-
-    /**
-     * Prints the stack trace from all threads.
-     */
-    private static void dumpStacks(
-            @Nullable Thread exceptionThread, @Nullable Throwable throwable) {
-        cancelTimeout();
-        synchronized (sDumpStackLock) {
-            final PrintStream out = sStdErr;
-            out.println("-----BEGIN ALL THREAD STACKS-----");
-
-            var stacks = Thread.getAllStackTraces();
-            var threads = stacks.keySet().stream().sorted(
-                    Comparator.comparingLong(Thread::getId)).collect(Collectors.toList());
-
-            // Put the test and the main thread at the top.
-            var testThread = sTestThread;
-            var mainThread = sMainThread;
-            if (mainThread != null) {
-                threads.remove(mainThread);
-                threads.add(0, mainThread);
-            }
-            if (testThread != null) {
-                threads.remove(testThread);
-                threads.add(0, testThread);
-            }
-            // Put the exception thread at the top.
-            // Also inject the stacktrace from the exception.
-            if (exceptionThread != null) {
-                threads.remove(exceptionThread);
-                threads.add(0, exceptionThread);
-                stacks.put(exceptionThread, throwable.getStackTrace());
-            }
-            for (var th : threads) {
-                out.println();
-
-                out.print("Thread");
-                if (th == exceptionThread) {
-                    out.print(" [** EXCEPTION THREAD **]");
-                }
-                out.print(": " + th.getName() + " / " + th);
-                out.println();
-
-                for (StackTraceElement e :  stacks.get(th)) {
-                    out.println("\tat " + e);
-                }
-            }
-            out.println("-----END ALL THREAD STACKS-----");
-        }
     }
 
     private static final String MOCKITO_ERROR = "FATAL: Unsupported Mockito detected!"
@@ -806,34 +373,12 @@ public class RavenwoodDriver {
         }
     }
 
-    private static void onUncaughtException(Thread thread, Throwable inner) {
-        if (isThrowableRecoverable(inner)) {
-            setPendingRecoverableUncaughtException(inner);
-            return;
-        }
-        var msg = String.format(
-                "Uncaught exception detected on thread %s, test=%s:"
-                + " %s; Failing all subsequent tests."
-                + " (Run with `RAVENWOOD_TOLERATE_UNHANDLED_EXCEPTIONS=1 atest...` to "
-                + "force run the subsequent tests)",
-                thread, sCurrentDescription, RavenwoodInternalUtils.getStackTraceString(inner));
-
-        var outer = new Exception(msg, inner);
-        Log.e(TAG, outer.getMessage(), outer);
-
-        sUnrecoverableUncaughtException.compareAndSet(null, outer);
-
-        doBugreport(thread, inner, DIE_ON_UNCAUGHT_EXCEPTION);
-    }
-
-    private static void doBugreport(
-            @Nullable Thread exceptionThread, @Nullable Throwable throwable,
-            boolean killSelf) {
-        // TODO: Print more information
-        dumpStacks(exceptionThread, throwable);
-        if (killSelf) {
-            System.exit(13);
-        }
+    private static void dumpRavenwoodProperties() {
+        Log.i(TAG, "Ravenwood properties:");
+        var env = RavenwoodEnvironment.getInstance();
+        Log.i(TAG, "  targetPackageName=" + env.getTargetPackageName());
+        Log.i(TAG, "  testPackageName=" + env.getInstPackageName());
+        Log.i(TAG, "  targetSdkLevel=" + env.getTargetSdkLevel());
     }
 
     private static void dumpJavaProperties() {
@@ -843,7 +388,19 @@ public class RavenwoodDriver {
 
     private static void dumpEnvironment() {
         Log.i(TAG, "Environment:");
-        dumpMap(System.getenv());
+
+        // Dump the environments, but don't print the values for "secret" ones.
+        dumpMap(System.getenv().entrySet().stream()
+                .collect(Collectors.toMap(
+                        // The key remains the same
+                        Map.Entry::getKey,
+
+                        // Hide the values as needed.
+                        entry -> sSecretEnvPattern.matcher(entry.getKey()).find()
+                                ? "[redacted]" : entry.getValue(),
+                        (oldValue, newValue) -> newValue,
+                        HashMap::new
+                )));
     }
 
     private static void dumpMap(Map<?, ?> map) {
@@ -851,6 +408,7 @@ public class RavenwoodDriver {
             Log.i(TAG, "  " + key + "=" + map.get(key));
         }
     }
+
     private static void dumpOtherInfo() {
         Log.i(TAG, "Other key information:");
         var jloc = Locale.getDefault();

@@ -58,6 +58,7 @@ import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dreams.ui.viewmodel.DreamViewModel;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.ui.viewmodel.GlanceableHubToLockscreenTransitionViewModel;
+import com.android.systemui.keyguard.ui.viewmodel.GoneToGlanceableHubTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenToGlanceableHubTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.OccludedToLockscreenTransitionViewModel;
 import com.android.systemui.log.core.LogLevel;
@@ -162,10 +163,12 @@ public class KeyguardStatusBarViewController extends ViewController<KeyguardStat
     private final CommunalSceneInteractor mCommunalSceneInteractor;
     private final GlanceableHubToLockscreenTransitionViewModel mHubToLockscreenTransitionViewModel;
     private final LockscreenToGlanceableHubTransitionViewModel mLockscreenToHubTransitionViewModel;
+    private final GoneToGlanceableHubTransitionViewModel mGoneToHubTransitionViewModel;
     private final OccludedToLockscreenTransitionViewModel mOccludedToLockscreenTransitionViewModel;
     private final DreamViewModel mDreamViewModel;
     private final KeyguardInteractor mKeyguardInteractor;
 
+    @Nullable private ComposeView mBatteryComposeView;
     private ViewGroup mSystemIconsContainer;
     private final StatusOverlayHoverListenerFactory mStatusOverlayHoverListenerFactory;
 
@@ -385,6 +388,7 @@ public class KeyguardStatusBarViewController extends ViewController<KeyguardStat
                     glanceableHubToLockscreenTransitionViewModel,
             LockscreenToGlanceableHubTransitionViewModel
                     lockscreenToGlanceableHubTransitionViewModel,
+            GoneToGlanceableHubTransitionViewModel goneToGlanceableHubTransitionViewModel,
             OccludedToLockscreenTransitionViewModel occludedToLockscreenTransitionViewModel,
             DreamViewModel dreamViewModel,
             KeyguardInteractor keyguardInteractor
@@ -420,6 +424,7 @@ public class KeyguardStatusBarViewController extends ViewController<KeyguardStat
         mCommunalSceneInteractor = communalSceneInteractor;
         mHubToLockscreenTransitionViewModel = glanceableHubToLockscreenTransitionViewModel;
         mLockscreenToHubTransitionViewModel = lockscreenToGlanceableHubTransitionViewModel;
+        mGoneToHubTransitionViewModel = goneToGlanceableHubTransitionViewModel;
         mOccludedToLockscreenTransitionViewModel = occludedToLockscreenTransitionViewModel;
         mDreamViewModel = dreamViewModel;
         mKeyguardInteractor = keyguardInteractor;
@@ -444,6 +449,9 @@ public class KeyguardStatusBarViewController extends ViewController<KeyguardStat
                 this::updateViewState
         );
         mStatusOverlayHoverListenerFactory = statusOverlayHoverListenerFactory;
+        if (NewStatusBarIcons.isEnabled() && SceneContainerFlag.isEnabled()) {
+            mBatteryComposeView = createAndBindComposeBattery();
+        }
     }
 
     private StatusBarContentInsetsProvider insetsProvider() {
@@ -514,6 +522,8 @@ public class KeyguardStatusBarViewController extends ViewController<KeyguardStat
                     mToGlanceableHubStatusBarAlphaConsumer, mCoroutineDispatcher);
             collectFlow(mView, mHubToLockscreenTransitionViewModel.getStatusBarAlpha(),
                     mFromGlanceableHubStatusBarAlphaConsumer, mCoroutineDispatcher);
+            collectFlow(mView, mGoneToHubTransitionViewModel.getStatusBarAlpha(),
+                    mToGlanceableHubStatusBarAlphaConsumer, mCoroutineDispatcher);
         }
         collectFlow(mView, mDreamViewModel.getStatusBarAlpha(),
                 this::setAlpha, mCoroutineDispatcher);
@@ -523,9 +533,10 @@ public class KeyguardStatusBarViewController extends ViewController<KeyguardStat
             collectFlow(mView, mKeyguardInteractor.primaryBouncerShowing, x -> updateViewState());
         }
         if (NewStatusBarIcons.isEnabled()) {
-            ComposeView batteryComposeView = createAndBindComposeBattery();
-
-            mSystemIconsContainer.addView(batteryComposeView, -1);
+            if (!SceneContainerFlag.isEnabled()) {
+                mBatteryComposeView = createAndBindComposeBattery();
+            }
+            mSystemIconsContainer.addView(mBatteryComposeView, -1);
             // Set the margins for the system icons appropriately
             AlphaOptimizedLinearLayout systemIcons =
                     mSystemIconsContainer.findViewById(R.id.statusIcons);
@@ -567,6 +578,9 @@ public class KeyguardStatusBarViewController extends ViewController<KeyguardStat
         }
         if (SceneContainerFlag.isEnabled()) {
             mKeyguardStateController.removeCallback(mKeyguardStateControllerCallback);
+            if (mBatteryComposeView != null) {
+                mSystemIconsContainer.removeView(mBatteryComposeView);
+            }
         }
     }
 

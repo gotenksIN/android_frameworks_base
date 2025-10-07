@@ -51,13 +51,6 @@ flag {
 }
 
 flag {
-  name: "notification_test"
-  namespace: "systemui"
-  description: "Timing test, no functionality"
-  bug: "316931130"
-}
-
-flag {
   name: "notification_custom_view_uri_restriction"
   namespace: "systemui"
   description: "This flag enables memory restriction of notifications holding custom views with Uri Bitmaps"
@@ -221,4 +214,29 @@ flag {
   }
 }
 
+flag {
+  name: "random_conversation_ids"
+  namespace: "systemui"
+  description: "Use random ids for new conversation channels, instead of concatenating parent id and conversation id"
+  bug: "432250872"
+}
 
+flag {
+  name: "preferences_throws_on_invalid_uid"
+  namespace: "systemui"
+  description: "Throw IAE when calling getOrCreatePackagePreferences() with INVALID_UID."
+  bug: "430250142"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "show_noisy_bundled_notifications"
+  namespace: "notifications"
+  description: "If a classification arrived late and the notification made noise, show the notification as unclassified temporarily"
+  bug: "430573835"
+  metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}

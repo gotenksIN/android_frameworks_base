@@ -75,23 +75,15 @@
     <item msgid="1051534112762023603">"Suprimeix completament"</item>
   </string-array>
   <string-array name="bluetooth_avrcp_versions">
-<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
     <item msgid="6603880723315236832">"AVRCP 1.6 (predeterminada)"</item>
     <item msgid="1637054408779685086">"AVRCP 1.3"</item>
     <item msgid="5896162189744596291">"AVRCP 1.4"</item>
-<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
     <item msgid="7556896992111771426">"AVRCP 1.5"</item>
   </string-array>
   <string-array name="bluetooth_avrcp_version_values">
-<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
     <item msgid="4041937689950033942">"avrcp16"</item>
     <item msgid="1613629084012791988">"avrcp13"</item>
     <item msgid="99467845610592181">"avrcp14"</item>
-<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
     <item msgid="1963366694959681026">"avrcp15"</item>
   </string-array>
   <string-array name="bluetooth_map_versions">
@@ -113,11 +105,7 @@
     <item msgid="3825367753087348007">"LDAC"</item>
     <item msgid="328951785723550863">"LC3"</item>
     <item msgid="506175145534048710">"Opus"</item>
-<!-- QTI_BEGIN: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
-<!-- QTI_END: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
     <item msgid="8711430979086781450">"Àudio <xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_ADAPTIVE">aptX™ Adaptive</xliff:g>"</item>
-<!-- QTI_BEGIN: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
-<!-- QTI_END: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
     <item msgid="6486050771049225">"Àudio <xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_TWSP">aptX™ TWS+</xliff:g>"</item>
   </string-array>
   <string-array name="bluetooth_a2dp_codec_summaries">
@@ -129,11 +117,7 @@
     <item msgid="2553206901068987657">"LDAC"</item>
     <item msgid="3940992993241040716">"LC3"</item>
     <item msgid="7940970833006181407">"Opus"</item>
-<!-- QTI_BEGIN: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
-<!-- QTI_END: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
     <item msgid="102988075927343894">"Àudio <xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_ADAPTIVE">aptX™ Adaptive</xliff:g>"</item>
-<!-- QTI_BEGIN: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
-<!-- QTI_END: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
     <item msgid="6486050771049481">"Àudio <xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_TWSP">aptX™ TWS+</xliff:g>"</item>
   </string-array>
   <string-array name="bluetooth_a2dp_codec_sample_rate_titles">
@@ -317,7 +301,7 @@
   <string-array name="shade_display_awareness_summaries">
     <item msgid="2964753205732912921">"Mostra l\'ombra només a la pantalla del dispositiu"</item>
     <item msgid="1955398604822147783">"Mostra l\'àrea en una sola pantalla externa"</item>
-    <item msgid="391477482416751568">"Mostra l\'àrea a la pantalla amb què s\'ha interaccionat per darrera vegada a la barra d\'estat"</item>
+    <item msgid="391477482416751568">"Mostra l\'àrea a la pantalla en què s\'ha interaccionat per últim cop amb la barra d\'estat"</item>
     <item msgid="1746820128097981528">"Mostra l\'àrea a la darrera pantalla en què s\'hagi posat el focus"</item>
   </string-array>
   <string-array name="shade_display_awareness_values">

@@ -143,8 +143,16 @@ public class AppBindingService extends Binder {
         }
     }
 
-    /** Get the list of services bound to a specific finder class. */
-    public List<AppServiceConnection> getAppServiceConnections(
+    /**
+     * Get the list of services bound to a specific finder class.
+     *
+     * This method will block until all connections are established or a timeout occurs.
+     *
+     * <p><b>NOTE: This method should be called from a background thread other than
+     * {@link BackgroundThread}, otherwise the {@link PersistentConnection} callbacks will not be
+     * delivered until after this method returns.</b></p>
+     */
+    public List<AppServiceConnection> getAppServiceConnectionsBlocking(
             Class<? extends AppServiceFinder<?, ?>> appServiceFinderClass, int userId) {
         List<AppServiceConnection> serviceConnections = new ArrayList<>();
         synchronized (mLock) {
@@ -153,36 +161,32 @@ public class AppBindingService extends Binder {
                 if (app.getClass() != appServiceFinderClass) {
                     continue;
                 }
-                serviceConnections.addAll(getBoundConnectionsLocked(userId, app));
+                serviceConnections.addAll(getConnectionsLocked(userId, app));
             }
         }
-        return serviceConnections;
+
+        List<AppServiceConnection> boundConnections = new ArrayList<>();
+        for (AppServiceConnection conn: serviceConnections) {
+            conn.bind();
+            if (conn.awaitConnection()) {
+                boundConnections.add(conn);
+            } else {
+                Slogf.w(TAG, "Failed to establish connection for %s, user %d, package %s",
+                        conn.getFinder().getAppDescription(), userId, conn.getPackageName());
+            }
+        }
+        return boundConnections;
     }
 
-    /** Get the connection bound to a specific finder. If the connection does not
-     * already exist, create one.  */
-    private List<AppServiceConnection> getBoundConnectionsLocked(int userId, AppServiceFinder app) {
+    /**
+     * Get the connection bound to a specific finder or create one if it does not exist.
+     */
+    private List<AppServiceConnection> getConnectionsLocked(int userId,
+            AppServiceFinder app) {
         Set<String> targetPackages = app.getTargetPackages(userId);
         List<AppServiceConnection> connections = new ArrayList<>();
         for (String targetPackage : targetPackages) {
-            AppServiceConnection conn = findConnectionLock(userId, app, targetPackage);
-            if (conn == null) {
-                final ServiceInfo service =
-                        app.findService(userId, mIPackageManager, mConstants, targetPackage);
-                if (service != null) {
-                    conn =
-                            new AppServiceConnection(
-                                    mContext,
-                                    userId,
-                                    mConstants,
-                                    mHandler,
-                                    app,
-                                    targetPackage,
-                                    service.getComponentName());
-                    mConnections.add(conn);
-                    conn.bind();
-                }
-            }
+            AppServiceConnection conn = getOrCreateConnectionLocked(userId, app, targetPackage);
             if (conn != null) {
                 connections.add(conn);
             }
@@ -462,7 +466,7 @@ public class AppBindingService extends Binder {
     }
 
     @Nullable
-    private AppServiceConnection findConnectionLock(
+    private AppServiceConnection getOrCreateConnectionLocked(
             int userId, @NonNull AppServiceFinder target, String targetPackage) {
         for (int i = 0; i < mConnections.size(); i++) {
             final AppServiceConnection conn = mConnections.get(i);
@@ -471,6 +475,22 @@ public class AppBindingService extends Binder {
                     && conn.getPackageName().equals(targetPackage)) {
                 return conn;
             }
+        }
+
+        final ServiceInfo service =
+                target.findService(userId, mIPackageManager, mConstants, targetPackage);
+        if (service != null) {
+            final AppServiceConnection conn  =
+                    new AppServiceConnection(
+                            mContext,
+                            userId,
+                            mConstants,
+                            mHandler,
+                            target,
+                            targetPackage,
+                            service.getComponentName());
+            mConnections.add(conn);
+            return conn;
         }
         return null;
     }

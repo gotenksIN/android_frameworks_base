@@ -17,6 +17,7 @@
 package com.android.settingslib.spa.widget.button
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +36,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Launch
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DisabledByDefault
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -102,13 +104,20 @@ fun ActionButtons(actionButtons: List<ActionButton>) {
 @Composable
 private fun RowScope.ActionButton(actionButton: ActionButton) {
     if (isSpaExpressiveEnabled) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = actionButton.onClick)
+        ) {
             IconButton(actionButton)
             Spacer(Modifier.height(SettingsSpace.extraSmall3))
             Text(
                 text = actionButton.text,
-                modifier = Modifier.clearAndSetSemantics {}, // semantics set in IconButton
+                modifier = Modifier
+                    .padding(horizontal = SettingsSpace.extraSmall4),
                 style = MaterialTheme.typography.titleSmallEmphasized,
+                textAlign = TextAlign.Center,
             )
         }
     } else {
@@ -164,7 +173,8 @@ private fun IconButton(actionButton: ActionButton) {
                     IconButtonDefaults.mediumContainerSize(
                         IconButtonDefaults.IconButtonWidthOption.Wide
                     )
-                ),
+                )
+                .clearAndSetSemantics {}, // semantics set in IconButton
         enabled = actionButton.enabled,
         // Because buttons could appear, disappear or change positions, reset the interaction source
         // to prevent highlight the wrong button.
@@ -201,6 +211,10 @@ private fun ActionButtonsPreview() {
                 ActionButton(text = "Open", imageVector = Icons.AutoMirrored.Outlined.Launch) {},
                 ActionButton(text = "Uninstall", imageVector = Icons.Outlined.Delete) {},
                 ActionButton(text = "Force stop", imageVector = Icons.Outlined.WarningAmber) {},
+                ActionButton(
+                    text = "long long long long text",
+                    imageVector = Icons.Outlined.DisabledByDefault
+                ) {},
             )
         )
     }

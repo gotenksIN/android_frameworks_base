@@ -23,6 +23,7 @@ import static android.view.WindowManager.TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION;
 import static android.view.WindowManager.TRANSIT_NONE;
 import static android.window.DesktopExperienceFlags.ENABLE_PARALLEL_CD_TRANSITIONS_DURING_RECENTS;
 
+import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN;
 import static com.android.server.wm.ActivityTaskManagerService.POWER_MODE_REASON_CHANGE_DISPLAY;
 
 import android.annotation.ColorInt;
@@ -47,10 +48,12 @@ import android.util.SparseArray;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
 import android.view.Display;
+import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.window.ITransitionMetricsReporter;
 import android.window.ITransitionPlayer;
 import android.window.RemoteTransition;
+import android.window.StartingWindowRemovalInfo;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
 import android.window.WindowContainerTransaction;
@@ -247,6 +250,10 @@ class TransitionController {
     TransitionController(ActivityTaskManagerService atm) {
         mAtm = atm;
         mRemotePlayer = new RemotePlayer(atm);
+        if (Flags.fallbackTransitionPlayer()) {
+            mTransitionPlayers.add(
+                    new TransitionPlayerRecord(new FallbackPlayer(atm), null /* proc */));
+        }
     }
 
     void setWindowManager(WindowManagerService wms) {
@@ -284,6 +291,16 @@ class TransitionController {
             mCollectingTransition.abort();
         }
         mRemotePlayer.clear();
+        for (int i = 0; i < mQueuedTransitions.size(); ++i) {
+            final QueuedTransition queued = mQueuedTransitions.get(i);
+            if (queued.mTransition != null) {
+                queued.mTransition.abort();
+            } else {
+                // legacy sync
+                mSyncEngine.abort(queued.mLegacySync.mSyncId);
+            }
+        }
+        mQueuedTransitions.clear();
         mRunningLock.doNotifyLocked();
         // Restore the rest of the player stack
         mTransitionPlayers.addAll(temp);
@@ -302,7 +319,7 @@ class TransitionController {
     Transition createTransition(@WindowManager.TransitionType int type,
             @WindowManager.TransitionFlags int flags) {
         if (mTransitionPlayers.isEmpty()) {
-            throw new IllegalStateException("Shell Transitions not enabled");
+            throw new IllegalStateException("Somehow creating a transition while flushing");
         }
         if (mCollectingTransition != null) {
             throw new IllegalStateException("Trying to directly start transition collection while "
@@ -322,8 +339,7 @@ class TransitionController {
             throw new IllegalStateException("Simultaneous transition collection not supported.");
         }
         if (mTransitionPlayers.isEmpty()) {
-            // If sysui has been killed (by a test) or crashed, we can temporarily have no player
-            // In this case, abort the transition.
+            // This means transitions are being "flushed" due to switching players.
             transition.abort();
             return;
         }
@@ -338,15 +354,15 @@ class TransitionController {
 
     void registerTransitionPlayer(@Nullable ITransitionPlayer player,
             @Nullable WindowProcessController playerProc) {
-        if (!mTransitionPlayers.isEmpty()) {
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Registering transition "
+        if (!mTransitionPlayers.isEmpty() || Flags.fallbackTransitionPlayer()) {
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Registering transition "
                     + "player %s over %d other players", player.asBinder(),
                     mTransitionPlayers.size());
             // flush currently running transitions so that the new player doesn't get
             // intermediate state
             flushRunningTransitions();
         } else {
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Registering transition "
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Registering transition "
                     + "player %s ", player.asBinder());
         }
         mTransitionPlayers.add(new TransitionPlayerRecord(player, playerProc));
@@ -359,18 +375,18 @@ class TransitionController {
             if (mTransitionPlayers.get(idx).mPlayer.asBinder() == player.asBinder()) break;
         }
         if (idx < 0) {
-            ProtoLog.w(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Attempt to unregister "
+            ProtoLog.w(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Attempt to unregister "
                     + "transition player %s but it isn't registered", player.asBinder());
             return;
         }
         final boolean needsFlush = idx == (mTransitionPlayers.size() - 1);
         final TransitionPlayerRecord record = mTransitionPlayers.remove(idx);
         if (needsFlush) {
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Unregistering active "
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Unregistering active "
                     + "transition player %s at index=%d leaving %d in stack", player.asBinder(),
                     idx, mTransitionPlayers.size());
         } else {
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Unregistering transition "
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Unregistering transition "
                     + "player %s at index=%d leaving %d in stack", player.asBinder(), idx,
                     mTransitionPlayers.size());
         }
@@ -383,11 +399,12 @@ class TransitionController {
     }
 
     @Nullable ITransitionPlayer getTransitionPlayer() {
-        return mTransitionPlayers.isEmpty() ? null : mTransitionPlayers.getLast().mPlayer;
+        if (!Flags.fallbackTransitionPlayer() && mTransitionPlayers.isEmpty()) return null;
+        return mTransitionPlayers.getLast().mPlayer;
     }
 
     boolean isShellTransitionsEnabled() {
-        return !mTransitionPlayers.isEmpty();
+        return !mTransitionPlayers.isEmpty() || Flags.fallbackTransitionPlayer();
     }
 
     /** @return {@code true} if using shell-transitions rotation instead of fixed-rotation. */
@@ -782,6 +799,9 @@ class TransitionController {
             @WindowManager.TransitionFlags int flags, @Nullable WindowContainer trigger,
             @NonNull WindowContainer readyGroupRef, @NonNull ActionChain chain) {
         if (mTransitionPlayers.isEmpty()) {
+            if (Flags.fallbackTransitionPlayer()) {
+                throw new IllegalStateException("Somehow requesting transition while flushing");
+            }
             return null;
         }
         Transition newTransition = null;
@@ -819,11 +839,27 @@ class TransitionController {
         return newTransition;
     }
 
-    /** Asks the transition player (shell) to start a created but not yet started transition. */
+    @NonNull
+    Transition requestStartUserTransition(@NonNull Transition transition,
+            @Nullable TransitionRequestInfo.UserChange userChange) {
+        return requestStartTransition(transition, null /* startTask */,
+                null /* remoteTransition */, null /* displayChange */, userChange);
+    }
+
     @NonNull
     Transition requestStartTransition(@NonNull Transition transition, @Nullable Task startTask,
             @Nullable RemoteTransition remoteTransition,
             @Nullable TransitionRequestInfo.DisplayChange displayChange) {
+        return requestStartTransition(transition, startTask, remoteTransition, displayChange,
+                null /* userChange */);
+    }
+
+    /** Asks the transition player (shell) to start a created but not yet started transition. */
+    @NonNull
+    Transition requestStartTransition(@NonNull Transition transition, @Nullable Task startTask,
+            @Nullable RemoteTransition remoteTransition,
+            @Nullable TransitionRequestInfo.DisplayChange displayChange,
+            @Nullable TransitionRequestInfo.UserChange userChange) {
         if (mIsWaitingForDisplayEnabled) {
             ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS,
                     "Disabling player for transition #%d because display isn't enabled yet",
@@ -835,8 +871,7 @@ class TransitionController {
             return transition;
         }
         if (mTransitionPlayers.isEmpty() || transition.isAborted()) {
-            // Apparently, some tests will kill(and restart) systemui, so there is a chance that
-            // the player might be transiently null.
+            // Either flushing or already flushed, so abort here.
             if (transition.isCollecting()) {
                 transition.abort();
             }
@@ -870,12 +905,12 @@ class TransitionController {
 
             final TransitionRequestInfo request = new TransitionRequestInfo(transition.mType,
                     startTaskInfo, pipChange, remoteTransition, displayChange,
-                    transition.getRequestedLocation(), transition.getFlags(),
+                    transition.getRequestedLocation(), userChange, transition.getFlags(),
                     transition.getSyncId());
 
             transition.mLogger.mRequestTimeNs = SystemClock.elapsedRealtimeNanos();
             transition.mLogger.mRequest = request;
-            mTransitionPlayers.getLast().mPlayer.requestStartTransition(
+            getTransitionPlayer().requestStartTransition(
                     transition.getToken(), request);
             if (remoteTransition != null) {
                 transition.setRemoteAnimationApp(remoteTransition.getAppThread());
@@ -892,7 +927,8 @@ class TransitionController {
      * @return the new transition if it was created for this request, `null` otherwise.
      */
     Transition requestCloseTransitionIfNeeded(@NonNull WindowContainer<?> wc) {
-        if (mTransitionPlayers.isEmpty() || isCollecting()) return null;
+        if (!Flags.fallbackTransitionPlayer() && mTransitionPlayers.isEmpty()) return null;
+        if (isCollecting()) return null;
         if (!wc.isVisibleRequested()) return null;
         return requestStartTransition(createTransition(TRANSIT_CLOSE, 0 /* flags */), wc.asTask(),
                 null /* remoteTransition */, null /* displayChange */);
@@ -1008,6 +1044,7 @@ class TransitionController {
 
     /** @see Transition#deferTransitionReady */
     void deferTransitionReady() {
+        if (Flags.migrateBasicLegacyReady()) return;
         if (!isShellTransitionsEnabled()) return;
         if (mCollectingTransition == null) {
             throw new IllegalStateException("No collecting transition to defer readiness for.");
@@ -1017,6 +1054,7 @@ class TransitionController {
 
     /** @see Transition#continueTransitionReady */
     void continueTransitionReady() {
+        if (Flags.migrateBasicLegacyReady()) return;
         if (!isShellTransitionsEnabled()) return;
         if (mCollectingTransition == null) {
             throw new IllegalStateException("No collecting transition to defer readiness for.");
@@ -1158,7 +1196,7 @@ class TransitionController {
             // If it's a legacy sync, then it needs to wait until there is no collecting transition.
             if (queued.mTransition == null) return;
             if (!canStartCollectingNow(queued.mTransition)) return;
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN,
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN,
                     "Moving #%d from collecting to waiting.", mCollectingTransition.getSyncId());
             mWaitingTransitions.add(mCollectingTransition);
             mCollectingTransition = null;
@@ -1186,7 +1224,7 @@ class TransitionController {
             // the incoming transition's changes stale (e.g. display change transition had not
             // been formally started). So send this transition to Shell before applying any changes
             // to report it as a no-op.
-            ProtoLog.w(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN,
+            ProtoLog.w(WM_DEBUG_WINDOW_TRANSITIONS_MIN,
                     "Formerly queued #%d force-reported as no-op", queued.mTransition.getSyncId());
             queued.mTransition.playNow();
         } else {
@@ -1533,13 +1571,14 @@ class TransitionController {
         proto.end(token);
     }
 
-    /** Returns {@code true} if it started collecting, {@code false} if it was queued. */
-    private void queueTransition(Transition transit, OnStartCollect onStartCollect) {
+    private void queueTransition(Transition transit, OnStartCollect onStartCollect,
+            boolean noopIfDuringDisplayChange) {
         final QueuedTransition queuedTransition = new QueuedTransition(transit, onStartCollect);
 
-        // If we queue a non-display transition while a collecting transition is still not
-        // formally started, then check if collecting transition is changing a display
-        if ((transit.getFlags() & TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION) == 0
+        // If we queue a non-display transition while a collecting transition
+        // is still not formally started, then check if collecting transition is changing a display.
+        if (noopIfDuringDisplayChange
+                && (transit.getFlags() & TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION) == 0
                 && mCollectingTransition != null && !mCollectingTransition.hasStarted()) {
             for (int i = 0; i < mCollectingTransition.mParticipants.size(); i++) {
                 if (mCollectingTransition.mParticipants.valueAt(i).asDisplayContent() != null) {
@@ -1550,15 +1589,26 @@ class TransitionController {
         }
 
         mQueuedTransitions.add(queuedTransition);
-        ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN,
+        ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN,
                 "Queueing transition: %s", transit);
     }
 
-    /** Returns {@code true} if it started collecting, {@code false} if it was queued. */
+    /** @see #startCollectOrQueue(Transition, OnStartCollect, boolean) */
     boolean startCollectOrQueue(Transition transit, OnStartCollect onStartCollect) {
+        return startCollectOrQueue(transit, onStartCollect, false /* isDirectFromShell */);
+    }
+
+    /**
+     * Returns {@code true} if it started collecting, {@code false} if it was queued.
+     *
+     * @param noopIfDuringDisplayChange true we should no-op this transition when a display
+     *                                  changing transition is collecting but not formally started.
+     */
+    boolean startCollectOrQueue(Transition transit, OnStartCollect onStartCollect,
+            boolean noopIfDuringDisplayChange) {
         if (!mQueuedTransitions.isEmpty()) {
             // Just add to queue since we already have a queue.
-            queueTransition(transit, onStartCollect);
+            queueTransition(transit, onStartCollect, noopIfDuringDisplayChange);
             return false;
         }
         if (mSyncEngine.hasActiveSync()) {
@@ -1566,7 +1616,7 @@ class TransitionController {
                 // Check if we can run in parallel here.
                 if (canStartCollectingNow(transit)) {
                     // start running in parallel.
-                    ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Moving #%d from"
+                    ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Moving #%d from"
                             + " collecting to waiting.", mCollectingTransition.getSyncId());
                     mWaitingTransitions.add(mCollectingTransition);
                     mCollectingTransition = null;
@@ -1577,7 +1627,7 @@ class TransitionController {
             } else {
                 Slog.w(TAG, "Ongoing Sync outside of transition.");
             }
-            queueTransition(transit, onStartCollect);
+            queueTransition(transit, onStartCollect, noopIfDuringDisplayChange);
             return false;
         }
         moveToCollecting(transit);
@@ -1594,6 +1644,9 @@ class TransitionController {
     @Nullable
     Transition createAndStartCollecting(int type) {
         if (mTransitionPlayers.isEmpty()) {
+            if (Flags.fallbackTransitionPlayer()) {
+                throw new IllegalStateException("Can't create transition while flushing");
+            }
             return null;
         }
         if (!mQueuedTransitions.isEmpty()) {
@@ -1605,7 +1658,7 @@ class TransitionController {
                 // Check if we can run in parallel here.
                 if (canStartCollectingNow(null /* transit */)) {
                     // create and collect in parallel.
-                    ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Moving #%d from"
+                    ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Moving #%d from"
                             + " collecting to waiting.", mCollectingTransition.getSyncId());
                     mWaitingTransitions.add(mCollectingTransition);
                     mCollectingTransition = null;
@@ -1629,7 +1682,7 @@ class TransitionController {
             // Just add to queue since we already have a queue.
             mQueuedTransitions.add(new QueuedTransition(syncGroup,
                     (deferred) -> applySync.accept(true /* deferred */)));
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN,
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN,
                     "Queueing legacy sync-set: %s", syncGroup.mSyncId);
             return;
         }
@@ -1826,10 +1879,10 @@ class TransitionController {
         }
 
         void logOnSend() {
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN, "%s", buildOnSendLog());
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN,
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "%s", buildOnSendLog());
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN,
                     "    startWCT=%s", mStartWCT);
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN, "    info=%s",
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "    info=%s",
                     mInfo.toString("    " /* prefix */));
         }
 
@@ -1855,7 +1908,7 @@ class TransitionController {
         }
 
         void logOnFinish() {
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN, "%s", buildOnFinishLog());
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "%s", buildOnFinishLog());
         }
     }
 
@@ -1917,6 +1970,61 @@ class TransitionController {
                     this.notifyAll();
                 }
             }
+        }
+    }
+
+    /** Fallback player used during time periods where a real player is not registered. */
+    private static class FallbackPlayer implements ITransitionPlayer {
+        final ActivityTaskManagerService mAtm;
+
+        FallbackPlayer(ActivityTaskManagerService atm) {
+            mAtm = atm;
+        }
+
+        @Override
+        public IBinder asBinder() {
+            return null;
+        }
+
+        @Override
+        public void onTransitionReady(IBinder transitionToken, TransitionInfo info,
+                SurfaceControl.Transaction t, SurfaceControl.Transaction finishT)
+                throws RemoteException {
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Playing [FALLBACK] "
+                    + "animation for #%d @%d", info.getDebugId(), info.getTrack());
+            t.apply();
+            finishT.apply();
+            mAtm.mH.post(() -> {
+                try {
+                    ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Transition animation [FALLBACK] "
+                            + "finished #%d @%d", info.getDebugId(), info.getTrack());
+                    mAtm.getWindowOrganizerController().finishTransition(transitionToken,
+                            null /* wct */);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Error finishing transition from fallback", e);
+                }
+            });
+        }
+
+        @Override
+        public void requestStartTransition(IBinder transitionToken, TransitionRequestInfo request)
+                throws RemoteException {
+            mAtm.mH.post(() -> {
+                try {
+                    ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN,
+                            "Transition requested [FALLBACK] (#%d): %s %s", request.getDebugId(),
+                            transitionToken, request);
+                    mAtm.getWindowOrganizerController().startTransition(transitionToken,
+                            null /* wct */);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Error starting transition from fallback", e);
+                }
+            });
+        }
+
+        @Override
+        public void removeStartingWindow(StartingWindowRemovalInfo removalInfo)
+                throws RemoteException {
         }
     }
 }

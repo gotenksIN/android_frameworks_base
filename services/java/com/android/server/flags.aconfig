@@ -2,14 +2,6 @@ package: "android.server"
 container: "system"
 
 flag {
-     namespace: "system_performance"
-     name: "telemetry_apis_service"
-     description: "Control service portion of telemetry APIs feature."
-     is_fixed_read_only: true
-     bug: "324153471"
-}
-
-flag {
      name: "remove_text_service"
      namespace: "wear_frameworks"
      description: "Remove TextServiceManagerService on Wear"
@@ -43,13 +35,6 @@ flag {
      description: "Migrate wrist orientation service functionality to wear settings service"
      bug: "352725980"
      is_fixed_read_only: true
-}
-
-flag {
-    name: "allow_network_time_update_service"
-    namespace: "wear_systems"
-    description: "Allow NetworkTimeUpdateService on Wear"
-    bug: "327508176"
 }
 
 flag {

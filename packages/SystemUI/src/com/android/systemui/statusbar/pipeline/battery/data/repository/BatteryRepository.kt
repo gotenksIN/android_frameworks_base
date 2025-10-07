@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.pipeline.battery.data.repository
 
 import android.content.Context
 import android.provider.Settings
+import com.android.systemui.Flags
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
@@ -32,11 +33,13 @@ import kotlin.coroutines.resume
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -54,6 +57,9 @@ interface BatteryRepository {
 
     /** Is power saver enabled */
     val isPowerSaveEnabled: Flow<Boolean>
+
+    /** Is extreme power saver enabled */
+    val isExtremePowerSaveEnabled: Flow<Boolean>
 
     /** Battery defender means the device is plugged in but not charging to protect the battery */
     val isBatteryDefenderEnabled: Flow<Boolean>
@@ -96,8 +102,18 @@ constructor(
     settingsRepository: SystemSettingsRepository,
     @BatteryTableLog tableLog: TableLogBuffer,
 ) : BatteryRepository {
+    private fun <T> flaggedCallbackFlow(block: suspend ProducerScope<T>.() -> Unit): Flow<T> {
+        if (Flags.statusBarBatteryNoConflation()) {
+            return callbackFlow(block)
+        } else {
+            return conflatedCallbackFlow(block)
+        }
+    }
+
     private val batteryState: StateFlow<BatteryCallbackState> =
-        conflatedCallbackFlow<(BatteryCallbackState) -> BatteryCallbackState> {
+        // Never use conflatedCallbackFlow here because that could cause us to drop events.
+        // See b/433239990.
+        flaggedCallbackFlow<(BatteryCallbackState) -> BatteryCallbackState> {
                 val callback =
                     object : BatteryController.BatteryStateChangeCallback {
                         override fun onBatteryLevelChanged(
@@ -110,6 +126,10 @@ constructor(
 
                         override fun onPowerSaveChanged(isPowerSave: Boolean) {
                             trySend { prev -> prev.copy(isPowerSaveEnabled = isPowerSave) }
+                        }
+
+                        override fun onExtremeBatterySaverChanged(isExtreme: Boolean) {
+                            trySend { prev -> prev.copy(isExtremePowerSaveEnabled = isExtreme) }
                         }
 
                         override fun onIsBatteryDefenderChanged(isBatteryDefender: Boolean) {
@@ -167,6 +187,21 @@ constructor(
                 initialValue = batteryState.value.isPowerSaveEnabled,
             )
             .stateIn(scope, SharingStarted.WhileSubscribed(), batteryState.value.isPowerSaveEnabled)
+
+    override val isExtremePowerSaveEnabled =
+        batteryState
+            .map { it.isExtremePowerSaveEnabled }
+            .distinctUntilChanged()
+            .logDiffsForTable(
+                tableLogBuffer = tableLog,
+                columnName = COL_EXTREME_POWER_SAVE,
+                initialValue = batteryState.value.isExtremePowerSaveEnabled,
+            )
+            .stateIn(
+                scope,
+                SharingStarted.WhileSubscribed(),
+                batteryState.value.isExtremePowerSaveEnabled,
+            )
 
     override val isBatteryDefenderEnabled =
         batteryState
@@ -267,6 +302,7 @@ constructor(
     companion object {
         private const val COL_PLUGGED_IN = "pluggedIn"
         private const val COL_POWER_SAVE = "powerSave"
+        private const val COL_EXTREME_POWER_SAVE = "extremePowerSave"
         private const val COL_DEFEND = "defend"
         private const val COL_INCOMPATIBLE_CHARGING = "incompatibleCharging"
         private const val COL_LEVEL = "level"
@@ -281,6 +317,7 @@ private data class BatteryCallbackState(
     val level: Int? = null,
     val isPluggedIn: Boolean = false,
     val isPowerSaveEnabled: Boolean = false,
+    val isExtremePowerSaveEnabled: Boolean = false,
     val isBatteryDefenderEnabled: Boolean = false,
     val isStateUnknown: Boolean = false,
     val isIncompatibleCharging: Boolean = false,

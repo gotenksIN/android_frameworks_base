@@ -91,7 +91,8 @@ import static android.view.WindowManagerGlobal.ADD_PERMISSION_DENIED;
 import static android.view.contentprotection.flags.Flags.createAccessibilityOverlayAppOpEnabled;
 
 import static com.android.hardware.input.Flags.enableNew25q2Keycodes;
-import static com.android.hardware.input.Flags.hidBluetoothWakeup;
+import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH;
+import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_CANCEL;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_COMPLETE;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_START;
@@ -281,6 +282,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final boolean DEBUG_INPUT = false;
     static final boolean DEBUG_KEYGUARD = false;
     static final boolean DEBUG_WAKEUP = false;
+    static final boolean DEBUG_DREAMS = false;
 
     // Whether to allow dock apps with METADATA_DOCK_HOME to temporarily take over the Home key.
     // No longer recommended for desk docks;
@@ -326,7 +328,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // The config value can be overridden using Settings.Global.POWER_BUTTON_DOUBLE_PRESS and/or
     // Settings.Global.POWER_BUTTON_TRIPLE_PRESS
     static final int MULTI_PRESS_POWER_NOTHING = 0;
-    static final int MULTI_PRESS_POWER_THEATER_MODE = 1;
+    // Deprecated: static final int MULTI_PRESS_POWER_THEATER_MODE = 1;
     static final int MULTI_PRESS_POWER_BRIGHTNESS_BOOST = 2;
     static final int MULTI_PRESS_POWER_LAUNCH_TARGET_ACTIVITY = 3;
 
@@ -445,6 +447,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private final SparseArray<ScreenOnListener> mScreenOnListeners = new SparseArray<>();
 
     Context mContext;
+    Injector mInjector;
     WindowManagerFuncs mWindowManagerFuncs;
     WindowManagerInternal mWindowManagerInternal;
     PowerManager mPowerManager;
@@ -609,6 +612,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mWakeOnBackKeyPress;
     boolean mSilenceRingerOnSleepKey;
     long mWakeUpToLastStateTimeout;
+    long mTurnOffTvToastSuppressionDelay;
+    long mTurnOffTvToastPostDelay;
+    long mLastShortPressTurnOffTvHintToastTime = 0;
     ComponentName mSearchKeyTargetActivity;
 
     // Key Behavior - Stem Primary
@@ -676,9 +682,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // display is on, even if the display is not interactive. If false, the power button short press
     // behavior will be skipped if the default display is non-interactive.
     private boolean mSupportShortPressPowerWhenDefaultDisplayOn;
-
-    // Whether to go to sleep entering theater mode from power button
-    private boolean mGoToSleepOnButtonPressTheaterMode;
 
     // Ringer toggle should reuse timing and triggering from screenshot power and a11y vol up
     int mRingerToggleChord = VOLUME_HUSH_OFF;
@@ -834,7 +837,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
-// QTI_BEGIN: 2021-04-28: Display: HDMI/DP pluggin notification changes
+// QTI_BEGIN: 2021-04-28: Core: HDMI/DP pluggin notification changes
     private UEventObserver mHDMISwitchObserver = new UEventObserver() {
         @Override
         public void onUEvent(UEventObserver.UEvent event) {
@@ -842,8 +845,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
-// QTI_END: 2021-04-28: Display: HDMI/DP pluggin notification changes
-// QTI_BEGIN: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
+// QTI_END: 2021-04-28: Core: HDMI/DP pluggin notification changes
+// QTI_BEGIN: 2019-06-24: Core: frameworks/base: Add HDMI hotplug handling
     private UEventObserver mExtEventObserver = new UEventObserver() {
         @Override
         public void onUEvent(UEventObserver.UEvent event) {
@@ -853,7 +856,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
-// QTI_END: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
+// QTI_END: 2019-06-24: Core: frameworks/base: Add HDMI hotplug handling
     class SettingsObserver extends ContentObserver {
         SettingsObserver(Handler handler) {
             super(handler);
@@ -1313,10 +1316,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 dreamManagerInternal.stopDream(false /*immediate*/, "short press power" /*reason*/);
                 return;
             }
-            Slog.d(TAG,
-                    "Can't start dreaming and the device is not dreaming when attempting to start "
-                    + "or stop dream from short power press (isScreenOn="
-                            + isScreenOn + ", awakeWhenDream=" + awakeWhenDream + ")");
+            if (DEBUG_DREAMS) {
+                Slog.d(TAG,
+                        "Can't start dreaming and the device is not dreaming when attempting to "
+                                + "start or stop dream from short power press (isScreenOn="
+                                + isScreenOn + ", awakeWhenDream=" + awakeWhenDream + ")");
+            }
             noDreamAction.run();
             return;
         }
@@ -1329,6 +1334,24 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         dreamManagerInternal.requestDream();
+        if (mHasFeatureLeanback
+                && getResolvedLongPressOnPowerBehavior() == LONG_PRESS_POWER_GO_TO_SLEEP) {
+            Runnable toastRunnable = () -> {
+                final long now = SystemClock.uptimeMillis();
+                if (mLastShortPressTurnOffTvHintToastTime == 0L
+                        || now - mLastShortPressTurnOffTvHintToastTime
+                                >= mTurnOffTvToastSuppressionDelay) {
+                    mLastShortPressTurnOffTvHintToastTime = now;
+                    Toast.makeText(
+                            mContext,
+                            UiThread.get().getLooper(),
+                            mContext.getString(R.string.long_press_power_to_turn_off_tv_toast),
+                            Toast.LENGTH_LONG)
+                            .show();
+                }
+            };
+            mHandler.postDelayed(toastRunnable, mTurnOffTvToastPostDelay);
+        }
     }
 
     /**
@@ -1346,12 +1369,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         final PowerManager.WakeData lastWakeUp = mPowerManagerInternal.getLastWakeup();
         if (lastWakeUp != null && (lastWakeUp.wakeReason == PowerManager.WAKE_REASON_GESTURE
                 || lastWakeUp.wakeReason == PowerManager.WAKE_REASON_LIFT
-                || lastWakeUp.wakeReason == PowerManager.WAKE_REASON_BIOMETRIC)) {
-            final long now = SystemClock.uptimeMillis();
+                || lastWakeUp.wakeReason == PowerManager.WAKE_REASON_BIOMETRIC
+                || lastWakeUp.wakeReason == PowerManager.WAKE_REASON_TAP)) {
+            final long now = mInjector.getUptimeMillis();
             if (mPowerButtonSuppressionDelayMillis > 0
                     && (now < lastWakeUp.wakeTime + mPowerButtonSuppressionDelayMillis)) {
                 Slog.i(TAG, "Sleep from power button suppressed. Time since gesture: "
-                        + (now - lastWakeUp.wakeTime) + "ms");
+                        + (now - lastWakeUp.wakeTime) + "ms. Gesture: "
+                        + PowerManager.wakeReasonToString(lastWakeUp.wakeReason));
                 return false;
             }
         }
@@ -1378,30 +1403,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private void powerMultiPressAction(long eventTime, boolean interactive, int behavior) {
         switch (behavior) {
             case MULTI_PRESS_POWER_NOTHING:
-                break;
-            case MULTI_PRESS_POWER_THEATER_MODE:
-                if (!isUserSetupComplete()) {
-                    Slog.i(TAG, "Ignoring toggling theater mode - device not setup.");
-                    break;
-                }
-
-                if (isTheaterModeEnabled()) {
-                    Slog.i(TAG, "Toggling theater mode off.");
-                    Settings.Global.putInt(mContext.getContentResolver(),
-                            Settings.Global.THEATER_MODE_ON, 0);
-                    if (!interactive) {
-                        wakeUpFromWakeKey(eventTime, KEYCODE_POWER, /* isDown= */ false);
-                    }
-                } else {
-                    Slog.i(TAG, "Toggling theater mode on.");
-                    Settings.Global.putInt(mContext.getContentResolver(),
-                            Settings.Global.THEATER_MODE_ON, 1);
-
-                    if (mGoToSleepOnButtonPressTheaterMode && interactive) {
-                        goToSleep(eventTime, PowerManager.GO_TO_SLEEP_REASON_POWER_BUTTON,
-                                0);
-                    }
-                }
                 break;
             case MULTI_PRESS_POWER_BRIGHTNESS_BOOST:
                 Slog.i(TAG, "Starting brightness boost.");
@@ -1624,6 +1625,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 allAppsIntent.addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK
                                 | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                sendCloseSystemWindows(SYSTEM_DIALOG_REASON_RECENT_APPS);
                 startActivityAsUser(allAppsIntent, UserHandle.CURRENT_OR_SELF);
                 break;
             case SHORT_PRESS_PRIMARY_LAUNCH_TARGET_ACTIVITY:
@@ -1832,7 +1834,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mGlobalActions.showDialog(keyguardShowing, isDeviceProvisioned());
         // since it took two seconds of long press to bring this up,
         // poke the wake lock so they have some time to see the dialog.
-        mPowerManager.userActivity(SystemClock.uptimeMillis(), false);
+        mPowerManager.userActivity(mInjector.getUptimeMillis(), false);
     }
 
     private void cancelGlobalActionsAction() {
@@ -2261,6 +2263,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         WindowWakeUpPolicy getWindowWakeUpPolicy() {
             return new WindowWakeUpPolicy(mContext);
         }
+
+        long getUptimeMillis() {
+            return SystemClock.uptimeMillis();
+        }
     }
 
     /** {@inheritDoc} */
@@ -2271,6 +2277,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     @VisibleForTesting
     void init(Injector injector) {
+        mInjector = injector;
         mContext = injector.getContext();
         mWindowManagerFuncs = injector.getWindowManagerFuncs();
         mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
@@ -2376,9 +2383,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mLidNavigationAccessibility = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_lidNavigationAccessibility);
 
-        mGoToSleepOnButtonPressTheaterMode = mContext.getResources().getBoolean(
-                com.android.internal.R.bool.config_goToSleepOnButtonPressTheaterMode);
-
         mSupportLongPressPowerWhenNonInteractive = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_supportLongPressPowerWhenNonInteractive);
         mSupportShortPressPowerWhenDefaultDisplayOn =
@@ -2430,6 +2434,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 com.android.internal.R.string.config_searchKeyTargetActivity));
         readConfigurationDependentBehaviors();
 
+        mTurnOffTvToastSuppressionDelay = mContext.getResources().getInteger(
+                com.android.internal.R.integer.config_turnOffTvToastSuppressionDelayMs);
+        mTurnOffTvToastPostDelay = mContext.getResources().getInteger(
+                    com.android.internal.R.integer.config_turnOffTvToastPostDelayMs);
+
         mDisplayFoldController = DisplayFoldController.create(mContext, DEFAULT_DISPLAY);
 
         mAccessibilityManager = mContext.getSystemService(AccessibilityManager.class);
@@ -2448,10 +2457,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mContext.registerReceiver(mMultiuserReceiver, filter);
 
         // register for Bluetooth HID profile broadcasts.
-        if (hidBluetoothWakeup()) {
-            filter = new IntentFilter(ACTION_CONNECTION_STATE_CHANGED);
-            mContext.registerReceiver(mBluetoothHidReceiver, filter);
-        }
+        filter = new IntentFilter(ACTION_CONNECTION_STATE_CHANGED);
+        mContext.registerReceiver(mBluetoothHidReceiver, filter);
 
         mVibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
 
@@ -3486,7 +3493,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_DO_NOT_DISTURB,
                 KeyGestureEvent.KEY_GESTURE_TYPE_RINGER_TOGGLE_CHORD,
                 KeyGestureEvent.KEY_GESTURE_TYPE_GLOBAL_ACTIONS,
-                KeyGestureEvent.KEY_GESTURE_TYPE_TV_TRIGGER_BUG_REPORT
+                KeyGestureEvent.KEY_GESTURE_TYPE_TV_TRIGGER_BUG_REPORT,
+                KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK
         ));
         if (!com.android.window.flags.Flags.grantManageKeyGesturesToRecents()) {
             // When grantManageKeyGesturesToRecents is enabled, the event is handled in the
@@ -3540,7 +3548,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (shouldLaunchAssist) {
                     launchAssistAction(
                             isPowerLongPress ? null : Intent.EXTRA_ASSIST_INPUT_HINT_KEYBOARD,
-                            deviceId, event.getDisplayId(), SystemClock.uptimeMillis(),
+                            deviceId, event.getDisplayId(), mInjector.getUptimeMillis(),
                             isPowerLongPress
                                     ? AssistUtils.INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS
                                     : AssistUtils.INVOCATION_TYPE_UNKNOWN);
@@ -3690,6 +3698,25 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             "Key gesture DND", true);
                 }
                 break;
+            case KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK:
+                if (complete) {
+                    try {
+                        RootTaskInfo currentRootTask =
+                                mActivityManagerService.getFocusedRootTaskInfo();
+                        if (currentRootTask == null) {
+                            Slog.e(TAG,
+                                    "onKeyGesture: KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK the current"
+                                            + " root task is null" );
+                            return;
+                        }
+                        mActivityManagerService.removeTask(currentRootTask.taskId);
+                    } catch (RemoteException e) {
+                        Slog.e(TAG,
+                                "onKeyGesture: KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK failed to close"
+                                        + " the current root task",
+                                e);
+                    }
+                }
             default:
                 Log.w(TAG, "Received a key gesture " + event
                         + " that was not registered by this handler");
@@ -3994,7 +4021,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
         if (startKeyguardExitAnimation) {
             if (DEBUG_KEYGUARD) Slog.d(TAG, "Starting keyguard exit animation");
-            startKeyguardExitAnimation(SystemClock.uptimeMillis());
+            startKeyguardExitAnimation(mInjector.getUptimeMillis());
         }
         return redoLayout;
     }
@@ -4303,7 +4330,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (lidOpen) {
             mWindowWakeUpPolicy.wakeUpFromLid();
         } else if (getLidBehavior() != LID_BEHAVIOR_SLEEP) {
-            mPowerManager.userActivity(SystemClock.uptimeMillis(), false);
+            mPowerManager.userActivity(mInjector.getUptimeMillis(), false);
         }
     }
 
@@ -4344,13 +4371,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     void initializeHdmiStateInternal() {
         boolean plugged = false;
-// QTI_BEGIN: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
+// QTI_BEGIN: 2019-06-24: Core: frameworks/base: Add HDMI hotplug handling
         mExtEventObserver.startObserving("mdss_mdp/drm/card");
-// QTI_END: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
+// QTI_END: 2019-06-24: Core: frameworks/base: Add HDMI hotplug handling
         // watch for HDMI plug messages if the hdmi switch exists
-// QTI_BEGIN: 2021-04-28: Display: HDMI/DP pluggin notification changes
+// QTI_BEGIN: 2021-04-28: Core: HDMI/DP pluggin notification changes
         mHDMISwitchObserver.startObserving("change@/devices/virtual/graphics/fb2");
-// QTI_END: 2021-04-28: Display: HDMI/DP pluggin notification changes
+// QTI_END: 2021-04-28: Core: HDMI/DP pluggin notification changes
         if (new File("/sys/devices/virtual/switch/hdmi/state").exists()) {
             mHDMIObserver.startObserving("DEVPATH=/devices/virtual/switch/hdmi");
 
@@ -5093,17 +5120,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return ACTION_PASS_TO_USER;
         }
 
-        // If we have not passed the action up and we are in theater mode without dreaming,
-        // there will be no dream to intercept the touch and wake into ambient.  The device should
-        // wake up in this case.
-        if (isTheaterModeEnabled() && (policyFlags & FLAG_WAKE) != 0) {
-            if (mWindowWakeUpPolicy.wakeUpFromMotion(displayId, whenNanos / 1000000, source,
-                    action == MotionEvent.ACTION_DOWN, mDeviceGoingToSleep)) {
-                // Woke up. Pass motion events to user.
-                return ACTION_PASS_TO_USER;
-            }
-        }
-
         return 0;
     }
 
@@ -5217,7 +5233,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mHavePendingMediaKeyRepeatWithWakeLock = false;
 
         KeyEvent repeatEvent = KeyEvent.changeTimeRepeat(event,
-                SystemClock.uptimeMillis(), 1, event.getFlags() | KeyEvent.FLAG_LONG_PRESS);
+                mInjector.getUptimeMillis(), 1, event.getFlags() | KeyEvent.FLAG_LONG_PRESS);
         if (DEBUG_INPUT) {
             Slog.d(TAG, "dispatchMediaKeyRepeatWithWakeLock: " + repeatEvent);
         }
@@ -5260,7 +5276,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 try {
                     IUiModeManager uiModeService = IUiModeManager.Stub.asInterface(
                             ServiceManager.getService(Context.UI_MODE_SERVICE));
-                    mUiMode = uiModeService.getCurrentModeType();
+                    mUiMode = uiModeService.getCurrentModeType(DEFAULT_DISPLAY);
                 } catch (RemoteException e) {
                 }
             }
@@ -5326,6 +5342,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // We only care about default and default-adjacent groups
         if (displayGroupId != Display.DEFAULT_DISPLAY_GROUP
                 && !mPowerManagerInternal.isDefaultGroupAdjacent(displayGroupId)) {
+            if (com.android.server.power.feature.flags.Flags.extraLoggingSeparateTimeout()) {
+                Slog.i(TAG, "Not signalling isReadyToSignalSleep because it's a non default "
+                        + "adjacent group " + displayGroupId);
+            }
             return false;
         }
 
@@ -5333,6 +5353,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 !mPowerManagerInternal.isAnyDefaultAdjacentGroupInteractive();
         boolean isDefaultGroupNonInteractive =
                 !mPowerManagerInternal.isGroupInteractive(Display.DEFAULT_DISPLAY_GROUP);
+        if (com.android.server.power.feature.flags.Flags.extraLoggingSeparateTimeout()) {
+            Slog.i(TAG, "Started going to sleep check status for group " + displayGroupId
+                    + " : "
+                    + (areAllDefaultAdjacentGroupsNonInteractive && isDefaultGroupNonInteractive)
+                    + " areAllDefaultAdjacentGroupsNonInteractive "
+                    + areAllDefaultAdjacentGroupsNonInteractive
+                    + " isDefaultGroupNonInteractive "
+                    + isDefaultGroupNonInteractive);
+        }
         return areAllDefaultAdjacentGroupsNonInteractive && isDefaultGroupNonInteractive;
     }
 
@@ -5393,6 +5422,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     @Override
     public void startedGoingToSleep(int displayGroupId,
             @PowerManager.GoToSleepReason int pmSleepReason) {
+        if (!isReadyToSignalSleep(displayGroupId)) {
+            return;
+        }
+
         if (DEBUG_WAKEUP) {
             Slog.i(TAG, "Started going to sleep... (groupId=" + displayGroupId + " why="
                     + WindowManagerPolicyConstants.offReasonToString(
@@ -5400,16 +5433,21 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                                     pmSleepReason)) + ")");
         }
 
-        if (!isReadyToSignalSleep(displayGroupId)) {
-            return;
-        }
-
         mRequestedOrSleepingDefaultDisplay = true;
         mIsGoingToSleep = true;
         setPendingSleepingGroup(displayGroupId);
 
         if (mKeyguardDelegate != null) {
+            if (com.android.server.power.feature.flags.Flags.extraLoggingSeparateTimeout()) {
+                Slog.i(TAG, "Notifying keyguard about onGoingToSleep displayGroupId "
+                        + displayGroupId);
+            }
             mKeyguardDelegate.onStartedGoingToSleep(pmSleepReason);
+        } else {
+            if (com.android.server.power.feature.flags.Flags.extraLoggingSeparateTimeout()) {
+                Slog.i(TAG, "Not notifying keyguard about onGoingToSleep displayGroupId "
+                        + displayGroupId);
+            }
         }
     }
 
@@ -5646,7 +5684,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     mHandler.removeMessages(MSG_KEYGUARD_DRAWN_TIMEOUT);
                     mHandler.sendEmptyMessageDelayed(MSG_KEYGUARD_DRAWN_TIMEOUT,
                             getKeyguardDrawnTimeout());
-                    mKeyguardDelegate.onScreenTurningOn(mKeyguardDrawnCallback);
+                    final int reason = mDefaultDisplayPolicy.isDisplaySwitching()
+                            ? SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH
+                            : SCREEN_TURNING_ON_REASON_UNKNOWN;
+                    mKeyguardDelegate.onScreenTurningOn(reason, mKeyguardDrawnCallback);
                 } else {
                     if (DEBUG_WAKEUP) Slog.d(TAG,
                             "null mKeyguardDelegate: setting mKeyguardDrawComplete.");
@@ -6168,7 +6209,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     mWindowManagerFuncs.lockDeviceNow();
                     break;
                 case LID_BEHAVIOR_SLEEP:
-                    goToSleep(SystemClock.uptimeMillis(),
+                    goToSleep(mInjector.getUptimeMillis(),
                             PowerManager.GO_TO_SLEEP_REASON_LID_SWITCH,
                             PowerManager.GO_TO_SLEEP_FLAG_NO_DOZE);
                     break;
@@ -6190,7 +6231,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     ServiceManager.getService(Context.UI_MODE_SERVICE));
         }
         try {
-            mUiMode = mUiModeManager.getCurrentModeType();
+            // The uiMode on DEFAULT_DISPLAY is equivalent to the device-level uiMode.
+            // Per-display overrides of uiMode are disallowed on DEFAULT_DISPLAY.
+            mUiMode = mUiModeManager.getCurrentModeType(DEFAULT_DISPLAY);
         } catch (RemoteException e) {
         }
     }
@@ -6365,11 +6408,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         return true;
     }
 
-    private boolean isTheaterModeEnabled() {
-        return Settings.Global.getInt(mContext.getContentResolver(),
-                Settings.Global.THEATER_MODE_ON, 0) == 1;
-    }
-
     private void performHapticFeedback(int effectId, String reason) {
         performHapticFeedback(effectId, reason, 0 /* flags */);
     }
@@ -6393,7 +6431,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     @Override
     public void keepScreenOnStoppedLw() {
         if (isKeyguardShowingAndNotOccluded()) {
-            mPowerManager.userActivity(SystemClock.uptimeMillis(), false);
+            mPowerManager.userActivity(mInjector.getUptimeMillis(), false);
         }
     }
 
@@ -6696,8 +6734,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         switch (behavior) {
             case MULTI_PRESS_POWER_NOTHING:
                 return "MULTI_PRESS_POWER_NOTHING";
-            case MULTI_PRESS_POWER_THEATER_MODE:
-                return "MULTI_PRESS_POWER_THEATER_MODE";
             case MULTI_PRESS_POWER_BRIGHTNESS_BOOST:
                 return "MULTI_PRESS_POWER_BRIGHTNESS_BOOST";
             case MULTI_PRESS_POWER_LAUNCH_TARGET_ACTIVITY:

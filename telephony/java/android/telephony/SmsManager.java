@@ -16,6 +16,11 @@
 
 package android.telephony;
 
+import static android.Manifest.permission.MANAGE_COMPANION_DEVICES;
+import static android.Manifest.permission.MANAGE_ROLE_HOLDERS;
+import static android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE;
+import static android.Manifest.permission.RECEIVE_SENSITIVE_NOTIFICATIONS;
+
 import android.Manifest;
 import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
@@ -26,22 +31,31 @@ import android.annotation.Nullable;
 import android.annotation.RequiresFeature;
 import android.annotation.RequiresPermission;
 import android.annotation.SuppressAutoDoc;
+import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.app.PendingIntent;
+import android.app.role.RoleManager;
+import android.companion.AssociationInfo;
+import android.companion.CompanionDeviceManager;
 import android.compat.Compatibility;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledAfter;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.Context;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.database.CursorWindow;
 import android.net.Uri;
+import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.RemoteException;
+import android.os.Trace;
+import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.Log;
 import android.util.Pair;
 
@@ -59,6 +73,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Executor;
 
 /*
@@ -290,6 +306,15 @@ public final class SmsManager {
             CarrierConfigManager.KEY_MMS_CLOSE_CONNECTION_BOOL;
 
     /**
+     * The following roles need access to SMS messages with OTPs:
+     * SMS: To handle basic SMS tasks
+     * ASSISTANT: To perform actions with all SMS messages
+     * DIALER: The Dialer role has SMS permissions, and is considered trusted
+     */
+    private static final List<String> SMS_OTP_READING_ROLES = List.of(RoleManager.ROLE_SMS,
+            RoleManager.ROLE_ASSISTANT, RoleManager.ROLE_DIALER);
+
+    /**
      * 3gpp2 SMS priority is not specified
      * @hide
      */
@@ -436,6 +461,17 @@ public final class SmsManager {
     @SystemApi
     public static final int PREMIUM_SMS_CONSENT_ALWAYS_ALLOW = 3;
 
+    /**
+     * A list of flags that should be used in the package manager to retrieve all system apps, in
+     * any state
+     */
+    private static final int SYSTEM_APP_FLAGS = PackageManager.MATCH_SYSTEM_ONLY
+            | PackageManager.MATCH_DISABLED_COMPONENTS
+            | PackageManager.MATCH_DISABLED_UNTIL_USED_COMPONENTS
+            | PackageManager.MATCH_KNOWN_PACKAGES
+            | PackageManager.MATCH_DIRECT_BOOT_AWARE
+            | PackageManager.MATCH_DIRECT_BOOT_UNAWARE;
+
     // result of asking the user for a subscription to perform an operation.
     private interface SubscriptionResolverResult {
         void onSuccess(int subId);
@@ -570,9 +606,9 @@ public final class SmsManager {
     public void sendTextMessage(
             String destinationAddress, String scAddress, String text,
             PendingIntent sentIntent, PendingIntent deliveryIntent) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(75, destinationAddress);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         sendTextMessageInternal(destinationAddress, scAddress, text, sentIntent, deliveryIntent,
                 true /* persistMessage*/, getOpPackageName(), getAttributionTag(),
                 0L /* messageId */);
@@ -815,7 +851,6 @@ public final class SmsManager {
                 getAttributionTag(), 0L /* messageId */);
     }
 
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
     private void sendTextMessageInternal(
             String destinationAddress, String scAddress, String text,
             PendingIntent sentIntent, PendingIntent deliveryIntent, boolean persistMessage,
@@ -829,20 +864,15 @@ public final class SmsManager {
         }
 
         if (priority < 0x00 || priority > 0x03) {
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
             Log.e(TAG, "Invalid Priority " + priority);
             priority = SMS_MESSAGE_PRIORITY_NOT_SPECIFIED;
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
         }
 
         if (validityPeriod < 0x05 || validityPeriod > 0x09b0a0) {
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
             Log.e(TAG, "Invalid Validity Period " + validityPeriod);
             validityPeriod = SMS_MESSAGE_PERIOD_NOT_SPECIFIED;
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
         }
 
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
         final int finalPriority = priority;
         final int finalValidity = validityPeriod;
         // We will only show the SMS disambiguation dialog in the case that the message is being
@@ -894,14 +924,12 @@ public final class SmsManager {
                 Log.e(TAG, "sendTextMessageInternal(no persist): Couldn't send SMS, exception - "
                         + e.getMessage());
                 notifySmsError(sentIntent, RESULT_REMOTE_EXCEPTION);
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
             }
         }
     }
 
     /**
      *
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      * Inject an SMS PDU into the android application framework.
      *
      * <p>Requires permission: {@link android.Manifest.permission#MODIFY_PHONE_STATE} or carrier
@@ -1242,7 +1270,6 @@ public final class SmsManager {
     }
 
     /**
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      * Send a multi-part text based SMS with messaging options. The callee should have already
      * divided the message into correctly sized parts by calling
      * <code>divideMessage</code>.
@@ -1256,7 +1283,6 @@ public final class SmsManager {
      * responsible for writing its sent messages to the SMS Provider). For information about
      * how to behave as the default SMS app, see {@link android.provider.Telephony}.</p>
      *
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      * <p class="note"><strong>Note:</strong> If {@link #getDefault()} is used to instantiate this
      * manager on a multi-SIM device, this operation may fail sending the SMS message because no
      * suitable default subscription could be found. In this case, if {@code sentIntent} is
@@ -1266,18 +1292,12 @@ public final class SmsManager {
      * where this operation may fail.
      * </p>
      *
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      * @param destinationAddress the address to send the message to
      * @param scAddress is the service center address or null to use
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      *  the current default SMSC
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      * @param parts an <code>ArrayList</code> of strings that, in order,
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      *  comprise the original message
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      * @param sentIntents if not null, an <code>ArrayList</code> of
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      *  <code>PendingIntent</code>s (one for each message part) that is
      *  broadcast when the corresponding message part has been sent.
      *  The result code will be <code>Activity.RESULT_OK</code> for success,
@@ -1341,14 +1361,11 @@ public final class SmsManager {
      *  For <code>RESULT_ERROR_GENERIC_FAILURE</code> or any of the RESULT_RIL errors,
      *  the sentIntent may include the extra "errorCode" containing a radio technology specific
      *  value, generally only useful for troubleshooting.<br>
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      * @param deliveryIntents if not null, an <code>ArrayList</code> of
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      *  <code>PendingIntent</code>s (one for each message part) that is
      *  broadcast when the corresponding message part has been delivered
      *  to the recipient.  The raw pdu of the status report is in the
      *  extended data ("pdu").
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
      * @param priority Priority level of the message
      *  Refer specification See 3GPP2 C.S0015-B, v2.0, table 4.5.9-1
      *  ---------------------------------
@@ -1370,18 +1387,14 @@ public final class SmsManager {
      * @throws IllegalArgumentException if destinationAddress or data are empty
      * {@hide}
      */
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
     @UnsupportedAppUsage
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
     public void sendMultipartTextMessage(
             String destinationAddress, String scAddress, ArrayList<String> parts,
             ArrayList<PendingIntent> sentIntents, ArrayList<PendingIntent> deliveryIntents,
             int priority, boolean expectMore, int validityPeriod) {
         sendMultipartTextMessageInternal(destinationAddress, scAddress, parts, sentIntents,
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
                 deliveryIntents, true /* persistMessage*/, priority, expectMore,
                 validityPeriod);
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
     }
 
     private void sendMultipartTextMessageInternal(
@@ -1396,21 +1409,16 @@ public final class SmsManager {
         }
 
         if (priority < 0x00 || priority > 0x03) {
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
             Log.e(TAG, "Invalid Priority " + priority);
             priority = SMS_MESSAGE_PRIORITY_NOT_SPECIFIED;
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
         }
 
         if (validityPeriod < 0x05 || validityPeriod > 0x09b0a0) {
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
             Log.e(TAG, "Invalid Validity Period " + validityPeriod);
             validityPeriod = SMS_MESSAGE_PERIOD_NOT_SPECIFIED;
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
         }
 
         if (parts.size() > 1) {
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
             final int finalPriority = priority;
             final int finalValidity = validityPeriod;
             if (persistMessage) {
@@ -1451,7 +1459,6 @@ public final class SmsManager {
                     Log.e(TAG, "sendMultipartTextMessageInternal (no persist): Couldn't send SMS - "
                             + e.getMessage());
                     notifySmsError(sentIntents, RESULT_REMOTE_EXCEPTION);
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
                 }
             }
         } else {
@@ -1469,7 +1476,6 @@ public final class SmsManager {
         }
     }
 
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
     /**
      * Send a data based SMS to a specific application port.
      *
@@ -1565,9 +1571,9 @@ public final class SmsManager {
     public void sendDataMessage(
             String destinationAddress, String scAddress, short destinationPort,
             byte[] data, PendingIntent sentIntent, PendingIntent deliveryIntent) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(73, destinationAddress);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (TextUtils.isEmpty(destinationAddress)) {
             throw new IllegalArgumentException("Invalid destinationAddress");
         }
@@ -1904,9 +1910,9 @@ public final class SmsManager {
     @RequiresPermission(Manifest.permission.ACCESS_MESSAGES_ON_ICC)
     public boolean copyMessageToIcc(
             @Nullable byte[] smsc, @NonNull byte[] pdu, @StatusOnIcc int status) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(79);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         boolean success = false;
 
         if (pdu == null) {
@@ -1950,9 +1956,9 @@ public final class SmsManager {
     @UnsupportedAppUsage
     @RequiresPermission(Manifest.permission.ACCESS_MESSAGES_ON_ICC)
     public boolean deleteMessageFromIcc(int messageIndex) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(80);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         boolean success = false;
 
         try {
@@ -1996,9 +2002,9 @@ public final class SmsManager {
     @UnsupportedAppUsage
     @RequiresPermission(Manifest.permission.ACCESS_MESSAGES_ON_ICC)
     public boolean updateMessageOnIcc(int messageIndex, int newStatus, byte[] pdu) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(81);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         boolean success = false;
 
         try {
@@ -2215,9 +2221,7 @@ public final class SmsManager {
      * @param records SMS EF records.
      * @return <code>ArrayList</code> of <code>SmsMessage</code> objects.
      */
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
     private ArrayList<SmsMessage> createMessageListFromRawRecords(List<SmsRawData> records) {
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
         ArrayList<SmsMessage> messages = new ArrayList<SmsMessage>();
         if (records != null) {
             int count = records.size();
@@ -2226,9 +2230,7 @@ public final class SmsManager {
                 // List contains all records, including "free" records (null)
                 if (data != null) {
                     SmsMessage sms = SmsMessage.createFromEfRecord(i + 1, data.getBytes(),
-// QTI_BEGIN: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
                             getSubscriptionId());
-// QTI_END: 2018-02-10: Telephony: Add support for sending message with priority, link control and validity period options
                     if (sms != null) {
                         messages.add(sms);
                     }
@@ -2376,25 +2378,19 @@ public final class SmsManager {
             android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE})
     @IntRange(from = 0)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_MESSAGING)
-// QTI_BEGIN: 2018-03-07: Telephony: Get SIM card capacity count of SMS
     public int getSmsCapacityOnIcc() {
-// QTI_END: 2018-03-07: Telephony: Get SIM card capacity count of SMS
         int ret = 0;
-// QTI_BEGIN: 2018-03-07: Telephony: Get SIM card capacity count of SMS
         try {
             ISms iccISms = getISmsService();
             if (iccISms != null) {
                 ret = iccISms.getSmsCapacityOnIccForSubscriber(getSubscriptionId());
             }
         } catch (RemoteException ex) {
-// QTI_END: 2018-03-07: Telephony: Get SIM card capacity count of SMS
             Log.e(TAG, "getSmsCapacityOnIcc() RemoteException", ex);
-// QTI_BEGIN: 2018-03-07: Telephony: Get SIM card capacity count of SMS
         }
         return ret;
     }
 
-// QTI_END: 2018-03-07: Telephony: Get SIM card capacity count of SMS
     /** @hide */
     @IntDef(prefix = { "STATUS_ON_ICC_" }, value = {
             STATUS_ON_ICC_FREE,
@@ -2498,7 +2494,7 @@ public final class SmsManager {
             RESULT_RIL_NO_NETWORK_FOUND,
             RESULT_RIL_DEVICE_IN_USE,
             RESULT_RIL_ABORTED,
-            RESULT_SMS_SEND_FAIL_AFTER_MAX_RETRY
+            RESULT_SMS_SEND_FAILED_AFTER_MAX_RETRY
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface Result {}
@@ -2855,11 +2851,16 @@ public final class SmsManager {
     public static final int RESULT_RIL_ABORTED = 137;
 
     /**
-     * SMS send failed due to exceeding max retry count
+     * Indicates that the SMS sending operation failed because all allowed retry attempts
+     * were exhausted without successfully sending the message.
+     * <p>
+     * This is distinct from {@link #RESULT_SMS_SEND_RETRY_FAILED}, which signals a single failed
+     * retry attempt where further retries might still be scheduled.
+     * In contrast, {@code RESULT_SMS_SEND_FAILED_AFTER_MAX_RETRY} signifies that the maximum retry
+     * limit has been surpassed, and no more attempts will be made for this SMS message.
      */
     @FlaggedApi(Flags.FLAG_SATELLITE_25Q4_APIS)
-    public static final int RESULT_SMS_SEND_FAIL_AFTER_MAX_RETRY = 138;
-
+    public static final int RESULT_SMS_SEND_FAILED_AFTER_MAX_RETRY = 138;
 
     // SMS receiving results sent as a "result" extra in {@link Intents.SMS_REJECTED_ACTION}
 
@@ -3746,5 +3747,167 @@ public final class SmsManager {
         } catch (RemoteException ex) {
             throw new RuntimeException(ex);
         }
+    }
+
+    private static Set<String> sSystemPkgs = null;
+
+    /**
+     * Get all app IDs that are allowed to read SMS messages/receive SMS Broadcasts which contain
+     * an otp code, provided said apps also have the READ_SMS/RECEIVE_SMS permissions.
+     * (respectively). This method is static because SmsManager instances can be null, if the
+     * phone process is unavailable.
+     * @hide
+     */
+    @SuppressLint({"UnflaggedApi"})
+    @TestApi
+    @RequiresPermission(allOf = {READ_PRIVILEGED_PHONE_STATE, MANAGE_COMPANION_DEVICES,
+            MANAGE_ROLE_HOLDERS})
+    public static @NonNull Set<String> getSmsOtpTrustedPackages(@NonNull Context context,
+            @Nullable UserHandle user) {
+        if (user == null || user == UserHandle.ALL) {
+            user = context.getUser();
+        }
+        Context userContext = context.createContextAsUser(user, 0);
+        PackageManager pm = userContext.getPackageManager();
+        Set<String> trustedPackages = new ArraySet<>();
+        final long token = Binder.clearCallingIdentity();
+        try {
+            Trace.beginSection("getSmsOtpTrustedPackagess");
+            // All system apps have access to OTPs in SMS messages
+            if (sSystemPkgs == null) {
+                Trace.beginSection("getSmsOtpTrustedPackages_systemApps");
+                sSystemPkgs = new ArraySet<>();
+                List<PackageInfo> systemPkgs = pm.getInstalledPackages(SYSTEM_APP_FLAGS);
+                for (PackageInfo pkg : systemPkgs) {
+                    sSystemPkgs.add(pkg.packageName);
+                }
+                Trace.endSection();
+            }
+            trustedPackages.addAll(sSystemPkgs);
+
+            // Certain role holders have access
+            trustedPackages.addAll(getTrustedOtpSmsRolePackages(userContext, user));
+
+            // Holders of the RECEIVE_SENSITIVE_NOTIFICATIONS permission have access
+            List<PackageInfo> permissionHolders = pm.getPackagesHoldingPermissions(
+                    new String[] {RECEIVE_SENSITIVE_NOTIFICATIONS}, 0);
+            for (PackageInfo pkg : permissionHolders) {
+                trustedPackages.add(pkg.packageName);
+            }
+
+            // Carrier privileged apps have access
+            trustedPackages.addAll(getPackagesWithCarrierPrivileges(userContext));
+
+            // Apps with a current companion device association often need to relay all sms
+            // messages to the companion device
+            for (AssociationInfo info : getAllCdmAssociations(userContext)) {
+                trustedPackages.add(info.getPackageName());
+            }
+        } finally {
+            Binder.restoreCallingIdentity(token);
+            Trace.endSection();
+        }
+        return trustedPackages;
+    }
+
+    /**
+     * Checks if a single app is allowed to to read SMS messages/receive SMS Broadcasts which
+     * contain an otp code, provided said apps also have the READ_SMS/RECEIVE_SMS permissions.
+     * This method is static because SmsManager instances can be null, if the phone process is
+     * unavailable.
+     * @hide
+     */
+    @SuppressLint({"UnflaggedApi"})
+    @TestApi
+    @RequiresPermission(allOf = {READ_PRIVILEGED_PHONE_STATE, MANAGE_COMPANION_DEVICES,
+            MANAGE_ROLE_HOLDERS})
+    public static boolean isAppTrustedForSmsOtp(@NonNull Context context,
+            @NonNull String packageName, int uid) {
+        final long token = Binder.clearCallingIdentity();
+        try {
+            Trace.beginSection("isAppTrustedForSmsOtp");
+            Context userContext =
+                    context.createContextAsUser(UserHandle.getUserHandleForUid(uid), 0);
+            // Holders of the RECEIVE_SENSITIVE_NOTIFICATIONS permission have access
+            if (userContext.getPackageManager()
+                    .checkPermission(RECEIVE_SENSITIVE_NOTIFICATIONS, packageName)
+                    == PackageManager.PERMISSION_GRANTED) {
+                return true;
+            }
+
+            // All system apps have access to OTPs in SMS messages
+            if (isSystemApp(userContext, packageName)) {
+                return true;
+            }
+
+            // Certain role holders have access
+            if (isTrustedOtpSmsRoleHolder(userContext, packageName, uid)) {
+                return true;
+            }
+
+            // Carrier privileged apps have access
+            if (getPackagesWithCarrierPrivileges(userContext).contains(packageName)) {
+                return true;
+            }
+
+            // Apps with a current companion device association often need to relay all sms
+            // messages to the companion device
+            for (AssociationInfo info : getAllCdmAssociations(userContext)) {
+                if (Objects.equals(info.getPackageName(), packageName)) {
+                    return true;
+                }
+            }
+
+        } finally {
+            Trace.endSection();
+            Binder.restoreCallingIdentity(token);
+        }
+        return false;
+    }
+
+    @SuppressLint("MissingPermission")
+    private static Set<String> getTrustedOtpSmsRolePackages(Context context, UserHandle user) {
+        RoleManager rm = context.getSystemService(RoleManager.class);
+        Set<String> roleHoldingPackages = new ArraySet<>();
+        for (String role: SMS_OTP_READING_ROLES) {
+            List<String> holders = rm.getRoleHoldersAsUser(role, user);
+            roleHoldingPackages.addAll(holders);
+        }
+        return roleHoldingPackages;
+    }
+
+    private static boolean isTrustedOtpSmsRoleHolder(Context context, String packageName, int uid) {
+        return getTrustedOtpSmsRolePackages(context, UserHandle.getUserHandleForUid(uid))
+                .contains(packageName);
+    }
+
+    private static boolean isSystemApp(Context context, String packageName) {
+        if (sSystemPkgs != null && sSystemPkgs.contains(packageName)) {
+            return true;
+        } else if (sSystemPkgs == null) {
+            try {
+                context.getPackageManager().getPackageUid(packageName, SYSTEM_APP_FLAGS);
+                // If the package isn't a system app, this method will throw an Exception
+                return true;
+            } catch (PackageManager.NameNotFoundException e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    @SuppressLint("MissingPermission")
+    private static Set<String> getPackagesWithCarrierPrivileges(Context context) {
+        TelephonyManager tm = context.getSystemService(TelephonyManager.class);
+        if (tm == null) {
+            return new ArraySet<>();
+        }
+        return tm.getPackagesWithCarrierPrivileges();
+    }
+
+    @SuppressLint("MissingPermission")
+    private static List<AssociationInfo> getAllCdmAssociations(Context context) {
+        CompanionDeviceManager cdm = context.getSystemService(CompanionDeviceManager.class);
+        return cdm.getAllAssociations();
     }
 }

@@ -132,6 +132,8 @@ public final class KeyGestureEvent {
     public static final int KEY_GESTURE_TYPE_SWITCH_TO_PREVIOUS_DESK = 77;
     public static final int KEY_GESTURE_TYPE_SWITCH_TO_NEXT_DESK = 78;
     public static final int KEY_GESTURE_TYPE_TOGGLE_QUICK_SETTINGS_PANEL = 79;
+    public static final int KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK = 80;
+    public static final int KEY_GESTURE_TYPE_QUIT_FOCUSED_DESKTOP_TASK = 81;
 
     public static final int FLAG_CANCELLED = 1 << 0;
     public static final int FLAG_LONG_PRESS = 1 << 1;
@@ -226,6 +228,8 @@ public final class KeyGestureEvent {
             KEY_GESTURE_TYPE_SWITCH_TO_PREVIOUS_DESK,
             KEY_GESTURE_TYPE_SWITCH_TO_NEXT_DESK,
             KEY_GESTURE_TYPE_TOGGLE_QUICK_SETTINGS_PANEL,
+            KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK,
+            KEY_GESTURE_TYPE_QUIT_FOCUSED_DESKTOP_TASK,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface KeyGestureType {
@@ -824,6 +828,10 @@ public final class KeyGestureEvent {
                 return "KEY_GESTURE_TYPE_SWITCH_TO_NEXT_DESK";
             case KEY_GESTURE_TYPE_TOGGLE_QUICK_SETTINGS_PANEL:
                 return "KEY_GESTURE_TYPE_TOGGLE_QUICK_SETTINGS_PANEL";
+            case KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK:
+                return "KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK";
+            case KEY_GESTURE_TYPE_QUIT_FOCUSED_DESKTOP_TASK:
+                return "KEY_GESTURE_TYPE_QUIT_FOCUSED_DESKTOP_TASK";
             default:
                 return Integer.toHexString(value);
         }

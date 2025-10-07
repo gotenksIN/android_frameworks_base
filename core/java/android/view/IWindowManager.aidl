@@ -72,11 +72,13 @@ import android.view.displayhash.VerifiedDisplayHash;
 import android.window.AddToSurfaceSyncGroupResult;
 import android.window.ConfigurationChangeSetting;
 import android.window.IGlobalDragListener;
+import android.window.IScreenCaptureCallback;
 import android.window.IScreenRecordingCallback;
 import android.window.ISurfaceSyncGroupCompletedListener;
 import android.window.ITaskFpsCallback;
 import android.window.ITrustedPresentationListener;
 import android.window.InputTransferToken;
+import android.window.ScreenCapture;
 import android.window.ScreenCaptureInternal;
 import android.window.TrustedPresentationThresholds;
 import android.window.WindowContextInfo;
@@ -740,17 +742,6 @@ interface IWindowManager
     boolean shouldShowSystemDecors(int displayId);
 
     /**
-     * Sets that the display should show system decors.
-     * <p>
-     * System decors include status bar, navigation bar, launcher.
-     * </p>
-     *
-     * @param displayId The id of the display.
-     * @param shouldShow Indicates that the display should show system decors.
-     */
-    void setShouldShowSystemDecors(int displayId, boolean shouldShow);
-
-    /**
      * Indicates that the display is eligible for the desktop mode from WindowManager's perspective.
      * This includes:
      * - The default display;
@@ -1117,6 +1108,12 @@ interface IWindowManager
      */
     oneway void captureDisplay(int displayId, in @nullable ScreenCaptureInternal.CaptureArgs captureArgs,
             in ScreenCaptureInternal.ScreenCaptureListener listener);
+
+    /**
+     * Implements the ScreenCapture system API.
+     */
+    oneway void screenCapture(in ScreenCapture.ScreenCaptureParams params,
+                              in IScreenCaptureCallback callback);
 
     /**
      * Returns {@code true} if the key will be handled globally and not forwarded to all apps.

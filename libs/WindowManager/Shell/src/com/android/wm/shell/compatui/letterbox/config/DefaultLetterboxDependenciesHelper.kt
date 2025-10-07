@@ -17,14 +17,16 @@
 package com.android.wm.shell.compatui.letterbox.config
 
 import android.window.TransitionInfo
-import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer
+import com.android.wm.shell.desktopmode.data.DesktopRepository
 
-/**
- * Default [LetterboxDependenciesHelper] implementation using Desktop Windowing dependencies.
- */
-class DefaultLetterboxDependenciesHelper(val desksOrganizer: DesksOrganizer) :
+/** Default [LetterboxDependenciesHelper] implementation. */
+class DefaultLetterboxDependenciesHelper(val desktopRepository: DesktopRepository) :
     LetterboxDependenciesHelper {
 
-    override fun isDesktopWindowingAction(change: TransitionInfo.Change): Boolean =
-        desksOrganizer.isDeskChange(change)
+    /**
+     * When in Desktop Windowing the reachability feature is disabled so the creation of the input
+     * surface for event detection can be ignored.
+     */
+    override fun shouldSupportInputSurface(change: TransitionInfo.Change): Boolean =
+        !desktopRepository.isAnyDeskActive(change.endDisplayId)
 }

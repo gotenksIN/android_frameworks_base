@@ -2647,17 +2647,14 @@ public class AppOpsManager {
 
     /** @hide Access to read heart rate sensor. */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_REPLACE_BODY_SENSOR_PERMISSION_ENABLED)
     public static final String OPSTR_READ_HEART_RATE = "android:read_heart_rate";
 
     /** @hide Access to read oxygen saturation. */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_REPLACE_BODY_SENSOR_PERMISSION_ENABLED)
     public static final String OPSTR_READ_OXYGEN_SATURATION = "android:read_oxygen_saturation";
 
     /** @hide Access to read skin temperature. */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_REPLACE_BODY_SENSOR_PERMISSION_ENABLED)
     public static final String OPSTR_READ_SKIN_TEMPERATURE = "android:read_skin_temperature";
 
     /** @hide Access to ranging */
@@ -2793,9 +2790,9 @@ public class AppOpsManager {
             // Notifications
             OP_POST_NOTIFICATION,
             // Health
-            Flags.replaceBodySensorPermissionEnabled() ? OP_READ_HEART_RATE : OP_NONE,
-            Flags.replaceBodySensorPermissionEnabled() ? OP_READ_SKIN_TEMPERATURE : OP_NONE,
-            Flags.replaceBodySensorPermissionEnabled() ? OP_READ_OXYGEN_SATURATION : OP_NONE,
+            OP_READ_HEART_RATE,
+            OP_READ_SKIN_TEMPERATURE,
+            OP_READ_OXYGEN_SATURATION,
             // Android XR
             android.xr.Flags.xrManifestEntries() ? OP_EYE_TRACKING_COARSE : OP_NONE,
             android.xr.Flags.xrManifestEntries() ? OP_EYE_TRACKING_FINE : OP_NONE,
@@ -3318,22 +3315,17 @@ public class AppOpsManager {
                 OPSTR_RECEIVE_SENSITIVE_NOTIFICATIONS, "RECEIVE_SENSITIVE_NOTIFICATIONS")
                 .setDefaultMode(MODE_IGNORED).build(),
         new AppOpInfo.Builder(OP_READ_HEART_RATE, OPSTR_READ_HEART_RATE, "READ_HEART_RATE")
-            .setPermission(Flags.replaceBodySensorPermissionEnabled() ?
-                HealthPermissions.READ_HEART_RATE : null)
+            .setPermission(HealthPermissions.READ_HEART_RATE)
             .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
         new AppOpInfo.Builder(OP_READ_SKIN_TEMPERATURE, OPSTR_READ_SKIN_TEMPERATURE,
-            "READ_SKIN_TEMPERATURE").setPermission(
-                Flags.replaceBodySensorPermissionEnabled()
-                    ? HealthPermissions.READ_SKIN_TEMPERATURE : null)
+            "READ_SKIN_TEMPERATURE").setPermission(HealthPermissions.READ_SKIN_TEMPERATURE)
             .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
         new AppOpInfo.Builder(OP_RANGING, OPSTR_RANGING, "RANGING")
             .setPermission(Flags.rangingPermissionEnabled()?
                 Manifest.permission.RANGING : null)
             .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
         new AppOpInfo.Builder(OP_READ_OXYGEN_SATURATION, OPSTR_READ_OXYGEN_SATURATION,
-            "READ_OXYGEN_SATURATION").setPermission(
-                Flags.replaceBodySensorPermissionEnabled()
-                    ? HealthPermissions.READ_OXYGEN_SATURATION : null)
+            "READ_OXYGEN_SATURATION").setPermission(HealthPermissions.READ_OXYGEN_SATURATION)
             .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
         new AppOpInfo.Builder(OP_WRITE_SYSTEM_PREFERENCES, OPSTR_WRITE_SYSTEM_PREFERENCES,
             "WRITE_SYSTEM_PREFERENCES").setPermission(
@@ -7925,6 +7917,17 @@ public class AppOpsManager {
          * @hide
          */
         default void onOpChanged(@NonNull String op, @NonNull String packageName,  int userId) {
+            // Backwards compat handling for the original {@link onOpChanged(String, String)}
+            // interface, which wasn't documented non-null. In 25Q2, we changed the
+            // service side implementation to pass empty strings to fix issues with
+            // dropped updates for native callers due to the AIDL interface being
+            // non-null. However, Java callers could still rely on the original,
+            // Java-specific nullity behavior, where a change with a null package name
+            // would be dispatched in the case of a global op state update (such as a
+            // restriction).
+            if ("".equals(packageName)) {
+                packageName = null;
+            }
             onOpChanged(op, packageName);
         }
 
@@ -7940,7 +7943,9 @@ public class AppOpsManager {
          * automatically.
          *
          * @param op The Op that changed.
-         * @param packageName Package of the app whose Op changed.
+         * @param packageName Package of the app whose Op changed. Can be empty in the case of a
+         * change which is not package specific (such as global restrictions) which may imply
+         * a change to the op or package being listened to.
          * @param userId User id of the app whose Op changed.
          * @param persistentDeviceId persistent device id whose Op changed.
          */
@@ -8245,6 +8250,10 @@ public class AppOpsManager {
     private static final String APP_OP_MODE_CACHING_NAME = "appOpModeCache";
     private static final int APP_OP_MODE_CACHING_SIZE = 2048;
 
+    private static final String CHECK_PACKAGE_CACHING_API = "checkPackage";
+    private static final String CHECK_PACKAGE_CACHING_NAME = "checkPackageCache";
+    private static final int CHECK_PACKAGE_CACHING_SIZE = 512;
+
     private static final IpcDataCache.QueryHandler<AppOpModeQuery, Integer> sGetAppOpModeQuery =
             new IpcDataCache.QueryHandler<>() {
                 @Override
@@ -8265,11 +8274,35 @@ public class AppOpsManager {
                 }
             };
 
+    private static final IpcDataCache.QueryHandler<CheckPackageQuery, Integer> sCheckPackageQuery =
+            new IpcDataCache.QueryHandler<>() {
+                @Override
+                public Integer apply(CheckPackageQuery query) {
+                    IAppOpsService service = getService();
+                    try {
+                        return service.checkPackage(query.uid, query.packageName);
+                    } catch (RemoteException e) {
+                        throw e.rethrowFromSystemServer();
+                    }
+                }
+
+                @Override
+                public boolean shouldBypassCache(@NonNull CheckPackageQuery query) {
+                    // If the flag to enable the new caching behavior is off, bypass the cache.
+                    return !Flags.checkPackageCachingEnabled();
+                }
+            };
+
+
     // A LRU cache on binder clients that caches AppOp mode by uid, packageName, virtualDeviceId
     // and attributionTag.
     private static final IpcDataCache<AppOpModeQuery, Integer> sAppOpModeCache =
             new IpcDataCache<>(APP_OP_MODE_CACHING_SIZE, IpcDataCache.MODULE_SYSTEM,
                     APP_OP_MODE_CACHING_API, APP_OP_MODE_CACHING_NAME, sGetAppOpModeQuery);
+
+    private static final IpcDataCache<CheckPackageQuery, Integer> sCheckPackageCache =
+            new IpcDataCache<>(CHECK_PACKAGE_CACHING_SIZE, IpcDataCache.MODULE_SYSTEM,
+                    CHECK_PACKAGE_CACHING_API, CHECK_PACKAGE_CACHING_NAME, sCheckPackageQuery);
 
     // Ops that we don't want to cache due to:
     // 1) Discrepancy of attributionTag support in checkOp and noteOp that determines if a package
@@ -8305,6 +8338,34 @@ public class AppOpsManager {
     public static void disableAppOpModeCache() {
         if (Flags.appopModeCachingEnabled()) {
             sAppOpModeCache.disableLocal();
+        }
+    }
+
+    /**
+     * @hide
+     */
+    public static void invalidateCheckPackageCache() {
+        if (Flags.checkPackageCachingEnabled()) {
+            IpcDataCache.invalidateCache(IpcDataCache.MODULE_SYSTEM, CHECK_PACKAGE_CACHING_API);
+        }
+    }
+
+    /**
+     * Bypass CheckPackageCache in the local process
+     *
+     * @hide
+     */
+    public static void disableCheckPackageCache() {
+        if (Flags.checkPackageCachingEnabled()) {
+            sCheckPackageCache.disableLocal();
+        }
+    }
+
+    private record CheckPackageQuery(int uid, @NonNull String packageName) {
+        @Override
+        public String toString() {
+            return TextUtils.formatSimple("CheckPackageQuery(uid=%d, packageName=%s)", uid,
+                    packageName);
         }
     }
 
@@ -8440,13 +8501,13 @@ public class AppOpsManager {
         } else {
             opCodes = null;
         }
-        final List<AppOpsManager.PackageOps> result;
         try {
-            result = mService.getPackagesForOpsForDevice(opCodes, persistentDeviceId);
+            ParceledListSlice<PackageOps> packageOps = mService.getPackagesForOpsForDevice(opCodes,
+                    persistentDeviceId);
+            return packageOps == null ? Collections.emptyList() : packageOps.getList();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-        return (result != null) ? result : Collections.emptyList();
     }
 
     /**
@@ -8465,8 +8526,9 @@ public class AppOpsManager {
     @UnsupportedAppUsage
     public List<AppOpsManager.PackageOps> getPackagesForOps(int[] ops) {
         try {
-            return mService.getPackagesForOpsForDevice(ops,
+            ParceledListSlice<PackageOps> packageOps = mService.getPackagesForOpsForDevice(ops,
                     VirtualDeviceManager.PERSISTENT_DEVICE_ID_DEFAULT);
+            return packageOps == null ? null : packageOps.getList();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -8739,23 +8801,47 @@ public class AppOpsManager {
      * Restrictions are temporary additional constraints imposed on top of the persisted rules
      * defined by {@link #setMode}.
      *
+     * Audio restrictions are keyed by code/usage pairs (i.e. OP_PLAY_AUDIO, USAGE_MEDIA), and have
+     * a value of a MODE and a set of exempted packages, and apply globally.
+     *
      * @param code The operation to restrict.
-     * @param usage The {@link android.media.AudioAttributes} usage value.
-     * @param mode The restriction mode (MODE_IGNORED,MODE_ERRORED) or MODE_ALLOWED to unrestrict.
+     * @param usages A set of {@link android.media.AudioAttributes} usage values to apply
+     * restrictions to, overriding any restriction currently in place for that usage.
+     * @param mode The restriction mode (MODE_IGNORED,MODE_ERRORED) or MODE_ALLOWED to unrestrict
+     * (see key above).
      * @param exceptionPackages Optional list of packages to exclude from the restriction.
      * @hide
      */
     @RequiresPermission(android.Manifest.permission.MANAGE_APP_OPS_MODES)
-    @UnsupportedAppUsage
-    public void setRestriction(int code, @AttributeUsage int usage, @Mode int mode,
+    public void setAudioRestriction(int code, @AttributeUsage int[] usages, @Mode int mode,
             String[] exceptionPackages) {
         try {
-            final int uid = Binder.getCallingUid();
-            mService.setAudioRestriction(code, usage, uid, mode, exceptionPackages);
+            mService.setAudioRestriction(code, usages, mode, exceptionPackages);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
+
+    /**
+     * See #setRestriction(int, int[], int, String[]).
+     *
+     * Included for compatibility
+     *
+     * @param code The operation to restrict.
+     * @param usage The {@link android.media.AudioAttributes} usage value.
+     * @param mode The restriction mode (MODE_IGNORED,MODE_ERRORED) or MODE_ALLOWED to unrestrict.
+     * @param exceptionPackages Optional list of packages to exclude from the restriction.
+     * @deprecated Use {@link #setAudioRestriction(int, int[], int, String[])} instead.
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.MANAGE_APP_OPS_MODES)
+    @Deprecated
+    @UnsupportedAppUsage
+    public void setRestriction(int code, @AttributeUsage int usage, @Mode int mode,
+            String[] exceptionPackages) {
+        setAudioRestriction(code, new int[] {usage}, mode, exceptionPackages);
+    }
+
 
     /** @hide */
     @RequiresPermission(android.Manifest.permission.MANAGE_APP_OPS_MODES)
@@ -10085,7 +10171,15 @@ public class AppOpsManager {
     @Deprecated
     public void checkPackage(int uid, @NonNull String packageName) {
         try {
-            if (mService.checkPackage(uid, packageName) != MODE_ALLOWED) {
+            int mode;
+            if (Flags.checkPackageCachingEnabled()) {
+                mode = sCheckPackageCache.query(
+                        new CheckPackageQuery(uid, packageName));
+            } else {
+                mode = mService.checkPackage(uid, packageName);
+            }
+
+            if (mode != MODE_ALLOWED) {
                 throw new SecurityException(
                         "Package " + packageName + " does not belong to " + uid);
             }

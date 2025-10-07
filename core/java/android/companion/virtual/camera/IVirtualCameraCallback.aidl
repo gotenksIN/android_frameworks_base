@@ -15,7 +15,10 @@
  */
 
 package android.companion.virtual.camera;
+
+import android.companion.virtual.camera.ICaptureResultConsumer;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.params.SessionConfiguration;
 import android.view.Surface;
 
 /**
@@ -39,6 +42,21 @@ oneway interface IVirtualCameraCallback {
      * is called.
      */
     void onOpenCamera();
+
+    /**
+     * Called when there's a new camera session. This callback is sent when clients open and
+     * configure the video session for the virtual camera.
+     *
+     * @param sessionParameters The {@link CaptureRequest} session parameters from the
+     *      {@link SessionConfiguration} requested by the app using the virtual camera.
+     *      The available Keys need to be set in the ANDROID_REQUEST_AVAILABLE_SESSION_KEYS tag of
+     *      the {@link CameraCharacteristics}.
+     * @param captureResultConsumer The consumer interface through which the virtual camera server
+     *      consumes the CameraMetadataNative part of the CaptureResult. It is null if per frame
+     *      camera metadata is not enabled.
+     */
+    void onConfigureSession(in CaptureRequest sessionParameters,
+        in @nullable ICaptureResultConsumer captureResultConsumer);
 
     /**
      * Called when one of the requested stream has been configured by the virtual camera service and

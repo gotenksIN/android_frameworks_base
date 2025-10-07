@@ -60,6 +60,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.withSettings;
 
 import android.app.ActivityManagerInternal;
+import android.app.ActivityTaskManager;
 import android.app.AppOpsManager;
 import android.app.IActivityManager;
 import android.app.NotificationManager;
@@ -389,6 +390,8 @@ class TestPhoneWindowManager {
         doReturn(mImeTargetWindowToken)
                 .when(mWindowManagerInternal).getTargetWindowTokenFromInputToken(mInputToken);
 
+        doReturn(null).when(mContext).registerReceiver(any(), any());
+
         mPhoneWindowManager.init(new TestInjector(mContext, mWindowManagerFuncsImpl));
         mPhoneWindowManager.systemReady();
         mPhoneWindowManager.systemBooted();
@@ -659,6 +662,10 @@ class TestPhoneWindowManager {
 
     void overrideKeyEventPolicyFlags(int flags) {
         mKeyEventPolicyFlags = flags;
+    }
+
+    void overrideFocusedRootTask(ActivityTaskManager.RootTaskInfo task) throws RemoteException {
+        doReturn(task).when(mActivityManagerService).getFocusedRootTaskInfo();
     }
 
     void assertShowGlobalActionsCalled() {
@@ -958,5 +965,9 @@ class TestPhoneWindowManager {
         mTestLooper.dispatchAll();
         verify(mContext, never()).startActivityAsUser(any(), any(), any());
         verify(mContext, never()).startActivityAsUser(any(), any());
+    }
+
+    void assertTaskClosed() throws RemoteException {
+        verify(mActivityManagerService).removeTask(anyInt());
     }
 }

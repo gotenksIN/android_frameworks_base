@@ -20,6 +20,7 @@ import static android.hardware.input.InputGestureData.createKeyTrigger;
 
 import static com.android.hardware.input.Flags.enableQuickSettingsPanelShortcut;
 import static com.android.hardware.input.Flags.enableTalkbackAndMagnifierKeyGestures;
+import static com.android.hardware.input.Flags.enableSelectToSpeakKeyGestures;
 import static com.android.hardware.input.Flags.enableVoiceAccessKeyGestures;
 import static com.android.hardware.input.Flags.keyboardA11yShortcutControl;
 
@@ -29,7 +30,6 @@ import android.annotation.UserIdInt;
 import android.content.Context;
 import android.hardware.input.InputGestureData;
 import android.hardware.input.InputManager;
-import android.hardware.input.InputSettings;
 import android.hardware.input.KeyGestureEvent;
 import android.os.SystemProperties;
 import android.util.IndentingPrintWriter;
@@ -211,6 +211,14 @@ final class InputGestureManager {
                             /* allowCaptureByFocusedWindow = */false
                     ));
         }
+        if (enableSelectToSpeakKeyGestures()) {
+            systemShortcuts.add(
+                    createKeyGesture(KeyEvent.KEYCODE_S,
+                            KeyEvent.META_META_ON | KeyEvent.META_ALT_ON,
+                            KeyGestureEvent.KEY_GESTURE_TYPE_ACTIVATE_SELECT_TO_SPEAK,
+                            /* allowCaptureByFocusedWindow = */true
+                    ));
+        }
         if (enableTalkbackAndMagnifierKeyGestures()) {
             systemShortcuts.add(
                     createKeyGesture(KeyEvent.KEYCODE_T,
@@ -222,12 +230,6 @@ final class InputGestureManager {
                     createKeyGesture(KeyEvent.KEYCODE_M,
                             KeyEvent.META_META_ON | KeyEvent.META_ALT_ON,
                             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION,
-                            /* allowCaptureByFocusedWindow = */true
-                    ));
-            systemShortcuts.add(
-                    createKeyGesture(KeyEvent.KEYCODE_S,
-                            KeyEvent.META_META_ON | KeyEvent.META_ALT_ON,
-                            KeyGestureEvent.KEY_GESTURE_TYPE_ACTIVATE_SELECT_TO_SPEAK,
                             /* allowCaptureByFocusedWindow = */true
                     ));
         }
@@ -278,15 +280,13 @@ final class InputGestureManager {
                             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_BOUNCE_KEYS,
                             /* allowCaptureByFocusedWindow = */true
                     ));
-            if (InputSettings.isAccessibilityMouseKeysFeatureFlagEnabled()) {
-                systemShortcuts.add(
-                        createKeyGesture(
-                                KeyEvent.KEYCODE_4,
-                                KeyEvent.META_META_ON | KeyEvent.META_ALT_ON,
-                                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MOUSE_KEYS,
-                                /* allowCaptureByFocusedWindow = */true
-                        ));
-            }
+            systemShortcuts.add(
+                    createKeyGesture(
+                            KeyEvent.KEYCODE_4,
+                            KeyEvent.META_META_ON | KeyEvent.META_ALT_ON,
+                            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MOUSE_KEYS,
+                            /* allowCaptureByFocusedWindow = */true
+                    ));
             systemShortcuts.add(
                     createKeyGesture(
                             KeyEvent.KEYCODE_5,
@@ -315,6 +315,15 @@ final class InputGestureManager {
                             KeyEvent.KEYCODE_RIGHT_BRACKET,
                             KeyEvent.META_META_ON | KeyEvent.META_CTRL_ON,
                             KeyGestureEvent.KEY_GESTURE_TYPE_SWITCH_TO_NEXT_DESK,
+                            /* allowCaptureByFocusedWindow = */false
+                    ));
+        }
+        if (DesktopExperienceFlags.CLOSE_TASK_KEYBOARD_SHORTCUT.isTrue()) {
+            systemShortcuts.add(
+                    createKeyGesture(
+                            KeyEvent.KEYCODE_W,
+                            KeyEvent.META_META_ON | KeyEvent.META_CTRL_ON,
+                            KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_DESKTOP_TASK,
                             /* allowCaptureByFocusedWindow = */false
                     ));
         }

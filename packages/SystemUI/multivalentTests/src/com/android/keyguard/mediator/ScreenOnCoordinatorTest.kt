@@ -21,6 +21,7 @@ import android.platform.test.flag.junit.SetFlagsRule
 import android.platform.test.flag.junit.SetFlagsRule.DefaultInitValueType.DEVICE_DEFAULT
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN
 import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.unfold.FoldAodAnimationController
@@ -36,15 +37,14 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Captor
 import org.mockito.Mock
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
 import java.util.Optional
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
-@android.platform.test.annotations.EnabledOnRavenwood
 class ScreenOnCoordinatorTest : SysuiTestCase() {
 
     @Mock
@@ -84,7 +84,7 @@ class ScreenOnCoordinatorTest : SysuiTestCase() {
 
     @Test
     fun testUnfoldTransitionEnabledDrawnTasksReady_onScreenTurningOn_callsDrawnCallback() {
-        screenOnCoordinator.onScreenTurningOn(runnable)
+        screenOnCoordinator.onScreenTurningOn(reason = SCREEN_TURNING_ON_REASON_UNKNOWN, runnable)
 
         onUnfoldOverlayReady()
         onFoldAodReady()
@@ -96,7 +96,7 @@ class ScreenOnCoordinatorTest : SysuiTestCase() {
 
     @Test
     fun testTasksReady_onScreenTurningOnAndTurnedOnEventsCalledTogether_callsDrawnCallback() {
-        screenOnCoordinator.onScreenTurningOn(runnable)
+        screenOnCoordinator.onScreenTurningOn(reason = SCREEN_TURNING_ON_REASON_UNKNOWN, runnable)
         screenOnCoordinator.onScreenTurnedOn()
 
         onUnfoldOverlayReady()
@@ -109,7 +109,7 @@ class ScreenOnCoordinatorTest : SysuiTestCase() {
 
     @Test
     fun testTasksReady_onScreenTurnedOnAndTurnedOffBeforeCompletion_doesNotCallDrawnCallback() {
-        screenOnCoordinator.onScreenTurningOn(runnable)
+        screenOnCoordinator.onScreenTurningOn(reason = SCREEN_TURNING_ON_REASON_UNKNOWN, runnable)
         screenOnCoordinator.onScreenTurnedOn()
         screenOnCoordinator.onScreenTurnedOff()
 
@@ -130,7 +130,7 @@ class ScreenOnCoordinatorTest : SysuiTestCase() {
             Optional.empty(),
             testHandler
         )
-        screenOnCoordinator.onScreenTurningOn(runnable)
+        screenOnCoordinator.onScreenTurningOn(reason = SCREEN_TURNING_ON_REASON_UNKNOWN, runnable)
         waitHandlerIdle()
 
         // Should be called when only keyguard drawn
@@ -144,7 +144,7 @@ class ScreenOnCoordinatorTest : SysuiTestCase() {
                 Optional.empty(),
                 testHandler
         )
-        screenOnCoordinator.onScreenTurningOn(runnable)
+        screenOnCoordinator.onScreenTurningOn(reason = SCREEN_TURNING_ON_REASON_UNKNOWN, runnable)
 
         // Never called as the main handler didn't schedule it yet.
         verify(runnable, never()).run()
@@ -158,7 +158,7 @@ class ScreenOnCoordinatorTest : SysuiTestCase() {
                 Optional.empty(),
                 testHandler
         )
-        screenOnCoordinator.onScreenTurningOn(runnable)
+        screenOnCoordinator.onScreenTurningOn(reason = SCREEN_TURNING_ON_REASON_UNKNOWN, runnable)
         // No need to wait for the handler to be idle, as it shouldn't be used
         // waitHandlerIdle()
 

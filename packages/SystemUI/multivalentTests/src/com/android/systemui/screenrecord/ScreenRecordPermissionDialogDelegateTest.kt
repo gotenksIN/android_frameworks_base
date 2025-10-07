@@ -23,6 +23,8 @@ import android.hardware.display.VirtualDisplayConfig
 import android.os.UserHandle
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.annotations.RequiresFlagsEnabled
+import android.platform.test.flag.junit.CheckFlagsRule
+import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import android.testing.TestableLooper
 import android.view.View
 import android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR
@@ -34,7 +36,6 @@ import com.android.systemui.Dependency
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.animation.DialogTransitionAnimator
 import com.android.systemui.broadcast.BroadcastDispatcher
-import com.android.systemui.common.domain.interactor.SysUIStateDisplaysInteractor
 import com.android.systemui.display.data.repository.FakeDisplayWindowPropertiesRepository
 import com.android.systemui.mediaprojection.MediaProjectionMetricsLogger
 import com.android.systemui.mediaprojection.appselector.MediaProjectionAppSelectorActivity
@@ -42,10 +43,12 @@ import com.android.systemui.mediaprojection.permission.ENTIRE_SCREEN
 import com.android.systemui.mediaprojection.permission.SINGLE_APP
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.res.R
-import com.android.systemui.settings.UserContextProvider
+import com.android.systemui.screenrecord.domain.interactor.screenRecordingStartStopInteractor
+import com.android.systemui.shade.data.repository.shadeDialogContextInteractor
 import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.statusbar.phone.SystemUIDialog
 import com.android.systemui.statusbar.phone.SystemUIDialogManager
+import com.android.systemui.testKosmos
 import com.android.systemui.util.mockito.argumentCaptor
 import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
@@ -53,6 +56,7 @@ import com.google.common.truth.Truth.assertWithMessage
 import junit.framework.Assert.assertEquals
 import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -65,14 +69,16 @@ import org.mockito.MockitoAnnotations
 @RunWith(AndroidJUnit4::class)
 @TestableLooper.RunWithLooper(setAsMainLooper = true)
 class ScreenRecordPermissionDialogDelegateTest : SysuiTestCase() {
+    @get:Rule val checkFlagsRule: CheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule()
 
     @Mock private lateinit var starter: ActivityStarter
     @Mock private lateinit var controller: ScreenRecordUxController
-    @Mock private lateinit var userContextProvider: UserContextProvider
     @Mock private lateinit var onStartRecordingClicked: Runnable
     @Mock private lateinit var mediaProjectionMetricsLogger: MediaProjectionMetricsLogger
     private val fakeDisplayWindowPropertiesRepository =
         FakeDisplayWindowPropertiesRepository(context)
+
+    private val kosmos = testKosmos()
 
     private lateinit var dialog: SystemUIDialog
     private lateinit var underTest: ScreenRecordPermissionDialogDelegate
@@ -85,7 +91,6 @@ class ScreenRecordPermissionDialogDelegateTest : SysuiTestCase() {
             SystemUIDialog.Factory(
                 context,
                 Dependency.get(SystemUIDialogManager::class.java),
-                Dependency.get(SysUIStateDisplaysInteractor::class.java),
                 Dependency.get(BroadcastDispatcher::class.java),
                 Dependency.get(DialogTransitionAnimator::class.java),
             )
@@ -96,13 +101,13 @@ class ScreenRecordPermissionDialogDelegateTest : SysuiTestCase() {
                 TEST_HOST_UID,
                 controller,
                 starter,
-                userContextProvider,
                 onStartRecordingClicked,
                 mediaProjectionMetricsLogger,
                 systemUIDialogFactory,
                 context,
                 context.getSystemService(DisplayManager::class.java)!!,
-                { fakeDisplayWindowPropertiesRepository },
+                kosmos.screenRecordingStartStopInteractor,
+                kosmos.shadeDialogContextInteractor,
             )
         dialog = underTest.createDialog()
     }

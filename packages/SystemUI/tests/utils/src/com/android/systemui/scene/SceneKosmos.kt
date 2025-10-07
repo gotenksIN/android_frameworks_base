@@ -12,6 +12,7 @@ import com.android.systemui.keyguard.ui.viewmodel.lightRevealScrimViewModel
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
 import com.android.systemui.power.domain.interactor.powerInteractor
+import com.android.systemui.qs.panels.ui.viewmodel.animateQsTilesViewModelFactory
 import com.android.systemui.scene.domain.interactor.onBootTransitionInteractor
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.logger.sceneLogger
@@ -38,6 +39,7 @@ var Kosmos.sceneKeys by Fixture {
         Scenes.Gone,
         Scenes.Communal,
         Scenes.Dream,
+        Scenes.Occluded,
     )
 }
 
@@ -60,6 +62,7 @@ var Kosmos.sceneContainerConfig by Fixture {
         mapOf(
             Scenes.Gone to 0,
             Scenes.Lockscreen to 0,
+            Scenes.Occluded to 1,
             Scenes.Communal to 1,
             Scenes.Dream to 2,
             Scenes.Shade to 3,
@@ -112,6 +115,7 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
                 onBootTransitionInteractor = onBootTransitionInteractor,
                 dualShadeEducationalTooltipsViewModelFactory =
                     dualShadeEducationalTooltipsViewModelFactory,
+                animateQsTilesViewModelFactory = animateQsTilesViewModelFactory,
             )
     }
 }

@@ -27,6 +27,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHearingAid;
 import android.bluetooth.BluetoothLeAudio;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothStatusCodes;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -76,11 +77,11 @@ import java.util.stream.Collectors;
         void onBluetoothRoutesUpdated();
     }
 
-    /** Interface for receiving events about Broadcast sinks volume changes. */
-    interface OnBroadcastSinkVolumeChangedListener {
+    /** Interface for receiving events about Broadcast sinks changes. */
+    interface OnBroadcastSinkChangedListener {
 
-        /** Called when Bluetooth sink volume in broadcast has changed. */
-        void onBroadcastSinkVolumeChanged();
+        /** Called when Bluetooth sink in broadcast has changed. */
+        void onBroadcastSinkChanged();
     }
 
     @NonNull
@@ -301,6 +302,14 @@ import java.util.stream.Collectors;
     }
 
     /**
+     * Trigger {@link BluetoothProfileMonitor} to stop the broadcast, optionally making a new BT
+     * device active.
+     */
+    protected void stopBroadcast(@Nullable String routeId) {
+        mBluetoothProfileMonitor.stopBroadcast(routeId);
+    }
+
+    /**
      * Obtains a list of selected bluetooth route infos.
      *
      * @return list of selected bluetooth route infos.
@@ -325,6 +334,14 @@ import java.util.stream.Collectors;
                                         .mRoute)
                 .filter(routeInfo -> routeIdSet.add(routeInfo.getId()))
                 .toList();
+    }
+
+    /** Returns whether LE Audio broadcast is supported. */
+    public boolean isLEAudioBroadcastSupported() {
+        return mBluetoothAdapter.isLeAudioBroadcastAssistantSupported()
+                == BluetoothStatusCodes.FEATURE_SUPPORTED
+                && mBluetoothAdapter.isLeAudioBroadcastSourceSupported()
+                == BluetoothStatusCodes.FEATURE_SUPPORTED;
     }
 
     private void notifyBluetoothRoutesUpdated() {

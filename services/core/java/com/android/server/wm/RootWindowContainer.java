@@ -45,10 +45,8 @@ import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_FOCUS_LIGHT;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_KEEP_SCREEN_ON;
-import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ORIENTATION;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_STATES;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_TASKS;
-import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_WALLPAPER;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_SHOW_SURFACE_ALLOC;
 import static com.android.server.policy.PhoneWindowManager.SYSTEM_DIALOG_REASON_ASSIST;
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_LAYOUT;
@@ -110,7 +108,6 @@ import android.hardware.display.DisplayManagerInternal.DisplayBrightnessOverride
 import android.hardware.power.Mode;
 import android.net.Uri;
 import android.os.Binder;
-import android.os.Debug;
 import android.os.FactoryTest;
 import android.os.Handler;
 import android.os.IBinder;
@@ -126,9 +123,9 @@ import android.provider.Settings;
 import android.service.voice.IVoiceInteractionSession;
 import android.util.ArrayMap;
 import android.util.ArraySet;
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
 import android.util.BoostFramework;
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
 import android.util.IntArray;
 import android.util.Pair;
 import android.util.Slog;
@@ -159,9 +156,9 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.utils.Slogf;
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
 import com.android.server.am.ProcessFreezerManager;
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
 import com.android.server.wm.utils.RegionUtils;
 import com.android.window.flags.Flags;
 
@@ -197,7 +194,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     private final SparseArray<DisplayBrightnessOverrideRequest> mDisplayBrightnessOverrides =
             new SparseArray<>();
     private long mUserActivityTimeout = -1;
-    private boolean mUpdateRotation = false;
+
     // Only set while traversing the default display based on its content.
     // Affects the behavior of mirroring on secondary displays.
     private boolean mObscureApplicationContentOnSecondaryDisplays = false;
@@ -246,14 +243,14 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     @NonNull
     private final DisplayRotationCoordinator mDisplayRotationCoordinator;
 
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
     public static boolean mPerfSendTapHint = false;
     public static boolean mIsPerfBoostAcquired = false;
     public static int mPerfHandle = -1;
     public BoostFramework mPerfBoost = null;
     public BoostFramework mUxPerf = null;
 
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
     /** Reference to default display so we can quickly look it up. */
     private DisplayContent mDefaultDisplay;
     private final SparseArray<IntArray> mDisplayAccessUIDs = new SparseArray<>();
@@ -546,8 +543,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (displayContent.isDefaultDisplay) {
                 final Configuration newConfig = mWmService.computeNewConfiguration(
                         displayContent.getDisplayId());
-                mWmService.mAtmService.updateConfigurationLocked(newConfig, null /* starting */,
-                        false /* initLocale */);
+                mWmService.mAtmService.updateConfigurationLocked(newConfig, false /* initLocale */);
             }
         }
     }
@@ -753,20 +749,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
      * check and {@link WindowSurfacePlacer#isInLayout()} won't take effect.
      */
     void performSurfacePlacement() {
-        Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "performSurfacePlacement");
-        try {
-            performSurfacePlacementNoTrace();
-        } finally {
-            Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
-        }
-    }
-
-    // "Something has changed!  Let's make it correct now."
-    // TODO: Super long method that should be broken down...
-    void performSurfacePlacementNoTrace() {
         if (DEBUG_WINDOW_TRACE) {
-            Slog.v(TAG, "performSurfacePlacementInner: entry. Called by "
-                    + Debug.getCallers(3));
+            Slog.v(TAG, "performSurfacePlacement: entry");
         }
 
         int i;
@@ -810,18 +794,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
         mWmService.mAtmService.mBackNavigationController
                 .checkAnimationReady(defaultDisplay.mWallpaperController);
-
-        for (int displayNdx = 0; displayNdx < mChildren.size(); ++displayNdx) {
-            final DisplayContent displayContent = mChildren.get(displayNdx);
-            if (displayContent.mWallpaperMayChange) {
-                ProtoLog.v(WM_DEBUG_WALLPAPER, "Wallpaper may change!  Adjusting");
-                displayContent.pendingLayoutChanges |= FINISH_LAYOUT_REDO_WALLPAPER;
-                if (DEBUG_LAYOUT_REPEATS) {
-                    surfacePlacer.debugLayoutRepeats("WallpaperMayChange",
-                            displayContent.pendingLayoutChanges);
-                }
-            }
-        }
 
         if (mWmService.mFocusMayChange) {
             mWmService.mFocusMayChange = false;
@@ -877,13 +849,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     mSustainedPerformanceModeEnabled);
         }
 
-        if (mUpdateRotation) {
-            ProtoLog.d(WM_DEBUG_ORIENTATION, "Performing post-rotate rotation");
-            mUpdateRotation = updateRotationUnchecked();
-        }
-
-        if (!mWmService.mWaitingForDrawnCallbacks.isEmpty()
-                || (!isLayoutNeeded() && !mUpdateRotation)) {
+        if (!mWmService.mWaitingForDrawnCallbacks.isEmpty() || !isLayoutNeeded()) {
             mWmService.checkDrawnWindowsLocked();
         }
 
@@ -1710,51 +1676,84 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     /**
-     * @return a list of pairs, containing activities and their task id which are the top ones in
-     * each visible root task. The first entry will be the focused activity.
+     * @return a list of {@link ActivityAssistInfo} of the visible activities in the given display.
+     * Visible activities in the focused root Task are at the front of the list.
      *
-     * <p>NOTE: If the top activity is in the split screen, the other activities in the same split
-     * screen will also be returned.
+     * <p>NOTE: This includes all visible activities, even if one is paused, which means it is
+     * behind a translucent container.
      */
     List<ActivityAssistInfo> getTopVisibleActivities(int displayId) {
         final ArrayList<ActivityAssistInfo> topVisibleActivities = new ArrayList<>();
-        final ArrayList<ActivityAssistInfo> activityAssistInfos = new ArrayList<>();
         final DisplayContent dc =
                 displayId != INVALID_DISPLAY ? getDisplayContent(displayId) : null;
         final Task topFocusedRootTask =
                 dc != null ? dc.getFocusedRootTask() : getTopDisplayFocusedRootTask();
 
-        final Consumer<Task> collectVisibleActivities = rootTask -> {
-            // Get top activity from a visible root task and add it to the list.
-            if (rootTask.shouldBeVisible(null /* starting */)) {
-                final ActivityRecord top = rootTask.getTopNonFinishingActivity();
-                if (top != null) {
-                    activityAssistInfos.clear();
-                    activityAssistInfos.add(new ActivityAssistInfo(top));
-                    // Check if the activity on the split screen.
-                    top.getTask().forOtherAdjacentTasks(task -> {
-                        final ActivityRecord adjacentActivityRecord =
-                                task.getTopNonFinishingActivity();
-                        if (adjacentActivityRecord != null) {
-                            activityAssistInfos.add(
-                                    new ActivityAssistInfo(adjacentActivityRecord));
+        if (Flags.returnAllVisibleActivitiesForVis()) {
+            final ArrayList<ActivityAssistInfo> visibleActivitiesInFocusedRoot = new ArrayList<>();
+            final Consumer<ActivityRecord> collectFromFocusedRoot = activity -> {
+                if (activity.isVisibleRequested()) {
+                    visibleActivitiesInFocusedRoot.add(new ActivityAssistInfo(activity));
+                }
+            };
+            final Consumer<ActivityRecord> collectFromNonFocusedRoot = activity -> {
+                if (activity.isVisibleRequested()) {
+                    topVisibleActivities.add(new ActivityAssistInfo(activity));
+                }
+            };
+            final Consumer<Task> collectFromDisplay = leafTaskFragment -> {
+                if (!leafTaskFragment.isVisibleRequested()) {
+                    return;
+                }
+                if (leafTaskFragment.getRootTask() == topFocusedRootTask) {
+                    leafTaskFragment.forAllActivities(collectFromFocusedRoot);
+                } else {
+                    leafTaskFragment.forAllActivities(collectFromNonFocusedRoot);
+                }
+            };
+
+            if (dc != null) {
+                dc.forAllRootTasks(collectFromDisplay);
+            } else {
+                // Traverse all displays.
+                forAllRootTasks(collectFromDisplay);
+            }
+            topVisibleActivities.addAll(0, visibleActivitiesInFocusedRoot);
+        } else {
+            final ArrayList<ActivityAssistInfo> activityAssistInfos = new ArrayList<>();
+            final Consumer<Task> collectVisibleActivities = rootTask -> {
+                // Get top activity from a visible root task and add it to the list.
+                if (rootTask.shouldBeVisible(null /* starting */)) {
+                    final ActivityRecord top = rootTask.getTopNonFinishingActivity();
+                    if (top != null) {
+                        activityAssistInfos.clear();
+                        activityAssistInfos.add(new ActivityAssistInfo(top));
+                        // Check if the activity on the split screen.
+                        top.getTask().forOtherAdjacentTasks(task -> {
+                            final ActivityRecord adjacentActivityRecord =
+                                    task.getTopNonFinishingActivity();
+                            if (adjacentActivityRecord != null) {
+                                activityAssistInfos.add(
+                                        new ActivityAssistInfo(adjacentActivityRecord));
+                            }
+                        });
+                        if (rootTask == topFocusedRootTask) {
+                            topVisibleActivities.addAll(0, activityAssistInfos);
+                        } else {
+                            topVisibleActivities.addAll(activityAssistInfos);
                         }
-                    });
-                    if (rootTask == topFocusedRootTask) {
-                        topVisibleActivities.addAll(0, activityAssistInfos);
-                    } else {
-                        topVisibleActivities.addAll(activityAssistInfos);
                     }
                 }
-            }
-        };
+            };
 
-        if (dc != null) {
-            dc.forAllRootTasks(collectVisibleActivities);
-        } else {
-            // Traverse all displays.
-            forAllRootTasks(collectVisibleActivities);
+            if (dc != null) {
+                dc.forAllRootTasks(collectVisibleActivities);
+            } else {
+                // Traverse all displays.
+                forAllRootTasks(collectVisibleActivities);
+            }
         }
+
         return topVisibleActivities;
     }
 
@@ -2102,7 +2101,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         final TransitionController transitionController = task.mTransitionController;
 
         transitionController.deferTransitionReady();
-        Transition.ReadyCondition pipChangesApplied = new Transition.ReadyCondition("movedToPip");
+        final Transition.ReadyCondition pipChangesApplied =
+                new Transition.ReadyCondition("movedToPip", !Flags.migrateBasicLegacyReady());
         transitionController.waitFor(pipChangesApplied);
         mService.deferWindowLayout();
         boolean localVisibilityDeferred = false;
@@ -2156,7 +2156,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                         return;
                     }
                     tf.clearAdjacentTaskFragments();
-                    tf.setCompanionTaskFragment(null /* companionTaskFragment */);
+                    tf.clearCompanionTaskFragment();
                     tf.setAnimationParams(TaskFragmentAnimationParams.DEFAULT);
                     if (tf.getTopNonFinishingActivity() != null) {
                         // When the Task is entering picture-in-picture, we should clear all
@@ -2175,6 +2175,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 rootTask = new Task.Builder(mService)
                         .setActivityType(r.getActivityType())
                         .setOnTop(true)
+                        .setTaskId(taskDisplayArea.getNextRootTaskId())
                         .setActivityInfo(r.info)
                         .setIntent(r.intent)
                         .setDeferTaskAppear(true)
@@ -2263,6 +2264,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     rootTask.getSyncTransaction().hide(task.getSurfaceControl());
                 }
             }
+            // Take snapshot, this is to make sure we have valid thumbnail after exit-PiP.
+            // When it's a multi-activity case, the snapshot is taken for the original task,
+            // it will otherwise be empty.
+            mWindowManager.mTaskSnapshotController.recordSnapshot(task);
 
             // TODO(remove-legacy-transit): Move this to the `singleActivity` case when removing
             //                              legacy transit.
@@ -2270,10 +2275,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
             // Set the launch bounds for launch-into-pip Activity on the root task.
             if (r.getOptions() != null && r.getOptions().isLaunchIntoPip()) {
-                // Record the snapshot now, it will be later fetched for content-pip animation.
-                // We do this early in the process to make sure the right snapshot is used for
-                // entering content-pip animation.
-                mWindowManager.mTaskSnapshotController.recordSnapshot(task);
                 if (!isPip2ExperimentEnabled()) {
                     // PiP2 always supplies bounds from Shell, so we can skip this.
                     rootTask.setBounds(r.pictureInPictureArgs.getSourceRectHint());
@@ -2422,35 +2423,37 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
     }
 
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
     void acquireAppLaunchPerfLock(ActivityRecord r) {
         /* Acquire perf lock during new app launch */
         if (mPerfBoost == null) {
             mPerfBoost = new BoostFramework();
         }
         if (mPerfBoost != null) {
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
             int pkgType = mPerfBoost.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                                                      r.packageName);
             int wpcPid = -1;
             if (mService != null && r != null && r.info != null && r.info.applicationInfo !=null) {
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
                 final WindowProcessController wpc =
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
                         mService.getProcessController(r.processName, r.info.applicationInfo.uid);
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
                 if (wpc != null && wpc.hasThread()) {
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
                    //If target process didn't start yet,
                    // this operation will be done when app call attach
                    wpcPid = wpc.getPid();
                 }
             }
+// QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2025-06-30: Core: Binder call reduction while launch am: 85e71044cc am: 85e71044cc
             if (mPerfBoost.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
                   mPerfBoost.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
 
@@ -2484,20 +2487,14 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                        r.packageName, -1, BoostFramework.Launch.BOOST_V2);
                    if (wpcPid != -1) {
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                        mPerfBoost.perfHint(
                            BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
                                r.packageName, wpcPid,
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                                BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
                    }
+// QTI_END: 2025-06-30: Core: Binder call reduction while launch am: 85e71044cc am: 85e71044cc
 
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2025-06-30: Core: Binder call reduction while launch am: 85e71044cc am: 85e71044cc
                    if (pkgType  == BoostFramework.WorkloadType.GAME)
                    {
                        mPerfHandle = mPerfBoost.perfHint(
@@ -2508,8 +2505,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                            BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                                r.packageName, -1, BoostFramework.Launch.BOOST_V3);
                    }
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                }
             }else {
                if (mPerfBoost.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
@@ -2519,27 +2514,29 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
                     wpcPid, BoostFramework.Launch.BOOST_V1);
                 }
+// QTI_END: 2025-06-30: Core: Binder call reduction while launch am: 85e71044cc am: 85e71044cc
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
             }
             if (mPerfHandle > 0)
                 mIsPerfBoostAcquired = true;
             // Start IOP
             if(r.info.applicationInfo != null &&
                 r.info.applicationInfo.sourceDir != null) {
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
                   if (mPerfBoost.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                     mPerfBoost.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                       mPerfBoost.perfIOPrefetchStart(-1,r.packageName,
                       r.info.applicationInfo.sourceDir.substring(
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
                         0, r.info.applicationInfo.sourceDir.lastIndexOf('/')));
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
                   }
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
             }
         }
     }
 
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
     @Nullable
     ActivityRecord findTask(ActivityRecord r, TaskDisplayArea preferredTaskDisplayArea,
             boolean includeLaunchedFromBubble) {
@@ -2561,7 +2558,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         if (preferredTaskDisplayArea != null) {
             mTmpFindTaskResult.process(preferredTaskDisplayArea);
             if (mTmpFindTaskResult.mIdealRecord != null) {
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
                 if(mTmpFindTaskResult.mIdealRecord.getState() == DESTROYED) {
                     /*It's a new app launch */
                     acquireAppLaunchPerfLock(r);
@@ -2569,7 +2566,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
                 if(mTmpFindTaskResult.mIdealRecord.getState() == STOPPED) {
                      /*Warm launch */
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
                      mUxPerf = new BoostFramework();
                      if (mUxPerf != null) {
                          if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
@@ -2579,47 +2576,47 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                              mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_WARM_LAUNCH, r.packageName, 2, 0, 0);
                          }
                      }
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
                     ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
                     if (freezer != null && freezer.useFreezerManager()) {
                         freezer.startFreeze(r.packageName, ProcessFreezerManager.WARM_LAUNCH_FREEZE);
                     }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
                 }
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
                 return mTmpFindTaskResult.mIdealRecord;
             } else if (mTmpFindTaskResult.mCandidateRecord != null) {
                 candidateActivity = mTmpFindTaskResult.mCandidateRecord;
             }
         }
 
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
         /* Acquire perf lock *only* during new app launch */
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
 // QTI_BEGIN: 2021-10-08: Core: Revert "Perf:fix issue that launch boost worked abnormal"
         if ((mTmpFindTaskResult.mIdealRecord == null) ||
             (mTmpFindTaskResult.mIdealRecord.getState() == DESTROYED)) {
 // QTI_END: 2021-10-08: Core: Revert "Perf:fix issue that launch boost worked abnormal"
-// QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
             if (r != null && r.isMainIntent(r.intent)) {
                 acquireAppLaunchPerfLock(r);
-// QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_END: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
                 ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
                 if (freezer != null && freezer.useFreezerManager()) {
                     freezer.startFreeze(r.packageName, ProcessFreezerManager.FIRST_LAUNCH_FREEZE);
                 }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
             } else if (r == null) {
                 Slog.w(TAG, "Should not happen! Didn't apply launch boost");
             }
-// QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
-// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
         }
 
-// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
         final ActivityRecord idealMatchActivity = getItemFromTaskDisplayAreas(taskDisplayArea -> {
             if (taskDisplayArea == preferredTaskDisplayArea) {
                 return null;
@@ -3186,14 +3183,18 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         if (mTmpOccludingRegion != null) {
             mTmpOccludingRegion.setEmpty();
         }
-        boolean changed = false;
-        if (!mTaskSupervisor.inActivityVisibilityUpdate()) {
-            changed = mTaskSupervisor.computeProcessActivityStateBatch();
-        }
-        if (mRankTaskLayersRunnable.mCheckUpdateOomAdj) {
-            mRankTaskLayersRunnable.mCheckUpdateOomAdj = false;
-            if (changed) {
-                mService.updateOomAdj();
+        // Multiple OomAdjuster affecting state changes can occur, wrap those state changes in a
+        // BatchSession.
+        try (var unused = mService.mActivityStateUpdater.startBatchSession()) {
+            boolean changed = false;
+            if (!mTaskSupervisor.inActivityVisibilityUpdate()) {
+                changed = mTaskSupervisor.computeProcessActivityStateBatch();
+            }
+            if (mRankTaskLayersRunnable.mCheckUpdateOomAdj) {
+                mRankTaskLayersRunnable.mCheckUpdateOomAdj = false;
+                if (changed) {
+                    mService.updateOomAdj();
+                }
             }
         }
     }
@@ -4132,10 +4133,5 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 }
             }
         }
-    }
-
-    boolean isTaskMoveAllowedOnDisplay(int displayId) {
-        DisplayContent dc = getDisplayContent(displayId);
-        return dc == null ? false : dc.isTaskMoveAllowedOnDisplay();
     }
 }

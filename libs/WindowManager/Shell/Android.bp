@@ -117,7 +117,7 @@ java_library {
 
     srcs: [
         "src/com/android/wm/shell/desktopmode/education/data/proto/**/*.proto",
-        "src/com/android/wm/shell/desktopmode/persistence/*.proto",
+        "src/com/android/wm/shell/desktopmode/data/persistence/*.proto",
     ],
     proto: {
         type: "lite",
@@ -163,6 +163,7 @@ android_library {
         "jsr330",
         "kotlinx-coroutines-android",
         "kotlinx-coroutines-core",
+        "lottie",
         "mechanics",
         "perfetto_trace_java_protos",
     ],

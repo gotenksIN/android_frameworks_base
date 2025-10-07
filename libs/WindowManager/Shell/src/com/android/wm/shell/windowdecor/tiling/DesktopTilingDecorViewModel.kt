@@ -20,7 +20,6 @@ import android.app.ActivityManager
 import android.app.ActivityManager.RunningTaskInfo
 import android.content.Context
 import android.graphics.Rect
-import android.util.ArraySet
 import android.util.SparseArray
 import android.window.DisplayAreaInfo
 import android.window.WindowContainerTransaction
@@ -28,6 +27,7 @@ import androidx.core.util.getOrElse
 import androidx.core.util.keyIterator
 import androidx.core.util.valueIterator
 import com.android.internal.annotations.VisibleForTesting
+import com.android.internal.jank.InteractionJankMonitor
 import com.android.internal.protolog.ProtoLog
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
@@ -49,7 +49,7 @@ import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.FocusTransitionObserver
 import com.android.wm.shell.transition.Transitions
-import com.android.wm.shell.windowdecor.DesktopModeWindowDecoration
+import com.android.wm.shell.windowdecor.WindowDecorationWrapper
 import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainCoroutineDispatcher
@@ -58,6 +58,7 @@ import kotlinx.coroutines.MainCoroutineDispatcher
 class DesktopTilingDecorViewModel(
     private val context: Context,
     @ShellMainThread private val mainDispatcher: MainCoroutineDispatcher,
+    @ShellMainThread private val mainScope: CoroutineScope,
     @ShellBackgroundThread private val bgScope: CoroutineScope,
     private val displayController: DisplayController,
     private val rootTdaOrganizer: RootTaskDisplayAreaOrganizer,
@@ -74,11 +75,11 @@ class DesktopTilingDecorViewModel(
     private val desktopState: DesktopState,
     private val shellInit: ShellInit,
     private val shellController: ShellController,
+    private val interactionJankMonitor: InteractionJankMonitor,
 ) : DisplayChangeController.OnDisplayChangingListener {
     @VisibleForTesting
     var tilingHandlerByUserAndDeskId = SparseArray<SparseArray<DesktopTilingWindowDecoration>>()
     var currentUserId: Int = -1
-    val disconnectedDisplayDesks = ArraySet<Int>()
 
     init {
         // TODO(b/374309287): Move this interface implementation to
@@ -88,7 +89,7 @@ class DesktopTilingDecorViewModel(
 
     fun snapToHalfScreen(
         taskInfo: ActivityManager.RunningTaskInfo,
-        desktopModeWindowDecoration: DesktopModeWindowDecoration,
+        windowDecoration: WindowDecorationWrapper,
         position: DesktopTasksController.SnapPosition,
         currentBounds: Rect,
         destinationBounds: Rect? = null,
@@ -106,6 +107,7 @@ class DesktopTilingDecorViewModel(
                     DesktopTilingWindowDecoration(
                             context,
                             mainDispatcher,
+                            mainScope,
                             bgScope,
                             syncQueue,
                             displayController,
@@ -123,13 +125,14 @@ class DesktopTilingDecorViewModel(
                             mainExecutor,
                             desktopState,
                             shellController,
+                            interactionJankMonitor,
                         )
                         .also { userHandlerList[deskId] = it }
                 }
         transitions.registerObserver(handler)
         return handler.onAppTiled(
             taskInfo,
-            desktopModeWindowDecoration,
+            windowDecoration,
             position,
             currentBounds,
             destinationBounds,
@@ -185,9 +188,7 @@ class DesktopTilingDecorViewModel(
      * Resets tiling sessions for all desks on the disconnected display and retains tiling data if
      * the destination display supports desktop mode, otherwise erases all tiling data.
      */
-    fun onDisplayDisconnected(
-        disconnectedDisplayId: Int,
-    ) {
+    fun onDisplayDisconnected(disconnectedDisplayId: Int) {
         // Reset the tiling session but keep the persistence data for when the moved desks
         // are activated again.
         for (userHandlerList in tilingHandlerByUserAndDeskId.valueIterator()) {
@@ -197,7 +198,6 @@ class DesktopTilingDecorViewModel(
                 if (disconnectedDisplayId == handler.displayId) {
                     handler.resetTilingSession(shouldPersistTilingData = true)
                     desksToRemove.add(desk)
-                    disconnectedDisplayDesks.add(desk)
                 }
             }
             desksToRemove.forEach { desk -> userHandlerList.remove(desk) }
@@ -215,19 +215,6 @@ class DesktopTilingDecorViewModel(
     }
 
     fun getRightSnapBoundsIfTiled(displayId: Int): Rect {
-        val deskId = getCurrentActiveDeskForDisplay(displayId)
-        if (deskId == null) {
-            logW(
-                "Attempted to get right tiling snap bounds with no active desktop for displayId=%d.",
-                displayId,
-            )
-            return Rect()
-        }
-        val tilingBounds =
-            tilingHandlerByUserAndDeskId[currentUserId]?.get(deskId)?.getRightSnapBoundsIfTiled()
-        if (tilingBounds != null) {
-            return tilingBounds
-        }
         val displayLayout = displayController.getDisplayLayout(displayId)
         val stableBounds = Rect()
         displayLayout?.getStableBounds(stableBounds)
@@ -240,23 +227,13 @@ class DesktopTilingDecorViewModel(
                 stableBounds.right,
                 stableBounds.bottom,
             )
-        return snapBounds
+
+        val deskId = getCurrentActiveDeskForDisplay(displayId) ?: return snapBounds
+        val tilingHandler = tilingHandlerByUserAndDeskId[currentUserId]?.get(deskId)
+        return tilingHandler?.getRightSnapBoundsIfTiled() ?: snapBounds
     }
 
     fun getLeftSnapBoundsIfTiled(displayId: Int): Rect {
-        val deskId = getCurrentActiveDeskForDisplay(displayId)
-        if (deskId == null) {
-            logW(
-                "Attempted to get left tiling snap bounds with no active desktop for displayId=%d.",
-                displayId,
-            )
-            return Rect()
-        }
-        val tilingBounds =
-            tilingHandlerByUserAndDeskId[currentUserId]?.get(deskId)?.getLeftSnapBoundsIfTiled()
-        if (tilingBounds != null) {
-            return tilingBounds
-        }
         val displayLayout = displayController.getDisplayLayout(displayId)
         val stableBounds = Rect()
         displayLayout?.getStableBounds(stableBounds)
@@ -268,7 +245,10 @@ class DesktopTilingDecorViewModel(
                     context.resources.getDimensionPixelSize(R.dimen.split_divider_bar_width) / 2,
                 stableBounds.bottom,
             )
-        return snapBounds
+
+        val deskId = getCurrentActiveDeskForDisplay(displayId) ?: return snapBounds
+        val tilingHandler = tilingHandlerByUserAndDeskId[currentUserId]?.get(deskId)
+        return tilingHandler?.getLeftSnapBoundsIfTiled() ?: snapBounds
     }
 
     /** Notifies tiling of a desk being deactivated. */
@@ -276,9 +256,9 @@ class DesktopTilingDecorViewModel(
         tilingHandlerByUserAndDeskId[currentUserId]?.get(deskId)?.hideDividerBar()
     }
 
-    /** Removes [deskId] from the previously deactivated desks to mark it's activation. */
-    fun onDeskActivated(deskId: Int): Boolean =
-        disconnectedDisplayDesks.remove(deskId) || !tilingHandlerByUserAndDeskId.contains(deskId)
+    /** Returns whether [deskId] already exists and active or needs initialization. */
+    fun tilingDeskActive(deskId: Int): Boolean =
+        tilingHandlerByUserAndDeskId[currentUserId]?.contains(deskId) ?: false
 
     /** Destroys a tiling session for a removed desk. */
     fun onDeskRemoved(deskId: Int) {

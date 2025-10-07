@@ -156,6 +156,7 @@ android_app {
     generate_product_characteristics_rro: true,
 
     flags_packages: [
+        "android.systemserver.flags-aconfig",
         "android.app.appfunctions.flags-aconfig",
         "android.app.contextualsearch.flags-aconfig",
         "android.app.flags-aconfig",
@@ -188,6 +189,8 @@ android_app {
         "appsearch_aconfig_flags",
         "aconfig_trade_in_mode_flags",
         "com.android.media.flags.projection-aconfig",
+        "surfaceflinger_flags",
+        "power_flags",
     ],
 }
 

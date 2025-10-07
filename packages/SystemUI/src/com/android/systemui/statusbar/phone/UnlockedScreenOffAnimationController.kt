@@ -16,9 +16,11 @@ import com.android.app.tracing.namedRunnable
 import com.android.internal.jank.InteractionJankMonitor
 import com.android.internal.jank.InteractionJankMonitor.CUJ_SCREEN_OFF
 import com.android.internal.jank.InteractionJankMonitor.CUJ_SCREEN_OFF_SHOW_AOD
+import com.android.server.power.feature.flags.Flags as powerManagerFlags
 import com.android.systemui.DejankUtils
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.display.domain.interactor.DisplayStateInteractor
 import com.android.systemui.keyguard.KeyguardViewMediator
 import com.android.systemui.keyguard.WakefulnessLifecycle
 import com.android.systemui.shade.ShadeViewController
@@ -69,6 +71,7 @@ constructor(
     private val powerManager: PowerManager,
     private val shadeLockscreenInteractorLazy: Lazy<ShadeLockscreenInteractor>,
     private val panelExpansionInteractorLazy: Lazy<PanelExpansionInteractor>,
+    private val displayStateInteractorLazy: Lazy<DisplayStateInteractor>,
     @Main private val handler: Handler,
 ) : WakefulnessLifecycle.Observer, ScreenOffAnimation {
     private lateinit var centralSurfaces: CentralSurfaces
@@ -346,12 +349,33 @@ constructor(
             return false
         }
 
+        // We currently draw both the light reveal scrim, and the AOD UI, in the shade. If it's
+        // already expanded and showing notifications/QS, the animation looks really messy. For now,
+        // disable it if the notification panel is expanded.
+        if (
+            (!this::centralSurfaces.isInitialized ||
+                panelExpansionInteractorLazy.get().isPanelExpanded) &&
+                // Status bar might be expanded because we have started
+                // playing the animation already
+                !isAnimationPlaying()
+        ) {
+            return false
+        }
+
         // We only play the unlocked screen off animation if we are... unlocked.
         if (statusBarStateControllerImpl.state != StatusBarState.SHADE) {
             return false
         }
 
         if (!this::centralSurfaces.isInitialized) {
+            return false
+        }
+
+        // If this display is off, skip animation to reduce flickers.
+        if (
+            powerManagerFlags.separateTimeoutsFlicker() &&
+                displayStateInteractorLazy.get().isDefaultDisplayOff.value
+        ) {
             return false
         }
 

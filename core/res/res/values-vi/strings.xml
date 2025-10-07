@@ -71,13 +71,18 @@
     <string name="CLIRDefaultOnNextCallOff" msgid="5036749051007098105">"Số gọi đến mặc định thành bị giới hạn. Cuộc gọi tiếp theo. Không bị giới hạn"</string>
     <string name="CLIRDefaultOffNextCallOn" msgid="1022781126694885017">"Số gọi đến mặc định thành không bị giới hạn. Cuộc gọi tiếp theo. Bị giới hạn"</string>
     <string name="CLIRDefaultOffNextCallOff" msgid="2491576172356463443">"Số gọi đến mặc định thành không bị giới hạn. Cuộc gọi tiếp theo. Không bị giới hạn"</string>
-    <string name="page_size_compat_apk_warning" msgid="2982396798449041224">"Ứng dụng này không tương thích với kích thước trang 16 KB. Không kiểm tra được sự tương thích của tệp APK. Ứng dụng này sẽ chạy ở chế độ tương thích với kích thước trang. Để đảm bảo khả năng tương thích tốt nhất, vui lòng biên dịch lại ứng dụng ở chế độ hỗ trợ kích thước trang 16 KB. Để biết thêm thông tin, hãy xem &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
-    <string name="page_size_compat_elf_warning" msgid="6753874059564812651">"Ứng dụng này không tương thích với kích thước trang 16 KB. Không kiểm tra được sự tương thích của tệp ELF. Ứng dụng này sẽ chạy ở chế độ tương thích với kích thước trang. Để đảm bảo khả năng tương thích tốt nhất, vui lòng biên dịch lại ứng dụng ở chế độ hỗ trợ kích thước trang 16 KB. Để biết thêm thông tin, hãy xem &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
-    <string name="page_size_compat_apk_and_elf_warning" msgid="7628675779500605390">"Ứng dụng này không tương thích với kích thước trang 16 KB. Không kiểm tra được sự tương thích của tệp APK và tệp ELF. Ứng dụng này sẽ chạy ở chế độ tương thích với kích thước trang. Để đảm bảo khả năng tương thích tốt nhất, vui lòng biên dịch lại ứng dụng ở chế độ hỗ trợ kích thước trang 16 KB. Để biết thêm thông tin, hãy xem &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
-    <string name="page_size_compat_apk_warning_4kb" msgid="2104642120436642689">"Cảnh báo này xuất hiện vì ứng dụng có thể gỡ lỗi này đang trong giai đoạn thử nghiệm. Nếu bạn không phải là nhà phát triển, vui lòng báo cáo vấn đề này cho nhà phát triển và yêu cầu cung cấp một ứng dụng không thể gỡ lỗi. Ứng dụng này không tương thích với bộ nhớ 16 KB. Không kiểm tra được sự tương thích của tệp APK. Vui lòng làm theo hướng dẫn trên &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
-    <string name="page_size_compat_elf_warning_4kb" msgid="8038334656395476900">"Cảnh báo này xuất hiện vì ứng dụng có thể gỡ lỗi này đang trong giai đoạn thử nghiệm. Nếu bạn không phải là nhà phát triển, vui lòng báo cáo vấn đề này cho nhà phát triển và yêu cầu cung cấp một ứng dụng không thể gỡ lỗi. Ứng dụng này không tương thích với bộ nhớ 16 KB. Không kiểm tra được sự tương thích của tệp ELF. Vui lòng làm theo hướng dẫn trên &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
-    <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="5417036941497610850">"Cảnh báo này xuất hiện vì ứng dụng có thể gỡ lỗi này đang trong giai đoạn thử nghiệm. Nếu bạn không phải là nhà phát triển, vui lòng báo cáo vấn đề này cho nhà phát triển và yêu cầu cung cấp một ứng dụng không thể gỡ lỗi. Ứng dụng này không tương thích với bộ nhớ 16 KB. Không kiểm tra được sự tương thích của tệp APK và tệp ELF. Vui lòng làm theo hướng dẫn trên &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
+    <string name="page_size_compat_apk_warning" msgid="2297836366674721648">"Ứng dụng này không tương thích với kích thước trang 16 KB. Không kiểm tra được cách căn chỉnh của tệp APK. Ứng dụng này sẽ chạy ở chế độ tương thích với kích thước trang. Để đảm bảo khả năng tương thích tốt nhất, vui lòng biên dịch lại ứng dụng ở chế độ hỗ trợ kích thước trang 16 KB. Để biết thêm thông tin, hãy xem &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; &lt;br&gt;&lt;br&gt; Các thư viện sau đây không được căn chỉnh theo kích thước trang 16 KB: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_elf_warning" msgid="8613720928493005883">"Ứng dụng này không tương thích với kích thước trang 16 KB. Không kiểm tra được cách căn chỉnh của tệp ELF. Ứng dụng này sẽ chạy ở chế độ tương thích với kích thước trang. Để đảm bảo khả năng tương thích tốt nhất, vui lòng biên dịch lại ứng dụng ở chế độ hỗ trợ kích thước trang 16 KB. Để biết thêm thông tin, hãy xem &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; &lt;br&gt;&lt;br&gt; Các thư viện sau đây không được căn chỉnh theo kích thước trang 16 KB: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_warning" msgid="9034695801295605229">"Ứng dụng này không tương thích với kích thước trang 16 KB. Không kiểm tra được cách căn chỉnh của tệp APK và tệp ELF. Ứng dụng này sẽ chạy ở chế độ tương thích với kích thước trang. Để đảm bảo khả năng tương thích tốt nhất, vui lòng biên dịch lại ứng dụng ở chế độ hỗ trợ kích thước trang 16 KB. Để biết thêm thông tin, hãy xem &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; &lt;br&gt;&lt;br&gt; Các thư viện sau đây không được căn chỉnh theo kích thước trang 16 KB: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_warning_4kb" msgid="5676451039424864495">"Cảnh báo này xuất hiện vì ứng dụng có thể gỡ lỗi này đang trong giai đoạn thử nghiệm. Nếu bạn không phải là nhà phát triển, hãy báo cáo vấn đề này cho nhà phát triển và yêu cầu cung cấp một ứng dụng không thể gỡ lỗi. &lt;br&gt;&lt;br&gt; Ứng dụng này không tương thích với kích thước trang 16 KB. Không kiểm tra được cách căn chỉnh của tệp APK. Vui lòng làm theo các bước trên &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; &lt;br&gt;&lt;br&gt; Các thư viện sau đây không được căn chỉnh theo kích thước trang 16 KB: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_elf_warning_4kb" msgid="5005239480522831311">"Cảnh báo này xuất hiện vì ứng dụng có thể gỡ lỗi này đang trong giai đoạn thử nghiệm. Nếu bạn không phải là nhà phát triển, hãy báo cáo vấn đề này cho nhà phát triển và yêu cầu cung cấp một ứng dụng không thể gỡ lỗi. &lt;br&gt;&lt;br&gt; Ứng dụng này không tương thích với kích thước trang 16 KB. Không kiểm tra được cách căn chỉnh của tệp ELF. Vui lòng làm theo các bước trên &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; &lt;br&gt;&lt;br&gt; Các thư viện sau đây không được căn chỉnh theo kích thước trang 16 KB: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="997926487776340721">"Cảnh báo này xuất hiện vì ứng dụng có thể gỡ lỗi này đang trong giai đoạn thử nghiệm. Nếu bạn không phải là nhà phát triển, hãy báo cáo vấn đề này cho nhà phát triển và yêu cầu cung cấp một ứng dụng không thể gỡ lỗi. &lt;br&gt;&lt;br&gt; Ứng dụng này không tương thích với kích thước trang 16 KB. Không kiểm tra được cách căn chỉnh của tệp APK và tệp ELF. Vui lòng làm theo các bước trên &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;. &lt;br&gt;&lt;br&gt; Các thư viện sau đây không được căn chỉnh theo kích thước trang 16 KB: &lt;br&gt;&lt;br&gt;"</string>
     <string name="page_size_compat_never_show" msgid="3391282612422783097">"Không hiện lại"</string>
+    <string name="page_size_compat_title" msgid="6497719153872572204">"Khả năng tương thích của ứng dụng Android"</string>
+    <string name="page_size_compat_elf_not_aligned" msgid="4404128993555194313">"&amp;#8226; %1$s : Phân đoạn TẢI chưa được căn chỉnh&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_not_aligned" msgid="1434875607880657092">"&amp;#8226; %1$s : Thư viện không nén chưa được căn chỉnh&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_not_aligned" msgid="7140216083697701972">"&amp;#8226; %1$s : Phân đoạn TẢI và thư viện không nén chưa được căn chỉnh&lt;br&gt;"</string>
+    <string name="page_size_compat_unknown" msgid="5183026525148169891">"&amp;#8226; %1$s : Lỗi không xác định&lt;br&gt;"</string>
     <string name="serviceNotProvisioned" msgid="8289333510236766193">"Dịch vụ không được cấp phép."</string>
     <string name="CLIRPermanent" msgid="166443681876381118">"Bạn không thể thay đổi cài đặt ID người gọi."</string>
     <string name="auto_data_switch_title" msgid="3286350716870518297">"Đã chuyển dữ liệu sang <xliff:g id="CARRIERDISPLAY">%s</xliff:g>"</string>
@@ -164,14 +169,10 @@
     <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"Bảo mật mạng di động"</string>
     <string name="scCellularNetworkSecuritySummary" msgid="7042036754550545005">"Mã hoá, thông báo cho mạng chưa được mã hoá"</string>
     <string name="scIdentifierDisclosureIssueTitle" msgid="2898888825129970328">"Mã thiết bị đã bị truy cập"</string>
-    <!-- no translation found for scIDIssueSummaryNotificationWithCellularID (8371590113242615316) -->
-    <skip />
-    <!-- no translation found for scIdentifierDisclosureIssueSummaryNotification (7106922007150754222) -->
-    <skip />
-    <!-- no translation found for scIDIssueSummaryWithCellularID (1189965658392583067) -->
-    <skip />
-    <!-- no translation found for scIdentifierDisclosureIssueSummary (4362014471570210380) -->
-    <skip />
+    <string name="scIDIssueSummaryNotificationWithCellularID" msgid="8371590113242615316">"Vào <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>, một mạng lân cận đã ghi lại mã nhận dạng duy nhất (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>) của thiết bị mà bạn sở hữu trong lúc sử dụng SIM <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> của bạn"</string>
+    <string name="scIdentifierDisclosureIssueSummaryNotification" msgid="7106922007150754222">"Vào <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>, một mạng lân cận đã ghi lại mã nhận dạng duy nhất của thiết bị bạn sở hữu trong lúc sử dụng SIM <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> của bạn"</string>
+    <string name="scIDIssueSummaryWithCellularID" msgid="1189965658392583067">"Vào <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>, một mạng lân cận đã ghi lại mã nhận dạng duy nhất (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>) của thiết bị mà bạn sở hữu trong lúc sử dụng SIM <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> của bạn.\n\nTức là vị trí, hoạt động hoặc danh tính của bạn đã được ghi lại. Đây là một phương pháp phổ biến nhưng có thể trở thành vấn đề đối với những ai lo ngại về quyền riêng tư."</string>
+    <string name="scIdentifierDisclosureIssueSummary" msgid="4362014471570210380">"Vào <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>, một mạng lân cận đã ghi lại mã nhận dạng duy nhất của thiết bị mà bạn sở hữu trong lúc sử dụng SIM <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> của bạn.\n\nTức là vị trí, hoạt động hoặc danh tính của bạn đã được ghi lại. Đây là một phương pháp phổ biến nhưng có thể trở thành vấn đề đối với những ai lo ngại về quyền riêng tư."</string>
     <string name="scNullCipherIssueEncryptedTitle" msgid="234717016411824969">"Đã kết nối với mạng <xliff:g id="NETWORK_NAME">%1$s</xliff:g> đã mã hoá"</string>
     <string name="scNullCipherIssueEncryptedSummary" msgid="8577510708842150475">"Kết nối SIM <xliff:g id="NETWORK_NAME">%1$s</xliff:g> nay an toàn hơn"</string>
     <string name="scNullCipherIssueNonEncryptedTitle" msgid="3978071464929453915">"Đã kết nối với mạng chưa được mã hoá"</string>
@@ -299,6 +300,7 @@
     <string name="global_action_assist" msgid="2517047220311505805">"Hỗ trợ"</string>
     <string name="global_action_voice_assist" msgid="6655788068555086695">"Trợ lý thoại"</string>
     <string name="global_action_lockdown" msgid="2475471405907902963">"Khóa"</string>
+    <string name="global_action_unrestricted_lock" msgid="7933224393323064116">"Khoá"</string>
     <string name="status_bar_notification_info_overflow" msgid="3330152558746563475">"999+"</string>
     <string name="notification_compact_heads_up_reply" msgid="2425293958371284340">"Trả lời"</string>
     <string name="notification_hidden_text" msgid="2835519769868187223">"Thông báo mới"</string>
@@ -364,12 +366,12 @@
     <string name="permgroupdesc_sensors" msgid="2610631290633747752">"truy cập dữ liệu cảm biến về dấu hiệu sinh tồn của bạn"</string>
     <string name="permgrouplab_notifications" msgid="5472972361980668884">"Thông báo"</string>
     <string name="permgroupdesc_notifications" msgid="4608679556801506580">"hiển thị thông báo"</string>
-    <string name="permgrouplab_xr_eye_sensitive" msgid="2099659100156643683">"Dữ liệu theo dõi ánh mắt nhạy cảm qua XR"</string>
-    <string name="permgroupdesc_xr_eye_sensitive" msgid="1414121516133760271">"truy cập vào dữ liệu theo dõi ánh mắt nhạy cảm"</string>
-    <string name="permgrouplab_xr_tracking" msgid="7418994009794287471">"dữ liệu theo dõi XR"</string>
-    <string name="permgroupdesc_xr_tracking" msgid="6777198859446500821">"truy cập vào dữ liệu XR về bạn và môi trường xung quanh bạn"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="2993940754322250652">"Dữ liệu theo dõi nhạy cảm qua XR"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="8498501397939308918">"truy cập vào dữ liệu theo dõi nhạy cảm về bạn và môi trường xung quanh bạn"</string>
+    <string name="permgrouplab_xr_eye_sensitive" msgid="1709596126334620353">"Dữ liệu theo dõi ánh mắt"</string>
+    <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"theo dõi chính xác cử động mắt"</string>
+    <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Dữ liệu về cử động và khu vực"</string>
+    <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"theo dõi mắt, khuôn mặt, cơ thể và quét khu vực"</string>
+    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Dữ liệu chính xác về cử động đầu và khu vực"</string>
+    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"theo dõi chính xác cử động đầu và quét khu vực"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Truy xuất nội dung cửa sổ"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Kiểm tra nội dung của cửa sổ bạn đang tương tác."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"Bật tính năng Khám phá bằng cách chạm"</string>
@@ -667,22 +669,22 @@
     <string name="permdesc_imagesWrite" msgid="5195054463269193317">"Cho phép ứng dụng này sửa đổi bộ sưu tập ảnh của bạn."</string>
     <string name="permlab_mediaLocation" msgid="7368098373378598066">"đọc vị trí từ bộ sưu tập phương tiện"</string>
     <string name="permdesc_mediaLocation" msgid="597912899423578138">"Cho phép ứng dụng này đọc vị trí từ bộ sưu tập phương tiện của bạn."</string>
-    <string name="permlab_eye_tracking_coarse" msgid="7989596289790269059">"theo dõi vị trí gần đúng của ánh mắt bạn"</string>
-    <string name="permdesc_eye_tracking_coarse" msgid="870510233930553355">"Cho phép ứng dụng này theo dõi vị trí gần đúng của ánh mắt bạn."</string>
-    <string name="permlab_eye_tracking_fine" msgid="6914457357027049512">"theo dõi vị trí bạn đang nhìn"</string>
-    <string name="permdesc_eye_tracking_fine" msgid="5788889152304524730">"Cho phép ứng dụng này truy cập vào dữ liệu vị trí chính xác của ánh mắt."</string>
-    <string name="permlab_face_tracking" msgid="2272048395128283324">"theo dõi cử động của khuôn mặt"</string>
-    <string name="permdesc_face_tracking" msgid="2622783922311211866">"Cho phép ứng dụng này truy cập vào dữ liệu theo dõi cử động của khuôn mặt."</string>
-    <string name="permlab_hand_tracking" msgid="6478233866595566940">"theo dõi cử động của tay"</string>
-    <string name="permdesc_hand_tracking" msgid="8639715900104966456">"Cho phép ứng dụng này truy cập vào dữ liệu theo dõi cử động của tay."</string>
-    <string name="permlab_head_tracking" msgid="1309731456372087270">"theo dõi cử động của đầu"</string>
-    <string name="permdesc_head_tracking" msgid="231597390513699188">"Cho phép ứng dụng này truy cập vào dữ liệu theo dõi cử động của đầu."</string>
-    <string name="permlab_scene_understanding_coarse" msgid="6518646430502858641">"hiểu về môi trường ngay xung quanh bạn"</string>
-    <string name="permdesc_scene_understanding_coarse" msgid="4508880777646198656">"Cho phép ứng dụng này truy cập vào dữ liệu theo dõi về môi trường ngay xung quanh bạn."</string>
-    <string name="permlab_scene_understanding_fine" msgid="409126403264393251">"hiểu cụ thể về môi trường ngay xung quanh bạn"</string>
-    <string name="permdesc_scene_understanding_fine" msgid="6223368011593524179">"Cho phép ứng dụng này truy cập vào dữ liệu theo dõi cụ thể về môi trường ngay xung quanh bạn."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="7117098718465619023">"truy cập vào dữ liệu XR khi không ở chế độ nền trước"</string>
-    <string name="permdesc_xr_tracking_in_background" msgid="939504041387836853">"Cho phép ứng dụng này truy cập vào dữ liệu thực tế mở rộng (XR) khi không ở chế độ nền trước."</string>
+    <string name="permlab_eye_tracking_coarse" msgid="1266477998416112440">"theo dõi cử động mắt"</string>
+    <string name="permdesc_eye_tracking_coarse" msgid="1652112796672085320">"Cho phép ứng dụng này theo dõi hướng gần đúng của ánh mắt bạn."</string>
+    <string name="permlab_eye_tracking_fine" msgid="6208991021186455002">"theo dõi chính xác cử động mắt"</string>
+    <string name="permdesc_eye_tracking_fine" msgid="9215360948852654836">"Cho phép ứng dụng này theo dõi hướng ánh mắt của bạn."</string>
+    <string name="permlab_face_tracking" msgid="6052126246676474909">"theo dõi cử động khuôn mặt"</string>
+    <string name="permdesc_face_tracking" msgid="185815778490412574">"Cho phép ứng dụng này theo dõi các biểu cảm và cử động khuôn mặt bạn."</string>
+    <string name="permlab_hand_tracking" msgid="21944950887649088">"theo dõi cử động tay"</string>
+    <string name="permdesc_hand_tracking" msgid="8083783248481460669">"Cho phép ứng dụng này theo dõi chuyển động tay của bạn."</string>
+    <string name="permlab_head_tracking" msgid="4304699038992159853">"theo dõi cử động đầu"</string>
+    <string name="permdesc_head_tracking" msgid="2232184518548944223">"Cho phép ứng dụng này theo dõi cử động đầu của bạn."</string>
+    <string name="permlab_scene_understanding_coarse" msgid="8765236119358852920">"quét khu vực xung quanh bạn"</string>
+    <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Cho phép ứng dụng này quét môi trường xung quanh bạn."</string>
+    <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"quét chính xác khu vực xung quanh bạn"</string>
+    <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Cho phép ứng dụng này quét chính xác môi trường xung quanh bạn."</string>
+    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"theo dõi dữ liệu XR ở chế độ nền"</string>
+    <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Cho phép ứng dụng này truy cập vào dữ liệu XR ở chế độ nền."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"ghi lại các phím"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Cho phép ứng dụng ghi lại các phím trước khi hệ thống có thể xử lý các thao tác và phím tắt trên đó."</string>
     <string name="biometric_app_setting_name" msgid="3339209978734534457">"Dùng dữ liệu sinh trắc học"</string>
@@ -690,6 +692,8 @@
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"Xác minh danh tính của bạn"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"Dùng dữ liệu sinh trắc học của bạn để tiếp tục"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"Dùng dữ liệu sinh trắc học của bạn hoặc phương thức khóa màn hình để tiếp tục"</string>
+    <string name="biometric_dialog_secondary_display_toast" product="default" msgid="256544327174107086">"Xác minh danh tính của bạn trên điện thoại để tiếp tục"</string>
+    <string name="biometric_dialog_secondary_display_toast" product="tablet" msgid="2855203015454795660">"Xác minh danh tính của bạn trên máy tính bảng để tiếp tục"</string>
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Không có phần cứng sinh trắc học"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"Đã hủy xác thực"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"Không nhận dạng được"</string>
@@ -913,6 +917,7 @@
     <string name="policydesc_disableCamera" msgid="3204405908799676104">"Ngăn sử dụng tất cả máy ảnh của thiết bị."</string>
     <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"Tắt một số tính năng của phương thức khóa màn hình"</string>
     <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"Ngăn sử dụng một số tính năng của phương thức khóa màn hình."</string>
+    <string name="exit_toast_on_long_press_escape" msgid="2983932499112557277">"Nhấn và giữ phím Esc để đóng ứng dụng này"</string>
   <string-array name="phoneTypes">
     <item msgid="8996339953292723951">"Nhà riêng"</item>
     <item msgid="7740243458912727194">"Di động"</item>
@@ -1123,6 +1128,7 @@
     <string name="keyguard_accessibility_sim_pin_unlock" msgid="4895939120871890557">"Mở khóa bằng mã PIN của SIM."</string>
     <string name="keyguard_accessibility_sim_puk_unlock" msgid="3459003464041899101">"Mở khóa bằng mã PUK của SIM."</string>
     <string name="keyguard_accessibility_password_unlock" msgid="6130186108581153265">"Mở khóa bằng mật khẩu."</string>
+    <string name="keyguard_accessibility_secure_lock_device_biometric_unlock" msgid="1884638289137214044">"Mở khoá bằng dữ liệu sinh trắc học để khoá thiết bị một cách an toàn."</string>
     <string name="keyguard_accessibility_pattern_area" msgid="1419570880512350689">"Khu vực hình."</string>
     <string name="keyguard_accessibility_slide_area" msgid="4331399051142520176">"Khu vực trượt."</string>
     <string name="password_keyboard_label_symbol_key" msgid="2716255580853511949">"?123"</string>
@@ -1480,8 +1486,6 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"TỪ CHỐI"</string>
     <string name="select_input_method" msgid="3971267998568587025">"Chọn phương thức nhập"</string>
     <string name="input_method_language_settings" msgid="8069089418056819437">"Cài đặt ngôn ngữ"</string>
-    <string name="show_ime" msgid="6406112007347443383">"Hiện bàn phím ảo trên màn hình trong khi bàn phím vật lý đang hoạt động"</string>
-    <string name="hardware" msgid="3611039921284836033">"Sử dụng bàn phím ảo"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"Định cấu hình <xliff:g id="DEVICE_NAME">%s</xliff:g>"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"Định cấu hình bàn phím vật lý"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"Nhấn để chọn ngôn ngữ và bố cục"</string>
@@ -1839,6 +1843,7 @@
     <string name="owner_name" msgid="8713560351570795743">"Chủ sở hữu"</string>
     <string name="guest_name" msgid="8502103277839834324">"Khách"</string>
     <string name="headless_system_user_name" msgid="1849150903255530049">"Người dùng hệ thống"</string>
+    <string name="unnamed_user_name" msgid="6096699110534542980">"Người dùng"</string>
     <string name="error_message_title" msgid="4082495589294631966">"Lỗi"</string>
     <string name="error_message_change_not_allowed" msgid="843159705042381454">"Quản trị viên của bạn không cho phép thực hiện thay đổi này"</string>
     <string name="app_not_found" msgid="3429506115332341800">"Không tìm thấy ứng dụng nào để xử lý tác vụ này"</string>
@@ -2042,6 +2047,12 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"Tối đa hóa"</string>
     <string name="close_button_text" msgid="10603510034455258">"Đóng"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
+    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
+    <skip />
+    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
+    <skip />
+    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
+    <skip />
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Trả lời"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Video"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Từ chối"</string>
@@ -2510,7 +2521,7 @@
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Nội dung ứng dụng bị ẩn khỏi tính năng chia sẻ màn hình vì lý do bảo mật"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"Đã tự động kết nối với vệ tinh"</string>
     <string name="satellite_notification_summary" msgid="5207364139430767162">"Bạn có thể gửi và nhận tin nhắn mà không cần có mạng di động hoặc mạng Wi-Fi"</string>
-    <string name="satellite_notification_summary_with_data" msgid="6486843676720429049">"Bạn có thể gửi và nhận tin nhắn cũng như sử dụng dữ liệu hạn chế qua vệ tinh"</string>
+    <string name="satellite_notification_summary_with_data" msgid="8290202758586475712">"Bạn có thể gửi và nhận tin nhắn cũng như dùng một số ứng dụng qua vệ tinh"</string>
     <string name="satellite_notification_manual_title" msgid="1097504441849466279">"Sử dụng tính năng nhắn tin qua vệ tinh?"</string>
     <string name="satellite_notification_manual_summary" msgid="901206289846283445">"Gửi và nhận tin nhắn mà không cần mạng di động hoặc Wi-Fi"</string>
     <string name="satellite_notification_open_message" msgid="4149234979688273729">"Mở ứng dụng Tin nhắn"</string>
@@ -2565,23 +2576,37 @@
     <string name="keyboard_shortcut_group_applications_calendar" msgid="3571770335653387606">"Lịch"</string>
     <string name="keyboard_shortcut_group_applications_calculator" msgid="6753209559716091507">"Máy tính"</string>
     <string name="keyboard_shortcut_group_applications_maps" msgid="7950000659522589471">"Bản đồ"</string>
+    <string name="keyboard_shortcut_group_applications_files" msgid="863938400765838051">"Files"</string>
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"Ứng dụng"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"Hệ thống không nhận dạng được vân tay của bạn. Hãy thiết lập lại tính năng Mở khoá bằng vân tay."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Tính bảo mật và quyền riêng tư"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="7202983697003493711">"Mở khoá màn hình trước tiên"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="2648733588653060170">"Mở khoá màn hình và kết nối lại"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_text" msgid="1628936399413661929">"Chế độ Bảo vệ nâng cao yêu cầu bạn phải dùng phương thức mở khoá màn hình thông thường để chuyển dữ liệu qua USB"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="608846071408348658">"Chế độ Bảo vệ nâng cao yêu cầu bạn phải dùng phương thức mở khoá màn hình thông thường để chuyển dữ liệu qua USB"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_low_power_charge_notification_text" msgid="1240936298914360256">"Chế độ Bảo vệ nâng cao yêu cầu bạn phải mở khoá màn hình để chuyển dữ liệu hoặc sạc nhanh qua USB"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_low_power_charge_replug_notification_text" msgid="6370672468652821937">"Chế độ Bảo vệ nâng cao yêu cầu bạn phải mở khoá màn hình để chuyển dữ liệu hoặc sạc nhanh qua USB"</string>
-    <string name="usb_apm_usb_plugged_in_for_power_brick_notification_text" msgid="1673711307740787848">"Chế độ Bảo vệ nâng cao yêu cầu bạn phải dùng phương thức mở khoá màn hình thông thường để sạc nhanh qua USB"</string>
-    <string name="usb_apm_usb_plugged_in_for_power_brick_replug_notification_text" msgid="1244847752922938852">"Chế độ Bảo vệ nâng cao yêu cầu bạn phải dùng phương thức mở khoá màn hình thông thường để sạc nhanh qua USB"</string>
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
+    <skip />
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Tắt tiếng"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Đã tắt tiếng thông báo"</string>
-    <string name="usb_apm_usb_notification_silenced_text" msgid="6414815636131602513">"Đã tắt tiếng thông báo của chế độ Bảo vệ nâng cao cho USB cho đến khi bạn khởi động lại thiết bị"</string>
+    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
+    <skip />
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"Hoạt động đáng ngờ liên quan đến USB"</string>
-    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="6537085605929303187">"Tín hiệu dữ liệu qua USB đã bị tắt."</string>
+    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
+    <skip />
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Bạn gặp sự cố khi sử dụng tính năng Mở khoá bằng vân tay?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Nhấn để xem các mẹo giúp cải thiện trải nghiệm mở khoá"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Không nhấp nháy"</string>
+    <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Nhấn và giữ nút Nguồn để tắt TV"</string>
+    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
+    <skip />
+    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
+    <skip />
+    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
+    <skip />
 </resources>

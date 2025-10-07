@@ -24,6 +24,7 @@ import android.app.smartspace.SmartspaceManager
 import android.app.smartspace.SmartspaceSession
 import android.app.smartspace.SmartspaceSession.OnTargetsAvailableListener
 import android.app.smartspace.SmartspaceTarget
+import android.content.ComponentName
 import android.content.Intent
 import android.content.applicationContext
 import android.content.testableContext
@@ -37,7 +38,6 @@ import androidx.test.filters.SmallTest
 import com.android.systemui.LauncherProxyService
 import com.android.systemui.LauncherProxyService.LauncherProxyListener
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.ambientcue.data.logger.ambientCueLogger
 import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.Companion.AMBIENT_CUE_SURFACE
 import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.Companion.DEBOUNCE_DELAY_MS
 import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.Companion.EXTRA_ACTION_TYPE
@@ -46,6 +46,7 @@ import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.
 import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.Companion.EXTRA_AUTOFILL_ID
 import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.Companion.MA_ACTION_TYPE_NAME
 import com.android.systemui.ambientcue.data.repository.AmbientCueRepositoryImpl.Companion.MR_ACTION_TYPE_NAME
+import com.android.systemui.ambientcue.shared.logger.ambientCueLogger
 import com.android.systemui.ambientcue.shared.model.ActionModel
 import com.android.systemui.concurrency.fakeExecutor
 import com.android.systemui.dump.DumpManager
@@ -276,6 +277,49 @@ class AmbientCueRepositoryTest : SysuiTestCase() {
         }
 
     @Test
+    fun isRootViewAttached_isAttachedAndSessionNotStartedBefore_setsAmbientCueLogs() =
+        kosmos.runTest {
+            val actions by collectLastValue(underTest.actions)
+            val isRootViewAttached by collectLastValue(underTest.isRootViewAttached)
+            val componentName = ComponentName(PACKAGE_NAME, ACTIVITY_NAME)
+            val intent = Intent()
+            intent.component = componentName
+            val runningTaskInfo = RunningTaskInfo().apply { this.baseIntent = intent }
+            underTest.isDeactivated.update { true }
+            secureSettingsRepository.setInt(
+                AmbientCueRepositoryImpl.AMBIENT_CUE_SETTING,
+                AmbientCueRepositoryImpl.OPTED_IN,
+            )
+            runCurrent()
+            taskStackChangeListeners.listenerImpl.onTaskMovedToFront(
+                runningTaskInfo.apply { taskId = TASK_ID }
+            )
+            verify(smartSpaceSession)
+                .addOnTargetsAvailableListener(any(), onTargetsAvailableListenerCaptor.capture())
+
+            onTargetsAvailableListenerCaptor.firstValue.onTargetsAvailable(
+                listOf(attributionDialogPendingIntentTarget)
+            )
+            underTest.isDeactivated.update { false }
+            advanceTimeBy(DEBOUNCE_DELAY_MS)
+
+            // Verify that the ambient cue displayed status is set.
+            verify(kosmos.ambientCueLogger).setAmbientCueDisplayStatus(any(), any())
+            verify(kosmos.ambientCueLogger).setPackageName(PACKAGE_NAME)
+
+            taskStackChangeListeners.listenerImpl.onTaskMovedToFront(
+                runningTaskInfo.apply { taskId = TASK_ID_2 }
+            )
+            underTest.isDeactivated.update { true }
+            advanceTimeBy(DEBOUNCE_DELAY_MS)
+
+            // Verify that the ambient cue dismissed status is set.
+            verify(kosmos.ambientCueLogger).setLoseFocusMillis()
+            verify(kosmos.ambientCueLogger).flushAmbientCueEventReported()
+            verify(kosmos.ambientCueLogger).clear()
+        }
+
+    @Test
     fun actions_whenHasSmartSpaceAction() =
         kosmos.runTest {
             val actions by collectLastValue(underTest.actions)
@@ -497,6 +541,8 @@ class AmbientCueRepositoryTest : SysuiTestCase() {
         private const val SUBTITLE_2 = "subtitle 2"
         private const val TASK_ID = 1
         private const val TASK_ID_2 = 2
+        private const val PACKAGE_NAME = "com.package.name"
+        private const val ACTIVITY_NAME = "com.package.name.activity"
         private val validTarget =
             mock<SmartspaceTarget> {
                 on { smartspaceTargetId } doReturn AMBIENT_CUE_SURFACE

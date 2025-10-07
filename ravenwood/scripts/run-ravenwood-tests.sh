@@ -25,9 +25,18 @@
 #   -f PCRE: Specify inclusion filter in PCRE
 
 set -e
+shopt -s nullglob # if a glob matches no file, expands to an empty string.
 
 # Move to the script's directory
 cd "${0%/*}"
+
+# Find the enablement files. This may be an empty list if there's no match.
+default_enablement_policy=(../texts/enablement-policy-*.txt)
+
+# ROLLING_TF_SUBPROCESS_OUTPUT is often quite behind for large tests.
+# let's disable it by default.
+: ${ROLLING_TF_SUBPROCESS_OUTPUT:=0}
+export ROLLING_TF_SUBPROCESS_OUTPUT
 
 smoke=0
 include_re=""
@@ -37,7 +46,6 @@ smoke_exclude_re=""
 dry_run=""
 exclude_large_tests=0
 atest_opts=""
-build_only=0
 list_options=""
 with_tools_tests=1
 
@@ -64,11 +72,6 @@ case "$opt" in
         # Redirect log to terminal
         export RAVENWOOD_LOG_OUT=-
         ;;
-    b)
-        # Build only
-        build_only=1
-        ATEST=m
-        ;;
     a)
         # atest options (e.g. "-t")
         atest_opts="$OPTARG"
@@ -93,20 +96,34 @@ esac
 done
 shift $(($OPTIND - 1))
 
+# If the rest of the arguments are available, just run these tests.
+targets=("$@")
+
 if (( $with_tools_tests )) ; then
-    all_tests=(hoststubgentest tiny-framework-dump-test hoststubgen-invoke-test ravenwood-stats-checker ravenhelpertest)
+    all_tests=(hoststubgentest tiny-framework-dump-test hoststubgen-invoke-test ravenwood-stats-checker ravenhelpertest ravenwood-scripts-sh-golden-test)
 fi
-all_raven_tests=( $( ./list-ravenwood-tests.sh $list_options ) )
+
+# Allow replacing 'list-ravenwood-tests.sh' with  $LIST_TEST_COMMAND.
+all_raven_tests=( $( "${LIST_TEST_COMMAND:=./list-ravenwood-tests.sh}" $list_options ) )
 
 all_tests+=( "${all_raven_tests[@]}" )
 
+# ROLLING_TF_SUBPROCESS_OUTPUT is often quite behind for large tests.
+# let's disable it by default.
+: ${ROLLING_TF_SUBPROCESS_OUTPUT:=0}
+export ROLLING_TF_SUBPROCESS_OUTPUT
+
+# Cat all the files in the argument with all the "#" comments removed.
+remove_comments() {
+    sed -e '/^#/d; s/[ \t][ \t]*//g; /^$/d' "$@"
+}
 
 get_smoke_re() {
     # Extract tests from smoke-excluded-tests.txt
     # - Skip lines starting with #
     # - Remove all spaces and tabs
     # - Skip empty lines
-    local tests=($(sed -e '/^#/d; s/[ \t][ \t]*//g; /^$/d' smoke-excluded-tests.txt))
+    local tests=($(remove_comments ../texts/smoke-excluded-tests.txt))
 
     # Then convert it to a regex.
     # - Wrap in "^( ... )$"
@@ -142,12 +159,15 @@ filter_out() {
     filter "$1" -v
 }
 
-# Remove the slow tests.
-targets=( $(
-    for t in "${all_tests[@]}"; do
-        echo $t | filter_in "$include_re" | filter_out "$smoke_exclude_re" | filter_out "$exclude_re"
-    done
-) )
+# If targets are not specified in the command line, run all tests w/ the filters.
+if (( "${#targets[@]}" == 0 )) ; then
+    # Filter the tests.
+    targets=( $(
+        for t in "${all_tests[@]}"; do
+            echo $t | filter_in "$include_re" | filter_out "$smoke_exclude_re" | filter_out "$exclude_re"
+        done
+    ) )
+fi
 
 # Show the target tests
 
@@ -158,13 +178,28 @@ done
 
 # Calculate the removed tests.
 
-diff="$(diff  <(echo "${all_tests[@]}" | tr ' ' '\n') <(echo "${targets[@]}" | tr ' ' '\n') | grep -v [0-9] || true)"
+diff="$(diff  <(echo "${all_tests[@]}" | tr ' ' '\n') <(echo "${targets[@]}" | tr ' ' '\n') | grep -v '[0-9]' || true)"
 
 if [[ "$diff" != "" ]]; then
     echo "Excluded tests:"
     echo "$diff"
 fi
 
+# Build the "enablement" policy by merging all the policy files.
+# But if RAVENWOOD_TEST_ENABLEMENT_POLICY is already set, just use it.
+if [[ "$RAVENWOOD_TEST_ENABLEMENT_POLICY" == "" ]] && (( "${#default_enablement_policy[@]}" > 0 )) ; then
+    export RAVENWOOD_TEST_ENABLEMENT_POLICY="$(readlink -m ${default_enablement_policy[*]} | tr '\n' ' ')"
+fi
+
+echo "RAVENWOOD_TEST_ENABLEMENT_POLICY=$RAVENWOOD_TEST_ENABLEMENT_POLICY"
+
+# Set experimental API flag
+for test in $(remove_comments ../texts/experimental-api-allowed-tests.txt); do
+    echo "Test \"$test\" can use experimental APIs".
+    export RAVENWOOD_ENABLE_EXP_API_${test}=1
+done
+
+# =========================================================
 
 run() {
     echo "Running: ${@}"
@@ -189,19 +224,17 @@ if (( $exclude_large_tests )) ; then
 fi
 
 # Add per-module arguments
-if (( ! $build_only )) ; then
-    extra_args+=("--")
+extra_args+=("--")
 
-    # Need to add the following two options for each module.
-    # But we can't add it to non-ravenwood tests, so use $all_raven_tests
-    # instead of $targets.
-    for module in "${all_raven_tests[@]}" ; do
-        for anno in "${exclude_annos[@]}" ; do
-            extra_args+=(
-                "--module-arg $module:exclude-annotation:$anno"
-                )
-        done
+# Need to add the following two options for each module.
+# But we can't add it to non-ravenwood tests, so use $all_raven_tests
+# instead of $targets.
+for module in "${all_raven_tests[@]}" ; do
+    for anno in "${exclude_annos[@]}" ; do
+        extra_args+=(
+            "--module-arg $module:exclude-annotation:$anno"
+            )
     done
-fi
+done
 
 run $dry_run ${ATEST:-atest} --class-level-report $atest_opts "${targets[@]}" "${extra_args[@]}"

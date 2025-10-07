@@ -211,7 +211,9 @@ public class AudioSystem
     /** @hide */
     public static final int MODE_COMMUNICATION_REDIRECT  = 6;
     /** @hide */
-    public static final int NUM_MODES               = 7;
+    public static final int MODE_ASSISTANT_CONVERSATION  = 7;
+    /** @hide */
+    public static final int NUM_MODES               = 8;
 
     /** @hide */
     public static String modeToString(int mode) {
@@ -225,6 +227,7 @@ public class AudioSystem
             case MODE_CALL_SCREENING: return "MODE_CALL_SCREENING";
             case MODE_CALL_REDIRECT: return "MODE_CALL_REDIRECT";
             case MODE_COMMUNICATION_REDIRECT: return "MODE_COMMUNICATION_REDIRECT";
+            case MODE_ASSISTANT_CONVERSATION: return "MODE_ASSISTANT_CONVERSATION";
             default: return "unknown mode (" + mode + ")";
         }
     }
@@ -381,9 +384,7 @@ public class AudioSystem
                 return AudioSystem.AUDIO_FORMAT_APTX_ADAPTIVE;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_TWSP:
                 return AudioSystem.AUDIO_FORMAT_APTX_TWSP;
-// QTI_BEGIN: 2020-10-01: Audio: Add support for lc3 codec.
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_LC3:
-// QTI_END: 2020-10-01: Audio: Add support for lc3 codec.
                 return AudioSystem.AUDIO_FORMAT_LC3;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS:
                 return AudioSystem.AUDIO_FORMAT_OPUS;
@@ -1188,6 +1189,8 @@ public class AudioSystem
     public static final Set<Integer> DEVICE_OUT_ALL_BLE_SET;
     /** @hide */
     public static final Set<Integer> DEVICE_OUT_PICK_FOR_VOLUME_SET;
+    /** @hide */
+    public static final Set<Integer> DEVICE_OUT_ALL_BLE_UNICAST_SET;
 
     static {
         DEVICE_OUT_ALL_SET = new HashSet<>();
@@ -1256,6 +1259,10 @@ public class AudioSystem
         DEVICE_OUT_ALL_BLE_SET.add(DEVICE_OUT_BLE_HEADSET);
         DEVICE_OUT_ALL_BLE_SET.add(DEVICE_OUT_BLE_SPEAKER);
         DEVICE_OUT_ALL_BLE_SET.add(DEVICE_OUT_BLE_BROADCAST);
+
+        DEVICE_OUT_ALL_BLE_UNICAST_SET = new HashSet<>();
+        DEVICE_OUT_ALL_BLE_UNICAST_SET.add(DEVICE_OUT_BLE_HEADSET);
+        DEVICE_OUT_ALL_BLE_UNICAST_SET.add(DEVICE_OUT_BLE_SPEAKER);
 
         DEVICE_OUT_PICK_FOR_VOLUME_SET = new HashSet<>();
         DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_WIRED_HEADSET);
@@ -1466,6 +1473,11 @@ public class AudioSystem
     public static boolean isBluetoothLeDevice(int deviceType) {
         return isBluetoothLeOutDevice(deviceType)
                 || isBluetoothLeInDevice(deviceType);
+    }
+
+    /** @hide */
+    public static boolean isBluetoothLeOutUnicastDevice(int deviceType) {
+        return DEVICE_OUT_ALL_BLE_UNICAST_SET.contains(deviceType);
     }
 
     /** @hide */
@@ -2002,16 +2014,6 @@ public class AudioSystem
      * @hide
      */
     public static native int setMaxVolumeIndexForGroup(int groupId, int index);
-
-    /**
-     * Get the volume group for stream type
-     * @param stream stream type to query
-     *
-     * @return volume group for the stream query stream type
-     *
-     * @hide
-     */
-    public static native int getVolumeGroupIdForStreamType(int stream);
 
     /** @hide */
     public static native int setMasterVolume(float value);

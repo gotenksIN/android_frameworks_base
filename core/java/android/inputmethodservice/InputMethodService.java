@@ -55,7 +55,6 @@ import static android.view.inputmethod.ConnectionlessHandwritingCallback.CONNECT
 import static android.view.inputmethod.ConnectionlessHandwritingCallback.CONNECTIONLESS_HANDWRITING_ERROR_OTHER;
 import static android.view.inputmethod.ConnectionlessHandwritingCallback.CONNECTIONLESS_HANDWRITING_ERROR_UNSUPPORTED;
 import static android.view.inputmethod.Flags.FLAG_CONNECTIONLESS_HANDWRITING;
-import static android.view.inputmethod.Flags.FLAG_IME_SWITCHER_REVAMP_API;
 import static android.view.inputmethod.Flags.FLAG_VERIFY_KEY_EVENT;
 import static android.view.inputmethod.Flags.ctrlShiftShortcut;
 
@@ -67,6 +66,7 @@ import android.annotation.IntDef;
 import android.annotation.MainThread;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.annotation.TestApi;
 import android.annotation.UiContext;
 import android.app.ActivityManager;
@@ -589,7 +589,6 @@ public class InputMethodService extends AbstractInputMethodService {
     InputConnection mStartedInputConnection;
     EditorInfo mInputEditorInfo;
 
-    @InputMethod.ShowFlags
     int mShowInputFlags;
     boolean mShowInputRequested;
     boolean mLastShowInputRequested;
@@ -634,7 +633,7 @@ public class InputMethodService extends AbstractInputMethodService {
 
     private @NonNull OptionalInt mHandwritingRequestId = OptionalInt.empty();
     private InputEventReceiver mHandwritingEventReceiver;
-    private Handler mHandler;
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
     private ImsConfigurationTracker mConfigTracker = new ImsConfigurationTracker();
     private boolean mDestroyed;
     private boolean mOnPreparedStylusHwCalled;
@@ -867,12 +866,11 @@ public class InputMethodService extends AbstractInputMethodService {
          */
         @MainThread
         @Override
-        public void hideSoftInputWithToken(int flags, ResultReceiver resultReceiver,
-                @NonNull ImeTracker.Token statsToken) {
+        public void hideSoftInputWithToken(@NonNull ImeTracker.Token statsToken) {
             mSystemCallingHideSoftInput = true;
             mCurStatsToken = statsToken;
             try {
-                hideSoftInput(flags, resultReceiver);
+                hideSoftInput(0 /* flags */, null /* resultReceiver */);
             } finally {
                 mSystemCallingHideSoftInput = false;
             }
@@ -906,20 +904,11 @@ public class InputMethodService extends AbstractInputMethodService {
             ImeTracing.getInstance().triggerServiceDump(
                     "InputMethodService.InputMethodImpl#hideSoftInput", mDumper,
                     null /* icProto */);
-            final boolean wasVisible = isInputViewShown();
 
             mShowInputFlags = 0;
             mShowInputRequested = false;
             mCurStatsToken = statsToken;
             hideWindow();
-            final boolean isVisible = isInputViewShown();
-            final boolean visibilityChanged = isVisible != wasVisible;
-            if (resultReceiver != null) {
-                resultReceiver.send(visibilityChanged
-                        ? InputMethodManager.RESULT_HIDDEN
-                        : (wasVisible ? InputMethodManager.RESULT_UNCHANGED_SHOWN
-                                : InputMethodManager.RESULT_UNCHANGED_HIDDEN), null);
-            }
             Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
             // After the IME window was hidden, we can remove its surface
             scheduleImeSurfaceRemoval();
@@ -934,12 +923,11 @@ public class InputMethodService extends AbstractInputMethodService {
          */
         @MainThread
         @Override
-        public void showSoftInputWithToken(@InputMethod.ShowFlags int flags,
-                ResultReceiver resultReceiver, @NonNull ImeTracker.Token statsToken) {
+        public void showSoftInputWithToken(@NonNull ImeTracker.Token statsToken) {
             mSystemCallingShowSoftInput = true;
             mCurStatsToken = statsToken;
             try {
-                showSoftInput(flags, resultReceiver);
+                showSoftInput(InputMethod.SHOW_EXPLICIT /* flags */, null /* resultReceiver */);
             } finally {
                 mSystemCallingShowSoftInput = false;
             }
@@ -950,7 +938,7 @@ public class InputMethodService extends AbstractInputMethodService {
          */
         @MainThread
         @Override
-        public void showSoftInput(@InputMethod.ShowFlags int flags, ResultReceiver resultReceiver) {
+        public void showSoftInput(int flags, ResultReceiver resultReceiver) {
             if (DEBUG) Log.v(TAG, "showSoftInput()");
 
             final var statsToken = mCurStatsToken != null ? mCurStatsToken
@@ -973,7 +961,6 @@ public class InputMethodService extends AbstractInputMethodService {
             ImeTracing.getInstance().triggerServiceDump(
                     "InputMethodService.InputMethodImpl#showSoftInput", mDumper,
                     null /* icProto */);
-            final boolean wasVisible = isInputViewShown();
             if (dispatchOnShowInputRequested(flags, false)) {
                 ImeTracker.forLogging().onProgress(statsToken,
                         ImeTracker.PHASE_IME_ON_SHOW_SOFT_INPUT_TRUE);
@@ -985,14 +972,6 @@ public class InputMethodService extends AbstractInputMethodService {
             }
             setImeWindowVisibility(computeImeWindowVis());
 
-            final boolean isVisible = isInputViewShown();
-            final boolean visibilityChanged = isVisible != wasVisible;
-            if (resultReceiver != null) {
-                resultReceiver.send(visibilityChanged
-                        ? InputMethodManager.RESULT_SHOWN
-                        : (wasVisible ? InputMethodManager.RESULT_UNCHANGED_SHOWN
-                                : InputMethodManager.RESULT_UNCHANGED_HIDDEN), null);
-            }
             Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
         }
 
@@ -1265,9 +1244,6 @@ public class InputMethodService extends AbstractInputMethodService {
                 || mImeSurfaceRemoverRunnable != null) {
             return;
         }
-        if (mHandler == null) {
-            mHandler = new Handler(getMainLooper());
-        }
 
         if (mLastWasInFullscreenMode) {
             // Caching surface / delaying surface removal can cause mServedView to detach in certain
@@ -1292,7 +1268,7 @@ public class InputMethodService extends AbstractInputMethodService {
     }
 
     private void cancelImeSurfaceRemoval() {
-        if (mHandler != null && mImeSurfaceRemoverRunnable != null) {
+        if (mImeSurfaceRemoverRunnable != null) {
             mHandler.removeCallbacks(mImeSurfaceRemoverRunnable);
         }
         mImeSurfaceRemoverRunnable = null;
@@ -1659,13 +1635,14 @@ public class InputMethodService extends AbstractInputMethodService {
 
     /**
      * Checks whether the IME should be shown when a hardware keyboard is connected, as configured
-     * through {@link Settings.Secure#SHOW_IME_WITH_HARD_KEYBOARD}, for testing purposes only.
+     * through {@link Settings.Secure#SHOW_IME_WITH_HARD_KEYBOARD}, for testing purposes only. If
+     * {@link #mSettingsObserver} is {@code null}, this will also return {@code null}.
      *
      * @hide
      */
     @VisibleForTesting
-    public final boolean getShouldShowImeWithHardKeyboardForTesting() {
-        return mSettingsObserver.shouldShowImeWithHardKeyboard();
+    public final Boolean getShouldShowImeWithHardKeyboardForTesting() {
+        return mSettingsObserver != null ? mSettingsObserver.shouldShowImeWithHardKeyboard() : null;
     }
 
     /**
@@ -2789,7 +2766,7 @@ public class InputMethodService extends AbstractInputMethodService {
         if (!mHandwritingRequestId.isPresent()) {
             return;
         }
-        if (mHandler != null && mFinishHwRunnable != null) {
+        if (mFinishHwRunnable != null) {
             mHandler.removeCallbacks(mFinishHwRunnable);
         }
         mFinishHwRunnable = null;
@@ -2887,15 +2864,12 @@ public class InputMethodService extends AbstractInputMethodService {
     }
 
     private void cancelStylusWindowIdleTimeout() {
-        if (mStylusWindowIdleTimeoutRunnable != null && mHandler != null) {
+        if (mStylusWindowIdleTimeoutRunnable != null) {
             mHandler.removeCallbacks(mStylusWindowIdleTimeoutRunnable);
         }
     }
 
     private void scheduleStylusWindowIdleTimeout() {
-        if (mHandler == null) {
-            return;
-        }
         cancelStylusWindowIdleTimeout();
         long timeout = (mStylusWindowIdleTimeoutForTest > 0)
                 ? mStylusWindowIdleTimeoutForTest : STYLUS_WINDOW_IDLE_TIMEOUT_MILLIS;
@@ -2971,9 +2945,7 @@ public class InputMethodService extends AbstractInputMethodService {
             return mFinishHwRunnable;
         }
         return mFinishHwRunnable = () -> {
-            if (mHandler != null) {
-                mHandler.removeCallbacks(mFinishHwRunnable);
-            }
+            mHandler.removeCallbacks(mFinishHwRunnable);
             Log.d(TAG, "Stylus handwriting idle timed-out. calling finishStylusHandwriting()");
             mFinishHwRunnable = null;
             finishStylusHandwriting();
@@ -2981,9 +2953,6 @@ public class InputMethodService extends AbstractInputMethodService {
     }
 
     private void scheduleHandwritingSessionTimeout() {
-        if (mHandler == null) {
-            mHandler = new Handler(getMainLooper());
-        }
         if (mFinishHwRunnable != null) {
             mHandler.removeCallbacks(mFinishHwRunnable);
         }
@@ -3003,7 +2972,7 @@ public class InputMethodService extends AbstractInputMethodService {
      * configuration change.
      * @return Returns true to indicate that the window should be shown.
      */
-    public boolean onShowInputRequested(@InputMethod.ShowFlags int flags, boolean configChange) {
+    public boolean onShowInputRequested(int flags, boolean configChange) {
         if (!onEvaluateInputViewShown()) {
             return false;
         }
@@ -3039,8 +3008,7 @@ public class InputMethodService extends AbstractInputMethodService {
      * @return Returns true to indicate that the window should be shown.
      * @see #onShowInputRequested(int, boolean)
      */
-    private boolean dispatchOnShowInputRequested(@InputMethod.ShowFlags int flags,
-            boolean configChange) {
+    private boolean dispatchOnShowInputRequested(int flags, boolean configChange) {
         final boolean result = onShowInputRequested(flags, configChange);
         mInlineSuggestionSessionController.notifyOnShowInputRequested(result);
         if (result) {
@@ -4368,6 +4336,8 @@ public class InputMethodService extends AbstractInputMethodService {
      *
      * @hide
      */
+    @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
+    @TestApi
     @VisibleForTesting
     public final boolean isImeNavigationBarShownForTesting() {
         return mNavigationBarController.isShown();
@@ -4400,7 +4370,6 @@ public class InputMethodService extends AbstractInputMethodService {
      *
      * @param visible whether the button is requested visible or not.
      */
-    @FlaggedApi(FLAG_IME_SWITCHER_REVAMP_API)
     public void onCustomImeSwitcherButtonRequestedVisible(boolean visible) {
         // Intentionally empty
     }

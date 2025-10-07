@@ -19,7 +19,7 @@ package com.android.wm.shell.windowdecor.tiling
 import android.os.IBinder
 import android.view.SurfaceControl.Transaction
 import android.window.TransitionInfo
-import com.android.wm.shell.desktopmode.DesktopRepository
+import com.android.wm.shell.desktopmode.data.DesktopRepository
 import com.android.wm.shell.transition.Transitions
 
 class TilingDisplayReconnectEventHandler(
@@ -69,14 +69,14 @@ class TilingDisplayReconnectEventHandler(
             desktopRepository.addLeftTiledTaskToDesk(
                 displayId,
                 session.leftTiledTask,
-                session.deskId
+                session.deskId,
             )
         }
         if (session.rightTiledTask != null) {
             desktopRepository.addRightTiledTaskToDesk(
                 displayId,
                 session.rightTiledTask,
-                session.deskId
+                session.deskId,
             )
         }
     }

@@ -149,10 +149,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
     private static final String USB_STATE_MATCH =
             "DEVPATH=/devices/virtual/android_usb/android0";
-// QTI_BEGIN: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
     private static final String USB_STATE_MATCH_SEC =
             "DEVPATH=/devices/virtual/android_usb/android1";
-// QTI_END: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
     private static final String ACCESSORY_START_MATCH =
             "DEVPATH=/devices/virtual/misc/usb_accessory";
     private static final String UDC_SUBSYS_MATCH =
@@ -365,6 +363,12 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         }
         mControlFds.put(UsbManager.FUNCTION_PTP, ptpFd);
 
+        if (android.hardware.usb.flags.Flags.enableAoaUserspaceImplementation()) {
+            if (!nativeOpenAccessoryControl()) {
+                Slog.e(TAG, "Failed to open control for accessory");
+            }
+        }
+
         if (mUsbGadgetHal == null) {
             /**
              * Initialze the legacy UsbHandler
@@ -451,9 +455,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
         // Watch for USB configuration changes
         mUEventObserver = new UsbUEventObserver();
-// QTI_BEGIN: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
         mUEventObserver.startObserving(USB_STATE_MATCH_SEC);
-// QTI_END: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
         mUEventObserver.startObserving(ACCESSORY_START_MATCH);
 
         mEnableUdcSysfsUsbStateUpdate =
@@ -477,6 +479,9 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
             mUEventObserver.startObserving(USB_STATE_MATCH);
         }
 
+        if (android.hardware.usb.flags.Flags.enableAoaUserspaceImplementation()) {
+            nativeStartVendorControlRequestMonitor();
+        }
         sEventLogger = new EventLogger(DUMPSYS_LOG_BUFFER, "UsbDeviceManager activity");
     }
 
@@ -539,7 +544,12 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
         int operationId = sUsbOperationCount.incrementAndGet();
 
-        mAccessoryStrings = nativeGetAccessoryStrings();
+        if (android.hardware.usb.flags.Flags.enableAoaUserspaceImplementation()) {
+            mAccessoryStrings = nativeGetAccessoryStringsFromFfs();
+        } else {
+            mAccessoryStrings = nativeGetAccessoryStrings();
+        }
+
         // don't start accessory mode if our mandatory strings have not been set
         boolean enableAccessory = (mAccessoryStrings != null &&
                 mAccessoryStrings[UsbAccessory.MANUFACTURER_STRING] != null &&
@@ -1248,7 +1258,6 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                     boolean prevHostConnected = mHostConnected;
                     UsbPort port = (UsbPort) args.arg1;
                     UsbPortStatus status = (UsbPortStatus) args.arg2;
-// QTI_BEGIN: 2020-05-15: Core: Fix null pointer exception if USBPort is removed
 
                     if (status != null) {
                         mHostConnected = status.getCurrentDataRole() == DATA_ROLE_HOST;
@@ -1265,26 +1274,21 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                                 && status.isRoleCombinationSupported(POWER_ROLE_SOURCE,
                                 DATA_ROLE_DEVICE)
                                 && status.isRoleCombinationSupported(POWER_ROLE_SINK, DATA_ROLE_DEVICE);
-// QTI_END: 2020-05-15: Core: Fix null pointer exception if USBPort is removed
 
                         boolean usbDataDisabled =
                                 status.getUsbDataStatus() != UsbPortStatus.DATA_STATUS_ENABLED;
                         mConnectedToDataDisabledPort = status.isConnected() && usbDataDisabled;
                         mPowerBrickConnectionStatus = status.getPowerBrickConnectionStatus();
-// QTI_BEGIN: 2020-05-15: Core: Fix null pointer exception if USBPort is removed
                     } else {
                         mHostConnected = false;
                         mSourcePower = false;
                         mSinkPower = false;
                         mAudioAccessoryConnected = false;
                         mSupportsAllCombinations = false;
-// QTI_END: 2020-05-15: Core: Fix null pointer exception if USBPort is removed
                         mConnectedToDataDisabledPort = false;
                         mPowerBrickConnectionStatus = UsbPortStatus.POWER_BRICK_STATUS_UNKNOWN;
-// QTI_BEGIN: 2020-05-15: Core: Fix null pointer exception if USBPort is removed
                     }
 
-// QTI_END: 2020-05-15: Core: Fix null pointer exception if USBPort is removed
                     if (mHostConnected) {
                         if (!mUsbAccessoryConnected) {
                             mInHostModeWithNoAccessoryConnected = true;
@@ -2614,6 +2618,66 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         return nativeOpenAccessory();
     }
 
+    /**
+     * opens the currently attached USB accessory to read from.
+     *
+     * @param accessory accessory to be opened.
+     * @param permissions UsbUserPermissionManager to check permissions.
+     * @param pid Pid of the caller
+     * @param uid Uid of the caller
+     */
+    public ParcelFileDescriptor openAccessoryForInputStream(
+            UsbAccessory accessory, UsbUserPermissionManager permissions, int pid, int uid) {
+        UsbAccessory currentAccessory = mHandler.getCurrentAccessory();
+        if (currentAccessory == null) {
+            throw new IllegalArgumentException("no accessory attached");
+        }
+        if (!currentAccessory.equals(accessory)) {
+            String error =
+                    accessory.toString() + " does not match current accessory " + currentAccessory;
+            throw new IllegalArgumentException(error);
+        }
+        permissions.checkPermission(accessory, pid, uid);
+        return nativeOpenAccessoryForInputStream();
+    }
+
+    /**
+     * opens the currently attached USB accessory to write to.
+     *
+     * @param accessory accessory to be opened.
+     * @param permissions UsbUserPermissionManager to check permissions.
+     * @param pid Pid of the caller
+     * @param uid Uid of the caller
+     */
+    public ParcelFileDescriptor openAccessoryForOutputStream(
+            UsbAccessory accessory, UsbUserPermissionManager permissions, int pid, int uid) {
+        UsbAccessory currentAccessory = mHandler.getCurrentAccessory();
+        if (currentAccessory == null) {
+            throw new IllegalArgumentException("no accessory attached");
+        }
+        if (!currentAccessory.equals(accessory)) {
+            String error =
+                    accessory.toString() + " does not match current accessory " + currentAccessory;
+            throw new IllegalArgumentException(error);
+        }
+        permissions.checkPermission(accessory, pid, uid);
+        return nativeOpenAccessoryForOutputStream();
+    }
+
+    public int getMaxPacketSize(UsbAccessory accessory) {
+        UsbAccessory currentAccessory = mHandler.getCurrentAccessory();
+        if (currentAccessory == null) {
+            throw new IllegalArgumentException("no accessory attached");
+        }
+        if (!currentAccessory.equals(accessory)) {
+            String error =
+                    accessory.toString() + " does not match current accessory " + currentAccessory;
+            throw new IllegalArgumentException(error);
+        }
+
+        return nativeGetMaxPacketSize();
+    }
+
     public long getCurrentFunctions() {
         return mHandler.getEnabledFunctions();
     }
@@ -2746,9 +2810,43 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         mHandler.updateState(state);
     }
 
+    /** Update accessory control state (Called by native code). */
+    @Keep
+    private void updateAccessoryState(String state) {
+        if (!android.hardware.usb.flags.Flags.enableAoaUserspaceImplementation()) {
+            Slog.w(TAG, "Accessory state update from userspace is not supported!");
+            return;
+        }
+
+        Slog.d(TAG, "Accessory state update " + state);
+
+        if ("GETPROTOCOL".equals(state)) {
+            if (DEBUG) Slog.d(TAG, "got accessory get protocol");
+            mHandler.setAccessoryUEventTime(SystemClock.elapsedRealtime());
+            resetAccessoryHandshakeTimeoutHandler();
+        } else if ("SENDSTRING".equals(state)) {
+            if (DEBUG) Slog.d(TAG, "got accessory send string");
+            mHandler.sendEmptyMessage(MSG_INCREASE_SENDSTRING_COUNT);
+            resetAccessoryHandshakeTimeoutHandler();
+        } else if ("START".equals(state)) {
+            if (DEBUG) Slog.d(TAG, "got accessory start");
+            mHandler.removeMessages(MSG_ACCESSORY_HANDSHAKE_TIMEOUT);
+            mHandler.setStartAccessoryTrue();
+            startAccessoryMode();
+        }
+    }
+
     private native String[] nativeGetAccessoryStrings();
 
+    private native String[] nativeGetAccessoryStringsFromFfs();
+
+    private native int nativeGetMaxPacketSize();
+
     private native ParcelFileDescriptor nativeOpenAccessory();
+
+    private native ParcelFileDescriptor nativeOpenAccessoryForInputStream();
+
+    private native ParcelFileDescriptor nativeOpenAccessoryForOutputStream();
 
     private native String nativeWaitAndGetProperty(String propName);
 
@@ -2759,4 +2857,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
     private native boolean nativeStartGadgetMonitor(String udcName);
 
     private native void nativeStopGadgetMonitor();
+
+    private native boolean nativeStartVendorControlRequestMonitor();
+
+    private native boolean nativeOpenAccessoryControl();
 }

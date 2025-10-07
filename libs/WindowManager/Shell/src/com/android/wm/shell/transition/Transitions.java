@@ -37,10 +37,9 @@ import static android.window.TransitionInfo.FLAG_IS_OCCLUDED;
 import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 import static android.window.TransitionInfo.FLAG_NO_ANIMATION;
 import static android.window.TransitionInfo.FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
-// QTI_BEGIN: 2024-07-09: Display: wm: Keep Wallpaper always at the bottom
 import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
-// QTI_END: 2024-07-09: Display: wm: Keep Wallpaper always at the bottom
 
+import static com.android.window.flags.Flags.unifyShellBinders;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_TRANSITIONS;
 import static com.android.wm.shell.shared.TransitionUtil.FLAG_IS_DESKTOP_WALLPAPER_ACTIVITY;
 import static com.android.wm.shell.shared.TransitionUtil.isClosingType;
@@ -386,10 +385,14 @@ public class Transitions implements RemoteCallable<Transitions>,
                 new SettingsObserver());
 
         // Register this transition handler with Core
-        try {
-            mOrganizer.registerTransitionPlayer(mPlayerImpl);
-        } catch (RuntimeException e) {
-            throw e;
+        if (unifyShellBinders()) {
+            mOrganizer.initializeDependencies(this);
+        } else {
+            try {
+                mOrganizer.registerTransitionPlayer(mPlayerImpl);
+            } catch (RuntimeException e) {
+                throw e;
+            }
         }
         // Pre-load the instance.
         TransitionMetrics.getInstance();
@@ -609,7 +612,6 @@ public class Transitions implements RemoteCallable<Transitions>,
         final boolean isClosing = isClosingType(transitType);
         final int mode = change.getMode();
         // Put all the OPEN/SHOW on top
-// QTI_BEGIN: 2024-07-09: Display: wm: Keep Wallpaper always at the bottom
         if ((change.getFlags() & FLAG_IS_WALLPAPER) != 0) {
             // Wallpaper is always at the bottom, opening wallpaper on top of closing one.
             if (mode == TRANSIT_OPEN || mode == TRANSIT_TO_FRONT) {
@@ -618,7 +620,6 @@ public class Transitions implements RemoteCallable<Transitions>,
                 return -zSplitLine - i;
             }
         } else if (mode == TRANSIT_OPEN || mode == TRANSIT_TO_FRONT) {
-// QTI_END: 2024-07-09: Display: wm: Keep Wallpaper always at the bottom
             if (isOpening) {
                 // put on top
                 return zSplitLine + numChanges - i;
@@ -630,7 +631,8 @@ public class Transitions implements RemoteCallable<Transitions>,
                 return zSplitLine + numChanges - i;
             }
         } else if (mode == TRANSIT_CLOSE || mode == TRANSIT_TO_BACK) {
-            if (isOpening) {
+            if (isOpening || (change.hasFlags(FLAG_IS_WALLPAPER)
+                    && com.android.window.flags.Flags.polishCloseWallpaperIncludesOpenChange())) {
                 // put on bottom and leave visible
                 return zSplitLine - i;
             } else {
@@ -702,8 +704,8 @@ public class Transitions implements RemoteCallable<Transitions>,
         return mTracks.get(trackId);
     }
 
-    @VisibleForTesting
-    void onTransitionReady(@NonNull IBinder transitionToken, @NonNull TransitionInfo info,
+    /** @see ITransitionPlayer#onTransitionReady */
+    public void onTransitionReady(@NonNull IBinder transitionToken, @NonNull TransitionInfo info,
             @NonNull SurfaceControl.Transaction t, @NonNull SurfaceControl.Transaction finishT) {
         info.setUnreleasedWarningCallSiteForAllSurfaces("Transitions.onTransitionReady");
         ProtoLog.v(WM_SHELL_TRANSITIONS, "onTransitionReady (#%d) %s: %s",
@@ -812,8 +814,7 @@ public class Transitions implements RemoteCallable<Transitions>,
         if (info.getRootCount() == 0 && !KeyguardTransitionHandler.handles(info)) {
             // No root-leashes implies that the transition is empty/no-op, so just do
             // housekeeping and return.
-            ProtoLog.v(WM_SHELL_TRANSITIONS, "No transition roots in %s so"
-                    + " abort", active);
+            ProtoLog.v(WM_SHELL_TRANSITIONS, "No transition roots in %s so abort", active);
             onAbort(active);
             return true;
         }
@@ -1146,6 +1147,10 @@ public class Transitions implements RemoteCallable<Transitions>,
      */
     private void releaseSurfaces(@Nullable TransitionInfo info) {
         if (info == null) return;
+        if (com.android.window.flags.Flags.releaseAllTransitionSurfaces()) {
+            info.releaseAllSurfaces();
+            return;
+        }
         info.releaseAnimSurfaces();
     }
 
@@ -1228,7 +1233,8 @@ public class Transitions implements RemoteCallable<Transitions>,
         processReadyQueue(track);
     }
 
-    void requestStartTransition(@NonNull IBinder transitionToken,
+    /** @see ITransitionPlayer#requestStartTransition  */
+    public void requestStartTransition(@NonNull IBinder transitionToken,
             @Nullable TransitionRequestInfo request) {
         ProtoLog.v(WM_SHELL_TRANSITIONS, "Transition requested (#%d): %s %s",
                 request.getDebugId(), transitionToken, request);
@@ -1408,6 +1414,11 @@ public class Transitions implements RemoteCallable<Transitions>,
 
     private SurfaceControl getHomeTaskOverlayContainer() {
         return mOrganizer.getHomeTaskOverlayContainer();
+    }
+
+    @Nullable
+    private SurfaceControl getOverviewOverlayContainer(int displayId) {
+        return mOrganizer.getOverviewOverlayContainer(displayId);
     }
 
     /**
@@ -1768,6 +1779,21 @@ public class Transitions implements RemoteCallable<Transitions>,
                         transitions.mFocusTransitionObserver.setRemoteFocusTransitionListener(
                                 transitions, listener);
                     });
+        }
+
+        @Override
+        public SurfaceControl getOverviewOverlayContainer(int displayId) {
+            SurfaceControl[] result = new SurfaceControl[1];
+            executeRemoteCallWithTaskPermission(mTransitions, "getOverviewOverlayContainer",
+                    (controller) -> {
+                        result[0] = controller.getOverviewOverlayContainer(displayId);
+                    }, true /* blocking */);
+            if (result[0] == null) {
+                Log.wtf("WindowManagerShell", "Null overview overlay surface, "
+                        + "mTransitions=%s" + (mTransitions != null) + "displayId: " + displayId);
+            }
+            // Return a copy as writing to parcel releases the original surface
+            return new SurfaceControl(result[0], "Transitions.OverviewOverlay");
         }
 
         @Override

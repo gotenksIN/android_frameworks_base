@@ -485,7 +485,7 @@ public class NotificationConversationInfoTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_NM_SUMMARIZATION, Flags.FLAG_NM_SUMMARIZATION_UI})
+    @EnableFlags({Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI})
     public void testBindNotification_SetsFeedbackLink_ifClassified() {
         mEntry.setRanking(new RankingBuilder(mEntry.getRanking())
                 .setChannel(new NotificationChannel(
@@ -520,18 +520,6 @@ public class NotificationConversationInfoTest extends SysuiTestCase {
         feedback.performClick();
         // Verify that listener was triggered.
         assertEquals(0, latch.getCount());
-    }
-
-    @Test
-    @EnableFlags({
-            Flags.FLAG_NM_SUMMARIZATION,
-            Flags.FLAG_NM_SUMMARIZATION_UI,
-            FLAG_NOTIFICATION_ANIMATED_ACTIONS_TREATMENT
-    })
-    public void testBindNotification_hidesFeedbackLink_ifSummaryNotInRanking() {
-        doStandardBind();
-
-        assertEquals(GONE, mNotificationInfo.findViewById(R.id.feedback).getVisibility());
     }
 
     @Test

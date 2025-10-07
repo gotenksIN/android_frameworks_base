@@ -239,6 +239,12 @@ public class GenericWindowPolicyController extends DisplayWindowPolicyController
         }
     }
 
+    boolean isActivityLaunchAllowedByDefault() {
+        synchronized (mGenericWindowPolicyControllerLock) {
+            return mActivityLaunchAllowedByDefault;
+        }
+    }
+
     void setActivityLaunchDefaultAllowed(boolean activityLaunchDefaultAllowed) {
         synchronized (mGenericWindowPolicyControllerLock) {
             if (mActivityLaunchAllowedByDefault != activityLaunchDefaultAllowed) {
@@ -314,12 +320,6 @@ public class GenericWindowPolicyController extends DisplayWindowPolicyController
         // Mirror displays cannot contain activities.
         if (waitAndGetIsMirrorDisplay()) {
             logActivityLaunchBlocked("Mirror virtual displays cannot contain activities.");
-            return false;
-        }
-        if (!android.companion.virtualdevice.flags.Flags.gwpcAwareWindowingMode()
-                && !isWindowingModeSupported(windowingMode)) {
-            logActivityLaunchBlocked(
-                    "Virtual device doesn't support windowing mode " + windowingMode);
             return false;
         }
         if (!mIsSecureDisplay && (activityInfo.flags & FLAG_CAN_DISPLAY_ON_REMOTE_DEVICES) == 0) {

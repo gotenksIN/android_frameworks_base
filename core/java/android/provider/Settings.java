@@ -1177,6 +1177,22 @@ public final class Settings {
             "android.settings.DARK_THEME_SETTINGS";
 
     /**
+     * Activity Action: Show settings to configure the screen magnification feature.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_SCREEN_MAGNIFICATION_SETTINGS =
+            "android.settings.MAGNIFICATION_SETTINGS";
+
+    /**
      * Activity Action: Show settings to allow configuration of locale.
      * <p>
      * In some cases, a matching Activity may not exist, so ensure you
@@ -2686,6 +2702,30 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_MANAGE_SUPERVISOR_RESTRICTED_SETTING =
             "android.settings.MANAGE_SUPERVISOR_RESTRICTED_SETTING";
+
+    /**
+     * Activity action: Launch UI to bypass the user restrictions set by the SupervisionService
+     * system entity.
+     *
+     * <p>Input: {@link #EXTRA_SUPERVISION_RESTRICTION} specifies the restriction to bypass.
+     *
+     * <p>Output: Nothing.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_BYPASS_SUPERVISION_RESTRICTION =
+            "android.settings.BYPASS_SUPERVISION_RESTRICTION";
+
+    /**
+     * Intent extra: supervision restriction that we are trying to pybass.
+     *
+     * <p>This should be used when launching {@link #ACTION_BYPASS_SUPERVISION_RESTRICTION} .
+     *
+     * @hide
+     */
+    public static final String EXTRA_SUPERVISION_RESTRICTION =
+            "android.settings.EXTRA_SUPERVISION_RESTRICTION";
 
     /**
      * Activity Action: Show a dialog for remote bugreport flow.
@@ -4401,9 +4441,9 @@ public final class Settings {
         @UnsupportedAppUsage
         public static String getStringForUser(ContentResolver resolver, String name,
                 @CanBeCURRENT @UserIdInt int userId) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(android.util.SeempLog.getSeempGetApiIdFromValue(name));
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, returning read-only value.");
@@ -4491,9 +4531,9 @@ public final class Settings {
                 Log.v(TAG, "System.putString(name=" + name + ", value=" + value + ") for "
                         + userId);
             }
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(android.util.SeempLog.getSeempPutApiIdFromValue(name));
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, value is unchanged.");
@@ -5313,7 +5353,7 @@ public final class Settings {
         public static final String DISPLAY_COLOR_MODE_VENDOR_HINT =
                 "display_color_mode_vendor_hint";
 
-// QTI_BEGIN: 2020-05-15: Telephony: FR30706: Add a playing tone setting.
+// QTI_BEGIN: 2020-05-15: Core: FR30706: Add a playing tone setting.
         /**
          * Whether to play tone while outgoing call is accepted.
          * The value 1 - vibrate, 0 - not
@@ -5321,7 +5361,7 @@ public final class Settings {
          */
         public static final String CALL_CONNECTED_TONE_ENABLED = "call_connected_tone_enabled";
 
-// QTI_END: 2020-05-15: Telephony: FR30706: Add a playing tone setting.
+// QTI_END: 2020-05-15: Core: FR30706: Add a playing tone setting.
         /**
          * The user selected min refresh rate in frames per second. If infinite, the user wants
          * the highest possible refresh rate.
@@ -6565,6 +6605,27 @@ public final class Settings {
         public static final String EGG_MODE = "egg_mode";
 
         /**
+         * Comma-separated string of package names will have force invert applied no matter what,
+         * overriding any device-level config blocklists or other criteria, for debugging.
+         *
+         * Note: HWUI may still determine that the app already appears to be dark theme and may not
+         * obey this setting.
+         *
+         * @hide
+         */
+        public static final String ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_ENABLE =
+                "accessibility_force_invert_color_override_packages_to_enable";
+
+        /**
+         * Comma-separated string of package names will *never* have force invert applied,
+         * overriding any device-level config blocklists or other criteria, for debugging.
+         *
+         * @hide
+         */
+        public static final String ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_DISABLE =
+                "accessibility_force_invert_color_override_packages_to_disable";
+
+        /**
          * Setting to determine whether or not to show the battery percentage in the status bar.
          *    0 - Don't show percentage
          *    1 - Show percentage
@@ -6642,7 +6703,7 @@ public final class Settings {
 
         /**
          * Setting to set CV preferred intensity
-         * Setting should be integer (0-10)
+         * Setting should be float range (0.0 - 1.0)
          *
          * @hide
          */
@@ -6745,6 +6806,8 @@ public final class Settings {
             PRIVATE_SETTINGS.add(WIFI_USE_STATIC_IP);
             PRIVATE_SETTINGS.add(END_BUTTON_BEHAVIOR);
             PRIVATE_SETTINGS.add(ADVANCED_SETTINGS);
+            PRIVATE_SETTINGS.add(ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_DISABLE);
+            PRIVATE_SETTINGS.add(ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_ENABLE);
             PRIVATE_SETTINGS.add(WEAR_ACCESSIBILITY_GESTURE_ENABLED);
             PRIVATE_SETTINGS.add(WEAR_ACCESSIBILITY_GESTURE_ENABLED_DURING_OOBE);
             PRIVATE_SETTINGS.add(WEAR_TTS_PREWARM_ENABLED);
@@ -6808,9 +6871,9 @@ public final class Settings {
             PRIVATE_SETTINGS.add(MOUSE_POINTER_ACCELERATION_ENABLED);
             PRIVATE_SETTINGS.add(PREFERRED_REGION);
             PRIVATE_SETTINGS.add(MOUSE_SCROLLING_ACCELERATION);
-// QTI_BEGIN: 2020-05-15: Telephony: FR30706: Add a playing tone setting.
+// QTI_BEGIN: 2020-05-15: Core: FR30706: Add a playing tone setting.
             PRIVATE_SETTINGS.add(CALL_CONNECTED_TONE_ENABLED);
-// QTI_END: 2020-05-15: Telephony: FR30706: Add a playing tone setting.
+// QTI_END: 2020-05-15: Core: FR30706: Add a playing tone setting.
             PRIVATE_SETTINGS.add(MOUSE_SCROLLING_SPEED);
         }
 
@@ -7241,9 +7304,9 @@ public final class Settings {
             MOVED_TO_GLOBAL.add(Settings.Global.NITZ_UPDATE_SPACING);
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_SERVER);
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_TIMEOUT);
-// QTI_BEGIN: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
+// QTI_BEGIN: 2018-08-11: Core: base: Secondary NTP Server Settings
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_SERVER_2);
-// QTI_END: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
+// QTI_END: 2018-08-11: Core: base: Secondary NTP Server Settings
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_ERROR_POLL_COUNT);
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_LONG_POLL_INTERVAL_MS);
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_MAX_PDP_RESET_FAIL_COUNT);
@@ -8888,17 +8951,13 @@ public final class Settings {
                 "suggested_theme_feature_enabled";
 
         /**
-         * Setting to indicate whether the AppFunction agent allowlist should be enabled.
-         *
-         * <ul>
-         *   <li>0 = Off
-         *   <li>1 = Enabled (Default)
-         * </ul>
-         *
+         * String property which is a comma separated list of package names. These package names
+         * will be added to the existing agent allowlist. Since this contains package names, it must
+         * NOT be marked @Readable.
          * @hide
          */
-        public static final String APP_FUNCTION_AGENT_ALLOWLIST_ENABLED =
-                "app_function_agent_allowlist_enabled";
+        public static final String APP_FUNCTION_ADDITIONAL_AGENT_ALLOWLIST =
+                "app_function_additional_agent_allowlist";
 
         /**
          * Set by the system to track if the user needs to see the call to action for
@@ -12499,7 +12558,7 @@ public final class Settings {
          * backup_finished_notification_receivers  (String[])
          * </pre>
          *
-         * backup_finished_notification_receivers uses ":" as delimeter for values.
+         * backup_finished_notification_receivers uses ":" as delimiter for values.
          *
          * <p>
          * Type: string
@@ -12734,7 +12793,7 @@ public final class Settings {
          * 1 = right-to-left (recent, home, back)
          * @hide
          */
-        public static final String NAV_BAR_ORDER = "nav_bar_order";
+        public static final String NAVIGATIONBAR_KEY_ORDER = "navigationbar_key_order";
 
         /**
          * Navigation bar mode.
@@ -13004,6 +13063,14 @@ public final class Settings {
                 "accessibility_magnification_two_finger_triple_tap_enabled";
 
         /**
+         * Whether to always expand notification bundles in the notification shade.
+         * 1 = expand, 0 = collapse.
+         * @hide
+         */
+        public static final String NOTIFICATION_BUNDLES_ALWAYS_EXPAND =
+                "notification_bundles_always_expand";
+
+        /**
          * Whether the magnify navigation bar and keyboard feature is enabled.
          *
          * @hide
@@ -13161,7 +13228,10 @@ public final class Settings {
          *
          * @hide
          */
+        @TestApi
         @Readable
+        @FlaggedApi(android.view.accessibility.Flags.FLAG_FORCE_INVERT_COLOR)
+        @SuppressLint("NoSettingsProvider")
         public static final String ACCESSIBILITY_FORCE_INVERT_COLOR_ENABLED =
                 "accessibility_force_invert_color_enabled";
 
@@ -13381,6 +13451,8 @@ public final class Settings {
         public static final int ACTION_CORNER_ACTION_NOTIFICATIONS = 3;
         /** @hide */
         public static final int ACTION_CORNER_ACTION_QUICK_SETTINGS = 4;
+        /** @hide */
+        public static final int ACTION_CORNER_ACTION_LOCKSCREEN = 5;
 
         /**
          * The different actions that can be used for action corners
@@ -13392,6 +13464,7 @@ public final class Settings {
                 ACTION_CORNER_ACTION_OVERVIEW,
                 ACTION_CORNER_ACTION_NOTIFICATIONS,
                 ACTION_CORNER_ACTION_QUICK_SETTINGS,
+                ACTION_CORNER_ACTION_LOCKSCREEN,
         })
         @Retention(RetentionPolicy.SOURCE)
         public @interface ActionCornerActionType {
@@ -13762,6 +13835,32 @@ public final class Settings {
          * @hide
          */
         public static final String AAPM_USB_DATA_PROTECTION = "aapm_usb_data_protection";
+
+        /**
+         * Tracks if the user has enabled Identity Check before Android 16 QPR1 build. This value
+         * is used to show promo card only to pre-existing users who have opted-in to the feature.
+         *
+         * @hide
+         */
+        public static final String IDENTITY_CHECK_ENABLED_V1 =
+                "identity_check_enabled_v1";
+
+        /**
+         * Tracks if the user has seen the promo card for Identity Check.
+         * The promo card should only appear once per user via Safety Center.
+         *
+         * @hide
+         */
+        public static final String IDENTITY_CHECK_PROMO_CARD_SHOWN =
+                "identity_check_promo_card_shown";
+
+        /**
+         * Tracks if the user has interacted with the Identity Check promo notification.
+         * The notification should only appear once per user via Safety Center.
+         * @hide
+         */
+        public static final String IDENTITY_CHECK_NOTIFICATION_VIEW_DETAILS_CLICKED =
+                "identity_check_notification_view_details_clicked";
     }
 
     /**
@@ -14690,7 +14789,7 @@ public final class Settings {
         @Readable
         public static final String MOBILE_DATA_ALWAYS_ON = "mobile_data_always_on";
 
-// QTI_BEGIN: 2021-05-03: Telephony: Add smart DDS switch to Developer options
+// QTI_BEGIN: 2021-05-03: Core: Add smart DDS switch to Developer options
         /**
         * Whether to allow modem to intelligently switch DDS without user direction
         *
@@ -14700,7 +14799,7 @@ public final class Settings {
         @Readable
         public static final String SMART_DDS_SWITCH = "smart_dds_switch";
 
-// QTI_END: 2021-05-03: Telephony: Add smart DDS switch to Developer options
+// QTI_END: 2021-05-03: Core: Add smart DDS switch to Developer options
         /**
          * The duration in milliseconds of each action, separated by commas. Ex:
          *
@@ -19020,6 +19119,17 @@ public final class Settings {
                 "hearing_device_local_notification";
 
         /**
+         * This defines the order in which the 3-button navigation bar's buttons are displayed.
+         * 0 = left-to-right (back, home, recent)
+         * 1 = right-to-left (recent, home, back)
+         * @hide
+         * @deprecated Use
+         * {@link Secure#NAVIGATIONBAR_KEY_ORDER} instead.
+         */
+        @Deprecated
+        public static final String NAVIGATIONBAR_KEY_ORDER = "navigationbar_key_order";
+
+        /**
          * Global settings that shouldn't be persisted.
          *
          * @hide
@@ -19067,6 +19177,7 @@ public final class Settings {
             MOVED_TO_SECURE.add(Global.BUGREPORT_IN_POWER_MENU);
             MOVED_TO_SECURE.add(Global.CUSTOM_BUGREPORT_HANDLER_APP);
             MOVED_TO_SECURE.add(Global.CUSTOM_BUGREPORT_HANDLER_USER);
+            MOVED_TO_SECURE.add(Global.NAVIGATIONBAR_KEY_ORDER);
         }
 
         // Certain settings have been moved from global to the per-user system namespace
@@ -19631,7 +19742,7 @@ public final class Settings {
         @Readable
         public static final String CELL_ON = "cell_on";
 
-// QTI_BEGIN: 2020-05-11: Telephony: Add vibrating for outgoing call accepted support
+// QTI_BEGIN: 2020-05-11: Core: Add vibrating for outgoing call accepted support
         /**
          * Whether to vibrate while outgoing call is accepted
          * The value 1 - vibrate, 0 - not
@@ -19640,7 +19751,7 @@ public final class Settings {
         public static final String VIBRATING_FOR_OUTGOING_CALL_ACCEPTED =
                 "vibrating_for_outgoing_call_accepted";
 
-// QTI_END: 2020-05-11: Telephony: Add vibrating for outgoing call accepted support
+// QTI_END: 2020-05-11: Core: Add vibrating for outgoing call accepted support
         /**
          * Global settings which can be accessed by instant apps.
          * @hide
@@ -20328,6 +20439,29 @@ public final class Settings {
          */
         public static final String GLOBAL_ACTIONS_TIMEOUT_MILLIS =
                 "global_actions_timeout_ms";
+
+        /**
+         * Indicates if the primary device is eligible for watch ranging or not.
+         *
+         * @hide
+         */
+        public static final String WATCH_RANGING_SUPPORTED_BY_PRIMARY_DEVICE =
+                "watch_ranging_supported_by_primary_device";
+
+        /**
+         * Indicates whether the device is in minmode.
+         *
+         * @hide
+         */
+        public static final String MINMODE_ACTIVE = "minmode_active";
+
+        /**
+          * Indicates if watch ranging is available for the device.
+         *
+         * @hide
+         */
+        public static final String WATCH_RANGING_AVAILABLE =
+                "watch_ranging_available";
 
         /**
          * Settings migrated from Wear OS settings provider.

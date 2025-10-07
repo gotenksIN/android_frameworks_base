@@ -23,6 +23,16 @@ flag {
 }
 
 flag {
+    name: "separate_timeouts_flicker"
+    namespace: "lse_desktop_experience"
+    description: "Prevent timeout flicker when timing out"
+    bug: "425275163"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "wakelock_attribution_via_workchain"
     namespace: "power"
     description: "Enables the attribution of wakelocks via WorkChain for updateWakelockUids"
@@ -47,6 +57,16 @@ flag {
     description: "Feature flag to enable per-display wake by touch"
     bug: "343295183"
     is_fixed_read_only: true
+}
+
+flag {
+    name: "lock_on_unplug"
+    namespace: "lse_desktop_experience"
+    description: "Fixes device locking when all remaining external displays are unplugged"
+    bug: "414558760"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -93,9 +113,19 @@ flag {
 }
 
 flag {
-    name: "sleeplocks"
+    name: "partial_sleep_wakelocks"
     namespace: "power"
     description: "Enable new wakelock to keep device asleep - for the user, but ensure that the CPU remains awake."
     bug: "401624085"
     is_fixed_read_only: true
+}
+
+flag {
+    name: "extra_logging_separate_timeout"
+    namespace: "power"
+    description: "Adds extra logs to triage some test flakiness"
+    bug: "428848574"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }

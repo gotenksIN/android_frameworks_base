@@ -279,6 +279,7 @@ public class SecureSettingsValidators {
         VALIDATORS.put(Secure.LOCK_SCREEN_NOTIFICATION_MINIMALISM, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.SHOW_NOTIFICATION_SNOOZE, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.NOTIFICATION_HISTORY_ENABLED, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Secure.NOTIFICATION_BUNDLES_ALWAYS_EXPAND, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.ZEN_DURATION, ANY_INTEGER_VALIDATOR);
         VALIDATORS.put(Secure.CHARGING_SOUNDS_ENABLED, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.CHARGING_VIBRATION_ENABLED, BOOLEAN_VALIDATOR);
@@ -301,8 +302,8 @@ public class SecureSettingsValidators {
         VALIDATORS.put(Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES, JSON_OBJECT_VALIDATOR);
         VALIDATORS.put(Secure.NAV_BAR_FORCE_VISIBLE, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.NAV_BAR_KIDS_MODE, BOOLEAN_VALIDATOR);
-        VALIDATORS.put(
-                Secure.NAV_BAR_ORDER, new DiscreteValueValidator(new String[] {"0", "1"}));
+        VALIDATORS.put(Secure.NAVIGATIONBAR_KEY_ORDER,
+                new DiscreteValueValidator(new String[] {"0", "1"}));
         VALIDATORS.put(
                 Secure.NAVIGATION_MODE, new DiscreteValueValidator(new String[] {"0", "1", "2"}));
         VALIDATORS.put(Secure.NAVIGATION_MODE_RESTORE,
@@ -515,6 +516,10 @@ public class SecureSettingsValidators {
         VALIDATORS.put(Secure.SUGGESTED_THEME_FEATURE_ENABLED, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.HDR_BRIGHTNESS_ENABLED, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Secure.HDR_BRIGHTNESS_BOOST_LEVEL, new InclusiveFloatRangeValidator(0, 1));
-        VALIDATORS.put(Secure.APP_FUNCTION_AGENT_ALLOWLIST_ENABLED, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Secure.IDENTITY_CHECK_ENABLED_V1, new InclusiveIntegerRangeValidator(0, 1));
+        VALIDATORS.put(Secure.IDENTITY_CHECK_PROMO_CARD_SHOWN,
+                new InclusiveIntegerRangeValidator(0, 1));
+        VALIDATORS.put(Secure.IDENTITY_CHECK_NOTIFICATION_VIEW_DETAILS_CLICKED,
+                new InclusiveIntegerRangeValidator(0, 1));
     }
 }

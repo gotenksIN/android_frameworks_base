@@ -56,7 +56,7 @@ class BundleBarn
 @Inject
 constructor(
     private val rowComponent: ExpandableNotificationRowComponent.Builder,
-    private val bundleRowComponentBuilder: BundleRowComponent.Builder,
+    private val bundleRowComponentFactory: BundleRowComponent.Factory,
     private val rowInflaterTaskProvider: Provider<RowInflaterTask>,
     private val listContainer: NotificationListContainer,
     @ShadeDisplayAware val context: Context,
@@ -115,17 +115,17 @@ constructor(
 
     private fun initBundleHeaderView(bundleEntry: BundleEntry, row: ExpandableNotificationRow) {
         val bundleRowComponent =
-            bundleRowComponentBuilder.bindBundleRepository(bundleEntry.bundleRepository).build()
+            bundleRowComponentFactory.create(repository = bundleEntry.bundleRepository)
         val headerComposeView = ComposeView(context)
         row.setBundleHeaderView(headerComposeView)
+        val viewModelFactory = bundleRowComponent.bundleViewModelFactory()
         headerComposeView.repeatWhenAttached {
             repeatOnLifecycle(Lifecycle.State.CREATED) {
                 headerComposeView.initOnBackPressedDispatcherOwner(lifecycle)
                 headerComposeView.setContent {
                     HeaderComposeViewContent(
                         row = row,
-                        bundleHeaderViewModelFactory =
-                            bundleRowComponent.bundleViewModelFactory()::create,
+                        bundleHeaderViewModelFactory = viewModelFactory::create,
                     )
                 }
             }
@@ -180,17 +180,18 @@ private fun HeaderComposeViewContent(
                 traceName = "BundleHeaderViewModel",
                 factory = bundleHeaderViewModelFactory,
             )
+        BundleHeader(viewModel)
         DisposableEffect(viewModel) {
             row.setBundleHeaderViewModel(viewModel)
-            onDispose { row.setBundleHeaderViewModel(null) }
+            row.setOnClickListener {
+                viewModel.onHeaderClicked()
+                row.expandNotification()
+            }
+            onDispose {
+                row.setOnClickListener(null)
+                row.setBundleHeaderViewModel(null)
+            }
         }
-        BundleHeader(
-            viewModel,
-            onHeaderClicked = { row.expandNotification() },
-            onHeaderLongClicked = { row.performLongClick() },
-            // to be used only for dismissal coming from an accessibility action.
-            onA11yDismissAction = { row.performDismiss(true) },
-        )
     }
 }
 

@@ -18,6 +18,7 @@ package com.android.server.security.authenticationpolicy;
 
 import static android.Manifest.permission.INTERACT_ACROSS_USERS_FULL;
 import static android.Manifest.permission.MANAGE_SECURE_LOCK_DEVICE;
+import static android.Manifest.permission.TEST_BIOMETRIC;
 import static android.Manifest.permission.USE_BIOMETRIC_INTERNAL;
 import static android.security.Flags.disableAdaptiveAuthCounterLock;
 import static android.security.Flags.failedAuthLockToggle;
@@ -46,6 +47,9 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Process;
+import android.os.ResultReceiver;
+import android.os.ShellCallback;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -54,7 +58,7 @@ import android.proximity.IProximityResultCallback;
 import android.security.authenticationpolicy.AuthenticationPolicyManager;
 import android.security.authenticationpolicy.AuthenticationPolicyManager.DisableSecureLockDeviceRequestStatus;
 import android.security.authenticationpolicy.AuthenticationPolicyManager.EnableSecureLockDeviceRequestStatus;
-import android.security.authenticationpolicy.AuthenticationPolicyManager.IsSecureLockDeviceAvailableRequestStatus;
+import android.security.authenticationpolicy.AuthenticationPolicyManager.GetSecureLockDeviceAvailabilityRequestStatus;
 import android.security.authenticationpolicy.DisableSecureLockDeviceParams;
 import android.security.authenticationpolicy.EnableSecureLockDeviceParams;
 import android.security.authenticationpolicy.IAuthenticationPolicyService;
@@ -73,6 +77,7 @@ import com.android.server.locksettings.LockSettingsStateListener;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
+import java.io.FileDescriptor;
 import java.util.Objects;
 
 /**
@@ -407,23 +412,23 @@ public class AuthenticationPolicyService extends SystemService {
 
     private final IBinder mService = new IAuthenticationPolicyService.Stub() {
         /**
-         * @see AuthenticationPolicyManager#isSecureLockDeviceAvailable()
+         * @see AuthenticationPolicyManager#getSecureLockDeviceAvailability()
          * @param user user associated with the calling context to check for secure lock device
          *             availability
-         * @return {@link IsSecureLockDeviceAvailableRequestStatus} int indicating whether secure
-         * lock device is available for the calling user
+         * @return {@link GetSecureLockDeviceAvailabilityRequestStatus} int indicating whether
+         * secure lock device is available for the calling user
          */
         @Override
         @EnforcePermission(MANAGE_SECURE_LOCK_DEVICE)
-        @IsSecureLockDeviceAvailableRequestStatus
-        public int isSecureLockDeviceAvailable(UserHandle user) {
-            isSecureLockDeviceAvailable_enforcePermission();
-            enforceCrossUserPermission(user, TAG + "#isSecureLockDeviceAvailable");
+        @GetSecureLockDeviceAvailabilityRequestStatus
+        public int getSecureLockDeviceAvailability(UserHandle user) {
+            getSecureLockDeviceAvailability_enforcePermission();
+            enforceCrossUserPermission(user, TAG + "#getSecureLockDeviceAvailability");
 
             // Required for internal service to acquire necessary system permissions
             final long identity = Binder.clearCallingIdentity();
             try {
-                return mSecureLockDeviceService.isSecureLockDeviceAvailable(user);
+                return mSecureLockDeviceService.getSecureLockDeviceAvailability(user);
             } finally {
                 Binder.restoreCallingIdentity(identity);
             }
@@ -540,6 +545,17 @@ public class AuthenticationPolicyService extends SystemService {
             }
         }
 
+        /**
+         * @see AuthenticationPolicyManager#setSecureLockDeviceTestStatus(boolean)
+         * @param isTestMode boolean indicating whether to enable test mode for secure lock device
+         */
+        @Override
+        @EnforcePermission(TEST_BIOMETRIC)
+        public void setSecureLockDeviceTestStatus(boolean isTestMode) {
+            setSecureLockDeviceTestStatus_enforcePermission();
+            mSecureLockDeviceService.setSecureLockDeviceTestStatus(isTestMode);
+        }
+
         @Override
         @EnforcePermission(USE_BIOMETRIC_INTERNAL)
         public void startWatchRangingForIdentityCheck(long authenticationRequestId,
@@ -556,6 +572,31 @@ public class AuthenticationPolicyService extends SystemService {
             cancelWatchRangingForRequestId_enforcePermission();
 
             mWatchRangingService.cancelWatchRangingForRequestId(authenticationRequestId);
+        }
+
+        @Override
+        @EnforcePermission(USE_BIOMETRIC_INTERNAL)
+        public void isWatchRangingAvailable(
+                @NonNull IProximityResultCallback proximityResultCallback) {
+            isWatchRangingAvailable_enforcePermission();
+
+            mWatchRangingService.isWatchRangingAvailable(proximityResultCallback);
+        }
+
+        @Override
+        public void onShellCommand(FileDescriptor in, FileDescriptor out, FileDescriptor err,
+                @NonNull String[] args, ShellCallback callback,
+                @NonNull ResultReceiver resultReceiver) {
+            if (Build.IS_DEBUGGABLE) {
+                if (Binder.getCallingUid() != Process.SHELL_UID) {
+                    Slog.e(TAG, "Shell command called from non-shell UID: "
+                            + Binder.getCallingUid());
+                    resultReceiver.send(-1, null);
+                    return;
+                }
+                (new AuthenticationPolicyServiceShellCommand(this, getContext()))
+                        .exec(this, in, out, err, args, callback, resultReceiver);
+            }
         }
     };
 }

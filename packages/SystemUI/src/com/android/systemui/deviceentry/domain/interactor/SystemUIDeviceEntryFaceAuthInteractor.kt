@@ -20,6 +20,7 @@ import android.app.trust.TrustManager
 import android.content.Context
 import android.hardware.biometrics.BiometricFaceConstants
 import android.hardware.biometrics.BiometricSourceType
+import android.security.Flags.secureLockDevice
 import android.service.dreams.Flags.dreamsV2
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.systemui.biometrics.data.repository.FacePropertyRepository
@@ -55,6 +56,7 @@ import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionsRepository
 import com.android.systemui.user.data.model.SelectionStatus
 import com.android.systemui.user.data.repository.UserRepository
 import com.android.systemui.util.kotlin.pairwise
@@ -110,6 +112,7 @@ constructor(
     private val sceneInteractor: Lazy<SceneInteractor>,
     deviceEntryFaceAuthStatusInteractor: DeviceEntryFaceAuthStatusInteractor,
     cameraSensorPrivacyInteractor: CameraSensorPrivacyInteractor,
+    private val mobileConnectionsRepository: MobileConnectionsRepository,
 ) : DeviceEntryFaceAuthInteractor {
 
     private val listeners: MutableList<FaceAuthenticationListener> = mutableListOf()
@@ -168,7 +171,12 @@ constructor(
             add(keyguardTransitionInteractor.transition(Edge.create(DOZING, LOCKSCREEN)))
 
             if (dreamsV2()) {
-                add(keyguardTransitionInteractor.transition(Edge.create(DREAMING, LOCKSCREEN)))
+                add(
+                    keyguardTransitionInteractor.transition(
+                        edge = Edge.create(Scenes.Dream, LOCKSCREEN),
+                        edgeWithoutSceneContainer = Edge.create(DREAMING, LOCKSCREEN),
+                    )
+                )
             }
         }
 
@@ -195,6 +203,13 @@ constructor(
                     FaceAuthUiEvent.FACE_AUTH_UPDATED_KEYGUARD_VISIBILITY_CHANGED,
                     fallbackToDetect = true,
                 )
+            }
+            .launchIn(applicationScope)
+
+        mobileConnectionsRepository.isAnySimSecure
+            .whenItFlipsToFalse()
+            .onEach {
+                runFaceAuth(FaceAuthUiEvent.FACE_AUTH_SIM_PIN_SUCCESS, fallbackToDetect = true)
             }
             .launchIn(applicationScope)
 
@@ -299,6 +314,15 @@ constructor(
 
     override fun onSwipeUpOnBouncer() {
         runFaceAuth(FaceAuthUiEvent.FACE_AUTH_TRIGGERED_SWIPE_UP_ON_BOUNCER, false)
+    }
+
+    override fun onSecureLockDeviceBiometricAuthRequested() {
+        runFaceAuth(FaceAuthUiEvent.FACE_AUTH_UPDATED_BIOMETRIC_ENABLED_ON_KEYGUARD, false)
+    }
+
+    override fun onSecureLockDeviceBiometricAuthHidden() {
+        if (!secureLockDevice()) return
+        repository.cancel()
     }
 
     override fun onNotificationPanelClicked() {
@@ -482,5 +506,13 @@ constructor(
 private fun Flow<Boolean>.whenItFlipsToTrue(): Flow<Boolean> {
     return this.pairwise()
         .filter { pair -> !pair.previousValue && pair.newValue }
+        .map { it.newValue }
+}
+
+// Extension method that filters a generic Boolean flow to one that emits
+// whenever there is flip from true -> false
+private fun Flow<Boolean>.whenItFlipsToFalse(): Flow<Boolean> {
+    return this.pairwise()
+        .filter { pair -> pair.previousValue && !pair.newValue }
         .map { it.newValue }
 }

@@ -52,6 +52,7 @@ android_library {
     ],
     static_libs: [
         "com.android.systemui.dagger-api",
+        "com.android.systemui.log.table-api",
         "BiometricsSharedLib",
         "PlatformAnimationLib",
         "PluginCoreLib",
@@ -59,6 +60,8 @@ android_library {
         "SystemUIUnfoldLib",
         "SystemUISharedLib-Keyguard",
         "WindowManager-Shell-shared",
+        "com.android.systemui.rotation-api",
+        "com.android.systemui.rotation-impl",
         "//frameworks/libs/systemui:tracinglib-platform",
         "androidx.dynamicanimation_dynamicanimation",
         "androidx.concurrent_concurrent-futures",

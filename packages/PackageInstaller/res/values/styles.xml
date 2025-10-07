@@ -16,34 +16,7 @@
   -->
 <resources>
 
-    <!-- TODO (b/274120822): Remove these styles when we replace all dialogs to MaterialAlertDialog -->
-    <style name="Widget.PackageInstaller.Button.Colored" parent="android:Widget.DeviceDefault.Button.Colored">
-        <item name="android:background">@drawable/background_colored_button</item>
-        <item name="android:layout_marginStart">8dp</item>
-        <item name="android:minHeight">@dimen/button_min_height</item>
-        <item name="android:paddingHorizontal">24dp</item>
-        <item name="android:textAppearance">@android:style/TextAppearance.DeviceDefault.Widget.Button</item>
-    </style>
-
-    <style name="Widget.PackageInstaller.Button.Outlined" parent="android:Widget.DeviceDefault.Button.Colored">
-        <item name="android:background">@drawable/background_outlined_button</item>
-        <item name="android:layout_marginStart">8dp</item>
-        <item name="android:minHeight">@dimen/button_min_height</item>
-        <item name="android:textAppearance">@android:style/TextAppearance.DeviceDefault.Widget.Button</item>
-        <item name="android:textColor">@color/primaryColor</item>
-    </style>
-
-    <style name="Widget.PackageInstaller.ButtonBar" parent="">
-        <item name="android:paddingBottom">20dp</item>
-        <item name="android:paddingHorizontal">12dp</item>
-        <item name="android:paddingTop">4dp</item>
-        <item name="android:textAppearance">@android:style/TextAppearance.DeviceDefault.Widget.Button</item>
-    </style>
-
-    <style name="Widget.PackageInstaller.WindowTitle" parent="">
-        <item name="android:autoSizeTextType">uniform</item>
-        <item name="android:layout_marginTop">4dp</item>
-        <item name="android:textAppearance">@android:style/TextAppearance.DeviceDefault.Headline</item>
+    <style name="TextAppearance.PackageInstaller.Title" parent="@android:style/TextAppearance.DeviceDefault.Headline">
     </style>
 
     <style name="TextAppearance.PackageInstaller.AppLabel" parent="@android:style/TextAppearance.DeviceDefault.SearchResult.Subtitle">
@@ -66,7 +39,6 @@
 
     <!-- Material design -->
     <style name="Widget.PackageInstaller.Material.ButtonBar" parent="">
-        <item name="android:paddingBottom">16dp</item>
         <item name="android:textAppearance">@android:style/TextAppearance.DeviceDefault.Widget.Button</item>
     </style>
 
@@ -77,6 +49,8 @@
     </style>
 
     <style name="Widget.PackageInstaller.Material.Button" parent="@style/Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:insetBottom">4dp</item>
+        <item name="android:insetTop">4dp</item>
         <item name="android:layout_marginStart">8dp</item>
         <item name="android:minHeight">@dimen/button_min_height</item>
         <item name="android:textAppearance">@style/TextAppearance.PackageInstaller.LabelLarge</item>
@@ -84,8 +58,8 @@
     </style>
 
     <style name="Widget.PackageInstaller.Material.Button.Colored" parent="@style/Widget.Material3.Button">
-        <item name="android:insetBottom">0dp</item>
-        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">4dp</item>
+        <item name="android:insetTop">4dp</item>
         <item name="android:layout_marginStart">8dp</item>
         <item name="android:minHeight">@dimen/button_min_height</item>
         <item name="android:paddingHorizontal">16dp</item>
@@ -95,8 +69,8 @@
     </style>
 
     <style name="Widget.PackageInstaller.Material.Button.Outlined" parent="@style/Widget.Material3.Button.OutlinedButton">
-        <item name="android:insetBottom">0dp</item>
-        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">4dp</item>
+        <item name="android:insetTop">4dp</item>
         <item name="android:layout_marginStart">8dp</item>
         <item name="android:minHeight">@dimen/button_min_height</item>
         <item name="android:paddingHorizontal">16dp</item>
@@ -167,5 +141,13 @@
 
     <style name="ShapeAppearance">
         <item name="cornerSize">@dimen/alert_dialog_radius</item>
+    </style>
+
+    <style name="PackageInstaller.ProgressBarStyle.Linear" parent="Widget.Material3.LinearProgressIndicator">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="indicatorColor">@color/primaryColor</item>
+        <item name="trackColor">@color/outlineVariantColor</item>
+        <item name="trackCornerRadius">4dp</item>
     </style>
 </resources>

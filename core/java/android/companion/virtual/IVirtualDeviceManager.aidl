@@ -22,6 +22,8 @@ import android.companion.virtual.IVirtualDeviceListener;
 import android.companion.virtual.IVirtualDeviceSoundEffectListener;
 import android.companion.virtual.VirtualDevice;
 import android.companion.virtual.VirtualDeviceParams;
+import android.companion.virtual.computercontrol.ComputerControlSessionParams;
+import android.companion.virtual.computercontrol.IComputerControlSessionCallback;
 import android.content.AttributionSource;
 
 /**
@@ -50,11 +52,13 @@ interface IVirtualDeviceManager {
             in VirtualDeviceParams params, in IVirtualDeviceActivityListener activityListener,
             in IVirtualDeviceSoundEffectListener soundEffectListener);
 
+    /**
+     * Requests a new computer control session.
+     */
     @EnforcePermission("ACCESS_COMPUTER_CONTROL")
-    IVirtualDevice createLocalVirtualDevice(
-            in IBinder token, in AttributionSource attributionSource,
-            in VirtualDeviceParams params, in IVirtualDeviceActivityListener activityListener,
-            in IVirtualDeviceSoundEffectListener soundEffectListener);
+    void requestComputerControlSession(
+            in AttributionSource attributionSource, in ComputerControlSessionParams params,
+            in IComputerControlSessionCallback callback);
 
     /**
      * Returns the details of all available virtual devices.
@@ -98,6 +102,11 @@ interface IVirtualDeviceManager {
      * Returns the device policy for the given virtual device and policy type.
      */
     int getDevicePolicy(int deviceId, int policyType);
+
+    /**
+     * Returns the device policy for the given display ID and policy type.
+     */
+    int getDevicePolicyForDisplayId(int displayId, int policyType);
 
     /**
      * Returns device-specific session id for playback, or AUDIO_SESSION_ID_GENERATE

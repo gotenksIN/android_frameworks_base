@@ -46,9 +46,9 @@ import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.TaskUpd
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.UnminimizeReason
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_END_DRAG_TO_DESKTOP
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_TASK_LIMIT_MINIMIZE
-import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_ENTER_DESKTOP_FROM_APP_FROM_OVERVIEW
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_ENTER_DESKTOP_FROM_APP_HANDLE_MENU_BUTTON
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_ENTER_DESKTOP_FROM_KEYBOARD_SHORTCUT
+import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_ENTER_DESKTOP_FROM_OVERVIEW_TASK_MENU
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_EXIT_DESKTOP_MODE_HANDLE_MENU_BUTTON
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_EXIT_DESKTOP_MODE_KEYBOARD_SHORTCUT
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_EXIT_DESKTOP_MODE_TASK_DRAG
@@ -68,7 +68,6 @@ import kotlin.jvm.optionals.getOrNull
  */
 class DesktopModeLoggerTransitionObserver(
     shellInit: ShellInit,
-    private val transitions: Transitions,
     private val desktopModeEventLogger: DesktopModeEventLogger,
     private val desktopTasksLimiter: Optional<DesktopTasksLimiter>,
     desktopState: DesktopState,
@@ -100,7 +99,6 @@ class DesktopModeLoggerTransitionObserver(
     @VisibleForTesting var isSessionActive: Boolean = false
 
     fun onInit() {
-        transitions.registerObserver(this)
         SystemProperties.set(
             VISIBLE_TASKS_COUNTER_SYSTEM_PROPERTY,
             VISIBLE_TASKS_COUNTER_SYSTEM_PROPERTY_DEFAULT_VALUE,
@@ -361,16 +359,8 @@ class DesktopModeLoggerTransitionObserver(
                     desktopModeEventLogger.logTaskAdded(
                         currentTaskUpdate.copy(unminimizeReason = unminimizeReason)
                     )
-                    Trace.setCounter(
-                        Trace.TRACE_TAG_WINDOW_MANAGER,
-                        VISIBLE_TASKS_COUNTER_NAME,
-                        postTransitionVisibleFreeformTasks.size.toLong(),
-                    )
-                    SystemProperties.set(
-                        VISIBLE_TASKS_COUNTER_SYSTEM_PROPERTY,
-                        postTransitionVisibleFreeformTasks.size.toString(),
-                    )
                 }
+
                 focusChangedReason != null ->
                     desktopModeEventLogger.logTaskInfoChanged(currentTaskUpdate)
                 // old tasks that were resized or repositioned
@@ -397,16 +387,19 @@ class DesktopModeLoggerTransitionObserver(
                         minimizeReason,
                     )
                 desktopModeEventLogger.logTaskRemoved(taskUpdate)
-                Trace.setCounter(
-                    Trace.TRACE_TAG_WINDOW_MANAGER,
-                    VISIBLE_TASKS_COUNTER_NAME,
-                    postTransitionVisibleFreeformTasks.size.toLong(),
-                )
-                SystemProperties.set(
-                    VISIBLE_TASKS_COUNTER_SYSTEM_PROPERTY,
-                    postTransitionVisibleFreeformTasks.size.toString(),
-                )
             }
+        }
+
+        if (preTransitionVisibleFreeformTasks.size != postTransitionVisibleFreeformTasks.size) {
+            Trace.setCounter(
+                Trace.TRACE_TAG_WINDOW_MANAGER,
+                VISIBLE_TASKS_COUNTER_NAME,
+                postTransitionVisibleFreeformTasks.size.toLong(),
+            )
+            SystemProperties.set(
+                VISIBLE_TASKS_COUNTER_SYSTEM_PROPERTY,
+                postTransitionVisibleFreeformTasks.size.toString(),
+            )
         }
     }
 
@@ -485,8 +478,8 @@ class DesktopModeLoggerTransitionObserver(
                     EnterReason.APP_HANDLE_DRAG
                 transitionInfo?.type == TRANSIT_ENTER_DESKTOP_FROM_APP_HANDLE_MENU_BUTTON ->
                     EnterReason.APP_HANDLE_MENU_BUTTON
-                transitionInfo?.type == TRANSIT_ENTER_DESKTOP_FROM_APP_FROM_OVERVIEW ->
-                    EnterReason.APP_FROM_OVERVIEW
+                transitionInfo?.type == TRANSIT_ENTER_DESKTOP_FROM_OVERVIEW_TASK_MENU ->
+                    EnterReason.OVERVIEW_TASK_MENU
                 transitionInfo?.type == TRANSIT_ENTER_DESKTOP_FROM_KEYBOARD_SHORTCUT ->
                     EnterReason.KEYBOARD_SHORTCUT_ENTER
                 // NOTE: the below condition also applies for EnterReason quickswitch

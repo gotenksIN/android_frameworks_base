@@ -26,6 +26,7 @@ import static android.app.ActivityManager.PROCESS_STATE_BOUND_TOP;
 import static android.app.ActivityManager.PROCESS_STATE_HEAVY_WEIGHT;
 import static android.app.ActivityManager.PROCESS_STATE_RECEIVER;
 import static android.app.ActivityManager.PROCESS_STATE_TOP;
+import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_BATCH_UPDATE_REQUEST;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_BIND_SERVICE;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_COMPONENT_DISABLED;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_EXECUTING_SERVICE;
@@ -144,6 +145,7 @@ import android.app.ActivityThread;
 import android.app.AppGlobals;
 import android.app.AppOpsManager;
 import android.app.BackgroundStartPrivileges;
+import android.app.BindUpdateInfo;
 import android.app.ForegroundServiceDelegationOptions;
 import android.app.ForegroundServiceStartNotAllowedException;
 import android.app.ForegroundServiceTypePolicy;
@@ -216,9 +218,9 @@ import android.stats.devicepolicy.DevicePolicyEnums;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
-// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
 import android.util.BoostFramework;
-// QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 import android.util.EventLog;
 import android.util.Pair;
 import android.util.PrintWriterPrinter;
@@ -291,11 +293,11 @@ public final class ActiveServices {
 
     private static final boolean LOG_SERVICE_START_STOP = DEBUG_SERVICE;
 
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     private static final String AIDL_SERVICE =
             "vendor.qti.hardware.servicetrackeraidl.IServicetracker/default";
 
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 // QTI_BEGIN: 2024-09-23: Core: Assign mIsAIDLSupported default value to false
     private static boolean mIsAIDLSupported = false;
 // QTI_END: 2024-09-23: Core: Assign mIsAIDLSupported default value to false
@@ -423,17 +425,17 @@ public final class ActiveServices {
     // at the same time.
     final int mMaxStartingBackground;
 
-// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
    //mPerf Object
    public static BoostFramework mPerf = new BoostFramework();
 
-// QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     // Flag to reschedule the services during app launch. Disable by default.
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
     private static boolean SERVICE_RESCHEDULE = false;
-// QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 
     /**
      * Master service bookkeeping, keyed by user number.
@@ -530,11 +532,11 @@ public final class ActiveServices {
     /** Amount of time to allow a last ANR message to exist before freeing the memory. */
     static final int LAST_ANR_LIFETIME_DURATION_MSECS = 2 * 60 * 60 * 1000; // Two hours
 
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     private vendor.qti.hardware.servicetracker.V1_0.IServicetracker mServicetracker;
     private vendor.qti.hardware.servicetrackeraidl.IServicetracker  mServicetracker_aidl;
 
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 // QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
     private final boolean isLowRamDevice =
             SystemProperties.getBoolean("ro.config.low_ram", false);
@@ -650,7 +652,7 @@ public final class ActiveServices {
                 // If the FGS is started by temp allowlist of alarm-clock
                 // (REASON_ALARM_MANAGER_ALARM_CLOCK), allow it to continue and do not stop it,
                 // even the app is background-restricted.
-                if (r.isForeground
+                if (r.isForeground()
                         && r.mAllowStartForegroundAtEntering != REASON_ALARM_MANAGER_ALARM_CLOCK
                         && !isDeviceProvisioningPackage(r.packageName)) {
                     toStop.add(r);
@@ -788,14 +790,14 @@ public final class ActiveServices {
                 }
                 r.delayed = false;
                 if (r.pendingStarts.size() <= 0) {
-                    Slog.wtf(TAG, "**** NO PENDING STARTS! " + r + " startReq=" + r.startRequested
-                            + " delayedStop=" + r.delayedStop);
+                    Slog.wtf(TAG, "**** NO PENDING STARTS! " + r + " startReq="
+                            + r.isStartRequested() + " delayedStop=" + r.delayedStop);
                 } else {
                     try {
                         final ServiceRecord.StartItem si = r.pendingStarts.get(0);
                         startServiceInnerLocked(this, si.intent, r, false, true, si.callingId,
                                 si.mCallingProcessName, si.mCallingProcessState,
-                                r.startRequested, si.mCallingPackageName);
+                                r.isStartRequested(), si.mCallingPackageName);
                     } catch (TransactionTooLargeException e) {
                         // Ignore, nobody upstack cares.
                     }
@@ -824,10 +826,10 @@ public final class ActiveServices {
 
         final IBinder b = ServiceManager.getService(Context.PLATFORM_COMPAT_SERVICE);
 
-// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
         if(mPerf != null)
             SERVICE_RESCHEDULE = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.am.reschedule_service", "false"));
-// QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 
         this.mFGSLogger = new ForegroundServiceTypeLoggerModule();
         this.mActiveServiceAnrTimer = new ProcessAnrTimer(service,
@@ -844,7 +846,7 @@ public final class ActiveServices {
                 new AnrTimer.Args()
                             .extend(true)
                             .longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer()));
-// QTI_BEGIN: 2023-10-16: Frameworks: Add check if vendor is supporting AIDL or HIDL
+// QTI_BEGIN: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
         try {
             if (ServiceManager.isDeclared(AIDL_SERVICE)){
                 if (DEBUG_SERVICE) Slog.w(TAG, "AIDL is supported");
@@ -854,7 +856,7 @@ public final class ActiveServices {
             if (DEBUG_SERVICE) Slog.w(TAG, "AIDL not Supported");
             mIsAIDLSupported = false;
         }
-// QTI_END: 2023-10-16: Frameworks: Add check if vendor is supporting AIDL or HIDL
+// QTI_END: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
     }
 
     void systemServicesReady() {
@@ -905,24 +907,24 @@ public final class ActiveServices {
     }
 
 // QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     private boolean getAIDLServicetrackerInstance() {
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2023-10-16: Frameworks: Add check if vendor is supporting AIDL or HIDL
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
 
         if (!mIsAIDLSupported) return false;
 
-// QTI_END: 2023-10-16: Frameworks: Add check if vendor is supporting AIDL or HIDL
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         if (mServicetracker_aidl == null ) {
             try {
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2023-10-16: Frameworks: Add check if vendor is supporting AIDL or HIDL
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
                 IBinder mBinder = ServiceManager.getService(AIDL_SERVICE);
                 mServicetracker_aidl =
                     vendor.qti.hardware.servicetrackeraidl.IServicetracker.Stub.asInterface(mBinder);
-// QTI_END: 2023-10-16: Frameworks: Add check if vendor is supporting AIDL or HIDL
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             } catch (java.util.NoSuchElementException e) {
                 // Service doesn't exist or cannot be opened logged below
             } catch (Exception e) {
@@ -937,7 +939,7 @@ public final class ActiveServices {
         return true;
     }
 
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     ServiceRecord getServiceByNameLocked(ComponentName name, int callingUser) {
         // TODO: Deal with global services
         if (DEBUG_MU)
@@ -955,7 +957,7 @@ public final class ActiveServices {
         if (smap != null) {
             for (int i = 0; i < smap.mServicesByInstanceName.size(); i++) {
                 final ServiceRecord sr = smap.mServicesByInstanceName.valueAt(i);
-                if (sr.appInfo.packageName.equals(pkg) && sr.isForeground) {
+                if (sr.appInfo.packageName.equals(pkg) && sr.isForeground()) {
                     if (sr.foregroundNoti != null
                             && Objects.equals(sr.foregroundNoti.getChannelId(), channelId)) {
                         if (DEBUG_FOREGROUND_SERVICE) {
@@ -998,7 +1000,7 @@ public final class ActiveServices {
         if (uidRec != null) {
             final ProcessRecord app = uidRec.getProcessInPackage(packageName);
             if (app != null) {
-                app.mState.setBackgroundRestricted(restricted);
+                app.setBackgroundRestricted(restricted);
             }
         }
     }
@@ -1036,6 +1038,16 @@ public final class ActiveServices {
         final String serviceName = (service.getComponentName() != null)
                 ? service.getComponentName().toShortString() : "(?)";
         Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, message + serviceName);
+    }
+
+    private static void traceInstantFgs(@NonNull String message, @NonNull ServiceRecord service) {
+        if (!Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+            return;
+        }
+        final String serviceName = (service.getComponentName() != null)
+                ? service.getComponentName().toShortString() : "(?)";
+        Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                message + serviceName + "; fgsType: " + service.getForegroundServiceType());
     }
 
     ComponentName startServiceLocked(IApplicationThread caller, Intent service, String resolvedType,
@@ -1078,7 +1090,7 @@ public final class ActiveServices {
                         + " (pid=" + callingPid
                         + ") when starting service " + service);
             }
-            callerFg = callerApp.mState.getSetSchedGroup() != ProcessList.SCHED_GROUP_BACKGROUND;
+            callerFg = callerApp.getSetSchedGroup() != ProcessList.SCHED_GROUP_BACKGROUND;
         } else {
             callerFg = true;
         }
@@ -1199,7 +1211,7 @@ public final class ActiveServices {
 
         // If this isn't a direct-to-foreground start, check our ability to kick off an
         // arbitrary service.
-        if (forcedStandby || (!r.startRequested && !fgRequired)) {
+        if (forcedStandby || (!r.isStartRequested() && !fgRequired)) {
             // Before going further -- if this app is not allowed to start services in the
             // background, then at this point we aren't going to let it period.
             final int allowed = mAm.getAppStartModeLOSP(appUid, appPackageName, appTargetSdkVersion,
@@ -1252,7 +1264,7 @@ public final class ActiveServices {
                 ? callingApp.processName : callingPackage;
         final int callingProcessState =
                 callingApp != null && callingApp.getThread() != null && !callingApp.isKilled()
-                ? callingApp.mState.getCurProcState() : ActivityManager.PROCESS_STATE_UNKNOWN;
+                ? callingApp.getCurProcState() : ActivityManager.PROCESS_STATE_UNKNOWN;
         r.updateProcessStateOnRequest();
 
         // The package could be frozen (meaning it's doing surgery), defer the actual
@@ -1313,7 +1325,7 @@ public final class ActiveServices {
         if (unscheduleServiceRestartLocked(r, callingUid, false)) {
             if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "START SERVICE WHILE RESTART PENDING: " + r);
         }
-        final boolean wasStartRequested = r.startRequested;
+        final boolean wasStartRequested = r.isStartRequested();
         mAm.mProcessStateController.setServiceLastActivityTime(r, SystemClock.uptimeMillis());
         mAm.mProcessStateController.setStartRequested(r, true);
         r.delayedStop = false;
@@ -1326,7 +1338,7 @@ public final class ActiveServices {
         // foreground service that was started in the same conditions that allows for scheduling
         // UI jobs. More explicitly, we want to allow scheduling UI jobs when the app is running
         // an FGS that started when the app was in the TOP or a BAL-approved state.
-        final boolean isFgs = r.isForeground || r.fgRequired;
+        final boolean isFgs = r.isForeground() || r.fgRequired;
         if (isFgs) {
             // As of Android UDC, the conditions required for the while-in-use permissions
             // are the same conditions that we want, so we piggyback on that logic.
@@ -1360,7 +1372,7 @@ public final class ActiveServices {
         if (!callerFg && !fgRequired && r.app == null
                 && mAm.mUserController.hasStartedUserState(r.userId)) {
             ProcessRecord proc = mAm.getProcessRecordLocked(r.processName, r.appInfo.uid);
-            if (proc == null || proc.mState.getCurProcState() > PROCESS_STATE_RECEIVER) {
+            if (proc == null || proc.getCurProcState() > PROCESS_STATE_RECEIVER) {
                 // If this is not coming from a foreground caller, then we may want
                 // to delay the start if there are already other background services
                 // that are starting.  This is to avoid process start spam when lots
@@ -1388,7 +1400,7 @@ public final class ActiveServices {
                 }
                 if (DEBUG_DELAYED_STARTS) Slog.v(TAG_SERVICE, "Not delaying: " + r);
                 addToStarting = true;
-            } else if (proc.mState.getCurProcState() >= ActivityManager.PROCESS_STATE_SERVICE) {
+            } else if (proc.getCurProcState() >= ActivityManager.PROCESS_STATE_SERVICE) {
                 // We slightly loosen when we will enqueue this new service as a background
                 // starting service we are waiting for, to also include processes that are
                 // currently running other services or receivers.
@@ -1397,9 +1409,9 @@ public final class ActiveServices {
                         "Not delaying, but counting as bg: " + r);
             } else if (DEBUG_DELAYED_STARTS) {
                 StringBuilder sb = new StringBuilder(128);
-                sb.append("Not potential delay (state=").append(proc.mState.getCurProcState())
-                        .append(' ').append(proc.mState.getAdjType());
-                String reason = proc.mState.makeAdjReason();
+                sb.append("Not potential delay (state=").append(proc.getCurProcState())
+                        .append(' ').append(proc.getAdjType());
+                String reason = proc.makeAdjReason();
                 if (reason != null) {
                     sb.append(' ');
                     sb.append(reason);
@@ -1682,7 +1694,7 @@ public final class ActiveServices {
                 firstLaunch,
                 0L /* TODO: stoppedDuration */);
 
-        if (r.startRequested && addToStarting) {
+        if (r.isStartRequested() && addToStarting) {
             boolean first = smap.mStartingBackground.size() == 0;
             smap.mStartingBackground.add(r);
             r.startingBgTimeout = SystemClock.uptimeMillis() + mAm.mConstants.BG_START_TIMEOUT;
@@ -1807,7 +1819,7 @@ public final class ActiveServices {
         if (services != null) {
             for (int i = services.mServicesByInstanceName.size() - 1; i >= 0; i--) {
                 ServiceRecord service = services.mServicesByInstanceName.valueAt(i);
-                if (service.appInfo.uid == uid && service.startRequested) {
+                if (service.appInfo.uid == uid && service.isStartRequested()) {
                     if (mAm.getAppStartModeLOSP(service.appInfo.uid, service.packageName,
                             service.appInfo.targetSdkVersion, -1, false, false, false)
                             != ActivityManager.APP_START_MODE_NORMAL) {
@@ -1985,7 +1997,7 @@ public final class ActiveServices {
         try {
             ServiceRecord r = findServiceLocked(className, token, userId);
             if (r != null) {
-                ret = r.foregroundServiceType;
+                ret = r.getForegroundServiceType();
             }
         } finally {
             mAm.mInjector.restoreCallingIdentity(origId);
@@ -2218,16 +2230,15 @@ public final class ActiveServices {
      * </p>
      */
     private boolean isForegroundServiceAllowedInBackgroundRestricted(ProcessRecord app) {
-        final ProcessStateRecord state = app.mState;
         if (isDeviceProvisioningPackage(app.info.packageName)) {
             return true;
         }
-        if (!state.isBackgroundRestricted()
-                || state.getSetProcState() <= ActivityManager.PROCESS_STATE_BOUND_TOP) {
+        if (!app.isBackgroundRestricted()
+                || app.getSetProcState() <= ActivityManager.PROCESS_STATE_BOUND_TOP) {
             return true;
         }
-        if (state.getSetProcState() == ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE
-                && state.isSetBoundByNonBgRestrictedApp()) {
+        if (app.getSetProcState() == ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE
+                && app.isSetBoundByNonBgRestrictedApp()) {
             return true;
         }
         return false;
@@ -2286,7 +2297,7 @@ public final class ActiveServices {
             if (notification == null) {
                 throw new IllegalArgumentException("null notification");
             }
-            traceInstant("startForeground(): ", r);
+            traceInstantFgs("startForeground(): ", r);
             final int foregroundServiceStartType = foregroundServiceType;
             // Instant apps need permission to create foreground services.
             if (r.appInfo.isInstantApp()) {
@@ -2420,12 +2431,12 @@ public final class ActiveServices {
                 // Whether setFgsRestrictionLocked() is called in here. Only used for logging.
                 boolean fgsRestrictionRecalculated = false;
 
-                final int previousFgsType = r.foregroundServiceType;
+                final int previousFgsType = r.getForegroundServiceType();
 
                 int fgsTypeCheckCode = FGS_TYPE_POLICY_CHECK_UNKNOWN;
                 if (!ignoreForeground) {
                     if (foregroundServiceType == FOREGROUND_SERVICE_TYPE_SHORT_SERVICE
-                            && !r.startRequested) {
+                            && !r.isStartRequested()) {
                         // There's a long standing bug that allows a bound service to become
                         // a foreground service *even when it's not started*.
                         // Unfortunately, there are apps relying on this behavior, so we can't just
@@ -2465,18 +2476,18 @@ public final class ActiveServices {
                     // If true, we skip the BFSL check.
                     boolean bypassBfslCheck = false;
 
-                    if (r.isForeground && (isOldTypeShortFgs || isNewTypeShortFgs)) {
+                    if (r.isForeground() && (isOldTypeShortFgs || isNewTypeShortFgs)) {
                         if (DEBUG_SHORT_SERVICE) {
                             Slog.i(TAG_SERVICE, String.format(
                                     "FGS type changing from %x%s to %x: %s",
-                                    r.foregroundServiceType,
+                                    r.getForegroundServiceType(),
                                     (isOldTypeShortFgsAndTimedOut ? "(timed out short FGS)" : ""),
                                     foregroundServiceStartType,
                                     r.toString()));
                         }
                     }
 
-                    if (r.isForeground && isOldTypeShortFgs) {
+                    if (r.isForeground() && isOldTypeShortFgs) {
 
                         // If we get here, that means startForeground(SHORT_SERVICE) is called again
                         // on a SHORT_SERVICE FGS.
@@ -2532,7 +2543,6 @@ public final class ActiveServices {
                         }
                     } else if (CompatChanges.isChangeEnabled(
                                     FGS_INTRODUCE_TIME_LIMITS, r.appInfo.uid)
-                                && android.app.Flags.introduceNewServiceOntimeoutCallback()
                                 && getTimeLimitedFgsType(foregroundServiceType)
                                         != ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE) {
                         // Calling startForeground on a FGS type which has a time limit will only be
@@ -2565,9 +2575,9 @@ public final class ActiveServices {
                                             SystemClock.elapsedRealtime() - (24 * 60 * 60 * 1000));
                                 final long lastTimeOutAt = fgsTypeInfo.getTimeLimitExceededAt();
                                 if (fgsTypeInfo.getFirstFgsStartRealtime() < before24Hr
-                                        || r.app.mState.getCurProcState() <= PROCESS_STATE_TOP
+                                        || r.app.getCurProcState() <= PROCESS_STATE_TOP
                                         || (lastTimeOutAt != Long.MIN_VALUE
-                                            && r.app.mState.getLastTopTime() > lastTimeOutAt)) {
+                                            && r.app.getLastTopTime() > lastTimeOutAt)) {
                                     // Reset the time limit info for this fgs type if it has been
                                     // more than 24hrs since the first fgs start or if the app is
                                     // currently in the TOP state or was in the TOP state after
@@ -2643,7 +2653,7 @@ public final class ActiveServices {
                     // forBoundFgs = false, so we'd set the FGS allowed reason to the
                     // by-bindings fields, so we can put it in the log, without affecting the
                     // logic.
-                    if (!fgsRestrictionRecalculated && !r.startRequested) {
+                    if (!fgsRestrictionRecalculated && !r.isStartRequested()) {
                         setFgsRestrictionLocked(r.serviceInfo.packageName, r.app.getPid(),
                                 r.appInfo.uid, r.intent.getIntent(), r,
                                 BackgroundStartPrivileges.NONE,
@@ -2736,7 +2746,7 @@ public final class ActiveServices {
                     }
                     notification.flags |= Notification.FLAG_FOREGROUND_SERVICE;
                     r.foregroundNoti = notification;
-                    if (r.isForeground && foregroundServiceType != previousFgsType) {
+                    if (r.isForeground() && foregroundServiceType != previousFgsType) {
                         // An already foreground service is being started with a different fgs type
                         // which results in the type changing without typical startForeground
                         // logging.
@@ -2744,7 +2754,7 @@ public final class ActiveServices {
                                 + " from " + previousFgsType + " to " + foregroundServiceType);
                     }
                     mAm.mProcessStateController.setForegroundServiceType(r, foregroundServiceType);
-                    if (!r.isForeground) {
+                    if (!r.isForeground()) {
                         final ServiceMap smap = getServiceMapLocked(r.userId);
                         if (smap != null) {
                             ActiveForegroundApp active = smap.mActiveForegroundApps
@@ -2800,7 +2810,7 @@ public final class ActiveServices {
                         mAm.updateForegroundServiceUsageStats(r.name, r.userId, true);
 
                         int fgsStartApi = FOREGROUND_SERVICE_STATE_CHANGED__FGS_START_API__FGSSTARTAPI_NONE;
-                        if (r.startRequested) {
+                        if (r.isStartRequested()) {
                             if (origFgRequired) {
                                 fgsStartApi =
                                         FOREGROUND_SERVICE_STATE_CHANGED__FGS_START_API__FGSSTARTAPI_START_FOREGROUND_SERVICE;
@@ -2835,8 +2845,7 @@ public final class ActiveServices {
                     mAm.notifyPackageUse(r.serviceInfo.packageName,
                             PackageManager.NOTIFY_PACKAGE_USE_FOREGROUND_SERVICE);
 
-                    if (CompatChanges.isChangeEnabled(FGS_INTRODUCE_TIME_LIMITS, r.appInfo.uid)
-                            && android.app.Flags.introduceNewServiceOntimeoutCallback()) {
+                    if (CompatChanges.isChangeEnabled(FGS_INTRODUCE_TIME_LIMITS, r.appInfo.uid)) {
                         maybeUpdateFgsTrackingLocked(r, previousFgsType);
                     }
                 } else {
@@ -2866,8 +2875,8 @@ public final class ActiveServices {
                 }
             }
         } else {
-            if (r.isForeground) {
-                traceInstant("stopForeground(): ", r);
+            if (r.isForeground()) {
+                traceInstantFgs("stopForeground(): ", r);
                 final ServiceMap smap = getServiceMapLocked(r.userId);
                 if (smap != null) {
                     decActiveForegroundAppLocked(smap, r);
@@ -2925,7 +2934,7 @@ public final class ActiveServices {
                 }
                 // foregroundServiceType is used in logFGSStateChangeLocked(), so we can't clear it
                 // earlier.
-                r.foregroundServiceType = 0;
+                r.setForegroundServiceType(0);
                 r.mFgsNotificationWasDeferred = false;
                 r.systemRequestedFgToBg = systemRequestedTransition;
                 signalForegroundServiceObserversLocked(r);
@@ -3152,7 +3161,7 @@ public final class ActiveServices {
 
         for (int i = 0; i < smap.mServicesByInstanceName.size(); i++) {
             final ServiceRecord sr = smap.mServicesByInstanceName.valueAt(i);
-            if (!sr.isForeground
+            if (!sr.isForeground()
                     || id != sr.foregroundId
                     || !pkg.equals(sr.appInfo.packageName)) {
                 // Not this one; keep looking
@@ -3244,7 +3253,7 @@ public final class ActiveServices {
             }
 
             // or is this an type of FGS that always shows immediately?
-            if ((r.foregroundServiceType & FGS_IMMEDIATE_DISPLAY_MASK) != 0) {
+            if ((r.getForegroundServiceType() & FGS_IMMEDIATE_DISPLAY_MASK) != 0) {
                 if (DEBUG_FOREGROUND_SERVICE) {
                     Slog.d(TAG_SERVICE, "FGS " + r
                             + " type gets immediate display");
@@ -3335,7 +3344,7 @@ public final class ActiveServices {
                         // The service might have been stopped or exited foreground state
                         // in the interval, so we lazy check whether we still need to show
                         // the notification.
-                        if (r.isForeground && r.app != null) {
+                        if (r.isForeground() && r.app != null) {
                             r.postNotification(true);
                             r.mFgsNotificationShown = true;
                         } else {
@@ -3424,7 +3433,7 @@ public final class ActiveServices {
         if (smap != null) {
             for (int i = 0; i < smap.mServicesByInstanceName.size(); i++) {
                 final ServiceRecord sr = smap.mServicesByInstanceName.valueAt(i);
-                if (sr.isForeground
+                if (sr.isForeground()
                         && id == sr.foregroundId
                         && sr.appInfo.packageName.equals(pkg)) {
                     if (DEBUG_FOREGROUND_SERVICE) {
@@ -3550,7 +3559,7 @@ public final class ActiveServices {
         }
 
         private boolean isNotTop() {
-            return mProcessRecord.mState.getCurProcState() != PROCESS_STATE_TOP;
+            return mProcessRecord.getCurProcState() != PROCESS_STATE_TOP;
         }
 
         private void incrementOpCount(int op, boolean allowed) {
@@ -3638,13 +3647,13 @@ public final class ActiveServices {
                 for (int i = sm.mServicesByInstanceName.size() - 1; i >= 0; i--) {
                     ServiceRecord other = sm.mServicesByInstanceName.valueAt(i);
                     if (other != r
-                            && other.isForeground
+                            && other.isForeground()
                             && other.foregroundId == r.foregroundId
                             && other.packageName.equals(r.packageName)) {
                         if (DEBUG_FOREGROUND_SERVICE) {
                             Slog.i(TAG_SERVICE, "FGS notification for " + r
                                     + " shared by " + other
-                                    + " (isForeground=" + other.isForeground + ")"
+                                    + " (isForeground=" + other.isForeground() + ")"
                                     + " - NOT cancelling");
                         }
                         return;
@@ -3661,10 +3670,10 @@ public final class ActiveServices {
         boolean hasTypeNone = false;
         for (int i = psr.numberOfRunningServices() - 1; i >= 0; i--) {
             ServiceRecord sr = psr.getRunningServiceAt(i);
-            if (sr.isForeground || sr.fgRequired) {
+            if (sr.isForeground() || sr.fgRequired) {
                 anyForeground = true;
-                fgServiceTypes |= sr.foregroundServiceType;
-                if (sr.foregroundServiceType == ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE) {
+                fgServiceTypes |= sr.getForegroundServiceType();
+                if (sr.getForegroundServiceType() == ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE) {
                     hasTypeNone = true;
                 }
             }
@@ -3706,7 +3715,7 @@ public final class ActiveServices {
                     Slog.i(TAG_SERVICE, "Short FGS started: " + sr);
                 }
             }
-            traceInstant("short FGS start/extend: ", sr);
+            traceInstantFgs("short FGS start/extend: ", sr);
             mAm.mProcessStateController.setShortFgsInfo(sr, SystemClock.uptimeMillis());
 
             // We'll restart the timeout.
@@ -3752,7 +3761,7 @@ public final class ActiveServices {
                 return;
             }
             Slog.e(TAG_SERVICE, "Short FGS timed out: " + sr);
-            traceInstant("short FGS timeout: ", sr);
+            traceInstantFgs("short FGS timeout: ", sr);
 
             logFGSStateChangeLocked(sr,
                     FOREGROUND_SERVICE_STATE_CHANGED__STATE__TIMED_OUT,
@@ -3809,7 +3818,7 @@ public final class ActiveServices {
             }
 
             Slog.e(TAG_SERVICE, "Short FGS procstate demoted: " + sr);
-            traceInstant("short FGS demote: ", sr);
+            traceInstantFgs("short FGS demote: ", sr);
 
             mAm.updateOomAdjLocked(sr.app, OOM_ADJ_REASON_SHORT_FGS_TIMEOUT);
         }
@@ -3843,7 +3852,7 @@ public final class ActiveServices {
                 Slog.e(TAG_SERVICE, message);
             }
 
-            traceInstant("short FGS ANR: ", sr);
+            traceInstantFgs("short FGS ANR: ", sr);
 
             mAm.appNotResponding(sr.app, tr);
 
@@ -3939,7 +3948,7 @@ public final class ActiveServices {
             }
         }
 
-        traceInstant("FGS start: ", sr);
+        traceInstantFgs("FGS (time-limited) start: ", sr);
         final long nowUptime = SystemClock.uptimeMillis();
 
         // Fetch/create/update the fgs info for the time-limited type.
@@ -3948,7 +3957,7 @@ public final class ActiveServices {
             fgsInfo = new SparseArray<>();
             mTimeLimitedFgsInfo.put(sr.appInfo.uid, fgsInfo);
         }
-        final int timeLimitedFgsType = getTimeLimitedFgsType(sr.foregroundServiceType);
+        final int timeLimitedFgsType = getTimeLimitedFgsType(sr.getForegroundServiceType());
         TimeLimitedFgsInfo fgsTypeInfo = fgsInfo.get(timeLimitedFgsType);
         if (fgsTypeInfo == null) {
             fgsTypeInfo = sr.createTimeLimitedFgsInfo();
@@ -3973,7 +3982,7 @@ public final class ActiveServices {
     }
 
     private void maybeStopFgsTimeoutLocked(ServiceRecord sr) {
-        final int timeLimitedType = getTimeLimitedFgsType(sr.foregroundServiceType);
+        final int timeLimitedType = getTimeLimitedFgsType(sr.getForegroundServiceType());
         if (timeLimitedType == ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE) {
             return; // if the current fgs type is not time-limited, return.
         }
@@ -4003,7 +4012,7 @@ public final class ActiveServices {
             if (sr == null) {
                 return false;
             }
-            return getTimeLimitedFgsType(sr.foregroundServiceType)
+            return getTimeLimitedFgsType(sr.getForegroundServiceType())
                     != ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE;
         } finally {
             mAm.mInjector.restoreCallingIdentity(ident);
@@ -4012,16 +4021,16 @@ public final class ActiveServices {
 
     void onFgsTimeout(ServiceRecord sr) {
         synchronized (mAm) {
-            final int fgsType = getTimeLimitedFgsType(sr.foregroundServiceType);
+            final int fgsType = getTimeLimitedFgsType(sr.getForegroundServiceType());
             if (fgsType == ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE || sr.app == null) {
                 mAm.mHandler.removeMessages(
                                 ActivityManagerService.SERVICE_FGS_CRASH_TIMEOUT_MSG, sr);
                 return;
             }
 
-            final boolean currentlyTop = sr.app.mState.getCurProcState() <= PROCESS_STATE_TOP;
+            final boolean currentlyTop = sr.app.getCurProcState() <= PROCESS_STATE_TOP;
             final long nowUptime = SystemClock.uptimeMillis();
-            final long lastTopTime = currentlyTop ? nowUptime : sr.app.mState.getLastTopTime();
+            final long lastTopTime = currentlyTop ? nowUptime : sr.app.getLastTopTime();
             final long constantTimeLimit = getTimeLimitForFgsType(fgsType);
             if (lastTopTime != Long.MIN_VALUE && constantTimeLimit > (nowUptime - lastTopTime)) {
                 // Discard any other messages for this service
@@ -4038,7 +4047,7 @@ public final class ActiveServices {
 
             Slog.e(TAG_SERVICE, "FGS (" + ServiceInfo.foregroundServiceTypeToLabel(fgsType)
                     + ") timed out: " + sr);
-            traceInstant("FGS timed out: ", sr);
+            traceInstantFgs("FGS (time-limited) timed out: ", sr);
 
             final TimeLimitedFgsInfo fgsTypeInfo = getFgsTimeLimitedInfo(sr.appInfo.uid, fgsType);
             if (fgsTypeInfo != null) {
@@ -4071,7 +4080,7 @@ public final class ActiveServices {
     }
 
     void onFgsCrashTimeout(ServiceRecord sr) {
-        final int fgsType = getTimeLimitedFgsType(sr.foregroundServiceType);
+        final int fgsType = getTimeLimitedFgsType(sr.getForegroundServiceType());
         if (fgsType == ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE) {
             return; // no timed out FGS type was found (either it was stopped or it switched types)
         }
@@ -4089,7 +4098,7 @@ public final class ActiveServices {
                     + " did not stop within its timeout: " + sr.getComponentName();
             // Crash the app
             Slog.e(TAG_SERVICE, "FGS Crashed: " + sr);
-            traceInstant("FGS Crash: ", sr);
+            traceInstantFgs("FGS (time-limited) Crash: ", sr);
             if (sr.app != null) {
                 mAm.crashApplicationWithTypeWithExtras(sr.app.uid, sr.app.getPid(),
                         sr.app.info.packageName, sr.app.userId, reason, false /*force*/,
@@ -4177,17 +4186,21 @@ public final class ActiveServices {
         return false;
     }
 
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     private void getServiceTrackerAidlData(vendor.qti.hardware.servicetrackeraidl.ServiceData sData,
             vendor.qti.hardware.servicetrackeraidl.ClientData cData, ServiceRecord r,
             ConnectionRecord connrec, ProcessRecord callerApp, boolean unbind) {
         if (unbind){
             sData.packageName = connrec.binding.service.packageName;
             sData.processName = connrec.binding.service.shortInstanceName;
-            sData.lastActivity = connrec.binding.service.lastActivity;
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+            sData.lastActivity = connrec.binding.service.getLastActivity();
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             if (connrec.binding.service.app != null) {
                 sData.pid = connrec.binding.service.app.getPid();
-                sData.serviceB = connrec.binding.service.app.mState.isServiceB();
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+                sData.serviceB = connrec.binding.service.app.isServiceB();
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             } else {
                 sData.pid = -1;
                 sData.serviceB = false;
@@ -4201,10 +4214,14 @@ public final class ActiveServices {
 
         sData.packageName = r.packageName;
         sData.processName = r.shortInstanceName;
-        sData.lastActivity = r.lastActivity;
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+        sData.lastActivity = r.getLastActivity();
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         if (r.app != null) {
             sData.pid = r.app.getPid();
-            sData.serviceB = r.app.mState.isServiceB();
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+            sData.serviceB = r.app.isServiceB();
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         } else {
             sData.pid = -1;
             sData.serviceB = false;
@@ -4221,10 +4238,14 @@ public final class ActiveServices {
         if (unbind) {
             sData.packageName = connrec.binding.service.packageName;
             sData.processName = connrec.binding.service.shortInstanceName;
-            sData.lastActivity = connrec.binding.service.lastActivity;
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+            sData.lastActivity = connrec.binding.service.getLastActivity();
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             if (connrec.binding.service.app != null) {
                 sData.pid = connrec.binding.service.app.getPid();
-                sData.serviceB = connrec.binding.service.app.mState.isServiceB();
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+                sData.serviceB = connrec.binding.service.app.isServiceB();
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             } else {
                 sData.pid = -1;
                 sData.serviceB = false;
@@ -4238,10 +4259,14 @@ public final class ActiveServices {
 
         sData.packageName = r.packageName;
         sData.processName = r.shortInstanceName;
-        sData.lastActivity = r.lastActivity;
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+        sData.lastActivity = r.getLastActivity();
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         if (r.app != null) {
             sData.pid = r.app.getPid();
-            sData.serviceB = r.app.mState.isServiceB();
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+            sData.serviceB = r.app.isServiceB();
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         } else {
             sData.pid = -1;
             sData.serviceB = false;
@@ -4252,7 +4277,7 @@ public final class ActiveServices {
         }
     }
 
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     int bindServiceLocked(IApplicationThread caller, IBinder token, Intent service,
             String resolvedType, final IServiceConnection connection, long flags,
             String instanceName, boolean isSdkSandboxService, int sdkSandboxClientAppUid,
@@ -4350,8 +4375,7 @@ public final class ActiveServices {
                     + ") set BIND_SIMULATE_ALLOW_FREEZE when binding service " + service);
         }
 
-        final boolean callerFg = callerApp.mState.getSetSchedGroup()
-                != ProcessList.SCHED_GROUP_BACKGROUND;
+        final boolean callerFg = callerApp.getSetSchedGroup() != ProcessList.SCHED_GROUP_BACKGROUND;
         final boolean isBindExternal =
                 (flags & Integer.toUnsignedLong(Context.BIND_EXTERNAL_SERVICE)) != 0
                 || (flags & Context.BIND_EXTERNAL_SERVICE_LONG) != 0;
@@ -4396,7 +4420,7 @@ public final class ActiveServices {
                 ? callingApp.processName : callingPackage;
         final int callingProcessState =
                 callingApp != null && callingApp.getThread() != null && !callingApp.isKilled()
-                ? callingApp.mState.getCurProcState() : ActivityManager.PROCESS_STATE_UNKNOWN;
+                ? callingApp.getCurProcState() : ActivityManager.PROCESS_STATE_UNKNOWN;
         s.updateProcessStateOnRequest();
 
         // The package could be frozen (meaning it's doing surgery), defer the actual
@@ -4440,10 +4464,10 @@ public final class ActiveServices {
                 mAm.requireAllowedAssociationsLocked(s.appInfo.packageName);
             }
 
-            final boolean wasStartRequested = s.startRequested;
+            final boolean wasStartRequested = s.isStartRequested();
             final boolean hadConnections = !s.getConnections().isEmpty();
             mAm.startAssociationLocked(callerApp.uid, callerApp.processName,
-                    callerApp.mState.getCurProcState(), s.appInfo.uid, s.appInfo.longVersionCode,
+                    callerApp.getCurProcState(), s.appInfo.uid, s.appInfo.longVersionCode,
                     s.instanceName, s.processName);
             // Once the apps have become associated, if one of them is caller is ephemeral
             // the target app should now be able to see the calling app
@@ -4478,8 +4502,7 @@ public final class ActiveServices {
                 s.isNotAppComponentUsage = true;
             }
 
-            if (s.app != null && s.app.mState != null
-                    && s.app.mState.getCurProcState() <= PROCESS_STATE_TOP
+            if (s.app != null && s.app.getCurProcState() <= PROCESS_STATE_TOP
                     && c.hasFlag(Context.BIND_ALMOST_PERCEPTIBLE)) {
                 mAm.mProcessStateController.setLastTopAlmostPerceptibleBindRequest(s,
                         SystemClock.uptimeMillis());
@@ -4499,7 +4522,7 @@ public final class ActiveServices {
             if (!isLowRamDevice) {
                 try {
 // QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                     if (getAIDLServicetrackerInstance()) {
                         vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
                                 new vendor.qti.hardware.servicetrackeraidl.ServiceData();
@@ -4513,7 +4536,7 @@ public final class ActiveServices {
                         vendor.qti.hardware.servicetracker.V1_0.ClientData cData =
                                 new vendor.qti.hardware.servicetracker.V1_0.ClientData();
                         getServiceTrackerHidlData(sData, cData, s, null, callerApp, false);
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 // QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
                         mServicetracker.bindService(sData, cData);
                     }
@@ -4521,9 +4544,9 @@ public final class ActiveServices {
                     Slog.e(TAG, "Failed to send bind details to servicetracker HAL", e);
                     mServicetracker = null;
 // QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                     mServicetracker_aidl = null;
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 // QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
                 }
             }
@@ -4579,7 +4602,7 @@ public final class ActiveServices {
                 // This could have made the service more important.
                 mAm.updateLruProcessLocked(s.app, (callerApp.hasActivitiesOrRecentTasks()
                             && servicePsr.hasClientActivities())
-                        || (callerApp.mState.getCurProcState() <= PROCESS_STATE_TOP
+                        || (callerApp.getCurProcState() <= PROCESS_STATE_TOP
                             && c.hasFlag(Context.BIND_TREAT_LIKE_ACTIVITY)),
                         b.client);
                 if (!s.wasOomAdjUpdated() && (serviceBindingOomAdjPolicy
@@ -4612,7 +4635,7 @@ public final class ActiveServices {
                     packageState,
                     s.packageName,
                     callerApp.info.packageName,
-                    callerApp.mState.getCurProcState(),
+                    callerApp.getCurProcState(),
                     s.mProcessStateOnRequest,
                     firstLaunch,
                     0L /* TODO */);
@@ -4733,8 +4756,8 @@ public final class ActiveServices {
                 }
 
                 serviceDoneExecutingLocked(r, mDestroyingServices.contains(r), false, false,
-                        !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated()
-                        ? OOM_ADJ_REASON_EXECUTING_SERVICE : OOM_ADJ_REASON_NONE);
+                        r.wasOomAdjUpdated() ? OOM_ADJ_REASON_EXECUTING_SERVICE
+                                : OOM_ADJ_REASON_NONE);
             }
         } finally {
             mAm.mInjector.restoreCallingIdentity(origId);
@@ -4756,11 +4779,9 @@ public final class ActiveServices {
                 if (srec.app != null) {
                     final ProcessServiceRecord psr = srec.app.mServices;
                     if (group > 0) {
-                        psr.setConnectionService(srec);
                         psr.setConnectionGroup(group);
                         psr.setConnectionImportance(importance);
                     } else {
-                        psr.setConnectionService(null);
                         psr.setConnectionGroup(0);
                         psr.setConnectionImportance(0);
                     }
@@ -4775,6 +4796,79 @@ public final class ActiveServices {
                 }
             }
         }
+    }
+
+    boolean unbindServiceConnectionsLocked(IBinder binder,
+                                           ArrayList<ConnectionRecord> clist) {
+        boolean needOomAdj = false;
+        while (clist.size() > 0) {
+            final ConnectionRecord r = clist.get(0);
+// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
+                if (!isLowRamDevice) {
+                    try {
+// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+                      if (getAIDLServicetrackerInstance()) {
+                          vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
+                                  new vendor.qti.hardware.servicetrackeraidl.ServiceData();
+                          vendor.qti.hardware.servicetrackeraidl.ClientData cData =
+                                  new vendor.qti.hardware.servicetrackeraidl.ClientData();
+                          getServiceTrackerAidlData(sData, cData, null, r, null, true);
+                          mServicetracker_aidl.unbindService(sData, cData);
+                      } else if (getServicetrackerInstance()) {
+                          vendor.qti.hardware.servicetracker.V1_0.ServiceData sData =
+                                  new vendor.qti.hardware.servicetracker.V1_0.ServiceData();
+                          vendor.qti.hardware.servicetracker.V1_0.ClientData cData =
+                                  new vendor.qti.hardware.servicetracker.V1_0.ClientData();
+                          getServiceTrackerHidlData(sData, cData, null, r, null, true);
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
+                          mServicetracker.unbindService(sData, cData);
+                      }
+                  } catch (RemoteException e) {
+// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+                      Slog.e(TAG, "Failed to send unbind details to servicetracker AIDL/HAL", e);
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
+                      mServicetracker = null;
+// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+                      mServicetracker_aidl = null;
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+                  }
+              }
+// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+            final int serviceBindingOomAdjPolicy = removeConnectionLocked(r, null, null, true);
+            if (clist.size() > 0 && clist.get(0) == r) {
+                // In case it didn't get removed above, do it now.
+                Slog.wtf(TAG, "Connection " + r + " not removed for binder " + binder);
+                clist.remove(0);
+            }
+
+            final ProcessRecord app = r.binding.service.app;
+            if (app != null) {
+                final ProcessServiceRecord psr = app.mServices;
+                if (psr.mAllowlistManager) {
+                    updateAllowlistManagerLocked(psr);
+                }
+                // This could have made the service less important.
+                if (r.hasFlag(Context.BIND_TREAT_LIKE_ACTIVITY)) {
+                    // TODO(b/367545398): the following line is a bug. A service unbind
+                    //  should potentially lower a process's importance, not elevate it.
+                    mAm.mProcessStateController.setTreatLikeActivity(psr, true);
+                    mAm.updateLruProcessLocked(app, true, null);
+                }
+                // If the bindee is more important than the binder, we may skip the OomAdjuster.
+                if (serviceBindingOomAdjPolicy == SERVICE_BIND_OOMADJ_POLICY_LEGACY) {
+                    mAm.enqueueOomAdjTargetLocked(app);
+                    needOomAdj = true;
+                }
+            }
+        }
+
+        return needOomAdj;
     }
 
     boolean unbindServiceLocked(IServiceConnection connection) {
@@ -4801,73 +4895,7 @@ public final class ActiveServices {
                 Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "unbindServiceLocked: " + info);
             }
 
-            boolean needOomAdj = false;
-            while (clist.size() > 0) {
-                ConnectionRecord r = clist.get(0);
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-                if (!isLowRamDevice) {
-                    try {
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
-                        if (getAIDLServicetrackerInstance()) {
-                            vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
-                                    new vendor.qti.hardware.servicetrackeraidl.ServiceData();
-                            vendor.qti.hardware.servicetrackeraidl.ClientData cData =
-                                    new vendor.qti.hardware.servicetrackeraidl.ClientData();
-                            getServiceTrackerAidlData(sData, cData, null, r, null, true);
-                            mServicetracker_aidl.unbindService(sData, cData);
-                        } else if (getServicetrackerInstance()) {
-                            vendor.qti.hardware.servicetracker.V1_0.ServiceData sData =
-                                    new vendor.qti.hardware.servicetracker.V1_0.ServiceData();
-                            vendor.qti.hardware.servicetracker.V1_0.ClientData cData =
-                                    new vendor.qti.hardware.servicetracker.V1_0.ClientData();
-                            getServiceTrackerHidlData(sData, cData, null, r, null, true);
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-                            mServicetracker.unbindService(sData, cData);
-                        }
-                    } catch (RemoteException e) {
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
-                        Slog.e(TAG, "Failed to send unbind details to servicetracker AIDL/HAL", e);
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-                        mServicetracker = null;
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
-                        mServicetracker_aidl = null;
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-                    }
-                }
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-                int serviceBindingOomAdjPolicy = removeConnectionLocked(r, null, null, true);
-                if (clist.size() > 0 && clist.get(0) == r) {
-                    // In case it didn't get removed above, do it now.
-                    Slog.wtf(TAG, "Connection " + r + " not removed for binder " + binder);
-                    clist.remove(0);
-                }
-
-                final ProcessRecord app = r.binding.service.app;
-                if (app != null) {
-                    final ProcessServiceRecord psr = app.mServices;
-                    if (psr.mAllowlistManager) {
-                        updateAllowlistManagerLocked(psr);
-                    }
-                    // This could have made the service less important.
-                    if (r.hasFlag(Context.BIND_TREAT_LIKE_ACTIVITY)) {
-                        // TODO(b/367545398): the following line is a bug. A service unbind
-                        //  should potentially lower a process's importance, not elevate it.
-                        mAm.mProcessStateController.setTreatLikeActivity(psr, true);
-                        mAm.updateLruProcessLocked(app, true, null);
-                    }
-                    // If the bindee is more important than the binder, we may skip the OomAdjuster.
-                    if (serviceBindingOomAdjPolicy == SERVICE_BIND_OOMADJ_POLICY_LEGACY) {
-                        mAm.enqueueOomAdjTargetLocked(app);
-                        needOomAdj = true;
-                    }
-                }
-            }
+            boolean needOomAdj = unbindServiceConnectionsLocked(binder, clist);
 
             if (needOomAdj) {
                 mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_UNBIND_SERVICE);
@@ -4879,6 +4907,103 @@ public final class ActiveServices {
         }
 
         return true;
+    }
+
+    boolean rebindServiceConnectionsLocked(IBinder binder,
+                                           ArrayList<ConnectionRecord> clist,
+                                           long flags) {
+        boolean needOomAdj = false;
+        for (int i = 0, size = clist.size(); i < size; i++) {
+            final ConnectionRecord r = clist.get(i);
+            final long updatedFlags = r.getFlags() ^ flags;
+            if (updatedFlags != (updatedFlags & Context.BIND_UPDATEABLE_FLAGS)) {
+                throw new IllegalArgumentException("Attempting to update non-updatedable flags");
+            }
+            if (r.updateFlags(flags)) {
+                final ProcessRecord app = r.binding.service.app;
+                if (app != null) {
+                    mAm.updateLruProcessLocked(app, true, null);
+                    mAm.enqueueOomAdjTargetLocked(app);
+                    needOomAdj = true;
+                }
+            }
+        }
+        return needOomAdj;
+    }
+
+    private boolean updateServiceBindingsSingleUnbindLocked(IBinder binder,
+                                          ArrayList<ConnectionRecord> clist) {
+        if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "updateServiceBindingsSingleUnbind: conn=" + binder);
+
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                            "updateServiceBindingsSingleUnbindLocked()");
+        }
+        boolean needOomAdj = false;
+        try {
+            needOomAdj = unbindServiceConnectionsLocked(binder, clist);
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+        }
+        return needOomAdj;
+    }
+
+    private boolean updateServiceBindingsSingleRebindLocked(IBinder binder,
+                                          ArrayList<ConnectionRecord> clist,
+                                          long flags) {
+        if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "updateServiceBindingsSingleRebind: conn=" + binder);
+
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                            "updateServiceBindingsSingleRebindLocked()");
+        }
+        boolean needOomAdj = false;
+        try {
+            needOomAdj = rebindServiceConnectionsLocked(binder, clist, flags);
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+        }
+        return needOomAdj;
+    }
+
+    private boolean updateServiceBindingsSingleLocked(BindUpdateInfo update) {
+        final IBinder binder = update.connection;
+        final ArrayList<ConnectionRecord> clist = mServiceConnections.get(binder);
+        if (clist == null) {
+            throw new IllegalArgumentException("Could not find connection for " + binder);
+        }
+
+        boolean needOomAdj = false;
+        if (update.unbind) {
+            needOomAdj = updateServiceBindingsSingleUnbindLocked(binder, clist);
+        } else {
+            needOomAdj = updateServiceBindingsSingleRebindLocked(binder, clist, update.flags);
+        }
+
+        return needOomAdj;
+    }
+
+    void updateServiceBindingsLocked(List<BindUpdateInfo> updates) {
+        final int callingPid = mAm.mInjector.getCallingPid();
+        final long origId = mAm.mInjector.clearCallingIdentity();
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "updateServiceBindingsLocked()");
+        }
+        try {
+            boolean needOomAdj = false;
+            for (int i = 0, size = updates.size(); i < size; i++) {
+                if (updateServiceBindingsSingleLocked(updates.get(i))) {
+                    needOomAdj = true;
+                }
+            }
+
+            if (needOomAdj) {
+                mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_BATCH_UPDATE_REQUEST);
+            }
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+            mAm.mInjector.restoreCallingIdentity(origId);
+        }
     }
 
     void unbindFinishedLocked(ServiceRecord r, IntentBindRecord b) {
@@ -4897,7 +5022,7 @@ public final class ActiveServices {
                         boolean inFg = false;
                         for (int i=b.apps.size()-1; i>=0; i--) {
                             ProcessRecord client = b.apps.valueAt(i).client;
-                            if (client != null && client.mState.getSetSchedGroup()
+                            if (client != null && client.getSetSchedGroup()
                                     != ProcessList.SCHED_GROUP_BACKGROUND) {
                                 inFg = true;
                                 break;
@@ -4917,8 +5042,7 @@ public final class ActiveServices {
                 }
 
                 serviceDoneExecutingLocked(r, inDestroying, false, false,
-                        !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated()
-                        ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
+                        r.wasOomAdjUpdated() ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
             }
         } finally {
             mAm.mInjector.restoreCallingIdentity(origId);
@@ -5457,8 +5581,7 @@ public final class ActiveServices {
             if (r.app != null) {
                 psr = r.app.mServices;
                 mAm.mProcessStateController.startExecutingService(psr, r);
-                mAm.mProcessStateController.setExecServicesFg(psr,
-                        psr.shouldExecServicesFg() || fg);
+                mAm.mProcessStateController.setExecServicesFg(psr, psr.isExecServicesFg() || fg);
                 if (timeoutNeeded && psr.numberOfExecutingServices() == 1) {
                     if (!shouldSkipTimeout) {
                         scheduleServiceTimeoutLocked(r.app);
@@ -5469,7 +5592,7 @@ public final class ActiveServices {
             }
         } else if (r.app != null && fg) {
             psr = r.app.mServices;
-            if (!psr.shouldExecServicesFg()) {
+            if (!psr.isExecServicesFg()) {
                 mAm.mProcessStateController.setExecServicesFg(psr, true);
                 if (timeoutNeeded) {
                     if (!shouldSkipTimeout) {
@@ -5481,7 +5604,7 @@ public final class ActiveServices {
             }
         }
         if (r.app != null
-                && r.app.mState.getCurProcState() > ActivityManager.PROCESS_STATE_SERVICE) {
+                && r.app.getCurProcState() > ActivityManager.PROCESS_STATE_SERVICE) {
             // Enqueue the oom adj target anyway for opportunistic oom adj updates.
             mAm.enqueueOomAdjTargetLocked(r.app);
             r.updateOomAdjSeq();
@@ -5518,7 +5641,7 @@ public final class ActiveServices {
                             + b.intent.getIntent() + ". bindSeq=" + mBindServiceSeqCounter);
                 }
                 r.app.getThread().scheduleBindService(r, b, b.intent.getIntent(), rebind,
-                        r.app.mState.getReportedProcState(), mBindServiceSeqCounter++);
+                        r.app.getReportedProcState(), mBindServiceSeqCounter++);
                 if (!rebind) {
                     b.requested = true;
                 }
@@ -5529,16 +5652,14 @@ public final class ActiveServices {
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Crashed while binding " + r, e);
                 final boolean inDestroying = mDestroyingServices.contains(r);
                 serviceDoneExecutingLocked(r, inDestroying, inDestroying, false,
-                        !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated()
-                        ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
+                        r.wasOomAdjUpdated() ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
                 throw e;
             } catch (RemoteException e) {
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Crashed while binding " + r);
                 // Keep the executeNesting count accurate.
                 final boolean inDestroying = mDestroyingServices.contains(r);
                 serviceDoneExecutingLocked(r, inDestroying, inDestroying, false,
-                        !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated()
-                        ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
+                        r.wasOomAdjUpdated() ? OOM_ADJ_REASON_UNBIND_SERVICE : OOM_ADJ_REASON_NONE);
                 return false;
             }
         }
@@ -5613,7 +5734,7 @@ public final class ActiveServices {
                     // Nothing to restart.
                     return false;
                 }
-                reason = (r.startRequested && !shouldStop) ? "start-requested" : "connection";
+                reason = (r.isStartRequested() && !shouldStop) ? "start-requested" : "connection";
             } else {
                 reason = "always";
             }
@@ -5951,29 +6072,27 @@ public final class ActiveServices {
             if(SERVICE_RESCHEDULE) {
                 boolean shouldDelay = false;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
+// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 boolean isVisible = false;
-// QTI_END: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
+// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 ActivityRecord top_rc = mAm.mTaskSupervisor.getTopResumedActivity();
-// QTI_BEGIN: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
+// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 ProcessRecord pRec = mAm.getProcessRecordLocked(r.serviceInfo.applicationInfo.processName,r.serviceInfo.applicationInfo.uid);
-// QTI_END: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
+// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
                 boolean isPersistent
                         = !((r.serviceInfo.applicationInfo.flags&ApplicationInfo.FLAG_PERSISTENT) == 0);
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
+// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 if (pRec != null)
                     isVisible = ((pRec.mProfile.getCurRawAdj()) ==  ProcessList.VISIBLE_APP_ADJ);
-// QTI_END: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
+// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                 if(top_rc != null) {
                     if(top_rc.launching && !r.shortInstanceName.contains(top_rc.packageName)
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
-                        && !isPersistent && r.isForeground == false && !isVisible) {
-// QTI_END: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
+                        && !isPersistent && !r.isForeground() && !isVisible) {
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         shouldDelay = true;
                     }
@@ -5995,9 +6114,7 @@ public final class ActiveServices {
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                 bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false,
                         false, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
-// QTI_BEGIN: 2020-06-03: Performance: perf: Refactor DSR
             }
-// QTI_END: 2020-06-03: Performance: perf: Refactor DSR
         } catch (TransactionTooLargeException e) {
             // Ignore, it's been logged and nothing upstack cares.
         } finally {
@@ -6127,7 +6244,7 @@ public final class ActiveServices {
             return null;
         }
 
-        final long startTimeNs = SystemClock.elapsedRealtimeNanos();
+        final long startTimeNs = SystemClock.uptimeNanos();
 
         if (DEBUG_SERVICE) {
             Slog.v(TAG_SERVICE, "Bringing up " + r + " " + r.intent + " fg=" + r.fgRequired);
@@ -6322,7 +6439,7 @@ public final class ActiveServices {
         if (r.delayedStop) {
             // Oh and hey we've already been asked to stop!
             r.delayedStop = false;
-            if (r.startRequested) {
+            if (r.isStartRequested()) {
                 if (DEBUG_DELAYED_STARTS) Slog.v(TAG_SERVICE,
                         "Applying delayed stop (in bring up): " + r);
                 stopServiceLocked(r, enqueueOomAdj);
@@ -6355,7 +6472,7 @@ public final class ActiveServices {
     private int getServiceBindingOomAdjPolicyForAddLocked(ProcessRecord clientApp,
             ProcessRecord hostApp, ConnectionRecord cr) {
         @ServiceBindingOomAdjPolicy int policy = SERVICE_BIND_OOMADJ_POLICY_LEGACY;
-        if (Flags.serviceBindingOomAdjPolicy() && clientApp != null && hostApp != null) {
+        if (clientApp != null && hostApp != null) {
             if (clientApp == hostApp) {
                 policy = DEFAULT_SERVICE_NO_BUMP_BIND_POLICY_FLAG;
             } else if (clientApp.isCached()) {
@@ -6389,7 +6506,7 @@ public final class ActiveServices {
     private int getServiceBindingOomAdjPolicyForRemovalLocked(ProcessRecord clientApp,
             ProcessRecord hostApp, ConnectionRecord cr) {
         @ServiceBindingOomAdjPolicy int policy = SERVICE_BIND_OOMADJ_POLICY_LEGACY;
-        if (Flags.serviceBindingOomAdjPolicy() && clientApp != null && hostApp != null
+        if (clientApp != null && hostApp != null
                 && cr != null) {
             if (clientApp == hostApp) {
                 policy = DEFAULT_SERVICE_NO_BUMP_BIND_POLICY_FLAG;
@@ -6467,7 +6584,7 @@ public final class ActiveServices {
                                  PackageManager.NOTIFY_PACKAGE_USE_SERVICE);
             thread.scheduleCreateService(r, r.serviceInfo,
                     null /* compatInfo (unused but need to keep method signature) */,
-                    app.mState.getReportedProcState());
+                    app.getReportedProcState());
             r.postNotification(false);
             created = true;
 
@@ -6475,7 +6592,7 @@ public final class ActiveServices {
             if (!isLowRamDevice) {
                 try {
 // QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                     if (getAIDLServicetrackerInstance()) {
                         vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
                                 new vendor.qti.hardware.servicetrackeraidl.ServiceData();
@@ -6485,7 +6602,7 @@ public final class ActiveServices {
                         vendor.qti.hardware.servicetracker.V1_0.ServiceData sData =
                                 new vendor.qti.hardware.servicetracker.V1_0.ServiceData();
                         getServiceTrackerHidlData(sData, null, r, null, null, false);
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 // QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
                         mServicetracker.startService(sData);
                     }
@@ -6493,9 +6610,9 @@ public final class ActiveServices {
                     Slog.e(TAG, "Failed to send start details to servicetracker HAL", e);
                     mServicetracker = null;
 // QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                     mServicetracker_aidl = null;
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 // QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
                 }
             }
@@ -6509,8 +6626,7 @@ public final class ActiveServices {
                 // Keep the executeNesting count accurate.
                 final boolean inDestroying = mDestroyingServices.contains(r);
                 serviceDoneExecutingLocked(r, inDestroying, inDestroying, false,
-                        !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated()
-                        ? OOM_ADJ_REASON_STOP_SERVICE : OOM_ADJ_REASON_NONE);
+                        r.wasOomAdjUpdated() ? OOM_ADJ_REASON_STOP_SERVICE : OOM_ADJ_REASON_NONE);
 
                 // Cleanup.
                 if (newService) {
@@ -6547,7 +6663,7 @@ public final class ActiveServices {
         // If the service is in the started state, and there are no
         // pending arguments, then fake up one so its onStartCommand() will
         // be called.
-        if (r.startRequested && r.callStart && r.pendingStarts.size() == 0) {
+        if (r.isStartRequested() && r.callStart && r.pendingStarts.size() == 0) {
             r.pendingStarts.add(new ServiceRecord.StartItem(r, false, r.makeNextStartId(),
                     null, null, 0, null, null, ActivityManager.PROCESS_STATE_UNKNOWN));
         }
@@ -6563,7 +6679,7 @@ public final class ActiveServices {
         if (r.delayedStop) {
             // Oh and hey we've already been asked to stop!
             r.delayedStop = false;
-            if (r.startRequested) {
+            if (r.isStartRequested()) {
                 if (DEBUG_DELAYED_STARTS) Slog.v(TAG_SERVICE,
                         "Applying delayed stop (from start): " + r);
                 stopServiceLocked(r, enqueueOomAdj);
@@ -6607,7 +6723,7 @@ public final class ActiveServices {
                     OOM_ADJ_REASON_NONE /* use "none" to avoid extra oom adj */,
                     false /* skipTimeoutIfPossible */);
             if (r.fgRequired && !r.fgWaiting) {
-                if (!r.isForeground) {
+                if (!r.isForeground()) {
                     if (DEBUG_BACKGROUND_CHECK) {
                         Slog.i(TAG, "Launched service must call startForeground() within timeout: " + r);
                     }
@@ -6671,7 +6787,7 @@ public final class ActiveServices {
     private final boolean isServiceNeededLocked(ServiceRecord r, boolean knowConn,
             boolean hasConn) {
         // Are we still explicitly being asked to run?
-        if (r.startRequested) {
+        if (r.isStartRequested()) {
             return true;
         }
 
@@ -6711,7 +6827,7 @@ public final class ActiveServices {
         if (!isLowRamDevice) {
             try {
 // QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                 if (getAIDLServicetrackerInstance()) {
                     vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
                             new vendor.qti.hardware.servicetrackeraidl.ServiceData();
@@ -6721,7 +6837,7 @@ public final class ActiveServices {
                     vendor.qti.hardware.servicetracker.V1_0.ServiceData sData =
                             new vendor.qti.hardware.servicetracker.V1_0.ServiceData();
                     getServiceTrackerHidlData(sData, null, r, null, null, false);
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 // QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
                     mServicetracker.destroyService(sData);
                 }
@@ -6729,9 +6845,9 @@ public final class ActiveServices {
                 Slog.e(TAG, "Failed to send destroy details to servicetracker HAL", e);
                 mServicetracker = null;
 // QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                 mServicetracker_aidl = null;
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 // QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             }
         }
@@ -6766,7 +6882,7 @@ public final class ActiveServices {
             }
         }
 
-        boolean oomAdjusted = Flags.serviceBindingOomAdjPolicy() && r.wasOomAdjUpdated();
+        boolean oomAdjusted = r.wasOomAdjUpdated();
 
         // Tell the service that it has been unbound.
         if (r.app != null && r.app.isThreadReady()) {
@@ -6862,7 +6978,7 @@ public final class ActiveServices {
         }
 
         cancelForegroundNotificationLocked(r);
-        final boolean exitingFg = r.isForeground;
+        final boolean exitingFg = r.isForeground();
         if (exitingFg) {
             maybeStopShortFgsTimeoutLocked(r);
             decActiveForegroundAppLocked(smap, r);
@@ -7002,7 +7118,7 @@ public final class ActiveServices {
                 if (sr == r) {
                     continue;
                 }
-                if (sr.isForeground
+                if (sr.isForeground()
                         && r.foregroundId == sr.foregroundId
                         && r.appInfo.packageName.equals(sr.appInfo.packageName)) {
                     shared = true;
@@ -7097,7 +7213,7 @@ public final class ActiveServices {
                             skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE,
                             skipOomAdj /* skipTimeoutIfPossible */);
                     if (b.client != s.app && c.notHasFlag(Context.BIND_WAIVE_PRIORITY)
-                            && s.app.mState.getSetProcState() <= PROCESS_STATE_HEAVY_WEIGHT) {
+                            && s.app.getSetProcState() <= PROCESS_STATE_HEAVY_WEIGHT) {
                         // If this service's process is not already in the cached list,
                         // then update it in the LRU list here because this may be causing
                         // it to go down there and we want it to start out near the top.
@@ -7117,7 +7233,7 @@ public final class ActiveServices {
 
             // If unbound while waiting to start and there is no connection left in this service,
             // remove the pending service
-            if (s.getConnections().isEmpty() && !s.startRequested) {
+            if (s.getConnections().isEmpty() && !s.isStartRequested()) {
                 mPendingServices.remove(s);
                 mPendingBringups.remove(s);
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Removed pending service: " + s);
@@ -7226,8 +7342,8 @@ public final class ActiveServices {
             }
             final long origId = mAm.mInjector.clearCallingIdentity();
             serviceDoneExecutingLocked(r, inDestroying, inDestroying, enqueueOomAdj,
-                    !Flags.serviceBindingOomAdjPolicy() || r.wasOomAdjUpdated() || needOomAdj
-                    ? OOM_ADJ_REASON_EXECUTING_SERVICE : OOM_ADJ_REASON_NONE);
+                    r.wasOomAdjUpdated() || needOomAdj ? OOM_ADJ_REASON_EXECUTING_SERVICE
+                            : OOM_ADJ_REASON_NONE);
             mAm.mInjector.restoreCallingIdentity(origId);
         } else {
             Slog.w(TAG, "Done executing unknown service from pid "
@@ -7321,8 +7437,7 @@ public final class ActiveServices {
         boolean didSomething = false;
 
         // Update the app background restriction of the caller
-        proc.mState.setBackgroundRestricted(appRestrictedAnyInBackground(
-                proc.uid, proc.info.packageName));
+        proc.setBackgroundRestricted(appRestrictedAnyInBackground(proc.uid, proc.info.packageName));
 
         // Collect any services that are waiting for this process to come up.
         if (mPendingServices.size() > 0) {
@@ -7435,7 +7550,7 @@ public final class ActiveServices {
                     || (service.packageName.equals(packageName)
                         && (filterByClasses == null
                             || filterByClasses.contains(service.name.getClassName())));
-            if (service.app != null && service.app.mState.getCurAdj() < minOomAdj) {
+            if (service.app != null && service.app.getCurAdj() < minOomAdj) {
                 Slog.i(TAG, "Skip force stopping service " + service
                             + ": below minimum oom adj level");
                 continue;
@@ -7531,7 +7646,7 @@ public final class ActiveServices {
         for (int i = 0; i < num; i++) {
             try {
                 mFgsObservers.getBroadcastItem(i).onForegroundStateChanged(r,
-                        r.appInfo.packageName, r.userId, r.isForeground);
+                        r.appInfo.packageName, r.userId, r.isForeground());
             } catch (RemoteException e) {
                 // Will be unregistered automatically by RemoteCallbackList's dead-object
                 // tracking, so nothing we need to do here.
@@ -7554,7 +7669,7 @@ public final class ActiveServices {
                     final int numServices = smap.mServicesByInstanceName.size();
                     for (int i = 0; i < numServices; i++) {
                         final ServiceRecord sr = smap.mServicesByInstanceName.valueAt(i);
-                        if (sr.isForeground && callingUid == sr.appInfo.uid) {
+                        if (sr.isForeground() && callingUid == sr.appInfo.uid) {
                             callback.onForegroundStateChanged(sr, sr.appInfo.packageName,
                                     sr.userId, true);
                         }
@@ -7611,7 +7726,7 @@ public final class ActiveServices {
         boolean needOomAdj = false;
         for (int i = services.size() - 1; i >= 0; i--) {
             ServiceRecord sr = services.get(i);
-            if (sr.startRequested) {
+            if (sr.isStartRequested()) {
                 if ((sr.serviceInfo.flags&ServiceInfo.FLAG_STOP_WITH_TASK) != 0) {
                     Slog.i(TAG, "Stopping service " + sr.shortInstanceName + ": remove task");
                     needOomAdj = true;
@@ -7669,25 +7784,25 @@ public final class ActiveServices {
 // QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
         try {
 // QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             if (!isLowRamDevice && getAIDLServicetrackerInstance()) {
                 mServicetracker_aidl.killProcess(app.getPid());
             } else if (!isLowRamDevice && getServicetrackerInstance()) {
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                 mServicetracker.killProcess(app.getPid());
 // QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             }
         } catch (RemoteException e) {
 // QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             Slog.e(TAG, "Failed to send kill process details to servicetracker AIDL/HAL", e);
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 // QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             mServicetracker = null;
 // QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             mServicetracker_aidl = null;
-// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
+// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
 // QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
         }
 
@@ -7759,7 +7874,7 @@ public final class ActiveServices {
                     /*
                     if (false && proc != null && !proc.isPersistent() && proc.getThread() != null
                             && proc.getPid() != 0 && proc.getPid() != ActivityManagerService.MY_PID
-                            && proc.mState.getSetProcState() >= PROCESS_STATE_LAST_ACTIVITY) {
+                            && proc.getSetProcState() >= PROCESS_STATE_LAST_ACTIVITY) {
                         proc.killLocked("bound to service " + sr.shortInstanceName
                                 + " in dying proc " + (app != null ? app.processName : "??"),
                                 ApplicationExitInfo.REASON_OTHER, true);
@@ -7888,16 +8003,16 @@ public final class ActiveServices {
         }
         info.uid = r.appInfo.uid;
         info.process = r.processName;
-        info.foreground = r.isForeground;
+        info.foreground = r.isForeground();
         info.activeSince = r.createRealTime;
-        info.started = r.startRequested;
+        info.started = r.isStartRequested();
         info.clientCount = r.getConnections().size();
         info.crashCount = r.crashCount;
-        info.lastActivityTime = r.lastActivity;
-        if (r.isForeground) {
+        info.lastActivityTime = r.getLastActivity();
+        if (r.isForeground()) {
             info.flags |= ActivityManager.RunningServiceInfo.FLAG_FOREGROUND;
         }
-        if (r.startRequested) {
+        if (r.isStartRequested()) {
             info.flags |= ActivityManager.RunningServiceInfo.FLAG_STARTED;
         }
         if (r.app != null && r.app.getPid() == ActivityManagerService.MY_PID) {
@@ -7992,6 +8107,43 @@ public final class ActiveServices {
         return null;
     }
 
+    /**
+     * Create a ConnectionInfo for test verification from a ConnectionRecord
+     */
+    ActivityManager.ConnectionInfo makeConnectionInfoLocked(ConnectionRecord r) {
+        final ActivityManager.ConnectionInfo info =
+                new ActivityManager.ConnectionInfo(r.getFlags(),
+                                r.getClientProcessName(),
+                                r.getClientPackageName());
+        return info;
+    }
+
+    /**
+     * Get a list of connections to a given service for test verification.
+     */
+    public List<ActivityManager.ConnectionInfo> getRunningServiceConnectionsLocked(
+                    ComponentName name) {
+
+        final int userId = UserHandle.getUserId(mAm.mInjector.getCallingUid());
+        final ServiceRecord r = getServiceByNameLocked(name, userId);
+        if (r == null) {
+            return new ArrayList<ActivityManager.ConnectionInfo>();
+        }
+
+        final ArrayMap<IBinder, ArrayList<ConnectionRecord>> connections = r.getConnections();
+        final ArrayList<ActivityManager.ConnectionInfo> res =
+                new ArrayList<ActivityManager.ConnectionInfo>(connections.size());
+        for (int conni = 0; conni < connections.size(); conni++) {
+            final ArrayList<ConnectionRecord> conn = connections.valueAt(conni);
+            for (int i = 0; i < conn.size(); i++) {
+                final ConnectionRecord cr = conn.get(i);
+                res.add(makeConnectionInfoLocked(conn.get(i)));
+            }
+        }
+
+        return res;
+    }
+
     void serviceTimeout(ProcessRecord proc) {
         try {
             Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "serviceTimeout()");
@@ -8010,7 +8162,7 @@ public final class ActiveServices {
                 }
                 final long now = SystemClock.uptimeMillis();
                 final long maxTime =  now
-                        - (psr.shouldExecServicesFg()
+                        - (psr.isExecServicesFg()
                         ? mAm.mConstants.SERVICE_TIMEOUT
                         : mAm.mConstants.SERVICE_BACKGROUND_TIMEOUT);
                 ServiceRecord timeout = null;
@@ -8042,7 +8194,7 @@ public final class ActiveServices {
                     mActiveServiceAnrTimer.accept(proc, timeoutRecord);
                 } else {
                     mActiveServiceAnrTimer.discard(proc);
-                    final long delay = psr.shouldExecServicesFg()
+                    final long delay = psr.isExecServicesFg()
                                        ? (nextTime + mAm.mConstants.SERVICE_TIMEOUT) :
                                        (nextTime + mAm.mConstants.SERVICE_BACKGROUND_TIMEOUT)
                                        - SystemClock.uptimeMillis();
@@ -8186,7 +8338,7 @@ public final class ActiveServices {
         if (proc.mServices.numberOfExecutingServices() == 0 || proc.getThread() == null) {
             return;
         }
-        final long delay = proc.mServices.shouldExecServicesFg()
+        final long delay = proc.mServices.isExecServicesFg()
                 ? mAm.mConstants.SERVICE_TIMEOUT : mAm.mConstants.SERVICE_BACKGROUND_TIMEOUT;
         mActiveServiceAnrTimer.start(proc, delay);
         proc.mServices.noteScheduleServiceTimeoutPending(false);
@@ -8360,7 +8512,7 @@ public final class ActiveServices {
                 pw.print("    created=");
                 TimeUtils.formatDuration(r.createRealTime, nowReal, pw);
                 pw.print(" started=");
-                pw.print(r.startRequested);
+                pw.print(r.isStartRequested());
                 pw.print(" connections=");
                 ArrayMap<IBinder, ArrayList<ConnectionRecord>> connections = r.getConnections();
                 pw.println(connections.size());
@@ -9223,8 +9375,7 @@ public final class ActiveServices {
                     (mAm.getUidProcessCapabilityLocked(callingUid) & PROCESS_CAPABILITY_BFSL) != 0;
             final Integer allowedType = mAm.mProcessList.searchEachLruProcessesLOSP(false, app -> {
                 if (app.uid == callingUid) {
-                    final ProcessStateRecord state = app.mState;
-                    final int procstate = state.getCurProcState();
+                    final int procstate = app.getCurProcState();
                     if ((procstate <= PROCESS_STATE_BOUND_TOP)
                             || (uidBfsl && (procstate <= PROCESS_STATE_BOUND_FOREGROUND_SERVICE))) {
                         return getReasonCodeFromProcState(procstate);
@@ -9234,7 +9385,7 @@ public final class ActiveServices {
                                 && instr.mHasBackgroundForegroundServiceStartsPermission) {
                             return REASON_INSTR_BACKGROUND_FGS_PERMISSION;
                         }
-                        final long lastInvisibleTime = app.mState.getLastInvisibleTime();
+                        final long lastInvisibleTime = app.getLastInvisibleTime();
                         if (lastInvisibleTime > 0 && lastInvisibleTime < Long.MAX_VALUE) {
                             final long sinceLastInvisible = SystemClock.elapsedRealtime()
                                     - lastInvisibleTime;
@@ -9274,7 +9425,7 @@ public final class ActiveServices {
                     if (uidRecord != null) {
                         for (int i = uidRecord.getNumOfProcs() - 1; i >= 0; i--) {
                             final ProcessRecord pr = uidRecord.getProcessRecordByIndex(i);
-                            if (pr != null && pr.mState.hasOverlayUi()) {
+                            if (pr != null && pr.getHasOverlayUi()) {
                                 ret = REASON_SYSTEM_ALERT_WINDOW_PERMISSION;
                                 break;
                             }
@@ -9524,7 +9675,7 @@ public final class ActiveServices {
                 r.mStartForegroundCount,
                 0, // Short instance name -- no longer logging it.
                 r.mFgsHasNotificationPermission,
-                r.foregroundServiceType,
+                r.getForegroundServiceType(),
                 fgsTypeCheckCode,
                 r.mIsFgsDelegate,
                 r.mFgsDelegation != null ? r.mFgsDelegation.mOptions.mClientUid : INVALID_UID,
@@ -9573,7 +9724,7 @@ public final class ActiveServices {
                 durationMs,
                 r.mStartForegroundCount,
                 fgsStopReasonToString(fgsStopReason),
-                r.foregroundServiceType);
+                r.getForegroundServiceType());
     }
 
     private void updateNumForegroundServicesLocked() {
@@ -9817,10 +9968,10 @@ public final class ActiveServices {
         final int serviceSize = smap.mServicesByInstanceName.size();
         for (int i = 0; i < serviceSize; i++) {
             final ServiceRecord sr = smap.mServicesByInstanceName.valueAt(i);
-            if (sr.appInfo.packageName.equals(packageName) && !sr.isForeground) {
+            if (sr.appInfo.packageName.equals(packageName) && !sr.isForeground()) {
                 // foregroundServiceType is cleared when media session is user-disengaged
                 // and calls notifyInactiveMediaForegroundService->setServiceForegroundInnerLocked.
-                if (sr.foregroundServiceType
+                if (sr.getForegroundServiceType()
                         == ServiceInfo.FOREGROUND_SERVICE_TYPE_NONE
                         && sr.foregroundId == notificationId) {
                     // check if service is explicitly requested by app to not be in foreground.
@@ -9879,8 +10030,8 @@ public final class ActiveServices {
         final int serviceSize = smap.mServicesByInstanceName.size();
         for (int i = 0; i < serviceSize; i++) {
             final ServiceRecord sr = smap.mServicesByInstanceName.valueAt(i);
-            if (sr.appInfo.packageName.equals(packageName) && sr.isForeground) {
-                if (sr.foregroundServiceType
+            if (sr.appInfo.packageName.equals(packageName) && sr.isForeground()) {
+                if (sr.getForegroundServiceType()
                         == ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
                         && sr.foregroundId == notificationId) {
                     if (CompatChanges.isChangeEnabled(MEDIA_FGS_STATE_TRANSITION, sr.appInfo.uid)) {

@@ -266,7 +266,7 @@
     <string name="enable_adb_summary" msgid="3711526030096574316">"Режим отклањања грешака када је USB повезан"</string>
     <string name="clear_adb_keys" msgid="3010148733140369917">"Опозивање одобрења за уклањање USB грешака"</string>
     <string name="enable_adb_wireless" msgid="6973226350963971018">"Бежично отклањање грешака"</string>
-    <string name="enable_adb_wireless_summary" msgid="7344391423657093011">"Режим за отклањање грешака када је Wi‑Fi повезан"</string>
+    <string name="enable_adb_wireless_summary" msgid="7344391423657093011">"Режим за отклањање грешака када је WiFi повезан"</string>
     <string name="adb_wireless_error" msgid="721958772149779856">"Грешка"</string>
     <string name="adb_wireless_settings" msgid="2295017847215680229">"Бежично отклањање грешака"</string>
     <string name="adb_wireless_list_empty_off" msgid="1713707973837255490">"Да бисте видели и користили доступне уређаје, укључите бежично отклањање грешака"</string>
@@ -340,7 +340,7 @@
     <string name="private_dns_mode_provider_hostname_hint" msgid="6564868953748514595">"Унесите име хоста добављача услуге DNS-а"</string>
     <string name="private_dns_mode_provider_failure" msgid="8356259467861515108">"Повезивање није успело"</string>
     <string name="wifi_display_certification_summary" msgid="8111151348106907513">"Приказује опције за сертификацију бежичног екрана"</string>
-    <string name="wifi_verbose_logging_summary" msgid="4993823188807767892">"Повећава ниво евидентирања за Wi‑Fi. Приказ по SSID RSSI-у у бирачу Wi‑Fi мреже"</string>
+    <string name="wifi_verbose_logging_summary" msgid="4993823188807767892">"Повећава ниво евидентирања за Wi‑Fi. Приказ по SSID RSSI-у у бирачу WiFi мреже"</string>
     <string name="wifi_scan_throttling_summary" msgid="2577105472017362814">"Смањује потрошњу батерије и побољшава учинак мреже"</string>
     <string name="wifi_non_persistent_mac_randomization_summary" msgid="2159794543105053930">"Када је овај режим омогућен, MAC адреса овог уређаја може да се промени сваки пут када се повеже са мрежом на којој је омогућено насумично разврставање MAC адреса."</string>
     <string name="wifi_metered_label" msgid="8737187690304098638">"Са ограничењем"</string>
@@ -356,7 +356,7 @@
     <string name="allow_mock_location" msgid="2102650981552527884">"Дозволи лажне локације"</string>
     <string name="allow_mock_location_summary" msgid="179780881081354579">"Дозволи лажне локације"</string>
     <string name="debug_view_attributes" msgid="3539609843984208216">"Омогући проверу атрибута за преглед"</string>
-    <string name="mobile_data_always_on_summary" msgid="1112156365594371019">"Мобилни подаци су увек активни, чак и када је Wi‑Fi активан (ради брзе промене мреже)."</string>
+    <string name="mobile_data_always_on_summary" msgid="1112156365594371019">"Мобилни подаци су увек активни, чак и када је WiFi активан (ради брзе промене мреже)."</string>
     <string name="tethering_hardware_offload_summary" msgid="7801345335142803029">"Користи се хардверско убрзање привезивања ако је доступно"</string>
     <string name="adb_warning_title" msgid="7708653449506485728">"Дозволи отклањање USB грешака?"</string>
     <string name="adb_warning_message" msgid="8145270656419669221">"Отклањање USB грешака намењено је само за сврхе програмирања. Користите га за копирање података са рачунара на уређај и обратно, инсталирање апликација на уређају без обавештења и читање података из евиденције."</string>
@@ -398,7 +398,7 @@
     <string name="pointer_location_summary" msgid="957120116989798464">"Преклопни елемент са тренутним подацима о додиру"</string>
     <string name="show_touches" msgid="8437666942161289025">"Приказуј додире"</string>
     <string name="show_touches_summary" msgid="3692861665994502193">"Приказује визуелне повратне информације за додире"</string>
-    <string name="show_key_presses" msgid="6360141722735900214">"Приказуј притиске тастера"</string>
+    <string name="show_key_presses" msgid="6360141722735900214">"Прикажи притиске тастера"</string>
     <string name="show_key_presses_summary" msgid="725387457373015024">"Приказује повратне информације за притиске тастера"</string>
     <string name="touchpad_visualizer" msgid="3707916068870825115">"Прикажи унос на тачпеду"</string>
     <string name="touchpad_visualizer_summary" msgid="4056080018119847449">"Елемент који прекрива садржај екрана приказује податке из уноса на тачпеду и препознаје покрете"</string>
@@ -436,10 +436,10 @@
     <string name="verbose_vendor_logging_notification_action" msgid="1190831050259046071">"Омогући још један дан"</string>
     <string name="verbose_vendor_logging_preference_summary_will_disable" msgid="6175431593394522553">"Онемогућено после једног дана"</string>
     <string name="verbose_vendor_logging_preference_summary_on" msgid="9017757242481762036">"Омогућено неограничено"</string>
-    <string name="window_animation_scale_title" msgid="5236381298376812508">"Размера анимације прозора"</string>
-    <string name="transition_animation_scale_title" msgid="1278477690695439337">"Размера анимације прелаза"</string>
-    <string name="animator_duration_scale_title" msgid="7082913931326085176">"Аниматорова размера трајања"</string>
-    <string name="overlay_display_devices_title" msgid="5411894622334469607">"Симулирај секундарне екране"</string>
+    <string name="window_animation_scale_title" msgid="5236381298376812508">"Брзина анимације прозора"</string>
+    <string name="transition_animation_scale_title" msgid="1278477690695439337">"Брзина анимације прелаза"</string>
+    <string name="animator_duration_scale_title" msgid="7082913931326085176">"Брзина генерисања анимације"</string>
+    <string name="overlay_display_devices_title" msgid="5411894622334469607">"Симулација секундарних екрана"</string>
     <string name="shade_display_awareness_title" msgid="8000009404669495876">"Положај сенке на екрану"</string>
     <string name="debug_applications_category" msgid="5394089406638954196">"Апликације"</string>
     <string name="immediately_destroy_activities" msgid="1826287490705167403">"Не чувај активности"</string>

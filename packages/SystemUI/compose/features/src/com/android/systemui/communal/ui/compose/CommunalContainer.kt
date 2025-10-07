@@ -1,6 +1,5 @@
 package com.android.systemui.communal.ui.compose
 
-import android.content.res.Configuration
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,7 +27,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.disabled
@@ -47,6 +44,7 @@ import com.android.compose.animation.scene.MutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.SceneTransitionLayout
 import com.android.compose.animation.scene.Swipe
+import com.android.compose.animation.scene.UserActionDistance
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.observableTransitionState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
@@ -90,6 +88,10 @@ object TransitionDuration {
         EDIT_MODE_TO_HUB_GRID_DELAY_MS + EDIT_MODE_TO_HUB_CONTENT_MS
     const val HUB_TO_EDIT_MODE_CONTENT_MS = 250
     const val TO_GLANCEABLE_HUB_DURATION_MS = 1000
+
+    // The duration in milliseconds to animate in and our of the background for edit mode
+    // transition.
+    const val EDIT_MODE_BACKGROUND_ANIM_DURATION_MS = 300
 }
 
 val sceneTransitionsV2 = transitions {
@@ -114,10 +116,22 @@ val sceneTransitionsV2 = transitions {
     to(CommunalScenes.Communal, key = CommunalTransitionKeys.Swipe) {
         spec = tween(durationMillis = TransitionDuration.TO_GLANCEABLE_HUB_DURATION_MS)
         translate(Communal.Elements.Grid, Edge.End)
-        timestampRange(startMillis = 167, endMillis = 334) { fade(AllElements) }
+        if (Flags.gestureBetweenHubAndLockscreenMotion()) {
+            distance = UserActionDistance { fromContent, _, _ ->
+                val fromContentSize = checkNotNull(fromContent.targetSize())
+                fromContentSize.width * 0.5f
+            }
+            timestampRange(startMillis = 167, endMillis = 334) { fade(Communal.Elements.StatusBar) }
+        } else {
+            timestampRange(startMillis = 167, endMillis = 334) { fade(AllElements) }
+        }
     }
     to(CommunalScenes.Blank) {
         spec = tween(durationMillis = TO_GONE_DURATION.toInt(DurationUnit.MILLISECONDS))
+        fade(AllElements)
+    }
+    to(CommunalScenes.Blank, key = CommunalTransitionKeys.SwipeUp) {
+        spec = tween(durationMillis = TO_LOCKSCREEN_DURATION.toInt(DurationUnit.MILLISECONDS))
         fade(AllElements)
     }
     to(CommunalScenes.Blank, key = CommunalTransitionKeys.SwipeInLandscape) {
@@ -134,15 +148,25 @@ val sceneTransitionsV2 = transitions {
     to(CommunalScenes.Blank, key = CommunalTransitionKeys.Swipe) {
         spec = tween(durationMillis = TransitionDuration.TO_GLANCEABLE_HUB_DURATION_MS)
         translate(Communal.Elements.Grid, Edge.End)
-        timestampRange(endMillis = 167) {
-            fade(Communal.Elements.Grid)
-            fade(Communal.Elements.IndicationArea)
-            fade(Communal.Elements.LockIcon)
-            if (!Flags.glanceableHubV2()) {
-                fade(Communal.Elements.StatusBar)
+        if (!Flags.gestureBetweenHubAndLockscreenMotion()) {
+            timestampRange(endMillis = 167) {
+                fade(Communal.Elements.Grid)
+                fade(Communal.Elements.IndicationArea)
+                fade(Communal.Elements.LockIcon)
+                if (!Flags.glanceableHubV2()) {
+                    fade(Communal.Elements.StatusBar)
+                }
             }
+            timestampRange(startMillis = 167, endMillis = 334) { fade(Communal.Elements.Scrim) }
         }
-        timestampRange(startMillis = 167, endMillis = 334) { fade(Communal.Elements.Scrim) }
+    }
+    to(CommunalScenes.Blank, key = CommunalTransitionKeys.ToEditMode) {
+        spec = tween(durationMillis = TransitionDuration.BETWEEN_HUB_AND_EDIT_MODE_MS)
+        fade(AllElements)
+    }
+    to(CommunalScenes.Communal, key = CommunalTransitionKeys.FromEditMode) {
+        spec = tween(durationMillis = TransitionDuration.BETWEEN_HUB_AND_EDIT_MODE_MS)
+        fade(AllElements)
     }
 }
 
@@ -285,7 +309,9 @@ fun CommunalContainer(
                             } else {
                                 CommunalTransitionKeys.Swipe
                             },
-                        )
+                        ),
+                    Swipe.Up to
+                        UserActionResult(CommunalScenes.Blank, CommunalTransitionKeys.SwipeUp),
                 ),
         ) {
             CommunalScene(
@@ -303,20 +329,6 @@ fun CommunalContainer(
     Box(modifier = Modifier.fillMaxSize().allowGestures(touchesAllowed))
 }
 
-/** Listens to orientation changes on communal scene and reset when scene is disposed. */
-@Composable
-fun ObserveOrientationChange(viewModel: CommunalViewModel) {
-    val configuration = LocalConfiguration.current
-
-    LaunchedEffect(configuration.orientation) {
-        viewModel.onOrientationChange(configuration.orientation)
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { viewModel.onOrientationChange(Configuration.ORIENTATION_UNDEFINED) }
-    }
-}
-
 /** Scene containing the glanceable hub UI. */
 @Composable
 fun ContentScope.CommunalScene(
@@ -329,8 +341,6 @@ fun ContentScope.CommunalScene(
 ) {
     val isFocusable by viewModel.isFocusable.collectAsStateWithLifecycle(initialValue = false)
 
-    // Observe screen rotation while Communal Scene is active.
-    ObserveOrientationChange(viewModel)
     Box(
         modifier =
             Modifier.element(Communal.Elements.Scrim)

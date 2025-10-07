@@ -78,13 +78,6 @@ flag {
 }
 
 flag {
-    name: "gnss_configuration_from_resource"
-    namespace: "location"
-    description: "Flag for GNSS configuration from resource"
-    bug: "317734846"
-}
-
-flag {
     name: "enable_ni_supl_message_injection_by_carrier_config_bugfix"
     namespace: "location"
     description: "Flag for enabling NI SUPL message injection by carrier config"
@@ -211,4 +204,21 @@ flag {
     description: "Changes the getAdasAllowlist API from hidden to system"
     bug: "362287534"
     is_exported: true
+}
+
+flag {
+    name: "fix_glonass_almanac_frequency_channel_range"
+    namespace: "location"
+    description: "Fix GLONASS almanac frequency channel range"
+    bug: "428050932"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "support_toa_in_gnss_satellite_almanac"
+    namespace: "location"
+    description: "Support TOA in GnssSatelliteAlmanac"
+    bug: "409934786"
 }

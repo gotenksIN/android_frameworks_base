@@ -16,7 +16,11 @@
 
 package com.android.systemui.communal.ui.compose
 
-import android.content.res.Configuration
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,8 +39,8 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.scene.ContentScope
 import com.android.compose.modifiers.thenIf
 import com.android.systemui.Flags
@@ -47,8 +51,8 @@ import com.android.systemui.communal.ui.compose.section.CommunalPopupSection
 import com.android.systemui.communal.ui.compose.section.HubOnboardingSection
 import com.android.systemui.communal.ui.view.layout.sections.CommunalAppWidgetSection
 import com.android.systemui.communal.ui.viewmodel.CommunalViewModel
-import com.android.systemui.keyguard.ui.composable.element.IndicationAreaElement
-import com.android.systemui.keyguard.ui.composable.element.LockElement
+import com.android.systemui.keyguard.ui.composable.elements.IndicationAreaElementProvider
+import com.android.systemui.keyguard.ui.composable.elements.LockIconElementProvider
 import com.android.systemui.keyguard.ui.composable.layout.LockIconAlignmentLines
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
@@ -62,8 +66,8 @@ constructor(
     private val interactionHandler: SmartspaceInteractionHandler,
     private val communalSettingsInteractor: CommunalSettingsInteractor,
     private val dialogFactory: SystemUIDialogFactory,
-    private val lockElement: LockElement,
-    private val indicationAreaElement: IndicationAreaElement,
+    private val lockElement: LockIconElementProvider,
+    private val indicationAreaElement: IndicationAreaElementProvider,
     private val communalPopupSection: CommunalPopupSection,
     private val widgetSection: CommunalAppWidgetSection,
     private val hubOnboardingSection: HubOnboardingSection,
@@ -76,9 +80,27 @@ constructor(
         CommunalTouchableSurface(viewModel = viewModel, modifier = modifier) {
             val orientation = LocalConfiguration.current.orientation
             var gridRegion by remember { mutableStateOf<Rect?>(null) }
+            val showBackgroundForEditModeTransition by
+                viewModel.showBackgroundForEditModeTransition.collectAsStateWithLifecycle(
+                    initialValue = false
+                )
+            val empty by viewModel.isEmptyState.collectAsStateWithLifecycle(initialValue = false)
+
+            // The animated background here matches the color scheme of the edit mode activity and
+            // facilitates the transition to and from edit mode.
+            AnimatedVisibility(
+                visible = showBackgroundForEditModeTransition,
+                enter = fadeIn(tween(TransitionDuration.EDIT_MODE_BACKGROUND_ANIM_DURATION_MS)),
+                exit = fadeOut(tween(TransitionDuration.EDIT_MODE_BACKGROUND_ANIM_DURATION_MS)),
+            ) {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceDim))
+            }
+
             Layout(
                 modifier =
-                    Modifier.fillMaxSize().thenIf(communalSettingsInteractor.isV2FlagEnabled()) {
+                    Modifier.fillMaxSize().thenIf(
+                        communalSettingsInteractor.isV2FlagEnabled() && !empty
+                    ) {
                         Modifier.consumeHorizontalDragGestures(gridRegion)
                     },
                 content = {
@@ -154,14 +176,9 @@ constructor(
                         } else {
                             constraints.maxHeight - lockIconBounds.top
                         }
-                    // Bias the widgets up by a small offset for visual balance in landscape
-                    // orientation
-                    val verticalOffset =
-                        (if (orientation == Configuration.ORIENTATION_LANDSCAPE) (-3).dp else 0.dp)
-                            .roundToPx()
                     // Use even top and bottom margin for grid to be centered in maxHeight (window)
                     communalGridMaxHeight = constraints.maxHeight - communalGridVerticalMargin * 2
-                    communalGridPositionY = communalGridVerticalMargin + verticalOffset
+                    communalGridPositionY = communalGridVerticalMargin
                 } else {
                     communalGridMaxHeight = lockIconBounds?.top ?: constraints.maxHeight
                     communalGridPositionY = 0

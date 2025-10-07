@@ -27,6 +27,7 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.hardware.display.DisplayManagerInternal;
 import android.util.ArraySet;
+import android.util.DisplayMetrics;
 import android.util.SparseArray;
 import android.view.Display;
 import android.view.DisplayEventReceiver;
@@ -77,6 +78,13 @@ final class LogicalDisplay {
     private static final int BLANK_LAYER_STACK = -1;
 
     private static final DisplayInfo EMPTY_DISPLAY_INFO = new DisplayInfo();
+
+    private static final double DEFAULT_DISPLAY_SIZE = 24.0;
+    // Touch target size 10.4mm in inches (divided by mm per inch 25.4)
+    private static final double EXTERNAL_DISPLAY_BASE_TOUCH_TARGET_SIZE_IN_INCHES = 10.4 / 25.4;
+    private static final int EXTERNAL_DISPLAY_MIN_DENSITY_DPI = 100;
+
+    private static final double BASE_TOUCH_TARGET_SIZE_DP = 48.0;
 
     private final DisplayInfo mBaseDisplayInfo = new DisplayInfo();
     private final int mDisplayId;
@@ -206,13 +214,6 @@ final class LogicalDisplay {
             new SparseArray<>();
 
     /**
-     * If enabled, will not check for {@link Display#FLAG_ROTATES_WITH_CONTENT} in LogicalDisplay
-     * and simply use the {@link DisplayInfo#rotation} supplied by WindowManager via
-     * {@link #setDisplayInfoOverrideFromWindowManagerLocked}
-     */
-    private boolean mAlwaysRotateDisplayDeviceEnabled;
-
-    /**
      * If the aspect ratio of the resolution of the display does not match the physical aspect
      * ratio of the display, then without this feature enabled, picture would appear stretched to
      * the user. This is because applications assume that they are rendered on square pixels
@@ -226,18 +227,17 @@ final class LogicalDisplay {
      * 3. If a setting on the display itself is set to "fill the entire display panel" then the
      * display will stretch the pixels to fill the display fully.
      */
-    private final boolean mIsAnisotropyCorrectionEnabled;
+    private boolean mIsAnisotropyCorrectionEnabled;
 
     private final boolean mSyncedResolutionSwitchEnabled;
 
     private boolean mCanHostTasks;
 
     LogicalDisplay(int displayId, int layerStack, DisplayDevice primaryDisplayDevice) {
-        this(displayId, layerStack, primaryDisplayDevice, false, false, false);
+        this(displayId, layerStack, primaryDisplayDevice, false);
     }
 
     LogicalDisplay(int displayId, int layerStack, DisplayDevice primaryDisplayDevice,
-            boolean isAnisotropyCorrectionEnabled, boolean isAlwaysRotateDisplayDeviceEnabled,
             boolean isSyncedResolutionSwitchEnabled) {
         mDisplayId = displayId;
         mLayerStack = layerStack;
@@ -249,10 +249,15 @@ final class LogicalDisplay {
         mThermalBrightnessThrottlingDataId = DisplayDeviceConfig.DEFAULT_ID;
         mPowerThrottlingDataId = DisplayDeviceConfig.DEFAULT_ID;
         mBaseDisplayInfo.thermalBrightnessThrottlingDataId = mThermalBrightnessThrottlingDataId;
-        mIsAnisotropyCorrectionEnabled = isAnisotropyCorrectionEnabled;
-        mAlwaysRotateDisplayDeviceEnabled = isAlwaysRotateDisplayDeviceEnabled;
         mSyncedResolutionSwitchEnabled = isSyncedResolutionSwitchEnabled;
-        mCanHostTasks = (mDisplayId == Display.DEFAULT_DISPLAY);
+
+        // No need to initialize mCanHostTasks here; it's handled in
+        // DisplayManagerService#setupLogicalDisplay().
+    }
+
+    public void setAnisotropyCorrectionEnabled(boolean enabled) {
+        mIsAnisotropyCorrectionEnabled = enabled;
+        mPrimaryDisplayDevice.setAnisotropyCorrectionEnabled(enabled);
     }
 
     public void setDevicePositionLocked(int position) {
@@ -430,6 +435,9 @@ final class LogicalDisplay {
             return;
         }
 
+        // TODO(b/375563565): Implement per-display setting to enable/disable anisotropy correction.
+        setAnisotropyCorrectionEnabled(true);
+
         // Bootstrap the logical display using its associated primary physical display.
         // We might use more elaborate configurations later.  It's possible that the
         // configuration of several physical displays might be used to determine the
@@ -539,7 +547,10 @@ final class LogicalDisplay {
             mBaseDisplayInfo.userDisabledHdrTypes = mUserDisabledHdrTypes;
             mBaseDisplayInfo.minimalPostProcessingSupported =
                     deviceInfo.allmSupported || deviceInfo.gameContentTypeSupported;
-            mBaseDisplayInfo.logicalDensityDpi = deviceInfo.densityDpi;
+            mBaseDisplayInfo.logicalDensityDpi = deviceInfo.densityDpi > 0
+                    ? deviceInfo.densityDpi
+                    : calculateBaseDensity(deviceInfo.xDpi, deviceInfo.yDpi, maskedWidth,
+                            maskedHeight);
             mBaseDisplayInfo.physicalXDpi = deviceInfo.xDpi;
             mBaseDisplayInfo.physicalYDpi = deviceInfo.yDpi;
             mBaseDisplayInfo.appVsyncOffsetNanos = deviceInfo.appVsyncOffsetNanos;
@@ -587,6 +598,25 @@ final class LogicalDisplay {
             mInfo.set(null);
             mDirty = false;
         }
+    }
+
+    private int calculateBaseDensity(float xDpi, float yDpi, int width, int height) {
+        // physical pixel density of the display
+        double ppi;
+        if (xDpi > 0 && yDpi > 0) {
+            ppi = Math.sqrt((Math.pow(xDpi, 2)
+                    + Math.pow(yDpi, 2)) / 2);
+        } else {
+            // xDPI and yDPI is missing, calculate DPI from display resolution and
+            // default display size
+            ppi = Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2))
+                    / DEFAULT_DISPLAY_SIZE;
+        }
+        // pixels needed to achieve target touch target size
+        double pixels = ppi * EXTERNAL_DISPLAY_BASE_TOUCH_TARGET_SIZE_IN_INCHES;
+        double dpi =
+                pixels * DisplayMetrics.DENSITY_DEFAULT / BASE_TOUCH_TARGET_SIZE_DP;
+        return Math.max((int) (dpi + 0.5), EXTERNAL_DISPLAY_MIN_DENSITY_DPI);
     }
 
     private void updateFrameRateOverrides(DisplayDeviceInfo deviceInfo) {
@@ -706,18 +736,9 @@ final class LogicalDisplay {
         // Set the orientation.
         // The orientation specifies how the physical coordinate system of the display
         // is rotated when the contents of the logical display are rendered.
-        int orientation = Surface.ROTATION_0;
-
-        // FLAG_ROTATES_WITH_CONTENT is now handled in DisplayContent. When the flag
-        // mAlwaysRotateDisplayDeviceEnabled is removed, we should also remove this check for
-        // ROTATES_WITH_CONTENT here and always set the orientation.
-        if ((displayDeviceInfo.flags & DisplayDeviceInfo.FLAG_ROTATES_WITH_CONTENT) != 0
-                    || mAlwaysRotateDisplayDeviceEnabled) {
-            orientation = displayInfo.rotation;
-        }
-
+        // FLAG_ROTATES_WITH_CONTENT is now handled in DisplayContent.
         // Apply the physical rotation of the display device itself.
-        orientation = (orientation + displayDeviceInfo.rotation) % 4;
+        final int orientation = (displayInfo.rotation + displayDeviceInfo.rotation) % 4;
 
         // Set the frame.
         // The frame specifies the rotated physical coordinates into which the viewport
@@ -1043,6 +1064,12 @@ final class LogicalDisplay {
         mPrimaryDisplayDeviceInfo = null;
         mBaseDisplayInfo.copyFrom(EMPTY_DISPLAY_INFO);
         mInfo.set(null);
+
+        // Since mCanHostTasks depends on mPrimaryDisplayDevice, we should refresh mCanHostTasks
+        // when mPrimaryDisplayDevice changes.
+        if (device != null) {
+            mCanHostTasks = validateCanHostTasksLocked(mCanHostTasks);
+        }
 
         return old;
     }

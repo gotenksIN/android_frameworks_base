@@ -49,7 +49,6 @@ import android.window.WindowProvider;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.IResultReceiver;
-import com.android.window.flags.Flags;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -165,9 +164,9 @@ public final class WindowManagerImpl implements WindowManager {
     public void addView(@NonNull View view, @NonNull ViewGroup.LayoutParams params) {
         applyWindowTypeOverrideIfNeeded(params, view);
 
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_vg_layout(383,params);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         applyTokens(params);
         mGlobal.addView(view, params, mContext.getDisplayNoVerify(), mParentWindow,
                 mContext.getUserId());
@@ -177,18 +176,17 @@ public final class WindowManagerImpl implements WindowManager {
     public void updateViewLayout(@NonNull View view, @NonNull ViewGroup.LayoutParams params) {
         applyWindowTypeOverrideIfNeeded(params, view);
 
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_vg_layout(384,params);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         applyTokens(params);
         mGlobal.updateViewLayout(view, params);
     }
 
     private void applyTokens(@NonNull ViewGroup.LayoutParams params) {
-        if (!(params instanceof WindowManager.LayoutParams)) {
+        if (!(params instanceof LayoutParams wparams)) {
             throw new IllegalArgumentException("Params must be WindowManager.LayoutParams");
         }
-        final WindowManager.LayoutParams wparams = (WindowManager.LayoutParams) params;
         assertWindowContextTypeMatches(wparams.type);
         // Only use the default token if we don't have a parent window and a token.
         if (mDefaultToken != null && mParentWindow == null && wparams.token == null) {
@@ -222,9 +220,6 @@ public final class WindowManagerImpl implements WindowManager {
     private void applyWindowTypeOverrideIfNeeded(
             @NonNull ViewGroup.LayoutParams params,
             @NonNull View view) {
-        if (!Flags.enableWindowContextOverrideType()) {
-            return;
-        }
         if (!(params instanceof WindowManager.LayoutParams wparams)) {
             throw new IllegalArgumentException("Params must be WindowManager.LayoutParams");
         }
@@ -325,15 +320,6 @@ public final class WindowManagerImpl implements WindowManager {
         try {
             WindowManagerGlobal.getWindowManagerService()
                     .setShouldShowWithInsecureKeyguard(displayId, shouldShow);
-        } catch (RemoteException e) {
-        }
-    }
-
-    @Override
-    public void setShouldShowSystemDecors(int displayId, boolean shouldShow) {
-        try {
-            WindowManagerGlobal.getWindowManagerService()
-                    .setShouldShowSystemDecors(displayId, shouldShow);
         } catch (RemoteException e) {
         }
     }

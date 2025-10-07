@@ -60,6 +60,10 @@ public class PowerManagerFlags {
     private final FlagState mMoveWscLoggingToNotifier =
             new FlagState(Flags.FLAG_MOVE_WSC_LOGGING_TO_NOTIFIER, Flags::moveWscLoggingToNotifier);
 
+    private final FlagState mLockOnUnplug =
+            new FlagState(Flags.FLAG_LOCK_ON_UNPLUG,
+                    Flags::lockOnUnplug);
+
     private final FlagState mWakelockAttributionViaWorkchain =
             new FlagState(Flags.FLAG_WAKELOCK_ATTRIBUTION_VIA_WORKCHAIN,
                     Flags::wakelockAttributionViaWorkchain);
@@ -75,9 +79,14 @@ public class PowerManagerFlags {
             new FlagState(Flags.FLAG_ENABLE_APP_WAKELOCK_DATA_SOURCE,
                     Flags::enableAppWakelockDataSource);
 
-    private final FlagState mSleeplocks = new FlagState(
-            Flags.FLAG_SLEEPLOCKS,
-            Flags::sleeplocks
+    private final FlagState mPartialSleepWakelocks = new FlagState(
+            Flags.FLAG_PARTIAL_SLEEP_WAKELOCKS,
+            Flags::partialSleepWakelocks
+    );
+
+    private final FlagState mSeparateTimeoutsFlicker = new FlagState(
+            Flags.FLAG_SEPARATE_TIMEOUTS_FLICKER,
+            Flags::separateTimeoutsFlicker
     );
 
     /** Returns whether early-screen-timeout-detector is enabled on not. */
@@ -120,10 +129,24 @@ public class PowerManagerFlags {
     }
 
     /**
+     * @return {@code true} if the flag for the flicker when timing out bugfix is enabled
+     */
+    public boolean isSeparateTimeoutsFlickerEnabled() {
+        return mSeparateTimeoutsFlicker.isEnabled();
+    }
+
+    /**
      * @return Whether the wakelock attribution via workchain is enabled
      */
     public boolean isWakelockAttributionViaWorkchainEnabled() {
         return mWakelockAttributionViaWorkchain.isEnabled();
+    }
+
+    /**
+     * @return Whether to lock when all remaining adjacent displays are asleep.
+     */
+    public boolean isLockOnUnplugEnabled() {
+        return mLockOnUnplug.isEnabled();
     }
 
     /**
@@ -151,8 +174,8 @@ public class PowerManagerFlags {
      * @return Whether new wakelock to keep device asleep - for the user, but ensures the CPU
      * remains awake - is enabled.
      */
-    public boolean isSleeplocksFeatureEnabled() {
-        return mSleeplocks.isEnabled();
+    public boolean isPartialSleepWakelocksFeatureEnabled() {
+        return mPartialSleepWakelocks.isEnabled();
     }
 
     /**
@@ -165,11 +188,13 @@ public class PowerManagerFlags {
         pw.println(" " + mImproveWakelockLatency);
         pw.println(" " + mPerDisplayWakeByTouch);
         pw.println(" " + mMoveWscLoggingToNotifier);
+        pw.println(" " + mLockOnUnplug);
         pw.println(" " + mWakelockAttributionViaWorkchain);
         pw.println(" " + mDisableFrozenProcessWakelocks);
         pw.println(" " + mForceDisableWakelocks);
         pw.println(" " + mEnableAppWakelockDataSource);
-        pw.println(" " + mSleeplocks);
+        pw.println(" " + mPartialSleepWakelocks);
+        pw.println(" " + mSeparateTimeoutsFlicker);
     }
 
     private static class FlagState {

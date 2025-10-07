@@ -40,6 +40,16 @@ object Scenes {
     @JvmField val Lockscreen = SceneKey("lockscreen")
 
     /**
+     * Activities that render over lockscreen. Similar to [Gone], it is the absence of any SystemUI
+     * visual elements. However, it is a very important device state where activities that have
+     * declared the ability to showOverLockscreen will be visible, with the [Shade] and
+     * [QuickSettings] being available to access from this state. Activities can also request
+     * keyguard dismissal directly, so it not required to navigate back to [Lockscreen] before
+     * unlocking.
+     */
+    @JvmField val Occluded = SceneKey("occluded")
+
+    /**
      * The quick settings scene shows the quick setting tiles.
      *
      * This scene is used for single/accordion configuration (swipe down once to reveal the shade,
@@ -67,17 +77,6 @@ object Scenes {
      * `NotificationsShade` and `QuickSettingsShade` are used respectively.
      */
     @JvmField val Shade = SceneKey("shade")
-
-    /**
-     * The edit mode scene allows users to customize their quick setting tiles used in the
-     * QuickSettings scene.
-     *
-     * This scene is only used in single/accordion configuration, accessible from [QuickSettings].
-     *
-     * TODO(http://b/425671700): Adding a top-leve scene incurs more maintenance cost. Move this
-     * into an STL internal to the QS scene instead.
-     */
-    @JvmField val QSEditMode = SceneKey("qs_edit_mode")
 }
 
 /**

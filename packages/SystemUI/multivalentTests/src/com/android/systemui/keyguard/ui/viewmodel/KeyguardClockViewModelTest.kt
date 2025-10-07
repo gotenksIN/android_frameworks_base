@@ -34,10 +34,11 @@ import com.android.systemui.keyguard.shared.model.ClockSize
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardClockViewModel.ClockLayout
 import com.android.systemui.kosmos.testScope
-import com.android.systemui.plugins.clocks.ClockConfig
-import com.android.systemui.plugins.clocks.ClockController
-import com.android.systemui.plugins.clocks.ClockFaceConfig
-import com.android.systemui.plugins.clocks.ClockFaceController
+import com.android.systemui.kosmos.useUnconfinedTestDispatcher
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockConfig
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockController
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockFaceConfig
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockFaceController
 import com.android.systemui.res.R
 import com.android.systemui.shade.data.repository.shadeRepository
 import com.android.systemui.statusbar.notification.data.repository.activeNotificationListRepository
@@ -59,7 +60,7 @@ import platform.test.runner.parameterized.Parameters
 @RunWith(ParameterizedAndroidJunit4::class)
 class KeyguardClockViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
-    private val kosmos = testKosmos()
+    private val kosmos = testKosmos().useUnconfinedTestDispatcher()
     private val testScope = kosmos.testScope
     private val underTest by lazy { kosmos.keyguardClockViewModel }
     private val res = context.resources
@@ -139,7 +140,7 @@ class KeyguardClockViewModelTest(flags: FlagsParameterization) : SysuiTestCase()
                     KeyguardState.AOD,
                     KeyguardState.LOCKSCREEN,
                 )
-                fakeKeyguardClockRepository.setShouldForceSmallClock(true)
+                fakeKeyguardClockRepository.setClockSize(ClockSize.SMALL)
             }
 
             assertThat(currentClockLayout).isEqualTo(ClockLayout.SPLIT_SHADE_SMALL_CLOCK)

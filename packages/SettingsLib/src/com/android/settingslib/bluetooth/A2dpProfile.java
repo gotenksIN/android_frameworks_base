@@ -287,9 +287,7 @@ public class A2dpProfile implements LocalBluetoothProfile {
             return false;
         }
 // QTI_END: 2021-09-03: Bluetooth: Add new function isMandatoryCodec
-// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
         BluetoothDevice bluetoothDevice = (device != null) ? device : getActiveDevice();
-// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
 // QTI_BEGIN: 2021-09-03: Bluetooth: Add new function isMandatoryCodec
         if (bluetoothDevice == null) {
             return false;

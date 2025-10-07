@@ -250,6 +250,8 @@ interface IDevicePolicyManager {
     Bundle getApplicationRestrictions(in ComponentName who, in String callerPackage, in String packageName, in boolean parent);
     boolean setApplicationRestrictionsManagingPackage(in ComponentName admin, in String packageName);
     String getApplicationRestrictionsManagingPackage(in ComponentName admin);
+    void setApplicationRestrictionsBySystem(in String systemEntity, in String packageName, in int userId, in Bundle settings);
+    Bundle getApplicationRestrictionsBySystem(in String systemEntity, in String packageName, in int userId);
     boolean isCallerApplicationRestrictionsManagingPackage(in String callerPackage);
 
     void setRestrictionsProvider(in ComponentName who, in ComponentName provider);
@@ -282,6 +284,7 @@ interface IDevicePolicyManager {
     Intent createAdminSupportIntent(in String restriction);
     Bundle getEnforcingAdminAndUserDetails(int userId, String restriction);
     EnforcingAdmin getEnforcingAdmin(int userId, String identifier);
+    List<EnforcingAdmin> getEnforcingAdminsForPolicy(String identifier, int userId);
     boolean setApplicationHidden(in ComponentName admin, in String callerPackage, in String packageName, boolean hidden, boolean parent);
     boolean isApplicationHidden(in ComponentName admin, in String callerPackage, in String packageName, boolean parent);
 
@@ -368,6 +371,8 @@ interface IDevicePolicyManager {
             in ComponentName agent, int userId, boolean parent);
 
     boolean addCrossProfileWidgetProvider(in ComponentName admin, String callerPackageName, String packageName);
+    void setCrossProfileWidgetProviders(String callerPackageName, in List<String> packageNames);
+
     boolean removeCrossProfileWidgetProvider(in ComponentName admin, String callerPackageName, String packageName);
     List<String> getCrossProfileWidgetProviders(in ComponentName admin, String callerPackageName);
 

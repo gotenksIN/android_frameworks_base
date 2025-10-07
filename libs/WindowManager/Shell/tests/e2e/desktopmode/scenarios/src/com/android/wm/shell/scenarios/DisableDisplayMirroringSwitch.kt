@@ -18,10 +18,7 @@ package com.android.wm.shell.scenarios
 
 import android.app.Instrumentation
 import android.platform.test.annotations.RequiresFlagsEnabled
-import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import android.provider.Settings
-import android.tools.NavBar
-import android.tools.Rotation
 import android.tools.traces.parsers.WindowManagerStateHelper
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.launcher3.tapl.LauncherInstrumentation
@@ -46,10 +43,7 @@ abstract class DisableDisplayMirroringSwitch : TestScenarioBase() {
     private val wmHelper = WindowManagerStateHelper(instrumentation)
     private val tapl = LauncherInstrumentation()
 
-    @get:Rule(order = 0) val checkFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule()
-    @get:Rule(order = 1) val testSetupRule = Utils.testSetupRule(NavBar.MODE_GESTURAL,
-        Rotation.ROTATION_0)
-    @get:Rule(order = 2) val connectedDisplayRule = SimulatedConnectedDisplayTestRule()
+    @get:Rule val connectedDisplayRule = SimulatedConnectedDisplayTestRule()
 
     @Before
     fun setup() {

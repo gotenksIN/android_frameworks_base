@@ -85,4 +85,13 @@ flag {
     description: "Enables cross platform transfers for backup agents"
     bug: "403956528"
     is_fixed_read_only: true
+    is_exported: true
+}
+
+flag {
+    name: "enable_delayed_restore_api"
+    namespace: "onboarding"
+    description: "Enables delayed restore API for system components"
+    bug: "399038494"
+    is_fixed_read_only: true
 }

@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 
 package com.android.server.wm;
 
@@ -107,11 +109,8 @@ import static android.internal.perfetto.protos.Windowmanagerservice.ActivityReco
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.ENABLE_RECENTS_SCREENSHOT;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.FILLS_PARENT;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.FRONT_OF_TASK;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IN_SIZE_COMPAT_MODE;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IS_ANIMATING;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.IS_USER_FULLSCREEN_OVERRIDE_ENABLED;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.LAST_DROP_INPUT_MODE;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.MIN_ASPECT_RATIO;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NAME;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NUM_DRAWN_WINDOWS;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.NUM_INTERESTING_WINDOWS;
@@ -122,15 +121,6 @@ import static android.internal.perfetto.protos.Windowmanagerservice.ActivityReco
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.REPORTED_DRAWN;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.REPORTED_VISIBLE;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.REQUEST_OPEN_IN_BROWSER_EDUCATION_TIMESTAMP;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_ALLOW_SIMULATE_REQUESTED_ORIENTATION_FOR_CAMERA_COMPAT;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_ENABLE_USER_ASPECT_RATIO_SETTINGS;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_FORCE_ROTATE_FOR_CAMERA_COMPAT;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_IGNORE_ORIENTATION_REQUEST_LOOP;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_OVERRIDE_FORCE_RESIZE_APP;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_OVERRIDE_MIN_ASPECT_RATIO;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_REFRESH_ACTIVITY_FOR_CAMERA_COMPAT;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_REFRESH_ACTIVITY_VIA_PAUSE_FOR_CAMERA_COMPAT;
-import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.SHOULD_SEND_COMPAT_FAKE_FOCUS;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.STARTING_DISPLAYED;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.STARTING_MOVED;
 import static android.internal.perfetto.protos.Windowmanagerservice.ActivityRecordProto.STARTING_WINDOW;
@@ -160,6 +150,9 @@ import static android.view.WindowManager.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENAB
 import static android.view.WindowManager.PROPERTY_ALLOW_UNTRUSTED_ACTIVITY_EMBEDDING_STATE_SHARING;
 import static android.view.WindowManager.TRANSIT_RELAUNCH;
 import static android.view.WindowManager.hasWindowExtensionsEnabled;
+import static android.window.DesktopExperienceFlags.ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE;
+import static android.window.DesktopExperienceFlags.ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS;
+import static android.window.DesktopExperienceFlags.ENABLE_PIP_PARAMS_UPDATE_NOTIFICATION_BUGFIX;
 import static android.window.DesktopExperienceFlags.ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS;
 import static android.window.TransitionInfo.FLAGS_IS_OCCLUDED_NO_ANIMATION;
 import static android.window.TransitionInfo.FLAG_IS_OCCLUDED;
@@ -200,9 +193,9 @@ import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_SWITCH;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_TRANSITION;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_USER_LEAVING;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_VISIBILITY;
-// QTI_BEGIN: 2020-10-14: Frameworks: Add Compile-time Flag to Enable/Disable Servicetracker Logs
+// QTI_BEGIN: 2020-10-14: Core: Add Compile-time Flag to Enable/Disable Servicetracker Logs
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_SERVICETRACKER;
-// QTI_END: 2020-10-14: Frameworks: Add Compile-time Flag to Enable/Disable Servicetracker Logs
+// QTI_END: 2020-10-14: Core: Add Compile-time Flag to Enable/Disable Servicetracker Logs
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_ADD_REMOVE;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_APP;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.POSTFIX_CONFIGURATION;
@@ -253,6 +246,7 @@ import android.annotation.Size;
 import android.app.Activity;
 import android.app.ActivityManager.TaskDescription;
 import android.app.ActivityOptions;
+import android.app.HandoffActivityData;
 import android.app.IApplicationThread;
 import android.app.IScreenCaptureObserver;
 import android.app.PendingIntent;
@@ -391,12 +385,12 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
 import vendor.qti.hardware.servicetracker.V1_2.IServicetracker;
 import vendor.qti.hardware.servicetracker.V1_2.ActivityDetails;
 import vendor.qti.hardware.servicetracker.V1_2.ActivityStats;
 import vendor.qti.hardware.servicetracker.V1_2.ActivityStates;
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
 /**
  * An entry in the history task, representing an activity.
  */
@@ -494,8 +488,8 @@ public final class ActivityRecord extends WindowToken {
     private final int theme;        // resource identifier of activity's theme.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     public int perfActivityBoostHandler = -1; //perflock handler when activity is created.
-    private int mPerfScenarioBoostHandler = -1;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+    private int mPerfScenarioBoostHandler = -1;
     private Task task;              // the task this is in.
     private long createTime = System.currentTimeMillis();
     long lastVisibleTime;         // last time this activity became visible
@@ -530,6 +524,7 @@ public final class ActivityRecord extends WindowToken {
     WindowProcessController app;      // if non-null, hosting application
     private State mState;    // current state we are in
     private Bundle mIcicle;         // last saved activity state
+    private HandoffActivityData mHandoffActivityData; // last saved handoff activity data
     private boolean mHandoffEnabled = false; // if Handoff is enabled for this activity
     private boolean mAllowFullTaskRecreation = false; // if the entire task stack can be recreated
                                                       // during handoff of this activity.
@@ -555,11 +550,10 @@ public final class ActivityRecord extends WindowToken {
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     public boolean launching;      // is activity launch in progress?
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2021-03-11: Performance: DSR: Fix broken DSR
+// QTI_BEGIN: 2021-03-11: Core: DSR: Fix broken DSR
     public boolean translucentWindowLaunch; // a translucent window launch?
-// QTI_END: 2021-03-11: Performance: DSR: Fix broken DSR
+// QTI_END: 2021-03-11: Core: DSR: Fix broken DSR
     boolean nowVisible;     // is this activity's window visible?
-    boolean mClientVisibilityDeferred;// was the visibility change message to client deferred?
     boolean idle;           // has the activity gone idle?
     boolean hasBeenLaunched;// has this activity ever been launched?
     boolean immersive;      // immersive mode (don't interrupt if possible)
@@ -976,7 +970,8 @@ public final class ActivityRecord extends WindowToken {
                 Slog.w(TAG, "Activity stop timeout for " + ActivityRecord.this);
                 if (isInHistory()) {
                     activityStopped(
-                            null /*icicle*/, null /*persistentState*/, null /*description*/);
+                            null /*icicle*/, null /*persistentState*/, null /*handoffActivityData*/,
+                            null /*description*/);
                 }
             }
         }
@@ -1324,8 +1319,16 @@ public final class ActivityRecord extends WindowToken {
 
     /** Update if handoff is enabled for this activity. */
     void setHandoffEnabled(boolean handoffEnabled, boolean allowFullTaskRecreation) {
+        final boolean didChange = mHandoffEnabled != handoffEnabled;
         mHandoffEnabled = handoffEnabled;
         mAllowFullTaskRecreation = allowFullTaskRecreation;
+        if (!mHandoffEnabled) {
+            mHandoffActivityData = null;
+        }
+
+        if (didChange) {
+            mAtmService.notifyHandoffEnablementChanged(this, handoffEnabled);
+        }
     }
 
     /**
@@ -1349,6 +1352,27 @@ public final class ActivityRecord extends WindowToken {
         }
 
         return mAllowFullTaskRecreation;
+    }
+
+    /**
+     * Set the handoff activity data for this activity. If Handoff is disabled for this activity,
+     * this will be ignored.
+     * @param handoffActivityData The handoff activity data.
+     */
+    void setHandoffActivityData(@Nullable HandoffActivityData handoffActivityData) {
+        if (!isHandoffEnabled()) {
+            return;
+        }
+
+        mHandoffActivityData = handoffActivityData;
+    }
+
+    /**
+     * Get the handoff activity data for this activity.
+     * @return the handoff activity data.
+     */
+    @Nullable HandoffActivityData getHandoffActivityData() {
+        return mHandoffActivityData;
     }
 
     /** Update the saved state of an activity. */
@@ -1896,19 +1920,12 @@ public final class ActivityRecord extends WindowToken {
         // getOverrideOrientation that requires having mAppCompatController initialised.
         mAppCompatController = new AppCompatController(mWmService, this);
         mResolveConfigHint = new TaskFragment.ConfigOverrideHint();
-        if (mWmService.mFlags.mInsetsDecoupledConfiguration) {
-            // When the stable configuration is the default behavior, override for the legacy apps
-            // without forward override flag.
-            mResolveConfigHint.mUseOverrideInsetsForConfig =
-                    !info.isChangeEnabled(INSETS_DECOUPLED_CONFIGURATION_ENFORCED)
-                            && !info.isChangeEnabled(
-                                    OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION);
-        } else {
-            // When the stable configuration is not the default behavior, forward overriding the
-            // listed apps.
-            mResolveConfigHint.mUseOverrideInsetsForConfig =
-                    info.isChangeEnabled(OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION);
-        }
+        // When the stable configuration is the default behavior, override for the legacy apps
+        // without forward override flag.
+        mResolveConfigHint.mUseOverrideInsetsForConfig =
+                !info.isChangeEnabled(INSETS_DECOUPLED_CONFIGURATION_ENFORCED)
+                        && !info.isChangeEnabled(
+                                OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION);
 
         mTargetSdk = info.applicationInfo.targetSdkVersion;
 
@@ -1988,9 +2005,9 @@ public final class ActivityRecord extends WindowToken {
         resultWho = _resultWho;
         requestCode = _reqCode;
         setState(INITIALIZING, "ActivityRecord ctor");
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         callServiceTrackeronActivityStatechange(INITIALIZING, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         launchFailed = false;
         delayedResume = false;
         finishing = false;
@@ -2000,10 +2017,10 @@ public final class ActivityRecord extends WindowToken {
         super.setClientVisible(true);
         idle = false;
         hasBeenLaunched = false;
-// QTI_BEGIN: 2021-03-11: Performance: DSR: Fix broken DSR
+// QTI_BEGIN: 2021-03-11: Core: DSR: Fix broken DSR
         launching = false;
         translucentWindowLaunch = false;
-// QTI_END: 2021-03-11: Performance: DSR: Fix broken DSR
+// QTI_END: 2021-03-11: Core: DSR: Fix broken DSR
         mTaskSupervisor = supervisor;
 
         info.taskAffinity = computeTaskAffinity(info.taskAffinity, info.applicationInfo.uid);
@@ -2342,7 +2359,9 @@ public final class ActivityRecord extends WindowToken {
         final TaskSnapshot snapshot;
         if (Flags.reduceTaskSnapshotMemoryUsage()) {
             snapshot = mWmService.mTaskSnapshotController.getSnapshot(task.mTaskId,
-                    TaskSnapshotManager.RESOLUTION_HIGH);
+                    Flags.respectRequestedTaskSnapshotResolution()
+                            ? TaskSnapshotManager.RESOLUTION_ANY
+                            : TaskSnapshotManager.RESOLUTION_HIGH);
         } else {
             snapshot = mWmService.mTaskSnapshotController.getSnapshot(task.mTaskId,
                     false /* isLowResolution */);
@@ -2820,13 +2839,7 @@ public final class ActivityRecord extends WindowToken {
         final boolean animate;
         final boolean hasImeSurface;
         if (mStartingData != null) {
-            if (!Flags.removeStartingInTransition()) {
-                if (getSyncTransactionCommitCallbackDepth() > 0 || mSyncState != SYNC_STATE_NONE) {
-                    mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_REMOVE_DIRECTLY;
-                    mStartingData.mPrepareRemoveAnimation = prepareAnimation;
-                    return;
-                }
-            } else if (mSyncState != SYNC_STATE_NONE) {
+            if (mSyncState != SYNC_STATE_NONE) {
                 mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_REMOVE_DIRECTLY;
                 mStartingData.mPrepareRemoveAnimation = prepareAnimation;
                 return;
@@ -3589,6 +3602,7 @@ public final class ActivityRecord extends WindowToken {
         pendingResults = null;
         newIntents = null;
         setSavedState(null /* savedState */);
+        setHandoffActivityData(null);
     }
 
     /** Activity finish request was not executed. */
@@ -3641,7 +3655,8 @@ public final class ActivityRecord extends WindowToken {
         }
 
         final Task rootTask = getRootTask();
-        final boolean mayAdjustTop = (isState(RESUMED) || rootTask.getTopResumedActivity() == null)
+        final boolean mayAdjustTop = !Flags.polishCloseWallpaperIncludesOpenChange()
+                && (isState(RESUMED) || rootTask.getTopResumedActivity() == null)
                 && rootTask.isFocusedRootTaskOnDisplay()
                 // Do not adjust focus task because the task will be reused to launch new activity.
                 && !task.isClearingToReuseTask();
@@ -3693,12 +3708,19 @@ public final class ActivityRecord extends WindowToken {
             if (chain.isCollecting()) {
                 chain.getTransition().collectClose(trigger);
             }
+
+            if (Flags.polishCloseWallpaperIncludesOpenChange() && endTask) {
+                final TaskDisplayArea displayArea = getDisplayArea();
+                if (displayArea != null && rootTask == displayArea.mPreferredTopFocusableRootTask) {
+                    displayArea.clearPreferredTopFocusableRootTask();
+                }
+            }
             // We are finishing the top focused activity and its task has nothing to be focused so
             // the next focusable task should be focused.
             if (mayAdjustTop && task.topRunningActivity(true /* focusableOnly */)
                     == null) {
                 task.adjustFocusToNextFocusableTask("finish-top", false /* allowFocusSelf */,
-                            shouldAdjustGlobalFocus);
+                        shouldAdjustGlobalFocus);
             }
 
             finishActivityResults(resultCode, resultData, resultGrants);
@@ -3921,9 +3943,9 @@ public final class ActivityRecord extends WindowToken {
      * destroying it until the next one starts.
      */
     boolean destroyIfPossible(String reason) {
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         callServiceTrackeronActivityStatechange(FINISHING, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         setState(FINISHING, "destroyIfPossible");
 
         // Make sure the record is cleaned out of other places.
@@ -3948,9 +3970,9 @@ public final class ActivityRecord extends WindowToken {
         }
         makeFinishingLocked();
 
-// QTI_BEGIN: 2021-02-05: Data: Update ActivityPluginDelegate notifications for S
+// QTI_BEGIN: 2021-02-05: Core: Update ActivityPluginDelegate notifications for S
         getRootTask().onARStopTriggered(this);
-// QTI_END: 2021-02-05: Data: Update ActivityPluginDelegate notifications for S
+// QTI_END: 2021-02-05: Core: Update ActivityPluginDelegate notifications for S
         final boolean activityRemoved = destroyImmediately("finish-imm:" + reason);
 
         // If the display does not have running activity, the configuration may need to be
@@ -3981,9 +4003,9 @@ public final class ActivityRecord extends WindowToken {
     @VisibleForTesting
     boolean addToFinishingAndWaitForIdle() {
         ProtoLog.v(WM_DEBUG_STATES, "Enqueueing pending finish: %s", this);
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         callServiceTrackeronActivityStatechange(FINISHING, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         setState(FINISHING, "addToFinishingAndWaitForIdle");
         if (!mTaskSupervisor.mFinishingActivities.contains(this)) {
             mTaskSupervisor.mFinishingActivities.add(this);
@@ -4062,18 +4084,18 @@ public final class ActivityRecord extends WindowToken {
             // we are not removing it from the list.
             if (finishing && !skipDestroy) {
                 ProtoLog.v(WM_DEBUG_STATES, "Moving to DESTROYING: %s (destroy requested)", this);
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
                 callServiceTrackeronActivityStatechange(DESTROYING, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
                 setState(DESTROYING,
                         "destroyActivityLocked. finishing and not skipping destroy");
                 mAtmService.mH.postDelayed(mDestroyTimeoutRunnable, DESTROY_TIMEOUT);
             } else {
                 ProtoLog.v(WM_DEBUG_STATES, "Moving to DESTROYED: %s "
                         + "(destroy skipped)", this);
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
                 callServiceTrackeronActivityStatechange(DESTROYED, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
                 setState(DESTROYED,
                         "destroyActivityLocked. not finishing or skipping destroy");
                 if (DEBUG_APP) Slog.v(TAG_APP, "Clearing app during destroy for activity " + this);
@@ -4086,9 +4108,9 @@ public final class ActivityRecord extends WindowToken {
                 removedFromHistory = true;
             } else {
                 ProtoLog.v(WM_DEBUG_STATES, "Moving to DESTROYED: %s (no app)", this);
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
                 callServiceTrackeronActivityStatechange(DESTROYED, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
                 setState(DESTROYED, "destroyActivityLocked. not finishing and had no app");
             }
         }
@@ -4109,9 +4131,9 @@ public final class ActivityRecord extends WindowToken {
         removeTimeouts();
         ProtoLog.v(WM_DEBUG_STATES, "Moving to DESTROYED: %s (removed from history)",
                 this);
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         callServiceTrackeronActivityStatechange(DESTROYED, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         setState(DESTROYED, "removeFromHistory");
         if (DEBUG_APP) Slog.v(TAG_APP, "Clearing app during remove for activity " + this);
         detachFromProcess();
@@ -4216,9 +4238,9 @@ public final class ActivityRecord extends WindowToken {
         cleanUpSplashScreen();
 
         if (setState) {
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             callServiceTrackeronActivityStatechange(DESTROYED, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             setState(DESTROYED, "cleanUp");
             if (DEBUG_APP) Slog.v(TAG_APP, "Clearing app during cleanUp for activity " + this);
             detachFromProcess();
@@ -4663,6 +4685,11 @@ public final class ActivityRecord extends WindowToken {
                     firstWindowDrawn = true;
                 }
                 if (fromActivity.isVisible()) {
+                    // Collect this activity in case it isn't yet visible from resume.
+                    if (Flags.transferStartingWindowToNextWhenInvisible()
+                            && !isVisibleRequested()) {
+                        mTransitionController.collect(this);
+                    }
                     setVisible(true);
                     setVisibleRequested(true);
                     mWmService.mAnimator.addSurfaceVisibilityUpdate(this);
@@ -4752,6 +4779,46 @@ public final class ActivityRecord extends WindowToken {
             }
             return !fromActivity.isVisibleRequested() && transferStartingWindow(fromActivity);
         });
+    }
+
+    /**
+     * Tries to transfer the starting window from this activity in the task but will not visible
+     * anymore. This is a common scenario apps use: A trampoline activity is started on top of an
+     * existing Task, the starting windowing should transfer to the activity below once the
+     * trampoline activity finishes.
+     */
+    void transferStartingWindowToNextRunningIfNeeded() {
+        if (mStartingData == null) {
+            return;
+        }
+        final ActivityRecord next = task.topRunningActivity();
+        if (next == null || next == this) {
+            return;
+        }
+        final WindowState mainWin = next.findMainWindow(false);
+        if (mainWin != null && mainWin.mWinAnimator.getShown()) {
+            // Next activity already has a visible window, so doesn't need to transfer the starting
+            // window from this activity to here. The starting window will be removed with this
+            // activity.
+            return;
+        }
+        final StartingData tmpStartingData = mStartingData;
+        if (tmpStartingData != null && tmpStartingData.mAssociatedTask == null
+                && mTransitionController.isCollecting(this)
+                && tmpStartingData instanceof SnapshotStartingData) {
+            final Rect myBounds = getBounds();
+            final Rect nextBounds = next.getBounds();
+            if (!myBounds.equals(nextBounds)) {
+                // Mark as no animation, so these changes won't merge into playing transition.
+                if (mTransitionController.inPlayingTransition(this)) {
+                    mTransitionController.setNoAnimation(next);
+                    mTransitionController.setNoAnimation(this);
+                }
+                removeStartingWindow();
+                return;
+            }
+        }
+        next.transferStartingWindow(this);
     }
 
     boolean isKeyguardLocked() {
@@ -5509,6 +5576,9 @@ public final class ActivityRecord extends WindowToken {
         setVisibleRequested(visible);
 
         if (!visible) {
+            if (Flags.transferStartingWindowToNextWhenInvisible()) {
+                transferStartingWindowToNextRunningIfNeeded();
+            }
             // Because starting window was transferred, this activity may be a trampoline which has
             // been occluded by next activity. If it has added windows, set client visibility
             // immediately to avoid the client getting RELAYOUT_RES_FIRST_TIME from relayout and
@@ -5533,7 +5603,9 @@ public final class ActivityRecord extends WindowToken {
             ProtoLog.v(WM_DEBUG_ADD_REMOVE, "No longer Stopped: %s", this);
             mAppStopped = false;
 
-            transferStartingWindowFromHiddenAboveTokenIfNeeded();
+            if (!Flags.transferStartingWindowToNextWhenInvisible()) {
+                transferStartingWindowFromHiddenAboveTokenIfNeeded();
+            }
         }
         requestUpdateWallpaperIfNeeded();
 
@@ -5663,12 +5735,8 @@ public final class ActivityRecord extends WindowToken {
 
     /** Updates draw state and shows drawn windows. */
     void commitFinishDrawing(SurfaceControl.Transaction t) {
-        boolean committed = false;
         for (int i = mChildren.size() - 1; i >= 0; i--) {
-            committed |= mChildren.get(i).commitFinishDrawing(t);
-        }
-        if (committed) {
-            requestUpdateWallpaperIfNeeded();
+            mChildren.get(i).commitFinishDrawing(t);
         }
     }
 
@@ -5727,10 +5795,10 @@ public final class ActivityRecord extends WindowToken {
         final State prevState = mState;
         mState = state;
 
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         callServiceTrackeronActivityStatechange(state, false);
 
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         if (getTaskFragment() != null) {
             getTaskFragment().onActivityStateChanged(this, state, reason);
         }
@@ -5806,7 +5874,7 @@ public final class ActivityRecord extends WindowToken {
     }
 
     void callServiceTrackeronActivityStatechange(State state, boolean early_notify) {
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         IServicetracker mServicetracker;
         ActivityDetails aDetails = new ActivityDetails();
         ActivityStats aStats = new ActivityStats();
@@ -5860,7 +5928,7 @@ public final class ActivityRecord extends WindowToken {
                 aState = ActivityStates.RESTARTING_PROCESS;
                 break;
         }
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
 // QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
         if (!isLowRamDevice) {
             if(DEBUG_SERVICETRACKER) {
@@ -5878,12 +5946,12 @@ public final class ActivityRecord extends WindowToken {
                     mAtmService.mTaskSupervisor.destroyServicetrackerInstance();
             }
 // QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         }
 
     }
 
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
     private void notifyActivityStartedToContentCaptureService() {
         final ContentCaptureManagerInternal contentCaptureService =
                 LocalServices.getService(ContentCaptureManagerInternal.class);
@@ -6112,10 +6180,7 @@ public final class ActivityRecord extends WindowToken {
             setVisibility(true);
             app.postPendingUiCleanMsg(true);
             if (reportToClient) {
-                mClientVisibilityDeferred = false;
                 makeActiveIfNeeded(starting);
-            } else {
-                mClientVisibilityDeferred = true;
             }
             // The activity may be waiting for stop, but that is no longer appropriate for it.
             mTaskSupervisor.mStoppingActivities.remove(this);
@@ -6178,9 +6243,9 @@ public final class ActivityRecord extends WindowToken {
             }
             // An activity must be in the {@link PAUSING} state for the system to validate
             // the move to {@link PAUSED}.
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             callServiceTrackeronActivityStatechange(PAUSING, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             setState(PAUSING, "makeActiveIfNeeded");
             EventLogTags.writeWmPauseActivity(mUserId, System.identityHashCode(this),
                     shortComponentName, "userLeaving=false", "make-active");
@@ -6191,13 +6256,13 @@ public final class ActivityRecord extends WindowToken {
             if (DEBUG_VISIBILITY) {
                 Slog.v(TAG_VISIBILITY, "Start visible activity, " + this);
             }
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             callServiceTrackeronActivityStatechange(STARTED, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             setState(STARTED, "makeActiveIfNeeded");
-// QTI_BEGIN: 2023-09-19: Performance: Perf: Activity boost optimization.
+// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
             acquireActivityBoost();
-// QTI_END: 2023-09-19: Performance: Perf: Activity boost optimization.
+// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
 
             final StartActivityItem item = new StartActivityItem(token, takeSceneTransitionInfo());
             mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(), item);
@@ -6322,6 +6387,7 @@ public final class ActivityRecord extends WindowToken {
         }
         r.setCustomizeSplashScreenExitAnimation(handleSplashScreenExit);
         r.setSavedState(null /* savedState */);
+        r.setHandoffActivityData(null /* handoffActivityData */);
 
         r.mDisplayContent.handleActivitySizeCompatModeIfNeeded(r);
         r.mDisplayContent.mUnknownAppVisibilityController.notifyAppResumedFinished(r);
@@ -6362,11 +6428,11 @@ public final class ActivityRecord extends WindowToken {
 
         mTaskSupervisor.updateHomeProcessIfNeeded(this);
         try {
-// QTI_BEGIN: 2024-07-31: Performance: Launch preferred apps only for home activity
+// QTI_BEGIN: 2024-07-31: Core: Launch preferred apps only for home activity
             if (isActivityTypeHome()) {
                 mTaskSupervisor.new PreferredAppsTask().execute();
             }
-// QTI_END: 2024-07-31: Performance: Launch preferred apps only for home activity
+// QTI_END: 2024-07-31: Core: Launch preferred apps only for home activity
         } catch (Exception e) {
             Slog.v (TAG, "Exception: " + e);
         }
@@ -6424,9 +6490,9 @@ public final class ActivityRecord extends WindowToken {
                         shortComponentName, pausingActivity != null
                                 ? pausingActivity.shortComponentName : "(none)");
                 if (isState(PAUSING)) {
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
                     callServiceTrackeronActivityStatechange(PAUSED, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
                     setState(PAUSED, "activityPausedLocked");
                     if (finishing) {
                         ProtoLog.v(WM_DEBUG_STATES,
@@ -6505,9 +6571,9 @@ public final class ActivityRecord extends WindowToken {
         final boolean isSuccessful = mAtmService.getLifecycleManager().scheduleTransactionItem(
                 app.getThread(), item);
         if (isSuccessful) {
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             callServiceTrackeronActivityStatechange(STOPPING, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             final int lastReportedWinMode = mLastReportedConfiguration.getMergedConfiguration()
                     .windowConfiguration.getWindowingMode();
             if (isPip2ExperimentEnabled()
@@ -6523,9 +6589,9 @@ public final class ActivityRecord extends WindowToken {
             mAppStopped = true;
             mStoppedTime = SystemClock.uptimeMillis();
             ProtoLog.v(WM_DEBUG_STATES, "Stop failed; moving to STOPPED: %s", this);
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             callServiceTrackeronActivityStatechange(STOPPED, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             setState(STOPPED, "stopIfPossible");
         }
     }
@@ -6534,8 +6600,11 @@ public final class ActivityRecord extends WindowToken {
      * Notifies that the activity has stopped, and it is okay to destroy any surfaces which were
      * keeping alive in case they were still being used.
      */
-    void activityStopped(Bundle newIcicle, PersistableBundle newPersistentState,
-            CharSequence description) {
+    void activityStopped(
+        Bundle newIcicle,
+        PersistableBundle newPersistentState,
+        HandoffActivityData newHandoffActivityData,
+        CharSequence description) {
         removeStopTimeout();
         final boolean isStopping = mState == STOPPING;
         if (!isStopping && mState != RESTARTING_PROCESS) {
@@ -6553,6 +6622,9 @@ public final class ActivityRecord extends WindowToken {
             setSavedState(newIcicle);
             launchCount = 0;
             updateTaskDescription(description);
+        }
+        if (newHandoffActivityData != null) {
+            setHandoffActivityData(newHandoffActivityData);
         }
         ProtoLog.i(WM_DEBUG_STATES, "Saving icicle of %s: %s", this, mIcicle);
 
@@ -6701,25 +6773,29 @@ public final class ActivityRecord extends WindowToken {
         }
     }
 
-// QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
     protected void releaseActivityBoost() {
-// QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_END: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
         if (mPerf != null && perfActivityBoostHandler > 0) {
             mPerf.perfLockReleaseHandler(perfActivityBoostHandler);
             perfActivityBoostHandler = -1;
         } else if (perfActivityBoostHandler > 0) {
             Slog.w(TAG, "activity boost didn't release as expected");
         }
-// QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
     }
 
-// QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
-// QTI_BEGIN: 2023-09-19: Performance: Perf: Activity boost optimization.
+// QTI_END: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
     protected void acquireActivityBoost() {
         if (mPerf != null) {
+// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
             if (mPerf.isUiPerfEnabled(mWmService.mContext, packageName)) {
                 return;
             }
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
+// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
             if (mPerf.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
                 int pkgType = mPerf.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                         packageName);
@@ -6752,12 +6828,12 @@ public final class ActivityRecord extends WindowToken {
         }
     }
 
-// QTI_END: 2023-09-19: Performance: Perf: Activity boost optimization.
-// QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
+// QTI_BEGIN: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
     /** Called when the windows associated app window container are drawn. */
     private void onWindowsDrawn() {
         releaseActivityBoost();
-// QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_END: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
         final TransitionInfoSnapshot info = mTaskSupervisor
                 .getActivityMetricsLogger().notifyWindowsDrawn(this);
         final boolean validInfo = info != null;
@@ -6781,7 +6857,7 @@ public final class ActivityRecord extends WindowToken {
 
     /** Called when the windows associated app window container are visible. */
     void onWindowsVisible() {
-        /* QTI_BEGIN */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
         if (mPerf != null && mPerf.isUiPerfEnabled(mWmService.mContext, packageName)) {
             int hint = mPerf.getUiPerfHint(mWmService.mContext, info.name);
             if (hint != -1) {
@@ -6790,8 +6866,8 @@ public final class ActivityRecord extends WindowToken {
                          hint, "android", timeout_ms);
             }
         }
-        /* QTI_END */
 
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
         if (DEBUG_VISIBILITY) Slog.v(TAG_WM, "Reporting visible in " + token);
         mTaskSupervisor.stopWaitingForActivityVisible(this);
         if (DEBUG_SWITCH) Log.v(TAG_SWITCH, "windowsVisibleLocked(): " + this);
@@ -6811,12 +6887,12 @@ public final class ActivityRecord extends WindowToken {
 
     /** Called when the windows associated app window container are no longer visible. */
     void onWindowsGone() {
-        /* QTI_BEGIN */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
         if (mPerfScenarioBoostHandler != -1 && mPerf != null) {
             mPerf.perfLockReleaseHandler(mPerfScenarioBoostHandler);
             mPerfScenarioBoostHandler = -1;
         }
-        /* QTI_END */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
         if (DEBUG_VISIBILITY) Slog.v(TAG_WM, "Reporting gone in " + token);
         if (DEBUG_SWITCH) Log.v(TAG_SWITCH, "windowsGone(): " + this);
         nowVisible = false;
@@ -7804,6 +7880,24 @@ public final class ActivityRecord extends WindowToken {
                 && newParentConfiguration.assetsSeq > requestedOverrideConfig.assetsSeq) {
             requestedOverrideConfig.assetsSeq = ASSETS_SEQ_UNDEFINED;
         }
+
+        // Retain the following configs for PiP so that the activity doesn't get destroyed and
+        // recreated on display transfer.
+        if (ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS.isTrue() && inPinnedWindowingMode()) {
+            final Configuration lastReportedMergedConfig =
+                    mLastReportedConfiguration.getMergedConfiguration();
+            int configChanges = info.getRealConfigChanged();
+            if ((configChanges & ActivityInfo.CONFIG_COLOR_MODE) == 0) {
+                requestedOverrideConfig.colorMode = lastReportedMergedConfig.colorMode;
+            }
+            if ((configChanges & ActivityInfo.CONFIG_TOUCHSCREEN) == 0) {
+                requestedOverrideConfig.touchscreen = lastReportedMergedConfig.touchscreen;
+            }
+            if ((configChanges & ActivityInfo.CONFIG_DENSITY) == 0) {
+                requestedOverrideConfig.densityDpi = lastReportedMergedConfig.densityDpi;
+            }
+        }
+
         super.resolveOverrideConfiguration(newParentConfiguration);
         final Configuration resolvedConfig = getResolvedOverrideConfiguration();
 
@@ -7828,8 +7922,7 @@ public final class ActivityRecord extends WindowToken {
 
         boolean shouldApplyLegacyInsets =
                 !isFloating(newParentConfiguration.windowConfiguration.getWindowingMode());
-        if (com.android.wm.shell.Flags.enableCreateAnyBubble()
-                && com.android.wm.shell.Flags.enableBubbleAppCompatFixes()) {
+        if (com.android.wm.shell.Flags.enableCreateAnyBubble()) {
             final Task task = getTask();
             if (task != null) {
                 // Similar to floating windows, an app bubble should not apply legacy insets.
@@ -8167,8 +8260,7 @@ public final class ActivityRecord extends WindowToken {
     }
 
     boolean isImmersiveMode(@NonNull Rect parentBounds) {
-        if (!mResolveConfigHint.mUseOverrideInsetsForConfig
-                && mWmService.mFlags.mInsetsDecoupledConfiguration) {
+        if (!mResolveConfigHint.mUseOverrideInsetsForConfig) {
             return false;
         }
         final Insets navBarInsets = mDisplayContent.getInsetsStateController()
@@ -8795,9 +8887,7 @@ public final class ActivityRecord extends WindowToken {
                 Configuration.configurationDiffToString(changes & ~(info.getRealConfigChanged())),
                 mLastReportedConfiguration);
 
-// QTI_BEGIN: 2024-03-28: Core: Revert PhoneLink in framework/base
         if (shouldRelaunchLocked(changes, mTmpConfig)) {
-// QTI_END: 2024-03-28: Core: Revert PhoneLink in framework/base
             final boolean displayMayChange = mTmpConfig.windowConfiguration.getDisplayRotation()
                     != getWindowConfiguration().getDisplayRotation()
                     || !mTmpConfig.windowConfiguration.getMaxBounds().equals(
@@ -9041,9 +9131,9 @@ public final class ActivityRecord extends WindowToken {
             mAtmService.getAppWarningsLocked().onResumeActivity(this);
         } else {
             removePauseTimeout();
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             callServiceTrackeronActivityStatechange(PAUSED, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
             setState(PAUSED, "relaunchActivityLocked");
         }
 
@@ -9071,12 +9161,57 @@ public final class ActivityRecord extends WindowToken {
         }
 
         // The restarting state avoids removing this record when process is died.
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         callServiceTrackeronActivityStatechange(RESTARTING_PROCESS, true);
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
         setState(RESTARTING_PROCESS, "restartActivityProcess");
 
-        if (!mVisibleRequested || mHaveState) {
+        if (mTransitionController.isShellTransitionsEnabled()) {
+            if (!ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue()
+                    && killInvisibleProcessOrPrepareForRestart()) {
+                return;
+            }
+            final Transition transition = new Transition(TRANSIT_RELAUNCH, 0 /* flags */,
+                    mTransitionController, mWmService.mSyncEngine);
+            mTransitionController.startCollectOrQueue(transition, (deferred) -> {
+                if (ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue()
+                        && killInvisibleProcessOrPrepareForRestart()) {
+                    transition.abort();
+                    return;
+                }
+                if (!ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue()
+                        && mState != RESTARTING_PROCESS) {
+                    transition.abort();
+                    return;
+                }
+                if (!attachedToProcess()) {
+                    transition.abort();
+                    return;
+                }
+                final ActionChain chain = mAtmService.mChainTracker.start(
+                        "restartProc", transition);
+                chain.collect(this);
+                // Make sure this will be a change in the transition.
+                transition.setKnownConfigChanges(this, CONFIG_WINDOW_CONFIGURATION);
+                mTransitionController.requestStartTransition(transition, task,
+                        null /* remoteTransition */, null /* displayChange */);
+                scheduleStopForRestartProcess();
+                mAtmService.mChainTracker.end();
+            });
+        } else {
+            if (killInvisibleProcessOrPrepareForRestart()) {
+                return;
+            }
+            scheduleStopForRestartProcess();
+        }
+    }
+
+    /**
+     * Returns {@code true} if the process is killed as the app is invisible. Otherwise, do some
+     * preparation to restart the process.
+     */
+    private boolean killInvisibleProcessOrPrepareForRestart() {
+        if (!mVisibleRequested || (!ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue() && mHaveState)) {
             // Kill its process immediately because the activity should be in background.
             // The activity state will be update to {@link #DESTROYED} in
             // {@link ActivityStack#cleanUp} when handling process died.
@@ -9091,7 +9226,13 @@ public final class ActivityRecord extends WindowToken {
                 }
                 mAtmService.mAmInternal.killProcess(wpc.mName, wpc.mUid, "resetConfig");
             });
-            return;
+            return true;
+        }
+
+        final boolean fullscreenOverrideChanged =
+                mAppCompatController.getAspectRatioOverrides().resetSystemFullscreenOverrideCache();
+        if (fullscreenOverrideChanged) {
+            task.updateForceResizeOverridesIfNeeded(this);
         }
 
         // Process restart may require trampoline activity launch, for which app switching needs to
@@ -9101,29 +9242,7 @@ public final class ActivityRecord extends WindowToken {
         if (ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS.isTrue()) {
             mAtmService.resumeAppSwitches();
         }
-
-        if (mTransitionController.isShellTransitionsEnabled()) {
-            final Transition transition = new Transition(TRANSIT_RELAUNCH, 0 /* flags */,
-                    mTransitionController, mWmService.mSyncEngine);
-            mTransitionController.startCollectOrQueue(transition, (deferred) -> {
-                if (mState != RESTARTING_PROCESS || !attachedToProcess()) {
-                    transition.abort();
-                    return;
-                }
-                final ActionChain chain = mAtmService.mChainTracker.start(
-                        "restartProc", transition);
-                // Request invisible so there will be a change after the activity is restarted
-                // to be visible.
-                setVisibleRequested(false);
-                chain.collect(this);
-                mTransitionController.requestStartTransition(transition, task,
-                        null /* remoteTransition */, null /* displayChange */);
-                scheduleStopForRestartProcess();
-                mAtmService.mChainTracker.end();
-            });
-        } else {
-            scheduleStopForRestartProcess();
-        }
+        return false;
     }
 
     private void scheduleStopForRestartProcess() {
@@ -9487,40 +9606,16 @@ public final class ActivityRecord extends WindowToken {
             proto.write(PROC_ID, app.getPid());
         }
         proto.write(PIP_AUTO_ENTER_ENABLED, pictureInPictureArgs.isAutoEnterEnabled());
-        proto.write(IN_SIZE_COMPAT_MODE, inSizeCompatMode());
-        proto.write(MIN_ASPECT_RATIO, getMinAspectRatio());
         // Only record if max bounds sandboxing is applied, if the caller has the necessary
         // permission to access the device configs.
         proto.write(PROVIDES_MAX_BOUNDS, providesMaxBounds());
         proto.write(ENABLE_RECENTS_SCREENSHOT, mEnableRecentsScreenshot);
         proto.write(LAST_DROP_INPUT_MODE, mLastDropInputMode);
         proto.write(OVERRIDE_ORIENTATION, getOverrideOrientation());
-        proto.write(SHOULD_SEND_COMPAT_FAKE_FOCUS, shouldSendCompatFakeFocus());
-        final AppCompatCameraOverrides cameraOverrides =
-                mAppCompatController.getCameraOverrides();
-        proto.write(SHOULD_FORCE_ROTATE_FOR_CAMERA_COMPAT,
-                cameraOverrides.shouldForceRotateForCameraCompat());
-        proto.write(SHOULD_REFRESH_ACTIVITY_FOR_CAMERA_COMPAT,
-                cameraOverrides.shouldRefreshActivityForCameraCompat());
-        proto.write(SHOULD_REFRESH_ACTIVITY_VIA_PAUSE_FOR_CAMERA_COMPAT,
-                cameraOverrides.shouldRefreshActivityViaPauseForCameraCompat());
-        final AppCompatAspectRatioOverrides aspectRatioOverrides =
-                mAppCompatController.getAspectRatioOverrides();
-        proto.write(SHOULD_OVERRIDE_MIN_ASPECT_RATIO,
-                aspectRatioOverrides.shouldOverrideMinAspectRatio());
-        proto.write(SHOULD_IGNORE_ORIENTATION_REQUEST_LOOP,
-                mAppCompatController.getOrientationOverrides()
-                        .shouldIgnoreOrientationRequestLoop());
-        proto.write(SHOULD_OVERRIDE_FORCE_RESIZE_APP,
-                mAppCompatController.getResizeOverrides().shouldOverrideForceResizeApp());
-        proto.write(SHOULD_ENABLE_USER_ASPECT_RATIO_SETTINGS,
-                aspectRatioOverrides.shouldEnableUserAspectRatioSettings());
-        proto.write(IS_USER_FULLSCREEN_OVERRIDE_ENABLED,
-                aspectRatioOverrides.isUserFullscreenOverrideEnabled());
         proto.write(REQUEST_OPEN_IN_BROWSER_EDUCATION_TIMESTAMP,
                 mRequestOpenInBrowserEducationTimestamp);
-        proto.write(SHOULD_ALLOW_SIMULATE_REQUESTED_ORIENTATION_FOR_CAMERA_COMPAT,
-                cameraOverrides.shouldApplyFreeformTreatmentForCameraCompat());
+
+        mAppCompatController.dumpDebug(proto);
     }
 
     @Override
@@ -9572,7 +9667,11 @@ public final class ActivityRecord extends WindowToken {
     void setPictureInPictureParams(PictureInPictureParams p) {
         pictureInPictureArgs.copyOnlySet(p);
         adjustPictureInPictureParamsIfNeeded(getBounds());
-        getTask().getRootTask().onPictureInPictureParamsChanged();
+        if (ENABLE_PIP_PARAMS_UPDATE_NOTIFICATION_BUGFIX.isTrue()) {
+            getTask().onPictureInPictureParamsChanged();
+        } else {
+            getTask().getRootTask().onPictureInPictureParamsChanged();
+        }
     }
 
     void setShouldDockBigOverlays(boolean shouldDockBigOverlays) {

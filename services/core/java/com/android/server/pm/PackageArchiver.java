@@ -125,7 +125,7 @@ import java.util.concurrent.CompletableFuture;
 public class PackageArchiver {
 
     private static final String TAG = "PackageArchiverService";
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     public static final String EXTRA_UNARCHIVE_INTENT_SENDER =
             "android.content.pm.extra.UNARCHIVE_INTENT_SENDER";
@@ -1282,6 +1282,7 @@ public class PackageArchiver {
             // Error already logged.
             return null;
         }
+        dialogIntent.putExtra(PackageInstaller.EXTRA_PACKAGE_NAME, appPackageName);
         dialogIntent.putExtra(EXTRA_INSTALLER_TITLE, installerTitle);
         return dialogIntent;
     }

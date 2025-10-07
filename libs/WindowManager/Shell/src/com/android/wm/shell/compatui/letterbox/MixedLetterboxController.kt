@@ -29,19 +29,23 @@ import javax.inject.Inject
  * implementations.
  */
 @WMSingleton
-class MixedLetterboxController @Inject constructor(
+class MixedLetterboxController
+@Inject
+constructor(
     private val singleSurfaceController: SingleSurfaceLetterboxController,
     private val multipleSurfaceController: MultiSurfaceLetterboxController,
     private val controllerStrategy: LetterboxControllerStrategy,
-    private val inputController: LetterboxInputController
-) : LetterboxController by singleSurfaceController.append(multipleSurfaceController)
-    .append(inputController) {
+    private val inputController: LetterboxInputController,
+) :
+    LetterboxController by singleSurfaceController
+        .append(multipleSurfaceController)
+        .append(inputController) {
 
     override fun createLetterboxSurface(
         key: LetterboxKey,
         transaction: Transaction,
         parentLeash: SurfaceControl,
-        token: WindowContainerToken?
+        token: WindowContainerToken?,
     ) {
         when (controllerStrategy.getLetterboxImplementationMode()) {
             SINGLE_SURFACE -> {
@@ -55,10 +59,14 @@ class MixedLetterboxController @Inject constructor(
                     key,
                     transaction,
                     parentLeash,
-                    token
+                    token,
                 )
             }
         }
-        inputController.createLetterboxSurface(key, transaction, parentLeash, token)
+        if (controllerStrategy.shouldSupportInputSurface()) {
+            inputController.createLetterboxSurface(key, transaction, parentLeash, token)
+        } else {
+            inputController.destroyLetterboxSurface(key, transaction)
+        }
     }
 }

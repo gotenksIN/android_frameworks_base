@@ -72,13 +72,18 @@
     <string name="CLIRDefaultOnNextCallOff" msgid="5036749051007098105">"ID do autor da chamada é predefinido como restrito. Chamada seguinte: Não restrita"</string>
     <string name="CLIRDefaultOffNextCallOn" msgid="1022781126694885017">"ID do autor da chamada é predefinido como não restrito. Chamada seguinte: Restrita"</string>
     <string name="CLIRDefaultOffNextCallOff" msgid="2491576172356463443">"ID do autor da chamada é predefinido com não restrito. Chamada seguinte: Não restrita"</string>
-    <string name="page_size_compat_apk_warning" msgid="2982396798449041224">"Esta app não é compatível com 16 KB. Falha na verificação do alinhamento do APK. Esta app vai ser executada através do modo compatível com o tamanho da página. Para uma melhor compatibilidade, recompile a aplicação de forma a ser compatível com 16 KB. Para ver mais informações, consulte &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
-    <string name="page_size_compat_elf_warning" msgid="6753874059564812651">"Esta app não é compatível com 16 KB. Falha na verificação do alinhamento do ELF. Esta app vai ser executada através do modo compatível com o tamanho da página. Para uma melhor compatibilidade, recompile a aplicação de forma a ser compatível com 16 KB. Para ver mais informações, consulte &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
-    <string name="page_size_compat_apk_and_elf_warning" msgid="7628675779500605390">"Esta app não é compatível com 16 KB. As verificações de alinhamento do APK e do ELF falharam. Esta app vai ser executada através do modo compatível com o tamanho da página. Para uma melhor compatibilidade, recompile a aplicação de forma a ser compatível com 16 KB. Para ver mais informações, consulte &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
-    <string name="page_size_compat_apk_warning_4kb" msgid="2104642120436642689">"Este aviso está a ser apresentado porque esta é uma app depurável que está atualmente a ser testada. Se não for o programador, comunique este problema ao programador e peça uma app não depurável. Esta app não é compatível com 16 KB. Falha na verificação do alinhamento do APK. Siga os passos em &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
-    <string name="page_size_compat_elf_warning_4kb" msgid="8038334656395476900">"Este aviso está a ser apresentado porque esta é uma app depurável que está atualmente a ser testada. Se não for o programador, comunique este problema ao programador e peça uma app não depurável. Esta app não é compatível com 16 KB. Falha na verificação do alinhamento do ELF. Siga os passos em &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
-    <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="5417036941497610850">"Este aviso está a ser apresentado porque esta é uma app depurável que está atualmente a ser testada. Se não for o programador, comunique este problema ao programador e peça uma app não depurável. Esta app não é compatível com 16 KB. As verificações de alinhamento do APK e do ELF falharam. Siga os passos em &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;"</string>
+    <string name="page_size_compat_apk_warning" msgid="2297836366674721648">"Esta app não é compatível com 16 KB. Falha na verificação do alinhamento do APK. Esta app vai ser executada através do modo compatível com o tamanho da página. Para uma melhor compatibilidade, recompile a aplicação de forma a ser compatível com 16 KB. Para mais informações, consulte o artigo &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; &lt;br&gt;&lt;br&gt; As seguintes bibliotecas não estão alinhadas com 16 KB: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_elf_warning" msgid="8613720928493005883">"Esta app não é compatível com 16 KB. Falha na verificação do alinhamento do ELF. Esta app vai ser executada através do modo compatível com o tamanho da página. Para uma melhor compatibilidade, recompile a aplicação de forma a ser compatível com 16 KB. Para mais informações, consulte o artigo &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; &lt;br&gt;&lt;br&gt; As seguintes bibliotecas não estão alinhadas com 16 KB: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_warning" msgid="9034695801295605229">"Esta app não é compatível com 16 KB. As verificações de alinhamento do APK e do ELF falharam. Esta app vai ser executada através do modo compatível com o tamanho da página. Para uma melhor compatibilidade, recompile a aplicação de forma a ser compatível com 16 KB. Para mais informações, consulte o artigo &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; &lt;br&gt;&lt;br&gt; As seguintes bibliotecas não estão alinhadas com 16 KB: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_warning_4kb" msgid="5676451039424864495">"Este aviso está a ser apresentado porque esta é uma app depurável que está atualmente a ser testada. Se não for o programador, comunique este problema ao programador e peça uma app não depurável. &lt;br&gt;&lt;br&gt; Esta app não é compatível com 16 KB. Falha na verificação do alinhamento do APK. Siga os passos em &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; &lt;br&gt;&lt;br&gt; As seguintes bibliotecas não estão alinhadas com 16 KB: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_elf_warning_4kb" msgid="5005239480522831311">"Este aviso está a ser apresentado porque esta é uma app depurável que está atualmente a ser testada. Se não for o programador, comunique este problema ao programador e peça uma app não depurável. &lt;br&gt;&lt;br&gt; Esta app não é compatível com 16 KB. Falha na verificação do alinhamento do ELF. Siga os passos em &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; &lt;br&gt;&lt;br&gt; As seguintes bibliotecas não estão alinhadas com 16 KB: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="997926487776340721">"Este aviso está a ser apresentado porque esta é uma app depurável que está atualmente a ser testada. Se não for o programador, comunique este problema ao programador e peça uma app não depurável. &lt;br&gt;&lt;br&gt; Esta app não é compatível com 16 KB. As verificações de alinhamento do APK e do ELF falharam. Siga os passos em &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt;. &lt;br&gt;&lt;br&gt; As seguintes bibliotecas não estão alinhadas com 16 KB: &lt;br&gt;&lt;br&gt;"</string>
     <string name="page_size_compat_never_show" msgid="3391282612422783097">"Não mostrar de novo"</string>
+    <string name="page_size_compat_title" msgid="6497719153872572204">"Compatibilidade de apps Android"</string>
+    <string name="page_size_compat_elf_not_aligned" msgid="4404128993555194313">"&amp;#8226; %1$s: segmento LOAD não alinhado&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_not_aligned" msgid="1434875607880657092">"&amp;#8226; %1$s: biblioteca não comprimida não alinhada&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_not_aligned" msgid="7140216083697701972">"&amp;#8226; %1$s: o segmento LOAD e a biblioteca não comprimida não estão alinhados&lt;br&gt;"</string>
+    <string name="page_size_compat_unknown" msgid="5183026525148169891">"&amp;#8226; %1$s: erro desconhecido&lt;br&gt;"</string>
     <string name="serviceNotProvisioned" msgid="8289333510236766193">"Serviço não fornecido."</string>
     <string name="CLIRPermanent" msgid="166443681876381118">"Não pode alterar a definição da identificação de chamadas."</string>
     <string name="auto_data_switch_title" msgid="3286350716870518297">"Os dados móveis foram alterados para o operador <xliff:g id="CARRIERDISPLAY">%s</xliff:g>"</string>
@@ -165,14 +170,10 @@
     <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"Segurança de redes móveis"</string>
     <string name="scCellularNetworkSecuritySummary" msgid="7042036754550545005">"Encriptação e notificações para redes não encriptadas"</string>
     <string name="scIdentifierDisclosureIssueTitle" msgid="2898888825129970328">"ID do dispositivo acedido"</string>
-    <!-- no translation found for scIDIssueSummaryNotificationWithCellularID (8371590113242615316) -->
-    <skip />
-    <!-- no translation found for scIdentifierDisclosureIssueSummaryNotification (7106922007150754222) -->
-    <skip />
-    <!-- no translation found for scIDIssueSummaryWithCellularID (1189965658392583067) -->
-    <skip />
-    <!-- no translation found for scIdentifierDisclosureIssueSummary (4362014471570210380) -->
-    <skip />
+    <string name="scIDIssueSummaryNotificationWithCellularID" msgid="8371590113242615316">"À(s) <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>, uma rede próxima registou o ID exclusivo do seu dispositivo (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>) enquanto usava o seu SIM <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g>"</string>
+    <string name="scIdentifierDisclosureIssueSummaryNotification" msgid="7106922007150754222">"À(s) <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>, uma rede próxima registou o ID exclusivo do seu dispositivo enquanto usava o seu SIM <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g>"</string>
+    <string name="scIDIssueSummaryWithCellularID" msgid="1189965658392583067">"À(s) <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>, uma rede próxima registou o ID exclusivo do seu dispositivo (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>) enquanto usava o seu SIM <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g>.\n\nIsto significa que a sua localização, atividade ou identidade foram registadas. Esta é uma prática comum, mas pode ser um problema para pessoas preocupadas com a privacidade."</string>
+    <string name="scIdentifierDisclosureIssueSummary" msgid="4362014471570210380">"À(s) <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g>, uma rede próxima registou o ID exclusivo do seu dispositivo enquanto usava o seu SIM <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g>.\n\nIsto significa que a sua localização, atividade ou identidade foram registadas. Esta é uma prática comum, mas pode ser um problema para pessoas preocupadas com a privacidade."</string>
     <string name="scNullCipherIssueEncryptedTitle" msgid="234717016411824969">"Ligação estabelecida à rede <xliff:g id="NETWORK_NAME">%1$s</xliff:g> encriptada"</string>
     <string name="scNullCipherIssueEncryptedSummary" msgid="8577510708842150475">"Agora, a ligação ao SIM <xliff:g id="NETWORK_NAME">%1$s</xliff:g> é mais segura"</string>
     <string name="scNullCipherIssueNonEncryptedTitle" msgid="3978071464929453915">"Ligação estabelecida a uma rede não encriptada"</string>
@@ -300,6 +301,7 @@
     <string name="global_action_assist" msgid="2517047220311505805">"Assistência"</string>
     <string name="global_action_voice_assist" msgid="6655788068555086695">"Assist. de voz"</string>
     <string name="global_action_lockdown" msgid="2475471405907902963">"Bloquear"</string>
+    <string name="global_action_unrestricted_lock" msgid="7933224393323064116">"Bloquear"</string>
     <string name="status_bar_notification_info_overflow" msgid="3330152558746563475">"999+"</string>
     <string name="notification_compact_heads_up_reply" msgid="2425293958371284340">"Responder"</string>
     <string name="notification_hidden_text" msgid="2835519769868187223">"Nova notificação"</string>
@@ -365,12 +367,12 @@
     <string name="permgroupdesc_sensors" msgid="2610631290633747752">"aceder a dados do sensor acerca dos seus sinais vitais"</string>
     <string name="permgrouplab_notifications" msgid="5472972361980668884">"Notificações"</string>
     <string name="permgroupdesc_notifications" msgid="4608679556801506580">"mostrar notificações"</string>
-    <string name="permgrouplab_xr_eye_sensitive" msgid="2099659100156643683">"Dados de acomp. dos olhos de XR confid."</string>
-    <string name="permgroupdesc_xr_eye_sensitive" msgid="1414121516133760271">"aceder a dados confidenciais do olhar"</string>
-    <string name="permgrouplab_xr_tracking" msgid="7418994009794287471">"dados de monitorização de XR"</string>
-    <string name="permgroupdesc_xr_tracking" msgid="6777198859446500821">"aceder a dados de XR sobre si e o ambiente à sua volta"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="2993940754322250652">"Dados de acompanhamento de XR confid."</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="8498501397939308918">"aceder a dados de acompanhamento confidenciais sobre si e o ambiente à sua volta"</string>
+    <string name="permgrouplab_xr_eye_sensitive" msgid="1709596126334620353">"Dados de acompanhamento dos olhos"</string>
+    <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"acompanhar com precisão o movimento dos olhos"</string>
+    <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Dados de movimentos e área"</string>
+    <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"acompanhar os olhos, o rosto e o corpo e analisar a área"</string>
+    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Dados de área e mov. da cabeça precisos"</string>
+    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"acompanhar a cabeça com precisão e analisar a área"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Obter conteúdo da janela"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Inspecionar o conteúdo de uma janela com a qual está a interagir."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"Ativar Explorar Através do Toque"</string>
@@ -668,22 +670,22 @@
     <string name="permdesc_imagesWrite" msgid="5195054463269193317">"Permite que a app modifique a sua coleção de fotos."</string>
     <string name="permlab_mediaLocation" msgid="7368098373378598066">"ler as localizações a partir da sua coleção de multimédia"</string>
     <string name="permdesc_mediaLocation" msgid="597912899423578138">"Permite que a app leia as localizações a partir da sua coleção de multimédia."</string>
-    <string name="permlab_eye_tracking_coarse" msgid="7989596289790269059">"monitorizar o seu olhar aproximado"</string>
-    <string name="permdesc_eye_tracking_coarse" msgid="870510233930553355">"Permite que a app monitorize o seu olhar aproximado."</string>
-    <string name="permlab_eye_tracking_fine" msgid="6914457357027049512">"monitorizar para onde está a olhar"</string>
-    <string name="permdesc_eye_tracking_fine" msgid="5788889152304524730">"Permite que a app aceda a dados precisos do olhar."</string>
-    <string name="permlab_face_tracking" msgid="2272048395128283324">"monitorizar o seu rosto"</string>
-    <string name="permdesc_face_tracking" msgid="2622783922311211866">"Permite que a app aceda a dados de monitorização facial."</string>
-    <string name="permlab_hand_tracking" msgid="6478233866595566940">"monitorizar as suas mãos"</string>
-    <string name="permdesc_hand_tracking" msgid="8639715900104966456">"Permite que a app aceda a dados de monitorização das mãos."</string>
-    <string name="permlab_head_tracking" msgid="1309731456372087270">"monitorizar a sua cabeça"</string>
-    <string name="permdesc_head_tracking" msgid="231597390513699188">"Permite que a app aceda a dados de posição da cabeça."</string>
-    <string name="permlab_scene_understanding_coarse" msgid="6518646430502858641">"compreender o seu ambiente imediato"</string>
-    <string name="permdesc_scene_understanding_coarse" msgid="4508880777646198656">"Permite que a app aceda a dados de monitorização sobre o ambiente diretamente à sua volta."</string>
-    <string name="permlab_scene_understanding_fine" msgid="409126403264393251">"compreender o seu ambiente imediato com grande detalhe"</string>
-    <string name="permdesc_scene_understanding_fine" msgid="6223368011593524179">"Permite que a app aceda a dados de monitorização sobre o ambiente diretamente à sua volta com detalhes muito precisos."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="7117098718465619023">"aceder aos dados de XR quando não estiver em primeiro plano"</string>
-    <string name="permdesc_xr_tracking_in_background" msgid="939504041387836853">"Permite que app aceda a dados de XR quando não está em primeiro plano."</string>
+    <string name="permlab_eye_tracking_coarse" msgid="1266477998416112440">"acompanhar o movimento dos olhos"</string>
+    <string name="permdesc_eye_tracking_coarse" msgid="1652112796672085320">"Permite que a app acompanhe a direção aproximada do seu olhar."</string>
+    <string name="permlab_eye_tracking_fine" msgid="6208991021186455002">"acompanhar com precisão o movimento dos olhos"</string>
+    <string name="permdesc_eye_tracking_fine" msgid="9215360948852654836">"Permite que a app acompanhe a direção do seu olhar."</string>
+    <string name="permlab_face_tracking" msgid="6052126246676474909">"acompanhar os movimentos faciais"</string>
+    <string name="permdesc_face_tracking" msgid="185815778490412574">"Permite que a app acompanhe os seus movimentos e expressões faciais."</string>
+    <string name="permlab_hand_tracking" msgid="21944950887649088">"acompanhar os movimentos das mãos"</string>
+    <string name="permdesc_hand_tracking" msgid="8083783248481460669">"Permite que a app acompanhe os movimentos das suas mãos."</string>
+    <string name="permlab_head_tracking" msgid="4304699038992159853">"acompanhar os movimentos da cabeça"</string>
+    <string name="permdesc_head_tracking" msgid="2232184518548944223">"Permite que a app acompanhe os movimentos da sua cabeça."</string>
+    <string name="permlab_scene_understanding_coarse" msgid="8765236119358852920">"analisar a área circundante"</string>
+    <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Permite que a app analise o que está à sua volta."</string>
+    <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"analisar a área circundante com precisão"</string>
+    <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Permite que a app analise com precisão o que está à sua volta."</string>
+    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"acompanhar os dados de XR em segundo plano"</string>
+    <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Permite que a app aceda a dados de XR em segundo plano."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"capturar teclas"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Permite à app capturar as teclas antes de o sistema poder processar atalhos e ações do sistema."</string>
     <string name="biometric_app_setting_name" msgid="3339209978734534457">"Usar a biometria"</string>
@@ -691,6 +693,8 @@
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"Confirme a sua identidade"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"Utilize a biometria para continuar."</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"Utilize a biometria ou o bloqueio de ecrã para continuar"</string>
+    <string name="biometric_dialog_secondary_display_toast" product="default" msgid="256544327174107086">"Valide a sua identidade no telemóvel para continuar"</string>
+    <string name="biometric_dialog_secondary_display_toast" product="tablet" msgid="2855203015454795660">"Valide a sua identidade no tablet para continuar"</string>
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Hardware biométrico indisponível."</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"Autenticação cancelada"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"Não reconhecido."</string>
@@ -914,6 +918,7 @@
     <string name="policydesc_disableCamera" msgid="3204405908799676104">"Evitar a utilização de todas as câmaras do dispositivo."</string>
     <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"Desativar funcionalidades do bloqueio de ecrã"</string>
     <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"Impede a utilização de algumas funcionalidades de bloqueio de ecrã."</string>
+    <string name="exit_toast_on_long_press_escape" msgid="2983932499112557277">"Mantenha premida a tecla Esc para fechar esta app"</string>
   <string-array name="phoneTypes">
     <item msgid="8996339953292723951">"Casa"</item>
     <item msgid="7740243458912727194">"Móvel"</item>
@@ -1124,6 +1129,7 @@
     <string name="keyguard_accessibility_sim_pin_unlock" msgid="4895939120871890557">"Desbloqueio do SIM através de PIN."</string>
     <string name="keyguard_accessibility_sim_puk_unlock" msgid="3459003464041899101">"Desbloqueio do PUK do SIM."</string>
     <string name="keyguard_accessibility_password_unlock" msgid="6130186108581153265">"Desbloqueio através de palavra-passe."</string>
+    <string name="keyguard_accessibility_secure_lock_device_biometric_unlock" msgid="1884638289137214044">"Desbloqueio biométrico para bloquear o dispositivo de forma segura."</string>
     <string name="keyguard_accessibility_pattern_area" msgid="1419570880512350689">"Área da sequência."</string>
     <string name="keyguard_accessibility_slide_area" msgid="4331399051142520176">"Área de deslize."</string>
     <string name="password_keyboard_label_symbol_key" msgid="2716255580853511949">"?123"</string>
@@ -1481,8 +1487,6 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"RECUSAR"</string>
     <string name="select_input_method" msgid="3971267998568587025">"Escolher o método de entrada"</string>
     <string name="input_method_language_settings" msgid="8069089418056819437">"Definições de idioma"</string>
-    <string name="show_ime" msgid="6406112007347443383">"Mantê-lo no ecrã enquanto o teclado físico estiver ativo"</string>
-    <string name="hardware" msgid="3611039921284836033">"Usar o teclado no ecrã"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"Configure o dispositivo <xliff:g id="DEVICE_NAME">%s</xliff:g>"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"Configure teclados físicos"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"Toque para selecionar o idioma e o esquema"</string>
@@ -1840,6 +1844,7 @@
     <string name="owner_name" msgid="8713560351570795743">"Proprietário"</string>
     <string name="guest_name" msgid="8502103277839834324">"Convidado"</string>
     <string name="headless_system_user_name" msgid="1849150903255530049">"Utilizador do sistema"</string>
+    <string name="unnamed_user_name" msgid="6096699110534542980">"Utilizador"</string>
     <string name="error_message_title" msgid="4082495589294631966">"Erro"</string>
     <string name="error_message_change_not_allowed" msgid="843159705042381454">"O gestor não permite esta alteração"</string>
     <string name="app_not_found" msgid="3429506115332341800">"Não foram encontradas aplicações para executar esta ação"</string>
@@ -2043,6 +2048,12 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"Maximizar"</string>
     <string name="close_button_text" msgid="10603510034455258">"Fechar"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
+    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
+    <skip />
+    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
+    <skip />
+    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
+    <skip />
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Atender"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Vídeo"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Recusar"</string>
@@ -2511,7 +2522,7 @@
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Conteúdo da app ocultado da partilha de ecrã por motivos de segurança"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"Ligação de satélite estabelecida automaticamente"</string>
     <string name="satellite_notification_summary" msgid="5207364139430767162">"Pode enviar e receber mensagens sem uma rede móvel ou Wi-Fi"</string>
-    <string name="satellite_notification_summary_with_data" msgid="6486843676720429049">"Pode enviar e receber mensagens, e usar dados limitados, por satélite"</string>
+    <string name="satellite_notification_summary_with_data" msgid="8290202758586475712">"Pode enviar e receber mensagens, e usar apps selecionadas, por satélite"</string>
     <string name="satellite_notification_manual_title" msgid="1097504441849466279">"Quer usar as mensagens por satélite?"</string>
     <string name="satellite_notification_manual_summary" msgid="901206289846283445">"Envie e receba mensagens sem uma rede móvel ou Wi-Fi"</string>
     <string name="satellite_notification_open_message" msgid="4149234979688273729">"Abre a app Mensagens"</string>
@@ -2566,23 +2577,37 @@
     <string name="keyboard_shortcut_group_applications_calendar" msgid="3571770335653387606">"Calendário"</string>
     <string name="keyboard_shortcut_group_applications_calculator" msgid="6753209559716091507">"Calculadora"</string>
     <string name="keyboard_shortcut_group_applications_maps" msgid="7950000659522589471">"Maps"</string>
+    <string name="keyboard_shortcut_group_applications_files" msgid="863938400765838051">"Files"</string>
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"Aplicações"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"Já não é possível reconhecer as suas impressões digitais. Configure o Desbloqueio por impressão digital novamente."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Segurança e privacidade"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="7202983697003493711">"Primeiro, desbloqueie o ecrã"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="2648733588653060170">"Desbloqueie o ecrã e restabeleça ligação"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_text" msgid="1628936399413661929">"A Proteção avançada requer o desbloqueio de ecrã habitual para transferências de dados por USB"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="608846071408348658">"A Proteção avançada requer o desbloqueio de ecrã habitual para transferências de dados por USB"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_low_power_charge_notification_text" msgid="1240936298914360256">"A Proteção avançada requer o desbloqueio do ecrã para transferências por USB ou um carregamento rápido"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_low_power_charge_replug_notification_text" msgid="6370672468652821937">"A Proteção avançada requer o desbloqueio do ecrã para transferências por USB ou um carregamento rápido"</string>
-    <string name="usb_apm_usb_plugged_in_for_power_brick_notification_text" msgid="1673711307740787848">"A Proteção avançada requer o desbloqueio de ecrã habitual para o carregamento rápido por USB"</string>
-    <string name="usb_apm_usb_plugged_in_for_power_brick_replug_notification_text" msgid="1244847752922938852">"A Proteção avançada requer o desbloqueio de ecrã habitual para o carregamento rápido por USB"</string>
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
+    <skip />
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Silenciar"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Notificações silenciadas"</string>
-    <string name="usb_apm_usb_notification_silenced_text" msgid="6414815636131602513">"Notificações USB da Proteção avançada silenciadas até reiniciar o dispositivo"</string>
+    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
+    <skip />
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"Atividade USB suspeita"</string>
-    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="6537085605929303187">"O sinal de dados USB foi desativado."</string>
+    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
+    <skip />
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Está a ter problemas com o Desbloqueio por impressão digital?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Toque para rever dicas para melhorar a sua experiência de desbloqueio"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Sem intermitência"</string>
+    <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Mantenha premido o botão ligar/desligar para desligar a TV"</string>
+    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
+    <skip />
+    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
+    <skip />
+    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
+    <skip />
 </resources>

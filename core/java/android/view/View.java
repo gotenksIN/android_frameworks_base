@@ -54,7 +54,6 @@ import static android.view.flags.Flags.sensitiveContentAppProtection;
 import static android.view.flags.Flags.toolkitFrameRateBySizeReadOnly;
 import static android.view.flags.Flags.toolkitMetricsForFrameRateDecision;
 import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
-import static android.view.flags.Flags.toolkitVelocityMapSysprop;
 import static android.view.flags.Flags.toolkitViewgroupSetRequestedFrameRateApi;
 import static android.view.flags.Flags.viewVelocityApi;
 import static android.view.inputmethod.Flags.FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR;
@@ -2482,13 +2481,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     // initialization at Zygote.
     /** @hide */
     @VisibleForTesting
-    static final class NoPreloadHolder {
-        private static boolean sToolkitVelocityMapSyspropFlagValue = toolkitVelocityMapSysprop();
+    public static final class NoPreloadHolder {
         private static String sFrameRateSysProp =
                 ViewProperties.vrr_velocity_threshold().orElse("");
 
         static {
-            if (sToolkitVelocityMapSyspropFlagValue && !sFrameRateSysProp.isEmpty()) {
+            if (!sFrameRateSysProp.isEmpty()) {
                 sFrameRateMappings = parseFrameRateMapping(sFrameRateSysProp);
             }
         }
@@ -2499,7 +2497,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
          * @hide
          */
         @VisibleForTesting
-        static int[][] parseFrameRateMapping(String mappings) {
+        public static int[][] parseFrameRateMapping(String mappings) {
             if (mappings.isEmpty()) {
                 return null;
             }
@@ -5520,21 +5518,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     private ViewTreeObserver mFloatingTreeObserver;
 
     /**
-     * Cache the touch slop from the context that created the view.
-     */
-    private int mTouchSlop;
-
-    /**
-     * Cache the tap timeout from the context that created the view.
-     */
-    private int mTapTimeoutMillis;
-
-    /**
-     * Cache the ambiguous gesture multiplier from the context that created the view.
-     */
-    private float mAmbiguousGestureMultiplier;
-
-    /**
      * Object that handles automatic animation of view properties.
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
@@ -5905,8 +5888,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     private float mFrameContentVelocity = -1;
 
     @Nullable
-
     private ViewTranslationResponse mViewTranslationResponse;
+
+    private final ViewConfiguration mViewConfiguration;
 
     /**
      * The size in DP that is considered small for VRR purposes, if square.
@@ -6010,11 +5994,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 (PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT) |
                 (IMPORTANT_FOR_ACCESSIBILITY_DEFAULT << PFLAG2_IMPORTANT_FOR_ACCESSIBILITY_SHIFT);
 
-        final ViewConfiguration configuration = ViewConfiguration.get(context);
-        mTouchSlop = configuration.getScaledTouchSlop();
-        mTapTimeoutMillis = Flags.viewconfigurationApis()
-                ? configuration.getTapTimeoutMillis() : ViewConfiguration.getTapTimeout();
-        mAmbiguousGestureMultiplier = configuration.getScaledAmbiguousGestureMultiplier();
+        mViewConfiguration = ViewConfiguration.get(context);
 
         setOverScrollMode(OVER_SCROLL_IF_CONTENT_SCROLLS);
         mUserPaddingStart = UNDEFINED_PADDING;
@@ -7018,6 +6998,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     View() {
         mResources = null;
         mRenderNode = RenderNode.create(getClass().getName(), new ViewAnimationHostBridge(this));
+        mViewConfiguration = new ViewConfiguration();
     }
 
     /**
@@ -7274,7 +7255,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         mScrollCache.fadingEdgeLength = a.getDimensionPixelSize(
                 R.styleable.View_fadingEdgeLength,
-                ViewConfiguration.get(mContext).getScaledFadingEdgeLength());
+            mViewConfiguration.getScaledFadingEdgeLength());
     }
 
     /**
@@ -7517,7 +7498,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         scrollabilityCache.scrollBarSize = a.getDimensionPixelSize(
                 com.android.internal.R.styleable.View_scrollbarSize,
-                ViewConfiguration.get(mContext).getScaledScrollBarSize());
+                mViewConfiguration.getScaledScrollBarSize());
 
         Drawable track = a.getDrawable(R.styleable.View_scrollbarTrackHorizontal);
         scrollabilityCache.scrollBar.setHorizontalTrackDrawable(track);
@@ -7676,7 +7657,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     private void initScrollCache() {
         if (mScrollCache == null) {
-            mScrollCache = new ScrollabilityCache(ViewConfiguration.get(mContext), this);
+            mScrollCache = new ScrollabilityCache(mViewConfiguration, this);
         }
     }
 
@@ -13093,19 +13074,28 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         }
     }
 
-    private void deepCopyRectsObjectRecycling(@NonNull ArrayList<Rect> dest, List<Rect> src) {
-        dest.ensureCapacity(src.size());
-        for (int i = 0; i < src.size(); i++) {
-            if (i < dest.size()) {
-                // Replace if there is an old rect to refresh
-                dest.get(i).set(src.get(i));
+    private void deepCopyRectsObjectRecycling(
+            @NonNull ArrayList<Rect> dest, @NonNull List<Rect> src) {
+        final int srcN = src.size();
+        final int destN = dest.size();
+        dest.ensureCapacity(srcN);
+
+        // Copy over the existing elements in-place.
+        for (int i = 0; i < srcN && i < destN; i++) {
+            final Rect destVal = dest.get(i);
+            final Rect srcVal = src.get(i);
+            if (srcVal == null || destVal == null) {
+                dest.set(i, Rect.copyOrNull(srcVal));
             } else {
-                // Add a rect if the list enlarged
-                dest.add(Rect.copyOrNull(src.get(i)));
+                destVal.set(srcVal);
             }
         }
-        while (dest.size() > src.size()) {
-            // Remove elements if the list shrank
+        // Add new elements if the list needs to grow.
+        for (int i = destN; i < srcN; i++) {
+            dest.add(Rect.copyOrNull(src.get(i)));
+        }
+        // Remove elements if the list needs to shrink.
+        for (int i = destN; i > srcN; i--) {
             dest.removeLast();
         }
     }
@@ -13327,7 +13317,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     List<Rect> collectPreferKeepClearRects() {
         ListenerInfo info = mListenerInfo;
         boolean keepClearForFocus = isFocused()
-                && ViewConfiguration.get(mContext).isPreferKeepClearForFocusEnabled();
+                && mViewConfiguration.isPreferKeepClearForFocusEnabled();
         boolean keepBoundsClear = (info != null && info.mPreferKeepClear) || keepClearForFocus;
         boolean hasCustomKeepClearRects = info != null && info.mKeepClearRects != null;
 
@@ -13350,7 +13340,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     private void updatePreferKeepClearForFocus() {
-        if (ViewConfiguration.get(mContext).isPreferKeepClearForFocusEnabled()) {
+        if (mViewConfiguration.isPreferKeepClearForFocusEnabled()) {
             updatePositionUpdateListener();
             post(this::updateKeepClearRects);
         }
@@ -16781,9 +16771,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         final int actionMasked = event.getActionMasked();
         if (actionMasked == MotionEvent.ACTION_DOWN) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(3);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             // Defensive cleanup for new gesture
             stopNestedScroll();
         }
@@ -16872,15 +16862,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             // Window is obscured, drop this touch.
             return false;
         }
-        if (android.view.accessibility.Flags.preventA11yNontoolFromInjectingIntoSensitiveViews()) {
-            if (event.isInjectedFromAccessibilityService()
-                    // If the event came from an Accessibility Service that does *not* declare
-                    // itself as AccessibilityServiceInfo#isAccessibilityTool and this View is
-                    // declared sensitive then drop the event.
-                    // Only Accessibility Tools are allowed to interact with sensitive Views.
-                    && !event.isInjectedFromAccessibilityTool() && isAccessibilityDataSensitive()) {
-                return false;
-            }
+        if (event.isInjectedFromAccessibilityService()
+                // If the event came from an Accessibility Service that does *not* declare
+                // itself as AccessibilityServiceInfo#isAccessibilityTool and this View is
+                // declared sensitive then drop the event.
+                // Only Accessibility Tools are allowed to interact with sensitive Views.
+                && !event.isInjectedFromAccessibilityTool() && isAccessibilityDataSensitive()) {
+            return false;
         }
         return true;
     }
@@ -16975,8 +16963,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             // 2) Limits latency from the `ViewConfiguration` API, which may be slow due to feature
             //    flag querying.
             if ((mPrivateFlags4 & PFLAG4_ROTARY_HAPTICS_DETERMINED) == 0) {
-                if (ViewConfiguration.get(mContext)
-                        .isViewBasedRotaryEncoderHapticScrollFeedbackEnabled()) {
+                if (mViewConfiguration.isViewBasedRotaryEncoderHapticScrollFeedbackEnabled()) {
                     mPrivateFlags4 |= PFLAG4_ROTARY_HAPTICS_ENABLED;
                 }
                 mPrivateFlags4 |= PFLAG4_ROTARY_HAPTICS_DETERMINED;
@@ -17559,9 +17546,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param event the KeyEvent object that defines the button action
      */
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(4);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (KeyEvent.isConfirmKey(keyCode) && event.hasNoModifiers()) {
             if ((mViewFlags & ENABLED_MASK) == DISABLED) {
                 return true;
@@ -17580,7 +17567,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                         setPressed(true, x, y);
                     }
                     checkForLongClick(
-                            ViewConfiguration.getLongPressTimeout(),
+                            getLongPressTimeoutMillis(),
                             x,
                             y,
                             // This is not a touch gesture -- do not classify it as one.
@@ -17619,9 +17606,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param event   The KeyEvent object that defines the button action.
      */
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(5);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (KeyEvent.isConfirmKey(keyCode) && event.hasNoModifiers()) {
             if ((mViewFlags & ENABLED_MASK) == DISABLED) {
                 return true;
@@ -18291,9 +18278,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @return True if the event was handled, false otherwise.
      */
     public boolean onTouchEvent(MotionEvent event) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(3);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         final float x = event.getX();
         final float y = event.getY();
         final int viewFlags = mViewFlags;
@@ -18394,7 +18381,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
                     if (!clickable) {
                         checkForLongClick(
-                                ViewConfiguration.getLongPressTimeout(),
+                                getLongPressTimeoutMillis(),
                                 x,
                                 y,
                                 TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS);
@@ -18417,12 +18404,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                         }
                         mPendingCheckForTap.x = event.getX();
                         mPendingCheckForTap.y = event.getY();
-                        postDelayed(mPendingCheckForTap, mTapTimeoutMillis);
+                        postDelayed(mPendingCheckForTap, getTapTimeoutMillis());
                     } else {
                         // Not inside a scrolling container, so show the feedback right away
                         setPressed(true, x, y);
                         checkForLongClick(
-                                ViewConfiguration.getLongPressTimeout(),
+                                getLongPressTimeoutMillis(),
                                 x,
                                 y,
                                 TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS);
@@ -18449,15 +18436,17 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                     final int motionClassification = event.getClassification();
                     final boolean ambiguousGesture =
                             motionClassification == MotionEvent.CLASSIFICATION_AMBIGUOUS_GESTURE;
-                    int touchSlop = mTouchSlop;
+                    int touchSlop = mViewConfiguration.getScaledTouchSlop();
                     if (ambiguousGesture && hasPendingLongPressCallback()) {
+                        float ambiguousGestureMultiplier =
+                                mViewConfiguration.getScaledAmbiguousGestureMultiplier();
                         if (!pointInView(x, y, touchSlop)) {
                             // The default action here is to cancel long press. But instead, we
                             // just extend the timeout here, in case the classification
                             // stays ambiguous.
                             removeLongPressCallback();
-                            long delay = (long) (ViewConfiguration.getLongPressTimeout()
-                                    * mAmbiguousGestureMultiplier);
+                            long delay = (long) (getLongPressTimeoutMillis()
+                                    * ambiguousGestureMultiplier);
                             // Subtract the time already spent
                             delay -= event.getEventTime() - event.getDownTime();
                             checkForLongClick(
@@ -18466,7 +18455,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                                     y,
                                     TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS);
                         }
-                        touchSlop *= mAmbiguousGestureMultiplier;
+                        touchSlop *= ambiguousGestureMultiplier;
                     }
 
                     // Be lenient about moving outside of buttons
@@ -18535,6 +18524,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         return false;
     }
 
+    /** @hide */
+    protected int getLongPressTimeoutMillis() {
+        return Flags.viewconfigurationApis()
+                ? mViewConfiguration.getLongPressTimeoutMillis()
+                : ViewConfiguration.getLongPressTimeout();
+    }
+
     /**
      * Remove the longpress detection timer.
      */
@@ -18542,6 +18538,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (mPendingCheckForLongPress != null) {
             removeCallbacks(mPendingCheckForLongPress);
         }
+    }
+
+    private int getTapTimeoutMillis() {
+        return Flags.viewconfigurationApis()
+                ? mViewConfiguration.getTapTimeoutMillis()
+                : ViewConfiguration.getTapTimeout();
     }
 
     /**
@@ -18954,15 +18956,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     private HapticScrollFeedbackProvider getScrollFeedbackProvider() {
         if (mScrollFeedbackProvider == null) {
             mScrollFeedbackProvider = new HapticScrollFeedbackProvider(this,
-                    ViewConfiguration.get(mContext), /* isFromView= */ true);
+                    mViewConfiguration, /* isFromView= */ true);
         }
         return mScrollFeedbackProvider;
     }
 
     private void doRotaryProgressForScrollHaptics(MotionEvent rotaryEvent) {
         final float axisScrollValue = rotaryEvent.getAxisValue(MotionEvent.AXIS_SCROLL);
-        final float verticalScrollFactor =
-                ViewConfiguration.get(mContext).getScaledVerticalScrollFactor();
+        final float verticalScrollFactor = mViewConfiguration.getScaledVerticalScrollFactor();
         final int scrollAmount = -Math.round(axisScrollValue * verticalScrollFactor);
         getScrollFeedbackProvider().onScrollProgress(
                 rotaryEvent.getDeviceId(), InputDevice.SOURCE_ROTARY_ENCODER,
@@ -22154,7 +22155,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     @InspectableProperty(name = "scrollbarSize")
     public int getScrollBarSize() {
-        return mScrollCache == null ? ViewConfiguration.get(mContext).getScaledScrollBarSize() :
+        return mScrollCache == null ? mViewConfiguration.getScaledScrollBarSize() :
                 mScrollCache.scrollBarSize;
     }
 
@@ -24441,8 +24442,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         final boolean use32BitCache = attachInfo != null && attachInfo.mUse32BitDrawingCache;
 
         final long projectedBitmapSize = width * height * (opaque && !use32BitCache ? 2 : 4);
-        final long drawingCacheSize =
-                ViewConfiguration.get(mContext).getScaledMaximumDrawingCacheSize();
+        final long drawingCacheSize = mViewConfiguration.getScaledMaximumDrawingCacheSize();
         if (width <= 0 || height <= 0 || projectedBitmapSize > drawingCacheSize) {
             if (width > 0 && height > 0) {
                 Log.w(VIEW_LOG_TAG, getClass().getSimpleName() + " not displayed because it is"
@@ -25549,6 +25549,17 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     private void setBackgroundRenderNodeProperties(RenderNode renderNode) {
         renderNode.setTranslationX(mScrollX);
         renderNode.setTranslationY(mScrollY);
+    }
+
+    /**
+     * @see RenderNode#setUsageHint(int)
+     *
+     * @hide
+     */
+    public void setUsageHint(@RenderNode.UsageHint int usageHint) {
+        if (mRenderNode != null) {
+            mRenderNode.setUsageHint(usageHint);
+        }
     }
 
     /**
@@ -31268,6 +31279,49 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
+     * A "pointer capture mode" in which the pointer is not captured.
+     * <p>
+     * Passing this to {@link #requestPointerCapture(int)} is equivalent to calling
+     * {@link #releasePointerCapture()}.
+     *
+     * @see #requestPointerCapture(int)
+     */
+    @FlaggedApi(com.android.hardware.input.Flags.FLAG_POINTER_CAPTURE_MODES)
+    public static final int POINTER_CAPTURE_MODE_UNCAPTURED =
+            android.os.PointerCaptureMode.UNCAPTURED;
+
+    /**
+     * A pointer capture mode in which touchpads report absolute finger locations.
+     * <p>
+     * In this capture mode, no attempt is made to recognize gestures from touchpad input. Instead,
+     * the absolute location of each touch on the pad is reported directly to the View, in the same
+     * way that other touches on devices with {@link InputDevice#SOURCE_CLASS_POINTER} are reported.
+     * <p>
+     * Events will be delivered with the source {@link InputDevice#SOURCE_TOUCHPAD}. The absolute
+     * position of each of touch will be available through {@link MotionEvent#getX(int)} and {@link
+     * MotionEvent#getY(int)}, and their relative movements through {@link
+     * MotionEvent#AXIS_RELATIVE_X} and {@link MotionEvent#AXIS_RELATIVE_Y}. If the touchpad
+     * supports them, touch dimension information may be available through the {@link
+     * MotionEvent#AXIS_PRESSURE}, {@link MotionEvent#AXIS_TOUCH_MAJOR}, {@link
+     * MotionEvent#AXIS_TOUCH_MINOR}, {@link MotionEvent#AXIS_TOOL_MAJOR}, and {@link
+     * MotionEvent#AXIS_TOOL_MINOR} axes.
+     * <p>
+     * Events from mice are always reported in the same way regardless of capture mode.
+     *
+     * @see #requestPointerCapture(int)
+     */
+    @FlaggedApi(com.android.hardware.input.Flags.FLAG_POINTER_CAPTURE_MODES)
+    public static final int POINTER_CAPTURE_MODE_ABSOLUTE = android.os.PointerCaptureMode.ABSOLUTE;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = "POINTER_CAPTURE_MODE_", value = {
+            POINTER_CAPTURE_MODE_UNCAPTURED,
+            POINTER_CAPTURE_MODE_ABSOLUTE,
+    })
+    public @interface PointerCaptureMode {}
+
+    /**
      * Requests pointer capture mode.
      * <p>
      * When the window has pointer capture, the mouse pointer icon will disappear and will not
@@ -31307,13 +31361,64 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @see #hasPointerCapture()
      * @see #onPointerCaptureChange(boolean)
      */
+    // TODO(b/403531245): when the flag launches, update this JavaDoc to say that calling this
+    //  method is equivalent to calling requestPointerCapture(int) with a particular mode.
     public void requestPointerCapture() {
         final ViewRootImpl viewRootImpl = getViewRootImpl();
         if (viewRootImpl != null) {
-            viewRootImpl.requestPointerCapture(true);
+            viewRootImpl.requestPointerCapture(POINTER_CAPTURE_MODE_ABSOLUTE);
         }
     }
 
+    /**
+     * Requests pointer capture in the specified mode.
+     * <p>
+     * When the window has pointer capture, the mouse pointer icon will disappear and will not
+     * change its position. Enabling pointer capture will change the behavior of input devices in
+     * the following ways:
+     * <ul>
+     *     <li>Events from a mouse will be delivered with the source
+     *     {@link InputDevice#SOURCE_MOUSE_RELATIVE}, and relative position changes will be
+     *     available through {@link MotionEvent#getX} and {@link MotionEvent#getY}.</li>
+     *
+     *     <li>Events from a touchpad (also known as a trackpad) will be delivered according to the
+     *     chosen pointer capture mode. See {@link #POINTER_CAPTURE_MODE_ABSOLUTE} for details.</li>
+     *
+     *     <li>Events from other types of devices, such as touchscreens, will not be affected.</li>
+     * </ul>
+     * <p>
+     * Pointer ballistics curves and the user's pointer speed settings will not be applied in this
+     * mode.
+     * <p>
+     * When pointer capture changes, connected mouse and touchpad devices may be reconfigured,
+     * and their properties (such as their sources or motion ranges) may change. Use an
+     * {@link android.hardware.input.InputManager.InputDeviceListener} to be notified when a device
+     * changes (which may happen after enabling or disabling pointer capture), and use
+     * {@link InputDevice#getDevice(int)} to get the updated {@link InputDevice}.
+     * <p>
+     * Events captured through pointer capture will be dispatched to
+     * {@link OnCapturedPointerListener#onCapturedPointer(View, MotionEvent)} if an
+     * {@link OnCapturedPointerListener} is set, and otherwise to
+     * {@link #onCapturedPointerEvent(MotionEvent)}.
+     * <p>
+     * The capture may be released through {@link #releasePointerCapture()}, or will be lost
+     * automatically when the window loses focus.
+     *
+     * @param mode The mode in which to capture the pointer, which determines how events from
+     *             touchpads are delivered.
+     *
+     * @see #POINTER_CAPTURE_MODE_ABSOLUTE
+     * @see #releasePointerCapture()
+     * @see #hasPointerCapture()
+     * @see #onPointerCaptureChange(boolean)
+     */
+    @FlaggedApi(com.android.hardware.input.Flags.FLAG_POINTER_CAPTURE_MODES)
+    public void requestPointerCapture(@PointerCaptureMode int mode) {
+        final ViewRootImpl viewRootImpl = getViewRootImpl();
+        if (viewRootImpl != null) {
+            viewRootImpl.requestPointerCapture(mode);
+        }
+    }
 
     /**
      * Releases the pointer capture.
@@ -31326,7 +31431,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public void releasePointerCapture() {
         final ViewRootImpl viewRootImpl = getViewRootImpl();
         if (viewRootImpl != null) {
-            viewRootImpl.requestPointerCapture(false);
+            viewRootImpl.requestPointerCapture(POINTER_CAPTURE_MODE_UNCAPTURED);
         }
     }
 
@@ -31785,8 +31890,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         public void run() {
             mPrivateFlags &= ~PFLAG_PREPRESSED;
             setPressed(true, x, y);
-            final long delay =
-                    (long) ViewConfiguration.getLongPressTimeout() - mTapTimeoutMillis;
+            final int delay = getLongPressTimeoutMillis() - getTapTimeoutMillis();
             checkForLongClick(delay, x, y, TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS);
         }
     }
@@ -33779,7 +33883,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 mTooltipInfo = new TooltipInfo();
                 mTooltipInfo.mShowTooltipRunnable = this::showHoverTooltip;
                 mTooltipInfo.mHideTooltipRunnable = this::hideTooltip;
-                mTooltipInfo.mHoverSlop = ViewConfiguration.get(mContext).getScaledHoverSlop();
+                mTooltipInfo.mHoverSlop = mViewConfiguration.getScaledHoverSlop();
                 mTooltipInfo.clearAnchorPos();
             }
             mTooltipInfo.mTooltipText = tooltipText;
@@ -34603,8 +34707,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     private float convertVelocityToFrameRate(float velocityPps) {
-        if (NoPreloadHolder.sToolkitVelocityMapSyspropFlagValue && sFrameRateMappings != null
-                && sFrameRateMappings.length > 0) {
+        if (sFrameRateMappings != null && sFrameRateMappings.length > 0) {
             return getFrameRateByVelocity(sFrameRateMappings, (int) velocityPps);
         }
         // Internal testing has shown that this gives a premium experience:
@@ -34637,6 +34740,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public void setFrameContentVelocity(float pixelsPerSecond) {
         if (mAttachInfo != null && mAttachInfo.mViewVelocityApi) {
             mFrameContentVelocity = Math.abs(pixelsPerSecond);
+
+            if (Trace.isTagEnabled(TRACE_TAG_VIEW)) {
+                Trace.instant(TRACE_TAG_VIEW,
+                        getClass().getSimpleName()
+                            + " - setFrameContentVelocity: " + mFrameContentVelocity);
+            }
 
             if (sToolkitMetricsForFrameRateDecisionFlagValue) {
                 Trace.setCounter("Set frame velocity", (long) mFrameContentVelocity);

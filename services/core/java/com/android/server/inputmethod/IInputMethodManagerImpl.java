@@ -44,7 +44,6 @@ import com.android.internal.inputmethod.IImeTracker;
 import com.android.internal.inputmethod.IInputMethodClient;
 import com.android.internal.inputmethod.IRemoteAccessibilityInputConnection;
 import com.android.internal.inputmethod.IRemoteInputConnection;
-import com.android.internal.inputmethod.InputBindResult;
 import com.android.internal.inputmethod.InputMethodInfoSafeList;
 import com.android.internal.inputmethod.StartInputFlags;
 import com.android.internal.inputmethod.StartInputReason;
@@ -113,26 +112,16 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
         @PermissionVerified(Manifest.permission.TEST_INPUT_METHOD)
         void hideSoftInputFromServerForTest();
 
-        void startInputOrWindowGainedFocusAsync(
-                @StartInputReason int startInputReason, IInputMethodClient client,
-                IBinder windowToken, @StartInputFlags int startInputFlags,
+        void startInputOrWindowGainedFocus(
+                @StartInputReason int startInputReason, @NonNull IInputMethodClient client,
+                @Nullable IBinder windowToken, @StartInputFlags int startInputFlags,
                 @WindowManager.LayoutParams.SoftInputModeFlags int softInputMode,
                 @WindowManager.LayoutParams.Flags int windowFlags, @Nullable EditorInfo editorInfo,
-                IRemoteInputConnection inputConnection,
-                IRemoteAccessibilityInputConnection remoteAccessibilityInputConnection,
+                @Nullable IRemoteInputConnection inputConnection,
+                @Nullable IRemoteAccessibilityInputConnection remoteAccessibilityInputConnection,
                 int unverifiedTargetSdkVersion, @UserIdInt int userId,
                 @NonNull ImeOnBackInvokedDispatcher imeDispatcher, boolean imeRequestedVisible,
-                int startInputSeq, boolean useAsyncShowHideMethod);
-
-        InputBindResult startInputOrWindowGainedFocus(
-                @StartInputReason int startInputReason, IInputMethodClient client,
-                IBinder windowToken, @StartInputFlags int startInputFlags,
-                @WindowManager.LayoutParams.SoftInputModeFlags int softInputMode,
-                @WindowManager.LayoutParams.Flags int windowFlags, @Nullable EditorInfo editorInfo,
-                IRemoteInputConnection inputConnection,
-                IRemoteAccessibilityInputConnection remoteAccessibilityInputConnection,
-                int unverifiedTargetSdkVersion, @UserIdInt int userId,
-                @NonNull ImeOnBackInvokedDispatcher imeDispatcher, boolean imeRequestedVisible);
+                int startInputSeq);
 
         void showInputMethodPickerFromClient(IInputMethodClient client, int auxiliarySubtypeMode);
 
@@ -162,16 +151,9 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
 
         int getInputMethodWindowVisibleHeight(IInputMethodClient client);
 
-        void reportPerceptibleAsync(IBinder windowToken, boolean perceptible);
+        void reportPerceptible(@NonNull IBinder windowToken, boolean perceptible);
 
-        @PermissionVerified(allOf = {
-                Manifest.permission.INTERACT_ACROSS_USERS_FULL,
-                Manifest.permission.INTERNAL_SYSTEM_WINDOW})
-        void removeImeSurface(int displayId);
-
-        void removeImeSurfaceFromWindowAsync(IBinder windowToken);
-
-        void startProtoDump(byte[] bytes, int i, String s);
+        void removeImeSurfaceFromWindow(@NonNull IBinder windowToken);
 
         boolean isImeTraceEnabled();
 
@@ -289,23 +271,7 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
     }
 
     @Override
-    public InputBindResult startInputOrWindowGainedFocus(
-            @StartInputReason int startInputReason, IInputMethodClient client, IBinder windowToken,
-            @StartInputFlags int startInputFlags,
-            @WindowManager.LayoutParams.SoftInputModeFlags int softInputMode,
-            @WindowManager.LayoutParams.Flags int windowFlags, @Nullable EditorInfo editorInfo,
-            IRemoteInputConnection inputConnection,
-            IRemoteAccessibilityInputConnection remoteAccessibilityInputConnection,
-            int unverifiedTargetSdkVersion, @UserIdInt int userId,
-            @NonNull ImeOnBackInvokedDispatcher imeDispatcher, boolean imeRequestedVisible) {
-        return mCallback.startInputOrWindowGainedFocus(
-                startInputReason, client, windowToken, startInputFlags, softInputMode,
-                windowFlags, editorInfo, inputConnection, remoteAccessibilityInputConnection,
-                unverifiedTargetSdkVersion, userId, imeDispatcher, imeRequestedVisible);
-    }
-
-    @Override
-    public void startInputOrWindowGainedFocusAsync(@StartInputReason int startInputReason,
+    public void startInputOrWindowGainedFocus(@StartInputReason int startInputReason,
             IInputMethodClient client, IBinder windowToken,
             @StartInputFlags int startInputFlags,
             @WindowManager.LayoutParams.SoftInputModeFlags int softInputMode,
@@ -314,12 +280,12 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
             IRemoteAccessibilityInputConnection remoteAccessibilityInputConnection,
             int unverifiedTargetSdkVersion, @UserIdInt int userId,
             @NonNull ImeOnBackInvokedDispatcher imeDispatcher, boolean imeRequestedVisible,
-            int startInputSeq, boolean useAsyncShowHideMethod) {
-        mCallback.startInputOrWindowGainedFocusAsync(
+            int startInputSeq) {
+        mCallback.startInputOrWindowGainedFocus(
                 startInputReason, client, windowToken, startInputFlags, softInputMode,
                 windowFlags, editorInfo, inputConnection, remoteAccessibilityInputConnection,
                 unverifiedTargetSdkVersion, userId, imeDispatcher, imeRequestedVisible,
-                startInputSeq, useAsyncShowHideMethod);
+                startInputSeq);
     }
 
     @Override
@@ -387,28 +353,13 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
     }
 
     @Override
-    public void reportPerceptibleAsync(@NonNull IBinder windowToken, boolean perceptible) {
-        mCallback.reportPerceptibleAsync(windowToken, perceptible);
-    }
-
-    @EnforcePermission(allOf = {
-            Manifest.permission.INTERNAL_SYSTEM_WINDOW,
-            Manifest.permission.INTERACT_ACROSS_USERS_FULL})
-    @Override
-    public void removeImeSurface(int displayId) {
-        super.removeImeSurface_enforcePermission();
-
-        mCallback.removeImeSurface(displayId);
+    public void reportPerceptible(@NonNull IBinder windowToken, boolean perceptible) {
+        mCallback.reportPerceptible(windowToken, perceptible);
     }
 
     @Override
-    public void removeImeSurfaceFromWindowAsync(IBinder windowToken) {
-        mCallback.removeImeSurfaceFromWindowAsync(windowToken);
-    }
-
-    @Override
-    public void startProtoDump(byte[] protoDump, int source, String where) {
-        mCallback.startProtoDump(protoDump, source, where);
+    public void removeImeSurfaceFromWindow(@NonNull IBinder windowToken) {
+        mCallback.removeImeSurfaceFromWindow(windowToken);
     }
 
     @Override

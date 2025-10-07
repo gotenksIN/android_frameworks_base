@@ -146,10 +146,8 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
 
     private final Map<Callback, Executor> mCallbackExecutorMap = new ConcurrentHashMap<>();
 
-// QTI_BEGIN: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
     public int mTwspBatteryState;
     public int mTwspBatteryLevel;
-// QTI_END: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
     /**
      * Last time a bt profile auto-connect was attempted.
      * If an ACTION_UUID intent comes in within
@@ -158,8 +156,9 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
      * The value is reset if a disconnection happens.
      */
     private long mConnectAttempted = -1;
-    private boolean isAclConnectedBrEdr = false;
-    private boolean isAclConnectedLe = false;
+    private long mBondFailureTimeMillis = -1;
+    private boolean mIsAclConnectedBrEdr = false;
+    private boolean mIsAclConnectedLe = false;
 
     // Active device state
     private boolean mIsActiveDeviceA2dp = false;
@@ -189,7 +188,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
 
     private int mQGroupId;
 // QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
-// QTI_BEGIN: 2020-12-18: Bluetooth: Group-UI: UI frameworks changes
+// QTI_BEGIN: 2020-12-18: Audio: Group-UI: UI frameworks changes
 
     private boolean mIsGroupDevice = false;
 
@@ -199,7 +198,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
     private int mType = UNKNOWN;
     static final int PRIVATE_ADDR = 101;
 
-// QTI_END: 2020-12-18: Bluetooth: Group-UI: UI frameworks changes
+// QTI_END: 2020-12-18: Audio: Group-UI: UI frameworks changes
 // QTI_BEGIN: 2022-10-07: Bluetooth: CSIP: Use Updated API for csip ICON.
     private boolean mIsLeAudioEnabled = false;
 
@@ -264,10 +263,8 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mQGroupId = BluetoothCsipSetCoordinator.GROUP_ID_INVALID;
 // QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
         initDrawableCache();
-// QTI_BEGIN: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
         mTwspBatteryState = -1;
         mTwspBatteryLevel = -1;
-// QTI_END: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
         mUnpairing = false;
         mInputDevice = BluetoothUtils.getInputDevice(mContext, getAddress());
         mIsDeviceStylus = BluetoothUtils.isDeviceStylus(mInputDevice, this);
@@ -280,9 +277,9 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mProfileManager = cachedDevice.mProfileManager;
         mDevice = cachedDevice.mDevice;
         fillData();
+// QTI_END: 2021-02-01: Bluetooth: Add BC profile entry
         mInputDevice = BluetoothUtils.getInputDevice(mContext, getAddress());
         mIsDeviceStylus = BluetoothUtils.isDeviceStylus(mInputDevice, this);
-// QTI_END: 2021-02-01: Bluetooth: Add BC profile entry
         initDrawableCache();
         mUnpairing = false;
 // QTI_BEGIN: 2021-02-01: Bluetooth: Add BC profile entry
@@ -357,8 +354,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                             mHandler.removeMessages(profile.getProfileId());
                             if (profile.getConnectionPolicy(mDevice) >
                                     BluetoothProfile.CONNECTION_POLICY_FORBIDDEN) {
-                                if (Flags.ignoreA2dpDisconnectionForAndroidAuto()
-                                        && profile instanceof A2dpProfile && isAndroidAuto()) {
+                                if (profile instanceof A2dpProfile && isAndroidAuto()) {
                                     Log.w(TAG,
                                             "onProfileStateChanged(): Skip setting A2DP "
                                                     + "connection fail for Android Auto");
@@ -523,9 +519,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             return;
         }
 
-// QTI_BEGIN: 2020-03-11: Bluetooth: GAP: Handle the race condition cases in auto connect logic
         Log.d(TAG, "connect: mConnectAttempted = " + mConnectAttempted);
-// QTI_END: 2020-03-11: Bluetooth: GAP: Handle the race condition cases in auto connect logic
         connectDevice();
     }
 
@@ -1162,7 +1156,9 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             Log.d(
                     TAG,
                     "onUuidChanged: Time since last connect/manual disconnect="
-                            + (SystemClock.elapsedRealtime() - lastConnectAttempted));
+                            + (SystemClock.elapsedRealtime() - lastConnectAttempted)
+                            + ", last connect attempt: "
+                            + mConnectAttempted);
         }
 
         /*
@@ -1178,7 +1174,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         dispatchAttributesChanged();
     }
 
-    void onBondingStateChanged(int bondState) {
+    void onBondingStateChanged(int bondState, int prevBondState) {
         if (bondState == BluetoothDevice.BOND_NONE) {
             synchronized (mProfileLock) {
                 mProfiles.clear();
@@ -1188,9 +1184,17 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             mDevice.setSimAccessPermission(BluetoothDevice.ACCESS_UNKNOWN);
 
             mBondTimestamp = null;
+
+            if (Flags.enableBluetoothDiagnosis()) {
+                if (prevBondState == BluetoothDevice.BOND_BONDING) {
+                    mBondFailureTimeMillis = SystemClock.elapsedRealtime();
+                }
+            }
         }
 
-        refresh();
+        if (!Flags.enableBluetoothDiagnosis()) {
+            refresh();
+        }
 
         if (bondState == BluetoothDevice.BOND_BONDED) {
             mBondTimestamp = new Timestamp(System.currentTimeMillis());
@@ -1198,15 +1202,21 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             boolean mIsBondingInitiatedLocally = mDevice.isBondingInitiatedLocally();
             Log.w(TAG, "mIsBondingInitiatedLocally" + mIsBondingInitiatedLocally);
 // QTI_END: 2019-06-26: Bluetooth: GAP: Reset bondingInitiatedLocally flag(1/3)
-// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
             if (mIsBondingInitiatedLocally) {
-// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
                  connect();
             }
 
             // Saves this device as just bonded and checks if it's an hearing device after
             // profiles are connected. This is for judging whether to display the survey.
             HearingAidStatsLogUtils.addToJustBonded(getAddress());
+
+            if (Flags.enableBluetoothDiagnosis()) {
+                mBondFailureTimeMillis = -1;
+            }
+        }
+
+        if (Flags.enableBluetoothDiagnosis()) {
+            refresh();
         }
     }
 
@@ -1224,27 +1234,50 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         boolean isUpdatedToConnected = state == BluetoothAdapter.STATE_CONNECTED;
         if (isUpdatedToConnected) {
             // Only update timestamp for the first ACL connection
-            if (!isAclConnectedLe && !isAclConnectedBrEdr) {
+            if (!mIsAclConnectedLe && !mIsAclConnectedBrEdr) {
                 mConnectAttempted = SystemClock.elapsedRealtime();
+                if (BluetoothUtils.D) {
+                    Log.d(
+                            TAG,
+                            "onAclStateChanged: device "
+                                    + mDevice.getAnonymizedAddress()
+                                    + ", connect time is updated: "
+                                    + mConnectAttempted
+                                    + ", le connection status: "
+                                    + mIsAclConnectedLe
+                                    + ", br/edr connection status: "
+                                    + mIsAclConnectedBrEdr);
+                }
             }
         }
 
         if (transport == BluetoothDevice.TRANSPORT_LE) {
-            isAclConnectedLe = isUpdatedToConnected;
+            mIsAclConnectedLe = isUpdatedToConnected;
         } else {
-            isAclConnectedBrEdr = isUpdatedToConnected;
+            mIsAclConnectedBrEdr = isUpdatedToConnected;
         }
 
         if (!isUpdatedToConnected) {
             // Reset the connection time if both classic and LE are disconnected.
-            if (!isAclConnectedLe && !isAclConnectedBrEdr) {
+            if (!mIsAclConnectedLe && !mIsAclConnectedBrEdr) {
                 mConnectAttempted = -1;
+                if (BluetoothUtils.D) {
+                    Log.d(
+                            TAG,
+                            "onAclStateChanged: device "
+                                    + mDevice.getAnonymizedAddress()
+                                    + ", connect time is reset");
+                }
             }
         }
     }
 
     public Timestamp getBondTimestamp() {
         return mBondTimestamp;
+    }
+
+    public long getBondFailureTimeMillis() {
+        return mBondFailureTimeMillis;
     }
 
     public BluetoothClass getBtClass() {
@@ -1587,8 +1620,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         if (mBluetoothManager == null) {
             mBluetoothManager = LocalBluetoothManager.getInstance(mContext, null);
         }
-        boolean isTempBond = Flags.enableTemporaryBondDevicesUi()
-                && BluetoothUtils.isTemporaryBondDevice(getDevice());
+        boolean isTempBond = BluetoothUtils.isTemporaryBondDevice(getDevice());
         if (BluetoothUtils.hasConnectedBroadcastSource(this, mBluetoothManager)) {
             // Gets summary for the buds which are in the audio sharing.
             int groupId = BluetoothUtils.getGroupId(this);
@@ -1791,8 +1823,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                 rightBattery = getRightBatteryLevel();
             }
 
-            boolean isTempBond = Flags.enableTemporaryBondDevicesUi()
-                    && BluetoothUtils.isTemporaryBondDevice(getDevice());
+            boolean isTempBond = BluetoothUtils.isTemporaryBondDevice(getDevice());
             // Set default string with battery level in device connected situation.
             if (isTwsBatteryAvailable(leftBattery, rightBattery)) {
                 stringRes =

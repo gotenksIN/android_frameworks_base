@@ -21,9 +21,7 @@ import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 
-import static com.android.window.flags.Flags.FLAG_EXCLUDE_TASK_FROM_RECENTS;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_ANYTHING;
-import static com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_APP_COMPAT_FIXES;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE;
 import static com.android.wm.shell.bubbles.util.BubbleTestUtils.verifyExitBubbleTransaction;
 
@@ -88,9 +86,7 @@ public class TaskViewTransitionsTest extends ShellTestCase {
 
     @Parameters(name = "{0}")
     public static List<FlagsParameterization> getParams() {
-        return FlagsParameterization.allCombinationsOf(
-                FLAG_EXCLUDE_TASK_FROM_RECENTS,
-                FLAG_ENABLE_BUBBLE_ANYTHING);
+        return FlagsParameterization.allCombinationsOf(FLAG_ENABLE_BUBBLE_ANYTHING);
     }
 
     @Mock
@@ -141,8 +137,6 @@ public class TaskViewTransitionsTest extends ShellTestCase {
     @EnableFlags({
             FLAG_ENABLE_CREATE_ANY_BUBBLE,
             FLAG_ENABLE_BUBBLE_ANYTHING,
-            FLAG_EXCLUDE_TASK_FROM_RECENTS,
-            FLAG_ENABLE_BUBBLE_APP_COMPAT_FIXES,
     })
     @Test
     public void testMoveTaskViewToFullscreen_applyWctToExitBubble() {
@@ -261,7 +255,7 @@ public class TaskViewTransitionsTest extends ShellTestCase {
     @Test
     public void testSetTaskVisibility_reorderNoHiddenVisibilitySync_resetsAlwaysOnTopAndReorder() {
         assumeTrue(TaskViewTransitions.useRepo());
-        assumeTrue(BubbleAnythingFlagHelper.enableCreateAnyBubbleWithForceExcludedFromRecents());
+        assumeTrue(BubbleAnythingFlagHelper.enableCreateAnyBubble());
 
         final Rect bounds = new Rect(0, 0, 100, 100);
         mTaskViewRepository.byTaskView(mTaskViewTaskController).mBounds = bounds;
@@ -450,6 +444,32 @@ public class TaskViewTransitionsTest extends ShellTestCase {
         // Remove the last one
         mTaskViewTransitions.removePendingTransitions(otherController);
         assertThat(mTaskViewTransitions.hasPending()).isFalse();
+    }
+
+    @Test
+    public void enqueueRunningExternal_clearedFromPendingWithoutStarting() {
+        // Add a normal transition to the queue first.
+        mTaskViewTransitions.setTaskViewVisible(mTaskViewTaskController, true);
+        assertThat(mTaskViewTransitions.findPending(mTaskViewTaskController,
+                TRANSIT_TO_FRONT)).isNotNull();
+
+        // Simulate an already running external transition by adding its binder ref.
+        IBinder externalTransition = new Binder();
+        mTaskViewTransitions.enqueueRunningExternal(mTaskViewTaskController, externalTransition);
+
+        // Verify that both transitions are in the pending queue.
+        assertThat(mTaskViewTransitions.findPending(mTaskViewTaskController,
+                TRANSIT_TO_FRONT)).isNotNull();
+        assertThat(mTaskViewTransitions.findPending(externalTransition)).isNotNull();
+
+        // Now, clear the external gate transition.
+        mTaskViewTransitions.onExternalDone(externalTransition);
+
+        // Verify that the external gate is removed, but the original transition is still pending.
+        assertThat(mTaskViewTransitions.findPending(externalTransition)).isNull();
+        assertThat(mTaskViewTransitions.findPending(mTaskViewTaskController,
+                TRANSIT_TO_FRONT)).isNotNull();
+        assertThat(mTaskViewTransitions.hasPending()).isTrue();
     }
 
     private ActivityManager.RunningTaskInfo createMockTaskInfo(int taskId,

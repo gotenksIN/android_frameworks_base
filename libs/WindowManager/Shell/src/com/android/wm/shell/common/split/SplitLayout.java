@@ -84,6 +84,7 @@ import com.android.wm.shell.common.split.SplitWindowManager.ParentContainerCallb
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.shared.desktopmode.DesktopState;
+import com.android.wm.shell.shared.split.SplitScreenConstants;
 import com.android.wm.shell.shared.split.SplitScreenConstants.PersistentSnapPosition;
 import com.android.wm.shell.shared.split.SplitScreenConstants.SnapPosition;
 import com.android.wm.shell.shared.split.SplitScreenConstants.SplitPosition;
@@ -575,11 +576,24 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
         // Estimate position by previous ratio.
         final float length =
                 (float) (mIsLeftRightSplit ? mRootBounds.width() : mRootBounds.height());
-        final int estimatePosition = (int) (length * snapRatio);
+        int estimatedPosition = (int) (length * snapRatio);
+
+        if (Flags.enableFlexibleTwoAppSplit()) {
+            // If we are able to find an exact match for the previous snapPosition (before
+            // rotation), use it. If not, just rely on the position estimate.
+            int previousState = mSplitState.get();
+            Integer exactPosition = mDividerSnapAlgorithm.getPositionBySnapPosition(previousState);
+            if (exactPosition != null) {
+                estimatedPosition = exactPosition;
+            }
+        }
+
         // Init divider position by estimated position using current bounds snap algorithm.
-        mDividerPosition = mDividerSnapAlgorithm.calculateNonDismissingSnapTarget(
-                estimatePosition).position;
+        SnapTarget newSnapTarget = mDividerSnapAlgorithm.calculateNonDismissingSnapTarget(
+                estimatedPosition);
+        mDividerPosition = newSnapTarget.position;
         updateBounds(mDividerPosition);
+        mSplitState.set(newSnapTarget.snapPosition);
     }
 
     private void updateBounds(int position) {
@@ -698,6 +712,9 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
         if (!mInitialized) {
             return;
         }
+
+        mStatusBarHider.onInsetsChanged(insetsState, mRootBounds);
+
         if (mFreezeDividerWindow) {
             // DO NOT change its layout before transition actually run because it might cause
             // flicker.
@@ -1242,11 +1259,11 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
                     && dimLayer != null) {
                 float instantaneousAlpha = 0f;
                 if (goingOffscreen) {
-                    instantaneousAlpha = moveProgress * ResizingEffectPolicy.DEFAULT_OFFSCREEN_DIM;
+                    instantaneousAlpha = moveProgress * SplitScreenConstants.DEFAULT_OFFSCREEN_DIM;
                 }
                 if (comingOnscreen) {
                     instantaneousAlpha =
-                            (1f - moveProgress) * ResizingEffectPolicy.DEFAULT_OFFSCREEN_DIM;
+                            (1f - moveProgress) * SplitScreenConstants.DEFAULT_OFFSCREEN_DIM;
                 }
                 t.setAlpha(dimLayer, instantaneousAlpha);
                 t.setVisibility(dimLayer, instantaneousAlpha > 0.001f);

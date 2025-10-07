@@ -312,22 +312,7 @@ class DozeLogger @Inject constructor(@DozeLog private val buffer: LogBuffer) {
         buffer.log(TAG, INFO, { str1 = reason }, { "Doze immediately ended due to $str1" })
     }
 
-    fun logDozeScreenBrightness(brightness: Int, afterRequest: Boolean) {
-        buffer.log(
-            TAG,
-            INFO,
-            {
-                int1 = brightness
-                bool1 = afterRequest
-            },
-            {
-                "Doze screen brightness ${if (bool1) "set" else "requested"}" +
-                    " (int), brightness=$int1"
-            },
-        )
-    }
-
-    fun logDozeScreenBrightnessFloat(brightness: Float, afterRequest: Boolean) {
+    fun logDozeScreenBrightness(brightness: Float, afterRequest: Boolean) {
         buffer.log(
             TAG,
             INFO,
@@ -335,19 +320,25 @@ class DozeLogger @Inject constructor(@DozeLog private val buffer: LogBuffer) {
                 double1 = brightness.toDouble()
                 bool1 = afterRequest
             },
-            {
-                "Doze screen brightness ${if (bool1) "set" else "requested"}" +
-                    " (float), brightness=$double1"
-            },
+            { "Doze screen brightness ${if (bool1) "set" else "requested"}, brightness=$double1" },
         )
     }
 
-    fun logSetAodDimmingScrim(scrimOpacity: Long) {
+    fun logSetAodDimmingScrim(scrimOpacity: Float) {
         buffer.log(
             TAG,
             INFO,
-            { long1 = scrimOpacity },
-            { "Doze aod dimming scrim opacity set, opacity=$long1" },
+            { double1 = scrimOpacity.toDouble() },
+            { "Doze aod dimming scrim opacity set, opacity=$double1" },
+        )
+    }
+
+    fun logSetAodWallpaperDimmingScrim(scrimOpacity: Float) {
+        buffer.log(
+            TAG,
+            INFO,
+            { double1 = scrimOpacity.toDouble() },
+            { "Doze aod wallpaper dimming scrim opacity set, opacity=$double1" },
         )
     }
 
@@ -415,46 +406,6 @@ class DozeLogger @Inject constructor(@DozeLog private val buffer: LogBuffer) {
             DEBUG,
             { bool1 = ignoreTouchWhilePulsing },
             { "Prox changed while pulsing. setIgnoreTouchWhilePulsing=$bool1" },
-        )
-    }
-
-    fun logShouldRequestUdfpsLongPressPulseImmediately(
-        immediate: Boolean,
-        fpsLockout: Boolean,
-        fpsAllowed: Boolean,
-        collectingEvents: Boolean,
-    ) {
-        buffer.log(
-            TAG,
-            DEBUG,
-            {
-                bool1 = immediate
-                bool2 = fpsLockout
-                bool3 = fpsAllowed
-                bool4 = collectingEvents
-            },
-            {
-                "ShouldRequestUdfpsLongPressPulseImmediately - immediate=$bool1, " +
-                    "lockout=$bool2, allowed=$bool3, collecting=$bool4, "
-            },
-        )
-    }
-
-    fun logShouldRequestUdfpsLongPressPulseImmediatelyFeatureAndFlagState(
-        flagEnabled: Boolean,
-        featureEnabled: Boolean,
-    ) {
-        buffer.log(
-            TAG,
-            DEBUG,
-            {
-                bool1 = flagEnabled
-                bool2 = featureEnabled
-            },
-            {
-                "ShouldRequestUdfpsLongPressPulseImmediately - flagEnabled=$bool1, " +
-                    "featureEnabled=$bool2"
-            },
         )
     }
 

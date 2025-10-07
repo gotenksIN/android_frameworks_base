@@ -12,13 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-// QTI_BEGIN: 2023-02-28: N/A: base: delay LE Audio device unavailability
+// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  *
-// QTI_END: 2023-02-28: N/A: base: delay LE Audio device unavailability
+// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
  */
 package com.android.server.audio;
 
@@ -328,7 +328,8 @@ public class AudioDeviceBroker {
         initAudioHalBluetoothState();
         initRoutingStrategyIds();
         mPreferredCommunicationDevice = null;
-        updateActiveCommunicationDevice();
+        AudioDeviceInfo device = getCommunicationDeviceInt();
+        mCurCommunicationPortId = device != null ? device.getId() : 0;
 
         mSystemServer.registerUserStartedReceiver(mContext);
     }
@@ -601,9 +602,7 @@ public class AudioDeviceBroker {
         for (CommunicationRouteClient crc : mCommunicationRouteClients) {
             if (crc.getUid() == mAudioModeOwner.mUid && !crc.isDisabled()) {
                 return crc;
-// QTI_BEGIN: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
             }
-// QTI_END: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
         }
         if (!mCommunicationRouteClients.isEmpty() && mAudioModeOwner.mPid == 0
                 && mCommunicationRouteClients.get(0).isActive()) {
@@ -806,6 +805,7 @@ public class AudioDeviceBroker {
         if (device == null) {
             AudioAttributes attr =
                     AudioProductStrategy.getAudioAttributesForStrategyWithLegacyStreamType(
+                            mAudioSystem.getAudioProductStrategies(/* filterInternal*/ true),
                             AudioSystem.STREAM_VOICE_CALL);
             List<AudioDeviceAttributes> devices = mAudioSystem.getDevicesForAttributes(
                     attr, false /* forVolume */);
@@ -1137,28 +1137,15 @@ public class AudioDeviceBroker {
                     .set(MediaMetrics.Property.NAME, name)
                     .set(MediaMetrics.Property.STATUS, data.mInfo.getProfile())
                     .record();
-            synchronized (mDeviceStateLock) {
-// QTI_BEGIN: 2024-05-11: N/A: base: Remove A2DP to A2DP quick SHO changes
-                postBluetoothDeviceConfigChange(createBtDeviceInfo(data, data.mNewDevice,
-                        BluetoothProfile.STATE_CONNECTED));
-// QTI_END: 2024-05-11: N/A: base: Remove A2DP to A2DP quick SHO changes
-            }
+            postBluetoothDeviceConfigChange(data);
         } else {
-            synchronized (mDeviceStateLock) {
-                if (data.mPreviousDevice != null) {
-                    btMediaMetricRecord(data.mPreviousDevice, MediaMetrics.Value.DISCONNECTED,
-                            data);
-                    sendLMsgNoDelay(MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT, SENDMSG_QUEUE,
-                            createBtDeviceInfo(data, data.mPreviousDevice,
-                                    BluetoothProfile.STATE_DISCONNECTED));
-                }
-                if (data.mNewDevice != null) {
-                    btMediaMetricRecord(data.mNewDevice, MediaMetrics.Value.CONNECTED, data);
-                    sendLMsgNoDelay(MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT, SENDMSG_QUEUE,
-                            createBtDeviceInfo(data, data.mNewDevice,
-                                    BluetoothProfile.STATE_CONNECTED));
-                }
+            if (data.mPreviousDevice != null) {
+                btMediaMetricRecord(data.mPreviousDevice, MediaMetrics.Value.DISCONNECTED, data);
             }
+            if (data.mNewDevice != null) {
+                btMediaMetricRecord(data.mNewDevice, MediaMetrics.Value.CONNECTED, data);
+            }
+            postBluetoothDeviceConnectionChange(data);
         }
     }
 
@@ -1235,12 +1222,10 @@ public class AudioDeviceBroker {
             for (String pair : kvpairs) {
                 String[] kv = pair.split("=");
 // QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
-// QTI_BEGIN: 2024-08-22: Audio: Fix string comparison for received SCO params
                 if (kv[0].equals("bt_lc3_swb")) {
                     mHasSwbLc3Enabled = ((kv[1].equals("on")) ? true : false);
                 } else if (kv[0].equals("bt_swb")) {
                     mHasSwbAptXEnabled = ((kv[1].equals("0")) ? true : false);
-// QTI_END: 2024-08-22: Audio: Fix string comparison for received SCO params
 // QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
                 }
             }
@@ -1479,8 +1464,12 @@ public class AudioDeviceBroker {
                 SENDMSG_REPLACE, new AudioModeInfo(mode, pid, uid));
     }
 
-    /*package*/ void postBluetoothDeviceConfigChange(@NonNull BtDeviceInfo info) {
-        sendLMsgNoDelay(MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE, SENDMSG_QUEUE, info);
+    /*package*/ void postBluetoothDeviceConfigChange(@NonNull BtDeviceChangedData data) {
+        sendLMsgNoDelay(MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE, SENDMSG_QUEUE, data);
+    }
+
+    /*package*/ void postBluetoothDeviceConnectionChange(@NonNull BtDeviceChangedData data) {
+        sendLMsgNoDelay(MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT, SENDMSG_QUEUE, data);
     }
 
     /*package*/ void startBluetoothScoForClient(IBinder cb,
@@ -1612,9 +1601,9 @@ public class AudioDeviceBroker {
             } else if (equalScoHaVcIndexRange() && isBluetoothHaActive()) {
                 btCommDeviceActiveType = BT_COMM_DEVICE_ACTIVE_HA;
             }
-            mAudioService.postBtCommDeviceActive(btCommDeviceActiveType);
+            mAudioService.updateBtCommDeviceActive(btCommDeviceActiveType);
         } else {
-            mAudioService.postBtCommDeviceActive(
+            mAudioService.updateBtCommDeviceActive(
                     isBluetoothScoActive() ? BT_COMM_DEVICE_ACTIVE_SCO : btCommDeviceActiveType);
         }
 
@@ -1895,10 +1884,10 @@ public class AudioDeviceBroker {
 
     /*package*/ void setLeAudioTimeout(String address, int device, int codec, int delayMs) {
         sendIILMsg(MSG_IIL_BTLEAUDIO_TIMEOUT, SENDMSG_QUEUE, device, codec, address, delayMs);
-// QTI_BEGIN: 2023-02-28: N/A: base: delay LE Audio device unavailability
+// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
     }
 
-// QTI_END: 2023-02-28: N/A: base: delay LE Audio device unavailability
+// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
     /*package*/ void setHearingAidTimeout(String address, int delayMs) {
         sendLMsg(MSG_IL_BT_HEARING_AID_TIMEOUT, SENDMSG_QUEUE, address, delayMs);
     }
@@ -1922,12 +1911,12 @@ public class AudioDeviceBroker {
         return mBluetoothA2dpEnabled.get();
     }
 
-    /*package*/ int getLeAudioDeviceGroupId(BluetoothDevice device) {
-        return mBtHelper.getLeAudioDeviceGroupId(device);
+    /*package*/ int getLeAudioDeviceGroupId(BluetoothDevice device, int profile) {
+        return mBtHelper.getLeAudioDeviceGroupId(device, profile);
     }
 
-    /*package*/ List<Pair<String, String>> getLeAudioGroupAddresses(int groupId) {
-        return mBtHelper.getLeAudioGroupAddresses(groupId);
+    /*package*/ List<Pair<String, String>> getLeAudioGroupAddresses(int groupId, int profile) {
+        return mBtHelper.getLeAudioGroupAddresses(groupId, profile);
     }
 
     /*package*/ void broadcastStickyIntentToCurrentProfileGroup(Intent intent) {
@@ -2183,7 +2172,14 @@ public class AudioDeviceBroker {
                     }
                     break;
                 case MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE: {
-                    final BtDeviceInfo btInfo = (BtDeviceInfo) msg.obj;
+                    final BtDeviceChangedData data = (BtDeviceChangedData) msg.obj;
+                    if (data.mNewDevice == null) {
+                        Slog.e(TAG, "Malformed MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE message");
+                        break;
+                    }
+                    final BtDeviceInfo btInfo = createBtDeviceInfo(
+                            data, data.mNewDevice, BluetoothProfile.STATE_CONNECTED);
+
                     final Pair<Integer, Boolean> codecAndChanged = mBtHelper.getCodecWithFallback(
                             btInfo.mDevice, btInfo.mProfile, btInfo.mIsLeOutput,
                             "MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE");
@@ -2295,12 +2291,26 @@ public class AudioDeviceBroker {
                     }
                     break;
                 case MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT: {
-                    final BtDeviceInfo btInfo = (BtDeviceInfo) msg.obj;
-                    if (btInfo.mDevice == null) break;
-                    AudioService.sDeviceLogger.enqueue((new EventLogger.StringEvent(
-                            "msg: MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT " + btInfo)).printLog(TAG));
-                    synchronized (mDeviceStateLock) {
-                        mDeviceInventory.setBluetoothActiveDevice(btInfo);
+                    final BtDeviceChangedData data = (BtDeviceChangedData) msg.obj;
+                    if (data.mPreviousDevice == null && data.mNewDevice == null) {
+                        Slog.e(TAG, "Malformed MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT message");
+                        break;
+                    }
+                    if (data.mPreviousDevice != null) {
+                        final BtDeviceInfo btInfo = createBtDeviceInfo(
+                                data, data.mPreviousDevice, BluetoothProfile.STATE_DISCONNECTED);
+                        synchronized (mDeviceStateLock) {
+                            mDeviceInventory.setBluetoothActiveDevice(btInfo,
+                                    "MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT" /*eventSource*/);
+                        }
+                    }
+                    if (data.mNewDevice != null) {
+                        final BtDeviceInfo btInfo = createBtDeviceInfo(
+                                data, data.mNewDevice, BluetoothProfile.STATE_CONNECTED);
+                        synchronized (mDeviceStateLock) {
+                            mDeviceInventory.setBluetoothActiveDevice(btInfo,
+                                    "MSG_L_BT_ACTIVE_DEVICE_CHANGE_EXT" /*eventSource*/);
+                        }
                     }
                 } break;
                 case MSG_CHECK_MUTE_MUSIC:
@@ -2578,9 +2588,7 @@ public class AudioDeviceBroker {
         }
         // Do not mute on bluetooth event if music is playing on a wired headset.
         if (message == MSG_L_SET_BT_ACTIVE_DEVICE
-// QTI_BEGIN: 2024-05-11: N/A: base: Remove A2DP to A2DP quick SHO changes
                 || message == MSG_L_BLUETOOTH_DEVICE_CONFIG_CHANGE
-// QTI_END: 2024-05-11: N/A: base: Remove A2DP to A2DP quick SHO changes
                 && AudioSystem.isStreamActive(AudioSystem.STREAM_MUSIC, 0)
                 && hasIntersection(mDeviceInventory.DEVICE_OVERRIDE_A2DP_ROUTE_ON_PLUG_SET,
                 mAudioService.getDeviceSetForStream(AudioSystem.STREAM_MUSIC).stream().map(
@@ -2744,9 +2752,7 @@ public class AudioDeviceBroker {
             // what has been communicated to audio policy manager. The device
             // returned by requestedCommunicationDevice() can be a placeholder SCO device if legacy
             // APIs are used to start SCO audio.
-// QTI_BEGIN: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
             AudioDeviceAttributes device = mBtHelper.getHeadsetAudioDummyDevice();
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
             if (device != null) {
                 return device;
             }
@@ -2936,7 +2942,7 @@ public class AudioDeviceBroker {
             }
         }
         dispatchCommunicationDevice();
-        mAudioService.postUpdateRingerModeServiceInt();
+        mAudioService.updateRingerModeMutedStreams();
     }
 
     @GuardedBy("mDeviceStateLock")
@@ -3202,6 +3208,10 @@ public class AudioDeviceBroker {
     @Nullable
     AdiDeviceState findBtDeviceStateForAddress(String address, int deviceType) {
         return mDeviceInventory.findBtDeviceStateForAddress(address, deviceType);
+    }
+
+    boolean hasAlwaysRingDevice() {
+        return mDeviceInventory.hasAlwaysRingDevice();
     }
 
     void addAudioDeviceWithCategoryInInventoryIfNeeded(@NonNull String address,

@@ -45,6 +45,8 @@ import com.android.systemui.deviceentry.shared.model.DeviceUnlockSource
 import com.android.systemui.keyguard.DismissCallbackRegistry
 import com.android.systemui.keyguard.domain.interactor.KeyguardEnabledInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardOcclusionInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardSurfaceBehindInteractor
 import com.android.systemui.keyguard.domain.interactor.TrustInteractor
 import com.android.systemui.keyguard.domain.interactor.WindowManagerLockscreenVisibilityInteractor.Companion.keyguardScenes
 import com.android.systemui.log.table.TableLogBuffer
@@ -57,11 +59,9 @@ import com.android.systemui.plugins.FalsingManager.FalsingBeliefListener
 import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.power.shared.model.WakeSleepReason
 import com.android.systemui.scene.data.model.asIterable
-import com.android.systemui.scene.data.model.sceneStackOf
 import com.android.systemui.scene.domain.SceneFrameworkTableLog
 import com.android.systemui.scene.domain.interactor.DisabledContentInteractor
 import com.android.systemui.scene.domain.interactor.SceneBackInteractor
-import com.android.systemui.scene.domain.interactor.SceneContainerOcclusionInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.session.shared.SessionStorage
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
@@ -88,6 +88,10 @@ import com.android.systemui.util.println
 import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
 import com.google.android.msdl.data.model.MSDLToken
 import com.google.android.msdl.domain.MSDLPlayer
+import dagger.Lazy
+import java.io.PrintWriter
+import java.util.Optional
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
@@ -106,10 +110,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import dagger.Lazy
-import java.io.PrintWriter
-import java.util.Optional
-import javax.inject.Inject
 
 /**
  * Hooks up business logic that manipulates the state of the [SceneInteractor] for the system UI
@@ -136,7 +136,7 @@ constructor(
     private val deviceProvisioningInteractor: DeviceProvisioningInteractor,
     private val centralSurfacesOptLazy: Lazy<Optional<CentralSurfaces>>,
     private val headsUpInteractor: HeadsUpNotificationInteractor,
-    private val occlusionInteractor: SceneContainerOcclusionInteractor,
+    private val occlusionInteractor: KeyguardOcclusionInteractor,
     private val faceUnlockInteractor: DeviceEntryFaceAuthInteractor,
     private val shadeInteractor: ShadeInteractor,
     private val uiEventLogger: UiEventLogger,
@@ -155,6 +155,7 @@ constructor(
     private val trustInteractor: TrustInteractor,
     private val sysuiStateInteractor: SysUIStateDisplaysInteractor,
     private val shadeDisplaysInteractor: Lazy<ShadeDisplaysInteractor>,
+    private val surfaceBehindInteractor: KeyguardSurfaceBehindInteractor,
 ) : CoreStartable {
     private val centralSurfaces: CentralSurfaces?
         get() = centralSurfacesOptLazy.get().getOrNull()
@@ -179,6 +180,7 @@ constructor(
             respondToFalsingDetections()
             hydrateInteractionState()
             handleBouncerOverscroll()
+            handleOcclusion()
             handleDeviceEntryHapticsWhileDeviceLocked()
             hydrateWindowController()
             hydrateBackStack()
@@ -198,6 +200,7 @@ constructor(
             printSection("SceneContainerFlag") {
                 printSection("Framework availability") {
                     println("isEnabled", SceneContainerFlag.isEnabled)
+                    println("isEnabledOnVariant", SceneContainerFlag.isEnabledOnVariant)
                 }
 
                 if (!SceneContainerFlag.isEnabled) {
@@ -283,13 +286,13 @@ constructor(
                         combine(
                                 sceneInteractor.transitionState,
                                 headsUpInteractor.isHeadsUpOrAnimatingAway,
-                                occlusionInteractor.invisibleDueToOcclusion,
                                 alternateBouncerInteractor.isVisible,
+                                surfaceBehindInteractor.isAnimatingSurface,
                             ) {
                                 transitionState,
                                 isHeadsUpOrAnimatingAway,
-                                invisibleDueToOcclusion,
-                                isAlternateBouncerVisible ->
+                                isAlternateBouncerVisible,
+                                isAnimatingSurface ->
                                 val isCommunalShowing =
                                     transitionState.isTransitioningFromOrTo(Scenes.Communal) ||
                                         transitionState.isIdle(Scenes.Communal)
@@ -301,10 +304,19 @@ constructor(
                                         is ObservableTransitionState.Idle -> {
                                             if (transitionState.currentScene == Scenes.Dream) {
                                                 false to "dream is showing"
-                                            } else if (transitionState.currentScene != Scenes.Gone) {
-                                                true to "scene is not Gone"
-                                            } else if (transitionState.currentOverlays.isNotEmpty()) {
+                                            } else if (
+                                                transitionState.currentScene != Scenes.Gone &&
+                                                    transitionState.currentScene != Scenes.Occluded
+                                            ) {
+                                                true to "scene is not Gone and not Occluded"
+                                            } else if (
+                                                transitionState.currentOverlays.isNotEmpty()
+                                            ) {
                                                 true to "overlay is shown"
+                                            } else if (
+                                                transitionState.currentScene == Scenes.Occluded
+                                            ) {
+                                                false to "occluded"
                                             } else {
                                                 false to "scene is Gone and no overlays are shown"
                                             }
@@ -317,6 +329,7 @@ constructor(
                                 when {
                                     isCommunalShowing ->
                                         true to "on or transitioning to/from communal"
+                                    isAnimatingSurface -> true to "animating surface behind"
                                     isHeadsUpOrAnimatingAway -> true to "showing a HUN"
                                     isAlternateBouncerVisible -> true to "showing alternate bouncer"
                                     // We need to be visible during transitions, even if occlusion
@@ -324,7 +337,6 @@ constructor(
                                     // transitions get a chance to complete.
                                     inTransition && visibilityForTransitionState.first ->
                                         true to visibilityForTransitionState.second
-                                    invisibleDueToOcclusion -> false to "invisible due to occlusion"
                                     else -> visibilityForTransitionState
                                 }
                             }
@@ -490,7 +502,7 @@ constructor(
                                     "device was unlocked with alternate bouncer showing" +
                                         " and shade didn't need to be left open"
                             } else {
-                                replaceLockscreenSceneOnBackStack()
+                                sceneBackInteractor.replaceLockscreenSceneOnBackStack()
                                 null
                             }
                         }
@@ -508,7 +520,7 @@ constructor(
                                         " didn't need to be left open"
                             } else {
                                 if (previousScene.value != Scenes.Gone) {
-                                    replaceLockscreenSceneOnBackStack()
+                                    sceneBackInteractor.replaceLockscreenSceneOnBackStack()
                                 }
                                 targetScene to
                                     "device was unlocked with primary bouncer showing," +
@@ -537,7 +549,7 @@ constructor(
                         // unlocked, replace the Lockscreen scene from the bottom of the navigation
                         // back stack with the Gone scene.
                         else -> {
-                            replaceLockscreenSceneOnBackStack()
+                            sceneBackInteractor.replaceLockscreenSceneOnBackStack()
                             null
                         }
                     }
@@ -545,22 +557,6 @@ constructor(
                 .collect { (targetSceneKey, loggingReason) ->
                     switchToScene(targetSceneKey = targetSceneKey, loggingReason = loggingReason)
                 }
-        }
-    }
-
-    /**
-     * If the [Scenes.Lockscreen] is on the bottom of the navigation backstack, replaces it with
-     * [Scenes.Gone].
-     */
-    private fun replaceLockscreenSceneOnBackStack() {
-        sceneBackInteractor.updateBackStack { stack ->
-            val list = stack.asIterable().toMutableList()
-            if (list.lastOrNull() == Scenes.Lockscreen) {
-                list[list.size - 1] = Scenes.Gone
-                sceneStackOf(*list.toTypedArray())
-            } else {
-                stack
-            }
         }
     }
 
@@ -649,6 +645,7 @@ constructor(
                         switchToScene(
                             targetSceneKey = SceneFamilies.Home,
                             loggingReason = "dream stopped",
+                            hideAllOverlays = deviceUnlockedInteractor.isUnlocked,
                         )
                     }
                 }
@@ -763,14 +760,12 @@ constructor(
                         .mapNotNull { it as? ObservableTransitionState.Idle }
                         .distinctUntilChanged(),
                     sceneInteractor.isVisible,
-                    occlusionInteractor.invisibleDueToOcclusion,
                     shadePendingDisplayId,
-                ) { idleState, isVisible, invisibleDueToOcclusion, displayId ->
+                ) { idleState, isVisible, displayId ->
                     displayId to
                         SceneContainerPlugin.SceneContainerPluginState(
                             scene = idleState.currentScene,
                             overlays = idleState.currentOverlays,
-                            invisibleDueToOcclusion = invisibleDueToOcclusion,
                             isVisible = isVisible,
                         )
                 }
@@ -781,7 +776,7 @@ constructor(
                         }
                 }
                 .distinctUntilChanged()
-                .collect { (displayId: Int, flagMap) ->
+                .collect { (displayId: Int, flagMap: List<Pair<Long, Boolean>>) ->
                     sysuiStateInteractor.setFlagsExclusivelyToDisplay(
                         targetDisplayId = displayId,
                         stateChanges = StateChange.from(flagMap),
@@ -809,8 +804,8 @@ constructor(
         }
 
         applicationScope.launch {
-            occlusionInteractor.invisibleDueToOcclusion.collect { invisibleDueToOcclusion ->
-                windowController.setKeyguardOccluded(invisibleDueToOcclusion)
+            occlusionInteractor.isKeyguardOccluded.collect { isKeyguardOccluded ->
+                windowController.setKeyguardOccluded(isKeyguardOccluded)
             }
         }
     }
@@ -941,6 +936,24 @@ constructor(
         }
     }
 
+    private fun handleOcclusion() {
+        applicationScope.launch {
+            occlusionInteractor.isKeyguardOccluded.collect { occluded ->
+                // This does not use the scene family to resolve, as there is a race condition when
+                // they both update state based off of the isKeyguardOccluded value.
+                if (occluded) {
+                    switchToScene(Scenes.Occluded, "isKeyguardOccluded == true")
+                } else if (sceneInteractor.currentScene.value == Scenes.Occluded) {
+                    if (deviceEntryInteractor.isDeviceEntered.value) {
+                        switchToScene(Scenes.Gone, "unoccluded and device entered")
+                    } else {
+                        switchToScene(Scenes.Lockscreen, "unoccluded and device not entered")
+                    }
+                }
+            }
+        }
+    }
+
     private fun handleKeyguardEnabledness() {
         // Automatically switches scenes when keyguard is enabled or disabled, as needed.
         applicationScope.launch {
@@ -991,12 +1004,14 @@ constructor(
         loggingReason: String,
         sceneState: Any? = null,
         freezeAndAnimateToCurrentState: Boolean = false,
+        hideAllOverlays: Boolean = true,
     ) {
         sceneInteractor.changeScene(
             toScene = targetSceneKey,
             loggingReason = loggingReason,
             sceneState = sceneState,
             forceSettleToTargetScene = freezeAndAnimateToCurrentState,
+            hideAllOverlays = hideAllOverlays,
         )
     }
 

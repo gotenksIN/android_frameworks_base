@@ -30,7 +30,9 @@
 /*
   Changes from Qualcomm Innovation Center are provided under the following license:
 
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
   Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
   SPDX-License-Identifier: BSD-3-Clause-Clear
 */
 
@@ -39,7 +41,9 @@ package com.android.systemui.statusbar.policy;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.ServiceConnection;
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
 import android.net.Uri;
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
@@ -55,28 +59,40 @@ import java.lang.Exception;
 import java.util.ArrayList;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.lang.ref.WeakReference;
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
 import javax.inject.Inject;
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
 
 import com.android.keyguard.KeyguardUpdateMonitorCallback;
 import com.android.settingslib.mobile.TelephonyIcons;
 import com.android.settingslib.SignalIcon.MobileIconGroup;
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
 import com.android.settingslib.R;
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
 import com.android.systemui.dagger.SysUISingleton;
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
 
 import com.qti.extphone.Client;
 import com.qti.extphone.ExtTelephonyManager;
 import com.qti.extphone.IExtPhoneCallback;
 import com.qti.extphone.ExtPhoneCallbackListener;
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
 import com.qti.extphone.NrIcon;
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
 import com.qti.extphone.NrIconType;
 import com.qti.extphone.Status;
 import com.qti.extphone.ServiceCallback;
 import com.qti.extphone.Token;
 
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
 @SysUISingleton
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
 public class FiveGServiceClient {
     private static final String TAG = "FiveGServiceClient";
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG)||true;
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
     private static final int MESSAGE_REBIND = 1024;
     private static final int MESSAGE_REINIT = MESSAGE_REBIND+1;
     private static final int MESSAGE_NOTIFIY_MONITOR_CALLBACK = MESSAGE_REBIND+2;
@@ -102,67 +118,107 @@ public class FiveGServiceClient {
     private boolean mIsConnectInProgress = false;
 
     public static class FiveGServiceState{
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
         private static final String COL_NR_ICON_TYPE = "NrIconType";
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
         private int mNrIconType;
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         private boolean mIs6Rx;
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
         private MobileIconGroup mIconGroup;
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
 
         public FiveGServiceState(){
             mNrIconType = NrIconType.INVALID;
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             mIs6Rx = false;
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             mIconGroup = TelephonyIcons.UNKNOWN;
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
         }
 
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
         @VisibleForTesting
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         public FiveGServiceState(int nrIconType, boolean is6Rx, Context context) {
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
             mNrIconType = nrIconType;
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             mIs6Rx = is6Rx;
             mIconGroup = getNrIconGroup(nrIconType, is6Rx, context);
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
         }
 
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
         public boolean isNrIconTypeValid() {
             return mNrIconType != NrIconType.INVALID && mNrIconType != NrIconType.TYPE_NONE;
         }
 
         @VisibleForTesting
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
         public MobileIconGroup getIconGroup() {
             return mIconGroup;
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
         }
 
         @VisibleForTesting
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
         public int getNrIconType() {
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
             return mNrIconType;
         }
 
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         @VisibleForTesting
         public boolean getIs6Rx() {
             return mIs6Rx;
         }
 
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         public void copyFrom(FiveGServiceState state) {
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             this.mIconGroup = state.mIconGroup;
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             this.mNrIconType = state.mNrIconType;
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             this.mIs6Rx = state.mIs6Rx;
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         }
 
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
         public boolean equals(FiveGServiceState state) {
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
             return this.mIconGroup == state.mIconGroup
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                     && this.mNrIconType == state.mNrIconType
                     && this.mIs6Rx == state.mIs6Rx;
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
         }
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
 
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
             builder.append("mNrIconType=").append(mNrIconType).append(", ").
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                     append("is6Rx=").append(mIs6Rx).append(", ").
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                     append("mIconGroup=").append(mIconGroup);
 
             return builder.toString();
         }
     }
 
+// QTI_BEGIN: 2023-03-02: Data: SystemUI: Support side car 5G icon
     @Inject
+// QTI_END: 2023-03-02: Data: SystemUI: Support side car 5G icon
     public FiveGServiceClient(Context context) {
         mContext = context;
         mPackageName = mContext.getPackageName();
@@ -214,12 +270,16 @@ public class FiveGServiceClient {
         Log.d(TAG, "resetState phoneId=" + phoneId);
         FiveGServiceState currentState = getCurrentServiceState(phoneId);
         currentState.mNrIconType = NrIconType.INVALID;
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         currentState.mIs6Rx = false;
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         currentState.mIconGroup = TelephonyIcons.UNKNOWN;
 
         FiveGServiceState lastState = getLastServiceState(phoneId);
         lastState.mNrIconType = NrIconType.INVALID;
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         lastState.mIs6Rx = false;
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         lastState.mIconGroup = TelephonyIcons.UNKNOWN;
     }
 
@@ -254,10 +314,16 @@ public class FiveGServiceClient {
         public void onConnected() {
             Log.d(TAG, "ExtTelephony Service connected");
             int[] events = new int[] {
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
                     ExtPhoneCallbackListener.EVENT_ON_NR_ICON_TYPE,
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                     ExtPhoneCallbackListener.EVENT_QUERY_NR_ICON_RESPONSE,
                     ExtPhoneCallbackListener.EVENT_ON_NR_ICON_CHANGE,
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
                     ExtPhoneCallbackListener.EVENT_ON_CIWLAN_AVAILABLE};
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
             mServiceConnected = true;
             mIsConnectInProgress = false;
             mClient = mExtTelephonyManager.registerCallbackWithEvents(
@@ -304,7 +370,9 @@ public class FiveGServiceClient {
         if ( !currentState.equals(lastState) ) {
 
             if ( DEBUG ) {
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
                 Log.d(TAG, "phoneId(" + phoneId + ") Change in state from " + lastState + " \n"+
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
                         "\tto " + currentState);
 
             }
@@ -336,7 +404,9 @@ public class FiveGServiceClient {
         if ( mServiceConnected && mClient != null) {
             Log.d(TAG, "query 5G service state for phoneId " + phoneId);
             try {
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 Token token = mExtTelephonyManager.queryNrIcon(phoneId, mClient);
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 Log.d(TAG, "queryNrIconType result:" + token);
             } catch (Exception e) {
                 Log.d(TAG, "initFiveGServiceState: Exception = " + e);
@@ -346,6 +416,7 @@ public class FiveGServiceClient {
                     mInitRetryTimes +=1;
                 }
             }
+// QTI_BEGIN: 2024-04-19: Data: SystemUI: Fix FiveGStateListener registration failure issue
 
             boolean ciWlanAvailable = mExtTelephonyManager.isCiwlanAvailable(phoneId);
             try {
@@ -353,24 +424,37 @@ public class FiveGServiceClient {
             } catch (RemoteException e) {
                 Log.d(TAG, "onCiwlanAvailable: Exception = " + e);
             }
+// QTI_END: 2024-04-19: Data: SystemUI: Fix FiveGStateListener registration failure issue
         }
     }
 
     @VisibleForTesting
+// QTI_BEGIN: 2024-04-19: Data: SystemUI: Fix FiveGStateListener registration failure issue
     void update5GIcon(FiveGServiceState state) {
+// QTI_END: 2024-04-19: Data: SystemUI: Fix FiveGStateListener registration failure issue
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         state.mIconGroup = getNrIconGroup(state.mNrIconType, state.mIs6Rx, mContext);
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
     }
 
+// QTI_END: 2018-12-18: Telephony: SystemUI: Display 5G Basic or 5G UWB icon per 5G service state
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
     private static MobileIconGroup getNrIconGroup(int nrIconType , boolean is6Rx, Context context) {
         boolean show6RxConfig = context.getResources().getBoolean(R.bool.config_display_6Rx);
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         boolean show5Ga = context.getResources().getBoolean(R.bool.config_display_5g_a);
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         Log.d(TAG, "getNrIconGroup nrIconType:" + nrIconType +
             "; is6Rx:" + is6Rx + "; show6RxConfig:" + show6RxConfig);
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         MobileIconGroup iconGroup = TelephonyIcons.UNKNOWN;
         switch (nrIconType){
             case NrIconType.TYPE_5G_BASIC:
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 iconGroup = (show6RxConfig && is6Rx) ?
                         TelephonyIcons.FIVE_G_BASIC_6RX : TelephonyIcons.FIVE_G_BASIC;
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 break;
             case NrIconType.TYPE_5G_UWB:
                 if (show5Ga) {
@@ -380,9 +464,11 @@ public class FiveGServiceClient {
                             TelephonyIcons.FIVE_G_UWB_6RX : TelephonyIcons.FIVE_G_UWB;
                 }
                 break;
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
             case NrIconType.TYPE_5G_PLUS_PLUS:
                 iconGroup = (show6RxConfig && is6Rx) ?
                         TelephonyIcons.FIVE_G_PLUS_PLUS_6RX : TelephonyIcons.FIVE_G_PLUS_PLUS;
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
                 break;
         }
         return iconGroup;
@@ -430,11 +516,14 @@ public class FiveGServiceClient {
             if (status.get() == Status.SUCCESS) {
                 FiveGServiceState state = getCurrentServiceState(slotId);
                 state.mNrIconType = nrIconType.get();
+// QTI_BEGIN: 2024-04-19: Data: SystemUI: Fix FiveGStateListener registration failure issue
                 update5GIcon(state);
+// QTI_END: 2024-04-19: Data: SystemUI: Fix FiveGStateListener registration failure issue
                 notifyListenersIfNecessary(slotId);
             }
         }
 
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
         @Override
         public void onNrIconResponse(int slotId, Token token, Status status, NrIcon
                 icon) throws RemoteException {
@@ -461,6 +550,8 @@ public class FiveGServiceClient {
             notifyListenersIfNecessary(slotId);
         }
 
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
         @Override
         public void onCiwlanAvailable(int slotId, boolean available)  throws RemoteException {
             Log.d(TAG,
@@ -475,10 +566,13 @@ public class FiveGServiceClient {
                 }
             }
         }
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     };
 
     public interface IFiveGStateListener {
         public void onStateChanged(FiveGServiceState state);
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
         public default void onCiwlanAvailableChanged(boolean available) {}
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     }
 }

@@ -37,7 +37,6 @@ import org.junit.runner.RunWith
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 @EnableFlags(SystemStatusIconsInCompose.FLAG_NAME)
-@android.platform.test.annotations.EnabledOnRavenwood
 class HotspotIconViewModelTest : SysuiTestCase() {
 
     private val kosmos = testKosmos().useUnconfinedTestDispatcher()
@@ -46,31 +45,40 @@ class HotspotIconViewModelTest : SysuiTestCase() {
         kosmos.hotspotIconViewModelFactory.create(context).apply { activateIn(kosmos.testScope) }
 
     @Test
-    fun icon_hotspotDisabled_outputsNull() =
+    fun visible_isFalse_byDefault() = kosmos.runTest { assertThat(underTest.visible).isFalse() }
+
+    @Test
+    fun visible_hotspotIsEnabled_isTrue() =
         kosmos.runTest {
-            fakeController.isHotspotEnabled = false
-            assertThat(underTest.icon).isNull()
+            fakeController.isHotspotEnabled = true
+
+            assertThat(underTest.visible).isTrue()
         }
 
     @Test
-    fun icon_hotspotEnabled_outputsIcon() =
+    fun visible_hotspotStateChanges_flips() =
         kosmos.runTest {
+            fakeController.isHotspotEnabled = false
+            assertThat(underTest.visible).isFalse()
+
             fakeController.isHotspotEnabled = true
-            assertThat(underTest.icon).isEqualTo(EXPECTED_HOTSPOT_ICON)
+
+            assertThat(underTest.visible).isTrue()
+
+            fakeController.isHotspotEnabled = false
+
+            assertThat(underTest.visible).isFalse()
         }
 
     @Test
-    fun icon_updatesWhenHotspotStateChanges() =
+    fun icon_visible_isCorrect() =
         kosmos.runTest {
-            fakeController.isHotspotEnabled = false
-            assertThat(underTest.icon).isNull()
-
             fakeController.isHotspotEnabled = true
-            assertThat(underTest.icon).isEqualTo(EXPECTED_HOTSPOT_ICON)
 
-            fakeController.isHotspotEnabled = false
-            assertThat(underTest.icon).isNull()
+            assertThat(underTest.icon).isEqualTo(EXPECTED_HOTSPOT_ICON)
         }
+
+    @Test fun icon_notVisible_isNull() = kosmos.runTest { assertThat(underTest.icon).isNull() }
 
     companion object {
         private val EXPECTED_HOTSPOT_ICON =

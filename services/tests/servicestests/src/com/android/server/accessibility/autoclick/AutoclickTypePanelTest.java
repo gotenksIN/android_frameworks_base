@@ -33,6 +33,7 @@ import static com.android.server.accessibility.autoclick.AutoclickTypePanel.POSI
 import static com.google.common.truth.Truth.assertThat;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.drawable.GradientDrawable;
 import android.provider.Settings;
 import android.testing.AndroidTestingRunner;
@@ -44,7 +45,6 @@ import android.view.PointerIcon;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageButton;
-import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 
@@ -71,14 +71,14 @@ public class AutoclickTypePanelTest {
 
     private AutoclickTypePanel mAutoclickTypePanel;
     @Mock private WindowManager mMockWindowManager;
-    private LinearLayout mLeftClickButton;
-    private LinearLayout mRightClickButton;
-    private LinearLayout mDoubleClickButton;
-    private LinearLayout mDragButton;
-    private LinearLayout mScrollButton;
-    private LinearLayout mPauseButton;
-    private LinearLayout mPositionButton;
-    private LinearLayout mLongPressButton;
+    private ImageButton mLeftClickButton;
+    private ImageButton mRightClickButton;
+    private ImageButton mDoubleClickButton;
+    private ImageButton mDragButton;
+    private ImageButton mScrollButton;
+    private ImageButton mPauseButton;
+    private ImageButton mPositionButton;
+    private ImageButton mLongPressButton;
 
     private @AutoclickType int mActiveClickType = AUTOCLICK_TYPE_LEFT_CLICK;
     private boolean mPaused;
@@ -110,16 +110,20 @@ public class AutoclickTypePanelTest {
                 new AutoclickTypePanel(mTestableContext, mMockWindowManager,
                         mTestableContext.getUserId(), clickPanelController);
         View contentView = mAutoclickTypePanel.getContentViewForTesting();
-        mLeftClickButton = contentView.findViewById(R.id.accessibility_autoclick_left_click_layout);
+        mLeftClickButton = contentView.findViewById(R.id.accessibility_autoclick_left_click_button);
         mRightClickButton =
-                contentView.findViewById(R.id.accessibility_autoclick_right_click_layout);
+                contentView.findViewById(R.id.accessibility_autoclick_right_click_button);
         mDoubleClickButton =
-                contentView.findViewById(R.id.accessibility_autoclick_double_click_layout);
-        mScrollButton = contentView.findViewById(R.id.accessibility_autoclick_scroll_layout);
-        mDragButton = contentView.findViewById(R.id.accessibility_autoclick_drag_layout);
-        mPauseButton = contentView.findViewById(R.id.accessibility_autoclick_pause_layout);
-        mPositionButton = contentView.findViewById(R.id.accessibility_autoclick_position_layout);
-        mLongPressButton = contentView.findViewById(R.id.accessibility_autoclick_long_press_layout);
+                contentView.findViewById(R.id.accessibility_autoclick_double_click_button);
+        mScrollButton = contentView.findViewById(R.id.accessibility_autoclick_scroll_button);
+        mDragButton = contentView.findViewById(R.id.accessibility_autoclick_drag_button);
+        mPauseButton = contentView.findViewById(R.id.accessibility_autoclick_pause_button);
+        mPositionButton = contentView.findViewById(R.id.accessibility_autoclick_position_button);
+        mLongPressButton = contentView.findViewById(R.id.accessibility_autoclick_long_press_button);
+
+        // Set panel to default bottom-right corner.
+        mAutoclickTypePanel.show();
+        mAutoclickTypePanel.resetPanelPositionForTesting();
     }
 
     @Test
@@ -185,12 +189,12 @@ public class AutoclickTypePanelTest {
 
     @Test
     public void togglePanelExpansion_selectButton_correctStyle() {
-        // By first click, the panel is expanded.
-        mLeftClickButton.callOnClick();
-
-        // Clicks any button in the expanded state to select a type button.
+        // The panel starts in an expanded state. This test verifies that clicking
+        // a new type button (e.g., Scroll) correctly selects it, collapses the
+        // panel, and applies the 'selected' visual style.
         mScrollButton.callOnClick();
 
+        // Verify the scroll button now has the style for a selected item.
         verifyButtonHasSelectedStyle(mScrollButton);
     }
 
@@ -200,6 +204,32 @@ public class AutoclickTypePanelTest {
         mScrollButton.callOnClick();
 
         assertThat(mActiveClickType).isEqualTo(AUTOCLICK_TYPE_SCROLL);
+    }
+
+    @Test
+    public void togglePanelExpansion_largeScreen_AllButtonsShowing() {
+        mAutoclickTypePanel.setIsExpandedPanelWiderThanScreenForTesting(false);
+
+        // Close and re-expand the panel.
+        mLeftClickButton.callOnClick();
+        mLeftClickButton.callOnClick();
+
+        // Expect the buttons to be shown because the screen can fit the whole panel.
+        assertThat(mPauseButton.getVisibility()).isEqualTo(View.VISIBLE);
+        assertThat(mPositionButton.getVisibility()).isEqualTo(View.VISIBLE);
+    }
+
+    @Test
+    public void togglePanelExpansion_smallScreen_HideButtons() {
+        mAutoclickTypePanel.setIsExpandedPanelWiderThanScreenForTesting(true);
+
+        // Close and re-expand the panel.
+        mLeftClickButton.callOnClick();
+        mLeftClickButton.callOnClick();
+
+        // Expect the buttons to be hidden because the screen is too small.
+        assertThat(mPauseButton.getVisibility()).isEqualTo(View.GONE);
+        assertThat(mPositionButton.getVisibility()).isEqualTo(View.GONE);
     }
 
     @Test
@@ -306,18 +336,17 @@ public class AutoclickTypePanelTest {
                 .accessibility_autoclick_resume);
         String pauseText = mTestableContext.getString(R.string
                 .accessibility_autoclick_pause);
-        ImageButton imageButton = (ImageButton) mPauseButton.getChildAt(/* index= */ 0);
 
         mPauseButton.callOnClick();
         assertThat(mPaused).isTrue();
         assertThat(mAutoclickTypePanel.isPaused()).isTrue();
-        assertThat(imageButton.getContentDescription().toString()).isEqualTo(resumeText);
+        assertThat(mPauseButton.getContentDescription().toString()).isEqualTo(resumeText);
         assertThat(mPauseButton.getTooltipText().toString()).isEqualTo(resumeText);
 
         mPauseButton.callOnClick();
         assertThat(mPaused).isFalse();
         assertThat(mAutoclickTypePanel.isPaused()).isFalse();
-        assertThat(imageButton.getContentDescription().toString()).isEqualTo(pauseText);
+        assertThat(mPauseButton.getContentDescription().toString()).isEqualTo(pauseText);
         assertThat(mPauseButton.getTooltipText().toString()).isEqualTo(pauseText);
     }
 
@@ -519,28 +548,28 @@ public class AutoclickTypePanelTest {
 
     @Test
     public void hovered_IsHovered() {
-        AutoclickLinearLayout mContext = mAutoclickTypePanel.getContentViewForTesting();
+        AutoclickTypeLinearLayout contentView = mAutoclickTypePanel.getContentViewForTesting();
 
         assertThat(mAutoclickTypePanel.isHovered()).isFalse();
-        mContext.onInterceptHoverEvent(getFakeMotionHoverMoveEvent());
+        contentView.onInterceptHoverEvent(getFakeMotionHoverMoveEvent());
         assertThat(mAutoclickTypePanel.isHovered()).isTrue();
     }
 
     @Test
     public void hovered_OnHoverChange_isHovered() {
-        AutoclickLinearLayout mContext = mAutoclickTypePanel.getContentViewForTesting();
+        View contentView = mAutoclickTypePanel.getContentViewForTesting();
 
         mHovered = false;
-        mContext.onHoverChanged(true);
+        contentView.onHoverChanged(true);
         assertThat(mHovered).isTrue();
     }
 
     @Test
     public void hovered_OnHoverChange_isNotHovered() {
-        AutoclickLinearLayout mContext = mAutoclickTypePanel.getContentViewForTesting();
+        View contentView = mAutoclickTypePanel.getContentViewForTesting();
 
         mHovered = true;
-        mContext.onHoverChanged(false);
+        contentView.onHoverChanged(false);
         assertThat(mHovered).isFalse();
     }
 
@@ -590,9 +619,17 @@ public class AutoclickTypePanelTest {
         assertThat(afterDragCursor.getType()).isEqualTo(PointerIcon.TYPE_GRAB);
     }
 
-    private void verifyButtonHasSelectedStyle(@NonNull LinearLayout button) {
+    private void verifyButtonHasSelectedStyle(@NonNull ImageButton button) {
         GradientDrawable gradientDrawable = (GradientDrawable) button.getBackground();
-        assertThat(gradientDrawable.getColor().getDefaultColor())
+        // Get the ColorStateList from the background.
+        ColorStateList colorStateList = gradientDrawable.getColor();
+        // Add an assertion to handle the lint warning and ensure the color list is not null.
+        assertThat(colorStateList).isNotNull();
+        // Get the color that corresponds to the button's current drawable state.
+        int currentColor = colorStateList.getColorForState(button.getDrawableState(), 0);
+
+        // Assert that the current color is the primary color.
+        assertThat(currentColor)
                 .isEqualTo(mTestableContext.getColor(R.color.materialColorPrimary));
     }
 

@@ -16,15 +16,148 @@
 
 package com.android.systemui.screencapture.record.smallscreen.ui.compose
 
-import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeContent
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.android.compose.PlatformIconButton
+import com.android.systemui.lifecycle.rememberViewModel
+import com.android.systemui.res.R
+import com.android.systemui.screencapture.common.ScreenCaptureScope
+import com.android.systemui.screencapture.common.ui.compose.PrimaryButton
 import com.android.systemui.screencapture.common.ui.compose.ScreenCaptureContent
+import com.android.systemui.screencapture.common.ui.compose.loadIcon
+import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.RecordDetailsPopupType
+import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.SmallScreenCaptureRecordViewModel
 import javax.inject.Inject
 
-class SmallScreenCaptureRecordContent @Inject constructor() : ScreenCaptureContent {
+@ScreenCaptureScope
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+class SmallScreenCaptureRecordContent
+@Inject
+constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Factory) :
+    ScreenCaptureContent {
 
     @Composable
     override fun Content() {
-        Text("Not yet implemented")
+        val viewModel =
+            rememberViewModel("SmallScreenCaptureRecordContent#viewModel") {
+                viewModelFactory.create()
+            }
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier =
+                Modifier.fillMaxSize()
+                    .windowInsetsPadding(
+                        WindowInsets.safeContent.only(
+                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal
+                        )
+                    )
+                    .padding(horizontal = 30.dp),
+        ) {
+            // TODO(b/428686600) use Toolbar shared with the large screen
+            Surface(
+                shape = FloatingToolbarDefaults.ContainerShape,
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 6.dp,
+            ) {
+                Row(
+                    modifier = Modifier.height(64.dp).padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PlatformIconButton(
+                        onClick = { viewModel.dismiss() },
+                        contentDescription =
+                            stringResource(id = R.string.underlay_close_button_content_description),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                            ),
+                        iconResource = R.drawable.ic_close,
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    val recordIcon by
+                        loadIcon(
+                            viewModel = viewModel,
+                            resId = R.drawable.ic_screenrecord,
+                            contentDescription = null,
+                        )
+                    PrimaryButton(
+                        onClick = { viewModel.startRecording() },
+                        text = stringResource(R.string.screen_capture_toolbar_record_button),
+                        icon = recordIcon,
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                        iconPadding = 4.dp,
+                        modifier = Modifier.height(40.dp),
+                    )
+                }
+            }
+
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(28.dp),
+                shadowElevation = 2.dp,
+                modifier = Modifier.animateContentSize(),
+            ) {
+                AnimatedContent(
+                    targetState = viewModel.detailsPopup,
+                    contentAlignment = Alignment.Center,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    modifier = Modifier.widthIn(max = 352.dp),
+                ) { currentPopup ->
+                    val contentModifier = Modifier.fillMaxWidth()
+                    when (currentPopup) {
+                        RecordDetailsPopupType.Empty -> {
+                            /* show nothing */
+                        }
+                        RecordDetailsPopupType.Settings ->
+                            RecordDetailsSettings(
+                                viewModel = viewModel.recordDetailsParametersViewModel,
+                                drawableLoaderViewModel = viewModel,
+                                modifier = contentModifier,
+                            )
+                        RecordDetailsPopupType.AppSelector ->
+                            RecordDetailsAppSelector(
+                                viewModel = viewModel.recordDetailsAppSelectorViewModel,
+                                onBackPressed = { viewModel.showSettings() },
+                                modifier = contentModifier,
+                            )
+                        RecordDetailsPopupType.MarkupColorSelector ->
+                            RecordDetailsMarkupColorSelector(modifier = contentModifier)
+                    }
+                }
+            }
+        }
     }
 }

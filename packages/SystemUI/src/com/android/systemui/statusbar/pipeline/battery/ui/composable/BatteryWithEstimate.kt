@@ -21,12 +21,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.android.systemui.lifecycle.rememberViewModel
@@ -47,7 +47,14 @@ fun BatteryWithEstimate(
         rememberViewModel(traceName = "BatteryWithEstimate") { viewModelFactory.create() }
 
     val batteryHeight =
-        with(LocalDensity.current) { BatteryViewModel.STATUS_BAR_BATTERY_HEIGHT.toDp() }
+        with(LocalDensity.current) {
+            BatteryViewModel.getStatusBarBatteryHeight(LocalContext.current).toDp()
+        }
+
+    val textStyle =
+        with(LocalDensity.current) {
+            BatteryViewModel.getStatusBarBatteryTextStyle(LocalContext.current)
+        }
 
     Row(
         modifier = modifier,
@@ -66,7 +73,7 @@ fun BatteryWithEstimate(
                 Text(
                     text = it,
                     color = textColor,
-                    style = MaterialTheme.typography.bodyMediumEmphasized,
+                    style = textStyle,
                     maxLines = 1,
                     modifier = Modifier.basicMarquee(iterations = 1),
                 )

@@ -31,6 +31,16 @@ interface ISerialManager {
     /** Unregisters a listener to monitor serial port connections and disconnections. */
     void unregisterSerialPortListener(in ISerialPortListener listener);
 
-    /** Requests opening a file descriptor for the serial port. */
-    void requestOpen(in String portName, in int flags, in boolean exclusive, in ISerialPortResponseCallback callback);
+    /**
+     * Requests opening a file descriptor for the serial port.
+     *
+     * @param flags       open flags {@code SerialPort.OPEN_FLAG_*} that define read/write mode and
+     *                    other options.
+     * @param exclusive   whether the app needs exclusive access with TIOCEXCL(2const)
+     * @param packageName the package name of the calling application
+     * @param callback    the receiver of the operation result.
+     * @throws IllegalArgumentException if the set of flags is not correct.
+     */
+    void requestOpen(in String portName, in int flags, in boolean exclusive, in String packageName,
+            in ISerialPortResponseCallback callback);
 }

@@ -42,6 +42,7 @@ import static android.window.DisplayAreaOrganizer.FEATURE_VENDOR_FIRST;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.doThrow;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mock;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.never;
@@ -89,6 +90,7 @@ import android.os.RemoteException;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.annotations.RequiresFlagsDisabled;
+import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.util.ArrayMap;
 import android.util.Rational;
 import android.view.Display;
@@ -103,6 +105,8 @@ import android.window.StartingWindowInfo;
 import android.window.StartingWindowRemovalInfo;
 import android.window.TaskAppearedInfo;
 import android.window.TaskFragmentOrganizer;
+import android.window.TransitionInfo;
+import android.window.TransitionRequestInfo;
 import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
@@ -280,7 +284,7 @@ public class WindowOrganizerTests extends WindowTestsBase {
         rootTask.setTaskOrganizer(null);
         mWm.mAtmService.mTaskOrganizerController.dispatchPendingEvents();
 
-        verify(mWm.mAtmService).removeTask(eq(rootTask));
+        verify(mWm.mAtmService).removeTask(eq(rootTask), any());
     }
 
     @Test
@@ -298,7 +302,7 @@ public class WindowOrganizerTests extends WindowTestsBase {
         rootTask.setTaskOrganizer(null);
         mWm.mAtmService.mTaskOrganizerController.dispatchPendingEvents();
 
-        verify(mWm.mAtmService, never()).removeTask(eq(rootTask));
+        verify(mWm.mAtmService, never()).removeTask(eq(rootTask), any());
     }
 
     @Test
@@ -956,7 +960,7 @@ public class WindowOrganizerTests extends WindowTestsBase {
         final RunningTaskInfo info2 = task2.getTaskInfo();
 
         WindowContainerTransaction wct = new WindowContainerTransaction();
-        wct.setAdjacentRootSet(info1.token, info2.token);
+        wct.setAdjacentRoots(info1.token, info2.token);
         mWm.mAtmService.mWindowOrganizerController.applyTransaction(wct);
         assertTrue(task1.isAdjacentTo(task2));
         assertTrue(task2.isAdjacentTo(task1));
@@ -990,7 +994,7 @@ public class WindowOrganizerTests extends WindowTestsBase {
         final RunningTaskInfo info3 = task3.getTaskInfo();
 
         WindowContainerTransaction wct = new WindowContainerTransaction();
-        wct.setAdjacentRootSet(info1.token, info2.token, info3.token);
+        wct.setAdjacentRoots(info1.token, info2.token, info3.token);
         mWm.mAtmService.mWindowOrganizerController.applyTransaction(wct);
         assertTrue(task1.hasAdjacentTaskFragment());
         assertTrue(task2.hasAdjacentTaskFragment());
@@ -1362,7 +1366,8 @@ public class WindowOrganizerTests extends WindowTestsBase {
         @Override
         public void copySplashScreenView(int taskId) { }
         @Override
-        public void onTaskAppeared(RunningTaskInfo info, SurfaceControl leash) {
+        public void onTaskAppeared(RunningTaskInfo info, SurfaceControl leash)
+                throws RemoteException {
             mInfo = info;
         }
         @Override
@@ -1379,6 +1384,13 @@ public class WindowOrganizerTests extends WindowTestsBase {
         }
         @Override
         public void onAppSplashScreenViewRemoved(int taskId) {
+        }
+        @Override
+        public void onTransitionReady(IBinder iBinder, TransitionInfo transitionInfo,
+                SurfaceControl.Transaction t, SurfaceControl.Transaction finishT) {
+        }
+        @Override
+        public void requestStartTransition(IBinder iBinder, TransitionRequestInfo request) {
         }
     };
 
@@ -1617,6 +1629,37 @@ public class WindowOrganizerTests extends WindowTestsBase {
     }
 
     @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ALWAYS_SEQ_ID_LAYOUT)
+    public void testNonBLASTWindowSyncWithNoChanges() throws Exception {
+        final Task rootTaskController = createRootTask();
+        final Task task = createTask(rootTaskController);
+        final WindowState w1 = createAppWindow(task, TYPE_APPLICATION, "Enlightened Window 1");
+        final WindowState w2 = createAppWindow(task, TYPE_APPLICATION, "Enlightened Window 2");
+        makeWindowVisible(w1);
+        makeWindowVisible(w2);
+        // Simulate window 1 as having no changes (hence no need to redraw)
+        w1.mWinAnimator.mDrawState = WindowStateAnimator.HAS_DRAWN;
+        w1.setLastConfigReportedToClientForTest(true);
+
+        IWindowContainerTransactionCallback mockCallback =
+                mock(IWindowContainerTransactionCallback.class);
+        int id = mWm.mAtmService.mWindowOrganizerController.startSyncWithOrganizer(mockCallback);
+        mWm.mSyncEngine.setSyncMethod(id, BLASTSyncEngine.METHOD_NONE);
+
+        mWm.mAtmService.mWindowOrganizerController.addToSyncSet(id, task);
+        mWm.mAtmService.mWindowOrganizerController.setSyncReady(id);
+
+        verify(mockCallback, never()).onTransactionReady(anyInt(), any());
+        assertTrue(w1.syncNextBuffer());
+        assertTrue(w2.syncNextBuffer());
+
+        // Make w2 ready and since w1 has no changes, the whole sync should finish.
+        w2.immediatelyNotifyBlastSync();
+        mWm.mSyncEngine.onSurfacePlacement();
+        verify(mockCallback).onTransactionReady(anyInt(), any());
+    }
+
+    @Test
     public void testDisplayAreaHiddenTransaction() {
         removeGlobalMinSizeRestriction();
 
@@ -1685,7 +1728,6 @@ public class WindowOrganizerTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_EXCLUDE_TASK_FROM_RECENTS)
     public void testSetTaskForceExcludedFromRecents() {
         final Task rootTask = createRootTask();
         final Task task = createTaskInRootTask(rootTask, 0 /* userId */);
@@ -1699,7 +1741,6 @@ public class WindowOrganizerTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_EXCLUDE_TASK_FROM_RECENTS)
     public void testSetTaskForceExcludedFromRecents_resetsTaskForceExcludedFromRecents() {
         final Task rootTask = createRootTask();
         final Task task = createTaskInRootTask(rootTask, 0 /* userId */);
@@ -1752,6 +1793,35 @@ public class WindowOrganizerTests extends WindowTestsBase {
         assertEquals(PendingTaskEvent.EVENT_APPEARED, pendingEvents.get(0).mEventType);
         assertEquals("TestDescription",
                 pendingEvents.get(0).mTask.getTaskInfo().taskDescription.getLabel());
+    }
+
+    @Test
+    public void testAppearFailed_ignoreOtherLifecycleCalls() throws RemoteException {
+        // Set up a task organizer that throws from onTaskAppeared
+        final ITaskOrganizer organizer = createMockOrganizer();
+        doThrow(new RemoteException()).when(organizer).onTaskAppeared(any(), any());
+        mWm.mAtmService.mTaskOrganizerController.registerTaskOrganizer(organizer);
+
+        // Create a task and notify the organizer
+        final Task rootTask = createRootTask();
+        final Task task = createTask(rootTask);
+        task.setTaskOrganizer(organizer);
+        final ActivityRecord activity = createActivityRecord(rootTask.mDisplayContent, task);
+        mAtm.mTaskOrganizerController.dispatchPendingEvents();
+
+        // Ensure that the exception resulted in the task appeared state to be reset and future
+        // updates are not sent to it
+        assertThat(task.mTaskAppearedSent).isFalse();
+
+        // Ignore subsequent task info changes
+        activity.setTaskDescription(new ActivityManager.TaskDescription("TestDescription"));
+        mAtm.mTaskOrganizerController.dispatchPendingEvents();
+        verify(organizer, never()).onTaskInfoChanged(any());
+
+        // Ignore subsequent vanished calls
+        rootTask.removeImmediately();
+        mAtm.mTaskOrganizerController.dispatchPendingEvents();
+        verify(organizer, never()).onTaskVanished(any());
     }
 
     @Test

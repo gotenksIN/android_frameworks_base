@@ -40,9 +40,9 @@ import android.os.Message;
 import android.os.Process;
 import android.os.ServiceManager;
 import android.os.SystemClock;
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
 import android.os.SystemProperties;
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
 import android.os.incremental.IIncrementalService;
 import android.os.incremental.IncrementalManager;
 import android.os.incremental.IncrementalMetrics;
@@ -59,9 +59,9 @@ import com.android.internal.os.ProcfsMemoryUtil.MemorySnapshot;
 import com.android.internal.os.TimeoutRecord;
 import com.android.internal.os.anr.AnrLatencyTracker;
 import com.android.internal.util.FrameworkStatsLog;
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
 import com.android.server.am.trace.SmartTraceUtils;
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
 import com.android.modules.expresslog.Counter;
 import com.android.server.ResourcePressureUtil;
 import com.android.server.criticalevents.CriticalEventLog;
@@ -116,10 +116,10 @@ class ProcessErrorStateRecord {
     @CompositeRWLock({"mService", "mProcLock"})
     private boolean mNotResponding;
 
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
     @CompositeRWLock({"mService", "mProcLock"})
     private boolean mDefered;
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
     /**
      * The report about crash of the app, generated &amp; stored when an app gets into a crash.
      * Will be "null" when all is OK.
@@ -207,7 +207,7 @@ class ProcessErrorStateRecord {
         mApp.getWindowProcessController().setNotResponding(notResponding);
     }
 
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
     @GuardedBy(anyOf = {"mService", "mProcLock"})
     boolean isDefered() {
         return mDefered;
@@ -218,7 +218,7 @@ class ProcessErrorStateRecord {
          mDefered = defer;
     }
 
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
     @GuardedBy(anyOf = {"mService", "mProcLock"})
     Runnable getCrashHandler() {
         return mCrashHandler;
@@ -325,9 +325,6 @@ class ProcessErrorStateRecord {
         ArrayList<Integer> firstPids = new ArrayList<>(5);
         SparseBooleanArray lastPids = new SparseBooleanArray(20);
         ActivityManagerService.VolatileDropboxEntryStates volatileDropboxEntriyStates = null;
-
-        // Release the expired timer preparatory to starting the dump or returning without dumping.
-        timeoutRecord.closeExpiredTimer();
 
         if (mApp.isDebugging()) {
             Slog.i(TAG, "Skipping debugged app ANR: " + this + " " + annotation);
@@ -444,7 +441,7 @@ class ProcessErrorStateRecord {
                             if (r.isPersistent()) {
                                 firstPids.add(myPid);
                                 if (DEBUG_ANR) Slog.i(TAG, "Adding persistent proc: " + r);
-                            } else if (r.mServices.isTreatedLikeActivity()) {
+                            } else if (r.mServices.isTreatLikeActivity()) {
                                 firstPids.add(myPid);
                                 if (DEBUG_ANR) Slog.i(TAG, "Adding likely IME: " + r);
                             } else {
@@ -520,15 +517,15 @@ class ProcessErrorStateRecord {
 
         // We push the native pids collection task to the helper thread through
         // the Anr auxiliary task executor, and wait on it later after dumping the first pids
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
         boolean smTraceEnabled = isSmartTraceEnabled(isSilentAnr);
         boolean isDefered;
         synchronized (mProcLock) {
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
           isDefered = isDefered();
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
         }
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
         Future<ArrayList<Integer>> nativePidsFuture =
                 auxiliaryTaskExecutor.submit(
                     () -> {
@@ -572,33 +569,33 @@ class ProcessErrorStateRecord {
                 isSilentAnr ? null : processCpuTracker, isSilentAnr ? null : lastPids,
                 nativePidsFuture, tracesFileException, firstPidEndOffset, annotation,
                 criticalEventLog, memoryHeaders, auxiliaryTaskExecutor, firstPidFilePromise,
-                latencyTracker);
+                latencyTracker, timeoutRecord);
 
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
         long dueTime = SystemClock.uptimeMillis()
                     + AnrHelper.APP_NOT_RESPONDING_DEFER_TIMEOUT_MILLIS;
         if (smTraceEnabled && tracesFile != null){
             long time = SystemClock.uptimeMillis();
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
             try {
                 SmartTraceUtils.dumpStackTraces(pid, firstPids, nativePidsFuture.get(), tracesFile);
                 Slog.i(TAG, mApp.processName + " hit anr, dumpStackTraces cost "
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
                     +(SystemClock.uptimeMillis() - time) +"  ms");
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
             } catch (ExecutionException e) {
                 Slog.w(TAG, "Failed to get native pids", e.getCause());
             } catch (InterruptedException e) {
                 Slog.w(TAG, "Failed to get native pids", e);
             }
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
         }
 
         if (isPerfettoDumpEnabled(isSilentAnr) && !isDefered){
             SmartTraceUtils.traceStart();
         }
 
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
         if (isMonitorCpuUsage()) {
             // Wait for the first call to finish
             try {
@@ -620,7 +617,7 @@ class ProcessErrorStateRecord {
         synchronized (processCpuTracker) {
             info.append(processCpuTracker.printCurrentState(anrTime));
         }
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
         if(shouldDeferAppNotResponding(isSilentAnr)) {
             if(!isDefered){
                 Slog.e(TAG, info.toString());
@@ -635,9 +632,9 @@ class ProcessErrorStateRecord {
                                  + " ANR, delay "+delay+" ms  ");
                 mApp.mService.mAnrHelper.deferAppNotResponding(mApp, activityShortComponentName,
                       aInfo, parentShortComponentName, parentProcess,
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
                       aboveSystem, auxiliaryTaskExecutor, timeoutRecord, delay, isContinuousAnr);
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
                 synchronized (mProcLock) {
                     setDefered(true);
                     setNotResponding(false);
@@ -653,7 +650,7 @@ class ProcessErrorStateRecord {
         }else {
             Slog.e(TAG, info.toString());
         }
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
 
         if (tracesFile == null) {
             // There is no trace file, so dump (only) the alleged culprit's threads to the log
@@ -813,7 +810,7 @@ class ProcessErrorStateRecord {
         mApp.getWindowProcessController().stopFreezingActivities();
     }
 
-// QTI_BEGIN: 2021-06-28: Android_UI: Add smart trace module
+// QTI_BEGIN: 2021-06-28: Core: Add smart trace module
     private boolean isSmartTraceEnabled(boolean isSilentAnr) {
         return SmartTraceUtils.isSmartTraceEnabled() &&
              (!isSilentAnr || (isSilentAnr && SmartTraceUtils.isSmartTraceEnabledOnBgApp()));
@@ -829,7 +826,7 @@ class ProcessErrorStateRecord {
                     isPerfettoDumpEnabled(isSilentAnr));
     }
 
-// QTI_END: 2021-06-28: Android_UI: Add smart trace module
+// QTI_END: 2021-06-28: Core: Add smart trace module
     @GuardedBy({"mService", "mProcLock"})
     void startAppProblemLSP() {
         // If this app is not running under the current user, then we can't give it a report button
@@ -863,7 +860,7 @@ class ProcessErrorStateRecord {
         // several places in the system server.
         return mApp.isInterestingToUserLocked()
                 || (mApp.info != null && "com.android.systemui".equals(mApp.info.packageName))
-                || (mApp.mState.hasTopUi() || mApp.mState.hasOverlayUi());
+                || (mApp.getHasTopUi() || mApp.getHasOverlayUi());
     }
 
     private boolean getShowBackground() {

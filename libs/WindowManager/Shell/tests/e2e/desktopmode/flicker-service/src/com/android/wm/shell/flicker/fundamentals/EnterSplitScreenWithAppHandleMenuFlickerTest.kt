@@ -16,13 +16,14 @@
 
 package com.android.wm.shell.flicker.fundamentals
 
-import android.platform.test.annotations.RequiresDevice
+import android.platform.test.annotations.Postsubmit
+import android.platform.test.annotations.RequiresDesktopDevice
 import android.tools.NavBar
-import android.tools.flicker.assertions.FlickerTest
+import android.tools.flicker.assertions.FlickerChecker
 import android.tools.flicker.junit.FlickerParametersRunnerFactory
-import android.tools.flicker.legacy.FlickerBuilder
-import android.tools.flicker.legacy.LegacyFlickerTest
-import android.tools.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.flicker.FlickerBuilder
+import android.tools.flicker.FlickerTest
+import android.tools.flicker.FlickerTestFactory
 import com.android.wm.shell.flicker.DesktopModeBaseTest
 import com.android.wm.shell.scenarios.EnterSplitScreenWithAppHandleMenu
 import com.android.wm.shell.Utils
@@ -37,10 +38,11 @@ import org.junit.runners.Parameterized
 /**
  * Enter the app in split screen via app handle menu.
  */
-@RequiresDevice
+@RequiresDesktopDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
-class EnterSplitScreenWithAppHandleMenuFlickerTest(flicker: LegacyFlickerTest) :
+@Postsubmit
+class EnterSplitScreenWithAppHandleMenuFlickerTest(flicker: FlickerTest) :
     DesktopModeBaseTest(flicker) {
     inner class EnterSplitScreenWithAppHandleMenuScenario : EnterSplitScreenWithAppHandleMenu(flicker.scenario.startRotation)
 
@@ -54,7 +56,7 @@ class EnterSplitScreenWithAppHandleMenuFlickerTest(flicker: LegacyFlickerTest) :
     override val transition: FlickerBuilder.() -> Unit
         get() = {
             setup {
-                scenario.setup()
+                scenario.baseSetup()
             }
             transitions {
                 scenario.enterSplitScreenFromAppHandle()
@@ -76,8 +78,8 @@ class EnterSplitScreenWithAppHandleMenuFlickerTest(flicker: LegacyFlickerTest) :
     companion object {
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
-        fun getParams(): Collection<FlickerTest> {
-            return LegacyFlickerTestFactory.nonRotationTests(
+        fun getParams(): Collection<FlickerChecker> {
+            return FlickerTestFactory.nonRotationTests(
                 supportedNavigationModes = listOf(NavBar.MODE_GESTURAL)
             )
         }

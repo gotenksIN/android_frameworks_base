@@ -36,7 +36,6 @@ import static android.window.SystemOverrideOnBackInvokedCallback.OVERRIDE_UNDEFI
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_BACK_PREVIEW;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_PREDICT_BACK;
-import static com.android.server.wm.WindowContainer.SYNC_STATE_NONE;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
 
 import android.annotation.BinderThread;
@@ -99,9 +98,13 @@ class BackNavigationController {
     // back animation.
     private AnimationHandler.ScheduleAnimationBuilder mCurrentAnimationBuilder;
 
-    // This will be set if the back navigation is in progress and the current transition is still
-    // running. The pending animation builder will do the animation stuff includes creating leashes,
-    // re-parenting leashes and set launch behind, etc. Will be handled when transition finished.
+    /**
+     * This will be set if the back navigation is in progress and the current transition is still
+     * running. The pending animation builder will do the animation stuff includes creating leashes,
+     * re-parenting leashes and set launch behind, etc. Will be handled when transition finished.
+     *
+     * @deprecated Remove after Flags#predictive_back_intercept_transition
+     */
     private AnimationHandler.ScheduleAnimationBuilder mPendingAnimationBuilder;
 
     private static int sDefaultAnimationResId;
@@ -125,15 +128,20 @@ class BackNavigationController {
      * Set up the necessary leashes for predictive back animation based on previous
      * startBackNavigation state.
      */
-    void startPredictiveBackAnimation() {
+    boolean startPredictiveBackAnimation() {
         synchronized (mWindowManagerService.mGlobalLock) {
             if (mCurrentAnimationBuilder == null) {
-                return;
+                return false;
+            }
+            if (mWindowManagerService.mAtmService.getTransitionController().inTransition()) {
+                mCurrentAnimationBuilder = null;
+                return false;
             }
             final AnimationHandler.ScheduleAnimationBuilder tmp = mCurrentAnimationBuilder;
             mCurrentAnimationBuilder = null;
             scheduleAnimationInner(tmp);
         }
+        return true;
     }
 
     /**
@@ -227,6 +235,13 @@ class BackNavigationController {
                 ProtoLog.d(WM_DEBUG_BACK_PREVIEW,
                         "Focused window didn't have a valid surface drawn.");
                 return null;
+            }
+
+            if (Flags.predictiveBackInterceptTransition()
+                    && window.mTransitionController.inTransition()) {
+                infoBuilder.setType(BackNavigationInfo.TYPE_IN_TRANSITION);
+                ProtoLog.d(WM_DEBUG_BACK_PREVIEW, "A transition is happening.");
+                return infoBuilder.build();
             }
 
             final ArrayList<EmbeddedWindowController.EmbeddedWindow> embeddedWindows = wmService
@@ -502,21 +517,41 @@ class BackNavigationController {
             if (!currTF.hasAdjacentTaskFragment()) {
                 final TaskFragment nextTF = findNextTaskFragment(currentTask, currTF);
                 if (isSecondCompanionToFirst(currTF, nextTF)) {
-                    // TF is isStacked, search bottom activity from companion TF.
-                    //
-                    // Sample hierarchy: search for underPrevious if any.
-                    //     Current TF
-                    //     Companion TF (bottomActivityInCompanion)
-                    //     Bottom Activity not inside companion TF (underPrevious)
-                    // find bottom activity in Companion TF.
-                    final ActivityRecord bottomActivityInCompanion = nextTF.getActivity(
-                            (below) -> !below.finishing, false /* traverseTopToBottom */);
-                    final ActivityRecord underPrevious = currentTask.getActivity(
-                            (below) -> !below.finishing, bottomActivityInCompanion,
-                            false /*includeBoundary*/, true /*traverseTopToBottom*/);
-                    if (underPrevious != null) {
-                        outPrevActivities.add(underPrevious);
-                        addPreviousAdjacentActivityIfExist(underPrevious, outPrevActivities);
+                    if (nextTF.shouldBeFinishedWithCompanionTaskFragment()) {
+                        // TF is stacked, search bottom activity from companion TF.
+                        //
+                        // Sample hierarchy: search for underPrevious if any.
+                        //     Current TF
+                        //     Companion TF (bottomActivityInCompanion)
+                        //     Bottom Activity not inside companion TF (underPrevious)
+                        // find bottom activity in Companion TF.
+                        final ActivityRecord bottomActivityInCompanion = nextTF.getActivity(
+                                (below) -> !below.finishing, false /* traverseTopToBottom */);
+                        final ActivityRecord underPrevious = currentTask.getActivity(
+                                (below) -> !below.finishing, bottomActivityInCompanion,
+                                false /*includeBoundary*/, true /*traverseTopToBottom*/);
+                        if (underPrevious != null) {
+                            outPrevActivities.add(underPrevious);
+                            addPreviousAdjacentActivityIfExist(underPrevious, outPrevActivities);
+                        }
+                    } else {
+                        // TF is stacked, there is a companion TF, but only one activity of it will
+                        // be finished together. Search the top activity in it that will not be
+                        // finished.
+                        //
+                        // Sample hierarchy:
+                        //     Current TF
+                        //     Companion TF
+                        //         Companion Activity (to be finished)
+                        //         Top Activity that will not be finished
+                        final IBinder toBeFinishedActivityToken =
+                                nextTF.getCompanionToBeFinishedActivity();
+                        final ActivityRecord topActivityInCompanion = nextTF.getActivity(
+                                (below) -> !below.finishing
+                                        && !below.token.equals(toBeFinishedActivityToken));
+                        if (topActivityInCompanion != null) {
+                            outPrevActivities.add(topActivityInCompanion);
+                        }
                     }
                     return true;
                 }
@@ -532,7 +567,8 @@ class BackNavigationController {
                     return true;
                 });
                 final TaskFragment adjacentTF = tmpAdjacent[0];
-                if (isSecondCompanionToFirst(currTF, adjacentTF)) {
+                if (isSecondCompanionToFirst(currTF, adjacentTF)
+                        && adjacentTF.shouldBeFinishedWithCompanionTaskFragment()) {
                     // The two TFs are adjacent (visually displayed side-by-side), search if any
                     // activity below the lowest one.
                     final WindowContainer commonParent = currTF.getParent();
@@ -1350,13 +1386,6 @@ class BackNavigationController {
                 }
                 allWindowDrawn &= next.mAppWindowDrawn;
             }
-            if (!Flags.removeStartingInTransition()) {
-                // Do not remove windowless surfaces if the transaction has not been applied.
-                if (activity.getSyncTransactionCommitCallbackDepth() > 0
-                        || activity.mSyncState != SYNC_STATE_NONE) {
-                    return;
-                }
-            }
             if (allWindowDrawn) {
                 mOpenAnimAdaptor.cleanUpWindowlessSurface(true);
             }
@@ -1415,7 +1444,7 @@ class BackNavigationController {
                 }
             }
             if (mCloseAdaptor != null) {
-                mCloseAdaptor.mTarget.cancelAnimation();
+                mCloseAdaptor.cleanUp();
                 mCloseAdaptor = null;
             }
             if (mOpenAnimAdaptor != null) {
@@ -1575,6 +1604,9 @@ class BackNavigationController {
                 if (mCloseTransaction != null) {
                     mCloseTransaction.apply();
                     mCloseTransaction = null;
+                }
+                if (mRemoteAnimationTarget != null) {
+                    mRemoteAnimationTarget.release();
                 }
 
                 mPreparedOpenTransition = null;
@@ -1742,6 +1774,13 @@ class BackNavigationController {
                     return tf.getTask();
                 }
                 return null;
+            }
+
+            void cleanUp() {
+                mTarget.cancelAnimation();
+                if (mAnimationTarget != null) {
+                    mAnimationTarget.release();
+                }
             }
 
             @Override
@@ -2200,7 +2239,8 @@ class BackNavigationController {
     }
 
     private void scheduleAnimationInner(AnimationHandler.ScheduleAnimationBuilder builder) {
-        if (mWindowManagerService.mAtmService.getTransitionController().inTransition()) {
+        if (!Flags.predictiveBackInterceptTransition()
+                && mWindowManagerService.mAtmService.getTransitionController().inTransition()) {
             ProtoLog.w(WM_DEBUG_BACK_PREVIEW,
                     "Pending back animation due to another animation is running");
             mPendingAnimationBuilder = builder;

@@ -36,8 +36,9 @@ import com.android.systemui.biometrics.UdfpsController;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.doze.dagger.DozeScope;
 import com.android.systemui.doze.dagger.WrappedService;
-import com.android.systemui.statusbar.phone.DozeParameters;
 import com.android.systemui.keyguard.domain.interactor.DozeInteractor;
+import com.android.systemui.scene.shared.flag.SceneContainerFlag;
+import com.android.systemui.statusbar.phone.DozeParameters;
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 import com.android.systemui.util.wakelock.SettableWakeLock;
 import com.android.systemui.util.wakelock.WakeLock;
@@ -58,7 +59,7 @@ public class DozeScreenState implements DozeMachine.Part {
      * Delay entering low power mode when animating to make sure that we'll have
      * time to move all elements into their final positions while still at 60 fps.
      */
-    private static final int ENTER_DOZE_DELAY = /* QTI_BEGIN */ 2000; /* QTI_END */
+    private static final int ENTER_DOZE_DELAY =  2000; 
     /**
      * Hide wallpaper earlier when entering low power mode. The gap between
      * hiding the wallpaper and changing the display mode is necessary to hide
@@ -208,7 +209,11 @@ public class DozeScreenState implements DozeMachine.Part {
                 mWakeLock.setAcquired(true);
             }
         } else if (turningOff) {
-            mDozeHost.prepareForGentleSleep(() -> applyScreenState(screenState));
+            if (SceneContainerFlag.isEnabled()) {
+                applyScreenState(screenState);
+            } else {
+                mDozeHost.prepareForGentleSleep(() -> applyScreenState(screenState));
+            }
         } else {
             applyScreenState(screenState);
         }

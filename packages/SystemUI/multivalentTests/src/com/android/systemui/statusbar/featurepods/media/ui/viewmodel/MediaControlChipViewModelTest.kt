@@ -25,9 +25,9 @@ import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.lifecycle.activateIn
-import com.android.systemui.media.controls.data.repository.mediaFilterRepository
 import com.android.systemui.media.controls.domain.pipeline.MediaDataManager
 import com.android.systemui.media.controls.shared.model.MediaData
+import com.android.systemui.media.remedia.data.repository.mediaRepository
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.statusbar.featurepods.media.domain.interactor.mediaControlChipInteractor
 import com.android.systemui.statusbar.featurepods.popups.ui.model.PopupChipModel
@@ -44,7 +44,6 @@ import platform.test.runner.parameterized.Parameters
 
 @SmallTest
 @RunWith(ParameterizedAndroidJunit4::class)
-@android.platform.test.annotations.EnabledOnRavenwood
 class MediaControlChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
     private val kosmos = testKosmos().useUnconfinedTestDispatcher()
     private val mediaControlChipInteractor by lazy { kosmos.mediaControlChipInteractor }
@@ -106,7 +105,7 @@ class MediaControlChipViewModelTest(flags: FlagsParameterization) : SysuiTestCas
 
     private fun updateMedia(mediaData: MediaData) {
         if (SceneContainerFlag.isEnabled) {
-            kosmos.mediaFilterRepository.addCurrentUserMediaEntry(mediaData)
+            kosmos.mediaRepository.addCurrentUserMediaEntry(mediaData)
         } else {
             mediaControlChipInteractor.updateMediaControlChipModelLegacy(mediaData)
         }

@@ -629,6 +629,19 @@ class Owners {
         }
     }
 
+    void markCrossProfileWidgetProviderMigrated() {
+        synchronized (mData) {
+            mData.mCrossProfileWidgetProviderMigrated = true;
+            mData.writeDeviceOwner();
+        }
+    }
+
+    boolean isCrossProfileWidgetProviderMigrated() {
+        synchronized (mData) {
+            return mData.mCrossProfileWidgetProviderMigrated;
+        }
+    }
+
     void markPermissionGrantStateMigrated() {
         synchronized (mData) {
             mData.mPermissionGrantStateMigrated = true;
@@ -639,6 +652,19 @@ class Owners {
     boolean isPermissionGrantStateMigrated() {
         synchronized (mData) {
             return mData.mPermissionGrantStateMigrated;
+        }
+    }
+
+    void markSetApplicationRestrictionsMigrated() {
+        synchronized (mData) {
+            mData.mSetApplicationRestrictionsMigrated = true;
+            mData.writeDeviceOwner();
+        }
+    }
+
+    boolean isSetApplicationRestrictionsMigrated() {
+        synchronized (mData) {
+            return mData.mSetApplicationRestrictionsMigrated;
         }
     }
 

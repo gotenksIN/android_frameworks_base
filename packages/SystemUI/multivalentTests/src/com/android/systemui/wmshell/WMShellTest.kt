@@ -52,9 +52,8 @@ import com.android.systemui.statusbar.policy.keyguardStateController
 import com.android.systemui.testKosmos
 import com.android.systemui.user.data.repository.fakeUserRepository
 import com.android.systemui.util.kotlin.javaAdapter
-import com.android.wm.shell.Flags.FLAG_FIX_MISSING_USER_CHANGE_CALLBACKS
 import com.android.wm.shell.desktopmode.DesktopMode
-import com.android.wm.shell.desktopmode.DesktopRepository.VisibleTasksListener
+import com.android.wm.shell.desktopmode.data.DesktopRepository.VisibleTasksListener
 import com.android.wm.shell.onehanded.OneHanded
 import com.android.wm.shell.onehanded.OneHandedEventCallback
 import com.android.wm.shell.onehanded.OneHandedTransitionCallback
@@ -188,7 +187,6 @@ class WMShellTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(FLAG_FIX_MISSING_USER_CHANGE_CALLBACKS)
     fun init_ensureUserChangeCallback() =
         kosmos.runTest {
             val userId = userTracker.userId

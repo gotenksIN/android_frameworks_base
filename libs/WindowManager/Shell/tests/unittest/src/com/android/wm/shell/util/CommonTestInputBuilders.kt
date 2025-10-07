@@ -17,6 +17,7 @@
 package com.android.wm.shell.util
 
 import android.app.ActivityManager.RunningTaskInfo
+import android.app.TaskInfo
 import android.content.ComponentName
 import android.graphics.Point
 import android.graphics.Rect
@@ -24,11 +25,11 @@ import android.view.SurfaceControl
 import android.view.WindowManager.TRANSIT_NONE
 import android.view.WindowManager.TransitionFlags
 import android.view.WindowManager.TransitionType
-
 import android.window.ActivityTransitionInfo
 import android.window.AppCompatTransitionInfo
 import android.window.TransitionInfo
 import android.window.TransitionInfo.Change
+import android.window.TransitionInfo.FLAG_NONE
 import android.window.TransitionInfo.TransitionMode
 import android.window.WindowContainerToken
 import org.mockito.kotlin.mock
@@ -57,6 +58,25 @@ open class BaseChangeTestContext {
 }
 
 /**
+ * Base class for Test Contexts requiring a [TaskInfo] object.
+ */
+open class BaseRunningTaskInfoTestContext {
+
+    protected lateinit var taskInfo: RunningTaskInfo
+
+    fun runningTaskInfo(
+        builder: RunningTaskInfoTestInputBuilder.(RunningTaskInfo) -> Unit
+    ): RunningTaskInfo {
+        val runningTaskInfoObj = RunningTaskInfoTestInputBuilder()
+        return RunningTaskInfo().also {
+            runningTaskInfoObj.builder(it)
+        }.apply {
+            taskInfo = this
+        }
+    }
+}
+
+/**
  * [InputBuilder] that helps in the creation of a [Change] object for testing.
  */
 class ChangeTestInputBuilder : TestInputBuilder<Change> {
@@ -65,6 +85,7 @@ class ChangeTestInputBuilder : TestInputBuilder<Change> {
     private val inputParams = InputParams()
     var endAbsBounds: Rect? = null
     var endRelOffset: Point? = null
+    var flags: Int = FLAG_NONE
     @TransitionMode var mode: Int = TRANSIT_NONE
     data class InputParams(
         var token: WindowContainerToken = mock<WindowContainerToken>(),
@@ -117,13 +138,14 @@ class ChangeTestInputBuilder : TestInputBuilder<Change> {
         ).apply {
             mode = this@ChangeTestInputBuilder.mode
             taskInfo = inputParams.taskInfo
-            this@ChangeTestInputBuilder.endAbsBounds?.let {
-                this@apply.endAbsBounds.set(endAbsBounds)
+            this@ChangeTestInputBuilder.endAbsBounds?.let { bounds ->
+                endAbsBounds.set(bounds)
             }
-            this@ChangeTestInputBuilder.endRelOffset?.let {
-                this@apply.endRelOffset.set(endRelOffset)
+            this@ChangeTestInputBuilder.endRelOffset?.let { offset ->
+                endRelOffset.set(offset)
             }
             activityTransitionInfo = inputParams.activityTransitionInfo
+            flags = this@ChangeTestInputBuilder.flags
         }
     }
 }

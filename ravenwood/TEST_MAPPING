@@ -1,10 +1,17 @@
 {
   "presubmit": [
+    // Non-ravenwood host side tests.
     { "name": "tiny-framework-dump-test" },
     { "name": "hoststubgentest" },
     { "name": "ravenhelpertest" },
     { "name": "hoststubgen-test-tiny-test" },
     { "name": "hoststubgen-invoke-test" },
+
+    // This test fails with mysterious errors on the server side. Commenting out for now.
+    // TODO(b/438195035) Un-comment it
+    // { "name": "ravenwood-scripts-sh-golden-test" },
+
+    // Device side tests for the bivalent tests.
     { "name": "RavenwoodMockitoTest_device" },
     { "name": "RavenwoodBivalentTest_device" },
     { "name": "RavenwoodBivalentTest_device_ravenizer" },
@@ -49,6 +56,18 @@
     }
   ],
   "ravenwood-presubmit": [
+// TODO(b/440069724) these tests didn't get to run on presubmit somehow
+//    {
+//      "name": "CarSystemUIRavenTests",
+//      "keywords": ["automotive_code_coverage"],
+//      "host": true
+//    },
+//   {
+//     "name": "CarLibHostUnitTest",
+//     "keywords": ["automotive_code_coverage"],
+//     "host": true
+//   },
+
     // AUTO-GENERATED-START
     // DO NOT MODIFY MANUALLY
     // Use scripts/update-test-mapping.sh to update it.
@@ -69,17 +88,7 @@
       "host": true
     },
     {
-      "name": "CarLibHostUnitTest",
-      "keywords": ["automotive_code_coverage"],
-      "host": true
-    },
-    {
       "name": "CarServiceHostUnitTest",
-      "keywords": ["automotive_code_coverage"],
-      "host": true
-    },
-    {
-      "name": "CarSystemUIRavenTests",
       "keywords": ["automotive_code_coverage"],
       "host": true
     },
@@ -132,6 +141,10 @@
       "host": true
     },
     {
+      "name": "CtsSurfaceControlTestsRavenwood",
+      "host": true
+    },
+    {
       "name": "CtsTextTestCasesRavenwood",
       "host": true
     },
@@ -153,6 +166,10 @@
     },
     {
       "name": "FrameworksServicesTestsRavenwood_Compat",
+      "host": true
+    },
+    {
+      "name": "FrameworksServicesTestsRavenwood_ProcessStateController",
       "host": true
     },
     {
@@ -216,7 +233,7 @@
       "host": true
     },
     {
-      "name": "RavenwoodUiTest",
+      "name": "RavenwoodUiTest_noexp",
       "host": true
     },
     {

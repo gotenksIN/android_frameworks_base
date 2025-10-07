@@ -16,6 +16,7 @@
 
 package android.companion.virtual;
 
+import static android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME;
 import static android.media.AudioManager.AUDIO_SESSION_ID_GENERATE;
 
 import android.Manifest;
@@ -26,6 +27,7 @@ import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
+import android.annotation.RestrictedForEnvironment;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
@@ -37,6 +39,9 @@ import android.companion.virtual.audio.VirtualAudioDevice;
 import android.companion.virtual.audio.VirtualAudioDevice.AudioConfigurationChangeCallback;
 import android.companion.virtual.camera.VirtualCamera;
 import android.companion.virtual.camera.VirtualCameraConfig;
+import android.companion.virtual.computercontrol.ComputerControlSession;
+import android.companion.virtual.computercontrol.ComputerControlSessionParams;
+import android.companion.virtual.computercontrol.IComputerControlSessionCallback;
 import android.companion.virtual.sensor.VirtualSensor;
 import android.companion.virtualdevice.flags.Flags;
 import android.content.ComponentName;
@@ -44,6 +49,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.IntentSender;
+import android.content.res.Configuration;
 import android.graphics.Point;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
@@ -68,6 +74,7 @@ import android.hardware.input.VirtualTouchscreen;
 import android.hardware.input.VirtualTouchscreenConfig;
 import android.media.AudioManager;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Looper;
 import android.os.RemoteException;
 import android.os.UserHandle;
@@ -101,6 +108,8 @@ import java.util.function.IntConsumer;
  * <p class="note">Not to be confused with the Android Studio's Virtual Device Manager, which allows
  * for device emulation.
  */
+@RestrictedForEnvironment(
+        environments = ENVIRONMENT_SDK_RUNTIME, from = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 @SystemService(Context.VIRTUAL_DEVICE_SERVICE)
 public final class VirtualDeviceManager {
 
@@ -200,14 +209,31 @@ public final class VirtualDeviceManager {
     }
 
     /**
+     * Requests the creation of a new {@link ComputerControlSession}.
+     *
+     * @param params The configuration of the session.
+     * @param executor An executor to run the callback on.
+     * @param callback A callback to get notified about the result of this operation.
+     *
      * @hide
      */
     @RequiresPermission(android.Manifest.permission.ACCESS_COMPUTER_CONTROL)
-    @NonNull
-    public VirtualDevice createVirtualDevice(@NonNull VirtualDeviceParams params) {
+    public void requestComputerControlSession(
+            @NonNull ComputerControlSessionParams params,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull ComputerControlSession.Callback callback) {
+        if (mService == null) {
+            Log.w(TAG, "Failed to request a new session; no virtual device manager service.");
+            return;
+        }
         Objects.requireNonNull(params, "params must not be null");
+        Objects.requireNonNull(executor, "executor must not be null");
+        Objects.requireNonNull(callback, "callback must not be null");
         try {
-            return new VirtualDevice(mService, mContext, params);
+            IComputerControlSessionCallback callbackProxy =
+                    new ComputerControlSession.CallbackProxy(executor, callback);
+            mService.requestComputerControlSession(
+                    mContext.getAttributionSource(), params, callbackProxy);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -346,6 +372,31 @@ public final class VirtualDeviceManager {
         }
         try {
             return mService.getDevicePolicy(deviceId, policyType);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns the device policy for the display with the given ID and the given policy type.
+     *
+     * <p>In case the display does not exist or is not owned by a virtual device,
+     * {@link VirtualDeviceParams#DEVICE_POLICY_DEFAULT} is returned.
+     *
+     * @hide
+     */
+    public @VirtualDeviceParams.DevicePolicy int getDevicePolicyForDisplayId(
+            int displayId, @VirtualDeviceParams.PolicyType int policyType) {
+        if (displayId == Context.DEVICE_ID_DEFAULT) {
+            // Avoid unnecessary binder call, for default display, policy will be always default.
+            return VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
+        }
+        if (mService == null) {
+            Log.w(TAG, "Failed to retrieve device policy; no virtual device manager service.");
+            return VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
+        }
+        try {
+            return mService.getDevicePolicyForDisplayId(displayId, policyType);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -565,15 +616,6 @@ public final class VirtualDeviceManager {
                 VirtualDeviceParams params) throws RemoteException {
             mVirtualDeviceInternal =
                     new VirtualDeviceInternal(service, context, associationId, params);
-        }
-
-        @RequiresPermission(Manifest.permission.ACCESS_COMPUTER_CONTROL)
-        private VirtualDevice(
-                IVirtualDeviceManager service,
-                Context context,
-                VirtualDeviceParams params) throws RemoteException {
-            mVirtualDeviceInternal =
-                    new VirtualDeviceInternal(service, context, params);
         }
 
         /** @hide */
@@ -1133,6 +1175,33 @@ public final class VirtualDeviceManager {
          */
         public void setDisplayImePolicy(int displayId, @WindowManager.DisplayImePolicy int policy) {
             mVirtualDeviceInternal.setDisplayImePolicy(displayId, policy);
+        }
+
+        /**
+         * Specifies the UI mode on the given display.
+         *
+         * <p>By default, all displays created by virtual devices have
+         * {@link Configuration#UI_MODE_TYPE_UNDEFINED} and
+         * {@link Configuration#UI_MODE_NIGHT_UNDEFINED}, meaning that they follow the global UI
+         * mode type and night mode. These constants can also be used to unset a previously set
+         * UI mode.</p>
+         *
+         * @param displayId the ID of the display to change the UI mode for. It must be a trusted
+         *   non-mirror display, owned by this virtual device.
+         * @param uiMode the UI mode to use on that display, a combination of the UI mode type
+         *   given by the {@link Configuration#UI_MODE_TYPE_MASK} bits, and the night mode given by
+         *   the {@link Configuration#UI_MODE_NIGHT_MASK} bits.
+         * @throws SecurityException if the display is not owned by this device, is not
+         *   {@link DisplayManager#VIRTUAL_DISPLAY_FLAG_TRUSTED trusted}, or is a
+         *   {@link DisplayManager#VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR mirror} display.
+         * @see Configuration#uiMode
+         */
+        @FlaggedApi(Flags.FLAG_DEVICE_AWARE_UI_MODE)
+        public void setDisplayUiMode(int displayId, int uiMode) {
+            if (!Flags.deviceAwareUiMode()) {
+                throw new UnsupportedOperationException("Required flag is not enabled");
+            }
+            mVirtualDeviceInternal.setDisplayUiMode(displayId, uiMode);
         }
 
         /**

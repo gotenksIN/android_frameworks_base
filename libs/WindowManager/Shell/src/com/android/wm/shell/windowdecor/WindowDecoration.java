@@ -16,7 +16,8 @@
 
 package com.android.wm.shell.windowdecor;
 
-import static android.content.res.Configuration.DENSITY_DPI_UNDEFINED;
+import static android.content.pm.ActivityInfo.CONFIG_ASSETS_PATHS;
+import static android.content.pm.ActivityInfo.CONFIG_UI_MODE;
 import static android.view.WindowInsets.Type.statusBars;
 import static android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
 import static android.view.WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
@@ -62,13 +63,14 @@ import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.transition.Transitions;
-import com.android.wm.shell.windowdecor.WindowDecoration.RelayoutParams.OccludingCaptionElement;
 import com.android.wm.shell.windowdecor.additionalviewcontainer.AdditionalViewHostViewContainer;
+import com.android.wm.shell.windowdecor.caption.OccludingElement;
 import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHost;
 import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHostSupplier;
 import com.android.wm.shell.windowdecor.extension.InsetsStateKt;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
@@ -128,6 +130,8 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
     final @NonNull DisplayController mDisplayController;
     final @NonNull DesktopModeEventLogger mDesktopModeEventLogger;
     final ShellTaskOrganizer mTaskOrganizer;
+
+    final Supplier<SurfaceControl> mSurfaceControlSupplier;
     final Supplier<SurfaceControl.Builder> mSurfaceControlBuilderSupplier;
     final Supplier<SurfaceControl.Transaction> mSurfaceControlTransactionSupplier;
     final Supplier<WindowContainerTransaction> mWindowContainerTransactionSupplier;
@@ -153,7 +157,7 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
     public Context mDecorWindowContext;
     int mLayoutResId;
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-    public final SurfaceControl mTaskSurface;
+    private SurfaceControl mTaskSurface;
 
     Display mDisplay;
     SurfaceControl mDecorationContainerSurface;
@@ -216,6 +220,7 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         mTaskInfo = taskInfo;
         mTaskSurface = cloneSurfaceControl(taskSurface, surfaceControlSupplier);
         mDesktopModeEventLogger = desktopModeEventLogger;
+        mSurfaceControlSupplier = surfaceControlSupplier;
         mSurfaceControlBuilderSupplier = surfaceControlBuilderSupplier;
         mSurfaceControlTransactionSupplier = surfaceControlTransactionSupplier;
         mWindowContainerTransactionSupplier = windowContainerTransactionSupplier;
@@ -255,7 +260,7 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
 
     void relayout(RelayoutParams params, SurfaceControl.Transaction startT,
             SurfaceControl.Transaction finishT, WindowContainerTransaction wct, T rootView,
-            RelayoutResult<T> outResult) {
+            SurfaceControl newTaskSurface, RelayoutResult<T> outResult) {
         Trace.beginSection("WindowDecoration#relayout");
         outResult.reset();
         if (params.mRunningTaskInfo != null) {
@@ -265,6 +270,13 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         mExclusionRegion.set(params.mDisplayExclusionRegion);
         final int oldLayoutResId = mLayoutResId;
         mLayoutResId = params.mLayoutResId;
+
+        if (mDecorationContainerSurface != null && newTaskSurface != null
+                && !newTaskSurface.isSameSurface(mTaskSurface)) {
+            mTaskSurface.release();
+            mTaskSurface = cloneSurfaceControl(newTaskSurface, mSurfaceControlSupplier);
+            startT.reparent(mDecorationContainerSurface, mTaskSurface);
+        }
 
         if (!mTaskInfo.isVisible) {
             releaseViews(wct);
@@ -391,28 +403,31 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         }
 
         outResult.mRootView = rootView;
-        final boolean fontScaleChanged = mWindowDecorConfig != null
-                && mWindowDecorConfig.fontScale != mTaskInfo.configuration.fontScale;
-        final boolean localeListChanged = mWindowDecorConfig != null
-                && !mWindowDecorConfig.getLocales()
-                    .equals(mTaskInfo.getConfiguration().getLocales());
-        final int oldDensityDpi = mWindowDecorConfig != null
-                ? mWindowDecorConfig.densityDpi : DENSITY_DPI_UNDEFINED;
-        final int oldNightMode =  mWindowDecorConfig != null
-                ? (mWindowDecorConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                : Configuration.UI_MODE_NIGHT_UNDEFINED;
-        mWindowDecorConfig = params.mWindowDecorConfig != null ? params.mWindowDecorConfig
-                : mTaskInfo.getConfiguration();
-        final int newDensityDpi = mWindowDecorConfig.densityDpi;
-        final int newNightMode =  mWindowDecorConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK;
-        if (oldDensityDpi != newDensityDpi
+        final Configuration oldConfig =
+                mWindowDecorConfig != null ? mWindowDecorConfig : mTaskInfo.getConfiguration();
+        final Configuration newConfig =
+                params.mWindowDecorConfig != null ? params.mWindowDecorConfig :
+                        mTaskInfo.getConfiguration();
+        final boolean fontScaleChanged = oldConfig.fontScale != mTaskInfo.configuration.fontScale;
+        final boolean localeListChanged =
+                !oldConfig.getLocales().equals(mTaskInfo.configuration.getLocales());
+        final boolean densityDpiChanged = oldConfig.densityDpi != newConfig.densityDpi;
+        final int oldNightMode = oldConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        final int newNightMode = newConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        final int diff = newConfig.diff(oldConfig);
+        final boolean themeChanged =
+                (diff & CONFIG_ASSETS_PATHS) != 0 || (diff & CONFIG_UI_MODE) != 0;
+        mWindowDecorConfig = newConfig;
+
+        if (densityDpiChanged
                 || mDisplay == null
                 || mDisplay.getDisplayId() != mTaskInfo.displayId
                 || oldLayoutResId != mLayoutResId
                 || oldNightMode != newNightMode
                 || mDecorWindowContext == null
                 || fontScaleChanged
-                || localeListChanged) {
+                || localeListChanged
+                || themeChanged) {
             releaseViews(wct);
 
             if (!obtainDisplayOrRegisterListener()) {
@@ -483,29 +498,21 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         // Caption bounding rectangles: these are optional, and are used to present finer
         // insets than traditional |Insets| to apps about where their content is occluded.
         // These are also in absolute coordinates.
-        final Rect[] boundingRects;
-        final int numOfElements = params.mOccludingCaptionElements.size();
-        if (numOfElements == 0) {
-            boundingRects = null;
-        } else {
+        final List<Rect> boundingRects = new ArrayList<>();
+        final List<OccludingElement> elements = params.mOccludingElementsCalculator.get();
+        if (!elements.isEmpty()) {
             // The customizable region can at most be equal to the caption bar.
             if (params.hasInputFeatureSpy()) {
                 outResult.mCustomizableCaptionRegion.set(captionInsetsRect);
             }
-            final Resources resources = mDecorWindowContext.getResources();
-            boundingRects = new Rect[numOfElements];
-            for (int i = 0; i < numOfElements; i++) {
-                final OccludingCaptionElement element =
-                        params.mOccludingCaptionElements.get(i);
-                final int elementWidthPx =
-                        resources.getDimensionPixelSize(element.mWidthResId);
-                boundingRects[i] =
-                        calculateBoundingRectLocal(element, elementWidthPx, captionInsetsRect);
+            for (int i = 0; i < elements.size(); i++) {
+                final OccludingElement element = elements.get(i);
+                final Rect boundingRect = calculateBoundingRectLocal(element, captionInsetsRect);
+                boundingRects.add(boundingRect);
                 // Subtract the regions used by the caption elements, the rest is
                 // customizable.
                 if (params.hasInputFeatureSpy()) {
-                    outResult.mCustomizableCaptionRegion.op(boundingRects[i],
-                            Region.Op.DIFFERENCE);
+                    outResult.mCustomizableCaptionRegion.op(boundingRect, Region.Op.DIFFERENCE);
                 }
             }
         }
@@ -534,8 +541,7 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         }
 
         if (params.mShouldSetBackground) {
-            final int backgroundColorInt = mTaskInfo.taskDescription != null
-                    ? mTaskInfo.taskDescription.getBackgroundColor() : Color.BLACK;
+            final int backgroundColorInt = Color.BLACK;
             mTmpColor[0] = (float) Color.red(backgroundColorInt) / 255.f;
             mTmpColor[1] = (float) Color.green(backgroundColorInt) / 255.f;
             mTmpColor[2] = (float) Color.blue(backgroundColorInt) / 255.f;
@@ -624,19 +630,15 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
     private Region calculateBoundingRectsRegion(
             @NonNull RelayoutParams params,
             @NonNull Rect captionBoundsInDisplay) {
-        final int numOfElements = params.mOccludingCaptionElements.size();
+        final List<OccludingElement> elements = params.mOccludingElementsCalculator.get();
         final Region region = Region.obtain();
-        if (numOfElements == 0) {
+        if (elements.isEmpty()) {
             // The entire caption is a bounding rect.
             region.set(captionBoundsInDisplay);
             return region;
         }
-        final Resources resources = mDecorWindowContext.getResources();
-        for (int i = 0; i < numOfElements; i++) {
-            final OccludingCaptionElement element = params.mOccludingCaptionElements.get(i);
-            final int elementWidthPx = resources.getDimensionPixelSize(element.mWidthResId);
-            final Rect boundingRect = calculateBoundingRectLocal(element, elementWidthPx,
-                    captionBoundsInDisplay);
+        for (OccludingElement e: elements) {
+            final Rect boundingRect = calculateBoundingRectLocal(e, captionBoundsInDisplay);
             // Bounding rect is initially calculated relative to the caption, so offset it to make
             // it relative to the display.
             boundingRect.offset(captionBoundsInDisplay.left, captionBoundsInDisplay.top);
@@ -645,30 +647,30 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         return region;
     }
 
-    private Rect calculateBoundingRectLocal(@NonNull OccludingCaptionElement element,
-            int elementWidthPx, @NonNull Rect captionRect) {
+    private Rect calculateBoundingRectLocal(@NonNull OccludingElement element,
+            @NonNull Rect captionRect) {
         final boolean isRtl =
                 mDecorWindowContext.getResources().getConfiguration().getLayoutDirection()
                         == View.LAYOUT_DIRECTION_RTL;
-        switch (element.mAlignment) {
+        switch (element.getAlignment()) {
             case START -> {
                 if (isRtl) {
-                    return new Rect(captionRect.width() - elementWidthPx, 0,
+                    return new Rect(captionRect.width() - element.getWidth(), 0,
                             captionRect.width(), captionRect.height());
                 } else {
-                    return new Rect(0, 0, elementWidthPx, captionRect.height());
+                    return new Rect(0, 0, element.getWidth(), captionRect.height());
                 }
             }
             case END -> {
                 if (isRtl) {
-                    return new Rect(0, 0, elementWidthPx, captionRect.height());
+                    return new Rect(0, 0, element.getWidth(), captionRect.height());
                 } else {
-                    return new Rect(captionRect.width() - elementWidthPx, 0,
+                    return new Rect(captionRect.width() - element.getWidth(), 0,
                             captionRect.width(), captionRect.height());
                 }
             }
         }
-        throw new IllegalArgumentException("Unexpected alignment " + element.mAlignment);
+        throw new IllegalArgumentException("Unexpected alignment " + element.getAlignment());
     }
 
     void onKeyguardStateChanged(boolean visible, boolean occluded) {
@@ -884,8 +886,9 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
 
         final Rect captionInsets = new Rect(0, 0, 0, captionHeight);
         final WindowDecorationInsets newInsets = new WindowDecorationInsets(mTaskInfo.token,
-                mOwner, captionInsets, null  /* taskFrame */,  null /* boundingRects */,
-                0 /* flags */, true /* shouldAddCaptionInset */, false /* excludedFromAppBounds */);
+                mOwner, captionInsets, null  /* taskFrame */,
+                Collections.emptyList() /* boundingRects */, 0 /* flags */,
+                true /* shouldAddCaptionInset */, false /* excludedFromAppBounds */);
         if (!newInsets.equals(mWindowDecorationInsets)) {
             mWindowDecorationInsets = newInsets;
             mWindowDecorationInsets.update(wct);
@@ -897,7 +900,7 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         int mLayoutResId;
         BiFunction<Context, Display, Integer> mCaptionHeightCalculator = (ctx, display) -> 0;
         int mCaptionWidthId;
-        final List<OccludingCaptionElement> mOccludingCaptionElements = new ArrayList<>();
+        Supplier<List<OccludingElement>> mOccludingElementsCalculator = () -> new ArrayList<>();
         boolean mLimitTouchRegionToSystemAreas;
         int mInputFeatures;
         boolean mIsInsetSource = true;
@@ -931,8 +934,8 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         void reset() {
             mLayoutResId = Resources.ID_NULL;
             mCaptionHeightCalculator = (ctx, display) -> 0;
+            mOccludingElementsCalculator = () -> new ArrayList<>();
             mCaptionWidthId = Resources.ID_NULL;
-            mOccludingCaptionElements.clear();
             mLimitTouchRegionToSystemAreas = false;
             mInputFeatures = 0;
             mIsInsetSource = true;
@@ -964,19 +967,6 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
 
         boolean hasInputFeatureSpy() {
             return (mInputFeatures & WindowManager.LayoutParams.INPUT_FEATURE_SPY) != 0;
-        }
-
-        /**
-         * Describes elements within the caption bar that could occlude app content, and should be
-         * sent as bounding rectangles to the insets system.
-         */
-        static class OccludingCaptionElement {
-            int mWidthResId;
-            Alignment mAlignment;
-
-            enum Alignment {
-                START, END
-            }
         }
     }
 

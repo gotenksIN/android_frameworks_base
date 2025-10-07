@@ -24,9 +24,7 @@ import android.window.TransitionInfo.Change
  * that don't allow the Desktop Windowing feature (a.g. Auto).
  */
 class IgnoreLetterboxDependenciesHelper : LetterboxDependenciesHelper {
-    /**
-     * We should ignore all the changes related to Desktop Windowing when the feature is not
-     * available.
-     */
-    override fun isDesktopWindowingAction(change: Change): Boolean = false
+
+    /** By default the input surface should always be created. */
+    override fun shouldSupportInputSurface(change: Change): Boolean = true
 }

@@ -60,6 +60,7 @@ import com.android.systemui.mediaprojection.data.model.MediaProjectionState
 import com.android.systemui.mediaprojection.data.repository.fakeMediaProjectionRepository
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.scene.data.repository.sceneContainerRepository
+import com.android.systemui.scene.data.repository.setSceneTransition
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Overlays
@@ -67,6 +68,7 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.screenrecord.data.model.ScreenRecordModel
 import com.android.systemui.screenrecord.data.repository.screenRecordRepository
 import com.android.systemui.shade.data.repository.fakeShadeDisplaysRepository
+import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.shade.shadeTestUtil
 import com.android.systemui.statusbar.chips.mediaprojection.domain.interactor.MediaProjectionChipInteractorTest.Companion.NORMAL_PACKAGE
 import com.android.systemui.statusbar.chips.mediaprojection.domain.interactor.MediaProjectionChipInteractorTest.Companion.setUpPackageManagerForMediaProjection
@@ -76,6 +78,7 @@ import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModelTest.Companion.assertIsCallChip
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModelTest.Companion.assertIsScreenRecordChip
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModelTest.Companion.assertIsShareToAppChip
+import com.android.systemui.statusbar.core.StatusBarForDesktop
 import com.android.systemui.statusbar.core.StatusBarRootModernization
 import com.android.systemui.statusbar.data.model.StatusBarMode
 import com.android.systemui.statusbar.data.repository.fakeStatusBarModeRepository
@@ -181,6 +184,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
+    @DisableSceneContainer
     fun isTransitioningFromLockscreenToOccluded_started_isTrue() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.isTransitioningFromLockscreenToOccluded)
@@ -198,6 +202,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
+    @DisableSceneContainer
     fun isTransitioningFromLockscreenToOccluded_running_isTrue() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.isTransitioningFromLockscreenToOccluded)
@@ -215,6 +220,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
+    @DisableSceneContainer
     fun isTransitioningFromLockscreenToOccluded_finished_isFalse() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.isTransitioningFromLockscreenToOccluded)
@@ -263,6 +269,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
+    @DisableSceneContainer
     fun isTransitioningFromLockscreenToOccluded_followsRepoUpdates() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.isTransitioningFromLockscreenToOccluded)
@@ -672,6 +679,50 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
             runCurrent()
 
             assertThat(latest).isFalse()
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
+    @EnableSceneContainer
+    fun isHomeStatusBarAllowed_onExternalDisplay_whenNotificationShadeIsVisibleOnDefaultDisplay_isTrue() =
+        kosmos.runTest {
+            val underTest = homeStatusBarViewModelFactory(EXTERNAL_DISPLAY)
+            val latest by collectLastValue(underTest.isHomeStatusBarAllowed)
+
+            sceneContainerRepository.instantlyTransitionTo(Scenes.Gone)
+            sceneContainerRepository.showOverlay(Overlays.NotificationsShade)
+            fakeShadeDisplaysRepository.setDisplayId(DEFAULT_DISPLAY)
+
+            assertThat(latest).isTrue()
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
+    @EnableSceneContainer
+    fun isHomeStatusBarAllowed_onDefaultDisplay_whenShadeIsVisibleOnDefaultDisplay_isFalse() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.isHomeStatusBarAllowed)
+
+            sceneContainerRepository.instantlyTransitionTo(Scenes.Gone)
+            sceneContainerRepository.showOverlay(Overlays.QuickSettingsShade)
+            fakeShadeDisplaysRepository.setDisplayId(DEFAULT_DISPLAY)
+
+            assertThat(latest).isFalse()
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
+    @EnableSceneContainer
+    fun isHomeStatusBarAllowed_onExternalDisplay_whenShadeIsVisibleOnDefaultDisplay_isTrue() =
+        kosmos.runTest {
+            val underTest = homeStatusBarViewModelFactory(EXTERNAL_DISPLAY)
+            val latest by collectLastValue(underTest.isHomeStatusBarAllowed)
+
+            sceneContainerRepository.instantlyTransitionTo(Scenes.Gone)
+            sceneContainerRepository.showOverlay(Overlays.QuickSettingsShade)
+            fakeShadeDisplaysRepository.setDisplayId(DEFAULT_DISPLAY)
+
+            assertThat(latest).isTrue()
         }
 
     @Test
@@ -1855,6 +1906,79 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
             assertThat(clockVisible!!.visibility).isEqualTo(View.INVISIBLE)
             assertThat(notifIconsVisible!!.visibility).isEqualTo(View.GONE)
             assertThat(systemInfoVisible!!.baseVisibility.visibility).isEqualTo(View.GONE)
+        }
+
+    @Test
+    @EnableSceneContainer
+    @EnableFlags(StatusBarForDesktop.FLAG_NAME)
+    fun onQuickSettingsChipClicked_qsShadeIsOpen_collapsesShade() =
+        kosmos.runTest {
+            enableDualShade()
+            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
+
+            sceneContainerRepository.showOverlay(Overlays.QuickSettingsShade)
+            setSceneTransition(
+                ObservableTransitionState.Idle(
+                    sceneInteractor.currentScene.value,
+                    checkNotNull(currentOverlays),
+                )
+            )
+            assertThat(currentOverlays).containsExactly(Overlays.QuickSettingsShade)
+
+            underTest.onQuickSettingsChipClicked()
+            assertThat(currentOverlays).doesNotContain(Overlays.QuickSettingsShade)
+        }
+
+    @Test
+    @EnableSceneContainer
+    @EnableFlags(StatusBarForDesktop.FLAG_NAME)
+    fun onQuickSettingsChipClicked_qsShadeIsClosed_expandsShade() =
+        kosmos.runTest {
+            enableDualShade()
+            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
+
+            assertThat(currentOverlays).doesNotContain(Overlays.QuickSettingsShade)
+
+            underTest.onQuickSettingsChipClicked()
+
+            assertThat(currentOverlays).contains(Overlays.QuickSettingsShade)
+        }
+
+    @Test
+    @EnableSceneContainer
+    @EnableFlags(StatusBarForDesktop.FLAG_NAME)
+    fun onNotificationIconChipClicked_notificationsShadeIsOpen_collapsesShade() =
+        kosmos.runTest {
+            enableDualShade()
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
+
+            sceneContainerRepository.showOverlay(Overlays.NotificationsShade)
+            setSceneTransition(
+                ObservableTransitionState.Idle(
+                    checkNotNull(currentScene),
+                    checkNotNull(currentOverlays),
+                )
+            )
+            assertThat(currentOverlays).contains(Overlays.NotificationsShade)
+
+            underTest.onNotificationIconChipClicked()
+
+            assertThat(currentOverlays).doesNotContain(Overlays.NotificationsShade)
+        }
+
+    @Test
+    @EnableSceneContainer
+    @EnableFlags(StatusBarForDesktop.FLAG_NAME)
+    fun onNotificationIconChipClicked_notificationsShadeIsClosed_expandsShade() =
+        kosmos.runTest {
+            enableDualShade()
+            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
+            assertThat(currentOverlays).doesNotContain(Overlays.NotificationsShade)
+
+            underTest.onNotificationIconChipClicked()
+
+            assertThat(currentOverlays).contains(Overlays.NotificationsShade)
         }
 
     private fun activeNotificationsStore(notifications: List<ActiveNotificationModel>) =

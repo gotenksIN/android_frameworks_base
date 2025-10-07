@@ -20,9 +20,7 @@ import android.hardware.display.DisplayManager
 import android.os.Bundle
 import android.os.UserHandle
 import android.view.View
-import android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR
 import androidx.annotation.StyleRes
-import com.android.systemui.display.data.repository.DisplayWindowPropertiesRepository
 import com.android.systemui.mediaprojection.MediaProjectionMetricsLogger
 import com.android.systemui.mediaprojection.permission.BaseMediaProjectionPermissionContentManager
 import com.android.systemui.mediaprojection.permission.BaseMediaProjectionPermissionDialogDelegate
@@ -30,11 +28,11 @@ import com.android.systemui.mediaprojection.permission.SINGLE_APP
 import com.android.systemui.mediaprojection.permission.ScreenShareMode
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.res.R
-import com.android.systemui.settings.UserContextProvider
+import com.android.systemui.screenrecord.domain.interactor.ScreenRecordingStartStopInteractor
 import com.android.systemui.shade.ShadeDisplayAware
+import com.android.systemui.shade.domain.interactor.ShadeDialogContextInteractor
 import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.statusbar.phone.SystemUIDialog
-import dagger.Lazy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -45,7 +43,6 @@ class ScreenRecordPermissionDialogDelegate(
     private val hostUid: Int,
     private val controller: ScreenRecordUxController,
     private val activityStarter: ActivityStarter,
-    private val userContextProvider: UserContextProvider,
     private val onStartRecordingClicked: Runnable?,
     private val mediaProjectionMetricsLogger: MediaProjectionMetricsLogger,
     private val systemUIDialogFactory: SystemUIDialog.Factory,
@@ -53,7 +50,8 @@ class ScreenRecordPermissionDialogDelegate(
     @StyleRes private val theme: Int,
     private val context: Context,
     private val displayManager: DisplayManager,
-    private val displayWindowPropertiesRepository: Lazy<DisplayWindowPropertiesRepository>,
+    private val screenRecordingStartStopInteractor: ScreenRecordingStartStopInteractor,
+    private val shadeDialogContextInteractor: ShadeDialogContextInteractor,
 ) :
     BaseMediaProjectionPermissionDialogDelegate<SystemUIDialog>(
         ScreenRecordPermissionContentManager.createOptionList(displayManager),
@@ -71,19 +69,18 @@ class ScreenRecordPermissionDialogDelegate(
         @Assisted hostUid: Int,
         @Assisted controller: ScreenRecordUxController,
         activityStarter: ActivityStarter,
-        userContextProvider: UserContextProvider,
         @Assisted onStartRecordingClicked: Runnable?,
         mediaProjectionMetricsLogger: MediaProjectionMetricsLogger,
         systemUIDialogFactory: SystemUIDialog.Factory,
         @ShadeDisplayAware context: Context,
         displayManager: DisplayManager,
-        displayWindowPropertiesRepository: Lazy<DisplayWindowPropertiesRepository>,
+        screenRecordingStartStopInteractor: ScreenRecordingStartStopInteractor,
+        shadeDialogContextInteractor: ShadeDialogContextInteractor,
     ) : this(
         hostUserHandle,
         hostUid,
         controller,
         activityStarter,
-        userContextProvider,
         onStartRecordingClicked,
         mediaProjectionMetricsLogger,
         systemUIDialogFactory,
@@ -91,7 +88,8 @@ class ScreenRecordPermissionDialogDelegate(
         theme = SystemUIDialog.DEFAULT_THEME,
         context,
         displayManager,
-        displayWindowPropertiesRepository,
+        screenRecordingStartStopInteractor,
+        shadeDialogContextInteractor,
     )
 
     @AssistedFactory
@@ -113,25 +111,15 @@ class ScreenRecordPermissionDialogDelegate(
             displayManager,
             controller,
             activityStarter,
-            userContextProvider,
             onStartRecordingClicked,
+            screenRecordingStartStopInteractor,
         )
     }
 
     override fun createDialog(): SystemUIDialog {
         val displayContext =
             if (ShadeWindowGoesAround.isEnabled) {
-                // This dialog needs to stay visible even if the notification shade closes,
-                // for example, after unlocking the device. If we used the shade's own context, the
-                // dialog would be tied to the shade and disappear when the shade collapses.
-                // To avoid this, we get a context associated with the status bar on the current
-                // display.  This ensures the dialog remains visible independently of the shade.
-                displayWindowPropertiesRepository
-                    .get()
-                    .get(context.displayId, TYPE_STATUS_BAR)
-                    ?.context
-                    // falls back to the default context if the status bar context is not available
-                    ?: context
+                shadeDialogContextInteractor.context
             } else {
                 context
             }

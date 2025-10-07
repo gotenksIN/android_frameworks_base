@@ -26,6 +26,7 @@ data class ActionViewModel(
     val onLongClick: () -> Unit,
     val actionType: ActionType,
     val oneTapEnabled: Boolean = false,
+    val oneTapDelayMs: Long = 0L,
 )
 
 enum class ActionType {
@@ -34,4 +35,9 @@ enum class ActionType {
     Unknown,
 }
 
-data class IconViewModel(val drawable: Drawable, val iconId: String, val repeatCount: Int)
+data class IconViewModel(
+    val small: Drawable,
+    val large: Drawable,
+    val iconId: String,
+    val repeatCount: Int,
+)

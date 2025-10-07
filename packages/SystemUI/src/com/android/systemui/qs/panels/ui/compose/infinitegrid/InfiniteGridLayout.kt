@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -34,11 +35,15 @@ import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.ElementKey
 import com.android.mechanics.compose.modifier.verticalTactileSurfaceReveal
 import com.android.mechanics.spec.builder.rememberMotionBuilderContext
+import com.android.systemui.common.ui.icons.Reset
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.grid.ui.compose.VerticalSpannedGrid
 import com.android.systemui.haptics.msdl.qs.TileHapticsViewModelFactoryProvider
 import com.android.systemui.lifecycle.rememberViewModel
+import com.android.systemui.qs.flags.QSMaterialExpressiveTiles
+import com.android.systemui.qs.flags.QsEditModeTabs
 import com.android.systemui.qs.panels.shared.model.SizedTileImpl
+import com.android.systemui.qs.panels.ui.compose.ButtonGroupGrid
 import com.android.systemui.qs.panels.ui.compose.EditTileListState
 import com.android.systemui.qs.panels.ui.compose.PaginatableGridLayout
 import com.android.systemui.qs.panels.ui.compose.TileListener
@@ -46,12 +51,13 @@ import com.android.systemui.qs.panels.ui.compose.bounceableInfo
 import com.android.systemui.qs.panels.ui.viewmodel.BounceableTileViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.DetailsViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.EditTileViewModel
+import com.android.systemui.qs.panels.ui.viewmodel.EditTopBarActionViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.IconTilesViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.InfiniteGridViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.TextFeedbackContentViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.TileViewModel
 import com.android.systemui.qs.pipeline.shared.TileSpec
-import com.android.systemui.qs.shared.ui.ElementKeys.toElementKey
+import com.android.systemui.qs.shared.ui.QuickSettings.Elements.toElementKey
 import com.android.systemui.qs.ui.composable.QuickSettingsShade
 import com.android.systemui.res.R
 import javax.inject.Inject
@@ -82,7 +88,7 @@ constructor(
 
         val context = LocalContext.current
         val textFeedbackViewModel =
-            rememberViewModel(traceName = "InfiniteGridLayout.TileGrid", context) {
+            rememberViewModel(traceName = "InfiniteGridLayout.TileGrid", key = context) {
                 textFeedbackContentViewModelFactory.create(context)
             }
 
@@ -96,42 +102,28 @@ constructor(
                     SizedTileImpl(it, if (largeTiles.contains(it.spec)) largeTilesSpan else 1)
                 }
             }
-        val bounceables =
-            remember(sizedTiles) { List(sizedTiles.size) { BounceableTileViewModel() } }
         val squishiness by viewModel.squishinessViewModel.squishiness.collectAsStateWithLifecycle()
         val scope = rememberCoroutineScope()
-        val spans by remember(sizedTiles) { derivedStateOf { sizedTiles.fastMap { it.width } } }
 
         val motionBuilderContext = rememberMotionBuilderContext()
         val marginBottom =
             with(LocalDensity.current) { QuickSettingsShade.Dimensions.Padding.toPx() }
 
-        VerticalSpannedGrid(
-            columns = columns,
-            columnSpacing = dimensionResource(R.dimen.qs_tile_margin_horizontal),
-            rowSpacing = dimensionResource(R.dimen.qs_tile_margin_vertical),
-            spans = spans,
-            keys = { sizedTiles[it].tile.spec },
-            modifier = modifier,
-        ) { spanIndex, column, isFirstInColumn, isLastInColumn ->
-            val it = sizedTiles[spanIndex]
-
-            Element(it.tile.spec.toElementKey(spanIndex), Modifier) {
+        if (QSMaterialExpressiveTiles.isEnabled) {
+            ButtonGroupGrid(
+                sizedTiles = sizedTiles,
+                columns = columns,
+                keys = { it.spec },
+                elementKey = { it.spec.toElementKey() },
+                horizontalPadding = dimensionResource(R.dimen.qs_tile_margin_horizontal),
+                modifier = modifier,
+            ) { sizedTile, interactionSource ->
                 Tile(
-                    tile = it.tile,
-                    iconOnly = iconTilesViewModel.isIconTile(it.tile.spec),
+                    tile = sizedTile.tile,
+                    iconOnly = iconTilesViewModel.isIconTile(sizedTile.tile.spec),
                     squishiness = { squishiness },
                     tileHapticsViewModelFactoryProvider = tileHapticsViewModelFactoryProvider,
                     coroutineScope = scope,
-                    bounceableInfo =
-                        bounceables.bounceableInfo(
-                            it,
-                            index = spanIndex,
-                            column = column,
-                            columns = columns,
-                            isFirstInRow = isFirstInColumn,
-                            isLastInRow = isLastInColumn,
-                        ),
                     detailsViewModel = detailsViewModel,
                     isVisible = listening,
                     requestToggleTextFeedback = textFeedbackViewModel::requestShowFeedback,
@@ -147,7 +139,58 @@ constructor(
                             Modifier
                         },
                     revealEffectContainer = revealEffectContainer,
+                    bounceableInfo = null,
+                    interactionSource = interactionSource,
                 )
+            }
+        } else {
+            val bounceables =
+                remember(sizedTiles) { List(sizedTiles.size) { BounceableTileViewModel() } }
+            val spans by remember(sizedTiles) { derivedStateOf { sizedTiles.fastMap { it.width } } }
+            VerticalSpannedGrid(
+                columns = columns,
+                columnSpacing = dimensionResource(R.dimen.qs_tile_margin_horizontal),
+                rowSpacing = dimensionResource(R.dimen.qs_tile_margin_vertical),
+                spans = spans,
+                keys = { sizedTiles[it].tile.spec },
+                modifier = modifier,
+            ) { spanIndex, column, isFirstInColumn, isLastInColumn ->
+                val it = sizedTiles[spanIndex]
+
+                Element(it.tile.spec.toElementKey(), Modifier) {
+                    Tile(
+                        tile = it.tile,
+                        iconOnly = iconTilesViewModel.isIconTile(it.tile.spec),
+                        squishiness = { squishiness },
+                        tileHapticsViewModelFactoryProvider = tileHapticsViewModelFactoryProvider,
+                        coroutineScope = scope,
+                        bounceableInfo =
+                            bounceables.bounceableInfo(
+                                it,
+                                index = spanIndex,
+                                column = column,
+                                columns = columns,
+                                isFirstInRow = isFirstInColumn,
+                                isLastInRow = isLastInColumn,
+                            ),
+                        detailsViewModel = detailsViewModel,
+                        isVisible = listening,
+                        requestToggleTextFeedback = textFeedbackViewModel::requestShowFeedback,
+                        modifier =
+                            if (revealEffectContainer != null) {
+                                Modifier.verticalTactileSurfaceReveal(
+                                    contentScope = this@TileGrid,
+                                    motionBuilderContext = motionBuilderContext,
+                                    container = revealEffectContainer,
+                                    deltaY = -marginBottom,
+                                )
+                            } else {
+                                Modifier
+                            },
+                        revealEffectContainer = revealEffectContainer,
+                        interactionSource = null,
+                    )
+                }
             }
         }
 
@@ -175,6 +218,10 @@ constructor(
             rememberViewModel("InfiniteGridLayout.EditTileGrid") {
                 viewModel.snapshotViewModelFactory.create()
             }
+        val topBarActionsViewModel =
+            rememberViewModel("InfiniteGridLayout.EditTileGrid") {
+                viewModel.editTopBarActionsViewModelFactory.create()
+            }
         val scrollState = rememberScrollState()
         val coroutineScope = rememberCoroutineScope()
         val dialogDelegate =
@@ -187,6 +234,20 @@ constructor(
                     coroutineScope.launch { scrollState.animateScrollTo(0) }
                 }
             }
+        val actions =
+            remember(topBarActionsViewModel) { topBarActionsViewModel.actions.toMutableStateList() }
+        if (QsEditModeTabs.isEnabled) {
+            val resetClick by rememberUpdatedState(dialogDelegate::showDialog)
+            val resetAction = remember {
+                EditTopBarActionViewModel(
+                    Reset,
+                    com.android.internal.R.string.reset,
+                    { resetClick() },
+                )
+            }
+
+            LaunchedEffect(actions) { actions.add(resetAction) }
+        }
         val columns = columnsViewModel.columns
         val largeTilesSpan = columnsViewModel.largeSpan
         val largeTiles by viewModel.iconTilesViewModel.largeTilesState
@@ -210,6 +271,7 @@ constructor(
             scrollState = scrollState,
             snapshotViewModel = snapshotViewModel,
             onStopEditing = onStopEditing,
+            topBarActions = actions,
         ) { action ->
             // Opening the dialog doesn't require a snapshot
             if (action != EditAction.ResetGrid) {

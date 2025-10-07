@@ -166,6 +166,18 @@ object KeyGestureTestData {
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
             ),
             KeyGestureData(
+                "META + CTRL + W -> Quit focused desktop task",
+                intArrayOf(
+                    KeyEvent.KEYCODE_META_LEFT,
+                    KeyEvent.KEYCODE_CTRL_LEFT,
+                    KeyEvent.KEYCODE_W,
+                ),
+                KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_DESKTOP_TASK,
+                intArrayOf(KeyEvent.KEYCODE_W),
+                KeyEvent.META_META_ON or KeyEvent.META_CTRL_ON,
+                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
+            ),
+            KeyGestureData(
                 "META + [ -> Resizes a task to fit the left half of the screen",
                 intArrayOf(KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_LEFT_BRACKET),
                 KeyGestureEvent.KEY_GESTURE_TYPE_SNAP_LEFT_FREEFORM_WINDOW,
@@ -511,6 +523,15 @@ object KeyGestureTestData {
                 AppLaunchData.createLaunchDataForCategory(Intent.CATEGORY_APP_CALCULATOR),
             ),
             KeyGestureData(
+                "META + F -> Launch Default Files Browser",
+                intArrayOf(KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_F),
+                KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_APPLICATION,
+                intArrayOf(KeyEvent.KEYCODE_F),
+                KeyEvent.META_META_ON,
+                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
+                AppLaunchData.createLaunchDataForCategory(Intent.CATEGORY_APP_FILES),
+            ),
+            KeyGestureData(
                 "META + CTRL + DEL -> Trigger Bug Report",
                 intArrayOf(
                     KeyEvent.KEYCODE_META_LEFT,
@@ -778,6 +799,15 @@ object KeyGestureTestData {
                 KeyEvent.META_META_ON,
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
                 AppLaunchData.createLaunchDataForCategory(Intent.CATEGORY_APP_CALCULATOR),
+            ),
+            KeyGestureData(
+                "META + F -> Launch Default Files",
+                intArrayOf(KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_F),
+                KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_APPLICATION,
+                intArrayOf(KeyEvent.KEYCODE_F),
+                KeyEvent.META_META_ON,
+                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
+                AppLaunchData.createLaunchDataForCategory(Intent.CATEGORY_APP_FILES),
             ),
             KeyGestureData(
                 "META + SHIFT + B -> Launch Default Browser",

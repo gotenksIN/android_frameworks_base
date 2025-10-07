@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -73,7 +74,6 @@ import com.android.server.ServiceThread;
 import com.android.server.SystemService;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.pm.UserManagerInternal;
-import com.android.server.wm.ImeTargetVisibilityPolicy;
 import com.android.server.wm.WindowManagerInternal;
 
 import org.junit.After;
@@ -85,8 +85,6 @@ import org.mockito.quality.Strictness;
 
 /** Base class for testing {@link InputMethodManagerService}. */
 public class InputMethodManagerServiceTestBase {
-    private static final int NO_VERIFY_SHOW_FLAGS = -1;
-
     protected static final String TEST_SELECTED_IME_ID = "test.ime";
     protected static final String TEST_EDITOR_PKG_NAME = "test.editor";
     protected static final String TEST_FOCUSED_WINDOW_NAME = "test.editor/activity";
@@ -125,7 +123,6 @@ public class InputMethodManagerServiceTestBase {
     @Mock protected IInputMethod mMockInputMethod;
     @Mock protected IBinder mMockInputMethodBinder;
     @Mock protected IInputManager mMockIInputManager;
-    @Mock protected ImeTargetVisibilityPolicy mMockImeTargetVisibilityPolicy;
     @Mock protected IProtoLogConfigurationService.Stub mMockProtoLogConfigurationService;
 
     protected Context mContext;
@@ -183,7 +180,6 @@ public class InputMethodManagerServiceTestBase {
         addLocalServiceMock(PackageManagerInternal.class, mMockPackageManagerInternal);
         addLocalServiceMock(InputManagerInternal.class, mMockInputManagerInternal);
         addLocalServiceMock(UserManagerInternal.class, mMockUserManagerInternal);
-        addLocalServiceMock(ImeTargetVisibilityPolicy.class, mMockImeTargetVisibilityPolicy);
 
         doReturn(mMockIInputMethodManager)
                 .when(() -> ServiceManager.getServiceOrThrow(Context.INPUT_METHOD_SERVICE));
@@ -334,32 +330,24 @@ public class InputMethodManagerServiceTestBase {
         mRegisteredLocalServices.forEach(LocalServices::removeServiceForTest);
     }
 
-    protected void verifyShowSoftInput(boolean setVisible, boolean showSoftInput)
-            throws RemoteException {
-        verifyShowSoftInput(setVisible, showSoftInput, NO_VERIFY_SHOW_FLAGS);
-    }
-
-    protected void verifyShowSoftInput(boolean setVisible, boolean showSoftInput, int showFlags)
+    protected void verifyShowSoftInput(boolean showSoftInput)
             throws RemoteException {
         synchronized (ImfLock.class) {
-            verify(mMockInputMethodBindingController, times(setVisible ? 1 : 0))
+            verify(mMockInputMethodBindingController, never())
                     .setCurrentMethodVisible();
         }
         verify(mMockInputMethod, times(showSoftInput ? 1 : 0))
-                .showSoftInput(notNull() /* statsToken */,
-                        showFlags != NO_VERIFY_SHOW_FLAGS ? eq(showFlags) : anyInt() /* flags*/,
-                        any() /* resultReceiver */);
+                .showSoftInput(notNull() /* statsToken */);
     }
 
-    protected void verifyHideSoftInput(boolean setNotVisible, boolean hideSoftInput)
+    protected void verifyHideSoftInput(boolean hideSoftInput)
             throws RemoteException {
         synchronized (ImfLock.class) {
-            verify(mMockInputMethodBindingController, times(setNotVisible ? 1 : 0))
+            verify(mMockInputMethodBindingController, never())
                     .setCurrentMethodNotVisible();
         }
         verify(mMockInputMethod, times(hideSoftInput ? 1 : 0))
-                .hideSoftInput(notNull() /* statsToken */,
-                        anyInt() /* flags */, any() /* resultReceiver */);
+                .hideSoftInput(notNull() /* statsToken */);
     }
 
     protected void verifySetImeVisibility(boolean setVisible, boolean invoked) {

@@ -17,22 +17,17 @@
 package com.android.systemui.scene.ui.view
 
 import android.content.Context
-import android.graphics.Point
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
+import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.core.view.isVisible
 import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.theme.PlatformTheme
-import com.android.internal.policy.ScreenDecorationsUtils
-import com.android.systemui.common.ui.compose.windowinsets.CutoutLocation
-import com.android.systemui.common.ui.compose.windowinsets.DisplayCutout
 import com.android.systemui.common.ui.compose.windowinsets.ScreenDecorProvider
 import com.android.systemui.compose.modifiers.sysUiResTagContainer
 import com.android.systemui.initOnBackPressedDispatcherOwner
@@ -40,7 +35,6 @@ import com.android.systemui.lifecycle.WindowLifecycleState
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.lifecycle.setSnapshotBinding
 import com.android.systemui.lifecycle.viewModel
-import com.android.systemui.qs.ui.adapter.QSSceneAdapter
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.model.SceneContainerConfig
 import com.android.systemui.scene.shared.model.SceneDataSourceDelegator
@@ -50,14 +44,10 @@ import com.android.systemui.scene.ui.composable.Scene
 import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.viewmodel.DualShadeEducationalTooltipsViewModel
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
+import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
-import javax.inject.Provider
-import kotlinx.coroutines.CoroutineScope
+import com.android.systemui.statusbar.phone.ui.TintedIconManager
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 
 /** View binder that wires up scene container specific view bindings. */
 object SceneWindowRootViewBinder {
@@ -67,15 +57,15 @@ object SceneWindowRootViewBinder {
         view: ViewGroup,
         viewModelFactory: SceneContainerViewModel.Factory,
         motionEventHandlerReceiver: (SceneContainerViewModel.MotionEventHandler?) -> Unit,
-        windowInsets: StateFlow<WindowInsets?>,
+        windowInsets: State<WindowInsets?>,
         containerConfig: SceneContainerConfig,
         sharedNotificationContainer: SharedNotificationContainer,
         scenes: Set<Scene>,
         overlays: Set<Overlay>,
         onVisibilityChangedInternal: (isVisible: Boolean) -> Unit,
         dataSourceDelegator: SceneDataSourceDelegator,
-        qsSceneAdapter: Provider<QSSceneAdapter>,
         sceneJankMonitorFactory: SceneJankMonitor.Factory,
+        tintedIconManagerFactory: TintedIconManager.Factory,
     ) {
         val unsortedSceneByKey: Map<SceneKey, Scene> = scenes.associateBy { scene -> scene.key }
         val sortedSceneByKey: Map<SceneKey, Scene> =
@@ -118,16 +108,15 @@ object SceneWindowRootViewBinder {
 
                     view.addView(
                         createSceneContainerView(
-                                scope = this,
                                 context = view.context,
                                 viewModel = viewModel,
                                 windowInsets = windowInsets,
                                 sceneByKey = sortedSceneByKey,
                                 overlayByKey = sortedOverlayByKey,
                                 dataSourceDelegator = dataSourceDelegator,
-                                qsSceneAdapter = qsSceneAdapter,
                                 containerConfig = containerConfig,
                                 sceneJankMonitorFactory = sceneJankMonitorFactory,
+                                tintedIconManagerFactory = tintedIconManagerFactory,
                             )
                             .also { it.id = R.id.scene_container_root_composable }
                     )
@@ -146,7 +135,6 @@ object SceneWindowRootViewBinder {
 
                     view.addView(
                         createDualShadeEducationalTooltipsView(
-                            scope = this,
                             context = view.context,
                             viewModelFactory =
                                 viewModel.dualShadeEducationalTooltipsViewModelFactory,
@@ -165,35 +153,32 @@ object SceneWindowRootViewBinder {
     }
 
     private fun createSceneContainerView(
-        scope: CoroutineScope,
         context: Context,
         viewModel: SceneContainerViewModel,
-        windowInsets: StateFlow<WindowInsets?>,
+        windowInsets: State<WindowInsets?>,
         sceneByKey: Map<SceneKey, Scene>,
         overlayByKey: Map<OverlayKey, Overlay>,
         dataSourceDelegator: SceneDataSourceDelegator,
-        qsSceneAdapter: Provider<QSSceneAdapter>,
         containerConfig: SceneContainerConfig,
         sceneJankMonitorFactory: SceneJankMonitor.Factory,
+        tintedIconManagerFactory: TintedIconManager.Factory,
     ): View {
         return ComposeView(context).apply {
             setContent {
                 PlatformTheme {
-                    ScreenDecorProvider(
-                        displayCutout = displayCutoutFromWindowInsets(scope, context, windowInsets),
-                        screenCornerRadius = ScreenDecorationsUtils.getWindowCornerRadius(context),
-                    ) {
-                        SceneContainer(
-                            viewModel = viewModel,
-                            sceneByKey = sceneByKey,
-                            overlayByKey = overlayByKey,
-                            initialSceneKey = containerConfig.initialSceneKey,
-                            transitionsBuilder = containerConfig.transitionsBuilder,
-                            dataSourceDelegator = dataSourceDelegator,
-                            qsSceneAdapter = qsSceneAdapter,
-                            sceneJankMonitorFactory = sceneJankMonitorFactory,
-                            modifier = Modifier.sysUiResTagContainer(),
-                        )
+                    ScreenDecorProvider(windowInsets = { windowInsets.value }) {
+                        WithStatusIconContext(tintedIconManagerFactory = tintedIconManagerFactory) {
+                            SceneContainer(
+                                viewModel = viewModel,
+                                sceneByKey = sceneByKey,
+                                overlayByKey = overlayByKey,
+                                initialSceneKey = containerConfig.initialSceneKey,
+                                transitionsBuilder = containerConfig.transitionsBuilder,
+                                dataSourceDelegator = dataSourceDelegator,
+                                sceneJankMonitorFactory = sceneJankMonitorFactory,
+                                modifier = Modifier.sysUiResTagContainer(),
+                            )
+                        }
                     }
                 }
             }
@@ -201,10 +186,9 @@ object SceneWindowRootViewBinder {
     }
 
     private fun createDualShadeEducationalTooltipsView(
-        scope: CoroutineScope,
         context: Context,
         viewModelFactory: DualShadeEducationalTooltipsViewModel.Factory,
-        windowInsets: StateFlow<WindowInsets?>,
+        windowInsets: State<WindowInsets?>,
     ): View {
         return ComposeView(context).apply {
             layoutParams =
@@ -214,52 +198,11 @@ object SceneWindowRootViewBinder {
                 )
             setContent {
                 PlatformTheme {
-                    ScreenDecorProvider(
-                        displayCutout = displayCutoutFromWindowInsets(scope, context, windowInsets),
-                        screenCornerRadius = ScreenDecorationsUtils.getWindowCornerRadius(context),
-                    ) {
+                    ScreenDecorProvider(windowInsets = { windowInsets.value }) {
                         DualShadeEducationalTooltips(viewModelFactory = viewModelFactory)
                     }
                 }
             }
         }
-    }
-
-    // TODO(b/298525212): remove once Compose exposes window inset bounds.
-    private fun displayCutoutFromWindowInsets(
-        scope: CoroutineScope,
-        context: Context,
-        windowInsets: StateFlow<WindowInsets?>,
-    ): StateFlow<DisplayCutout> =
-        windowInsets
-            .map {
-                val boundingRect = it?.displayCutout?.boundingRectTop
-                val width = boundingRect?.let { boundingRect.right - boundingRect.left } ?: 0
-                val left = boundingRect?.left?.toDp(context) ?: 0.dp
-                val top = boundingRect?.top?.toDp(context) ?: 0.dp
-                val right = boundingRect?.right?.toDp(context) ?: 0.dp
-                val bottom = boundingRect?.bottom?.toDp(context) ?: 0.dp
-                val location =
-                    when {
-                        width <= 0f -> CutoutLocation.NONE
-                        left <= 0.dp -> CutoutLocation.LEFT
-                        right >= getDisplayWidth(context) -> CutoutLocation.RIGHT
-                        else -> CutoutLocation.CENTER
-                    }
-                val viewDisplayCutout = it?.displayCutout
-                DisplayCutout(left, top, right, bottom, location, viewDisplayCutout)
-            }
-            .stateIn(scope, SharingStarted.WhileSubscribed(), DisplayCutout())
-
-    // TODO(b/298525212): remove once Compose exposes window inset bounds.
-    private fun getDisplayWidth(context: Context): Dp {
-        val point = Point()
-        checkNotNull(context.display).getRealSize(point)
-        return point.x.toDp(context)
-    }
-
-    // TODO(b/298525212): remove once Compose exposes window inset bounds.
-    private fun Int.toDp(context: Context): Dp {
-        return (this.toFloat() / context.resources.displayMetrics.density).dp
     }
 }

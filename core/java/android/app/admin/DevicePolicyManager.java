@@ -16,7 +16,6 @@
 
 package android.app.admin;
 
-import static android.app.admin.flags.Flags.FLAG_SPLIT_CREATE_MANAGED_PROFILE_ENABLED;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS_FULL;
 import static android.Manifest.permission.LOCK_DEVICE;
@@ -55,12 +54,16 @@ import static android.Manifest.permission.QUERY_DEVICE_STOLEN_STATE;
 import static android.Manifest.permission.REQUEST_PASSWORD_COMPLEXITY;
 import static android.Manifest.permission.SET_TIME;
 import static android.Manifest.permission.SET_TIME_ZONE;
+import static android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME;
 import static android.app.admin.DeviceAdminInfo.HEADLESS_DEVICE_OWNER_MODE_UNSUPPORTED;
 import static android.app.admin.flags.Flags.FLAG_DEVICE_THEFT_API_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_REMOVE_MANAGED_PROFILE_ENABLED;
+import static android.app.admin.flags.Flags.FLAG_CROSS_PROFILE_WIDGET_PROVIDER_BULK_APIS;
+import static android.app.admin.flags.Flags.FLAG_SECONDARY_LOCKSCREEN_API_ENABLED;
+import static android.app.admin.flags.Flags.FLAG_SPLIT_CREATE_MANAGED_PROFILE_ENABLED;
+import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING;
 import static android.app.admin.flags.Flags.onboardingBugreportV2Enabled;
 import static android.app.admin.flags.Flags.onboardingConsentlessBugreports;
-import static android.app.admin.flags.Flags.FLAG_SECONDARY_LOCKSCREEN_API_ENABLED;
 import static android.content.Intent.LOCAL_FLAG_FROM_SYSTEM;
 import static android.net.NetworkCapabilities.NET_ENTERPRISE_ID_1;
 import static android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE;
@@ -78,6 +81,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresFeature;
 import android.annotation.RequiresPermission;
+import android.annotation.RestrictedForEnvironment;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.StringDef;
@@ -315,15 +319,11 @@ import java.util.function.Consumer;
  * "Android Automotive builds"} should always check for this exception.
  */
 
+@RestrictedForEnvironment(
+        environments = ENVIRONMENT_SDK_RUNTIME, from = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 @SystemService(Context.DEVICE_POLICY_SERVICE)
 @RequiresFeature(PackageManager.FEATURE_DEVICE_ADMIN)
 public class DevicePolicyManager {
-
-    /** @hide */
-    public static final String ADD_ISFINANCED_DEVICE_FLAG =
-            "add-isfinanced-device";
-    /** @hide */
-    public static final boolean ADD_ISFINANCED_FEVICE_DEFAULT = true;
 
     private static String TAG = "DevicePolicyManager";
 
@@ -2294,6 +2294,17 @@ public class DevicePolicyManager {
      */
     @SystemApi
     public static final String EXTRA_RESTRICTION = "android.app.extra.RESTRICTION";
+
+    /**
+     * A parcelable extra that contains {@link EnforcingAdmin} information that enforces a user
+     * restriction or policy.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENFORCING_ADMIN_EXTRA_ENABLED)
+    // Suppress API linter warning to have consistent value with other extras in this file.
+    @SuppressLint("ActionValue")
+    public static final String EXTRA_ENFORCING_ADMIN = "android.app.extra.ENFORCING_ADMIN";
 
     /**
      * Activity action: have the user enter a new password.
@@ -10766,8 +10777,8 @@ public class DevicePolicyManager {
      * in the calling user, as well as the parent user of an organization-owned managed profile via
      * the {@link DevicePolicyManager} instance returned by
      * {@link #getParentProfileInstance(ComponentName)}. App restrictions set by the device policy
-     * management role holder are not returned by
-     * {@link UserManager#getApplicationRestrictions(String)}. The target application should use
+     * management role holder are returned by
+     * {@link UserManager#getApplicationRestrictions(String)} but the target application should use
      * {@link android.content.RestrictionsManager#getApplicationRestrictionsPerAdmin} to retrieve
      * them, alongside any app restrictions the profile or device owner might have set.
      *
@@ -10790,6 +10801,42 @@ public class DevicePolicyManager {
             try {
                 mService.setApplicationRestrictions(admin, mContext.getPackageName(), packageName,
                         settings, mParentInstance);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * Similar to the public variant of {@link #setApplicationRestrictions} but for use by the
+     * system.
+     *
+     * <p>Called by a system service only, meaning that the caller's UID must be equal to
+     * {@link Process#SYSTEM_UID}.
+     *
+     * @throws SecurityException if caller is not permitted to set Mte policy
+     * @throws UnsupportedOperationException if the device does not support MTE
+     * @param systemEntity  The service entity that adds the restriction. A application restriction
+     *                     set by a service entity can only be cleared by the same entity. This can
+     *                     be just the calling package name, or any string of the caller's choice
+     *                     can be used.
+     * @param packageName The name of the package to update restricted settings for.
+     * @param settings A {@link Bundle} to be parsed by the receiving application, conveying a new
+     *            set of active restrictions.
+     * @throws SecurityException if {@code admin} is not a device or profile owner.
+     * @see #setDelegatedScopes
+     * @see #DELEGATION_APP_RESTRICTIONS
+     * @see UserManager#KEY_RESTRICTIONS_PENDING
+     * @hide
+     */
+    @WorkerThread
+    public void setApplicationRestrictionsBySystem(
+            @NonNull String systemEntity, String packageName, Bundle settings) {
+        throwIfParentInstance("setApplicationRestrictions");
+        if (mService != null) {
+            try {
+                mService.setApplicationRestrictionsBySystem(
+                    systemEntity, packageName, myUserId(), settings);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -12223,6 +12270,40 @@ public class DevicePolicyManager {
     }
 
     /**
+     * Similar to the public variant of {@link #getApplicationRestrictions} but for use by the
+     * system.
+     *
+     * <p>Called by a system service only, meaning that the caller's UID must be equal to
+     * {@link Process#SYSTEM_UID}.
+     *
+     * @param systemEntity  The service entity that adds the restriction. A application restriction
+     *                     set by a service entity can only be cleared by the same entity. This can
+     *                     be just the calling package name, or any string of the caller's choice
+     *                     can be used.
+     * @param packageName The name of the package to fetch restricted settings of.
+     * @return {@link Bundle} of settings corresponding to what was set last time
+     *         {@link DevicePolicyManager#setApplicationRestrictions} was called, or an empty
+     *         {@link Bundle} if no restrictions have been set.
+     * @throws SecurityException if {@code admin} is not a device or profile owner.
+     * @see #setDelegatedScopes
+     * @see #DELEGATION_APP_RESTRICTIONS
+     * @hide
+     */
+    @WorkerThread
+    public @NonNull Bundle getApplicationRestrictionsBySystem(
+            @NonNull String systemEntity, @NonNull String packageName) {
+        if (mService != null) {
+            try {
+                return mService.getApplicationRestrictionsBySystem(
+                        systemEntity, packageName, myUserId());
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return null;
+    }
+
+    /**
      * Called by a profile owner, device owner or a holder of any permission that is associated with
      * a user restriction to set a user restriction specified by the key.
      * <p>
@@ -12650,6 +12731,50 @@ public class DevicePolicyManager {
             }
         }
         return null;
+    }
+
+
+    /**
+     * Returns information about {@link EnforcingAdmin}s that are currently enforcing a specific
+     * device policy for a given user.
+     *
+     * <p>The list includes only those admins whose set policy value is the one actively
+     * applied on the device after policy resolution (i.e., considering policies from all
+     * relevant admins). If no admin enforces the policy for the user, returns an empty list.
+     *
+     * <p><strong>Note:</strong> This method does not support policies that require additional
+     * parameters when being set (e.g., policies that take a package name as an argument).
+     * Attempting to query such policies will result in an {@link IllegalArgumentException}.
+     *
+     * @param policyIdentifier The identifier for the device policy. This must be one of the
+     *                         constants defined in {@link DevicePolicyIdentifiers}. For user
+     *                         restrictions, use
+     *                         {@link DevicePolicyIdentifiers#getIdentifierForUserRestriction}
+     *                         to obtain the correct identifier.
+     * @param userId           The identifier of the user for whom to retrieve the enforcing admins.
+     * @return {@link PolicyEnforcementInfo} that contains the list of {@link EnforcingAdmin}
+     *         objects, or an empty list if no admin is enforcing the policy for the specified user.
+     * @throws IllegalArgumentException if {@code devicePolicyIdentifier} is not a recognized policy
+     *         identifier or if it corresponds to a policy that requires additional parameters for
+     *         its enforcement.
+     * @hide
+     */
+    @RequiresPermission(QUERY_ADMIN_POLICY)
+    @NonNull
+    public PolicyEnforcementInfo getEnforcingAdminsForPolicy(
+            @NonNull String policyIdentifier, int userId) {
+        Objects.requireNonNull(policyIdentifier, "devicePolicyIdentifier can't be null");
+
+        if (mService != null) {
+            try {
+                return new PolicyEnforcementInfo(
+                        mService.getEnforcingAdminsForPolicy(policyIdentifier, userId));
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+        return new PolicyEnforcementInfo(Collections.emptyList());
     }
 
     /**
@@ -13777,8 +13902,12 @@ public class DevicePolicyManager {
      * permission {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_PROFILE_INTERACTION}.
      * @see #removeCrossProfileWidgetProvider(android.content.ComponentName, String)
      * @see #getCrossProfileWidgetProviders(android.content.ComponentName)
+     * @deprecated While this API still works to mutate the current allowlist, please consider
+     * switching to {@link #setCrossProfileWidgetProviders} for better performance.
      */
+    @Deprecated
     @RequiresPermission(value = MANAGE_DEVICE_POLICY_PROFILE_INTERACTION, conditional = true)
+    @FlaggedApi(FLAG_CROSS_PROFILE_WIDGET_PROVIDER_BULK_APIS)
     public boolean addCrossProfileWidgetProvider(@Nullable ComponentName admin,
             String packageName) {
         throwIfParentInstance("addCrossProfileWidgetProvider");
@@ -13791,6 +13920,42 @@ public class DevicePolicyManager {
             }
         }
         return false;
+    }
+
+    /**
+     * Called by the profile owner of a managed profile or a holder of the permission
+     * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_PROFILE_INTERACTION} to enable
+     * widget providers from packages to be available in the parent profile. As a result the
+     * user will be able to add widgets from the allowlisted package running under the profile to a
+     * widget host which runs under the parent profile, for example the home screen. Note that a
+     * package may have zero or more provider components, where each component provides a different
+     * widget type.
+     * <p>
+     * <strong>Note:</strong> By default no widget provider package is allowlisted.
+     *
+     * <p>
+     * <strong>Note:</strong> This API updates the entire allowlist in one-go, overriding any
+     * previous allowlist. This is more efficient than using {@link #addCrossProfileWidgetProvider}
+     * and {@link #removeCrossProfileWidgetProvider} to update the allowlist one package a time,
+     * especially if the allowlist consists of many packages.
+     *
+     * @param packageNames The packages from which widget providers are allowlisted.
+     * @throws SecurityException if {@code admin} is not a profile owner and not a holder of the
+     * permission {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_PROFILE_INTERACTION}.
+     * @see #getCrossProfileWidgetProviders(android.content.ComponentName)
+     */
+    @RequiresPermission(value = MANAGE_DEVICE_POLICY_PROFILE_INTERACTION, conditional = true)
+    @FlaggedApi(FLAG_CROSS_PROFILE_WIDGET_PROVIDER_BULK_APIS)
+    public void setCrossProfileWidgetProviders(@NonNull Set<String> packageNames) {
+        throwIfParentInstance("addCrossProfileWidgetProviders");
+        if (mService != null) {
+            try {
+                mService.setCrossProfileWidgetProviders(
+                        mContext.getPackageName(), List.copyOf(packageNames));
+            } catch (RemoteException re) {
+                throw re.rethrowFromSystemServer();
+            }
+        }
     }
 
     /**
@@ -13810,8 +13975,12 @@ public class DevicePolicyManager {
      * permission {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_PROFILE_INTERACTION}.
      * @see #addCrossProfileWidgetProvider(android.content.ComponentName, String)
      * @see #getCrossProfileWidgetProviders(android.content.ComponentName)
+     * @deprecated While this API still works to mutate the current allowlist, please consider
+     * switching to {@link #setCrossProfileWidgetProviders} for better performance.
      */
+    @Deprecated
     @RequiresPermission(value = MANAGE_DEVICE_POLICY_PROFILE_INTERACTION, conditional = true)
+    @FlaggedApi(FLAG_CROSS_PROFILE_WIDGET_PROVIDER_BULK_APIS)
     public boolean removeCrossProfileWidgetProvider(@Nullable ComponentName admin,
             String packageName) {
         throwIfParentInstance("removeCrossProfileWidgetProvider");
@@ -18357,5 +18526,84 @@ public class DevicePolicyManager {
             }
         }
         return HEADLESS_DEVICE_OWNER_MODE_UNSUPPORTED;
+    }
+
+    /**
+     * Flag used by {@link #setPolicy} to apply the policy to the same user as the context user.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    public static final int POLICY_SCOPE_USER = 0x0001;
+
+    /**
+     * Flag used by {@link #setPolicy} to apply the policy to the entire device.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    public static final int POLICY_SCOPE_DEVICE = 0x0002;
+
+    /**
+     * Flag used by {@link #setPolicy} to apply the policy to the parent user of the context user.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    public static final int POLICY_SCOPE_PARENT_USER = 0x0003;
+
+    /**
+     * Possible policy scopes
+     *
+     * @hide
+     */
+    @IntDef(prefix = { "POLICY_SCOPE_" }, value = {
+            POLICY_SCOPE_USER,
+            POLICY_SCOPE_DEVICE,
+            POLICY_SCOPE_PARENT_USER,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface PolicyScope {}
+
+    /**
+     * Sets the given policy.
+     *
+     * @param id The policy identifier to update. It must be one of the values inside
+     * {@link DevicePolicyIdentifier}.
+     * @param scope The scope the policy will apply to.
+     * @param value The value of the policy. If value is set to null, the policy is cleared.
+     * Check the documentation of individual identifiers for more details about the default.
+     * @throws SecurityException If the caller does not have sufficient permissions to set the
+     * specified id. Check the documentation of individual identifiers for more details.
+     * @throws IllegalArgumentException The passed value failed validation. Check the
+     * documentation of individual identifiers for more details.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    @UserHandleAware
+    public <T> void setPolicy(
+            @NonNull PolicyIdentifier<T> id,
+            @PolicyScope int scope,
+            @Nullable T value) {
+        throwIfParentInstance("setPolicy");
+        if (mService != null) {
+            // TODO(b/434655549): Implement as a generic handler.
+            if (id.equals(PolicyIdentifier.SCREEN_CAPTURE_DISABLED)) {
+                if (value == null) return; // No way to clear the policy.
+
+                // TODO(b/434615264): Actually use the scope here.
+                setScreenCaptureDisabled(null, (Boolean) value);
+            } else {
+                throw new IllegalArgumentException("Unhandled policy " + id);
+            }
+        }
+    }
+
+    /**
+     * Template free version of setPolicy for booleans.
+     *
+     * @hide
+    */
+    @TestApi
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
+    public void setBooleanPolicy(
+            @NonNull String key,
+            @PolicyScope int scope,
+            boolean value) {
+        // TODO(b/434920631): Remove this method and use {@link #setPolicy} in tests directly.
+        setPolicy(new PolicyIdentifier<Boolean>(key), scope, Boolean.valueOf(value));
     }
 }

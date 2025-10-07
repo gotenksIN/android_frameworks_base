@@ -31,6 +31,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 public class RavenwoodInternalUtils {
     public static final String TAG = "Ravenwood";
@@ -38,25 +39,21 @@ public class RavenwoodInternalUtils {
     private RavenwoodInternalUtils() {
     }
 
+    public static final String ANDROID_PACKAGE_NAME = "android";
+
     /**
      * If set to "1", we enable the verbose logging.
      *
      * (See also InitLogging() in http://ac/system/libbase/logging.cpp)
      */
-    public static final boolean RAVENWOOD_VERBOSE_LOGGING = "1".equals(System.getenv(
-            "RAVENWOOD_VERBOSE"));
+    public static final boolean RAVENWOOD_VERBOSE_LOGGING =
+            "1".equals(System.getenv("RAVENWOOD_VERBOSE"))
+            || "1".equals(System.getProperty("ravenwood.verbose"));
 
     private static boolean sEnableExtraRuntimeCheck =
             "1".equals(System.getenv("RAVENWOOD_ENABLE_EXTRA_RUNTIME_CHECK"));
 
     public static final String RAVENWOOD_SYSPROP = "ro.is_on_ravenwood";
-
-    public static final String RAVENWOOD_RESOURCE_APK = "ravenwood-res-apks/ravenwood-res.apk";
-    public static final String RAVENWOOD_INST_RESOURCE_APK =
-            "ravenwood-res-apks/ravenwood-inst-res.apk";
-
-    public static final String RAVENWOOD_EMPTY_RESOURCES_APK =
-            "ravenwood-data/ravenwood-empty-res.apk";
 
     /**
      * @return if we're running on Ravenwood.
@@ -273,5 +270,33 @@ public class RavenwoodInternalUtils {
     @Nullable
     public static <T> T withDefault(@Nullable T value, @Nullable T def) {
         return value != null ? value : def;
+    }
+
+
+    private static final Pattern sWildcardValidater =
+            Pattern.compile("[^\\w.*$]");
+
+    /**
+     * Convert a wildcard string using "*" and "**" to match Java classnames.
+     *
+     * The input string can only contain alnum, "$", "." and "*".
+     */
+    public static Pattern parseClassNameWildcard(String pattern) {
+        // Convert "**" -> match anything (== .*)
+        // Convert "*" -> match anything except for periods (== [^.]*)
+        // Convert "." -> \.
+
+        if (sWildcardValidater.matcher(pattern).find()) {
+            throw new IllegalArgumentException(
+                    "Invalid character found in wildcard '" + pattern + "'");
+        }
+
+        // Save "**" to something else and convert it back to ".*" at the end.
+        String temp = pattern.replace("**", "@@");
+        temp = temp.replace(".", "\\.");
+        temp = temp.replace("$", "\\$");
+        temp = temp.replace("*", "[^.]*");
+        temp = temp.replace("@@", ".*");
+        return Pattern.compile(temp);
     }
 }

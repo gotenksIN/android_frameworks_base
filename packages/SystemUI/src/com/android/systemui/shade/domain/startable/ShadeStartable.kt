@@ -26,6 +26,7 @@ import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.dagger.ShadeTouchLog
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
+import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.ShadeExpansionStateManager
 import com.android.systemui.shade.TouchLogger.Companion.logTouchesTo
@@ -33,7 +34,6 @@ import com.android.systemui.shade.data.repository.ShadeRepository
 import com.android.systemui.shade.domain.interactor.ShadeDisplayStateInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
-import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.shade.transition.ScrimShadeTransitionController
 import com.android.systemui.statusbar.NotificationShadeDepthController
 import com.android.systemui.statusbar.PulseExpansionHandler
@@ -89,10 +89,13 @@ constructor(
             combine(
                     shadeInteractor.shadeExpansion,
                     sceneInteractorProvider.get().isTransitionUserInputOngoing,
-                ) { panelExpansion, tracking ->
+                    sceneInteractorProvider.get().transitionState,
+                ) { panelExpansion, tracking, transitionState ->
+                    val fraction =
+                        if (transitionState.isIdle(Scenes.Lockscreen)) 1f else panelExpansion
                     shadeExpansionStateManager.onPanelExpansionChanged(
-                        fraction = panelExpansion,
-                        expanded = panelExpansion > 0f,
+                        fraction = fraction,
+                        expanded = fraction > 0f,
                         tracking = tracking,
                     )
                 }
@@ -111,24 +114,25 @@ constructor(
     }
 
     private fun hydrateShadeLayoutWidth() {
-        applicationScope.launch {
-            // TODO(b/354926927): `isShadeLayoutWide` should be deprecated in SceneContainer.
-            if (SceneContainerFlag.isEnabled) {
-                    shadeDisplayStateInteractor.isWideScreen
-                } else {
-                    configurationRepository.onAnyConfigurationChange
-                        // Force initial collection.
-                        .onStart { emit(Unit) }
-                        .map {
-                            // The configuration for 'shouldUseSplitNotificationShade' dictates the
-                            // width of the shade in split-shade mode.
-                            splitShadeStateController.shouldUseSplitNotificationShade(
-                                context.resources
-                            )
-                        }
-                        .distinctUntilChanged()
+        if (SceneContainerFlag.isEnabled) {
+            applicationScope.launch {
+                shadeDisplayStateInteractor.isWideScreen.collect {
+                    shadeRepository.isWideScreen.value = it
                 }
-                .collect(shadeRepository::setShadeLayoutWide)
+            }
+        }
+
+        applicationScope.launch {
+            configurationRepository.onAnyConfigurationChange
+                // Force initial collection.
+                .onStart { emit(Unit) }
+                .map {
+                    // The configuration for 'shouldUseSplitNotificationShade' dictates the width of
+                    // the shade in single/split shade modes.
+                    splitShadeStateController.shouldUseSplitNotificationShade(context.resources)
+                }
+                .distinctUntilChanged()
+                .collect { shadeRepository.legacyUseSplitShade.value = it }
         }
     }
 
@@ -136,19 +140,10 @@ constructor(
         if (SceneContainerFlag.isEnabled) {
             val shadeModeInteractor = shadeModeInteractorProvider.get()
             applicationScope.launch {
-                combine(shadeModeInteractor.shadeMode, shadeDisplayStateInteractor.isWideScreen) {
-                        shadeMode,
-                        isWideScreen ->
-                        when (shadeMode) {
-                            is ShadeMode.Single -> true
-                            is ShadeMode.Split -> false
-                            is ShadeMode.Dual -> !isWideScreen
-                        }
-                    }
-                    .collect { isFullWidth ->
-                        nsslc.setIsFullWidth(isFullWidth)
-                        scrimController.setClipsQsScrim(isFullWidth)
-                    }
+                shadeModeInteractor.isFullWidthShade.collect { isFullWidth ->
+                    nsslc.setIsFullWidth(isFullWidth)
+                    scrimController.setClipsQsScrim(isFullWidth)
+                }
             }
         }
     }

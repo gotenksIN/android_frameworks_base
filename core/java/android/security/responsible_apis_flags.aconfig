@@ -31,13 +31,10 @@ flag {
 }
 
 flag {
-  name: "asm_reintroduce_grace_period"
+  name: "asm_ignore_grace_period_exemption"
   namespace: "responsible_apis"
-  description: "Allow launches within the grace period for ASM apps"
+  description: "Ignore grace period exemption for ASM apps"
   bug: "367702727"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -142,12 +139,6 @@ flag {
 }
 
 flag {
-    name: "aapm_feature_memory_tagging_extension"
-    namespace: "responsible_apis"
-    description: "Android Advanced Protection Mode Feature: Memory Tagging Extension"
-    bug: "378931989"
-}
-flag {
     name: "aapm_feature_disable_cellular_2g"
     namespace: "responsible_apis"
     description: "Android Advanced Protection Mode Feature: Disable Cellular 2G"
@@ -173,4 +164,45 @@ flag {
     namespace: "permissions"
     description: "Flag for restricting implicit URI grants on Send action intents"
     bug: "295238578"
+}
+
+flag {
+    name: "enable_intent_firewall_extra_key_value_filter"
+    namespace: "responsible_apis"
+    description: "Flag for enable ExtraKeyValueFilter in IntentFirewall"
+    bug: "428733109"
+}
+
+flag {
+    name: "enable_intent_firewall_component_class_filter"
+    namespace: "responsible_apis"
+    description: "Flag for enabling component-class-filter in IntentFirewall"
+    bug: "428733109"
+}
+
+flag {
+    name: "fail_on_parcel_size_mismatch"
+    namespace: "responsible_apis"
+    description: "Flag for failing instead of logging in case of parcel size mismatches"
+    bug: "416031865"
+}
+
+flag {
+    name: "wtf_bundle_defuse"
+    namespace: "responsible_apis"
+    description: "Flag for wtf logging when defuse is enabled."
+    bug: "254848919"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "deprecate_bundle_defuse"
+    namespace: "responsible_apis"
+    description: "Flag for failing instead of logging when defuse is enabled."
+    bug: "254848919"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

@@ -37,6 +37,7 @@ import java.util.List;
 public class PathData extends Operation implements VariableSupport, Serializable {
     private static final int OP_CODE = Operations.DATA_PATH;
     private static final String CLASS_NAME = "PathData";
+    private static final int MAX_PATH_LENGTH = 20000;
     int mInstanceId;
     float[] mFloatPath;
     float[] mOutputPath;
@@ -140,7 +141,7 @@ public class PathData extends Operation implements VariableSupport, Serializable
      * @param id the id of the path
      * @param data the path
      */
-    public static void apply(@NonNull WireBuffer buffer, int id, @NonNull float[] data) {
+    public static void apply(@NonNull WireBuffer buffer, int id, @NonNull float [] data) {
         buffer.start(Operations.DATA_PATH);
         buffer.writeInt(id);
         buffer.writeInt(data.length);
@@ -158,6 +159,9 @@ public class PathData extends Operation implements VariableSupport, Serializable
     public static void read(@NonNull WireBuffer buffer, @NonNull List<Operation> operations) {
         int imageId = buffer.readInt();
         int len = buffer.readInt();
+        if (len > MAX_PATH_LENGTH) {
+            throw new RuntimeException("Path too long");
+        }
         float[] data = new float[len];
         for (int i = 0; i < data.length; i++) {
             data[i] = buffer.readFloat();
@@ -185,7 +189,7 @@ public class PathData extends Operation implements VariableSupport, Serializable
      * @return string describing the path
      */
     @NonNull
-    public static String pathString(@Nullable float[] path) {
+    public static String pathString(@Nullable float [] path) {
         if (path == null) {
             return "null";
         }
@@ -242,7 +246,7 @@ public class PathData extends Operation implements VariableSupport, Serializable
     }
 
     @Override
-    public void serialize(MapSerializer serializer) {
+    public void serialize(@NonNull MapSerializer serializer) {
         serializer.addType(CLASS_NAME).add("id", mInstanceId).addPath("path", mFloatPath);
     }
 }

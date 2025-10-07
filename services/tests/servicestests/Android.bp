@@ -90,6 +90,7 @@ android_test {
         "services.supervision",
         "services.usage",
         "servicestests-utils",
+        "signal_collector_flags_lib",
         "testables",
         // TODO: remove once Android migrates to JUnit 4.12,
         // which provides assertThrows
@@ -252,6 +253,7 @@ java_library {
         "androidx.test.ext.truth",
         "androidx.test.rules",
         "frameworks-base-testutils",
+        "service-permission.stubs.system_server",
         "services.core",
         "services.devicepolicy",
     ],
@@ -1092,4 +1094,14 @@ test_module_config {
         "device-tests",
     ],
     include_filters: ["com.android.server.supervision"],
+}
+
+test_module_config {
+    name: "FrameworksServicesTests_incident",
+    base: "FrameworksServicesTests",
+    test_suites: [
+        "automotive-tests",
+        "device-tests",
+    ],
+    include_filters: ["com.android.server.incident"],
 }

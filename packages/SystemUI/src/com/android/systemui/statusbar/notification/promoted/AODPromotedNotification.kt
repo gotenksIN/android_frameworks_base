@@ -21,10 +21,10 @@ import android.app.Notification
 import android.content.Context
 import android.graphics.PorterDuff
 import android.graphics.Rect
+import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.util.Log
 import android.util.Size
-import android.view.LayoutInflater
 import android.view.NotificationHeaderView
 import android.view.NotificationTopLineView
 import android.view.View
@@ -68,7 +68,9 @@ import com.android.internal.widget.CachingIconView
 import com.android.internal.widget.ImageFloatingTextView
 import com.android.internal.widget.NotificationExpandButton
 import com.android.internal.widget.NotificationProgressBar
+import com.android.internal.widget.NotificationProgressDrawable
 import com.android.internal.widget.NotificationProgressModel
+import com.android.systemui.FontStyles
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.res.R as systemuiR
 import com.android.systemui.statusbar.notification.promoted.AodPromotedNotificationColor.Background
@@ -96,38 +98,18 @@ fun AODPromotedNotification(
     val content = viewModel.content ?: return
     val audiblyAlertedIconVisible = viewModel.audiblyAlertedIconVisible
 
-    if (com.android.systemui.Flags.uiRichOngoingAodSkeletonBgInflation()) {
-        val notificationView = content.notificationView
-        if (notificationView == null) {
-            Log.w(TAG, "not displaying promoted notif with ineligible style on AOD")
-            return
-        }
-        key(content.identity, notificationView.getTag(viewInflationIdentity)) {
-            AODPromotedNotificationView(
-                notificationViewFactory = { notificationView },
-                content = content,
-                audiblyAlertedIconVisible = audiblyAlertedIconVisible,
-                modifier = modifier,
-            )
-        }
-    } else {
-        val layoutResource = content.layoutResource
-        if (layoutResource == null) {
-            Log.w(TAG, "not displaying promoted notif with ineligible style on AOD")
-            return
-        }
-        key(content.identity) {
-            AODPromotedNotificationView(
-                notificationViewFactory = { context ->
-                    traceSection("$TAG.inflate") {
-                        LayoutInflater.from(context).inflate(layoutResource, /* root= */ null)
-                    }
-                },
-                content = content,
-                audiblyAlertedIconVisible = audiblyAlertedIconVisible,
-                modifier = modifier,
-            )
-        }
+    val notificationView = content.notificationView
+    if (notificationView == null) {
+        Log.w(TAG, "not displaying promoted notif with ineligible style on AOD")
+        return
+    }
+    key(content.identity, notificationView.getTag(viewInflationIdentity)) {
+        AODPromotedNotificationView(
+            notificationViewFactory = { notificationView },
+            content = content,
+            audiblyAlertedIconVisible = audiblyAlertedIconVisible,
+            modifier = modifier,
+        )
     }
 }
 
@@ -320,6 +302,7 @@ private class AODPromotedNotificationViewUpdater(root: View) {
 
     private val defaultLargeIconSizePx: Int =
         root.context.resources.getDimensionPixelSize(R.dimen.notification_right_icon_size)
+    private val defaultTypeface: Typeface? = getNotificationTypeFace(root.context)
 
     private val marginPx: Int =
         if (notificationsRedesignTemplates()) {
@@ -329,6 +312,15 @@ private class AODPromotedNotificationViewUpdater(root: View) {
                 systemuiR.dimen.notification_shade_content_margin_horizontal
             )
         }
+
+    private val progressStyleProgressThickness: Float =
+        root.context.resources.getDimension(
+            systemuiR.dimen.notification_aod_progress_style_progress_thickness
+        )
+    private val progressStyleProgressAheadThickness: Float =
+        root.context.resources.getDimension(
+            systemuiR.dimen.notification_aod_progress_style_ahead_progress_thickness
+        )
 
     private data class SmallIconSavedState(val background: Drawable?, val padding: Rect)
 
@@ -356,6 +348,8 @@ private class AODPromotedNotificationViewUpdater(root: View) {
         setTextViewColor(headerTextSecondaryDivider, SecondaryText)
         setTextViewColor(timeDivider, SecondaryText)
         setTextViewColor(verificationDivider, SecondaryText)
+
+        adjustPromotedNotificationTextFonts()
 
         if (notificationsRedesignTemplates()) {
             (mainColumn?.layoutParams as? MarginLayoutParams)?.let { mainColumnMargins ->
@@ -443,6 +437,11 @@ private class AODPromotedNotificationViewUpdater(root: View) {
 
     private fun updateNewProgressBar(content: PromotedNotificationContentModel) {
         val newProgressBar = newProgressBar ?: return
+
+        (newProgressBar.notificationProgressDrawable.mutate() as? NotificationProgressDrawable)
+            ?.setSegmentHeight(progressStyleProgressThickness)
+        (newProgressBar.notificationProgressDrawable.mutate() as? NotificationProgressDrawable)
+            ?.setFadedSegmentHeight(progressStyleProgressAheadThickness)
 
         if (content.newProgress != null && !content.newProgress.isIndeterminate) {
             newProgressBar.setProgressModel(content.newProgress.toSkeleton().toBundle())
@@ -745,6 +744,41 @@ private class AODPromotedNotificationViewUpdater(root: View) {
 
     private fun setTextViewColor(view: TextView?, color: AodPromotedNotificationColor) {
         view?.setTextColor(color.colorInt)
+    }
+
+    private fun adjustPromotedNotificationTextFonts() {
+        adjustTextViewFont(appNameDivider)
+        adjustTextViewFont(appNameText)
+        adjustTextViewFont(bigText)
+        adjustTextViewFont(conversationText)
+        adjustTextViewFont(headerText)
+        adjustTextViewFont(headerTextDivider)
+        adjustTextViewFont(headerTextSecondary)
+        adjustTextViewFont(headerTextSecondaryDivider)
+        adjustTextViewFont(text)
+        adjustTextViewFont(title)
+        adjustTextViewFont(verificationDivider)
+        adjustTextViewFont(verificationText)
+        adjustTextViewFont(time)
+        adjustTextViewFont(timeDivider)
+    }
+
+    private fun getNotificationTypeFace(context: Context): Typeface? =
+        try {
+            val defaultFontFamily =
+                if (notificationsRedesignTemplates()) {
+                    FontStyles.GSF_BODY_MEDIUM
+                } else {
+                    context.resources.getString(R.string.config_bodyFontFamily)
+                }
+            Typeface.create(defaultFontFamily, Typeface.NORMAL)
+        } catch (throwable: Throwable) {
+            Log.wtf(TAG, "Font is not found for Promoted Notifications")
+            null
+        }
+
+    private fun adjustTextViewFont(view: TextView?) {
+        view?.setTypeface(defaultTypeface, Typeface.NORMAL)
     }
 
     companion object {

@@ -663,6 +663,31 @@ class KeyguardInteractorTest : SysuiTestCase() {
             assertThat(dozeAmount).isEqualTo(0f)
         }
 
+    @Test
+    fun primaryBouncerShowing_initialValueFalse() =
+        testScope.runTest {
+            val primaryBouncerShowing by collectLastValue(underTest.primaryBouncerShowing)
+            assertThat(primaryBouncerShowing).isFalse()
+        }
+
+    @Test
+    fun primaryBouncerShowing_bouncerShow() =
+        testScope.runTest {
+            val primaryBouncerShowing by collectLastValue(underTest.primaryBouncerShowing)
+            bouncerRepository.setPrimaryShow(true)
+            runCurrent()
+            assertThat(primaryBouncerShowing).isTrue()
+        }
+
+    @Test
+    fun primaryBouncerShowing_bouncerShowingSoon() =
+        testScope.runTest {
+            val primaryBouncerShowing by collectLastValue(underTest.primaryBouncerShowing)
+            bouncerRepository.setPrimaryShowingSoon(true)
+            runCurrent()
+            assertThat(primaryBouncerShowing).isTrue()
+        }
+
     private suspend fun sendTransitionStep(step: TransitionStep) {
         keyguardTransitionRepository.sendTransitionStep(step)
         testScope.runCurrent()

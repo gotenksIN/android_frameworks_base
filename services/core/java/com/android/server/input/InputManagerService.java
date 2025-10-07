@@ -114,6 +114,7 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.view.Display;
+import android.view.DisplayInfo;
 import android.view.IInputFilter;
 import android.view.IInputFilterHost;
 import android.view.IInputMonitorHost;
@@ -128,6 +129,7 @@ import android.view.PointerIcon;
 import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.VerifiedInputEvent;
+import android.view.View;
 import android.view.WindowManager;
 import android.view.WindowManagerPolicyConstants;
 import android.view.inputmethod.InputMethodInfo;
@@ -173,6 +175,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /** The system implementation of {@link IInputManager} that manages input devices. */
@@ -313,6 +316,12 @@ public class InputManagerService extends IInputManager.Stub
     // Currently only accessed by InputReader.
     @GuardedBy("mAssociationsLock")
     private final Map<String, String> mKeyboardLayoutAssociations = new ArrayMap<>();
+
+    // The set of input ports (String) for all the devices that are marked as "virtual devices".
+    // Typically all devices created from VDM or any other Uinput device created by system server
+    // should be marked as virtual.
+    @GuardedBy("mAssociationsLock")
+    private final Set<String> mVirtualDevicePorts = new ArraySet<>();
 
     // Stores input ports associated with device types. For example, adding an association
     // {"123", "touchNavigation"} here would mean that a touch device appearing at port "123" would
@@ -1051,6 +1060,33 @@ public class InputManagerService extends IInputManager.Stub
         }
     }
 
+    @NonNull
+    @Override
+    @EnforcePermission(anyOf = {
+            Manifest.permission.INJECT_KEY_EVENTS,
+            Manifest.permission.INJECT_EVENTS
+    })
+    public IVirtualInputDevice createVirtualKeyboard(@NonNull IBinder token,
+            @NonNull VirtualKeyboardConfig config) {
+        super.createVirtualKeyboard_enforcePermission();
+
+        int displayId = config.getAssociatedDisplayId();
+        if (displayId != Display.INVALID_DISPLAY && displayId != Display.DEFAULT_DISPLAY) {
+            DisplayInfo displayInfo =
+                    mDisplayManagerInternal.getDisplayInfo(displayId);
+            int callingUid = Binder.getCallingUid();
+            // Explicit display association requires either the caller to own the display or if
+            // it's from the system.
+            if (callingUid != displayInfo.ownerUid && callingUid != Process.SYSTEM_UID
+                    && callingUid != 0) {
+                throw new SecurityException(
+                        "Explicit display association requires caller to own the display");
+            }
+        }
+
+        return createVirtualKeyboardInternal(token, config);
+    }
+
     @Override // Binder call
     public VerifiedInputEvent verifyInputEvent(@NonNull InputEvent event) {
         Objects.requireNonNull(event, "event must not be null");
@@ -1362,10 +1398,14 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     @Override
-    public void requestPointerCapture(@NonNull IBinder inputChannelToken, boolean enabled) {
+    public void requestPointerCapture(@NonNull IBinder inputChannelToken, int mode) {
         Objects.requireNonNull(inputChannelToken, "inputChannelToken must not be null");
+        if (mode != View.POINTER_CAPTURE_MODE_UNCAPTURED
+                && mode != View.POINTER_CAPTURE_MODE_ABSOLUTE) {
+            throw new IllegalArgumentException("Invalid pointer capture mode " + mode);
+        }
 
-        mNative.requestPointerCapture(inputChannelToken, enabled);
+        mNative.requestPointerCapture(inputChannelToken, mode);
     }
 
     public void setInputDispatchMode(boolean enabled, boolean frozen) {
@@ -1459,6 +1499,17 @@ public class InputManagerService extends IInputManager.Stub
 
     private void setDisplayEligibilityForPointerCapture(int displayId, boolean isEligible) {
         mNative.setDisplayEligibilityForPointerCapture(displayId, isEligible);
+    }
+
+    // For display mirroring, we want to dispatch all key events to the source (default)
+    // display, as the virtual display doesn't have any focused windows. Hence, call this for
+    // associating any input device to the source display if the input device emits any key
+    // events.
+    private int getTargetDisplayIdForInput(int displayId) {
+        DisplayManagerInternal displayManager = LocalServices.getService(
+                DisplayManagerInternal.class);
+        int mirroredDisplayId = displayManager.getDisplayIdToMirror(displayId);
+        return mirroredDisplayId == Display.INVALID_DISPLAY ? displayId : mirroredDisplayId;
     }
 
     private static class VibrationInfo {
@@ -1903,6 +1954,34 @@ public class InputManagerService extends IInputManager.Stub
             mKeyboardLayoutAssociations.remove(inputPort);
         }
         mNative.changeKeyboardLayoutAssociation();
+    }
+
+    void addVirtualDevice(@NonNull String inputPort) {
+        Objects.requireNonNull(inputPort);
+
+        synchronized (mAssociationsLock) {
+            mVirtualDevicePorts.add(inputPort);
+        }
+        mNative.changeVirtualDevices();
+    }
+
+    void removeVirtualDevice(@NonNull String inputPort) {
+        Objects.requireNonNull(inputPort);
+
+        synchronized (mAssociationsLock) {
+            mVirtualDevicePorts.remove(inputPort);
+        }
+        mNative.changeVirtualDevices();
+    }
+
+    @NonNull
+    IVirtualInputDevice createVirtualKeyboardInternal(@NonNull IBinder token,
+            @NonNull VirtualKeyboardConfig config) {
+        return mVirtualInputDeviceController.createKeyboard(config.getInputDeviceName(),
+                config.getVendorId(), config.getProductId(), token,
+                InputManagerService.this.getTargetDisplayIdForInput(
+                        config.getAssociatedDisplayId()),
+                config.getLanguageTag(), config.getLayoutType());
     }
 
     @Override // Binder call
@@ -2377,6 +2456,12 @@ public class InputManagerService extends IInputManager.Stub
     // Native callback.
     @SuppressWarnings("unused")
     private void notifyInputDevicesChanged(InputDevice[] inputDevices) {
+        mHandler.post(() -> {
+            // Input device change can possibly change configuration, so notify window manager to
+            // update its configuration.
+            // Shift to main thread and release InputReader thread.
+            mWindowManagerCallbacks.notifyConfigurationChanged();
+        });
         synchronized (mInputDevicesLock) {
             if (!mInputDevicesChangedPending) {
                 mInputDevicesChangedPending = true;
@@ -2386,9 +2471,6 @@ public class InputManagerService extends IInputManager.Stub
 
             mInputDevices = inputDevices;
         }
-        // Input device change can possibly change configuration, so notify window manager to update
-        // its configuration.
-        mWindowManagerCallbacks.notifyConfigurationChanged();
     }
 
     // Native callback.
@@ -2808,7 +2890,7 @@ public class InputManagerService extends IInputManager.Stub
                 }
                 break;
             case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MOUSE_KEYS:
-                if (complete && InputSettings.isAccessibilityMouseKeysFeatureFlagEnabled()) {
+                if (complete) {
                     final boolean mouseKeysEnabled = InputSettings.isAccessibilityMouseKeysEnabled(
                             mContext);
                     InputSettings.setAccessibilityMouseKeysEnabled(mContext, !mouseKeysEnabled);
@@ -2982,6 +3064,14 @@ public class InputManagerService extends IInputManager.Stub
             configs.putAll(mKeyboardLayoutAssociations);
         }
         return flatten(configs);
+    }
+
+    // Native callback.
+    @SuppressWarnings("unused")
+    private String[] getVirtualDevicePorts() {
+        synchronized (mAssociationsLock) {
+            return mVirtualDevicePorts.toArray(new String[0]);
+        }
     }
 
     /**
@@ -3192,7 +3282,7 @@ public class InputManagerService extends IInputManager.Stub
 
     @Override // Binder call
     @Nullable
-    public PointF getCursorPosition(int displayId) {
+    public PointF getCursorPositionInPhysicalDisplay(int displayId) {
         if (!checkCallingPermission(
                 Manifest.permission.INJECT_EVENTS,
                 "getCursorPosition()",
@@ -3201,7 +3291,25 @@ public class InputManagerService extends IInputManager.Stub
                     "The INJECT_EVENTS permission is required to access cursor outside the "
                             + "intermediate window / display.");
         }
-        final float[] p = mNative.getMouseCursorPosition(displayId);
+        final float[] p = mNative.getMouseCursorPositionInPhysicalDisplay(displayId);
+        if (p == null || p.length != 2) {
+            return null;
+        }
+        return new PointF(p[0], p[1]);
+    }
+
+    @Override // Binder call
+    @Nullable
+    public PointF getCursorPositionInLogicalDisplay(int displayId) {
+        if (!checkCallingPermission(
+                Manifest.permission.INJECT_EVENTS,
+                "getCursorPositionInLogicalDisplay()",
+                true /*checkInstrumentationSource*/)) {
+            throw new SecurityException(
+                    "The INJECT_EVENTS permission is required to access cursor outside the "
+                            + "intermediate window / display.");
+        }
+        final float[] p = mNative.getMouseCursorPositionInLogicalDisplay(displayId);
         if (p == null || p.length != 2) {
             return null;
         }
@@ -3826,8 +3934,7 @@ public class InputManagerService extends IInputManager.Stub
         @Override
         public long interceptKeyCombinationBeforeAccessibility(@NonNull KeyEvent event) {
             if (fixKeyboardInterceptorPolicyCall()) {
-                return mKeyGestureController.interceptKeyBeforeDispatching(/* focusedToken= */null,
-                        event, /* policyFlags= */0);
+                return mKeyGestureController.interceptKeyCombinationBeforeAccessibility(event);
             } else {
                 return mWindowManagerCallbacks.interceptKeyBeforeDispatching(
                         /* focusedToken= */null, event)
@@ -3840,10 +3947,7 @@ public class InputManagerService extends IInputManager.Stub
         @Override
         public IVirtualInputDevice createVirtualKeyboard(@NonNull IBinder token,
                 @NonNull VirtualKeyboardConfig config) {
-            return mVirtualInputDeviceController.createKeyboard(config.getInputDeviceName(),
-                    config.getVendorId(), config.getProductId(), token,
-                    getTargetDisplayIdForInput(config.getAssociatedDisplayId()),
-                    config.getLanguageTag(), config.getLayoutType());
+            return InputManagerService.this.createVirtualKeyboardInternal(token, config);
         }
 
         @NonNull
@@ -3871,7 +3975,8 @@ public class InputManagerService extends IInputManager.Stub
             return mVirtualInputDeviceController.createNavigationTouchpad(
                     config.getInputDeviceName(), config.getVendorId(),
                     config.getProductId(), token,
-                    getTargetDisplayIdForInput(config.getAssociatedDisplayId()),
+                    InputManagerService.this.getTargetDisplayIdForInput(
+                            config.getAssociatedDisplayId()),
                     config.getHeight(), config.getWidth());
         }
 
@@ -3881,7 +3986,8 @@ public class InputManagerService extends IInputManager.Stub
                 @NonNull VirtualDpadConfig config) {
             return mVirtualInputDeviceController.createDpad(config.getInputDeviceName(),
                     config.getVendorId(), config.getProductId(), token,
-                    getTargetDisplayIdForInput(config.getAssociatedDisplayId()));
+                    InputManagerService.this.getTargetDisplayIdForInput(
+                            config.getAssociatedDisplayId()));
         }
 
         @NonNull
@@ -3900,23 +4006,13 @@ public class InputManagerService extends IInputManager.Stub
                 @NonNull VirtualRotaryEncoderConfig config) {
             return mVirtualInputDeviceController.createRotaryEncoder(config.getInputDeviceName(),
                     config.getVendorId(), config.getProductId(), token,
-                    getTargetDisplayIdForInput(config.getAssociatedDisplayId()));
+                    InputManagerService.this.getTargetDisplayIdForInput(
+                            config.getAssociatedDisplayId()));
         }
 
         @Override
         public void closeVirtualInputDevice(IBinder token) {
             mVirtualInputDeviceController.unregisterInputDevice(token);
-        }
-
-        // For display mirroring, we want to dispatch all key events to the source (default)
-        // display, as the virtual display doesn't have any focused windows. Hence, call this for
-        // associating any input device to the source display if the input device emits any key
-        // events.
-        private int getTargetDisplayIdForInput(int displayId) {
-            DisplayManagerInternal displayManager = LocalServices.getService(
-                    DisplayManagerInternal.class);
-            int mirroredDisplayId = displayManager.getDisplayIdToMirror(displayId);
-            return mirroredDisplayId == Display.INVALID_DISPLAY ? displayId : mirroredDisplayId;
         }
     }
 

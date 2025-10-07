@@ -36,7 +36,7 @@ import androidx.tracing.trace
 import com.android.systemui.Dumpable
 import com.android.systemui.LauncherProxyService
 import com.android.systemui.LauncherProxyService.LauncherProxyListener
-import com.android.systemui.ambientcue.data.logger.AmbientCueLogger
+import com.android.systemui.ambientcue.shared.logger.AmbientCueLogger
 import com.android.systemui.ambientcue.shared.model.ActionModel
 import com.android.systemui.ambientcue.shared.model.IconModel
 import com.android.systemui.dagger.SysUISingleton
@@ -165,14 +165,30 @@ constructor(
                                     chip.extras?.getParcelable<ActivityId>(EXTRA_ACTIVITY_ID)
                                 val actionType = chip.extras?.getString(EXTRA_ACTION_TYPE)
                                 val oneTapEnabled = chip.extras?.getBoolean(EXTRA_ONE_TAP_ENABLED)
+                                val oneTapDelayMs =
+                                    chip.extras?.getLong(
+                                        EXTRA_ONE_TAP_DELAY_MS,
+                                        DEFAULT_ONE_TAP_DELAY_MS,
+                                    )
                                 ActionModel(
                                     icon =
                                         IconModel(
-                                            chip.icon?.loadDrawable(applicationContext)
-                                                ?: applicationContext.getDrawable(
-                                                    R.drawable.ic_paste_spark
-                                                )!!,
-                                            chip?.icon?.resPackage + "#" + chip?.icon?.resId,
+                                            small =
+                                                (chip.icon
+                                                        ?.loadDrawable(applicationContext)
+                                                        ?: applicationContext.getDrawable(
+                                                            R.drawable.ic_paste_spark
+                                                        )!!)
+                                                    .mutate(),
+                                            large =
+                                                (chip.icon
+                                                        ?.loadDrawable(applicationContext)
+                                                        ?: applicationContext.getDrawable(
+                                                            R.drawable.ic_paste_spark
+                                                        )!!)
+                                                    .mutate(),
+                                            iconId =
+                                                chip?.icon?.resPackage + "#" + chip?.icon?.resId,
                                         ),
                                     label = title,
                                     attribution = chip.subtitle?.toString(),
@@ -230,6 +246,7 @@ constructor(
                                     taskId = activityId?.taskId ?: INVALID_TASK_ID,
                                     actionType = actionType,
                                     oneTapEnabled = oneTapEnabled == true,
+                                    oneTapDelayMs = oneTapDelayMs ?: DEFAULT_ONE_TAP_DELAY_MS,
                                 )
                             }
                     if (DEBUG) {
@@ -293,12 +310,19 @@ constructor(
 
     override val isDeactivated: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
+    /**
+     * The [RunningTaskInfo] for the task that is currently in the foreground. Updated whenever a
+     * new task moves to the front. Used to derive the package name for logging.
+     */
+    private var frontRunningTask: RunningTaskInfo? = null
+
     @OptIn(FlowPreview::class)
     override val globallyFocusedTaskId: StateFlow<Int> =
         conflatedCallbackFlow {
                 val taskListener =
                     object : TaskStackChangeListener {
                         override fun onTaskMovedToFront(runningTaskInfo: RunningTaskInfo) {
+                            frontRunningTask = runningTaskInfo
                             trySend(runningTaskInfo.taskId)
                         }
                     }
@@ -347,6 +371,7 @@ constructor(
                     isSessionStarted = true
                     var maCount = 0
                     var mrCount = 0
+                    val packageName = frontRunningTask?.baseIntent?.component?.packageName ?: ""
                     actions.value.forEach { action ->
                         when (action.actionType) {
                             MA_ACTION_TYPE_NAME -> maCount++
@@ -354,9 +379,13 @@ constructor(
                             else -> {}
                         }
                     }
+                    ambientCueLogger.setPackageName(packageName)
                     ambientCueLogger.setAmbientCueDisplayStatus(maCount, mrCount)
                 }
                 if (!isAttached && isSessionStarted) {
+                    if (globallyFocusedTaskId.value != targetTaskId.value) {
+                        ambientCueLogger.setLoseFocusMillis()
+                    }
                     ambientCueLogger.flushAmbientCueEventReported()
                     ambientCueLogger.clear()
                     isSessionStarted = false
@@ -406,6 +435,8 @@ constructor(
         const val EXTRA_ATTRIBUTION_DIALOG_PENDING_INTENT = "attributionDialogPendingIntent"
         @VisibleForTesting const val EXTRA_ACTION_TYPE = "actionType"
         private const val EXTRA_ONE_TAP_ENABLED = "oneTapEnabled"
+        private const val EXTRA_ONE_TAP_DELAY_MS = "oneTapDelayMs"
+        private const val DEFAULT_ONE_TAP_DELAY_MS = 200L
 
         // Timeout to hide cuebar if it wasn't interacted with
         private const val TAG = "AmbientCueRepository"

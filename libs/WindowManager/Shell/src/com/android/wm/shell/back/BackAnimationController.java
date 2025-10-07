@@ -33,6 +33,7 @@ import static com.android.internal.jank.InteractionJankMonitor.CUJ_PREDICTIVE_BA
 import static com.android.window.flags.Flags.predictiveBackDelayWmTransition;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BACK_PREVIEW;
 
+import android.animation.ValueAnimator;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
@@ -81,7 +82,6 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.LatencyTracker;
 import com.android.internal.view.AppearanceRegion;
-import com.android.window.flags.Flags;
 import com.android.wm.shell.R;
 import com.android.wm.shell.common.ExternalInterfaceBinder;
 import com.android.wm.shell.common.RemoteCallable;
@@ -110,6 +110,9 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
      * Max duration to wait for an animation to finish before triggering the real back.
      */
     private static final long MAX_ANIMATION_DURATION = 2000;
+    private long mMaxAnimationDuration = MAX_ANIMATION_DURATION;
+    // Note: Must keep a reference when register to ValueAnimator.
+    private final ValueAnimator.DurationScaleChangeListener mAnimationScaleChangeListener;
     private final LatencyTracker mLatencyTracker;
     @ShellMainThread private final Handler mHandler;
 
@@ -156,13 +159,14 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
      * (and navigation) associated with {@link #mCurrentTracker} have not yet finished.
      */
     private BackTouchTracker mQueuedTracker = new BackTouchTracker();
+    private final TransitionIdleRunner mTransitionIdleRunner = new TransitionIdleRunner();
 
     private final BackTransitionObserver mBackTransitionObserver =
             new BackTransitionObserver();
 
     private final Runnable mAnimationTimeoutRunnable = () -> {
         ProtoLog.w(WM_SHELL_BACK_PREVIEW, "Animation didn't finish in %d ms. Resetting...",
-                MAX_ANIMATION_DURATION);
+                mMaxAnimationDuration);
         finishBackAnimation();
     };
 
@@ -282,6 +286,8 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         mTransitions.registerObserver(mBackTransitionObserver);
         mBackTransitionObserver.setBackTransitionHandler(mBackTransitionHandler);
         updateTouchableArea();
+        mAnimationScaleChangeListener = scale -> mShellExecutor.execute(
+                this::updateAnimationScale);
     }
 
     private void onInit() {
@@ -291,6 +297,14 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         mShellCommandHandler.addDumpCallback(this::dump, this);
         mShellController.addConfigurationChangeListener(this);
         registerBackGestureDelegate();
+        ValueAnimator.registerDurationScaleChangeListener(mAnimationScaleChangeListener);
+        updateAnimationScale();
+    }
+
+    private void updateAnimationScale() {
+        final float scale = Math.max(Math.min(ValueAnimator.getDurationScale(), 20), 1);
+        final double result = scale * MAX_ANIMATION_DURATION;
+        mMaxAnimationDuration = Math.round(result);
     }
 
     public BackAnimation getBackAnimationImpl() {
@@ -449,7 +463,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         final boolean shouldDispatchToAnimator = shouldDispatchToAnimator();
         if (!shouldDispatchToAnimator && mActiveCallback != null) {
             mCurrentTracker.updateStartLocation();
-            tryDispatchOnBackStarted(mActiveCallback, mCurrentTracker.createStartEvent(null));
+            tryDispatchOnBackStarted(mActiveCallback, mCurrentTracker.createStartEvent());
             if (mBackNavigationInfo != null && !isAppProgressGenerationAllowed()) {
                 tryPilferPointers();
             }
@@ -457,24 +471,35 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
             tryPilferPointers();
         }
 
-        if (predictiveBackDelayWmTransition()) {
-            mShellExecutor.execute(() -> {
-                if (shouldDispatchToAnimator()) {
-                    try {
-                        mActivityTaskManager.startPredictiveBackAnimation();
-                    } catch (RemoteException r) {
-                        Log.e(TAG, "Failed to start predictive animation", r);
-                        finishBackNavigation(mCurrentTracker.getTriggerBack());
-                        return;
-                    }
-                    final int backType = mBackNavigationInfo.getType();
-                    if (!mShellBackAnimationRegistry.startGesture(backType)) {
-                        mActiveCallback = null;
-                    }
-                    requestTopUi(true, backType);
-                }
-            });
+        startPredictiveBackAnimationIfNeeded();
+    }
+
+    private void startPredictiveBackAnimationIfNeeded() {
+        if (!predictiveBackDelayWmTransition() || !mThresholdCrossed) {
+            return;
         }
+        mShellExecutor.execute(() -> {
+            if (!shouldDispatchToAnimator()) {
+                return;
+            }
+            boolean started;
+            try {
+                started = mActivityTaskManager.startPredictiveBackAnimation();
+            } catch (RemoteException r) {
+                Log.e(TAG, "Failed to start predictive animation", r);
+                started = false;
+            }
+            if (!started) {
+                ProtoLog.d(WM_SHELL_BACK_PREVIEW, "Failed to start predictive back animation.");
+                finishBackNavigation(mCurrentTracker.getTriggerBack());
+                return;
+            }
+            final int backType = mBackNavigationInfo.getType();
+            if (!mShellBackAnimationRegistry.startGesture(backType)) {
+                mActiveCallback = null;
+            }
+            requestTopUi(true, backType);
+        });
     }
 
     private boolean isAppProgressGenerationAllowed() {
@@ -611,6 +636,27 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         }
     }
 
+    private class TransitionIdleRunner implements Runnable {
+        int mRequestCount;
+
+        @Override
+        public void run() {
+            if (mRequestCount == 0 || !mCurrentTracker.isActive()) {
+                return;
+            }
+            if (mRequestCount > 2) {
+                // Break from recursive call.
+                mRequestCount = 0;
+                return;
+            }
+            ProtoLog.d(WM_SHELL_BACK_PREVIEW, "Gesture hasn't finish after transition "
+                    + "idle, start back navigation again.");
+            mRequestCount = 0;
+            startBackNavigation(mCurrentTracker);
+            startPredictiveBackAnimationIfNeeded();
+        }
+    }
+
     private void onBackNavigationInfoReceived(@Nullable BackNavigationInfo backNavigationInfo,
             @NonNull BackTouchTracker touchTracker) {
         ProtoLog.d(WM_SHELL_BACK_PREVIEW, "Received backNavigationInfo:%s", backNavigationInfo);
@@ -622,6 +668,14 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
             return;
         }
         final int backType = backNavigationInfo.getType();
+        if (backType == BackNavigationInfo.TYPE_IN_TRANSITION) {
+            mBackNavigationInfo = null;
+            tryPilferPointers();
+            mTransitionIdleRunner.mRequestCount++;
+            mTransitions.runOnIdle(() -> mShellExecutor.executeDelayed(
+                    mTransitionIdleRunner, 0));
+            return;
+        }
         final boolean shouldDispatchToAnimator = shouldDispatchToAnimator();
         if (shouldDispatchToAnimator) {
             if (!predictiveBackDelayWmTransition()) {
@@ -635,7 +689,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
             mActiveCallback = mBackNavigationInfo.getOnBackInvokedCallback();
             // App is handling back animation. Cancel system animation latency tracking.
             cancelLatencyTracking();
-            tryDispatchOnBackStarted(mActiveCallback, touchTracker.createStartEvent(null));
+            tryDispatchOnBackStarted(mActiveCallback, touchTracker.createStartEvent());
             if (!isAppProgressGenerationAllowed()) {
                 tryPilferPointers();
             }
@@ -846,6 +900,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         mPointersPilfered = false;
         mBackGestureStarted = false;
         activeTouchTracker.setState(BackTouchTracker.TouchTrackerState.FINISHED);
+        mTransitionIdleRunner.mRequestCount = 0;
 
         if (mPostCommitAnimationInProgress) {
             ProtoLog.w(WM_SHELL_BACK_PREVIEW, "Animation is still running");
@@ -880,7 +935,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
             ProtoLog.w(WM_SHELL_BACK_PREVIEW, "Gesture released, but animation didn't ready.");
             // Supposed it is in post commit animation state, and start the timeout to watch
             // if the animation is ready.
-            mShellExecutor.executeDelayed(mAnimationTimeoutRunnable, MAX_ANIMATION_DURATION);
+            mShellExecutor.executeDelayed(mAnimationTimeoutRunnable, mMaxAnimationDuration);
             return;
         }
         startPostCommitAnimation();
@@ -898,7 +953,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         mShellExecutor.removeCallbacks(mAnimationTimeoutRunnable);
         ProtoLog.d(WM_SHELL_BACK_PREVIEW, "BackAnimationController: startPostCommitAnimation()");
         mPostCommitAnimationInProgress = true;
-        mShellExecutor.executeDelayed(mAnimationTimeoutRunnable, MAX_ANIMATION_DURATION);
+        mShellExecutor.executeDelayed(mAnimationTimeoutRunnable, mMaxAnimationDuration);
 
         // The next callback should be {@link #onBackAnimationFinished}.
         if (mCurrentTracker.getTriggerBack()) {
@@ -1079,8 +1134,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
                 () -> mShellExecutor.execute(this::onBackAnimationFinished));
 
         if (mApps.length >= 1) {
-            BackMotionEvent startEvent = mCurrentTracker.createStartEvent(
-                    Flags.removeDepartTargetFromMotion() ? null : mApps[0]);
+            BackMotionEvent startEvent = mCurrentTracker.createStartEvent();
             dispatchOnBackStarted(mActiveCallback, startEvent);
             if (startEvent.getSwipeEdge() == EDGE_NONE) {
                 // TODO(b/373544911): onBackStarted is dispatched here so that

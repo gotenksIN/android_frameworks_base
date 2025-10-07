@@ -16,12 +16,16 @@
 
 package com.android.systemui.shade.ui.viewmodel
 
+import com.android.systemui.desktop.domain.interactor.desktopInteractor
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
+import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.media.controls.domain.pipeline.interactor.mediaCarouselInteractor
+import com.android.systemui.media.remedia.ui.viewmodel.factory.mediaViewModelFactory
 import com.android.systemui.notifications.ui.viewmodel.NotificationsShadeOverlayContentViewModel
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.shade.domain.interactor.shadeInteractor
+import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.statusbar.disableflags.domain.interactor.disableFlagsInteractor
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModelFactory
 import com.android.systemui.window.domain.interactor.windowRootViewBlurInteractor
@@ -29,12 +33,16 @@ import com.android.systemui.window.domain.interactor.windowRootViewBlurInteracto
 val Kosmos.notificationsShadeOverlayContentViewModel:
     NotificationsShadeOverlayContentViewModel by Fixture {
     NotificationsShadeOverlayContentViewModel(
+        mainDispatcher = testDispatcher,
         shadeHeaderViewModelFactory = shadeHeaderViewModelFactory,
         notificationsPlaceholderViewModelFactory = notificationsPlaceholderViewModelFactory,
         sceneInteractor = sceneInteractor,
         shadeInteractor = shadeInteractor,
+        shadeModeInteractor = shadeModeInteractor,
         disableFlagsInteractor = disableFlagsInteractor,
         mediaCarouselInteractor = mediaCarouselInteractor,
         windowRootViewBlurInteractor = windowRootViewBlurInteractor,
+        desktopInteractor = desktopInteractor,
+        mediaViewModelFactory = mediaViewModelFactory,
     )
 }

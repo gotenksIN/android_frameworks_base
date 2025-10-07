@@ -23,6 +23,9 @@ import android.provider.Settings;
 public class SecureSettings {
 
     /**
+     * You must either add your setting here to be backed up, or add it to
+     * SettingsBackupTest#BACKUP_DENY_LIST_SECURE_SETTINGS.
+     *
      * NOTE: Settings are backed up and restored in the order they appear
      *       in this array. If you have one setting depending on another,
      *       make sure that they are ordered appropriately.
@@ -321,5 +324,9 @@ public class SecureSettings {
         Settings.Secure.SELECTED_SPELL_CHECKER_SUBTYPE,
         Settings.Secure.HDR_BRIGHTNESS_ENABLED,
         Settings.Secure.HDR_BRIGHTNESS_BOOST_LEVEL,
+        Settings.Secure.IDENTITY_CHECK_ENABLED_V1,
+        Settings.Secure.IDENTITY_CHECK_PROMO_CARD_SHOWN,
+        Settings.Secure.IDENTITY_CHECK_NOTIFICATION_VIEW_DETAILS_CLICKED,
+        Settings.Secure.NOTIFICATION_BUNDLES_ALWAYS_EXPAND,
     };
 }

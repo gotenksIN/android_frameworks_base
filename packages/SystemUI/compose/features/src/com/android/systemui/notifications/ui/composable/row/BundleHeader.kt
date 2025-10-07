@@ -21,8 +21,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,10 +43,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.collapse
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.dismiss
-import androidx.compose.ui.semantics.expand
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -87,20 +83,14 @@ object BundleHeader {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun BundleHeader(
-    viewModel: BundleHeaderViewModel,
-    modifier: Modifier = Modifier,
-    onHeaderClicked: () -> Unit = {},
-    onHeaderLongClicked: () -> Unit = {},
-    onA11yDismissAction: () -> Unit = {}, // only for dismissing via accessibility action
-) {
+fun BundleHeader(viewModel: BundleHeaderViewModel, modifier: Modifier = Modifier) {
     val state =
         rememberMutableSceneTransitionLayoutState(
             initialScene = BundleHeader.Scenes.Collapsed,
             transitions =
                 transitions {
                     from(BundleHeader.Scenes.Collapsed, to = BundleHeader.Scenes.Expanded) {
-                        spec = tween(350, easing = LinearEasing)
+                        spec = tween(350, easing = FastOutSlowInEasing)
                         val scale = 0.6f
                         timestampRange(endMillis = 250, easing = FastOutSlowInEasing) {
                             scaleDraw(BundleHeader.Elements.PreviewIcon1, scale, scale)
@@ -143,37 +133,12 @@ fun BundleHeader(
 
     Box(modifier) {
         Background(background = viewModel.backgroundDrawable, modifier = Modifier.matchParentSize())
-        fun toggle() {
-            viewModel.onHeaderClicked()
-            onHeaderClicked()
-        }
         SceneTransitionLayout(
             state = state,
-            modifier =
-                Modifier.combinedClickable(
-                        onClick = { toggle() },
-                        onLongClick = { onHeaderLongClicked() },
-                        interactionSource = null,
-                        indication = null,
-                    )
-                    .semantics {
-                        when (state.currentScene) {
-                            BundleHeader.Scenes.Collapsed ->
-                                expand {
-                                    toggle()
-                                    true
-                                }
-                            BundleHeader.Scenes.Expanded ->
-                                collapse {
-                                    toggle()
-                                    true
-                                }
-                        }
-                        dismiss {
-                            onA11yDismissAction()
-                            true
-                        }
-                    },
+            // The BundleHeader is clickable, but clicks are handled at the level of the
+            // ExpandableNotificationRow. We clear all semantics here so that accessibility focus
+            // remains on the same element as handles the clicks and actions.
+            modifier = Modifier.clearAndSetSemantics {},
         ) {
             scene(BundleHeader.Scenes.Collapsed) {
                 BundleHeaderContent(viewModel, collapsed = true)
@@ -207,12 +172,14 @@ private fun ContentScope.BundleHeaderContent(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.padding(vertical = 16.dp),
+        modifier = modifier.padding(vertical = 12.dp),
     ) {
         BundleIcon(
             viewModel.bundleIcon,
+            large = false, // BundleHeader is always small
             modifier =
-                Modifier.padding(horizontal = 16.dp)
+                Modifier.padding(start = 16.dp, end = 8.dp)
+                    .align(Alignment.CenterVertically)
                     // Has to be a shared element because we may have a semi-transparent background
                     .element(NotificationRowPrimitives.Elements.NotificationIconBackground),
         )
@@ -236,7 +203,7 @@ private fun ContentScope.BundleHeaderContent(
 
         ExpansionControl(
             collapsed = collapsed,
-            numberToShow = viewModel.numberOfChildren,
+            numberToShow = if (collapsed) viewModel.numberOfChildren else null,
             modifier =
                 Modifier.padding(start = 8.dp, end = 16.dp).semantics(mergeDescendants = false) {
                     contentDescription = viewModel.numberOfChildrenContentDescription
@@ -251,7 +218,7 @@ private fun ContentScope.BundlePreviewIcons(
     modifier: Modifier = Modifier,
 ) {
     check(previewDrawables.isNotEmpty())
-    val iconSize = 32.dp
+    val iconSize = 24.dp
 
     // The design stroke width is 2.5dp but there is a ~4% padding inside app icons; ~1.25dp here.
     val borderWidth = 1.25.dp

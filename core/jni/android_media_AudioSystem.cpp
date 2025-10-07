@@ -896,18 +896,6 @@ static jint android_media_AudioSystem_setMaxVolumeIndexForGroup(JNIEnv *env, job
             AudioSystem::setMaxVolumeIndexForGroup(static_cast<volume_group_t>(groupId), index));
 }
 
-static jint android_media_AudioSystem_getVolumeGroupIdForStreamType(JNIEnv *env, jobject thiz,
-                                                                jint stream) {
-    int group;
-    status_t status = AudioSystem::getVolumeGroupIdForStreamType(
-            static_cast<audio_stream_type_t>(stream), group);
-    if (status != NO_ERROR) {
-        ALOGE("%s AudioSystem::getVolumeGroupIdForStreamType error %d", __func__, status);
-        group = -1;
-    }
-    return group;
-}
-
 static jint
 android_media_AudioSystem_setMasterVolume(JNIEnv *env, jobject thiz, jfloat value)
 {
@@ -2196,10 +2184,6 @@ jobject nativeAudioConfigBaseToJavaAudioFormat(JNIEnv *env, const audio_config_b
 
 jint nativeAudioConfigToJavaAudioFormat(JNIEnv *env, const audio_config_t *nConfigBase,
                                         jobject *jAudioFormat, bool isInput) {
-    if (!audio_flags::audio_mix_test_api()) {
-        return AUDIO_JAVA_INVALID_OPERATION;
-    }
-
     if (nConfigBase == nullptr) {
         return AUDIO_JAVA_BAD_VALUE;
     }
@@ -2321,10 +2305,6 @@ static jint convertAudioMixingRuleToNative(JNIEnv *env, const jobject audioMixin
 
 static jint nativeAudioMixToJavaAudioMixingRule(JNIEnv *env, const AudioMix &nAudioMix,
                                                 jobject *jAudioMixingRule) {
-    if (!audio_flags::audio_mix_test_api()) {
-        return AUDIO_JAVA_INVALID_OPERATION;
-    }
-
     jobject jAudioMixMatchCriterionList = env->NewObject(gArrayListClass, gArrayListMethods.cstor);
     for (const auto &criteria : nAudioMix.mCriteria) {
         jobject jAudioAttributes = NULL;
@@ -2383,9 +2363,6 @@ static jint nativeAudioMixToJavaAudioMixingRule(JNIEnv *env, const AudioMix &nAu
 }
 
 static jint convertAudioMixFromNative(JNIEnv *env, jobject *jAudioMix, const AudioMix &nAudioMix) {
-    if (!audio_flags::audio_mix_test_api()) {
-        return AUDIO_JAVA_INVALID_OPERATION;
-    }
     jobject jAudioMixingRule = NULL;
     int status = nativeAudioMixToJavaAudioMixingRule(env, nAudioMix, &jAudioMixingRule);
     if (status != AUDIO_JAVA_SUCCESS) {
@@ -2490,10 +2467,6 @@ android_media_AudioSystem_registerPolicyMixes(JNIEnv *env, jobject clazz,
 
 static jint android_media_AudioSystem_getRegisteredPolicyMixes(JNIEnv *env, jobject clazz,
                                                                jobject jMixes) {
-    if (!audio_flags::audio_mix_test_api()) {
-        return AUDIO_JAVA_INVALID_OPERATION;
-    }
-
     status_t status;
     std::vector<AudioMix> mixes;
     ALOGV("AudioSystem::getRegisteredPolicyMixes");
@@ -3578,8 +3551,6 @@ static const JNINativeMethod gMethods[] = {
                                android_media_AudioSystem_getMaxVolumeIndexForGroup),
         MAKE_JNI_NATIVE_METHOD("setMaxVolumeIndexForGroup", "(II)I",
                                android_media_AudioSystem_setMaxVolumeIndexForGroup),
-        MAKE_JNI_NATIVE_METHOD("getVolumeGroupIdForStreamType", "(I)I",
-                               android_media_AudioSystem_getVolumeGroupIdForStreamType),
         MAKE_AUDIO_SYSTEM_METHOD(setMasterVolume),
         MAKE_AUDIO_SYSTEM_METHOD(getMasterVolume),
         MAKE_AUDIO_SYSTEM_METHOD(setMasterMute),
@@ -3880,12 +3851,10 @@ int register_android_media_AudioSystem(JNIEnv *env)
 
     jclass audioMixClass = FindClassOrDie(env, "android/media/audiopolicy/AudioMix");
     gAudioMixClass = MakeGlobalRefOrDie(env, audioMixClass);
-    if (audio_flags::audio_mix_test_api()) {
-        gAudioMixCstor =
-                GetMethodIDOrDie(env, audioMixClass, "<init>",
-                                 "(Landroid/media/audiopolicy/AudioMixingRule;Landroid/"
-                                 "media/AudioFormat;IIILjava/lang/String;Landroid/os/IBinder;I)V");
-    }
+    gAudioMixCstor =
+            GetMethodIDOrDie(env, audioMixClass, "<init>",
+                             "(Landroid/media/audiopolicy/AudioMixingRule;Landroid/"
+                             "media/AudioFormat;IIILjava/lang/String;Landroid/os/IBinder;I)V");
     gAudioMixFields.mRule = GetFieldIDOrDie(env, audioMixClass, "mRule",
                                                 "Landroid/media/audiopolicy/AudioMixingRule;");
     gAudioMixFields.mFormat = GetFieldIDOrDie(env, audioMixClass, "mFormat",
@@ -3910,10 +3879,8 @@ int register_android_media_AudioSystem(JNIEnv *env)
 
     jclass audioMixingRuleClass = FindClassOrDie(env, "android/media/audiopolicy/AudioMixingRule");
     gAudioMixingRuleClass = MakeGlobalRefOrDie(env, audioMixingRuleClass);
-    if (audio_flags::audio_mix_test_api()) {
-        gAudioMixingRuleCstor = GetMethodIDOrDie(env, audioMixingRuleClass, "<init>",
+    gAudioMixingRuleCstor = GetMethodIDOrDie(env, audioMixingRuleClass, "<init>",
                                                  "(ILjava/util/Collection;ZZ)V");
-    }
     gAudioMixingRuleFields.mCriteria = GetFieldIDOrDie(env, audioMixingRuleClass, "mCriteria",
                                                        "Ljava/util/ArrayList;");
     gAudioMixingRuleFields.mAllowPrivilegedPlaybackCapture =
@@ -3922,24 +3889,20 @@ int register_android_media_AudioSystem(JNIEnv *env)
     gAudioMixingRuleFields.mVoiceCommunicationCaptureAllowed =
             GetFieldIDOrDie(env, audioMixingRuleClass, "mVoiceCommunicationCaptureAllowed", "Z");
 
-    if (audio_flags::audio_mix_test_api()) {
-        jclass audioAttributesClass = FindClassOrDie(env, "android/media/AudioAttributes");
-        gAudioAttributesClass = MakeGlobalRefOrDie(env, audioAttributesClass);
-        gAudioAttributesCstor = GetMethodIDOrDie(env, gAudioAttributesClass, "<init>", "()V");
-        gAudioAttributesFields.mSource = GetFieldIDOrDie(env, gAudioAttributesClass, "mUsage", "I");
-        gAudioAttributesFields.mUsage = GetFieldIDOrDie(env, gAudioAttributesClass, "mSource", "I");
-    }
+    jclass audioAttributesClass = FindClassOrDie(env, "android/media/AudioAttributes");
+    gAudioAttributesClass = MakeGlobalRefOrDie(env, audioAttributesClass);
+    gAudioAttributesCstor = GetMethodIDOrDie(env, gAudioAttributesClass, "<init>", "()V");
+    gAudioAttributesFields.mSource = GetFieldIDOrDie(env, gAudioAttributesClass, "mUsage", "I");
+    gAudioAttributesFields.mUsage = GetFieldIDOrDie(env, gAudioAttributesClass, "mSource", "I");
 
     jclass audioMixMatchCriterionClass =
                 FindClassOrDie(env, "android/media/audiopolicy/AudioMixingRule$AudioMixMatchCriterion");
     gAudioMixMatchCriterionClass = MakeGlobalRefOrDie(env,audioMixMatchCriterionClass);
-    if (audio_flags::audio_mix_test_api()) {
-        gAudioMixMatchCriterionAttrCstor =
-                GetMethodIDOrDie(env, gAudioMixMatchCriterionClass, "<init>",
-                                 "(Landroid/media/AudioAttributes;I)V");
-        gAudioMixMatchCriterionIntPropCstor = GetMethodIDOrDie(env, gAudioMixMatchCriterionClass,
-                                                               "<init>", "(Ljava/lang/Integer;I)V");
-    }
+    gAudioMixMatchCriterionAttrCstor =
+            GetMethodIDOrDie(env, gAudioMixMatchCriterionClass, "<init>",
+                             "(Landroid/media/AudioAttributes;I)V");
+    gAudioMixMatchCriterionIntPropCstor = GetMethodIDOrDie(env, gAudioMixMatchCriterionClass,
+                                                           "<init>", "(Ljava/lang/Integer;I)V");
     gAudioMixMatchCriterionFields.mAttr = GetFieldIDOrDie(env, audioMixMatchCriterionClass, "mAttr",
                                                        "Landroid/media/AudioAttributes;");
     gAudioMixMatchCriterionFields.mIntProp = GetFieldIDOrDie(env, audioMixMatchCriterionClass, "mIntProp",

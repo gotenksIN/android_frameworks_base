@@ -21,8 +21,10 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.view.Display.DEFAULT_DISPLAY;
+import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_DISALLOW_OVERRIDE_BOUNDS_FOR_CHILDREN;
 
 import static com.android.wm.shell.Flags.FLAG_ENABLE_ENTER_SPLIT_REMOVE_BUBBLE;
+import static com.android.wm.shell.Flags.FLAG_SPLIT_DISABLE_CHILD_TASK_BOUNDS;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_2_50_50;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_INDEX_UNDEFINED;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT;
@@ -49,6 +51,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -74,6 +77,7 @@ import android.window.DisplayAreaInfo;
 import android.window.RemoteTransition;
 import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
+import android.window.WindowContainerTransaction.HierarchyOp;
 
 import androidx.annotation.Nullable;
 import androidx.test.annotation.UiThreadTest;
@@ -99,8 +103,8 @@ import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.common.split.SplitDecorManager;
 import com.android.wm.shell.common.split.SplitLayout;
 import com.android.wm.shell.common.split.SplitState;
-import com.android.wm.shell.desktopmode.DesktopRepository;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
+import com.android.wm.shell.desktopmode.data.DesktopRepository;
 import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.desktopmode.FakeDesktopState;
 import com.android.wm.shell.splitscreen.SplitScreen.SplitScreenListener;
@@ -121,6 +125,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -549,7 +555,7 @@ public class StageCoordinatorTests extends ShellTestCase {
         int windowingMode = mWctCaptor.getValue().getChanges().get(mBinder).getWindowingMode();
         assertEquals(windowingMode, WINDOWING_MODE_UNDEFINED);
         assertThat(mWctCaptor.getValue().getHierarchyOps().stream().filter(
-                        WindowContainerTransaction.HierarchyOp::isReparent).findFirst().get()
+                        HierarchyOp::isReparent).findFirst().get()
                 .getNewParent()).isNull();
     }
 
@@ -640,6 +646,133 @@ public class StageCoordinatorTests extends ShellTestCase {
         ActivityOptions options = ActivityOptions.fromBundle(bundle);
 
         assertThat(options.getLaunchBounds()).isNull();
+    }
+
+    @Test
+    @EnableFlags(FLAG_SPLIT_DISABLE_CHILD_TASK_BOUNDS)
+    public void onRootTaskAppeared_disableChildTaskBounds() {
+        // root tasks for stages are created in setUp, mark them set
+        mMainStage.mHasRootTask = true;
+        mSideStage.mHasRootTask = true;
+        ActivityManager.RunningTaskInfo rootTaskInfo =
+                mSplitMultiDisplayHelper.getDisplayRootTaskInfo(DEFAULT_DISPLAY);
+        mStageCoordinator.onRootTaskAppeared(rootTaskInfo);
+
+        ArgumentCaptor<WindowContainerTransaction> wctCaptor =
+                ArgumentCaptor.forClass(WindowContainerTransaction.class);
+        verify(mSyncQueue).queue(wctCaptor.capture());
+
+        WindowContainerTransaction capturedWct = wctCaptor.getValue();
+        List<HierarchyOp> disableChildBoundsOps = capturedWct.getHierarchyOps().stream()
+                .filter(op -> op.getType()
+                        == HIERARCHY_OP_TYPE_DISALLOW_OVERRIDE_BOUNDS_FOR_CHILDREN)
+                .toList();
+        assertThat(disableChildBoundsOps).hasSize(1);
+        HierarchyOp op = disableChildBoundsOps.getFirst();
+        assertThat(op.getContainer()).isEqualTo(rootTaskInfo.token.asBinder());
+        assertThat(op.getDisallowOverrideBoundsForChildren()).isTrue();
+    }
+
+    @Test
+    @EnableFlags(com.android.window.flags.Flags.FLAG_ENABLE_MULTI_DISPLAY_SPLIT)
+    public void moveSplitScreenRoot_whenFlagEnabled_doesNothing() {
+        SplitMultiDisplayHelper mockHelper = mock(SplitMultiDisplayHelper.class);
+        mStageCoordinator.mSplitMultiDisplayHelper = mockHelper;
+
+        mStageCoordinator.prepareMovingSplitScreenRoot(mWct, DEFAULT_DISPLAY + 1);
+
+        verify(mockHelper, never()).getCachedOrSystemDisplayIds();
+        verify(mRootTDAOrganizer, never()).getDisplayAreaInfo(anyInt());
+        verify(mWct, never()).reparent(any(), any(), anyBoolean());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    @DisableFlags(com.android.window.flags.Flags.FLAG_ENABLE_MULTI_DISPLAY_SPLIT)
+    public void moveSplitScreenRoot_whenRootNotFound_throwsException() {
+        SplitMultiDisplayHelper mockHelper = mock(SplitMultiDisplayHelper.class);
+        mStageCoordinator.mSplitMultiDisplayHelper = mockHelper;
+        when(mockHelper.getCachedOrSystemDisplayIds()).thenReturn(
+                new ArrayList<>(List.of(DEFAULT_DISPLAY)));
+        when(mockHelper.getDisplayRootTaskInfo(anyInt())).thenReturn(null);
+
+        mStageCoordinator.prepareMovingSplitScreenRoot(mWct, DEFAULT_DISPLAY + 1);
+    }
+
+    @Test
+    @DisableFlags(com.android.window.flags.Flags.FLAG_ENABLE_MULTI_DISPLAY_SPLIT)
+    public void moveSplitScreenRoot_whenTargetIsSameDisplay_doesNothing() {
+        SplitMultiDisplayHelper mockHelper = mock(SplitMultiDisplayHelper.class);
+        mStageCoordinator.mSplitMultiDisplayHelper = mockHelper;
+        final int targetDisplayId = DEFAULT_DISPLAY;
+        ActivityManager.RunningTaskInfo currentRootTaskInfo = new TestRunningTaskInfoBuilder()
+                .setDisplayId(targetDisplayId)
+                .build();
+        when(mockHelper.getCachedOrSystemDisplayIds()).thenReturn(
+                new ArrayList<>(List.of(targetDisplayId)));
+        when(mockHelper.getDisplayRootTaskInfo(targetDisplayId))
+                .thenReturn(currentRootTaskInfo);
+
+        mStageCoordinator.prepareMovingSplitScreenRoot(mWct, targetDisplayId);
+
+        verify(mWct, never()).reparent(any(), any(), anyBoolean());
+    }
+
+    @Test
+    @DisableFlags(com.android.window.flags.Flags.FLAG_ENABLE_MULTI_DISPLAY_SPLIT)
+    public void moveSplitScreenRoot_whenTargetIsDifferentDisplay_reparentsRoot() {
+        SplitMultiDisplayHelper mockHelper = mock(SplitMultiDisplayHelper.class);
+        mStageCoordinator.mSplitMultiDisplayHelper = mockHelper;
+        final int currentDisplayId = DEFAULT_DISPLAY;
+        final int targetDisplayId = DEFAULT_DISPLAY + 1;
+
+        WindowContainerToken currentRootToken = mock(WindowContainerToken.class);
+        when(mRootDisplayAreaOrganizer.getDisplayTokenForDisplay(anyInt()))
+                .thenReturn(mock(WindowContainerToken.class));
+        ActivityManager.RunningTaskInfo currentRootTaskInfo = new TestRunningTaskInfoBuilder()
+                .setDisplayId(currentDisplayId)
+                .setToken(currentRootToken)
+                .build();
+        when(mockHelper.getCachedOrSystemDisplayIds())
+                .thenReturn(new ArrayList<>(List.of(currentDisplayId, targetDisplayId)));
+        when(mockHelper.getDisplayRootTaskInfo(currentDisplayId))
+                .thenReturn(currentRootTaskInfo);
+
+        WindowContainerToken targetDisplayAreaToken = new MockToken().token();
+        DisplayAreaInfo targetDisplayAreaInfo = new DisplayAreaInfo(targetDisplayAreaToken,
+                targetDisplayId, 0);
+        when(mRootTDAOrganizer.getDisplayAreaInfo(targetDisplayId))
+                .thenReturn(targetDisplayAreaInfo);
+
+        mStageCoordinator.prepareMovingSplitScreenRoot(mWct, targetDisplayId);
+
+        verify(mWct).reparent(eq(currentRootToken), eq(targetDisplayAreaToken), eq(true));
+    }
+
+    @Test
+    @DisableFlags(com.android.window.flags.Flags.FLAG_ENABLE_MULTI_DISPLAY_SPLIT)
+    public void moveSplitScreenRoot_whenTargetDisplayAreaNotFound_doesNothing() {
+        SplitMultiDisplayHelper mockHelper = mock(SplitMultiDisplayHelper.class);
+        mStageCoordinator.mSplitMultiDisplayHelper = mockHelper;
+
+        final int currentDisplayId = DEFAULT_DISPLAY;
+        final int targetDisplayId = DEFAULT_DISPLAY + 1;
+
+        // Setup current root, but no target display area
+        WindowContainerToken currentRootToken = mock(WindowContainerToken.class);
+        ActivityManager.RunningTaskInfo currentRootTaskInfo = new TestRunningTaskInfoBuilder()
+                .setDisplayId(currentDisplayId)
+                .setToken(currentRootToken)
+                .build();
+        when(mockHelper.getCachedOrSystemDisplayIds())
+                .thenReturn(new ArrayList<>(List.of(currentDisplayId, targetDisplayId)));
+        when(mockHelper.getDisplayRootTaskInfo(currentDisplayId))
+                .thenReturn(currentRootTaskInfo);
+
+        when(mRootTDAOrganizer.getDisplayAreaInfo(targetDisplayId)).thenReturn(null);
+
+        mStageCoordinator.prepareMovingSplitScreenRoot(mWct, targetDisplayId);
+
+        verify(mWct, never()).reparent(any(), any(), anyBoolean());
     }
 
     private Transitions createTestTransitions() {

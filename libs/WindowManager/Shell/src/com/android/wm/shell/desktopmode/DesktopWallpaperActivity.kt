@@ -16,13 +16,20 @@
 
 package com.android.wm.shell.desktopmode
 
+import android.app.ActivityManager.getCurrentUser
 import android.app.TaskInfo
+import android.app.WallpaperColors
+import android.app.WallpaperManager
 import android.content.ComponentName
+import android.content.res.Configuration
+import android.hardware.display.DisplayManager
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import android.window.DesktopExperienceFlags
 import androidx.activity.addCallback
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
 
 /**
@@ -35,6 +42,42 @@ import androidx.fragment.app.FragmentActivity
  * onto the shell main thread. Activities are always started on the main thread.
  */
 class DesktopWallpaperActivity : FragmentActivity() {
+
+    private var wallpaperManager: WallpaperManager? = null
+    private var displayManager: DisplayManager? = null
+    // TODO(b/432710419): Refresh current user on user change if needed
+    private var currentUser: Int = getCurrentUser()
+    private var initialDisplayId: Int? = null
+
+    private val wallpaperColorsListener =
+        object : WallpaperManager.OnColorsChangedListener {
+            override fun onColorsChanged(colors: WallpaperColors?, which: Int) {}
+
+            override fun onColorsChanged(colors: WallpaperColors?, which: Int, userId: Int) {
+                if (userId == currentUser) {
+                    updateStatusBarIconColors(colors)
+                }
+            }
+        }
+
+    private val displayRemovedListener =
+        object : DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) {
+                // No-op
+            }
+
+            override fun onDisplayRemoved(displayId: Int) {
+                // DesktopWallpaperActivity should never move to another display; if this
+                // activity's display is removed, finish the activity.
+                if (displayId == initialDisplayId) {
+                    finish()
+                }
+            }
+
+            override fun onDisplayChanged(displayId: Int) {
+                // No-op
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +98,30 @@ class DesktopWallpaperActivity : FragmentActivity() {
         ) {
             onBackPressedDispatcher.addCallback(this) { moveTaskToBack(true) }
         }
+
+        // Handle wallpaper color changes
+        wallpaperManager = getSystemService(WallpaperManager::class.java)
+        wallpaperManager?.addOnColorsChangedListener(wallpaperColorsListener, mainThreadHandler)
+
+        // Handle self-removal on display disconnect
+        displayManager = getSystemService(DisplayManager::class.java)
+        displayManager?.registerDisplayListener(displayRemovedListener, mainThreadHandler)
+
+        // Set the initial color of status bar icons on activity creation.
+        updateStatusBarIconColors(
+            wallpaperManager?.getWallpaperColors(WallpaperManager.FLAG_SYSTEM, currentUser)
+        )
+        initialDisplayId = displayId
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        wallpaperManager?.removeOnColorsChangedListener(wallpaperColorsListener)
+        displayManager?.unregisterDisplayListener(displayRemovedListener)
+    }
+
+    override fun onMovedToDisplay(displayId: Int, config: Configuration?) {
+        finish()
     }
 
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
@@ -72,6 +139,17 @@ class DesktopWallpaperActivity : FragmentActivity() {
             window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         }
     }
+
+    /** Set the status bar icon colours depending on wallpaper hint. */
+    private fun updateStatusBarIconColors(wallpaperColors: WallpaperColors?) {
+        wallpaperColors?.colorHints?.let {
+            getWindowInsetsController().isAppearanceLightStatusBars =
+                (it and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0
+        }
+    }
+
+    private fun getWindowInsetsController(): WindowInsetsControllerCompat =
+        WindowCompat.getInsetsController(window, window.decorView)
 
     companion object {
         private const val TAG = "DesktopWallpaperActivity"

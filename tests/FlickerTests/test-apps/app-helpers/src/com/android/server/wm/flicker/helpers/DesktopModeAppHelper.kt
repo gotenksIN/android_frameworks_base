@@ -17,6 +17,7 @@
 package com.android.server.wm.flicker.helpers
 
 import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
+import android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN
 import android.content.Context
 import android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK
 import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
@@ -32,6 +33,7 @@ import android.tools.device.apphelpers.StandardAppHelper
 import android.tools.helpers.SYSTEMUI_PACKAGE
 import android.tools.traces.parsers.WindowManagerStateHelper
 import android.tools.traces.wm.WindowingMode
+import android.view.Display.DEFAULT_DISPLAY
 import android.view.KeyEvent.KEYCODE_D
 import android.view.KeyEvent.KEYCODE_DPAD_DOWN
 import android.view.KeyEvent.KEYCODE_DPAD_UP
@@ -122,12 +124,7 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         device: UiDevice,
         motionEventHelper: MotionEventHelper
     ) {
-        val windowRect = wmHelper.getWindowRegion(innerHelper).bounds
-        val startX = windowRect.centerX()
-
-        // Start dragging a little under the top to prevent dragging the notification shade.
-        val startY = 10
-
+        val (startX, startY) = getAppHandleDragPosition(wmHelper)
         val displayRect = getDisplayRect(wmHelper)
 
         // The position we want to drag to
@@ -141,6 +138,63 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         } else {
             device.drag(startX, startY, startX, endY, 100)
         }
+    }
+
+    /**
+     * Drags a window to one side of the screen to enter split-screen mode.
+     *
+     * This function simulates a user dragging an application window from near the top-center
+     * to either the left or right edge of the display, triggering a split-screen view.
+     *
+     * @param wmHelper Helper class to get information about the window manager state, such as the
+     * window's current position and size.
+     * @param device The UiDevice instance used to interact with the device, specifically to perform
+     * the drag gesture.
+     * @param direction The target side of the screen to drag the window to, either
+     * {@link SplitDirection#LEFT} or {@link SplitDirection#RIGHT}.
+     * @param motionEventHelper A helper for dispatching motion events. It is used for touch-based
+     * input.
+     */
+    fun dragFromFullscreenToSplit(
+        wmHelper: WindowManagerStateHelper,
+        device: UiDevice,
+        direction: SplitDirection,
+        motionEventHelper: MotionEventHelper = MotionEventHelper(getInstrumentation(), TOUCH),
+    ) {
+        if (!isInFullscreenMode(wmHelper)) {
+            error("Should be in Fullscreen mode")
+        }
+
+        val (startX, startY) = getAppHandleDragPosition(wmHelper)
+        val displayRect = getDisplayRect(wmHelper)
+
+        // Determine the end coordinates for the drag.
+        val endY = displayRect.centerY()
+        val endX = when (direction) {
+            SplitDirection.LEFT -> displayRect.left + 20 // Target the left edge with an offset.
+            SplitDirection.RIGHT -> displayRect.right - 20 // Target the right edge with an offset.
+        }
+
+        val steps = 100 // Number of move steps in the drag gesture.
+
+        // Perform the drag action.
+        if (motionEventHelper.inputMethod == TOUCH
+            && DesktopModeFlags.ENABLE_HOLD_TO_DRAG_APP_HANDLE.isTrue) {
+            // We need more sleep because we are waiting for the split screen indicator.
+            motionEventHelper.holdToDrag(startX, startY, endX, endY, steps, sleepTimeBeforeDrop = 1000)
+        } else {
+            // Use standard UiDevice.drag for other input methods (e.g., mouse).
+            device.drag(startX, startY, endX, endY, steps)
+        }
+    }
+
+    private fun getAppHandleDragPosition(wmHelper: WindowManagerStateHelper): Pair<Int, Int> {
+        val windowRect = wmHelper.getWindowRegion(innerHelper).bounds
+        val startX = windowRect.centerX()
+
+        // Start dragging a little under the top to prevent dragging the notification shade.
+        val startY = 10
+        return Pair(startX, startY)
     }
 
     private fun getMaximizeButtonForTheApp(caption: UiObject2?): UiObject2 {
@@ -481,6 +535,23 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
             .waitForAndVerify()
     }
 
+    fun dragRight(wmHelper: WindowManagerStateHelper, device: UiDevice, distance: Int) {
+        val windowRect = wmHelper.getWindowRegion(innerHelper).bounds
+        // Set start x-coordinate as center of app header.
+        val startX = windowRect.centerX()
+        val startY = windowRect.top
+
+        val endX = startX + distance
+        val endY = startY + distance
+
+        // drag the window to to the right by [distance].
+        device.drag(startX, startY, endX, endY, /* steps= */ 100)
+        wmHelper
+            .StateSyncBuilder()
+            .withAppTransitionIdle()
+            .waitForAndVerify()
+    }
+
     private fun getStartCoordinatesForCornerResize(
         windowRect: Rect,
         corner: Corners
@@ -565,10 +636,18 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
 
     fun enterDesktopModeFromAppHandleMenu(
         wmHelper: WindowManagerStateHelper,
-        device: UiDevice
+        device: UiDevice,
+        isImmersiveApp: Boolean = false,
     ) {
         if (isAnyDesktopWindowVisible(wmHelper)) error("Already in Desktop Mode")
-
+        if (isImmersiveApp) {
+            val windowRect = wmHelper.getWindowRegion(innerHelper).bounds
+            val startX = windowRect.centerX()
+            val startY = windowRect.top
+            val endY = windowRect.centerY() / 2
+            // Swipe down from the top edge of the screen to show the app handle
+            device.swipe(startX, startY, startX, endY, 10)
+        }
         clickAppHandle(wmHelper, device)
         wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
 
@@ -579,6 +658,35 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
 
         desktopModeButton.click()
         waitForTransitionToFreeform(wmHelper)
+    }
+
+    fun enterImmersiveMode(
+        wmHelper: WindowManagerStateHelper,
+        device: UiDevice
+    ) {
+        val caption = getCaptionForTheApp(wmHelper, device)
+        val maximizeButton = getMaximizeButtonForTheApp(caption)
+        maximizeButton.longClick()
+        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+
+        val buttonResId = IMMERSIVE_BUTTON_IN_MENU
+        val maximizeMenu = getDesktopAppViewByRes(MAXIMIZE_MENU)
+
+        val immersiveButton =
+            maximizeMenu
+                ?.wait(Until.findObject(By.res(SYSTEMUI_PACKAGE, buttonResId)), TIMEOUT.toMillis())
+                ?: error("Unable to find object with resource id $buttonResId")
+        immersiveButton.click()
+        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
+    }
+
+    /** Exits immersive mode to maximized in desktop window via META+= keyboard shortcut. */
+    fun exitImmersiveToDesktopWithKeyboard(
+        wmHelper: WindowManagerStateHelper
+    ) {
+        val keyEventHelper = KeyEventHelper(getInstrumentation())
+        keyEventHelper.press(KEYCODE_EQUALS, META_META_ON)
+        wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
     }
 
     fun enterSplitScreenFromAppHandleMenu(
@@ -596,7 +704,7 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
     }
 
-    fun exitDesktopModeToFullScreenWithAppHeader(wmHelper:WindowManagerStateHelper) {
+    fun exitDesktopModeToFullScreenWithAppHeader(wmHelper: WindowManagerStateHelper) {
         val openMenuButton = getDesktopAppViewByRes(OPEN_MENU_BUTTON)
         openMenuButton?.click()
         wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
@@ -611,7 +719,7 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
     }
 
-    fun exitDesktopModeToSplitScreenWithAppHeader(wmHelper:WindowManagerStateHelper) {
+    fun exitDesktopModeToSplitScreenWithAppHeader(wmHelper: WindowManagerStateHelper) {
         val openMenuButton = getDesktopAppViewByRes(OPEN_MENU_BUTTON)
         openMenuButton?.click()
         wmHelper.StateSyncBuilder().withAppTransitionIdle().waitForAndVerify()
@@ -676,6 +784,22 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         }
     }
 
+    fun clickCaption(
+        wmHelper: WindowManagerStateHelper,
+        device: UiDevice,
+        displayId: Int = DEFAULT_DISPLAY
+    ) {
+        val caption = checkNotNull(getCaptionForTheApp(wmHelper, device)) {
+           "Unable to find caption"
+        }
+        caption.click()
+        wmHelper
+            .StateSyncBuilder()
+            .withAppTransitionIdle(displayId)
+            .withTopVisibleApp(innerHelper)
+            .waitForAndVerify()
+    }
+
     private fun getDesktopAppViewByRes(viewResId: String): UiObject2 =
         DeviceHelpers.waitForObj(By.res(SYSTEMUI_PACKAGE, viewResId), TIMEOUT)
 
@@ -713,6 +837,9 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
     // Requirement of DesktopWindowingMode is having a minimum of 1 app in WINDOWING_MODE_FREEFORM.
     private fun isInDesktopWindowingMode(wmHelper: WindowManagerStateHelper) =
         wmHelper.getWindow(innerHelper)?.windowingMode == WINDOWING_MODE_FREEFORM
+
+    private fun isInFullscreenMode(wmHelper: WindowManagerStateHelper) =
+        wmHelper.getWindow(innerHelper)?.windowingMode == WINDOWING_MODE_FULLSCREEN
 
     private fun isAnyDesktopWindowVisible(wmHelper: WindowManagerStateHelper) =
         wmHelper.currentState.wmState.hasFreeformWindow()
@@ -755,6 +882,11 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         CENTER
     }
 
+    enum class SplitDirection {
+        LEFT,
+        RIGHT
+    }
+
     private companion object {
         val TIMEOUT: Duration = Duration.ofSeconds(3)
         const val SNAP_RESIZE_DRAG_INSET: Int = 5 // inset to avoid dragging to display edge
@@ -774,6 +906,7 @@ open class DesktopModeAppHelper(private val innerHelper: StandardAppHelper) :
         const val RESTART_DIALOG_RESTART_BUTTON: String = "letterbox_restart_dialog_restart_button"
         const val FULL_SCREEN_BUTTON: String = "fullscreen_button"
         const val SPLIT_SCREEN_BUTTON: String = "split_screen_button"
+        const val IMMERSIVE_BUTTON_IN_MENU: String = "maximize_menu_immersive_toggle_button"
         val caption: BySelector
             get() = By.res(SYSTEMUI_PACKAGE, CAPTION)
 

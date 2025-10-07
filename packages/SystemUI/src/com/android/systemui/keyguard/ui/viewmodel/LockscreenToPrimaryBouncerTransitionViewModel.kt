@@ -16,7 +16,6 @@
 
 package com.android.systemui.keyguard.ui.viewmodel
 
-import android.util.MathUtils
 import com.android.systemui.Flags
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.keyguard.domain.interactor.FromLockscreenTransitionInteractor
@@ -69,20 +68,23 @@ constructor(private val blurConfig: BlurConfig, animationFlow: KeyguardTransitio
             onFinish = { 0f },
         )
 
-    @Deprecated("use lockscreenAlpha(ViewStateAccessor) function instead")
-    val lockscreenAlpha: Flow<Float> = shortcutsAlpha
-
-    fun lockscreenAlpha(viewState: ViewStateAccessor): Flow<Float> {
-        var startAlpha = 1f
-        return transitionAnimation.sharedFlow(
-            duration = FromLockscreenTransitionInteractor.TO_PRIMARY_BOUNCER_DURATION,
-            onStart = { startAlpha = viewState.alpha() },
-            onStep = { MathUtils.lerp(startAlpha, 0f, it) },
-        )
-    }
+    val lockscreenAlpha: Flow<Float> =
+        if (SceneContainerFlag.isEnabled) {
+            // Lockscreen -> Bouncer is a scene transition in Flexiglass.
+            // SharedNotificationContainerViewModel#alphaForShadeAndQsExpansion might be relevant
+            // instead.
+            emptyFlow()
+        } else {
+            shortcutsAlpha
+        }
 
     val notificationAlpha: Flow<Float> =
-        if (Flags.bouncerUiRevamp()) {
+        if (SceneContainerFlag.isEnabled) {
+            // Lockscreen -> Bouncer is a scene transition in Flexiglass.
+            // SharedNotificationContainerViewModel#alphaForShadeAndQsExpansion might be relevant
+            // instead.
+            emptyFlow()
+        } else if (Flags.bouncerUiRevamp()) {
             transitionAnimation.sharedFlowWithShade(
                 duration = 200.milliseconds,
                 onStep = { step, isShadeExpanded ->

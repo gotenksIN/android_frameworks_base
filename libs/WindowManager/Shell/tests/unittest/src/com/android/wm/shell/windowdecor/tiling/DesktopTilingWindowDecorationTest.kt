@@ -32,6 +32,7 @@ import android.window.TransitionInfo
 import android.window.TransitionInfo.Change
 import android.window.WindowContainerTransaction
 import androidx.test.filters.SmallTest
+import com.android.internal.jank.InteractionJankMonitor
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
@@ -41,33 +42,34 @@ import com.android.wm.shell.common.ShellExecutor
 import com.android.wm.shell.common.SyncTransactionQueue
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ResizeTrigger
-import com.android.wm.shell.desktopmode.DesktopRepository
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFreeformTask
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.createPinnedTask
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.ReturnToDragStartAnimator
 import com.android.wm.shell.desktopmode.ToggleResizeDesktopTaskTransitionHandler
+import com.android.wm.shell.desktopmode.data.DesktopRepository
 import com.android.wm.shell.shared.desktopmode.FakeDesktopState
 import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.transition.FocusTransitionObserver
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.transition.Transitions.TRANSIT_START_RECENTS_TRANSITION
-import com.android.wm.shell.windowdecor.DesktopModeWindowDecoration
 import com.android.wm.shell.windowdecor.DragResizeWindowGeometry
+import com.android.wm.shell.windowdecor.WindowDecorationWrapper
 import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainCoroutineDispatcher
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
-import org.mockito.ArgumentMatchers.eq
 import org.mockito.Captor
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.capture
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
@@ -96,7 +98,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
     private val returnToDragStartAnimator: ReturnToDragStartAnimator = mock()
 
-    private val desktopWindowDecoration: DesktopModeWindowDecoration = mock()
+    private val windowDecoration: WindowDecorationWrapper = mock()
 
     private val displayLayout: DisplayLayout = mock()
 
@@ -113,12 +115,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
     private val motionEvent: MotionEvent = mock()
     private val desktopRepository: DesktopRepository = mock()
     private val mainDispatcher: MainCoroutineDispatcher = mock()
+    private val mainScope: CoroutineScope = mock()
     private val bgScope: CoroutineScope = mock()
     private val taskResourceLoader: WindowDecorTaskResourceLoader = mock()
     private val focusTransitionObserver: FocusTransitionObserver = mock()
     private val shellController: ShellController = mock()
     private val mainExecutor: ShellExecutor = mock()
     private val configuration: Configuration = mock()
+    private val jankMonitor: InteractionJankMonitor = mock()
     private lateinit var tilingDecoration: DesktopTilingWindowDecoration
     private lateinit var desktopState: FakeDesktopState
 
@@ -135,6 +139,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
             DesktopTilingWindowDecoration(
                 context,
                 mainDispatcher,
+                mainScope,
                 bgScope,
                 syncQueue,
                 displayController,
@@ -152,6 +157,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
                 mainExecutor,
                 desktopState,
                 shellController,
+                jankMonitor,
             )
         whenever(context.createContextAsUser(any(), any())).thenReturn(context)
         whenever(userRepositories.current).thenReturn(desktopRepository)
@@ -172,7 +178,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -202,7 +208,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -228,11 +234,11 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         }
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
-        whenever(desktopWindowDecoration.getLeash()).thenReturn(surfaceControlMock)
+        whenever(windowDecoration.taskSurface).thenReturn(surfaceControlMock)
 
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -240,7 +246,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         task1.configuration.windowConfiguration.setBounds(getLeftTaskBounds())
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             NON_STABLE_BOUNDS_MOCK,
             destinationBoundsOverride = null,
@@ -270,7 +276,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -295,14 +301,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -328,14 +334,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -373,14 +379,14 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -403,18 +409,18 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         }
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
-        whenever(desktopWindowDecoration.getLeash()).thenReturn(surfaceControlMock)
+        whenever(windowDecoration.taskSurface).thenReturn(surfaceControlMock)
         whenever(userRepositories.current.isVisibleTask(any())).thenReturn(true)
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -441,18 +447,18 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         }
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
-        whenever(desktopWindowDecoration.getLeash()).thenReturn(surfaceControlMock)
+        whenever(windowDecoration.taskSurface).thenReturn(surfaceControlMock)
         whenever(userRepositories.current.isVisibleTask(any())).thenReturn(true)
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -480,24 +486,24 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         }
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
-        desktopWindowDecoration.mTaskInfo = task1
+        whenever(windowDecoration.taskInfo).thenReturn(task1)
         task1.minWidth = 0
         task1.minHeight = 0
         initTiledTaskHelperMock(task1)
-        desktopWindowDecoration.mDecorWindowContext = context
+        whenever(windowDecoration.decorWindowContext).thenReturn(context)
         whenever(resources.getBoolean(any())).thenReturn(true)
 
         // Act
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -549,24 +555,24 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         }
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
-        desktopWindowDecoration.mTaskInfo = task1
+        whenever(windowDecoration.taskInfo).thenReturn(task1)
         task1.minWidth = 0
         task1.minHeight = 0
         initTiledTaskHelperMock(task1)
-        desktopWindowDecoration.mDecorWindowContext = context
+        whenever(windowDecoration.decorWindowContext).thenReturn(context)
         whenever(resources.getBoolean(any())).thenReturn(true)
 
         // Act
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -612,10 +618,10 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
         whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
-        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(tiledTaskHelper.windowDecoration).thenReturn(windowDecoration)
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -625,8 +631,8 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         tilingDecoration.removeTaskIfTiled(task1.taskId)
 
         assertThat(tilingDecoration.leftTaskResizingHelper).isNull()
-        verify(desktopWindowDecoration, times(1)).removeDragResizeListener(any())
-        verify(desktopWindowDecoration, times(1))
+        verify(windowDecoration, times(1)).removeDragResizeListener(any())
+        verify(windowDecoration, times(1))
             .updateDisabledResizingEdge(eq(DragResizeWindowGeometry.DisabledEdge.NONE), eq(false))
         verify(tiledTaskHelper, times(1)).dispose()
     }
@@ -642,10 +648,10 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
         whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
-        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(tiledTaskHelper.windowDecoration).thenReturn(windowDecoration)
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -669,10 +675,9 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         val task2 = createVisibleTask()
         val additionalTaskHelper: DesktopTilingWindowDecoration.AppResizingHelper = mock()
         whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
-        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(tiledTaskHelper.windowDecoration).thenReturn(windowDecoration)
         whenever(additionalTaskHelper.taskInfo).thenReturn(task2)
-        whenever(additionalTaskHelper.desktopModeWindowDecoration)
-            .thenReturn(desktopWindowDecoration)
+        whenever(additionalTaskHelper.windowDecoration).thenReturn(windowDecoration)
 
         tilingDecoration.leftTaskResizingHelper = tiledTaskHelper
         tilingDecoration.rightTaskResizingHelper = additionalTaskHelper
@@ -707,12 +712,12 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
     // Construction of a tiling divider with null config expects a null pointer here
     // which is a sign a new divider is being created due to dpi changes.
-    @Test(expected = NullPointerException::class)
+    @Test
     fun tilingDividerDestroyed_whenDpiChanges() {
         val task1 = createVisibleTask()
         val additionalTaskHelper: DesktopTilingWindowDecoration.AppResizingHelper = mock()
         whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
-        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(tiledTaskHelper.windowDecoration).thenReturn(windowDecoration)
         val stableBounds = STABLE_BOUNDS_MOCK
         whenever(displayController.getDisplayLayout(any())).thenReturn(displayLayout)
         whenever(displayLayout.getStableBounds(any())).thenAnswer { i ->
@@ -724,7 +729,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -732,9 +737,9 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
         tilingDecoration.leftTaskResizingHelper = tiledTaskHelper
         tilingDecoration.desktopTilingDividerWindowManager = desktopTilingDividerWindowManager
-        tilingDecoration.onDensityOrFontScaleChanged()
-
-        verify(desktopTilingDividerWindowManager, times(1)).release()
+        assertThrows(NullPointerException::class.java) {
+            tilingDecoration.onDensityOrFontScaleChanged()
+        }
     }
 
     @Test
@@ -744,10 +749,9 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         val additionalTaskHelper: DesktopTilingWindowDecoration.AppResizingHelper = mock()
         val manager = desktopTilingDividerWindowManager
         whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
-        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(tiledTaskHelper.windowDecoration).thenReturn(windowDecoration)
         whenever(additionalTaskHelper.taskInfo).thenReturn(task2)
-        whenever(additionalTaskHelper.desktopModeWindowDecoration)
-            .thenReturn(desktopWindowDecoration)
+        whenever(additionalTaskHelper.windowDecoration).thenReturn(windowDecoration)
 
         tilingDecoration.apply {
             leftTaskResizingHelper = tiledTaskHelper
@@ -784,10 +788,10 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
         whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
-        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(tiledTaskHelper.windowDecoration).thenReturn(windowDecoration)
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -797,8 +801,8 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         tilingDecoration.removeTaskIfTiled(task2.taskId)
 
         assertThat(tilingDecoration.leftTaskResizingHelper).isNotNull()
-        verify(desktopWindowDecoration, never()).removeDragResizeListener(any())
-        verify(desktopWindowDecoration, never()).updateDisabledResizingEdge(any(), any())
+        verify(windowDecoration, never()).removeDragResizeListener(any())
+        verify(windowDecoration, never()).updateDisabledResizingEdge(any(), any())
         verify(tiledTaskHelper, never()).dispose()
     }
 
@@ -814,17 +818,17 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
         whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
-        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(tiledTaskHelper.windowDecoration).thenReturn(windowDecoration)
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
         )
         tilingDecoration.onAppTiled(
             task2,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -837,7 +841,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
 
         assertThat(tilingDecoration.leftTaskResizingHelper).isNull()
         assertThat(tilingDecoration.rightTaskResizingHelper).isNull()
-        verify(desktopWindowDecoration, times(2)).removeDragResizeListener(any())
+        verify(windowDecoration, times(2)).removeDragResizeListener(any())
         verify(tiledTaskHelper, times(2)).dispose()
         verify(context, never()).getApplicationContext()
     }
@@ -853,10 +857,10 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
         whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
-        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(tiledTaskHelper.windowDecoration).thenReturn(windowDecoration)
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.LEFT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -882,11 +886,11 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         whenever(context.resources).thenReturn(resources)
         whenever(resources.getDimensionPixelSize(any())).thenReturn(split_divider_width)
         whenever(tiledTaskHelper.taskInfo).thenReturn(task1)
-        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(tiledTaskHelper.windowDecoration).thenReturn(windowDecoration)
 
         tilingDecoration.onAppTiled(
             task1,
-            desktopWindowDecoration,
+            windowDecoration,
             DesktopTasksController.SnapPosition.RIGHT,
             BOUNDS,
             destinationBoundsOverride = null,
@@ -905,7 +909,7 @@ class DesktopTilingWindowDecorationTest : ShellTestCase() {
         whenever(tiledTaskHelper.bounds).thenReturn(BOUNDS)
         whenever(tiledTaskHelper.taskInfo).thenReturn(taskInfo)
         whenever(tiledTaskHelper.newBounds).thenReturn(Rect(BOUNDS))
-        whenever(tiledTaskHelper.desktopModeWindowDecoration).thenReturn(desktopWindowDecoration)
+        whenever(tiledTaskHelper.windowDecoration).thenReturn(windowDecoration)
     }
 
     private fun assertRectEqual(rect1: Rect, rect2: Rect) {

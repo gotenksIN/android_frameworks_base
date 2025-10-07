@@ -29,6 +29,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.AdditionalMatchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -253,10 +254,9 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
 
     @Test
     public void testSetLockCredential_forPrimaryUser_sendsCredentials() throws Exception {
-        setCredential(PRIMARY_USER_ID, newPassword("password"));
-        verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretChanged(CREDENTIAL_TYPE_PASSWORD, "password".getBytes(),
-                        PRIMARY_USER_ID);
+        LockscreenCredential password = newPassword("password");
+        setCredential(PRIMARY_USER_ID, password);
+        verify(mRecoverableKeyStoreManager).lockScreenSecretChanged(password, PRIMARY_USER_ID);
     }
 
     @Test
@@ -280,21 +280,21 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
     @Test
     public void testSetLockCredential_forProfileWithSeparateChallenge_sendsCredentials()
             throws Exception {
-        setCredential(MANAGED_PROFILE_USER_ID, newPattern("12345"));
+        LockscreenCredential pattern = newPattern("12345");
+        setCredential(MANAGED_PROFILE_USER_ID, pattern);
         verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretChanged(CREDENTIAL_TYPE_PATTERN, "12345".getBytes(),
-                        MANAGED_PROFILE_USER_ID);
+                .lockScreenSecretChanged(pattern, MANAGED_PROFILE_USER_ID);
     }
 
     @Test
     public void testSetLockCredential_forProfileWithSeparateChallenge_updatesCredentials()
             throws Exception {
+        LockscreenCredential cred1 = newPattern("12345");
+        LockscreenCredential cred2 = newPassword("newPassword");
         mService.setSeparateProfileChallengeEnabled(MANAGED_PROFILE_USER_ID, true, null);
-        setCredential(MANAGED_PROFILE_USER_ID, newPattern("12345"));
-        setCredential(MANAGED_PROFILE_USER_ID, newPassword("newPassword"), newPattern("12345"));
-        verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretChanged(CREDENTIAL_TYPE_PASSWORD, "newPassword".getBytes(),
-                        MANAGED_PROFILE_USER_ID);
+        setCredential(MANAGED_PROFILE_USER_ID, cred1);
+        setCredential(MANAGED_PROFILE_USER_ID, cred2, cred1);
+        verify(mRecoverableKeyStoreManager).lockScreenSecretChanged(cred2, MANAGED_PROFILE_USER_ID);
     }
 
     @Test
@@ -310,11 +310,11 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
     @Test
     public void testSetLockCredential_forProfileWithUnifiedChallenge_doesNotSendRandomCredential()
             throws Exception {
+        LockscreenCredential pattern = newPattern("12345");
         mService.setSeparateProfileChallengeEnabled(MANAGED_PROFILE_USER_ID, false, null);
-        setCredential(PRIMARY_USER_ID, newPattern("12345"));
+        setCredential(PRIMARY_USER_ID, pattern);
         verify(mRecoverableKeyStoreManager, never())
-                .lockScreenSecretChanged(
-                        eq(CREDENTIAL_TYPE_PASSWORD), any(), eq(MANAGED_PROFILE_USER_ID));
+                .lockScreenSecretChanged(not(eq(pattern)), eq(MANAGED_PROFILE_USER_ID));
     }
 
     @Test
@@ -327,12 +327,9 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         mService.setSeparateProfileChallengeEnabled(MANAGED_PROFILE_USER_ID, false, null);
         setCredential(PRIMARY_USER_ID, newCredential, oldCredential);
 
+        verify(mRecoverableKeyStoreManager).lockScreenSecretChanged(newCredential, PRIMARY_USER_ID);
         verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretChanged(CREDENTIAL_TYPE_PASSWORD, newCredential.getCredential(),
-                        PRIMARY_USER_ID);
-        verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretChanged(CREDENTIAL_TYPE_PASSWORD, newCredential.getCredential(),
-                        MANAGED_PROFILE_USER_ID);
+                .lockScreenSecretChanged(newCredential, MANAGED_PROFILE_USER_ID);
     }
 
 
@@ -383,14 +380,15 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
     public void
             testSetLockCredential_forPrimaryUserWithUnifiedChallengeProfile_removesBothCredentials()
                     throws Exception {
+        LockscreenCredential noneCredential = nonePassword();
         setCredential(PRIMARY_USER_ID, newPassword("oldPassword"));
         mService.setSeparateProfileChallengeEnabled(MANAGED_PROFILE_USER_ID, false, null);
         clearCredential(PRIMARY_USER_ID, newPassword("oldPassword"));
 
         verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretChanged(CREDENTIAL_TYPE_NONE, null, PRIMARY_USER_ID);
+                .lockScreenSecretChanged(noneCredential, PRIMARY_USER_ID);
         verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretChanged(CREDENTIAL_TYPE_NONE, null, MANAGED_PROFILE_USER_ID);
+                .lockScreenSecretChanged(noneCredential, MANAGED_PROFILE_USER_ID);
     }
 
     @Test
@@ -437,8 +435,7 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         mService.setSeparateProfileChallengeEnabled(MANAGED_PROFILE_USER_ID, false, null);
         setCredential(MANAGED_PROFILE_USER_ID, profilePassword);
         verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretChanged(CREDENTIAL_TYPE_PASSWORD, profilePassword.getCredential(),
-                        MANAGED_PROFILE_USER_ID);
+                .lockScreenSecretChanged(profilePassword, MANAGED_PROFILE_USER_ID);
     }
 
     @Test
@@ -458,7 +455,7 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         // Called once for setting the initial separate profile credentials and not again during
         // unification.
         verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretChanged(anyInt(), any(), eq(MANAGED_PROFILE_USER_ID));
+                .lockScreenSecretChanged(any(), eq(MANAGED_PROFILE_USER_ID));
     }
 
     @Test
@@ -469,9 +466,7 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
 
         mService.verifyCredential(password, PRIMARY_USER_ID, 0 /* flags */);
 
-        verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretAvailable(
-                        CREDENTIAL_TYPE_PASSWORD, password.getCredential(), PRIMARY_USER_ID);
+        verify(mRecoverableKeyStoreManager).lockScreenSecretAvailable(password, PRIMARY_USER_ID);
     }
 
     @Test
@@ -484,8 +479,7 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         mService.verifyCredential(pattern, MANAGED_PROFILE_USER_ID, 0 /* flags */);
 
         verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretAvailable(
-                        CREDENTIAL_TYPE_PATTERN, pattern.getCredential(), MANAGED_PROFILE_USER_ID);
+                .lockScreenSecretAvailable(pattern, MANAGED_PROFILE_USER_ID);
     }
 
     @Test
@@ -499,16 +493,12 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         mService.verifyCredential(pattern, PRIMARY_USER_ID, 0 /* flags */);
 
         // Parent sends its credentials for both the parent and profile.
+        verify(mRecoverableKeyStoreManager).lockScreenSecretAvailable(pattern, PRIMARY_USER_ID);
         verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretAvailable(
-                        CREDENTIAL_TYPE_PATTERN, pattern.getCredential(), PRIMARY_USER_ID);
-        verify(mRecoverableKeyStoreManager)
-                .lockScreenSecretAvailable(
-                        CREDENTIAL_TYPE_PATTERN, pattern.getCredential(), MANAGED_PROFILE_USER_ID);
+                .lockScreenSecretAvailable(pattern, MANAGED_PROFILE_USER_ID);
         // Profile doesn't send its own random credentials.
         verify(mRecoverableKeyStoreManager, never())
-                .lockScreenSecretAvailable(
-                        eq(CREDENTIAL_TYPE_PASSWORD), any(), eq(MANAGED_PROFILE_USER_ID));
+                .lockScreenSecretAvailable(not(eq(pattern)), eq(MANAGED_PROFILE_USER_ID));
     }
 
     @Test
@@ -731,6 +721,18 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         assertEquals(Duration.ZERO, response.getTimeoutAsDuration());
     }
 
+    @Test
+    @EnableFlags(com.android.server.flags.Flags.FLAG_KEYSTORE_IN_MEMORY_CLEANUP)
+    public void testLockUser_locksCeStorageAndKeystore() throws Exception {
+        final int userId = PRIMARY_USER_ID;
+        final LockscreenCredential password = newPassword("password");
+        setCredential(PRIMARY_USER_ID, password);
+        mLocalService.lockUser(userId);
+
+        // Verify that lockCeStorage is called on the correct user ID.
+        verify(mInjector.getStorageManager()).lockCeStorage(eq(userId));
+    }
+
     // Same as preceding test case, but uses a nonzero timeout.
     @Test
     @EnableFlags(android.security.Flags.FLAG_SOFTWARE_RATELIMITER)
@@ -759,7 +761,7 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
 
     // Tests that if verifyCredential is passed a correct guess but it fails due to Weaver reporting
     // a status of THROTTLE (which is the expected status when there is a remaining rate-limiting
-    // delay in Weaver), then LockSettingsService does not block the same guess from being
+    // timeout in Weaver), then LockSettingsService does not block the same guess from being
     // re-attempted and in particular does not reject it as a duplicate wrong guess.
     @Test
     @EnableFlags(android.security.Flags.FLAG_SOFTWARE_RATELIMITER)
@@ -800,6 +802,65 @@ public class LockSettingsServiceTests extends BaseLockSettingsServiceTests {
         assertTrue(response.isOtherError());
         assertEquals(Duration.ZERO, response.getTimeoutAsDuration());
 
+        response = mService.verifyCredential(credential, userId, /* flags= */ 0);
+        assertTrue(response.isMatched());
+    }
+
+    @Test
+    @EnableFlags(android.security.Flags.FLAG_SOFTWARE_RATELIMITER)
+    public void test20UniqueGuessesAllowed() throws Exception {
+        final int userId = PRIMARY_USER_ID;
+        final LockscreenCredential credential = newPassword("password");
+        final Duration tenYears = Duration.ofDays(10 * 365);
+        Duration now = Duration.ZERO;
+        VerifyCredentialResponse response;
+
+        mInjector.setTimeSinceBoot(now);
+        setCredential(userId, credential);
+        for (int i = 0; i < 19; i++) {
+            response = mService.verifyCredential(newPassword("wrong" + i), userId, /* flags= */ 0);
+            assertFalse(response.isMatched());
+            now = now.plus(tenYears); // Advance 10 years to get past rate-limiting
+            mInjector.setTimeSinceBoot(now);
+        }
+        response = mService.verifyCredential(credential, userId, /* flags= */ 0);
+        assertTrue(response.isMatched());
+    }
+
+    @Test
+    @EnableFlags(android.security.Flags.FLAG_SOFTWARE_RATELIMITER)
+    public void testMoreThan20UniqueGuessesNotAllowed() throws Exception {
+        final int userId = PRIMARY_USER_ID;
+        final LockscreenCredential credential = newPassword("password");
+        final Duration tenYears = Duration.ofDays(10 * 365);
+        Duration now = Duration.ZERO;
+        VerifyCredentialResponse response;
+
+        mInjector.setTimeSinceBoot(now);
+        setCredential(userId, credential);
+        for (int i = 0; i < 20; i++) {
+            response = mService.verifyCredential(newPassword("wrong" + i), userId, /* flags= */ 0);
+            assertFalse(response.isMatched());
+            now = now.plus(tenYears); // Advance 10 years to get past rate-limiting
+            mInjector.setTimeSinceBoot(now);
+        }
+        response = mService.verifyCredential(credential, userId, /* flags= */ 0);
+        assertFalse(response.isMatched());
+    }
+
+    @Test
+    @DisableFlags(android.security.Flags.FLAG_SOFTWARE_RATELIMITER)
+    public void testMoreThan20UniqueGuessesAllowed_softwareRateLimiterFlagDisabled()
+            throws Exception {
+        final int userId = PRIMARY_USER_ID;
+        final LockscreenCredential credential = newPassword("password");
+        VerifyCredentialResponse response;
+
+        setCredential(userId, credential);
+        for (int i = 0; i < 20; i++) {
+            response = mService.verifyCredential(newPassword("wrong" + i), userId, /* flags= */ 0);
+            assertFalse(response.isMatched());
+        }
         response = mService.verifyCredential(credential, userId, /* flags= */ 0);
         assertTrue(response.isMatched());
     }

@@ -485,6 +485,20 @@ public class CarrierConfigManager {
             "allow_emergency_numbers_in_call_log_bool";
 
     /**
+     * Flag indicating whether to log calls which were answered on another device.
+     * <p>
+     * If {@code true}, calls which are disconnected with
+     * {@link android.telecom.DisconnectCause#ANSWERED_ELSEWHERE} will be added to the call
+     * log.
+     * <p>
+     * If {@code false}, these calls will not be added to the call log.
+     * The default value is {@code true}.
+     */
+    @FlaggedApi(Flags.FLAG_LOG_CALLS_ANSWERED_ELSEWHERE)
+    public static final String KEY_LOG_CALLS_ANSWERED_ELSEWHERE_BOOL =
+            "log_calls_answered_elsewhere_bool";
+
+    /**
      * A string array containing numbers that shouldn't be included in the call log.
      */
     public static final String KEY_UNLOGGABLE_NUMBERS_STRING_ARRAY =
@@ -573,7 +587,6 @@ public class CarrierConfigManager {
      * @deprecated Legacy CDMA is unsupported.
      */
     @Deprecated
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     public static final String KEY_SHOW_CDMA_CHOICES_BOOL = "show_cdma_choices_bool";
 
     /** CDMA activation goes through HFA */
@@ -585,7 +598,6 @@ public class CarrierConfigManager {
      */
     // TODO: This should be combined with config_use_hfa_for_provisioning and implemented as an enum
     // (NONE, HFA, OTASP).
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final String KEY_USE_OTASP_FOR_PROVISIONING_BOOL =
             "use_otasp_for_provisioning_bool";
@@ -601,7 +613,6 @@ public class CarrierConfigManager {
      * @deprecated Legacy CDMA is unsupported.
      */
     @Deprecated
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     public static final String KEY_SHOW_APN_SETTING_CDMA_BOOL = "show_apn_setting_cdma_bool";
 
     /**
@@ -609,7 +620,6 @@ public class CarrierConfigManager {
      * @deprecated Legacy CDMA is unsupported.
      */
     @Deprecated
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     public static final String KEY_SUPPORT_SWAP_AFTER_MERGE_BOOL = "support_swap_after_merge_bool";
 
     /**
@@ -650,7 +660,6 @@ public class CarrierConfigManager {
      * @deprecated Legacy CDMA is unsupported.
      */
     @Deprecated
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     public static final String KEY_DISABLE_CDMA_ACTIVATION_CODE_BOOL =
             "disable_cdma_activation_code_bool";
 
@@ -730,7 +739,6 @@ public class CarrierConfigManager {
      * Value is string array of SIDs to be considered roaming for 3GPP2 RATs.
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final String
             KEY_CDMA_ROAMING_NETWORKS_STRING_ARRAY = "cdma_roaming_networks_string_array";
@@ -740,7 +748,6 @@ public class CarrierConfigManager {
      * Value is string array of SIDs to be considered not roaming for 3GPP2 RATs.
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final String
             KEY_CDMA_NONROAMING_NETWORKS_STRING_ARRAY = "cdma_nonroaming_networks_string_array";
@@ -970,7 +977,6 @@ public class CarrierConfigManager {
     public static final String KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL =
             "carrier_wfc_supports_wifi_only_bool";
 
-// QTI_BEGIN: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
     /**
      * Flag specifying whether WFC over IMS supports the "ims preferred" option.  If false, the wifi
      * calling settings will not include an option for "ims preferred".  If true, the wifi calling
@@ -983,7 +989,6 @@ public class CarrierConfigManager {
             "carrier_wfc_supports_ims_preferred_bool";
 
 
-// QTI_END: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
     /**
      * Default mode for WFC over IMS on home network:
      * <ul>
@@ -1495,7 +1500,6 @@ public class CarrierConfigManager {
      * sends out successive DTMF tones on the network.
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final String KEY_CDMA_DTMF_TONE_DELAY_INT = "cdma_dtmf_tone_delay_int";
 
@@ -1557,6 +1561,15 @@ public class CarrierConfigManager {
      */
     public static final String KEY_IS_IMS_CONFERENCE_SIZE_ENFORCED_BOOL =
             "is_ims_conference_size_enforced_bool";
+
+    /**
+     * Determine whether multi-party anchor conference calls are supported by a carrier. When
+     * {@code true}, merging a locally hosted conference call with a remotely hosted conference
+     * into a multi-party anchor conference call is permitted, {@code false otherwise}.
+     */
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MULTI_PARTY_ANCHOR_CONF)
+    public static final String KEY_SUPPORT_MULTI_PARTY_ANCHOR_CONFERENCE_BOOL =
+            "support_multi_anchor_conf_bool";
 
     /**
      * Determines the maximum number of participants the carrier supports for a conference call.
@@ -2208,6 +2221,27 @@ public class CarrierConfigManager {
             "ratchet_nr_advanced_bandwidth_if_rrc_idle_bool";
 
     /**
+     * Controls whether the framework applies modem provided display network type for icon display.
+     *
+     * <p>If {@code true}, the system uses the display network type
+     * suggested by the modem through the HAL indication displayNetworkTypeChanged.
+     * This allows the displayed network type to differ from the actual registered
+     * Radio Access Technology (RAT) based on specific network conditions or
+     * carrier requirements.
+     * </p>
+     *
+     * <p>If {@code false}, modem-suggested display overrides are ignored, and the
+     * network type display follows standard framework logic.
+     * </p>
+     *
+     * <p>Default value is {@code false}.</p>
+     *
+     * @hide
+     */
+    public static final String KEY_USE_MODEM_DISPLAY_NETWORK_TYPE_BOOL =
+            "use_modem_display_network_type_bool";
+
+    /**
      * Boolean indicating if operator name should be shown in the status bar
      * @hide
      */
@@ -2239,9 +2273,7 @@ public class CarrierConfigManager {
             "show_precise_failed_cause_bool";
 
 
-// QTI_BEGIN: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
     /**
-// QTI_END: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
      * A list of carrier nr availability is used to determine whether the carrier enable the
      * non-standalone (NSA) mode of 5G NR, standalone (SA) mode of 5G NR
      *
@@ -2253,9 +2285,7 @@ public class CarrierConfigManager {
      * If the carrier doesn't support 5G NR, the value is the empty array.
      * If the key is invalid or not configured, the default value {
      * {@link #CARRIER_NR_AVAILABILITY_NSA},{@link #CARRIER_NR_AVAILABILITY_SA}} will apply.
-// QTI_BEGIN: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
      */
-// QTI_END: 2018-03-22: Telephony: Add config to disable CDMA call forward/waiting
     public static final String KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY =
             "carrier_nr_availabilities_int_array";
 
@@ -2534,6 +2564,16 @@ public class CarrierConfigManager {
             "allow_hold_call_during_emergency_bool";
 
     /**
+     * Flag indicating whether RTT (Real-Time Text) calls support the hold/unhold capability. If
+     * false, the hold capability will be disabled for RTT calls. If true, RTT hold capability is
+     * determined by IMS service capabilities.
+     *
+     * The default value is {@code true}.
+     */
+    @FlaggedApi(Flags.FLAG_ENABLE_RTT_HOLD_CARRIER_CONFIG)
+    public static final String KEY_ALLOW_HOLD_IN_RTT_CALL_BOOL = "allow_hold_in_rtt_call_bool";
+
+    /**
      * Flag indicating whether or not the carrier supports the periodic exchange of phone numbers
      * in the user's address book with the carrier's presence server in order to retrieve the RCS
      * capabilities for each contact used in the RCS User Capability Exchange (UCE) procedure. See
@@ -2604,7 +2644,6 @@ public class CarrierConfigManager {
      * flash is sent.
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final String KEY_CDMA_3WAYCALL_FLASH_DELAY_INT = "cdma_3waycall_flash_delay_int";
 
@@ -2622,7 +2661,6 @@ public class CarrierConfigManager {
      *
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final String KEY_CDMA_ROAMING_MODE_INT = "cdma_roaming_mode_int";
 
@@ -2632,7 +2670,6 @@ public class CarrierConfigManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     public static final String KEY_SUPPORT_CDMA_1X_VOICE_CALLS_BOOL =
@@ -2757,16 +2794,12 @@ public class CarrierConfigManager {
     public static final String KEY_ALLOW_ADD_CALL_DURING_VIDEO_CALL_BOOL =
             "allow_add_call_during_video_call";
 
-// QTI_BEGIN: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
     /**
-// QTI_END: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
      * When {@code true}, indicates that video calls can be put on hold in order to swap to another
      * call (e.g. a new outgoing call).
      * <p>
      * This is {@code true} by default.
-// QTI_BEGIN: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
      */
-// QTI_END: 2018-03-07: Telephony: IMS-VT: Add config to control holding a video call
     public static final String KEY_ALLOW_HOLD_VIDEO_CALL_BOOL = "allow_hold_video_call_bool";
 
     /**
@@ -9934,6 +9967,59 @@ public class CarrierConfigManager {
             "carrier_supported_satellite_services_per_provider_bundle";
 
     /**
+     * A PersistableBundle that contains a list of key-value pairs, where keys are satellite
+     * provider PLMNs and values are bundles containing satellite configurations for that PLMN.
+     * This allows for per-provider settings within a single carrier, which is necessary for
+     * hybrid scenarios where a carrier supports multiple satellite networks with different
+     * capabilities (e.g., AST and Skylo).
+     * <p>
+     * The keys in this bundle are PLMNs of satellite providers as strings. The values are
+     * PersistableBundles containing some of the <b>existing</b> satellite configurations for that
+     * PLMN.
+     * <p>
+     * The <b>allowed</b> satellite configuration keys that the PersistableBundle values can have
+     * are:
+     * <ul>
+     * <li>{@link #KEY_CARRIER_ROAMING_NTN_EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_INT}</li>
+     * <li>{@link #KEY_CARRIER_ROAMING_NTN_CONNECT_TYPE_INT}</li>
+     * </ul>
+     * <p>
+     * An example config for a hybrid carrier supporting two PLMNs (lets say "XXXXXX" is the PLMN of
+     * AST and "YYYYYY" is the PLMN of Skylo):
+     * <pre>{@code
+     * <pbundle_as_map name="satellite_configs_per_plmn_bundle">
+     *     <!-- AST PLMN's satellite configurations -->
+     *     <pbundle_as_map name="XXXXXX">
+     *         <!-- SatelliteManager#EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_T911 -->
+     *         <int name="carrier_roaming_ntn_emergency_call_to_satellite_handover_type_int"
+     *              value="2" />
+     *         <!-- CarrierConfigManager#CARRIER_ROAMING_NTN_CONNECT_AUTOMATIC -->
+     *         <int name="carrier_roaming_ntn_connect_type_int" value="0" />
+     *     </pbundle_as_map>
+     *     <!-- Skylo PLMN's satellite configurations -->
+     *     <pbundle_as_map name="YYYYYY">
+     *         <!-- SatelliteManager#EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_SOS -->
+     *         <int name="carrier_roaming_ntn_emergency_call_to_satellite_handover_type_int"
+     *              value="1" />
+     *         <!-- CarrierConfigManager#CARRIER_ROAMING_NTN_CONNECT_MANUAL -->
+     *         <int name="carrier_roaming_ntn_connect_type_int" value="1" />
+     *     </pbundle_as_map>
+     * </pbundle_as_map>
+     * }</pre>
+     * <p>
+     * When set, this PLMN config would take precedence over the global configs. For example,
+     * if the global handover type is set as {@link SatelliteManager
+     * #EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_SOS}, but if this config's current PLMN handover
+     * type is set as {@link SatelliteManager#EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_T911}, then
+     * T911 would be effective way of handling emergency call.
+     * <p>
+     * This config is empty by default.
+     */
+    @FlaggedApi(Flags.FLAG_SATELLITE_26Q2_APIS)
+    public static final String KEY_SATELLITE_CONFIGS_PER_PLMN_BUNDLE =
+            "satellite_configs_per_plmn_bundle";
+
+    /**
      * A PersistableBundle that contains a list of key-value pairs, where the values are integer
      * arrays.
      * <p>
@@ -10299,6 +10385,13 @@ public class CarrierConfigManager {
     @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final int CARRIER_ROAMING_NTN_CONNECT_MANUAL = 1;
     /**
+     * Device can connect to carrier roaming non-terrestrial network both automatically and
+     * manually i.e. Carrier would support multiple satellite providers with automatical and
+     * manually connect capabilities.
+     */
+    @FlaggedApi(Flags.FLAG_SATELLITE_26Q2_APIS)
+    public static final int CARRIER_ROAMING_NTN_CONNECT_HYBRID = 2;
+    /**
      * Indicates carrier roaming non-terrestrial network connect type that the device can use to
      * perform satellite communication.
      * If this key is set to CARRIER_ROAMING_NTN_CONNECT_MANUAL then connect button will be
@@ -10434,6 +10527,13 @@ public class CarrierConfigManager {
      */
     public static final String KEY_CALL_COMPOSER_PICTURE_SERVER_URL_STRING =
             "call_composer_picture_server_url_string";
+
+    /**
+     * Indicates if the carrier supports a video color ring back tone call (CRBT).
+     */
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_IS_USING_VIDEO_RINGBACK)
+    public static final String KEY_SUPPORTS_VIDEO_RINGBACK_BOOL =
+            "supports_video_back_tone_bool";
 
     /**
      * Determines the default RTT mode.
@@ -10763,7 +10863,6 @@ public class CarrierConfigManager {
             "carrier_supports_multianchor_conference";
 
 // QTI_END: 2020-03-01: Telephony: IMS: Add new Carrier Config.
-// QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /**
      * String array of APN configurations of same MVNO type GID.
      * The entries should be of form "GID data:all supported apn types:devicecapability:apnname".
@@ -10781,8 +10880,7 @@ public class CarrierConfigManager {
     public static final String KEY_REQUIRE_APN_FILTERING_WITH_RADIO_CAPABILITY =
             "require_apn_filtering_with_radio_capability_bool";
 
-// QTI_END: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
-// QTI_BEGIN: 2021-03-02: AndroidCore: IMS: Add new carrier config.
+// QTI_BEGIN: 2021-03-02: Telephony: IMS: Add new carrier config.
     /**
      * Determines whether carrier supports Sms Callback Mode.
      * When {@code true}, modem can enter/exit SMS callback mode (SCBM) after sending e911 SMS.
@@ -10795,7 +10893,7 @@ public class CarrierConfigManager {
     public static final String KEY_USE_SMS_CALLBACK_MODE_BOOL =
             "use_sms_callback_mode_bool";
 
-// QTI_END: 2021-03-02: AndroidCore: IMS: Add new carrier config.
+// QTI_END: 2021-03-02: Telephony: IMS: Add new carrier config.
 // QTI_BEGIN: 2022-09-09: Telephony: Add 5G Ultra Wideband icon carrier config keys
     /**
      * Determines the SIB2 value for showing the 5G Ultra Wideband icon.
@@ -11121,6 +11219,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_AUTO_RETRY_FAILED_WIFI_EMERGENCY_CALL, false);
         sDefaults.putBoolean(KEY_ADDITIONAL_CALL_SETTING_BOOL, true);
         sDefaults.putBoolean(KEY_ALLOW_EMERGENCY_NUMBERS_IN_CALL_LOG_BOOL, false);
+        sDefaults.putBoolean(KEY_LOG_CALLS_ANSWERED_ELSEWHERE_BOOL, true);
         sDefaults.putStringArray(KEY_UNLOGGABLE_NUMBERS_STRING_ARRAY, null);
         sDefaults.putBoolean(KEY_ALLOW_LOCAL_DTMF_TONES_BOOL, true);
         sDefaults.putBoolean(KEY_PLAY_CALL_RECORDING_TONE_BOOL, false);
@@ -11151,9 +11250,7 @@ public class CarrierConfigManager {
 // QTI_END: 2024-01-11: Telephony: Add config to show signal strength for MSIM CIWLAN
         sDefaults.putBoolean(KEY_ENABLE_CROSS_SIM_CALLING_ON_OPPORTUNISTIC_DATA_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL, false);
-// QTI_BEGIN: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_IMS_PREFERRED_BOOL, false);
-// QTI_END: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ROAMING_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_PROMOTE_WFC_ON_CALL_FAIL_BOOL, false);
@@ -11319,6 +11416,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_SUPPORTS_DEVICE_TO_DEVICE_COMMUNICATION_USING_DTMF_BOOL, false);
         sDefaults.putBoolean(KEY_SUPPORT_VIDEO_CONFERENCE_CALL_BOOL, false);
         sDefaults.putBoolean(KEY_IS_IMS_CONFERENCE_SIZE_ENFORCED_BOOL, false);
+        sDefaults.putBoolean(KEY_SUPPORT_MULTI_PARTY_ANCHOR_CONFERENCE_BOOL, false);
         sDefaults.putInt(KEY_IMS_CONFERENCE_SIZE_LIMIT_INT, 5);
         sDefaults.putBoolean(KEY_DISPLAY_HD_AUDIO_PROPERTY_BOOL, true);
         sDefaults.putBoolean(KEY_EDITABLE_ENHANCED_4G_LTE_BOOL, true);
@@ -11400,6 +11498,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_ALLOW_NON_EMERGENCY_CALLS_IN_ECM_BOOL, true);
         sDefaults.putInt(KEY_EMERGENCY_SMS_MODE_TIMER_MS_INT, 0);
         sDefaults.putBoolean(KEY_ALLOW_HOLD_CALL_DURING_EMERGENCY_BOOL, true);
+        sDefaults.putBoolean(KEY_ALLOW_HOLD_IN_RTT_CALL_BOOL, true);
         sDefaults.putBoolean(KEY_USE_RCS_PRESENCE_BOOL, false);
         sDefaults.putBoolean(KEY_USE_RCS_SIP_OPTIONS_BOOL, false);
         sDefaults.putBoolean(KEY_FORCE_IMEI_BOOL, false);
@@ -11530,6 +11629,7 @@ public class CarrierConfigManager {
                 KEY_NR_ADVANCED_REQUIRES_SINGLE_CC_ABOVE_BANDWIDTH_THRESHOLD_BOOL, false);
         sDefaults.putBoolean(KEY_INCLUDE_LTE_FOR_NR_ADVANCED_THRESHOLD_BANDWIDTH_BOOL, false);
         sDefaults.putBoolean(KEY_RATCHET_NR_ADVANCED_BANDWIDTH_IF_RRC_IDLE_BOOL, false);
+        sDefaults.putBoolean(KEY_USE_MODEM_DISPLAY_NETWORK_TYPE_BOOL, false);
         sDefaults.putIntArray(KEY_CARRIER_NR_AVAILABILITIES_INT_ARRAY,
                 new int[]{CARRIER_NR_AVAILABILITY_NSA, CARRIER_NR_AVAILABILITY_SA});
         sDefaults.putBoolean(KEY_LTE_ENABLED_BOOL, true);
@@ -11793,7 +11893,8 @@ public class CarrierConfigManager {
                 KEY_TELEPHONY_NETWORK_CAPABILITY_PRIORITIES_STRING_ARRAY, new String[] {
                         "eims:90", "supl:80", "mms:70", "xcap:70", "cbs:50", "mcx:50", "fota:50",
                         "ims:40", "rcs:40", "dun:30", "enterprise:20", "internet:20",
-                        "prioritize_bandwidth:20", "prioritize_latency:20"
+                        "prioritize_bandwidth:20", "prioritize_latency:20",
+                        "prioritize_unified_communications:20"
                 });
         sDefaults.putStringArray(
                 KEY_TELEPHONY_DATA_SETUP_RETRY_RULES_STRING_ARRAY, new String[] {
@@ -11807,7 +11908,8 @@ public class CarrierConfigManager {
                                 + "-3|65543|65547|2252|2253|2254, retry_interval=2500",
                         "capabilities=mms|supl|cbs|rcs, retry_interval=2000",
                         "capabilities=internet|enterprise|dun|ims|fota|xcap|mcx|"
-                                + "prioritize_bandwidth|prioritize_latency, retry_interval="
+                                + "prioritize_bandwidth|prioritize_latency|"
+                                + "prioritize_unified_communications, retry_interval="
                                 + "2500|3000|5000|10000|15000|20000|40000|60000|120000|240000|"
                                 + "600000|1200000|1800000, maximum_retries=20"
                 });
@@ -11819,6 +11921,8 @@ public class CarrierConfigManager {
         sDefaults.putStringArray(KEY_MISSED_INCOMING_CALL_SMS_PATTERN_STRING_ARRAY, new String[0]);
         sDefaults.putPersistableBundle(
                 KEY_CARRIER_SUPPORTED_SATELLITE_SERVICES_PER_PROVIDER_BUNDLE,
+                PersistableBundle.EMPTY);
+        sDefaults.putPersistableBundle(KEY_SATELLITE_CONFIGS_PER_PLMN_BUNDLE,
                 PersistableBundle.EMPTY);
         sDefaults.putPersistableBundle(
                 KEY_REGIONAL_SATELLITE_EARFCN_BUNDLE,
@@ -11890,12 +11994,11 @@ public class CarrierConfigManager {
         sDefaults.putString(KEY_DEFAULT_PREFERRED_APN_NAME_STRING, "");
         sDefaults.putBoolean(KEY_SUPPORTS_CALL_COMPOSER_BOOL, false);
         sDefaults.putBoolean(KEY_SUPPORTS_BUSINESS_CALL_COMPOSER_BOOL, false);
+        sDefaults.putBoolean(KEY_SUPPORTS_VIDEO_RINGBACK_BOOL, false);
         sDefaults.putString(KEY_CALL_COMPOSER_PICTURE_SERVER_URL_STRING, "");
         sDefaults.putBoolean(KEY_USE_ACS_FOR_RCS_BOOL, false);
         sDefaults.putBoolean(KEY_NETWORK_TEMP_NOT_METERED_SUPPORTED_BOOL, true);
-// QTI_BEGIN: 2020-03-23: Telephony: IMS: Add new carrier config.
         sDefaults.putInt(KEY_DEFAULT_RTT_MODE_INT, 0);
-// QTI_END: 2020-03-23: Telephony: IMS: Add new carrier config.
         sDefaults.putBoolean(KEY_STORE_SIM_PIN_FOR_UNATTENDED_REBOOT_BOOL, true);
         sDefaults.putBoolean(KEY_HIDE_ENABLE_2G, false);
         sDefaults.putStringArray(KEY_ALLOWED_INITIAL_ATTACH_APN_TYPES_STRING_ARRAY,
@@ -11907,7 +12010,6 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_DISPLAY_NO_DATA_NOTIFICATION_ON_PERMANENT_FAILURE_BOOL, false);
         sDefaults.putBoolean(KEY_UNTHROTTLE_DATA_RETRY_WHEN_TAC_CHANGES_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_SUPPORTS_MULTIANCHOR_CONFERENCE, false);
-// QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
         sDefaults.putStringArray(KEY_MULTI_APN_ARRAY_FOR_SAME_GID, new String[] {
                 "52FF:mms,supl,hipri,default,fota:SA:nrphone",
                 "52FF:mms,supl,hipri,default,fota:NSA:nxtgenphone",
@@ -11927,10 +12029,9 @@ public class CarrierConfigManager {
                 "53FF:mms,supl,hipri,default,fota:1xRTT:nxtgenphone",
         });
         sDefaults.putBoolean(KEY_REQUIRE_APN_FILTERING_WITH_RADIO_CAPABILITY, false);
-// QTI_END: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
-// QTI_BEGIN: 2021-03-02: AndroidCore: IMS: Add new carrier config.
+// QTI_BEGIN: 2021-03-02: Telephony: IMS: Add new carrier config.
         sDefaults.putBoolean(KEY_USE_SMS_CALLBACK_MODE_BOOL, false);
-// QTI_END: 2021-03-02: AndroidCore: IMS: Add new carrier config.
+// QTI_END: 2021-03-02: Telephony: IMS: Add new carrier config.
         sDefaults.putBoolean(KEY_VONR_SETTING_VISIBILITY_BOOL, true);
         sDefaults.putBoolean(KEY_VONR_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_VONR_ON_BY_DEFAULT_BOOL, true);

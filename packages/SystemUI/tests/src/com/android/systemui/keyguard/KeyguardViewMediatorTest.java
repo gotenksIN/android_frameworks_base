@@ -69,9 +69,7 @@ import android.platform.test.annotations.EnableFlags;
 import android.telephony.TelephonyManager;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
-// QTI_BEGIN: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 import android.testing.TestableLooper.RunWithLooper;
-// QTI_END: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 import android.view.IRemoteAnimationFinishedCallback;
 import android.view.RemoteAnimationTarget;
 import android.view.View;
@@ -143,7 +141,7 @@ import com.android.systemui.wallpapers.data.repository.FakeWallpaperRepository;
 import com.android.window.flags.Flags;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 
-import kotlinx.coroutines.CoroutineDispatcher;
+import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.flow.Flow;
 import kotlinx.coroutines.test.TestScope;
 
@@ -158,15 +156,13 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(AndroidTestingRunner.class)
-// QTI_BEGIN: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 @RunWithLooper
-// QTI_END: 2021-09-08: Android_UI: Revert "Make sure SIM PIN screen shows"
 @SmallTest
 @DisableSceneContainer // Class is deprecated in flexi.
 public class KeyguardViewMediatorTest extends SysuiTestCase {
 
     private static final boolean ENABLE_NEW_KEYGUARD_SHELL_TRANSITIONS =
-            Flags.ensureKeyguardDoesTransitionStarting();
+            Flags.ensureKeyguardDoesTransitionStartingBugFix();
 
     private final KosmosJavaAdapter mKosmos = new KosmosJavaAdapter(this);
     private KeyguardViewMediator mViewMediator;
@@ -238,7 +234,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
     /** Most recent value passed to {@link KeyguardStateController#notifyKeyguardGoingAway}. */
     private boolean mKeyguardGoingAway = false;
 
-    private @Mock CoroutineDispatcher mDispatcher;
+    private @Mock CoroutineScope mApplicationScope;
     private @Mock DreamViewModel mDreamViewModel;
     private @Mock CommunalTransitionViewModel mCommunalTransitionViewModel;
     private @Mock SystemPropertiesHelper mSystemPropertiesHelper;
@@ -318,6 +314,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
      */
     @After
     public void assertATMSAndKeyguardViewMediatorStatesMatch() {
+        android.util.Log.i("CLJ", "7");
         try {
             if (mKeyguardGoingAway) {
                 assertATMSKeyguardGoingAway();
@@ -1237,7 +1234,9 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         IRemoteAnimationFinishedCallback callback = mock(IRemoteAnimationFinishedCallback.class);
 
         when(mKeyguardStateController.isKeyguardGoingAway()).thenReturn(true);
-        mViewMediator.mKeyguardGoingAwayRunnable.run();
+        mViewMediator.hideLocked();
+        processAllMessagesAndBgExecutorMessages();
+
         mViewMediator.startKeyguardExitAnimation(TRANSIT_OLD_KEYGUARD_GOING_AWAY, apps, wallpapers,
                 null, callback);
         processAllMessagesAndBgExecutorMessages();
@@ -1452,6 +1451,26 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         mViewMediator.getViewMediatorCallback().onBouncerSwipeDown();
         verify(mStatusBarKeyguardViewManager).reset(true);
     }
+
+    @Test
+    @TestableLooper.RunWithLooper(setAsMainLooper = true)
+    public void testKeyguardExitAnimationCanceledIfShowIsRequested() {
+        // Mock a secure user
+        setCurrentUser(55, true);
+
+        // Setup keyguard
+        mViewMediator.onSystemReady();
+        processAllMessagesAndBgExecutorMessages();
+        mViewMediator.setShowingLocked(true, "");
+
+        // This will create a SHOW message, followed by a request to start the exit animation
+        mViewMediator.showDismissibleKeyguard();
+        startMockKeyguardExitAnimation();
+
+        assertTrue(mViewMediator.isShowingAndNotOccluded());
+        verify(mStatusBarKeyguardViewManager, never()).hide(anyLong(), anyLong());
+    }
+
     private void createAndStartViewMediator() {
         createAndStartViewMediator(false);
     }
@@ -1502,7 +1521,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
                 mSystemSettings,
                 mSystemClock,
                 mProcessWrapper,
-                mDispatcher,
+                mApplicationScope,
                 () -> mDreamViewModel,
                 () -> mCommunalTransitionViewModel,
                 mSystemPropertiesHelper,

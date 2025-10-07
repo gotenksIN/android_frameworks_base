@@ -22,6 +22,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.hardware.input.KeyGestureEvent
+import android.text.BidiFormatter
 import android.text.TextUtils
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityManager
@@ -78,31 +79,56 @@ constructor(
         keyCode: Int,
         targetName: String,
     ): Pair<String, CharSequence>? {
-        val featureNameToIntro = getFeatureNameToIntro(keyGestureType, targetName)
-
         // TODO: b/419026315 - Update the secondary modifier key label.
         val secondaryModifierLabel = ShortcutHelperKeys.modifierLabels[MODIFIER_KEY xor metaState]
         val keyCodeLabel = keyCodeMap[keyCode]
-        if (featureNameToIntro == null || secondaryModifierLabel == null || keyCodeLabel == null) {
+
+        if (secondaryModifierLabel == null || keyCodeLabel == null) {
             return null
         }
 
-        // TODO: b/410892855 - bidi wrap the title.
-        val title =
-            resources.getString(
-                R.string.accessibility_key_gesture_dialog_title,
-                featureNameToIntro.first,
-            )
-        val contentText =
-            TextUtils.expandTemplate(
-                resources.getText(R.string.accessibility_key_gesture_dialog_content),
-                secondaryModifierLabel.invoke(context),
-                keyCodeLabel,
-                featureNameToIntro.first,
-                featureNameToIntro.second,
-            )
+        if (keyGestureType == KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION) {
+            val featureName =
+                resources.getString(
+                    com.android.settingslib.R.string.accessibility_screen_magnification_title
+                )
+            val title =
+                resources.getString(
+                    R.string.accessibility_key_gesture_magnification_dialog_title,
+                    featureName,
+                )
+            val content =
+                TextUtils.expandTemplate(
+                    resources.getText(
+                        R.string.accessibility_key_gesture_magnification_dialog_content
+                    ),
+                    secondaryModifierLabel.invoke(context),
+                    keyCodeLabel,
+                    featureName,
+                )
+            return Pair(title, content)
+        } else {
+            val featureNameToIntro = getFeatureNameToIntro(keyGestureType, targetName)
+            if (featureNameToIntro == null) {
+                return null
+            }
 
-        return Pair(title, contentText)
+            val title =
+                resources.getString(
+                    R.string.accessibility_key_gesture_dialog_title,
+                    featureNameToIntro.first,
+                )
+            val content =
+                TextUtils.expandTemplate(
+                    resources.getText(R.string.accessibility_key_gesture_dialog_content),
+                    secondaryModifierLabel.invoke(context),
+                    keyCodeLabel,
+                    featureNameToIntro.first,
+                    featureNameToIntro.second,
+                )
+
+            return Pair(title, content)
+        }
     }
 
     override fun getActionKeyIconResId(): Int {
@@ -125,13 +151,6 @@ constructor(
         targetName: String,
     ): Pair<CharSequence, CharSequence>? {
         return when (keyGestureType) {
-            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION ->
-                Pair(
-                    resources.getString(
-                        com.android.settingslib.R.string.accessibility_screen_magnification_title
-                    ),
-                    resources.getString(R.string.accessibility_key_gesture_dialog_magnifier_intro),
-                )
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS,
             KeyGestureEvent.KEY_GESTURE_TYPE_ACTIVATE_SELECT_TO_SPEAK,
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER -> {
@@ -145,13 +164,51 @@ constructor(
                 if (accessibilityServiceInfo == null) {
                     null
                 } else {
-                    Pair(
-                        accessibilityServiceInfo.resolveInfo.loadLabel(packageManager).toString(),
-                        accessibilityServiceInfo.loadIntro(packageManager) ?: "",
-                    )
+                    val featureName =
+                        formatFeatureName(
+                            accessibilityServiceInfo.resolveInfo.loadLabel(packageManager)
+                        )
+
+                    val intro =
+                        getFeatureIntro(
+                            keyGestureType,
+                            featureName,
+                            accessibilityServiceInfo.loadIntro(packageManager),
+                        )
+
+                    Pair(featureName, intro)
                 }
             }
             else -> null
+        }
+    }
+
+    // Get the service name and bidi wrap it to protect from bidi side effects.
+    private fun formatFeatureName(label: CharSequence): CharSequence {
+        val locale = context.resources.configuration.getLocales().get(0)
+        return BidiFormatter.getInstance(locale).unicodeWrap(label)
+    }
+
+    /**
+     * @param defaultIntro The intro we get from AccessibilityServiceInfo
+     * @return A customize introduction
+     */
+    private fun getFeatureIntro(
+        keyGestureType: Int,
+        featureName: CharSequence,
+        defaultIntro: CharSequence?,
+    ): CharSequence {
+        return when (keyGestureType) {
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER ->
+                resources.getString(
+                    R.string.accessibility_key_gesture_dialog_talkback_intro,
+                    featureName,
+                )
+
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS ->
+                resources.getString(R.string.accessibility_key_gesture_dialog_va_intro, featureName)
+
+            else -> defaultIntro ?: ""
         }
     }
 }

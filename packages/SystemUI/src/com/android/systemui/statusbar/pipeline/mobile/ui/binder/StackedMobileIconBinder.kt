@@ -30,6 +30,7 @@ import com.android.systemui.kairos.ExperimentalKairosApi
 import com.android.systemui.kairos.KairosNetwork
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.lifecycle.repeatWhenAttached
+import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.statusbar.pipeline.mobile.StatusBarMobileIconKairos
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModel
@@ -37,6 +38,7 @@ import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobile
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModelKairos
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.ModernStatusBarViewBinding
 import com.android.systemui.statusbar.pipeline.shared.ui.composable.StackedMobileIcon
+import com.android.systemui.statusbar.pipeline.shared.ui.composable.CustomStackedMobileIcon
 import com.android.systemui.statusbar.pipeline.shared.ui.view.SingleBindableStatusBarComposeIconView
 import com.android.systemui.util.composable.kairos.rememberKairosActivatable
 
@@ -57,7 +59,11 @@ object StackedMobileIconBinder {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     view.composeView.apply {
                         setViewCompositionStrategy(
-                            ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+                            if (SceneContainerFlag.isEnabled) {
+                                ViewCompositionStrategy.Default
+                            } else {
+                                ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+                            }
                         )
                         setContent {
                             val viewModel: StackedMobileIconViewModel =
@@ -76,7 +82,7 @@ object StackedMobileIconBinder {
                             val tint by tintFlow.collectAsStateWithLifecycle()
                             if (viewModel.isIconVisible) {
                                 CompositionLocalProvider(LocalContentColor provides Color(tint)) {
-                                    StackedMobileIcon(
+                                    CustomStackedMobileIcon(
                                         viewModel,
                                         modifier = Modifier.onSizeChanged { view.requestLayout() },
                                     )

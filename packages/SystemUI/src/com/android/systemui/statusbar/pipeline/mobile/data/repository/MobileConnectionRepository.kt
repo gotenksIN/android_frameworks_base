@@ -14,23 +14,26 @@
  * limitations under the License.
  */
 
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
 package com.android.systemui.statusbar.pipeline.mobile.data.repository
 
 import android.telephony.CellSignalStrength
 import android.telephony.SubscriptionInfo
 import android.telephony.TelephonyManager
+import com.android.systemui.kairos.ExperimentalKairosApi
+import com.android.systemui.kairos.State
+import com.android.systemui.kairos.combine as kairosCombine
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.statusbar.pipeline.mobile.data.model.DataConnectionState
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
@@ -152,6 +155,9 @@ interface MobileConnectionRepository {
     /** Observable tracking [TelephonyManager.isDataConnectionAllowed] */
     val dataEnabled: StateFlow<Boolean>
 
+    /** Enables/disables data. See [TelephonyManager.setDataEnabledForReason] */
+    fun setDataEnabled(enabled: Boolean)
+
     /**
      * See [TelephonyManager.getCdmaEnhancedRoamingIndicatorDisplayNumber]. This bit only matters if
      * the connection type is CDMA.
@@ -163,35 +169,35 @@ interface MobileConnectionRepository {
     /** The service provider name for this network connection, or the default name. */
     val networkName: StateFlow<NetworkNameModel>
 
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
     val lteRsrpLevel: StateFlow<Int>
     val voiceNetworkType: StateFlow<Int>
     val dataNetworkType: StateFlow<Int>
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the customization signal strength icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
     val nrIconType: StateFlow<Int>
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the side car 5G icon
+// QTI_BEGIN: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
     val is6Rx: StateFlow<Boolean>
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
+// QTI_END: 2024-05-21: Data: SystemUI: Add 6Rx icons support for NrIcons
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt network type icon customization
     val dataRoamingEnabled: StateFlow<Boolean>
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt network type icon customization
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
     val originNetworkType: StateFlow<Int>
     val voiceCapable: StateFlow<Boolean>
     val videoCapable: StateFlow<Boolean>
     val imsRegistered: StateFlow<Boolean>
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the Volte HD icon
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt the Volte HD icon
+// QTI_BEGIN: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
     val imsRegistrationTech: StateFlow<Int>
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
-// QTI_BEGIN: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
+// QTI_END: 2023-04-01: Data: SystemUI: Readapt VoWifi icon
+// QTI_BEGIN: 2023-06-26: Data: Separate exclamation mark display for mobile network
     val isConnectionFailed: StateFlow<Boolean>
-// QTI_END: 2023-06-26: Telephony: Separate exclamation mark display for mobile network
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2023-06-26: Data: Separate exclamation mark display for mobile network
+// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
     val ciwlanAvailable: StateFlow<Boolean>
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
 
     /**
      * The service provider name for this network connection, or the default name.
@@ -264,6 +270,28 @@ interface MobileConnectionRepository {
                     }
                 }
                 .stateIn(scope, SharingStarted.WhileSubscribed(), default.value)
+        }
+
+        /**
+         * Automatically implements [MobileConnectionRepository.numberOfLevels] based on the
+         * [inflateSignalStrength] value, but for Kairos states.
+         *
+         * @param default The default number of levels to use if [inflateSignalStrength] is false.
+         */
+        @ExperimentalKairosApi
+        fun createNumberOfLevelsState(
+            inflateSignalStrength: State<Boolean>,
+            default: State<Int>,
+        ): State<Int> {
+            return kairosCombine(default, inflateSignalStrength) {
+                defaultNumberOfLevels,
+                shouldInflate ->
+                if (shouldInflate) {
+                    defaultNumberOfLevels + 1
+                } else {
+                    defaultNumberOfLevels
+                }
+            }
         }
     }
 }

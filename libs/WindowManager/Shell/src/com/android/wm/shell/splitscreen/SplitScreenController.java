@@ -868,7 +868,7 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
     public void startIntent(PendingIntent intent, int userId1, @Nullable Intent fillInIntent,
             @SplitPosition int position, @Nullable Bundle options,
             @Nullable WindowContainerToken hideTaskToken, @SplitIndex int index) {
-        startIntent(intent, userId1, fillInIntent, position, options, hideTaskToken,
+        startIntent(intent, userId1, fillInIntent, position, options, hideTaskToken, null /* wct */,
                 false /* forceLaunchNewTask */, index, DEFAULT_DISPLAY);
     }
 
@@ -882,8 +882,8 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
      */
     public void startIntent(PendingIntent intent, int userId1, @Nullable Intent fillInIntent,
             @SplitPosition int position, @Nullable Bundle options,
-            @Nullable WindowContainerToken hideTaskToken, boolean forceLaunchNewTask,
-            @SplitIndex int index, int displayId) {
+            @Nullable WindowContainerToken hideTaskToken, @Nullable WindowContainerTransaction wct,
+            boolean forceLaunchNewTask, @SplitIndex int index, int displayId) {
         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN,
                 "startIntent(): intent=%s user=%d fillInIntent=%s position=%d", intent, userId1,
                 fillInIntent, position);
@@ -935,7 +935,7 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
         }
 
         mStageCoordinator.startIntent(intent, fillInIntent, position, options, hideTaskToken,
-                index, displayId);
+                wct, index, displayId);
     }
 
     /**
@@ -1040,6 +1040,14 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
         if (isSplitScreenVisible()) {
             mStageCoordinator.switchSplitPosition(reason);
         }
+    }
+
+    /**
+     * Returns whether the status bar is in immersive mode.
+     * @return true if the status bar is in immersive mode.
+     */
+    public boolean isStatusBarImmersive() {
+        return mStageCoordinator.isStatusBarImmersive();
     }
 
     /**
@@ -1174,7 +1182,9 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
         @Override
         public void registerSplitAnimationListener(@NonNull SplitInvocationListener listener,
                 @NonNull Executor executor) {
-            mStageCoordinator.registerSplitAnimationListener(listener, executor);
+            mMainExecutor.execute(() -> {
+                mStageCoordinator.registerSplitAnimationListener(listener, executor);
+            });
         }
 
         @Override

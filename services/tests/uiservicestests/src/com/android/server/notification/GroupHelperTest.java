@@ -825,6 +825,162 @@ public class GroupHelperTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(FLAG_NOTIFICATION_FORCE_GROUPING)
+    public void testAutoGrouped_updateOngoingChild_updatesSummary() {
+        final String pkg = "package";
+        final String expectedGroupKey = GroupHelper.getFullAggregateGroupKey(pkg,
+                AGGREGATE_GROUP_KEY + "AlertingSection", UserHandle.SYSTEM.getIdentifier());
+
+        // Post AUTOGROUP_AT_COUNT ongoing notifications
+        ArrayList<NotificationRecord> notifications = new ArrayList<>();
+        for (int i = 0; i < AUTOGROUP_AT_COUNT; i++) {
+            NotificationRecord r = getNotificationRecord(pkg, i, String.valueOf(i),
+                    UserHandle.SYSTEM);
+            notifications.add(r);
+        }
+
+        for (NotificationRecord r: notifications) {
+            mGroupHelper.onNotificationPosted(r, false);
+            r.setOverrideGroupKey(expectedGroupKey);
+        }
+
+        // Update one notification to ONGOING_EVENT
+        Mockito.reset(mCallback);
+        final NotificationRecord updatedNotification = notifications.get(0);
+        updatedNotification.getNotification().flags |= FLAG_ONGOING_EVENT;
+        mGroupHelper.onNotificationPosted(updatedNotification, true);
+
+        // Check that summary has FLAG_ONGOING_EVENT
+        verify(mCallback).updateAutogroupSummary(anyInt(), anyString(), anyString(),
+                eq(getNotificationAttributes(BASE_FLAGS | FLAG_ONGOING_EVENT)));
+    }
+
+    @Test
+    @EnableFlags(FLAG_NOTIFICATION_FORCE_GROUPING)
+    public void testAutoGrouped_noFlagsUpdate_doesNotUpdateSummary() {
+        final String pkg = "package";
+        final String expectedGroupKey = GroupHelper.getFullAggregateGroupKey(pkg,
+                AGGREGATE_GROUP_KEY + "AlertingSection", UserHandle.SYSTEM.getIdentifier());
+
+        // Post AUTOGROUP_AT_COUNT ongoing notifications
+        ArrayList<NotificationRecord> notifications = new ArrayList<>();
+        for (int i = 0; i < AUTOGROUP_AT_COUNT; i++) {
+            NotificationRecord r = getNotificationRecord(pkg, i, String.valueOf(i),
+                    UserHandle.SYSTEM);
+            notifications.add(r);
+        }
+
+        for (NotificationRecord r: notifications) {
+            mGroupHelper.onNotificationPosted(r, false);
+            r.setOverrideGroupKey(expectedGroupKey);
+        }
+
+        // Update one notification without updating its flags
+        Mockito.reset(mCallback);
+        final NotificationRecord updatedNotification = notifications.get(0);
+        mGroupHelper.onNotificationPosted(updatedNotification, true);
+
+        // Check that nothing was updated
+        verify(mCallback, never()).removeAutoGroup(anyString());
+        verify(mCallback, never()).removeAutoGroupSummary(anyInt(), anyString(), anyString());
+        verify(mCallback, never()).updateAutogroupSummary(anyInt(), anyString(), anyString(),
+                any());
+    }
+
+    @Test
+    @EnableFlags(FLAG_NOTIFICATION_FORCE_GROUPING)
+    public void testAddAggregateSummary_summaryNoChildren_updateFlags_updatesSummary() {
+        final String pkg = "package";
+        final String expectedGroupKey = GroupHelper.getFullAggregateGroupKey(pkg,
+                AGGREGATE_GROUP_KEY + "AlertingSection", UserHandle.SYSTEM.getIdentifier());
+        final List<NotificationRecord> notificationList = new ArrayList<>();
+        final ArrayMap<String, NotificationRecord> summaryByGroup = new ArrayMap<>();
+        // Post group summaries without children => force autogroup
+        for (int i = 0; i < AUTOGROUP_AT_COUNT; i++) {
+            NotificationRecord r = getNotificationRecord(pkg, i, String.valueOf(i),
+                    UserHandle.SYSTEM, "testGrp " + i, true);
+            notificationList.add(r);
+            mGroupHelper.onNotificationPostedWithDelay(r, notificationList, summaryByGroup);
+        }
+        // Check that notifications were autogrouped
+        verify(mCallback, times(1)).addAutoGroupSummary(anyInt(), eq(pkg), anyString(),
+                eq(expectedGroupKey), anyInt(), eq(getNotificationAttributes(BASE_FLAGS)));
+        verify(mCallback, times(AUTOGROUP_AT_COUNT)).addAutoGroup(anyString(),
+                eq(expectedGroupKey), eq(true));
+        verify(mCallback, never()).removeAutoGroup(anyString());
+        verify(mCallback, never()).removeAutoGroupSummary(anyInt(), anyString(), anyString());
+        verify(mCallback, never()).updateAutogroupSummary(anyInt(), anyString(), anyString(),
+                any());
+
+        // Update notifications group key to aggregate group
+        for (NotificationRecord r: notificationList) {
+            r.setOverrideGroupKey(expectedGroupKey);
+        }
+
+        // Update to FLAG_ONGOING_EVENT
+        Mockito.reset(mCallback);
+        final NotificationRecord updatedNotification = notificationList.get(0);
+        updatedNotification.getNotification().flags |= FLAG_ONGOING_EVENT;
+        mGroupHelper.onNotificationPosted(updatedNotification, true);
+
+        verify(mCallback, times(1)).removeAutoGroup(updatedNotification.getKey());
+        updatedNotification.setOverrideGroupKey(null);
+
+        mGroupHelper.onNotificationPostedWithDelay(updatedNotification, notificationList,
+                summaryByGroup);
+
+        // Check that summary has FLAG_ONGOING_EVENT
+        verify(mCallback).updateAutogroupSummary(anyInt(), anyString(), anyString(),
+                eq(getNotificationAttributes(BASE_FLAGS | FLAG_ONGOING_EVENT)));
+    }
+
+    @Test
+    @EnableFlags(FLAG_NOTIFICATION_FORCE_GROUPING)
+    public void testAddAggregateSummary_childrenNoSummary_updateFlags_updatesSummary() {
+        final String pkg = "package";
+        final String expectedGroupKey = GroupHelper.getFullAggregateGroupKey(pkg,
+                AGGREGATE_GROUP_KEY + "AlertingSection", UserHandle.SYSTEM.getIdentifier());
+        final List<NotificationRecord> notificationList = new ArrayList<>();
+        final ArrayMap<String, NotificationRecord> summaryByGroup = new ArrayMap<>();
+        // Post group notifications without summaries => force autogroup
+        for (int i = 0; i < AUTOGROUP_AT_COUNT; i++) {
+            NotificationRecord r = getNotificationRecord(pkg, i, String.valueOf(i),
+                    UserHandle.SYSTEM, "testGrp " + i, false);
+            notificationList.add(r);
+            mGroupHelper.onNotificationPostedWithDelay(r, notificationList, summaryByGroup);
+        }
+        verify(mCallback, times(1)).addAutoGroupSummary(anyInt(), eq(pkg), anyString(),
+                eq(expectedGroupKey), anyInt(), eq(getNotificationAttributes(BASE_FLAGS)));
+        verify(mCallback, times(AUTOGROUP_AT_COUNT)).addAutoGroup(anyString(),
+                eq(expectedGroupKey), eq(true));
+        verify(mCallback, never()).removeAutoGroup(anyString());
+        verify(mCallback, never()).removeAutoGroupSummary(anyInt(), anyString(), anyString());
+        verify(mCallback, never()).updateAutogroupSummary(anyInt(), anyString(), anyString(),
+                any());
+
+        // Update notification group
+        for (NotificationRecord r: notificationList) {
+            r.setOverrideGroupKey(expectedGroupKey);
+        }
+
+        // Update to FLAG_ONGOING_EVENT
+        Mockito.reset(mCallback);
+        final NotificationRecord updatedNotification = notificationList.get(0);
+        updatedNotification.getNotification().flags |= FLAG_ONGOING_EVENT;
+        mGroupHelper.onNotificationPosted(updatedNotification, true);
+
+        verify(mCallback, times(1)).removeAutoGroup(updatedNotification.getKey());
+        updatedNotification.setOverrideGroupKey(null);
+
+        mGroupHelper.onNotificationPostedWithDelay(updatedNotification, notificationList,
+                summaryByGroup);
+
+        // Check that summary has FLAG_ONGOING_EVENT
+        verify(mCallback).updateAutogroupSummary(anyInt(), anyString(), anyString(),
+                eq(getNotificationAttributes(BASE_FLAGS | FLAG_ONGOING_EVENT)));
+    }
+
+    @Test
     @EnableFlags({FLAG_NOTIFICATION_FORCE_GROUPING})
     public void testDropToZeroRemoveGroup() {
         final String pkg = "package";
@@ -885,6 +1041,46 @@ public class GroupHelperTest extends UiServiceTestCase {
             }
         }
         verify(mCallback, times(1)).removeAutoGroupSummary(anyInt(), anyString(), anyString());
+    }
+
+    @Test
+    @EnableFlags({FLAG_NOTIFICATION_FORCE_GROUPING, FLAG_NOTIFICATION_CLASSIFICATION})
+    public void testAppStartsGroupingBundledNotification_doesNotUnAutogroup() {
+        final String pkg = "package";
+        final NotificationChannel socialChannel = new NotificationChannel(
+                NotificationChannel.SOCIAL_MEDIA_ID, NotificationChannel.SOCIAL_MEDIA_ID,
+                IMPORTANCE_LOW);
+        final String expectedGroupKey_social = GroupHelper.getFullAggregateGroupKey(pkg,
+                AGGREGATE_GROUP_KEY + "SocialSection", UserHandle.SYSTEM.getIdentifier());
+        ArrayList<NotificationRecord> posted = new ArrayList<>();
+        // Post ungrouped bundled notifications to trigger autogrouping
+        for (int i = 0; i < AUTOGROUP_BUNDLES_AT_COUNT; i++) {
+            NotificationRecord r = getNotificationRecord(pkg, i, String.valueOf(i),
+                    UserHandle.SYSTEM);
+            r.updateNotificationChannel(socialChannel);
+            posted.add(r);
+            mGroupHelper.onNotificationPosted(r, false);
+        }
+        verify(mCallback, times(1)).addAutoGroupSummary(anyInt(), eq(pkg), anyString(),
+                eq(expectedGroupKey_social), anyInt(), any());
+        verify(mCallback, times(AUTOGROUP_BUNDLES_AT_COUNT - 1)).addAutoGroup(anyString(),
+                eq(expectedGroupKey_social), anyBoolean());
+        verify(mCallback, never()).removeAutoGroup(anyString());
+        verify(mCallback, never()).removeAutoGroupSummary(anyInt(), anyString(), anyString());
+        Mockito.reset(mCallback);
+
+        // Set a group name for the notifications (app grouped) and post update
+        for (int i = 0; i < AUTOGROUP_BUNDLES_AT_COUNT; i++) {
+            final NotificationRecord r = getNotificationRecord(pkg, i, String.valueOf(i),
+                    UserHandle.SYSTEM, "app group", false);
+            r.getSbn().setOverrideGroupKey(expectedGroupKey_social);
+            r.updateNotificationChannel(socialChannel);
+            mGroupHelper.onNotificationPosted(r, true);
+        }
+        verify(mCallback, never()).removeAutoGroup(anyString());
+        verify(mCallback, never()).removeAutoGroupSummary(anyInt(), anyString(), anyString());
+        verify(mCallback, never()).updateAutogroupSummary(anyInt(), anyString(), anyString(),
+                any());
     }
 
     @Test

@@ -16,6 +16,7 @@
 
 package com.android.server.pm.verify.developer;
 
+import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_BYPASSED_REASON_UNSPECIFIED;
 import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_INCOMPLETE_NETWORK_UNAVAILABLE;
 import static android.content.pm.verify.developer.DeveloperVerificationSession.DEVELOPER_VERIFICATION_INCOMPLETE_UNKNOWN;
 import static android.os.Process.INVALID_UID;
@@ -76,7 +77,7 @@ public class DeveloperVerifierController {
             "verification_request_timeout_millis";
     // Default duration to wait for a verifier to respond to a verification request.
     private static final long DEFAULT_VERIFICATION_REQUEST_TIMEOUT_MILLIS =
-            TimeUnit.MINUTES.toMillis(1);
+            TimeUnit.SECONDS.toMillis(10);
     /**
      * Configurable maximum amount of time in milliseconds that the verifier can request to extend
      * the verification request timeout duration to. This is the maximum amount of time the system
@@ -140,6 +141,8 @@ public class DeveloperVerifierController {
     // Counter of active verification sessions per user; must be synced with the trackers map.
     private final SparseIntArray mSessionsCountPerUser = new SparseIntArray();
 
+    private final DeveloperVerifierExperimentProvider mExperimentProvider;
+
     /**
      * Get an instance of VerifierController.
      */
@@ -161,6 +164,7 @@ public class DeveloperVerifierController {
         mHandler = handler;
         mDeveloperVerificationServiceProvider = developerVerificationServiceProvider;
         mInjector = injector;
+        mExperimentProvider = new DeveloperVerifierExperimentProvider(mHandler);
     }
 
     /**
@@ -185,6 +189,20 @@ public class DeveloperVerifierController {
     }
 
     /**
+     * Return the UID of the verifier that is bound to the system. If the verifier has not been
+     * bound, return INVALID_UID.
+     */
+    public int getVerifierUidIfBound(int userId) {
+        synchronized (mRemoteServices) {
+            var remoteService = mRemoteServices.get(userId);
+            if (remoteService == null) {
+                return INVALID_UID;
+            }
+            return remoteService.getUid();
+        }
+    }
+
+    /**
      * Called to start querying and binding to a qualified verifier agent.
      *
      * @return False if a qualified verifier agent doesn't exist on device, so that the system can
@@ -201,7 +219,7 @@ public class DeveloperVerifierController {
      * {@link PackageInstallerSession.DeveloperVerifierCallback#onConnectionFailed}.
      */
     public boolean bindToVerifierServiceIfNeeded(Supplier<Computer> snapshotSupplier, int userId,
-            PackageInstallerSession.DeveloperVerifierCallback callback) {
+            Runnable onConnectionEstablished) {
         if (DEBUG) {
             Slog.i(TAG, "Requesting to bind to the verifier service for user " + userId);
         }
@@ -247,7 +265,7 @@ public class DeveloperVerifierController {
                         Slog.i(TAG, "Verifier " + verifierPackageName + " is connected"
                                 + " on user " + userId);
                         // Logging the success of connecting to the verifier.
-                        callback.onConnectionEstablished(verifierUid);
+                        onConnectionEstablished.run();
                         // Aggressively auto-disconnect until verification requests are sent out
                         startAutoDisconnectCountdown(
                                 remoteServiceWrapper.getAutoDisconnectCallback());
@@ -373,9 +391,9 @@ public class DeveloperVerifierController {
             @PackageInstaller.DeveloperVerificationPolicy int verificationPolicy,
             @Nullable PersistableBundle extensionParams,
             PackageInstallerSession.DeveloperVerifierCallback callback,
-            boolean retry) {
+            Runnable onConnectionEstablished, boolean retry) {
         // Try connecting to the verifier if not already connected
-        if (!bindToVerifierServiceIfNeeded(snapshotSupplier, userId, callback)) {
+        if (!bindToVerifierServiceIfNeeded(snapshotSupplier, userId, onConnectionEstablished)) {
             return false;
         }
         // For now, the verification id is the same as the installation session id.
@@ -645,6 +663,51 @@ public class DeveloperVerifierController {
             // Remove status tracking and stop the timeout countdown
             removeStatusTracker(id);
         }
+
+        @Override
+        public void reportVerificationBypassed(int id, int bypassReason) {
+            assertCallerIsCurrentVerifier(getCallingUid());
+            final DeveloperVerificationRequestStatusTracker tracker;
+            synchronized (mVerificationStatusTrackers) {
+                tracker = mVerificationStatusTrackers.get(id);
+                if (tracker == null) {
+                    throw new IllegalStateException("Verification session " + id
+                            + " doesn't exist or has finished");
+                }
+            }
+            if (bypassReason <= DEVELOPER_VERIFICATION_BYPASSED_REASON_UNSPECIFIED) {
+                throw new IllegalArgumentException("Verification session " + id
+                        + " reported invalid bypass_reason code " + bypassReason);
+            }
+            mCallback.onVerificationBypassedReceived(bypassReason);
+            // Remove status tracking and stop the timeout countdown
+            removeStatusTracker(id);
+        }
+    }
+
+    /**
+     * Add an experiment to the experiment provider.
+     * <p>Notice that invalid status codes will be ignored. Valid status codes are defined in
+     * {@link DeveloperVerificationStatusInternal}.
+     * </p>
+     */
+    public void addExperiment(String packageName, int verificationPolicy, List<Integer> status) {
+        mExperimentProvider.addExperiment(packageName, verificationPolicy, status);
+    }
+
+    /**
+     * Check if there is an experiment for the given package.
+     */
+    public boolean hasExperiments(String packageName) {
+        return mExperimentProvider.hasExperiments(packageName);
+    }
+
+    /**
+     * Start a local experiment for the given package.
+     */
+    public void startLocalExperiment(String packageName,
+            PackageInstallerSession.DeveloperVerifierCallback callback) {
+        mExperimentProvider.runNextExperiment(packageName, callback);
     }
 
     private static class ServiceConnectorWrapper {

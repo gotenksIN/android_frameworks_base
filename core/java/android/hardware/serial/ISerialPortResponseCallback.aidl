@@ -28,11 +28,11 @@ oneway interface ISerialPortResponseCallback {
     /** Error codes for {@link #onError}. */
     @Backing(type="int")
     enum ErrorCode {
-        // IOException while reading the list of derial drivers
-        ERROR_READING_DRIVERS = 0,
         // Serial port with the given name does not exist.
-        ERROR_PORT_NOT_FOUND = 1,
-        // ErrnoException while opening the serial port.
+        ERROR_PORT_NOT_FOUND = 0,
+        // SecurityException due to access denied.
+        ERROR_ACCESS_DENIED = 1,
+        // Error while opening the serial port.
         ERROR_OPENING_PORT = 2,
     }
 
@@ -48,8 +48,7 @@ oneway interface ISerialPortResponseCallback {
      * Called when the serial port opening failed.
      *
      * @param errorCode The error code indicating the type of error that occurred.
-     * @param errno The errno from ErrnoException in case of ERROR_OPENING_PORT.
      * @param message Additional text information about the error.
      */
-    void onError(in ErrorCode errorCode, in int errno, in String message);
+    void onError(in ErrorCode errorCode, in String message);
 }

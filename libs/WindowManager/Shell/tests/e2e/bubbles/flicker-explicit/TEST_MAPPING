@@ -4,16 +4,73 @@
       "name": "WMShellExplicitFlickerTestsBubbles-CatchAll"
     },
     {
-      "name": "WMShellExplicitFlickerTestsBubbles-CollapseBubbleViaBackTest"
+      "name": "WMShellExplicitFlickerTestsBubbles-BubbleBarMovesTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-BubbleBarVisibilityTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-BubbleIconMoveTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-CollapseBubbleAppFromOverviewTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-CollapseBubbleAppViaBackTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-CollapseBubbleAppViaTouchOutsideTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-DismissAllCollapsedBubbleAppsTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-DismissExpandedBubbleViaBubbleBarHandleTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-DismissExpandedBubbleViaBubbleBarTest"
     },
     {
       "name": "WMShellExplicitFlickerTestsBubbles-DismissExpandedBubbleViaBubbleViewTest"
     },
     {
+      "name": "WMShellExplicitFlickerTestsBubbles-EnterBubbleFromHomeScreenTest"
+    },
+    {
       "name": "WMShellExplicitFlickerTestsBubbles-EnterBubbleViaBubbleMenuTest"
     },
     {
+      "name": "WMShellExplicitFlickerTestsBubbles-EnterBubbleViaDragToBubbleBarTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-EnterBubbleViaOverflowMenuTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-EnterBubbleWithImeViaBubbleMenuTest"
+    },
+    {
       "name": "WMShellExplicitFlickerTestsBubbles-ExpandBubbleViaBubbleStackTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-ExpandBubbleWithImeViaBubbleBarTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-ExpandedBubbleAppMoveTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-LaunchMultipleBubbleTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-ScrollableBubbleAppTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-SwitchBetweenBubblesTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchSplitScreenToBubbleTest"
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchBubbleIntoSplitScreenTest"
     }
   ]
 }

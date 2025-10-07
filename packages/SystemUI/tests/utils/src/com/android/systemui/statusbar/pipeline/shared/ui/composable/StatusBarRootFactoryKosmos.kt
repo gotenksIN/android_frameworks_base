@@ -16,9 +16,11 @@
 
 package com.android.systemui.statusbar.pipeline.shared.ui.composable
 
+import com.android.systemui.clock.ui.viewmodel.clockViewModelFactory
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.media.controls.ui.controller.mediaHierarchyManager
 import com.android.systemui.media.controls.ui.view.qsMediaHost
+import com.android.systemui.media.remedia.ui.viewmodel.factory.mediaViewModelFactory
 import com.android.systemui.plugins.fakeDarkIconDispatcher
 import com.android.systemui.statusbar.events.domain.interactor.systemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.connectedDisplaysStatusBarNotificationIconViewStoreFactory
@@ -33,12 +35,15 @@ val Kosmos.statusBarRootFactory by
         StatusBarRootFactory(
             notificationIconsBinder = mock(),
             iconViewStoreFactory = connectedDisplaysStatusBarNotificationIconViewStoreFactory,
+            clockViewModelFactory = clockViewModelFactory,
             darkIconManagerFactory = mock(),
+            tintedIconManagerFactory = mock(),
             iconController = statusBarIconController,
             ongoingCallController = mock(),
             eventAnimationInteractor = systemStatusEventAnimationInteractor,
             mediaHierarchyManager = mediaHierarchyManager,
             mediaHost = qsMediaHost,
+            mediaViewModelFactory = mediaViewModelFactory,
             darkIconDispatcher = fakeDarkIconDispatcher,
             homeStatusBarViewBinder = homeStatusBarViewBinder,
             homeStatusBarViewModelFactory = defaultDisplayHomeStatusBarViewModelFactory,

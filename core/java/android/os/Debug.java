@@ -29,6 +29,7 @@ import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.Preconditions;
 import com.android.internal.util.TypedProperties;
 
+import dalvik.annotation.optimization.CriticalNative;
 import dalvik.system.VMDebug;
 
 import org.apache.harmony.dalvik.ddmc.Chunk;
@@ -52,8 +53,10 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 import java.util.List;
 import java.util.ArrayList;
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 
 
 /**
@@ -999,6 +1002,7 @@ public final class Debug
         }
     }
 
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     /**
      * This class is used to retrieved process allocated dma buffer
      * {@hide}
@@ -1027,6 +1031,7 @@ public final class Debug
             return size / pids.size();
         }
     }
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 
     /**
      * Wait until a debugger attaches. As soon as a debugger attaches,
@@ -1966,18 +1971,21 @@ public final class Debug
      * Returns the size of the native heap.
      * @return The size of the native heap in bytes.
      */
+    @CriticalNative
     public static native long getNativeHeapSize();
 
     /**
      * Returns the amount of allocated memory in the native heap.
      * @return The allocated size in bytes.
      */
+    @CriticalNative
     public static native long getNativeHeapAllocatedSize();
 
     /**
      * Returns the amount of free memory in the native heap.
      * @return The freed size in bytes.
      */
+    @CriticalNative
     public static native long getNativeHeapFreeSize();
 
     /**
@@ -2067,39 +2075,67 @@ public final class Debug
     /** @hide */
     public static final int MEMINFO_PAGE_TABLES = 13;
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_SEC_PAGE_TABLES = 14;
     /** @hide */
     public static final int MEMINFO_KERNEL_STACK = 15;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /**
      * Note: MEMINFO_KRECLAIMABLE includes MEMINFO_SLAB_RECLAIMABLE (see KReclaimable field
      * description in kernel documentation).
      * @hide
      */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_KRECLAIMABLE = 16;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_ACTIVE = 17;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_INACTIVE = 18;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_UNEVICTABLE = 19;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_AVAILABLE = 20;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_ACTIVE_ANON = 21;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_INACTIVE_ANON = 22;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_ACTIVE_FILE = 23;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_INACTIVE_FILE = 24;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_CMA_TOTAL = 25;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_CMA_FREE = 26;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_SWAP_CACHED = 27;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
     /** @hide */
+// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
     public static final int MEMINFO_COUNT = 28;
+// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
 
     /**
      * Retrieves /proc/meminfo.  outSizes is filled with fields
@@ -2934,6 +2970,7 @@ public final class Debug
      */
     public static native long getKernelCmaUsageKb();
 
+// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     /**
      * Retrieves the list of DMA buffers used by all processes that are currently using DMA.
      * @return true if the DMA buffers were read successfully, false otherwise.
@@ -2949,4 +2986,5 @@ public final class Debug
      */
     public static native String getPidComm(int pid);
 
+// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 }

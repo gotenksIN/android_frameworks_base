@@ -31,6 +31,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import androidx.test.ext.junit.rules.ActivityScenarioRule
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Configurator
@@ -44,10 +45,9 @@ import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.runners.JUnit4
 import platform.test.desktop.DesktopMouseTestRule
 
-@RunWith(JUnit4::class)
+@RunWith(AndroidJUnit4::class)
 @RequiresFlagsEnabled(Flags.FLAG_ENABLE_AUTOCLICK_INDICATOR)
 class AutoclickClickTypeTests {
     @Rule(order = 0)
@@ -56,6 +56,11 @@ class AutoclickClickTypeTests {
 
     @Rule(order = 1)
     @JvmField
+    val activityScenarioRule: ActivityScenarioRule<TestClickActivity> =
+        ActivityScenarioRule(TestClickActivity::class.java)
+
+    @Rule(order = 2)
+    @JvmField
     val autoclickEnabledSettingRule: SettingsStateChangerRule =
         SettingsStateChangerRule(
             InstrumentationRegistry.getInstrumentation().context,
@@ -63,15 +68,9 @@ class AutoclickClickTypeTests {
             "1"
         )
 
-    @Rule(order = 2)
+    @Rule(order = 3)
     @JvmField
     val desktopMouseTestRule = DesktopMouseTestRule()
-
-    @Rule
-    @JvmField
-    val activityScenarioRule: ActivityScenarioRule<TestClickActivity> =
-        ActivityScenarioRule(TestClickActivity::class.java)
-
     private val instrumentation: Instrumentation = InstrumentationRegistry.getInstrumentation()
 
     private lateinit var uiDevice: UiDevice
@@ -85,6 +84,10 @@ class AutoclickClickTypeTests {
         activityScenarioRule.scenario.onActivity { activity ->
             testClickButton = activity.findViewById(TEST_BUTTON_ID)
         }
+
+        initiateAutoclickPanel(
+            InstrumentationRegistry.getInstrumentation().context, uiDevice, desktopMouseTestRule
+        )
     }
 
     private fun getViewCenter(view: View): Pair<Int, Int> {
@@ -198,14 +201,16 @@ class AutoclickClickTypeTests {
         changeClickType(uiDevice, desktopMouseTestRule, SCROLL_BUTTON_LAYOUT_ID)
         moveMouseToView(testClickButton)
 
+        // Scroll to each button in this order to prevent the exit button from being inadvertently
+        // hovered.
+        moveMouseToScrollButton(SCROLL_RIGHT_BUTTON_LAYOUT_ID)
+        waitAndAssert {
+            testClickButton.text == SCROLL_RIGHT_TEXT
+        }
+
         moveMouseToScrollButton(SCROLL_UP_BUTTON_LAYOUT_ID)
         waitAndAssert {
             testClickButton.text == SCROLL_UP_TEXT
-        }
-
-        moveMouseToScrollButton(SCROLL_DOWN_BUTTON_LAYOUT_ID)
-        waitAndAssert {
-            testClickButton.text == SCROLL_DOWN_TEXT
         }
 
         moveMouseToScrollButton(SCROLL_LEFT_BUTTON_LAYOUT_ID)
@@ -213,9 +218,15 @@ class AutoclickClickTypeTests {
             testClickButton.text == SCROLL_LEFT_TEXT
         }
 
-        moveMouseToScrollButton(SCROLL_RIGHT_BUTTON_LAYOUT_ID)
+        moveMouseToScrollButton(SCROLL_DOWN_BUTTON_LAYOUT_ID)
         waitAndAssert {
-            testClickButton.text == SCROLL_RIGHT_TEXT
+            testClickButton.text == SCROLL_DOWN_TEXT
+        }
+
+        // Close the scroll panel.
+        moveMouseToScrollButton(SCROLL_EXIT_BUTTON_LAYOUT_ID)
+        waitAndAssert {
+            uiDevice.findObject(By.res(SCROLL_EXIT_BUTTON_LAYOUT_ID)) == null
         }
     }
 
@@ -325,6 +336,12 @@ class AutoclickClickTypeTests {
         @AfterClass
         @JvmStatic
         fun teardownAfterClass() {
+            // Wait for the Autoclick panel to be closed.
+            waitAndAssert {
+                UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                    .findObject(By.res(AUTOCLICK_PANEL_ID)) == null
+            }
+
             // Re-enable SDK version dialog.
             InstrumentationRegistry.getInstrumentation().uiAutomation
                 .executeShellCommand("setprop debug.wm.disable_deprecated_target_sdk_dialog 0")

@@ -24,6 +24,7 @@ import static com.android.internal.util.Preconditions.checkNotNull;
 
 import android.Manifest;
 import android.annotation.BoolRes;
+import android.annotation.BroadcastBehavior;
 import android.annotation.BytesLong;
 import android.annotation.CallbackExecutor;
 import android.annotation.CurrentTimeMillisLong;
@@ -71,6 +72,7 @@ import android.os.OutcomeReceiver;
 import android.os.ParcelFileDescriptor;
 import android.os.ParcelUuid;
 import android.os.Parcelable;
+import android.os.ParcelableException;
 import android.os.PersistableBundle;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
@@ -191,7 +193,6 @@ import java.util.stream.IntStream;
 public class TelephonyManager {
     private static final String TAG = "TelephonyManager";
 
-    private TelephonyRegistryManager mTelephonyRegistryMgr;
     /**
      * To expand the error codes for {@link TelephonyManager#updateAvailableNetworks} and
      * {@link TelephonyManager#setPreferredOpportunisticDataSubscription}.
@@ -675,8 +676,12 @@ public class TelephonyManager {
         static final int PSEUDO_DSDA = 2;
         /** Concurrent calls on both subscriptions are possible */
         static final int DSDA = 3;
+// QTI_END: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
+// QTI_BEGIN: 2025-01-22: Telephony: Introduce new MultiSimVoiceCapability value
         /** MultiSimVoiceCapability is unsupported/deprecated */
         static final int UNSUPPORTED = 4;
+// QTI_END: 2025-01-22: Telephony: Introduce new MultiSimVoiceCapability value
+// QTI_BEGIN: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
     }
 
 // QTI_END: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
@@ -1452,7 +1457,6 @@ public class TelephonyManager {
      *
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int CDMA_ROAMING_MODE_RADIO_DEFAULT = -1;
     /**
@@ -1461,7 +1465,6 @@ public class TelephonyManager {
      *
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int CDMA_ROAMING_MODE_HOME = 0;
     /**
@@ -1470,7 +1473,6 @@ public class TelephonyManager {
      *
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int CDMA_ROAMING_MODE_AFFILIATED = 1;
     /**
@@ -1479,7 +1481,6 @@ public class TelephonyManager {
      *
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int CDMA_ROAMING_MODE_ANY = 2;
 
@@ -2215,6 +2216,42 @@ public class TelephonyManager {
     public static final String ACTION_RESET_MOBILE_NETWORK_SETTINGS =
             "android.telephony.action.RESET_MOBILE_NETWORK_SETTINGS";
 
+    /**
+     * Broadcast intent action indicating the SET UP EVENT LIST received from the UICC has
+     * changed.
+     *
+     * <p> The intent will have the following extra values:</p>
+     * <ul>
+     *   <li>{@link #EXTRA_SUBSCRIPTION_ID}</li>
+     *   <li>{@link #EXTRA_SETUP_EVENT_LIST}</li>
+     * </ul>
+     * <p class="note">Requires the STK_PERMISSION.</p>
+     * <p class="note">This is a protected intent that can only be sent by the system.</p>
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_IMS_REGISTRATION_EVENT_DOWNLOAD)
+    @RequiresPermission(android.Manifest.permission.RECEIVE_STK_COMMANDS)
+    @SystemApi
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    @BroadcastBehavior(explicitOnly = true)
+    public static final String ACTION_STK_SETUP_EVENT_LIST =
+            "android.telephony.action.STK_SETUP_EVENT_LIST";
+
+    /**
+     * Extra included in {@link #ACTION_STK_SETUP_EVENT_LIST}.
+     * It indicates changed list of SET UP EVENT LIST. UICC supplies this list of events
+     * which it wants the terminal to provide details of when these events happen.
+     * Each event in the list shall be coded with one of the values in 8.25 of TS 102.223
+     * (e.g. IMS Registration = 0x17)
+     *
+     * <p class="note"> Retrieve with
+     * {@link android.content.Intent#getIntArrayExtra(String)}.</p>
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_IMS_REGISTRATION_EVENT_DOWNLOAD)
+    @SystemApi
+    public static final String EXTRA_SETUP_EVENT_LIST = "android.telephony.extra.SETUP_EVENT_LIST";
+
     //
     //
     // Device Info
@@ -2362,9 +2399,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public String getDeviceId(int slotIndex) {
         // FIXME this assumes phoneId == slotIndex
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(8, ""+slotIndex);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -2506,14 +2543,12 @@ public class TelephonyManager {
      *          Android 25Q1 or earlier and does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_CDMA}.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SuppressAutoDoc // No support for device / profile owner or carrier privileges (b/72967236).
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public String getMeid() {
-        if (Flags.cleanupCdma()) return null;
-        return getMeid(getSlotIndex());
+        return null;
     }
 
     /**
@@ -2552,29 +2587,12 @@ public class TelephonyManager {
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_CDMA}.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SuppressAutoDoc // No support for device / profile owner or carrier privileges (b/72967236).
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public String getMeid(int slotIndex) {
-        if (Flags.cleanupCdma()) return null;
-        ITelephony telephony = getITelephony();
-        if (telephony == null) return null;
-
-        try {
-            String meid = telephony.getMeidForSlot(slotIndex, getOpPackageName(),
-                    getAttributionTag());
-            if (TextUtils.isEmpty(meid)) {
-                Log.d(TAG, "getMeid: return null because MEID is not available");
-                return null;
-            }
-            return meid;
-        } catch (RemoteException ex) {
-            return null;
-        } catch (NullPointerException ex) {
-            return null;
-        }
+        return null;
     }
 
     /**
@@ -2585,13 +2603,11 @@ public class TelephonyManager {
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_CDMA}.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     @Nullable
     public String getManufacturerCode() {
-        if (Flags.cleanupCdma()) return null;
-        return getManufacturerCode(getSlotIndex());
+        return null;
     }
 
     /**
@@ -2604,22 +2620,11 @@ public class TelephonyManager {
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_CDMA}.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     @Nullable
     public String getManufacturerCode(int slotIndex) {
-        if (Flags.cleanupCdma()) return null;
-        ITelephony telephony = getITelephony();
-        if (telephony == null) return null;
-
-        try {
-            return telephony.getManufacturerCodeForSlot(slotIndex);
-        } catch (RemoteException ex) {
-            return null;
-        } catch (NullPointerException ex) {
-            return null;
-        }
+        return null;
     }
 
     /**
@@ -2697,9 +2702,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public CellLocation getCellLocation() {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(49);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null) {
@@ -2738,9 +2743,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public List<NeighboringCellInfo> getNeighboringCellInfo() {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(50);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null)
@@ -2763,7 +2768,6 @@ public class TelephonyManager {
      *
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int PHONE_TYPE_CDMA = PhoneConstants.PHONE_TYPE_CDMA;
     /** Phone is via SIP. */
@@ -2784,26 +2788,25 @@ public class TelephonyManager {
     public static final int PHONE_TYPE_THIRD_PARTY = PhoneConstants.PHONE_TYPE_THIRD_PARTY;
 
     /**
-     * Returns the current phone type.
-     * TODO: This is a last minute change and hence hidden.
+     * Returns the current phone type. It should be always {@link #PHONE_TYPE_GSM} as we no longer
+     * support CDMA.
      *
      * @see #PHONE_TYPE_NONE
      * @see #PHONE_TYPE_GSM
      * @see #PHONE_TYPE_CDMA
      * @see #PHONE_TYPE_SIP
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY}.
      * {@hide}
      */
     @SystemApi
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY)
     public int getCurrentPhoneType() {
-        return getCurrentPhoneType(getSubId());
+        return PHONE_TYPE_GSM;
     }
 
     /**
-     * Returns a constant indicating the device phone type for a subscription.
+     * Returns a constant indicating the device phone type for a subscription. It should be always
+     * {@link #PHONE_TYPE_GSM} as we no longer support CDMA.
      *
      * @see #PHONE_TYPE_NONE
      * @see #PHONE_TYPE_GSM
@@ -2818,41 +2821,7 @@ public class TelephonyManager {
     @SystemApi
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY)
     public int getCurrentPhoneType(int subId) {
-        int phoneId;
-        if (subId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-            // if we don't have any sims, we don't have subscriptions, but we
-            // still may want to know what type of phone we've got.
-            phoneId = 0;
-        } else {
-            phoneId = SubscriptionManager.getPhoneId(subId);
-        }
-
-        return getCurrentPhoneTypeForSlot(phoneId);
-    }
-
-    /**
-     * See getCurrentPhoneType.
-     *
-     * @hide
-     */
-    public int getCurrentPhoneTypeForSlot(int slotIndex) {
-        try{
-            ITelephony telephony = getITelephony();
-            if (telephony != null) {
-                return telephony.getActivePhoneTypeForSlot(slotIndex);
-            } else {
-                // This can happen when the ITelephony interface is not up yet.
-                return getPhoneTypeFromProperty(slotIndex);
-            }
-        } catch (RemoteException ex) {
-            // This shouldn't happen in the normal case, as a backup we
-            // read from the system property.
-            return getPhoneTypeFromProperty(slotIndex);
-        } catch (NullPointerException ex) {
-            // This shouldn't happen in the normal case, as a backup we
-            // read from the system property.
-            return getPhoneTypeFromProperty(slotIndex);
-        }
+        return PHONE_TYPE_GSM;
     }
 
     /**
@@ -2872,81 +2841,7 @@ public class TelephonyManager {
         if (!isDeviceVoiceCapable() && !isDataCapable()) {
             return PHONE_TYPE_NONE;
         }
-        return getCurrentPhoneType();
-    }
-
-    /** {@hide} */
-    @UnsupportedAppUsage
-    private int getPhoneTypeFromProperty(int phoneId) {
-        Integer type = getTelephonyProperty(
-                phoneId, TelephonyProperties.current_active_phone(), null);
-        if (type != null) return type;
-        return getPhoneTypeFromNetworkType(phoneId);
-    }
-
-    /** {@hide} */
-    private int getPhoneTypeFromNetworkType(int phoneId) {
-        // When the system property CURRENT_ACTIVE_PHONE, has not been set,
-        // use the system property for default network type.
-        // This is a fail safe, and can only happen at first boot.
-        Integer mode = getTelephonyProperty(phoneId, TelephonyProperties.default_network(), null);
-        if (mode != null) {
-            return TelephonyManager.getPhoneType(mode);
-        }
-        return TelephonyManager.PHONE_TYPE_NONE;
-    }
-
-    /**
-     * This function returns the type of the phone, depending
-     * on the network mode.
-     *
-     * @param networkMode
-     * @return Phone Type
-     *
-     * @hide
-     */
-    @UnsupportedAppUsage
-    public static int getPhoneType(int networkMode) {
-        switch(networkMode) {
-        case RILConstants.NETWORK_MODE_CDMA:
-        case RILConstants.NETWORK_MODE_CDMA_NO_EVDO:
-        case RILConstants.NETWORK_MODE_EVDO_NO_CDMA:
-            return PhoneConstants.PHONE_TYPE_CDMA;
-
-        case RILConstants.NETWORK_MODE_WCDMA_PREF:
-        case RILConstants.NETWORK_MODE_GSM_ONLY:
-        case RILConstants.NETWORK_MODE_WCDMA_ONLY:
-        case RILConstants.NETWORK_MODE_GSM_UMTS:
-        case RILConstants.NETWORK_MODE_LTE_GSM_WCDMA:
-        case RILConstants.NETWORK_MODE_LTE_WCDMA:
-        case RILConstants.NETWORK_MODE_LTE_CDMA_EVDO_GSM_WCDMA:
-        case RILConstants.NETWORK_MODE_TDSCDMA_ONLY:
-        case RILConstants.NETWORK_MODE_TDSCDMA_WCDMA:
-        case RILConstants.NETWORK_MODE_LTE_TDSCDMA:
-        case RILConstants.NETWORK_MODE_TDSCDMA_GSM:
-        case RILConstants.NETWORK_MODE_LTE_TDSCDMA_GSM:
-        case RILConstants.NETWORK_MODE_TDSCDMA_GSM_WCDMA:
-        case RILConstants.NETWORK_MODE_LTE_TDSCDMA_WCDMA:
-        case RILConstants.NETWORK_MODE_LTE_TDSCDMA_GSM_WCDMA:
-        case RILConstants.NETWORK_MODE_LTE_TDSCDMA_CDMA_EVDO_GSM_WCDMA:
-            return PhoneConstants.PHONE_TYPE_GSM;
-
-        // Use CDMA Phone for the global mode including CDMA
-        case RILConstants.NETWORK_MODE_GLOBAL:
-        case RILConstants.NETWORK_MODE_LTE_CDMA_EVDO:
-        case RILConstants.NETWORK_MODE_TDSCDMA_CDMA_EVDO_GSM_WCDMA:
-            return PhoneConstants.PHONE_TYPE_CDMA;
-
-        case RILConstants.NETWORK_MODE_LTE_ONLY:
-            if (TelephonyProperties.lte_on_cdma_device().orElse(
-                    PhoneConstants.LTE_ON_CDMA_FALSE) == PhoneConstants.LTE_ON_CDMA_TRUE) {
-                return PhoneConstants.PHONE_TYPE_CDMA;
-            } else {
-                return PhoneConstants.PHONE_TYPE_GSM;
-            }
-        default:
-            return PhoneConstants.PHONE_TYPE_GSM;
-        }
+        return PHONE_TYPE_GSM;
     }
 
     /**
@@ -2966,10 +2861,6 @@ public class TelephonyManager {
 
     /**
      * Returns the alphabetic name of current registered operator.
-     * <p>
-     * Availability: Only when user is registered to a network. Result may be
-     * unreliable on CDMA networks (use {@link #getPhoneType()} to determine if
-     * on a CDMA network).
      */
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public String getNetworkOperatorName() {
@@ -2980,10 +2871,8 @@ public class TelephonyManager {
      * Returns the alphabetic name of current registered operator
      * for a particular subscription.
      * <p>
-     * Availability: Only when user is registered to a network. Result may be
-     * unreliable on CDMA networks (use {@link #getPhoneType()} to determine if
-     * on a CDMA network).
-     * @param subId
+     *
+     * @param subId The subscription id.
      * @hide
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
@@ -2994,10 +2883,6 @@ public class TelephonyManager {
 
     /**
      * Returns the numeric name (MCC+MNC) of current registered operator.
-     * <p>
-     * Availability: Only when user is registered to a network. Result may be
-     * unreliable on CDMA networks (use {@link #getPhoneType()} to determine if
-     * on a CDMA network).
      */
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public String getNetworkOperator() {
@@ -3007,12 +2892,8 @@ public class TelephonyManager {
     /**
      * Returns the numeric name (MCC+MNC) of current registered operator
      * for a particular subscription.
-     * <p>
-     * Availability: Only when user is registered to a network. Result may be
-     * unreliable on CDMA networks (use {@link #getPhoneType()} to determine if
-     * on a CDMA network).
      *
-     * @param subId
+     * @param subId The subscription id.
      * @hide
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
@@ -3025,11 +2906,8 @@ public class TelephonyManager {
      * Returns the numeric name (MCC+MNC) of current registered operator
      * for a particular subscription.
      * <p>
-     * Availability: Only when user is registered to a network. Result may be
-     * unreliable on CDMA networks (use {@link #getPhoneType()} to determine if
-     * on a CDMA network).
      *
-     * @param phoneId
+     * @param phoneId The phone id
      * @hide
      **/
     @UnsupportedAppUsage
@@ -3110,9 +2988,6 @@ public class TelephonyManager {
     /**
      * Returns the ISO-3166-1 alpha-2 country code equivalent of the MCC (Mobile Country Code) of
      * the current registered operator or the cell nearby, if available.
-     *
-     * Note: Result may be unreliable on CDMA networks (use {@link #getPhoneType()} to determine
-     * if on a CDMA network).
      * <p>
      * @return the lowercase 2 character ISO-3166-1 alpha-2 country code, or empty string if not
      * available.
@@ -3130,10 +3005,6 @@ public class TelephonyManager {
      * the current registered operator or the cell nearby, if available. This is same as
      * {@link #getNetworkCountryIso()} but allowing specifying the SIM slot index. This is used for
      * accessing network country info from the SIM slot that does not have SIM inserted.
-     *
-     * Note: Result may be unreliable on CDMA networks (use {@link #getPhoneType()} to determine
-     * if on a CDMA network).
-     * <p>
      *
      * @param slotIndex the SIM slot index to get network country ISO.
      *
@@ -3190,28 +3061,24 @@ public class TelephonyManager {
      * Current network is CDMA: Either IS95A or IS95B
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int NETWORK_TYPE_CDMA = TelephonyProtoEnums.NETWORK_TYPE_CDMA; // = 4.
     /**
      * Current network is EVDO revision 0
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int NETWORK_TYPE_EVDO_0 = TelephonyProtoEnums.NETWORK_TYPE_EVDO_0; // = 5.
     /**
      * Current network is EVDO revision A
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int NETWORK_TYPE_EVDO_A = TelephonyProtoEnums.NETWORK_TYPE_EVDO_A; // = 6.
     /**
      * Current network is 1xRTT
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int NETWORK_TYPE_1xRTT = TelephonyProtoEnums.NETWORK_TYPE_1XRTT; // = 7.
     /** Current network is HSDPA */
@@ -3230,7 +3097,6 @@ public class TelephonyManager {
      * Current network is EVDO revision B
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int NETWORK_TYPE_EVDO_B = TelephonyProtoEnums.NETWORK_TYPE_EVDO_B; // = 12.
     /** Current network is LTE */
@@ -3239,7 +3105,6 @@ public class TelephonyManager {
      * Current network is eHRPD
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int NETWORK_TYPE_EHRPD = TelephonyProtoEnums.NETWORK_TYPE_EHRPD; // = 14.
     /** Current network is HSPA+ */
@@ -4380,9 +4245,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @UnsupportedAppUsage
     public String getSimSerialNumber(int subId) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(388, ""+subId);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -4415,35 +4280,7 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public boolean isLteCdmaEvdoGsmWcdmaEnabled() {
-        return getLteOnCdmaMode(getSubId()) == PhoneConstants.LTE_ON_CDMA_TRUE;
-    }
-
-    /**
-     * Return if the current radio is LTE on CDMA for Subscription. This
-     * is a tri-state return value as for a period of time
-     * the mode may be unknown.
-     *
-     * @param subId for which radio is LTE on CDMA is returned
-     * @return {@link PhoneConstants#LTE_ON_CDMA_UNKNOWN}, {@link PhoneConstants#LTE_ON_CDMA_FALSE}
-     * or {@link PhoneConstants#LTE_ON_CDMA_TRUE}
-     * @hide
-     */
-    @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
-    @UnsupportedAppUsage
-    public int getLteOnCdmaMode(int subId) {
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony == null)
-                return PhoneConstants.LTE_ON_CDMA_UNKNOWN;
-            return telephony.getLteOnCdmaModeForSubscriber(subId, getOpPackageName(),
-                    getAttributionTag());
-        } catch (RemoteException ex) {
-            // Assume no ICC card if remote exception which shouldn't happen
-            return PhoneConstants.LTE_ON_CDMA_UNKNOWN;
-        } catch (NullPointerException ex) {
-            // This could happen before phone restarts due to crashing
-            return PhoneConstants.LTE_ON_CDMA_UNKNOWN;
-        }
+        return false;
     }
 
     /**
@@ -4681,6 +4518,23 @@ public class TelephonyManager {
      * slotMapping[0] = UiccSlotMapping{0, 1, 0} and slotMapping[1] = UiccSlotMapping{1, 1, 1} or
      * slotMapping[0] = UiccSlotMapping{1, 1, 0} and slotMapping[1] = UiccSlotMapping{0, 1, 1}
      *
+     * <p>Starting API level 37 along with supported HAL version, this API can be used to set the
+     * support sim type {@link SimType} corresponding to the physical slot.
+     * Example: Some hardware configurations support more than one sim type on physical slot and
+     * at a time only one of the supported sim types can be mapped to the physical slot.
+     *
+     * Assume no. of logical slots 2, physical slots 2 and consider both slots are non MEP.Also
+     * assume 2nd physical slot supports either a pSIM or eSIM sim type. To map the physical slot
+     * to one of the supported sim types,available mappings are:
+     *
+     * slotMapping[0] = UiccSlotMapping{0 //port, 0 //physical slot, 0 //logical slot, 1 //simType}
+     * slotMapping[1] = UiccSlotMapping{0 //port, 1 //physical slot, 1 //logical slot, 1 //simType}
+     *
+     * or
+     *
+     * slotMapping[0] = UiccSlotMapping{0 //port, 0 //physical slot, 0 //logical slot, 1 //simType}
+     * slotMapping[1] = UiccSlotMapping{0 //port, 1 //physical slot, 1 //logical slot, 2 //simType}
+     *
      * @param slotMapping Logical to physical slot and port mapping.
      * @throws IllegalStateException if telephony service is null or slot mapping was sent when the
      *         radio in middle of a silent restart or other invalid states to handle the command
@@ -4841,9 +4695,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public String getSubscriberId(int subId) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(389, ""+subId);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -5505,9 +5359,9 @@ public class TelephonyManager {
     })
     @UnsupportedAppUsage
     public String getLine1Number(int subId) {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(9, ""+subId);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         String number = null;
         try {
             ITelephony telephony = getITelephony();
@@ -6953,7 +6807,6 @@ public class TelephonyManager {
      * 3GPP2 C.R1001-H v1.0 Table 8.1-1.
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int ERI_ON = 0;
 
@@ -6962,7 +6815,6 @@ public class TelephonyManager {
      * 3GPP2 C.R1001-H v1.0 Table 8.1-1.
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int ERI_OFF = 1;
 
@@ -6971,7 +6823,6 @@ public class TelephonyManager {
      * 3GPP2 C.R1001-H v1.0 Table 8.1-1.
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final int ERI_FLASH = 2;
 
@@ -7019,14 +6870,12 @@ public class TelephonyManager {
      *          {@link PackageManager#FEATURE_TELEPHONY_CDMA}.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public @EriIconIndex int getCdmaEnhancedRoamingIndicatorDisplayNumber() {
-        if (Flags.cleanupCdma()) return -1;
-        return getCdmaEriIconIndex(getSubId());
+        return -1;
     }
 
     /**
@@ -7038,19 +6887,7 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @UnsupportedAppUsage
     public @EriIconIndex int getCdmaEriIconIndex(int subId) {
-        if (Flags.cleanupCdma()) return -1;
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony == null)
-                return -1;
-            return telephony.getCdmaEriIconIndexForSubscriber(subId, getOpPackageName(),
-                    getAttributionTag());
-        } catch (RemoteException ex) {
-            // the phone process is restarting.
-            return -1;
-        } catch (NullPointerException ex) {
-            return -1;
-        }
+        return -1;
     }
 
     /**
@@ -7065,19 +6902,7 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @UnsupportedAppUsage
     public @EriIconMode int getCdmaEriIconMode(int subId) {
-        if (Flags.cleanupCdma()) return -1;
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony == null)
-                return -1;
-            return telephony.getCdmaEriIconModeForSubscriber(subId, getOpPackageName(),
-                    getAttributionTag());
-        } catch (RemoteException ex) {
-            // the phone process is restarting.
-            return -1;
-        } catch (NullPointerException ex) {
-            return -1;
-        }
+        return -1;
     }
 
     /**
@@ -7089,8 +6914,7 @@ public class TelephonyManager {
     @Deprecated
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
     public String getCdmaEriText() {
-        if (Flags.cleanupCdma()) return null;
-        return getCdmaEriText(getSubId());
+        return null;
     }
 
     /**
@@ -7103,19 +6927,7 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
     @UnsupportedAppUsage
     public String getCdmaEriText(int subId) {
-        if (Flags.cleanupCdma()) return null;
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony == null)
-                return null;
-            return telephony.getCdmaEriTextForSubscriber(subId, getOpPackageName(),
-                    getAttributionTag());
-        } catch (RemoteException ex) {
-            // the phone process is restarting.
-            return null;
-        } catch (NullPointerException ex) {
-            return null;
-        }
+        return null;
     }
 
     // Suppressing AndroidFrameworkCompatChange because we're querying vendor
@@ -8385,16 +8197,6 @@ public class TelephonyManager {
     @Deprecated
     @UnsupportedAppUsage
     public String nvReadItem(int itemID) {
-        if (Flags.cleanupCdma()) return "";
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony != null)
-                return telephony.nvReadItem(itemID);
-        } catch (RemoteException ex) {
-            Rlog.e(TAG, "nvReadItem RemoteException", ex);
-        } catch (NullPointerException ex) {
-            Rlog.e(TAG, "nvReadItem NPE", ex);
-        }
         return "";
     }
 
@@ -8415,16 +8217,6 @@ public class TelephonyManager {
      */
     @Deprecated
     public boolean nvWriteItem(int itemID, String itemValue) {
-        if (Flags.cleanupCdma()) return false;
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony != null)
-                return telephony.nvWriteItem(itemID, itemValue);
-        } catch (RemoteException ex) {
-            Rlog.e(TAG, "nvWriteItem RemoteException", ex);
-        } catch (NullPointerException ex) {
-            Rlog.e(TAG, "nvWriteItem NPE", ex);
-        }
         return false;
     }
 
@@ -8444,16 +8236,6 @@ public class TelephonyManager {
      */
     @Deprecated
     public boolean nvWriteCdmaPrl(byte[] preferredRoamingList) {
-        if (Flags.cleanupCdma()) return false;
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony != null)
-                return telephony.nvWriteCdmaPrl(preferredRoamingList);
-        } catch (RemoteException ex) {
-            Rlog.e(TAG, "nvWriteCdmaPrl RemoteException", ex);
-        } catch (NullPointerException ex) {
-            Rlog.e(TAG, "nvWriteCdmaPrl NPE", ex);
-        }
         return false;
     }
 
@@ -8478,10 +8260,8 @@ public class TelephonyManager {
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     @Deprecated
     public boolean nvResetConfig(int resetType) {
-        if (Flags.cleanupCdma()) {
-            if (resetType != 1) {  // 1: reload NV reset (reboot modem)
-                return false;
-            }
+        if (resetType != 1) {  // 1: reload NV reset (reboot modem)
+            return false;
         }
         try {
             ITelephony telephony = getITelephony();
@@ -8518,24 +8298,10 @@ public class TelephonyManager {
      * @hide
      */
     @Deprecated
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
     @SystemApi
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public boolean resetRadioConfig() {
-        if (Flags.cleanupCdma()) {
-            return false;
-        }
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony != null) {
-                return telephony.resetModemConfig(getSlotIndex());
-            }
-        } catch (RemoteException ex) {
-            Rlog.e(TAG, "resetRadioConfig RemoteException", ex);
-        } catch (NullPointerException ex) {
-            Rlog.e(TAG, "resetRadioConfig NPE", ex);
-        }
         return false;
     }
 
@@ -9013,6 +8779,85 @@ public class TelephonyManager {
         return Collections.EMPTY_LIST;
     }
 
+    /**
+     * The key to indicate the result of the ResultReceiver in the {@link #requestUiccIari}.
+     * @hide
+     */
+    public static final String KEY_UICC_IARI_LIST = "uicc_iari_list";
+    /**
+     * The key to indicate the exception of the ResultReceiver in the {@link #requestUiccIari}.
+     * @hide
+     */
+    public static final String KEY_UICC_IARI_EXCEPTION = "uicc_iari_exception";
+
+    /**
+     * Fetches the IMS Application Reference Identifier(IARI) that was loaded from the UICC.
+     * If an error occurs internally during the process of fetching IARI,
+     * an exception is passed through the onError callback.
+     * <ul>
+     *   <li>IllegalArgumentException : if the subscriptionId is not valid</li>
+     *   <li>SecurityException : if the caller does not have the required permission</li>
+     *   <li>UnsupportedOperationException : if the device does not have
+     *   {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}</li>
+     * </ul>
+     *
+     * @param executor executor to run the callback on.
+     * @param callback callback object to which the result will be delivered.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_IMS_REGISTRATION_EVENT_DOWNLOAD)
+    @SystemApi
+    @RequiresPermission(value = Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
+    @RequiresFeature(PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION)
+    public void requestUiccIari(@NonNull Executor executor,
+            @NonNull OutcomeReceiver<Set<String>, Exception> callback) {
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+
+        IPhoneSubInfo info = getSubscriberInfoService();
+        if (info == null) {
+            executor.execute(() -> callback.onError(
+                    new RuntimeException("requestUiccIari : Subscriber Info is null")));
+            return;
+        }
+
+        ResultReceiver wrappedCallback = new ResultReceiver(null) {
+            @Override
+            protected void onReceiveResult(int resultCode, Bundle result) {
+                ParcelableException e = result.getParcelable(
+                        KEY_UICC_IARI_EXCEPTION, android.os.ParcelableException.class);
+                if (e != null) {
+                    Throwable t = e.getCause();
+                    if (t instanceof IllegalArgumentException || t instanceof SecurityException
+                            || t instanceof UnsupportedOperationException) {
+                        executor.execute(() -> callback.onError((Exception) t));
+                    } else {
+                        executor.execute(() -> callback.onError(
+                                new RuntimeException("requestUiccIari : " + t.getMessage())));
+                    }
+                } else {
+                    List<String> iaris = result.getStringArrayList(KEY_UICC_IARI_LIST);
+                    Set<String> iariSet = (iaris != null) ? new HashSet<>(iaris) : new HashSet<>();
+                    Rlog.e(TAG, "requestUiccIari onReceiveResult: " + iariSet);
+                    executor.execute(() -> callback.onResult(iariSet));
+                }
+            }
+        };
+
+        try {
+            if (isApplicationOnUicc(APPTYPE_ISIM)) {
+                info.getUiccIari(getSubId(), APPTYPE_ISIM, getOpPackageName(), wrappedCallback);
+            } else if (isApplicationOnUicc(APPTYPE_USIM)) {
+                info.getUiccIari(getSubId(), APPTYPE_USIM, getOpPackageName(), wrappedCallback);
+            } else {
+                executor.execute(() -> callback.onError(new RuntimeException(
+                        "requestUiccIari : ISIM or USIM application is not exist in UICC")));
+            }
+        } catch (Exception ex) {
+            executor.execute(() -> callback.onError(ex));
+        }
+    }
+
     /** UICC application type is unknown or not specified */
     public static final int APPTYPE_UNKNOWN = PhoneConstants.APPTYPE_UNKNOWN;
     /** UICC application type is SIM */
@@ -9070,11 +8915,13 @@ public class TelephonyManager {
      *
      * <p>Requires one of the following permissions:
      * <ul>
-     *     <li>READ_PRIVILEGED_PHONE_STATE
      *     <li>the calling app has carrier privileges (see {@link #hasCarrierPrivileges}).
      *     <li>the calling app has been granted the
      *     {@link Manifest.permission#USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER} permission.
      * </ul>
+     *
+     * The use of {@link Manifest.permission#READ_PRIVILEGED_PHONE_STATE} is deprecated.
+     * Use {@link Manifest.permission#USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER instead.
      *
      * @param appType the icc application type, like {@link #APPTYPE_USIM}
      * @param authType the authentication type, any one of {@link #AUTHTYPE_EAP_AKA} or
@@ -10247,7 +10094,7 @@ public class TelephonyManager {
             if (telephony != null) {
                 return telephony.setAllowedNetworkTypesForReason(subId,
                         TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER,
-                        RadioAccessFamily.getRafFromNetworkType(networkType));
+                        RadioAccessFamily.getRafFromNetworkType(networkType), getOpPackageName());
             }
         } catch (RemoteException ex) {
             Rlog.e(TAG, "setPreferredNetworkType RemoteException", ex);
@@ -10289,7 +10136,8 @@ public class TelephonyManager {
             if (telephony != null) {
                 networkTypeBitmask = checkNetworkTypeBitmask(networkTypeBitmask);
                 return telephony.setAllowedNetworkTypesForReason(getSubId(),
-                        TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER, networkTypeBitmask);
+                        TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_USER, networkTypeBitmask,
+                        getOpPackageName());
             }
         } catch (RemoteException ex) {
             Rlog.e(TAG, "setPreferredNetworkTypeBitmask RemoteException", ex);
@@ -10343,7 +10191,8 @@ public class TelephonyManager {
             if (telephony != null) {
                 allowedNetworkTypes = checkNetworkTypeBitmask(allowedNetworkTypes);
                 return telephony.setAllowedNetworkTypesForReason(getSubId(),
-                        TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_CARRIER, allowedNetworkTypes);
+                        TelephonyManager.ALLOWED_NETWORK_TYPES_REASON_CARRIER, allowedNetworkTypes,
+                        getOpPackageName());
             }
         } catch (RemoteException ex) {
             Rlog.e(TAG, "setAllowedNetworkTypes RemoteException", ex);
@@ -10449,7 +10298,7 @@ public class TelephonyManager {
             if (telephony != null) {
                 allowedNetworkTypes = checkNetworkTypeBitmask(allowedNetworkTypes);
                 telephony.setAllowedNetworkTypesForReason(getSubId(), reason,
-                        allowedNetworkTypes);
+                        allowedNetworkTypes, getOpPackageName());
             } else {
                 throw new IllegalStateException("telephony service is null.");
             }
@@ -10804,14 +10653,12 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public String getCdmaMdn() {
-        if (Flags.cleanupCdma()) return null;
-        return getCdmaMdn(getSubId());
+        return null;
     }
 
     /**
@@ -10820,23 +10667,12 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public String getCdmaMdn(int subId) {
-        if (Flags.cleanupCdma()) return null;
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony == null)
-                return null;
-            return telephony.getCdmaMdn(subId);
-        } catch (RemoteException ex) {
-            return null;
-        } catch (NullPointerException ex) {
-            return null;
-        }
+        return null;
     }
 
     /**
@@ -10845,14 +10681,12 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public String getCdmaMin() {
-        if (Flags.cleanupCdma()) return null;
-        return getCdmaMin(getSubId());
+        return null;
     }
 
     /**
@@ -10861,23 +10695,12 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public String getCdmaMin(int subId) {
-        if (Flags.cleanupCdma()) return null;
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony == null)
-                return null;
-            return telephony.getCdmaMin(subId);
-        } catch (RemoteException ex) {
-            return null;
-        } catch (NullPointerException ex) {
-            return null;
-        }
+        return null;
     }
 
     /**
@@ -11957,20 +11780,18 @@ public class TelephonyManager {
     }
 
     /**
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_RADIO_ACCESS}.
+     * Checks if the device needs to be provisioned for OTA (Over-The-Air) service.
+     * OTA service provisioning is a device-specific process that may be required
+     * before the device can connect to the cellular network.
+     *
+     * <p>This method always returns {@code false} as CDMA is no longer supported.
+     *
+     * @return {@code false} always.
      * @hide
      */
     @SystemApi
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public boolean needsOtaServiceProvisioning() {
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony != null)
-                return telephony.needsOtaServiceProvisioning();
-        } catch (RemoteException e) {
-            Log.e(TAG, "Error calling ITelephony#needsOtaServiceProvisioning", e);
-        }
         return false;
     }
 
@@ -12155,26 +11976,12 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public @CdmaRoamingMode int getCdmaRoamingMode() {
-        if (Flags.cleanupCdma()) return CDMA_ROAMING_MODE_RADIO_DEFAULT;
-        int mode = CDMA_ROAMING_MODE_RADIO_DEFAULT;
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony != null) {
-                mode = telephony.getCdmaRoamingMode(getSubId());
-            } else {
-                throw new IllegalStateException("telephony service is null.");
-            }
-        } catch (RemoteException ex) {
-            Log.e(TAG, "Error calling ITelephony#getCdmaRoamingMode", ex);
-            ex.rethrowFromSystemServer();
-        }
-        return mode;
+        return CDMA_ROAMING_MODE_RADIO_DEFAULT;
     }
 
     /**
@@ -12203,28 +12010,11 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public void setCdmaRoamingMode(@CdmaRoamingMode int mode) {
-        if (Flags.cleanupCdma()) return;
-        if (getPhoneType() != PHONE_TYPE_CDMA) {
-            throw new IllegalStateException("Phone does not support CDMA.");
-        }
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony != null) {
-                boolean result = telephony.setCdmaRoamingMode(getSubId(), mode);
-                if (!result) throw new IllegalStateException("radio is unavailable.");
-            } else {
-                throw new IllegalStateException("telephony service is null.");
-            }
-        } catch (RemoteException ex) {
-            Log.e(TAG, "Error calling ITelephony#setCdmaRoamingMode", ex);
-            ex.rethrowFromSystemServer();
-        }
     }
 
     /** @hide
@@ -12244,7 +12034,6 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     public static final int CDMA_SUBSCRIPTION_UNKNOWN  = -1;
@@ -12254,7 +12043,6 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     public static final int CDMA_SUBSCRIPTION_RUIM_SIM = 0;
@@ -12264,7 +12052,6 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     public static final int CDMA_SUBSCRIPTION_NV       = 1;
@@ -12289,26 +12076,12 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public @CdmaSubscription int getCdmaSubscriptionMode() {
-        if (Flags.cleanupCdma()) return CDMA_SUBSCRIPTION_UNKNOWN;
-        int mode = CDMA_SUBSCRIPTION_RUIM_SIM;
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony != null) {
-                mode = telephony.getCdmaSubscriptionMode(getSubId());
-            } else {
-                throw new IllegalStateException("telephony service is null.");
-            }
-        } catch (RemoteException ex) {
-            Log.e(TAG, "Error calling ITelephony#getCdmaSubscriptionMode", ex);
-            ex.rethrowFromSystemServer();
-        }
-        return mode;
+        return CDMA_SUBSCRIPTION_UNKNOWN;
     }
 
     /**
@@ -12333,28 +12106,11 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public void setCdmaSubscriptionMode(@CdmaSubscription int mode) {
-        if (Flags.cleanupCdma()) return;
-        if (getPhoneType() != PHONE_TYPE_CDMA) {
-            throw new IllegalStateException("Phone does not support CDMA.");
-        }
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony != null) {
-                boolean result = telephony.setCdmaSubscriptionMode(getSubId(), mode);
-                if (!result) throw new IllegalStateException("radio is unavailable.");
-            } else {
-                throw new IllegalStateException("telephony service is null.");
-            }
-        } catch (RemoteException ex) {
-            Log.e(TAG, "Error calling ITelephony#setCdmaSubscriptionMode", ex);
-            ex.rethrowFromSystemServer();
-        }
     }
 
     /**
@@ -14018,39 +13774,6 @@ public class TelephonyManager {
     }
 
     /**
-     * Return the Electronic Serial Number.
-     *
-     * Requires that the calling app has READ_PRIVILEGED_PHONE_STATE permission
-     *
-     * @return ESN or null if error.
-     * @hide
-     */
-    public String getEsn() {
-        return getEsn(getSubId());
-    }
-
-    /**
-     * Return the Electronic Serial Number.
-     *
-     * Requires that the calling app has READ_PRIVILEGED_PHONE_STATE permission
-     *
-     * @param subId the subscription ID that this request applies to.
-     * @return ESN or null if error.
-     * @hide
-     */
-    public String getEsn(int subId) {
-        try {
-            ITelephony service = getITelephony();
-            if (service != null) {
-                return service.getEsn(subId);
-            }
-        } catch (RemoteException e) {
-            Log.e(TAG, "Error calling ITelephony#getEsn", e);
-        }
-        return null;
-    }
-
-    /**
      * Return the Preferred Roaming List Version
      *
      * Requires that the calling app has READ_PRIVILEGED_PHONE_STATE permission
@@ -14062,13 +13785,11 @@ public class TelephonyManager {
      * @deprecated Legacy CDMA is unsupported.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     @SystemApi
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CDMA)
     public String getCdmaPrlVersion() {
-        if (Flags.cleanupCdma()) return null;
-        return getCdmaPrlVersion(getSubId());
+        return null;
     }
 
     /**
@@ -14083,15 +13804,6 @@ public class TelephonyManager {
      */
     @Deprecated
     public String getCdmaPrlVersion(int subId) {
-        if (Flags.cleanupCdma()) return null;
-        try {
-            ITelephony service = getITelephony();
-            if (service != null) {
-                return service.getCdmaPrlVersion(subId);
-            }
-        } catch (RemoteException e) {
-            Log.e(TAG, "Error calling ITelephony#getCdmaPrlVersion", e);
-        }
         return null;
     }
 
@@ -15250,7 +14962,6 @@ public class TelephonyManager {
      * network type bitmask indicating the support of radio tech CDMA(IS95A/IS95B).
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final long NETWORK_TYPE_BITMASK_CDMA = (1 << (NETWORK_TYPE_CDMA -1));
     /**
@@ -15275,7 +14986,6 @@ public class TelephonyManager {
      * network type bitmask indicating the support of radio tech EHRPD.
      * @deprecated Legacy CDMA is unsupported.
      */
-    @FlaggedApi(Flags.FLAG_DEPRECATE_CDMA)
     @Deprecated
     public static final long NETWORK_TYPE_BITMASK_EHRPD = (1 << (NETWORK_TYPE_EHRPD -1));
     /**
@@ -18214,20 +17924,15 @@ public class TelephonyManager {
             throw new IllegalStateException("telephony service is null.");
         }
 
-        if (executor == null || callback == null) {
-            throw new IllegalArgumentException("TelephonyCallback and executor must be non-null");
-        }
-        mTelephonyRegistryMgr = (TelephonyRegistryManager)
-                mContext.getSystemService(Context.TELEPHONY_REGISTRY_SERVICE);
-        if (mTelephonyRegistryMgr != null) {
-            mTelephonyRegistryMgr.registerTelephonyCallback(
-                    includeLocationData != INCLUDE_LOCATION_DATA_FINE,
-                    includeLocationData == INCLUDE_LOCATION_DATA_NONE,
-                    executor, mSubId, getOpPackageName(),
-                    getAttributionTag(), callback, getITelephony() != null);
-        } else {
-            throw new IllegalStateException("telephony service is null.");
-        }
+        TelephonyRegistryManager mgr = mContext.getSystemService(TelephonyRegistryManager.class);
+
+        if (mgr == null) throw new IllegalStateException("telephony service is null.");
+
+        mgr.registerTelephonyCallback(
+                includeLocationData != INCLUDE_LOCATION_DATA_FINE,
+                includeLocationData == INCLUDE_LOCATION_DATA_NONE,
+                executor, mSubId, getOpPackageName(),
+                getAttributionTag(), callback, getITelephony() != null);
     }
 
     /**
@@ -18236,22 +17941,21 @@ public class TelephonyManager {
      * @param callback The {@link TelephonyCallback} object to unregister.
      */
     public void unregisterTelephonyCallback(@NonNull TelephonyCallback callback) {
-
         if (mContext == null) {
             throw new IllegalStateException("telephony service is null.");
         }
 
-        if (callback.callback == null) {
-            return;
-        }
+        Objects.requireNonNull(callback,
+                "unregisterTelephonyCallback: cannot unregister a null callback");
 
-        mTelephonyRegistryMgr = mContext.getSystemService(TelephonyRegistryManager.class);
-        if (mTelephonyRegistryMgr != null) {
-            mTelephonyRegistryMgr.unregisterTelephonyCallback(mSubId, getOpPackageName(),
-                    getAttributionTag(), callback, getITelephony() != null);
-        } else {
-            throw new IllegalStateException("telephony service is null.");
-        }
+        if (callback.callback == null) return; // Already unregistered
+
+        TelephonyRegistryManager mgr = mContext.getSystemService(TelephonyRegistryManager.class);
+
+        if (mgr == null) throw new IllegalStateException("telephony service is null.");
+
+        mgr.unregisterTelephonyCallback(mSubId, getOpPackageName(),
+                getAttributionTag(), callback, getITelephony() != null);
     }
 
     /** @hide */
@@ -19216,11 +18920,12 @@ public class TelephonyManager {
             throw new IllegalArgumentException(
                     "CarrierPrivilegesCallback and executor must be non-null");
         }
-        mTelephonyRegistryMgr = mContext.getSystemService(TelephonyRegistryManager.class);
-        if (mTelephonyRegistryMgr == null) {
-            throw new IllegalStateException("Telephony registry service is null");
-        }
-        mTelephonyRegistryMgr.addCarrierPrivilegesCallback(logicalSlotIndex, executor, callback);
+
+        TelephonyRegistryManager mgr = mContext.getSystemService(TelephonyRegistryManager.class);
+
+        if (mgr == null) throw new IllegalStateException("telephony service is null.");
+
+        mgr.addCarrierPrivilegesCallback(logicalSlotIndex, executor, callback);
     }
 
     /**
@@ -19236,11 +18941,11 @@ public class TelephonyManager {
         } else if (callback == null) {
             throw new IllegalArgumentException("CarrierPrivilegesCallback must be non-null");
         }
-        mTelephonyRegistryMgr = mContext.getSystemService(TelephonyRegistryManager.class);
-        if (mTelephonyRegistryMgr == null) {
-            throw new IllegalStateException("Telephony registry service is null");
-        }
-        mTelephonyRegistryMgr.removeCarrierPrivilegesCallback(callback);
+        TelephonyRegistryManager mgr = mContext.getSystemService(TelephonyRegistryManager.class);
+
+        if (mgr == null) throw new IllegalStateException("telephony service is null.");
+
+        mgr.removeCarrierPrivilegesCallback(callback);
     }
 
     /**
@@ -19687,7 +19392,6 @@ public class TelephonyManager {
      * The emergency callback mode is due to emergency call.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_EMERGENCY_CALLBACK_MODE_NOTIFICATION)
     @SystemApi
     public static final int EMERGENCY_CALLBACK_MODE_CALL = 1;
 
@@ -19695,7 +19399,6 @@ public class TelephonyManager {
      * The emergency callback mode is due to emergency SMS.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_EMERGENCY_CALLBACK_MODE_NOTIFICATION)
     @SystemApi
     public static final int EMERGENCY_CALLBACK_MODE_SMS = 2;
 
@@ -19720,7 +19423,6 @@ public class TelephonyManager {
      * Indicates that emergency callback mode has been stopped for an unknown reason.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_EMERGENCY_CALLBACK_MODE_NOTIFICATION)
     @SystemApi
     public static final int STOP_REASON_UNKNOWN = 0;
 
@@ -19729,7 +19431,6 @@ public class TelephonyManager {
      * initiated.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_EMERGENCY_CALLBACK_MODE_NOTIFICATION)
     @SystemApi
     public static final int STOP_REASON_OUTGOING_NORMAL_CALL_INITIATED = 1;
 
@@ -19738,7 +19439,6 @@ public class TelephonyManager {
      * sent.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_EMERGENCY_CALLBACK_MODE_NOTIFICATION)
     @SystemApi
     public static final int STOP_REASON_NORMAL_SMS_SENT = 2;
 
@@ -19747,7 +19447,6 @@ public class TelephonyManager {
      * call was initiated.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_EMERGENCY_CALLBACK_MODE_NOTIFICATION)
     @SystemApi
     public static final int STOP_REASON_OUTGOING_EMERGENCY_CALL_INITIATED = 3;
 
@@ -19755,7 +19454,6 @@ public class TelephonyManager {
      * Indicates that emergency callback mode has been stopped because a new emergency SMS was sent.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_EMERGENCY_CALLBACK_MODE_NOTIFICATION)
     @SystemApi
     public static final int STOP_REASON_EMERGENCY_SMS_SENT = 4;
 
@@ -19764,7 +19462,6 @@ public class TelephonyManager {
      * timer expiry.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_EMERGENCY_CALLBACK_MODE_NOTIFICATION)
     @SystemApi
     public static final int STOP_REASON_TIMER_EXPIRED = 5;
 
@@ -19773,7 +19470,6 @@ public class TelephonyManager {
      * mode by clicking the notification.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_EMERGENCY_CALLBACK_MODE_NOTIFICATION)
     @SystemApi
     public static final int STOP_REASON_USER_ACTION = 6;
 
@@ -20023,4 +19719,41 @@ public class TelephonyManager {
         }
         return UNKNOWN_CARRIER_ID;
     }
+
+    /**
+     * Sim Type mounted on each physical slot.
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = {"SIM_TYPE_"},
+            value = {
+                    SIM_TYPE_UNKNOWN,
+                    SIM_TYPE_PHYSICAL,
+                    SIM_TYPE_EMBEDDED,
+            })
+    public @interface SimType {}
+
+    /**
+     * Sim Type: type is not known.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_SLOT_SWITCHING_2PSIM_1ESIM_CONFIG)
+    @SystemApi
+    public static final int SIM_TYPE_UNKNOWN = -1;
+
+    /**
+     * Sim Type: physical sim.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_SLOT_SWITCHING_2PSIM_1ESIM_CONFIG)
+    @SystemApi
+    public static final int SIM_TYPE_PHYSICAL = 1;
+
+    /**
+     * Sim Type: embedded sim.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_SLOT_SWITCHING_2PSIM_1ESIM_CONFIG)
+    @SystemApi
+    public static final int SIM_TYPE_EMBEDDED = 2;
 }

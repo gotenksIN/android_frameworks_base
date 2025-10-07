@@ -62,7 +62,6 @@ constructor(val promptSelectorInteractor: PromptSelectorInteractor) {
     val icCredentialSubtitle: Flow<Int?> =
         watchRangingState.map { status ->
             when (status) {
-                WatchRangingState.WATCH_RANGING_IDLE,
                 WatchRangingState.WATCH_RANGING_STARTED -> {
                     R.string.biometric_dialog_identity_check_watch_ranging
                 }
@@ -77,39 +76,21 @@ constructor(val promptSelectorInteractor: PromptSelectorInteractor) {
 
     /** Whether to show the identity check footer text */
     val icShowFooter: Flow<Boolean> =
-        watchRangingState.map { status -> status == WatchRangingState.WATCH_RANGING_STOPPED }
+        watchRangingState.map { status ->
+            status == WatchRangingState.WATCH_RANGING_STOPPED ||
+                status == WatchRangingState.WATCH_RANGING_IDLE
+        }
 
     /** Whether the credential fallback button should be shown */
     val showCredential: Flow<Boolean> =
-        combine(credentialAllowed, credentialKind, identityCheckActive) {
-            credentialAllowed,
-            credentialKind,
-            identityCheckActive ->
-            credentialAllowed && credentialKind.isCredential() && !identityCheckActive
+        combine(credentialAllowed, identityCheckActive) { credentialAllowed, identityCheckActive ->
+            credentialAllowed && !identityCheckActive
         }
 
     /** Whether to show the manage identity check button */
     val showManageIdentityCheck: Flow<Boolean> =
         combine(credentialAllowed, identityCheckActive) { credentialAllowed, identityCheckActive ->
             credentialAllowed && identityCheckActive
-        }
-
-    /**
-     * Total option count for the fallback view
-     *
-     * This includes all options added by prompt caller. If Credential is allowed, it counts as an
-     * option. If credential is allowed and identity Check is enabled, this counts as another option
-     */
-    val optionCount: Flow<Int> =
-        combine(showCredential, identityCheckActive, fallbackOptions) {
-            showCredential,
-            identityCheckEnabled,
-            fallbackOptions ->
-            var total = 0
-            if (showCredential) total++
-            if (identityCheckEnabled && showCredential) total++
-            total += fallbackOptions.size
-            total
         }
 
     /** Icon to be used for the credential kind */

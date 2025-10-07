@@ -18,20 +18,16 @@ package com.android.settingslib.bluetooth;
 
 import static android.bluetooth.BluetoothProfile.CONNECTION_POLICY_FORBIDDEN;
 
-import static com.android.settingslib.Utils.isAudioModeOngoingCall;
 import static com.android.settingslib.bluetooth.LocalBluetoothLeBroadcastAssistant.LocalBluetoothLeBroadcastSourceState.DECRYPTION_FAILED;
 import static com.android.settingslib.bluetooth.LocalBluetoothLeBroadcastAssistant.LocalBluetoothLeBroadcastSourceState.PAUSED;
 import static com.android.settingslib.bluetooth.LocalBluetoothLeBroadcastAssistant.LocalBluetoothLeBroadcastSourceState.PAUSED_BY_RECEIVER;
 import static com.android.settingslib.bluetooth.LocalBluetoothLeBroadcastAssistant.LocalBluetoothLeBroadcastSourceState.STREAMING;
 import static com.android.settingslib.bluetooth.LocalBluetoothLeBroadcastAssistant.getLocalSourceStateWithSelectedChannel;
 
-import static java.util.stream.Collectors.toList;
-
 import android.annotation.CallbackExecutor;
 import android.annotation.IntDef;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothClass;
-import android.bluetooth.BluetoothCsipSetCoordinator;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothLeAudioContentMetadata;
 import android.bluetooth.BluetoothLeBroadcast;
@@ -74,17 +70,14 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
 
 /**
  * LocalBluetoothLeBroadcast provides an interface between the Settings app and the functionality of
@@ -147,7 +140,6 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     private final Context mContext;
     private final CachedBluetoothDeviceManager mDeviceManager;
     private final LocalBluetoothProfileManager mProfileManager;
-    private final boolean mHysteresisModeFixAvailable;
     private final boolean mIsWorkProfile;
     private BluetoothLeBroadcast mServiceBroadcast;
     private BluetoothLeBroadcastAssistant mServiceBroadcastAssistant;
@@ -155,7 +147,9 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     private BluetoothLeBroadcastMetadata mBluetoothLeBroadcastMetadata;
     private BluetoothLeAudioContentMetadata.Builder mBuilder;
     private int mBroadcastId = UNKNOWN_VALUE_PLACEHOLDER;
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     private final Object mBroadcastIdLock = new Object();
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     private String mAppSourceName = "";
     private String mNewAppSourceName = "";
     private boolean mIsBroadcastProfileReady = false;
@@ -334,7 +328,6 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                                         + ", sourceId = "
                                         + sourceId);
                     }
-                    updateFallbackActiveDeviceIfNeeded();
                 }
 
                 @Override
@@ -449,7 +442,7 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                     var sourceState = sourceStateAndSelectedChannel.first;
                     var selectedChannel = sourceStateAndSelectedChannel.second;
                     if (sourceState == STREAMING || sourceState == DECRYPTION_FAILED
-                            || (mHysteresisModeFixAvailable && sourceState == PAUSED)
+                            || sourceState == PAUSED
                             || (Flags.audioStreamPlayPauseByModifySource()
                             && sourceState == PAUSED_BY_RECEIVER)) {
                         List<BluetoothLeAudioContentMetadata> subgroupMetadata =
@@ -497,9 +490,6 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
         BluetoothAdapter.getDefaultAdapter()
                 .getProfileProxy(
                         context, mServiceListener, BluetoothProfile.LE_AUDIO_BROADCAST_ASSISTANT);
-
-        mHysteresisModeFixAvailable = BluetoothUtils.isAudioSharingHysteresisModeFixAvailable(
-                context);
         mIsWorkProfile = isWorkProfile(mContext);
     }
 
@@ -739,15 +729,19 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
 
     private void setLatestBroadcastId(int broadcastId) {
         Log.d(TAG, "setLatestBroadcastId: mBroadcastId is " + broadcastId);
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             mBroadcastId = broadcastId;
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     public int getLatestBroadcastId() {
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             return mBroadcastId;
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     private void setAppSourceName(String appSourceName, boolean updateContentResolver) {
@@ -778,12 +772,14 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
 
     private void setLatestBluetoothLeBroadcastMetadata(
             BluetoothLeBroadcastMetadata bluetoothLeBroadcastMetadata) {
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             if (bluetoothLeBroadcastMetadata != null
                     && bluetoothLeBroadcastMetadata.getBroadcastId() == mBroadcastId) {
                 mBluetoothLeBroadcastMetadata = bluetoothLeBroadcastMetadata;
                 updateBroadcastInfoFromBroadcastMetadata(bluetoothLeBroadcastMetadata);
             }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         }
     }
 
@@ -798,6 +794,7 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                 || mBluetoothLeBroadcastMetadata.getBroadcastId() != mBroadcastId) {
             final List<BluetoothLeBroadcastMetadata> metadataList =
                     mServiceBroadcast.getAllBroadcastMetadata();
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
             synchronized (mBroadcastIdLock) {
                 Log.d(TAG, "mBroadcastId: " + mBroadcastId);
                 mBluetoothLeBroadcastMetadata =
@@ -806,6 +803,7 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                                 .findFirst()
                                 .orElse(null);
             }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
             Log.d(TAG, "getLatestBluetoothLeBroadcastMetadata for broadcast id " + mBroadcastId);
         }
         return mBluetoothLeBroadcastMetadata;
@@ -880,9 +878,11 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
      * the corresponding callback {@link BluetoothLeBroadcast.Callback}.
      */
     public void stopLatestBroadcast() {
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             stopBroadcast(mBroadcastId);
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     /**
@@ -917,9 +917,11 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
         }
         mNewAppSourceName = appSourceName;
         mBluetoothLeAudioContentMetadata = mBuilder.setProgramInfo(programInfo).build();
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             mServiceBroadcast.updateBroadcast(mBroadcastId, mBluetoothLeAudioContentMetadata);
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     /**
@@ -953,9 +955,11 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                             + " programInfo = "
                             + programInfo);
         }
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             mServiceBroadcast.updateBroadcast(mBroadcastId, settings);
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     /**
@@ -1169,9 +1173,11 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
         }
         setAppSourceName("", /* updateContentResolver= */ true);
         mBluetoothLeBroadcastMetadata = null;
+// QTI_BEGIN: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
         synchronized (mBroadcastIdLock) {
             mBroadcastId = UNKNOWN_VALUE_PLACEHOLDER;
         }
+// QTI_END: 2025-03-20: Bluetooth: Add synchronized lock for broadcastId
     }
 
     private static String generateRandomPassword() {
@@ -1221,138 +1227,6 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
         }
     }
 
-    /** Update fallback active device if needed. */
-    public void updateFallbackActiveDeviceIfNeeded() {
-        if (Flags.disableAudioSharingAutoPickFallbackInUi() || (mContext != null
-                && Flags.audioSharingDeveloperOption()
-                && BluetoothUtils.getAudioSharingPreviewValue(mContext.getContentResolver()))) {
-            Log.d(TAG, "Skip updateFallbackActiveDeviceIfNeeded, disable flag is on");
-            return;
-        }
-        if (mIsWorkProfile) {
-            Log.d(TAG, "Skip updateFallbackActiveDeviceIfNeeded for work profile.");
-            return;
-        }
-        if (isAudioModeOngoingCall(mContext)) {
-            Log.d(TAG, "Skip updateFallbackActiveDeviceIfNeeded due to ongoing call");
-            return;
-        }
-        Map<Integer, List<BluetoothDevice>> deviceGroupsInBroadcast = getDeviceGroupsInBroadcast();
-        if (deviceGroupsInBroadcast.isEmpty()) {
-            Log.d(TAG, "Skip updateFallbackActiveDeviceIfNeeded due to no sinks in broadcast");
-            return;
-        }
-        int targetGroupId = BluetoothCsipSetCoordinator.GROUP_ID_INVALID;
-        int fallbackActiveGroupId = BluetoothUtils.getPrimaryGroupIdForBroadcast(
-                mContext.getContentResolver());
-        if (BluetoothUtils.isAudioSharingHysteresisModeFixAvailable(mContext)) {
-            int userPreferredPrimaryGroupId = getUserPreferredPrimaryGroupId();
-            if (userPreferredPrimaryGroupId != BluetoothCsipSetCoordinator.GROUP_ID_INVALID
-                    && deviceGroupsInBroadcast.containsKey(userPreferredPrimaryGroupId)) {
-                if (userPreferredPrimaryGroupId == fallbackActiveGroupId) {
-                    Log.d(TAG, "Skip updateFallbackActiveDeviceIfNeeded, already user preferred");
-                    return;
-                } else {
-                    targetGroupId = userPreferredPrimaryGroupId;
-                }
-            }
-            if (targetGroupId == BluetoothCsipSetCoordinator.GROUP_ID_INVALID) {
-                // If there is no user preferred primary device, set the earliest connected
-                // device in sharing session as the fallback.
-                targetGroupId = getEarliestConnectedDeviceGroup(deviceGroupsInBroadcast);
-            }
-        } else {
-            // Set the earliest connected device in sharing session as the fallback.
-            targetGroupId = getEarliestConnectedDeviceGroup(deviceGroupsInBroadcast);
-        }
-        Log.d(TAG, "updateFallbackActiveDeviceIfNeeded, target group id = " + targetGroupId);
-        if (targetGroupId == BluetoothCsipSetCoordinator.GROUP_ID_INVALID) return;
-        if (targetGroupId == fallbackActiveGroupId) {
-            Log.d(TAG, "Skip updateFallbackActiveDeviceIfNeeded, already is fallback");
-            return;
-        }
-        CachedBluetoothDevice targetCachedDevice = getMainDevice(
-                deviceGroupsInBroadcast.get(targetGroupId));
-        if (targetCachedDevice == null) {
-            Log.d(TAG, "Skip updateFallbackActiveDeviceIfNeeded, fail to find main device");
-            return;
-        }
-        Log.d(
-                TAG,
-                "updateFallbackActiveDeviceIfNeeded, set active device: "
-                        + targetCachedDevice.getDevice());
-        targetCachedDevice.setActive();
-    }
-
-    @NonNull
-    private Map<Integer, List<BluetoothDevice>> getDeviceGroupsInBroadcast() {
-        if (mServiceBroadcastAssistant == null) return new HashMap<>();
-        boolean hysteresisModeFixEnabled =
-                BluetoothUtils.isAudioSharingHysteresisModeFixAvailable(mContext);
-        List<BluetoothDevice> connectedDevices = mServiceBroadcastAssistant.getConnectedDevices();
-        return connectedDevices.stream()
-                .filter(
-                        device -> {
-                            List<BluetoothLeBroadcastReceiveState> sourceList =
-                                    mServiceBroadcastAssistant.getAllSources(device);
-                            synchronized (mBroadcastIdLock) {
-                                return !sourceList.isEmpty() && sourceList.stream().anyMatch(
-                                        source -> hysteresisModeFixEnabled
-                                                ? BluetoothUtils.isSourceMatched(source, mBroadcastId)
-                                                : BluetoothUtils.isConnected(source));
-                            }
-                        })
-                .collect(Collectors.groupingBy(
-                        device -> BluetoothUtils.getGroupId(mDeviceManager.findDevice(device))));
-    }
-
-    private int getEarliestConnectedDeviceGroup(
-            @NonNull Map<Integer, List<BluetoothDevice>> deviceGroups) {
-        List<BluetoothDevice> devices =
-                BluetoothAdapter.getDefaultAdapter().getMostRecentlyConnectedDevices();
-        // Find the earliest connected device in sharing session.
-        int targetDeviceIdx = -1;
-        int targetGroupId = BluetoothCsipSetCoordinator.GROUP_ID_INVALID;
-        for (Map.Entry<Integer, List<BluetoothDevice>> entry : deviceGroups.entrySet()) {
-            for (BluetoothDevice device : entry.getValue()) {
-                if (devices.contains(device)) {
-                    int idx = devices.indexOf(device);
-                    if (idx > targetDeviceIdx) {
-                        targetDeviceIdx = idx;
-                        targetGroupId = entry.getKey();
-                    }
-                }
-            }
-        }
-        Log.d(TAG, "updateFallbackActiveDeviceIfNeeded, earliest group id = " + targetGroupId);
-        return targetGroupId;
-    }
-
-    @Nullable
-    private CachedBluetoothDevice getMainDevice(@Nullable List<BluetoothDevice> devices) {
-        if (devices == null || devices.isEmpty()) return null;
-        List<CachedBluetoothDevice> cachedDevices =
-                devices.stream()
-                        .map(device -> mDeviceManager.findDevice(device))
-                        .filter(Objects::nonNull)
-                        .collect(toList());
-        for (CachedBluetoothDevice cachedDevice : cachedDevices) {
-            if (!cachedDevice.getMemberDevice().isEmpty()) {
-                return cachedDevice;
-            }
-        }
-        CachedBluetoothDevice mainDevice = cachedDevices.isEmpty() ? null : cachedDevices.get(0);
-        return mainDevice;
-    }
-
-    private int getUserPreferredPrimaryGroupId() {
-        // TODO: use real key name in SettingsProvider
-        return Settings.Secure.getInt(
-                mContentResolver,
-                BLUETOOTH_LE_BROADCAST_PRIMARY_DEVICE_GROUP_ID,
-                BluetoothCsipSetCoordinator.GROUP_ID_INVALID);
-    }
-
     private void notifyBroadcastStateChange(@BroadcastState int state) {
         String packageName = mContext.getPackageName();
         if (!packageName.equals(SETTINGS_PKG) && !packageName.equals(SYSUI_PKG)) {
@@ -1396,10 +1270,6 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
     @WorkerThread
     public void handleProfileConnected(@NonNull CachedBluetoothDevice cachedDevice,
             int bluetoothProfile, @Nullable LocalBluetoothManager btManager) {
-        if (!Flags.promoteAudioSharingForSecondAutoConnectedLeaDevice()) {
-            Log.d(TAG, "Skip handleProfileConnected, flag off");
-            return;
-        }
         if (!SYSUI_PKG.equals(mContext.getPackageName())) {
             Log.d(TAG, "Skip handleProfileConnected, not a valid caller");
             return;

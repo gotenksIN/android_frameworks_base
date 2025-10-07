@@ -17,8 +17,8 @@
 package com.android.systemui.statusbar.phone.fragment.dagger;
 
 import com.android.systemui.battery.BatteryMeterViewController;
-import com.android.systemui.dagger.qualifiers.DisplaySpecific;
 import com.android.systemui.dagger.qualifiers.RootView;
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.DisplayAware;
 import com.android.systemui.plugins.DarkIconDispatcher;
 import com.android.systemui.statusbar.core.NewStatusBarIcons;
 import com.android.systemui.statusbar.data.repository.StatusBarConfigurationController;
@@ -60,8 +60,7 @@ public interface HomeStatusBarComponent {
         HomeStatusBarComponent create(
                 @BindsInstance @RootView PhoneStatusBarView phoneStatusBarView,
                 @BindsInstance StatusBarConfigurationController configurationController,
-                @BindsInstance StatusBarWindowController statusBarWindowController,
-                @BindsInstance @DisplaySpecific DarkIconDispatcher darkIconDispatcher);
+                @BindsInstance StatusBarWindowController statusBarWindowController);
     }
 
     /**
@@ -128,10 +127,10 @@ public interface HomeStatusBarComponent {
     StatusBarBoundsProvider getBoundsProvider();
 
     /** */
-    @DisplaySpecific
+    @DisplayAware
     DarkIconDispatcher getDarkIconDispatcher();
 
     /** */
-    @DisplaySpecific
+    @DisplayAware
     int getDisplayId();
 }

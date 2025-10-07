@@ -22,6 +22,7 @@ import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentat
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -74,10 +75,13 @@ public class OomAdjusterTests {
         // We need to run with dexmaker share class loader to make use of
         // ActivityTaskManagerService from wm package.
         runWithDexmakerShareClassLoader(() -> {
+            final ProcessStateController psc = mock(ProcessStateController.class);
+            doReturn(mock(ProcessStateController.ActivityStateAsyncUpdater.class)).when(
+                    psc).createActivityStateAsyncUpdater(any());
+
             sService = mock(ActivityManagerService.class);
             sService.mActivityTaskManager = new ActivityTaskManagerService(sContext);
-            sService.mActivityTaskManager.initialize(null, null, mock(ProcessStateController.class),
-                    sContext.getMainLooper());
+            sService.mActivityTaskManager.initialize(null, null, psc, sContext.getMainLooper());
             sService.mAtmInternal = sService.mActivityTaskManager.getAtmInternal();
 
             setFieldValue(ActivityManagerService.class, sService, "mProcLock",
@@ -142,7 +146,7 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStatePersistentUI() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_PERSISTENT_UI);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_PERSISTENT_UI);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(ZERO, true, elapsedTime);
@@ -151,7 +155,7 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateTop() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_TOP);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_TOP);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(ZERO, true, elapsedTime);
@@ -160,8 +164,8 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateTop_PreviousInteraction() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_TOP);
-        mProcessRecord.mState.setReportedInteraction(true);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_TOP);
+        mProcessRecord.setHasReportedInteraction(true);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(ZERO, true, ZERO);
@@ -170,8 +174,8 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateTop_PastUsageInterval() {
         final long elapsedTime = 3 * USAGE_STATS_INTERACTION;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_TOP);
-        mProcessRecord.mState.setReportedInteraction(true);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_TOP);
+        mProcessRecord.setHasReportedInteraction(true);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(ZERO, true, elapsedTime);
@@ -180,7 +184,7 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateBoundTop() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_BOUND_TOP);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_BOUND_TOP);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(ZERO, true, elapsedTime);
@@ -189,7 +193,7 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateFGS() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(elapsedTime, false, ZERO);
@@ -199,8 +203,8 @@ public class OomAdjusterTests {
     public void testMaybeUpdateUsageStats_ProcStateFGS_ShortInteraction() {
         final long elapsedTime = ZERO;
         final long fgInteractionTime = 1000L;
-        mProcessRecord.mState.setFgInteractionTime(fgInteractionTime);
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
+        mProcessRecord.setFgInteractionTime(fgInteractionTime);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(fgInteractionTime, false, ZERO);
@@ -210,8 +214,8 @@ public class OomAdjusterTests {
     public void testMaybeUpdateUsageStats_ProcStateFGS_LongInteraction() {
         final long elapsedTime = 2 * SERVICE_USAGE_INTERACTION;
         final long fgInteractionTime = 1000L;
-        mProcessRecord.mState.setFgInteractionTime(fgInteractionTime);
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
+        mProcessRecord.setFgInteractionTime(fgInteractionTime);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(fgInteractionTime, true, elapsedTime);
@@ -221,9 +225,9 @@ public class OomAdjusterTests {
     public void testMaybeUpdateUsageStats_ProcStateFGS_PreviousLongInteraction() {
         final long elapsedTime = 2 * SERVICE_USAGE_INTERACTION;
         final long fgInteractionTime = 1000L;
-        mProcessRecord.mState.setFgInteractionTime(fgInteractionTime);
-        mProcessRecord.mState.setReportedInteraction(true);
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
+        mProcessRecord.setFgInteractionTime(fgInteractionTime);
+        mProcessRecord.setHasReportedInteraction(true);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(fgInteractionTime, true, ZERO);
@@ -232,7 +236,7 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateFGSLocation() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(elapsedTime, false, ZERO);
@@ -241,7 +245,7 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateBFGS() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(
+        mProcessRecord.setCurProcState(
                 ActivityManager.PROCESS_STATE_BOUND_FOREGROUND_SERVICE);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
@@ -251,7 +255,7 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateImportantFG() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(ZERO, true, elapsedTime);
@@ -260,8 +264,8 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateImportantFG_PreviousInteraction() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND);
-        mProcessRecord.mState.setReportedInteraction(true);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND);
+        mProcessRecord.setHasReportedInteraction(true);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(ZERO, true, ZERO);
@@ -270,8 +274,8 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateImportantFG_PastUsageInterval() {
         final long elapsedTime = 3 * USAGE_STATS_INTERACTION;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND);
-        mProcessRecord.mState.setReportedInteraction(true);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND);
+        mProcessRecord.setHasReportedInteraction(true);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(ZERO, true, elapsedTime);
@@ -280,7 +284,7 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateImportantBG() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_IMPORTANT_BACKGROUND);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_IMPORTANT_BACKGROUND);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(ZERO, false, ZERO);
@@ -289,7 +293,7 @@ public class OomAdjusterTests {
     @Test
     public void testMaybeUpdateUsageStats_ProcStateService() {
         final long elapsedTime = ZERO;
-        mProcessRecord.mState.setCurProcState(ActivityManager.PROCESS_STATE_SERVICE);
+        mProcessRecord.setCurProcState(ActivityManager.PROCESS_STATE_SERVICE);
         sService.mOomAdjuster.maybeUpdateUsageStats(mProcessRecord, elapsedTime);
 
         assertProcessRecordState(ZERO, false, ZERO);
@@ -298,10 +302,10 @@ public class OomAdjusterTests {
     private void assertProcessRecordState(long fgInteractionTime, boolean reportedInteraction,
             long interactionEventTime) {
         assertEquals("Foreground interaction time was not updated correctly.",
-                fgInteractionTime, mProcessRecord.mState.getFgInteractionTime());
+                fgInteractionTime, mProcessRecord.getFgInteractionTime());
         assertEquals("Interaction was not updated correctly.",
-                reportedInteraction, mProcessRecord.mState.hasReportedInteraction());
+                reportedInteraction, mProcessRecord.getHasReportedInteraction());
         assertEquals("Interaction event time was not updated correctly.",
-                interactionEventTime, mProcessRecord.mState.getInteractionEventTime());
+                interactionEventTime, mProcessRecord.getInteractionEventTime());
     }
 }

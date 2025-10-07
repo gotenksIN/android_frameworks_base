@@ -823,17 +823,7 @@ public class BluetoothUtils {
             Log.d(TAG, "Skip check hasConnectedBroadcastSourceForBtDevice due to arg is null");
             return false;
         }
-        if (isAudioSharingHysteresisModeFixAvailable(localBtManager.getContext())) {
-            return hasActiveLocalBroadcastSourceForBtDevice(device, localBtManager);
-        }
-        LocalBluetoothLeBroadcastAssistant assistant =
-                localBtManager.getProfileManager().getLeAudioBroadcastAssistantProfile();
-        if (device == null || assistant == null) {
-            Log.d(TAG, "Skip check hasConnectedBroadcastSourceForBtDevice due to arg is null");
-            return false;
-        }
-        List<BluetoothLeBroadcastReceiveState> sourceList = assistant.getAllSources(device);
-        return !sourceList.isEmpty() && sourceList.stream().anyMatch(BluetoothUtils::isConnected);
+        return hasActiveLocalBroadcastSourceForBtDevice(device, localBtManager);
     }
 
     /**
@@ -1238,10 +1228,6 @@ public class BluetoothUtils {
      */
     public static void setTemporaryBondMetadata(@Nullable BluetoothDevice device) {
         if (device == null) return;
-        if (!Flags.enableTemporaryBondDevicesUi()) {
-            Log.d(TAG, "Skip setTemporaryBondMetadata, flag is disabled");
-            return;
-        }
         String fastPairCustomizedMeta = getStringMetaData(device,
                 METADATA_FAST_PAIR_CUSTOMIZED_FIELDS);
         String fullContentWithTag = generateExpressionWithTag(TEMP_BOND_TYPE,
@@ -1403,5 +1389,26 @@ public class BluetoothUtils {
         Log.d(TAG, "modifySelectedChannelIndex(): existedMetadata = " + original
                 + " updatedMetadata = " + updated);
         assistant.modifySource(sink, sourceId, updated);
+    }
+
+    /**
+     * Checks if the Bluetooth LE Audio Broadcast Assistant profile is available and at least one
+     * device is currently connected to it.
+     *
+     * @param bluetoothManager The {@link LocalBluetoothManager} instance to query.
+     * @return {@code true} if at least one device is connected to the LE Audio Broadcast Assistant
+     *     profile, {@code false} otherwise.
+     */
+    public static boolean hasConnectedBroadcastAssistantDevice(
+            @NonNull LocalBluetoothManager bluetoothManager) {
+        LocalBluetoothLeBroadcastAssistant assistantProfile =
+                bluetoothManager.getProfileManager().getLeAudioBroadcastAssistantProfile();
+
+        // assistantProfile can be null if the profile is not supported or available.
+        if (assistantProfile == null) {
+            return false;
+        }
+
+        return !assistantProfile.getAllConnectedDevices().isEmpty();
     }
 }

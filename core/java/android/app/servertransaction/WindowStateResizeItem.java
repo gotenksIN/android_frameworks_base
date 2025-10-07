@@ -76,8 +76,7 @@ public class WindowStateResizeItem extends WindowStateTransactionItem {
     @Override
     public void execute(@NonNull ClientTransactionHandler client, @NonNull IWindow window,
             @NonNull PendingTransactionActions pendingActions) {
-        Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER,
-                mReportDraw ? "windowResizedReport" : "windowResized");
+        Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER, "windowResized");
         try {
             window.resized(mLayout, mReportDraw, mForceLayout, mDisplayId, mSyncWithBuffers,
                     mDragResizing);

@@ -29,7 +29,6 @@ import android.media.ISoundDoseCallback;
 import android.media.audiopolicy.AudioMix;
 import android.media.audiopolicy.AudioMixingRule;
 import android.media.audiopolicy.AudioProductStrategy;
-import android.media.audiopolicy.AudioVolumeGroup;
 import android.media.audiopolicy.Flags;
 import android.os.IBinder;
 import android.os.RemoteCallbackList;
@@ -664,10 +663,6 @@ public class AudioSystemAdapter implements AudioSystem.RoutingUpdateCallback,
      * @return a list of AudioMixes that are registered in the audio policy manager.
      */
     public List<AudioMix> getRegisteredPolicyMixes() {
-        if (!Flags.audioMixTestApi()) {
-            return Collections.emptyList();
-        }
-
         List<AudioMix> audioMixes = new ArrayList<>();
         int result = AudioSystem.getRegisteredPolicyMixes(audioMixes);
         if (result != AudioSystem.SUCCESS) {
@@ -785,20 +780,6 @@ public class AudioSystemAdapter implements AudioSystem.RoutingUpdateCallback,
         }
 
         return sAudioProductStrategies;
-    }
-
-    /**
-     * Gets volume group mapped to stream
-     * @param stream stream to query
-     * @return volume group mapped to stream, DEFAULT_VOLUME_GROUP if no mapping is found.
-     */
-    public int getVolumeGroupIdFromStreamType(int stream) {
-        AudioAttributes attributes =
-                AudioProductStrategy.getAudioAttributesForStrategyWithLegacyStreamType(stream);
-        if (attributes.equals(new AudioAttributes.Builder().build())) {
-            return AudioVolumeGroup.DEFAULT_VOLUME_GROUP;
-        }
-        return AudioSystem.getVolumeGroupIdForStreamType(stream);
     }
 
     /**

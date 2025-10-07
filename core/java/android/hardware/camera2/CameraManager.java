@@ -16,6 +16,7 @@
 
 package android.hardware.camera2;
 
+import static android.app.WindowConfiguration.ROTATION_UNDEFINED;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_INVALID;
@@ -33,9 +34,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
-// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
 import android.app.ActivityThread;
-// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
 import android.app.ActivityManager;
 import android.app.CameraCompatTaskInfo;
 import android.app.TaskInfo;
@@ -48,6 +47,8 @@ import android.content.AttributionSource;
 import android.content.AttributionSourceState;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.res.CameraCompatibilityInfo;
+import android.content.res.CompatibilityInfo;
 import android.graphics.Point;
 import android.hardware.CameraExtensionSessionStats;
 import android.hardware.CameraStatus;
@@ -79,10 +80,8 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.ServiceSpecificException;
 import android.os.SystemProperties;
-// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
 import android.text.TextUtils;
 import android.util.Log;
-// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
@@ -90,7 +89,6 @@ import android.util.Pair;
 import android.util.Size;
 import android.view.Display;
 import android.view.Surface;
-import android.window.DesktopModeFlags;
 
 import com.android.internal.camera.flags.Flags;
 import com.android.internal.util.ArrayUtils;
@@ -780,9 +778,7 @@ public final class CameraManager {
     public CameraCharacteristics getCameraCharacteristics(@NonNull String cameraId,
             boolean overrideToPortrait) throws CameraAccessException {
         return getCameraCharacteristics(cameraId,
-                overrideToPortrait
-                        ? ICameraService.ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT
-                        : ICameraService.ROTATION_OVERRIDE_NONE);
+                getLandscapeToPortraitOverride(overrideToPortrait));
     }
 
     @NonNull
@@ -1319,10 +1315,9 @@ public final class CameraManager {
             @Nullable Handler handler,
             @NonNull final CameraDevice.StateCallback callback) throws CameraAccessException {
         openCameraImpl(cameraId, callback, CameraDeviceImpl.checkAndWrapHandler(handler),
-                         /*oomScoreOffset*/0,
-                         overrideToPortrait
-                                 ? ICameraService.ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT
-                                 : ICameraService.ROTATION_OVERRIDE_NONE, /*sharedMode*/false);
+                         /*oomScoreOffset*/ 0,
+                         getLandscapeToPortraitOverride(overrideToPortrait),
+                         /*sharedMode*/ false);
     }
 
     /**
@@ -1702,46 +1697,38 @@ public final class CameraManager {
     /**
      * @hide
      */
-    public static int getRotationOverride(@Nullable Context context,
-            @Nullable PackageManager packageManager, @Nullable String packageName) {
-        // Isolated process does not have access to the ContentProvider which
-        // `DesktopModeFlags` uses. `DesktopModeFlags` combines developer options and Aconfig flags.
-        if (!Process.isIsolated() && DesktopModeFlags
-                .ENABLE_CAMERA_COMPAT_SIMULATE_REQUESTED_ORIENTATION.isTrue()) {
-            return getRotationOverrideInternal(context, packageManager, packageName);
-        } else {
-            return shouldOverrideToPortrait(packageManager, packageName)
-                        ? ICameraService.ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT
-                        : ICameraService.ROTATION_OVERRIDE_NONE;
-        }
-    }
-
-    /**
-     * @hide
-     */
-    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     @TestApi
-    public static int getRotationOverrideInternal(@Nullable Context context,
+    public static int getRotationOverride(@Nullable Context context,
             @Nullable PackageManager packageManager, @Nullable String packageName) {
         if (!CameraManagerGlobal.sLandscapeToPortrait) {
             return ICameraService.ROTATION_OVERRIDE_NONE;
         }
 
-        // Isolated process does not have access to ActivityTaskManager service, which is used
-        // indirectly in `ActivityManager.getAppTasks()`.
-        if (context != null && !Process.isIsolated()) {
-            final ActivityManager activityManager = context.getSystemService(ActivityManager.class);
-            if (activityManager != null) {
-                for (ActivityManager.AppTask appTask : activityManager.getAppTasks()) {
-                    final TaskInfo taskInfo = appTask.getTaskInfo();
-                    final int freeformCameraCompatMode = taskInfo.appCompatTaskInfo
-                            .cameraCompatTaskInfo.freeformCameraCompatMode;
-                    if (isInCameraCompatMode(freeformCameraCompatMode)
-                            && taskInfo.topActivity != null
-                            && taskInfo.topActivity.getPackageName().equals(packageName)) {
-                        // WindowManager has requested rotation override.
-                        return getRotationOverrideForCompatFreeform(freeformCameraCompatMode,
-                                taskInfo.appCompatTaskInfo.cameraCompatTaskInfo.displayRotation);
+        if (com.android.window.flags.Flags
+                .enableCameraCompatCompatibilityInfoRotateAndCropBugfix()) {
+            if (isCameraCompatModeRequested()) {
+                return getRotationOverrideForCompatFreeform(CompatibilityInfo
+                        .getCameraCompatibilityInfo().getRotateAndCropRotation());
+            }
+        } else {
+            // Isolated process does not have access to ActivityTaskManager service, which is used
+            // indirectly in `ActivityManager.getAppTasks()`.
+            if (context != null && !Process.isIsolated()) {
+                final ActivityManager activityManager = context.getSystemService(
+                        ActivityManager.class);
+                if (activityManager != null) {
+                    for (ActivityManager.AppTask appTask : activityManager.getAppTasks()) {
+                        final TaskInfo taskInfo = appTask.getTaskInfo();
+                        final int cameraCompatMode = taskInfo.appCompatTaskInfo.cameraCompatTaskInfo
+                                .cameraCompatMode;
+                        if (isInCameraCompatMode(cameraCompatMode)
+                                && taskInfo.topActivity != null
+                                && taskInfo.topActivity.getPackageName().equals(packageName)) {
+                            // WindowManager has requested rotation override.
+                            return getRotationOverrideForCompatFreeform(cameraCompatMode,
+                                    taskInfo.appCompatTaskInfo.cameraCompatTaskInfo
+                                            .displayRotation);
+                        }
                     }
                 }
             }
@@ -1749,35 +1736,54 @@ public final class CameraManager {
 
         if (packageManager != null && packageName != null) {
             try {
-                return packageManager.getProperty(
-                        PackageManager.PROPERTY_COMPAT_OVERRIDE_LANDSCAPE_TO_PORTRAIT,
-                        packageName).getBoolean()
-                        ? ICameraService.ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT
-                        : ICameraService.ROTATION_OVERRIDE_NONE;
+                return getLandscapeToPortraitOverride(packageManager.getProperty(
+                        PackageManager.PROPERTY_COMPAT_OVERRIDE_LANDSCAPE_TO_PORTRAIT, packageName)
+                        .getBoolean());
             } catch (PackageManager.NameNotFoundException e) {
                 // No such property
             }
         }
 
-        return CompatChanges.isChangeEnabled(OVERRIDE_CAMERA_LANDSCAPE_TO_PORTRAIT)
-                ? ICameraService.ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT
+        return getLandscapeToPortraitOverride(CompatChanges.isChangeEnabled(
+                OVERRIDE_CAMERA_LANDSCAPE_TO_PORTRAIT));
+    }
+
+    private static int getLandscapeToPortraitOverride(boolean shouldOverride) {
+        return shouldOverride ? ICameraService.ROTATION_OVERRIDE_OVERRIDE_TO_PORTRAIT
                 : ICameraService.ROTATION_OVERRIDE_NONE;
     }
 
-    private static boolean isInCameraCompatMode(@CameraCompatTaskInfo.FreeformCameraCompatMode int
-            freeformCameraCompatMode) {
-        return (freeformCameraCompatMode != CameraCompatTaskInfo.CAMERA_COMPAT_FREEFORM_UNSPECIFIED)
-                && (freeformCameraCompatMode != CameraCompatTaskInfo.CAMERA_COMPAT_FREEFORM_NONE);
+    private static boolean isCameraCompatModeRequested() {
+        final CameraCompatibilityInfo compatInfo = CompatibilityInfo.getCameraCompatibilityInfo();
+        return compatInfo.getRotateAndCropRotation() != ROTATION_UNDEFINED
+                || compatInfo.shouldOverrideSensorOrientation();
+    }
+
+    private static boolean isInCameraCompatMode(@CameraCompatTaskInfo.CameraCompatMode int
+            cameraCompatMode) {
+        return (cameraCompatMode != CameraCompatTaskInfo.CAMERA_COMPAT_UNSPECIFIED)
+                && (cameraCompatMode != CameraCompatTaskInfo.CAMERA_COMPAT_NONE);
     }
 
     private static int getRotationOverrideForCompatFreeform(
-            @CameraCompatTaskInfo.FreeformCameraCompatMode int freeformCameraCompatMode,
+            @Surface.Rotation int requestedRotation) {
+        if (requestedRotation == ROTATION_90) {
+            return ICameraService.ROTATION_OVERRIDE_ROTATION_ONLY;
+        } else if (requestedRotation == ROTATION_270) {
+            return ICameraService.ROTATION_OVERRIDE_ROTATION_ONLY_REVERSE;
+        } else {
+            return ICameraService.ROTATION_OVERRIDE_NONE;
+        }
+    }
+
+    private static int getRotationOverrideForCompatFreeform(
+            @CameraCompatTaskInfo.CameraCompatMode int freeformCameraCompatMode,
             @Surface.Rotation int displayRotation) {
         // Only rotate-and-crop if the app and device orientations do not match.
         if (freeformCameraCompatMode
-                == CameraCompatTaskInfo.CAMERA_COMPAT_FREEFORM_LANDSCAPE_DEVICE_IN_PORTRAIT
+                == CameraCompatTaskInfo.CAMERA_COMPAT_LANDSCAPE_DEVICE_IN_PORTRAIT
                 || freeformCameraCompatMode
-                    == CameraCompatTaskInfo.CAMERA_COMPAT_FREEFORM_PORTRAIT_DEVICE_IN_LANDSCAPE) {
+                    == CameraCompatTaskInfo.CAMERA_COMPAT_PORTRAIT_DEVICE_IN_LANDSCAPE) {
             // Rotate-and-crop compensates for changes in camera preview calculations (sandboxing).
             // Recommended calculation of camera preview is:
             // rotation = (sensorOrientationDegrees - deviceOrientationDegrees * sign + 360) % 360
@@ -1805,30 +1811,6 @@ public final class CameraManager {
             return ICameraService.ROTATION_OVERRIDE_NONE;
         }
     }
-
-    /**
-     * @hide
-     */
-    @TestApi
-    public static boolean shouldOverrideToPortrait(@Nullable PackageManager packageManager,
-            @Nullable String packageName) {
-        if (!CameraManagerGlobal.sLandscapeToPortrait) {
-            return false;
-        }
-
-        if (packageManager != null && packageName != null) {
-            try {
-                return packageManager.getProperty(
-                        PackageManager.PROPERTY_COMPAT_OVERRIDE_LANDSCAPE_TO_PORTRAIT,
-                        packageName).getBoolean();
-            } catch (PackageManager.NameNotFoundException e) {
-                // No such property
-            }
-        }
-
-        return CompatChanges.isChangeEnabled(OVERRIDE_CAMERA_LANDSCAPE_TO_PORTRAIT);
-    }
-
 
     /**
      * @hide
@@ -2873,7 +2855,6 @@ public final class CameraManager {
                     throw new IllegalArgumentException("cameraId was null");
                 }
 
-// QTI_BEGIN: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
                 /* Force to expose only two cameras
                  * if the package name does not falls in this bucket
                  */
@@ -2894,7 +2875,6 @@ public final class CameraManager {
                     throw new IllegalArgumentException("invalid cameraId");
                 }
 
-// QTI_END: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
                 ICameraService cameraService = getCameraService();
                 if (cameraService == null) {
                     throw new CameraAccessException(CameraAccessException.CAMERA_DISCONNECTED,
@@ -3153,7 +3133,6 @@ public final class CameraManager {
         }
 
         private void onStatusChangedLocked(int status, DeviceCameraInfo info) {
-// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
             /* Force to ignore the last mono/aux camera status update
              * if the package name does not falls in this bucket
              */
@@ -3172,15 +3151,12 @@ public final class CameraManager {
             }
 
             if (exposeMonoCamera == false) {
-// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
                 if (Integer.parseInt(info.mCameraId) >= 2) {
                     Log.w(TAG, "[soar.cts] ignore the status update of camera: " + info.mCameraId);
-// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
                     return;
                 }
             }
 
-// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
             if (DEBUG) {
                 Log.v(TAG,
                         String.format("Camera id %s has status changed to 0x%x for device %d",
@@ -3341,7 +3317,6 @@ public final class CameraManager {
                         info.mCameraId, status, info.mDeviceId));
             }
 
-// QTI_BEGIN: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
             /* Force to ignore the aux or composite camera torch status update
              * if the package name does not falls in this bucket
              */
@@ -3360,16 +3335,13 @@ public final class CameraManager {
             }
 
             if (exposeMonoCamera == false) {
-// QTI_END: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
                 if (Integer.parseInt(info.mCameraId) >= 2) {
                     Log.w(TAG, "ignore the torch status update of camera: " + info.mCameraId);
-// QTI_BEGIN: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
                     return;
                 }
             }
 
 
-// QTI_END: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
             if (!validTorchStatus(status)) {
                 Log.e(TAG, String.format(
                         "Ignoring invalid camera %s torch status 0x%x for device %d",

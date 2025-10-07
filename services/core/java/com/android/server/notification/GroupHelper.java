@@ -604,11 +604,14 @@ public class GroupHelper {
             maybeUngroupOnSectionChanged(record, prevSectionKey);
         }
 
-        // This notification is already aggregated
-        if (record.getGroupKey().equals(fullAggregateGroupKey.toString())) {
-            return false;
-        }
         synchronized (mAggregatedNotifications) {
+            // This notification is already aggregated
+            if (record.getGroupKey().equals(fullAggregateGroupKey.toString())) {
+                // Update summary if flags updated
+                maybeUpdateSummaryAttributes(record, fullAggregateGroupKey, sectioner);
+                return false;
+            }
+
             ArrayMap<String, NotificationAttributes> ungrouped =
                 mUngroupedAbuseNotifications.getOrDefault(fullAggregateGroupKey, new ArrayMap<>());
             ungrouped.put(record.getKey(), new NotificationAttributes(
@@ -657,6 +660,36 @@ public class GroupHelper {
         }
 
         return sbnToBeAutogrouped;
+    }
+
+    @GuardedBy("mAggregatedNotifications")
+    private void maybeUpdateSummaryAttributes(NotificationRecord childRecord,
+            FullyQualifiedGroupKey fullAggregateGroupKey,
+            NotificationSectioner sectioner) {
+        final ArrayMap<String, NotificationAttributes> aggregatedNotificationsAttrs =
+                mAggregatedNotifications.getOrDefault(fullAggregateGroupKey, new ArrayMap<>());
+        NotificationAttributes oldAttrs = aggregatedNotificationsAttrs.get(childRecord.getKey());
+        if (oldAttrs != null) {
+            NotificationAttributes newAttr = new NotificationAttributes(
+                    childRecord.getFlags(),
+                    childRecord.getNotification().getSmallIcon(),
+                    childRecord.getNotification().color,
+                    childRecord.getNotification().visibility,
+                    childRecord.getNotification().getGroupAlertBehavior(),
+                    childRecord.getChannel().getId());
+            if (!oldAttrs.equals(newAttr)) {
+                aggregatedNotificationsAttrs.put(childRecord.getKey(), newAttr);
+                mAggregatedNotifications.put(fullAggregateGroupKey, aggregatedNotificationsAttrs);
+
+                if (DEBUG) {
+                    Slog.i(TAG, "maybeUpdateSummaryAttributes: " + childRecord);
+                }
+
+                // Update aggregate summary
+                updateAggregateAppGroup(fullAggregateGroupKey, childRecord.getKey(), true,
+                        sectioner.mSummaryId);
+            }
+        }
     }
 
     /**
@@ -711,7 +744,7 @@ public class GroupHelper {
      *
      * And updates the internal state of un-app-grouped notifications and their flags.
      *
-     * @return true if the notification was previously auto-grouped
+     * @return true if the notification was previously auto-grouped and was ungrouped by this method
      */
     private boolean maybeUngroupWithSections(NotificationRecord record,
             @Nullable FullyQualifiedGroupKey fullAggregateGroupKey) {
@@ -740,6 +773,19 @@ public class GroupHelper {
                 mAggregatedNotifications.getOrDefault(fullAggregateGroupKey, new ArrayMap<>());
             // check if the removed notification was part of the aggregate group
             if (aggregatedNotificationsAttrs.containsKey(record.getKey())) {
+                // If bundled and the section did not change, do not un-autogroup
+                final NotificationSectioner sectioner = getSection(record);
+                if (sectioner != null
+                        && NOTIFICATION_BUNDLE_SECTIONS.contains(sectioner)
+                        && fullAggregateGroupKey.equals(
+                            FullyQualifiedGroupKey.forRecord(record, sectioner))) {
+                    if (DEBUG) {
+                        Slog.i(TAG, "Skip removeAutoGroup because bundled: " + record);
+                    }
+                    maybeUpdateSummaryAttributes(record, fullAggregateGroupKey, sectioner);
+                    return false;
+                }
+
                 aggregatedNotificationsAttrs.remove(sbn.getKey());
                 mAggregatedNotifications.put(fullAggregateGroupKey, aggregatedNotificationsAttrs);
                 wasUnAggregated = true;
@@ -840,7 +886,23 @@ public class GroupHelper {
                     Log.i(TAG, "isGroupChildWithoutSummary OR isGroupSummaryWithoutChild"
                             + record);
                 }
-                addToUngroupedAndMaybeAggregate(record, fullAggregateGroupKey, sectioner);
+
+                boolean aggregated =
+                        addToUngroupedAndMaybeAggregate(record, fullAggregateGroupKey, sectioner);
+                if (android.service.notification.Flags.notificationClassification()) {
+                    if (!aggregated && isSummaryWithAllChildrenBundled(record, notificationList,
+                            new ArrayList<>())) {
+                        // Cancel the summary and cache it if does not get aggregated
+                        // in order to avoid empty summaries
+                        if (DEBUG) {
+                            Slog.i(TAG,
+                                    "Empty group summary to be canceled and cached: " + record);
+                        }
+                        mCallback.removeAppProvidedSummary(record.getKey());
+                        cacheCanceledSummary(record);
+                    }
+                }
+
                 return;
             }
 
@@ -1660,7 +1722,7 @@ public class GroupHelper {
         // Find all posted children for this summary
         for (NotificationRecord r : postedNotificationsList) {
             if (!r.getNotification().isGroupSummary()
-                    && groupKey.equals(r.getSbn().getGroup())) {
+                    && groupKey.equals(r.getSbn().getNotification().getGroup())) {
                 numChildren++;
                 if (isInBundleSection(r)) {
                     numBundledChildren++;
@@ -1670,7 +1732,7 @@ public class GroupHelper {
         // Find all enqueued children for this summary
         for (NotificationRecord r : enqueuedNotificationsList) {
             if (!r.getNotification().isGroupSummary()
-                    && groupKey.equals(r.getSbn().getGroup())) {
+                    && groupKey.equals(r.getSbn().getNotification().getGroup())) {
                 numChildren++;
                 if (isInBundleSection(r)) {
                     numBundledChildren++;

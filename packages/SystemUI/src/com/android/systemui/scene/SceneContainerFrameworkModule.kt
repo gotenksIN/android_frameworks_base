@@ -47,13 +47,13 @@ import dagger.multibindings.IntoMap
             EmptySceneModule::class,
             GoneSceneModule::class,
             LockscreenSceneModule::class,
+            OccludedSceneModule::class,
             QuickSettingsSceneModule::class,
             ShadeSceneModule::class,
             QuickSettingsShadeOverlayModule::class,
             NotificationsShadeOverlayModule::class,
             NotificationsShadeSessionModule::class,
             SceneDomainModule::class,
-            EditSceneModule::class,
 
             // List SceneResolver modules for supported SceneFamilies
             HomeSceneFamilyResolverModule::class,
@@ -100,10 +100,10 @@ interface SceneContainerFrameworkModule {
                         Scenes.Gone,
                         Scenes.Communal,
                         Scenes.Dream,
+                        Scenes.Occluded,
                         Scenes.Lockscreen,
                         Scenes.QuickSettings,
                         Scenes.Shade,
-                        Scenes.QSEditMode,
                     ),
                 initialSceneKey = Scenes.Lockscreen,
                 overlayKeys =
@@ -116,11 +116,11 @@ interface SceneContainerFrameworkModule {
                     mapOf(
                         Scenes.Gone to 0,
                         Scenes.Lockscreen to 0,
+                        Scenes.Occluded to 0,
                         Scenes.Communal to 1,
                         Scenes.Dream to 2,
                         Scenes.Shade to 3,
                         Scenes.QuickSettings to 4,
-                        Scenes.QSEditMode to 5,
                     ),
                 transitionsBuilder = SceneContainerTransitions(),
             )

@@ -815,7 +815,7 @@ public class SettingsBackupTest {
                  Settings.Secure.SUGGESTED_THEME_FEATURE_ENABLED,
                  Settings.Secure.REDACT_OTP_NOTIFICATION_WHILE_CONNECTED_TO_WIFI,
                  Settings.Secure.OTP_NOTIFICATION_REDACTION_LOCK_TIME,
-                 Settings.Secure.APP_FUNCTION_AGENT_ALLOWLIST_ENABLED);
+                 Settings.Secure.APP_FUNCTION_ADDITIONAL_AGENT_ALLOWLIST);
 
     @Test
     public void systemSettingsBackedUpOrDenied() {
@@ -875,7 +875,7 @@ public class SettingsBackupTest {
                         Settings.Secure.NAS_SETTINGS_UPDATED,
                         Settings.Secure.NAV_BAR_FORCE_VISIBLE,
                         Settings.Secure.NAV_BAR_KIDS_MODE,
-                        Settings.Secure.NAV_BAR_ORDER,
+                        Settings.Secure.NAVIGATIONBAR_KEY_ORDER,
                         Settings.Secure.NEARBY_FAST_PAIR_SETTINGS_DEVICES_COMPONENT,
                         Settings.Secure.NEARBY_SHARING_SLICE_URI,
                         Settings.Secure.NOTIFIED_NON_ACCESSIBILITY_CATEGORY_SERVICES,
@@ -914,6 +914,10 @@ public class SettingsBackupTest {
                         Settings.System.APPEND_FOR_LAST_AUDIBLE, // suffix deprecated since API 2
                         Settings.System.EGG_MODE, // I am the lolrus
                         Settings.System.END_BUTTON_BEHAVIOR, // bug?
+                        Settings.System
+                                .ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_ENABLE,
+                        Settings.System
+                                .ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_DISABLE,
                         Settings.System.DEFAULT_DEVICE_FONT_SCALE, // Non configurable
                         Settings.System.HIDE_ROTATION_LOCK_TOGGLE_FOR_ACCESSIBILITY,
                         Settings.System.INPUT_GAIN_INDEX_SETTINGS,

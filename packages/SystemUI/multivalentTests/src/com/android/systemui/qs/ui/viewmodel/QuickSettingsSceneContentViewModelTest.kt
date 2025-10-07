@@ -28,24 +28,26 @@ import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.lifecycle.activateIn
-import com.android.systemui.media.controls.data.repository.mediaFilterRepository
-import com.android.systemui.media.controls.domain.pipeline.interactor.mediaCarouselInteractor
-import com.android.systemui.media.controls.shared.model.MediaData
 import com.android.systemui.qs.FooterActionsController
 import com.android.systemui.qs.footer.ui.viewmodel.FooterActionsViewModel
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.domain.startable.sceneContainerStartable
+import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
-import com.android.systemui.settings.brightness.ui.viewmodel.brightnessMirrorViewModelFactory
 import com.android.systemui.shade.domain.interactor.disableDualShade
+import com.android.systemui.shade.domain.interactor.enableDualShade
+import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.domain.interactor.enableSplitShade
+import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.shade.ui.viewmodel.shadeHeaderViewModelFactory
 import com.android.systemui.testKosmos
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
+import com.android.systemui.window.domain.interactor.windowRootViewBlurInteractor
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.launch
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -74,18 +76,17 @@ class QuickSettingsSceneContentViewModelTest : SysuiTestCase() {
                 }
             underTest =
                 QuickSettingsSceneContentViewModel(
-                    brightnessMirrorViewModelFactory = brightnessMirrorViewModelFactory,
                     shadeHeaderViewModelFactory = shadeHeaderViewModelFactory,
-                    qsSceneAdapter = fakeQsSceneAdapter,
                     qsContainerViewModelFactory = kosmos.quickSettingsContainerViewModelFactory,
                     footerActionsViewModelFactory = footerActionsViewModelFactory,
                     footerActionsController = footerActionsController,
-                    mediaCarouselInteractor = mediaCarouselInteractor,
                     shadeModeInteractor = shadeModeInteractor,
                     sceneInteractor = sceneInteractor,
                     mainDispatcher = testDispatcher,
+                    windowRootViewBlurInteractor = windowRootViewBlurInteractor,
                 )
             underTest.activateIn(testScope)
+            testScope.backgroundScope.launch { underTest.detectShadeModeChanges() }
             disableDualShade()
         }
     }
@@ -99,40 +100,33 @@ class QuickSettingsSceneContentViewModelTest : SysuiTestCase() {
     }
 
     @Test
-    fun addAndRemoveMedia_mediaVisibilityIsUpdated() =
-        kosmos.runTest {
-            val userMedia = MediaData(active = true)
-
-            assertThat(underTest.isMediaVisible).isFalse()
-
-            mediaFilterRepository.addCurrentUserMediaEntry(userMedia)
-
-            assertThat(underTest.isMediaVisible).isTrue()
-
-            mediaFilterRepository.removeCurrentUserMediaEntry(userMedia.instanceId)
-
-            assertThat(underTest.isMediaVisible).isFalse()
-        }
-
-    @Test
-    fun addInactiveMedia_mediaVisibilityIsUpdated() =
-        kosmos.runTest {
-            val userMedia = MediaData(active = false)
-
-            assertThat(underTest.isMediaVisible).isFalse()
-
-            mediaFilterRepository.addCurrentUserMediaEntry(userMedia)
-
-            assertThat(underTest.isMediaVisible).isTrue()
-        }
-
-    @Test
-    fun shadeModeChange_switchToShadeScene() =
+    fun shadeModeChange_split_switchToShadeScene() =
         kosmos.runTest {
             val scene by collectLastValue(sceneInteractor.currentScene)
+
+            enableSingleShade()
+            shadeInteractor.expandQuickSettingsShade("test")
+            assertThat(scene).isEqualTo(Scenes.QuickSettings)
 
             enableSplitShade()
 
             assertThat(scene).isEqualTo(Scenes.Shade)
+        }
+
+    @Test
+    fun shadeModeChange_dual_switchToOverlay() =
+        kosmos.runTest {
+            val scene by collectLastValue(sceneInteractor.currentScene)
+            val overlays by collectLastValue(sceneInteractor.currentOverlays)
+
+            enableSingleShade()
+            shadeInteractor.expandQuickSettingsShade("test")
+            assertThat(scene).isEqualTo(Scenes.QuickSettings)
+            assertThat(overlays).isEmpty()
+
+            enableDualShade()
+
+            assertThat(scene).isEqualTo(Scenes.Lockscreen)
+            assertThat(overlays).containsExactly(Overlays.QuickSettingsShade)
         }
 }

@@ -150,7 +150,7 @@ fun ContentScope.BouncerContent(
     // Give an extra delay for showing BouncerContent if face auth or active unlock may run.
     // This gives passive auth methods an opportunity to succeed before showing bouncer contents.
     val appearAnimationInterpolator = FastOutSlowInEasing
-    val appearAnimationDuration = 250
+    var appearAnimationDuration: Int by remember { mutableIntStateOf(0) }
     var appearAnimationDelay: Int by remember { mutableIntStateOf(0) }
     var startAppearAnimation: Boolean by remember { mutableStateOf(false) }
     val animatedAlpha: Float by
@@ -193,6 +193,12 @@ fun ContentScope.BouncerContent(
         appearAnimationDelay =
             BOUNCER_CONTENTS_PASSIVE_AUTH_DELAY.takeIf { viewModel.shouldDelayBouncerContent() }
                 ?: 0
+
+        // evaluate once when BouncerContent first shows; we don't animate if the
+        // bouncer showing was initiated from a drag/fling
+        appearAnimationDuration =
+            if (!isDraggingToBouncer()) BOUNCER_CONTENTS_ALPHA_IN_ANIMATION_DURATION else 0
+
         startAppearAnimation = true
     }
 
@@ -219,9 +225,11 @@ fun ContentScope.BouncerContent(
                     alpha =
                         if (isDraggingToBouncer()) {
                             appearAnimationInterpolator.transform(
+                                // animate in along with the layout's transition
                                 layoutState.currentTransition!!.progress
                             )
                         } else {
+                            // animate in separately from the layout's transition
                             animatedAlpha
                         }
                 },
@@ -230,7 +238,7 @@ fun ContentScope.BouncerContent(
 
 @Composable
 @VisibleForTesting
-fun ContentScope.BouncerContent(
+fun BouncerContent(
     layout: BouncerOverlayLayout,
     viewModel: BouncerOverlayContentViewModel,
     dialogFactory: BouncerDialogFactory,
@@ -265,11 +273,14 @@ fun ContentScope.BouncerContent(
                 border =
                     BorderStroke(width = 1.dp, color = MaterialTheme.colorScheme.outlineVariant),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                colors =
+                    ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
             ) {
                 Text(
                     text = stringResource(R.string.back_button_on_bouncer),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -289,7 +300,7 @@ private fun StandardLayout(
         LocalWindowSizeClass.current.heightSizeClass == WindowHeightSizeClass.Expanded
 
     FoldAware(
-        modifier = modifier.padding(top = 92.dp, bottom = 48.dp),
+        modifier = modifier.padding(top = 92.dp, bottom = 32.dp),
         viewModel = viewModel,
         aboveFold = {
             Column(
@@ -318,7 +329,15 @@ private fun StandardLayout(
                     )
                 }
 
-                ActionArea(viewModel = viewModel, modifier = Modifier.padding(top = 48.dp))
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ActionArea(viewModel = viewModel, modifier = Modifier.padding(top = 32.dp))
+                    // This spacer dynamically resizes to 0 when there is insufficient space
+                    // available, e.g. when the IME is shown.
+                    Spacer(modifier = Modifier.weight(1f, fill = false).height(16.dp))
+                }
             }
         },
     )
@@ -381,7 +400,7 @@ private fun SplitLayout(viewModel: BouncerOverlayContentViewModel, modifier: Mod
             }
         }
 
-        // Right side (in right-to-left locales).
+        // Right side (in left-to-right locales).
         Box(modifier = Modifier.fillMaxHeight().weight(1f)) {
             when (authMethod) {
                 is PinBouncerViewModel,
@@ -1051,3 +1070,4 @@ object BouncerMotionTestKeys {
 }
 
 private const val BOUNCER_CONTENTS_PASSIVE_AUTH_DELAY = 500
+private const val BOUNCER_CONTENTS_ALPHA_IN_ANIMATION_DURATION = 250

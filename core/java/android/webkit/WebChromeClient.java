@@ -411,11 +411,11 @@ public class WebChromeClient {
      *                 origin.
      */
     public void onGeolocationPermissionsShowPrompt(String origin,
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
             GeolocationPermissions.Callback callback) {
             android.util.SeempLog.record(54);
             }
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
 
     /**
      * Notify the host application that a request for Geolocation permissions,
@@ -584,7 +584,7 @@ public class WebChromeClient {
          * @hide
          */
         @ChangeId
-        @EnabledAfter(targetSdkVersion = android.os.Build.VERSION_CODES.VANILLA_ICE_CREAM)
+        @EnabledAfter(targetSdkVersion = android.os.Build.VERSION_CODES.BAKLAVA)
         @FlaggedApi(android.webkit.Flags.FLAG_FILE_SYSTEM_ACCESS)
         @SystemApi
         public static final long ENABLE_FILE_SYSTEM_ACCESS = 364980165L;

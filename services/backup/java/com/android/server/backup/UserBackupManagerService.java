@@ -91,7 +91,6 @@ import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.AtomicFile;
 import android.util.EventLog;
-import android.util.FeatureFlagUtils;
 import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -428,6 +427,7 @@ public class UserBackupManagerService {
 
     @VisibleForTesting
     UserBackupManagerService(
+            @UserIdInt int userId,
             Context context,
             PackageManager packageManager,
             LifecycleOperationStorage operationStorage,
@@ -436,9 +436,9 @@ public class UserBackupManagerService {
             BackupManagerConstants backupManagerConstants,
             IActivityManager activityManager,
             ActivityManagerInternal activityManagerInternal) {
+        mUserId = userId;
         mContext = context;
 
-        mUserId = 0;
         mLogIdMsg = "[UserID:" + mUserId + "] ";
         mRegisterTransportsRequestedTime = 0;
         mPackageManager = packageManager;
@@ -2997,7 +2997,7 @@ public class UserBackupManagerService {
         }
     }
 
-    synchronized boolean isFrameworkSchedulingEnabled() {
+    boolean isFrameworkSchedulingEnabled() {
         // By default scheduling is enabled
         final int defaultSetting = 1;
         int isEnabled =
@@ -3976,11 +3976,6 @@ public class UserBackupManagerService {
     @BackupDestination
     int getBackupDestinationFromTransport(TransportConnection transportConnection)
             throws TransportNotAvailableException, RemoteException {
-        if (!shouldUseNewBackupEligibilityRules()) {
-            // Return the default to stick to the legacy behaviour.
-            return BackupDestination.CLOUD;
-        }
-
         final long oldCallingId = Binder.clearCallingIdentity();
         try {
             BackupTransportClient transport =
@@ -3988,18 +3983,17 @@ public class UserBackupManagerService {
                             /* caller */ "BMS.getBackupDestinationFromTransport");
             if ((transport.getTransportFlags() & BackupAgent.FLAG_DEVICE_TO_DEVICE_TRANSFER) != 0) {
                 return BackupDestination.DEVICE_TRANSFER;
+            } else if (Flags.enableCrossPlatformTransfer()
+                    && (transport.getTransportFlags()
+                                    & BackupAgent.FLAG_CROSS_PLATFORM_DATA_TRANSFER_IOS)
+                            != 0) {
+                return BackupDestination.CROSS_PLATFORM_TRANSFER;
             } else {
                 return BackupDestination.CLOUD;
             }
         } finally {
             Binder.restoreCallingIdentity(oldCallingId);
         }
-    }
-
-    @VisibleForTesting
-    boolean shouldUseNewBackupEligibilityRules() {
-        return FeatureFlagUtils.isEnabled(
-                mContext, FeatureFlagUtils.SETTINGS_USE_NEW_BACKUP_ELIGIBILITY_RULES);
     }
 
     public IBackupManager getBackupManagerBinder() {

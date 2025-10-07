@@ -545,27 +545,10 @@
 
     <!-- If this is true, allow wake from theater mode when plugged in or unplugged. -->
     <bool name="config_allowTheaterModeWakeFromUnplug">false</bool>
-    <!-- If this is true, allow wake from theater mode from gesture. -->
-    <bool name="config_allowTheaterModeWakeFromGesture">false</bool>
-    <!-- If this is true, allow wake from theater mode from camera lens cover is switched. -->
-    <bool name="config_allowTheaterModeWakeFromCameraLens">false</bool>
-    <!-- If this is true, allow wake from theater mode from power key press. -->
-    <bool name="config_allowTheaterModeWakeFromPowerKey">true</bool>
-    <!-- If this is true, allow wake from theater mode from regular key press. Setting this value to
-         true implies config_allowTheaterModeWakeFromPowerKey is also true-->
-    <bool name="config_allowTheaterModeWakeFromKey">false</bool>
-    <!-- If this is true, allow wake from theater mode from motion. -->
-    <bool name="config_allowTheaterModeWakeFromMotion">false</bool>
-    <!-- If this is true, allow wake from theater mode from motion. -->
-    <bool name="config_allowTheaterModeWakeFromMotionWhenNotDreaming">false</bool>
-    <!-- If this is true, allow wake from theater mode from lid switch. -->
-    <bool name="config_allowTheaterModeWakeFromLidSwitch">false</bool>
     <!-- If this is true, allow wake from theater mode when docked. -->
     <bool name="config_allowTheaterModeWakeFromDock">false</bool>
     <!-- If this is true, allow wake from theater mode from window layout flag. -->
     <bool name="config_allowTheaterModeWakeFromWindowLayout">false</bool>
-    <!-- If this is true, go to sleep when theater mode is enabled from button press -->
-    <bool name="config_goToSleepOnButtonPressTheaterMode">true</bool>
     <!-- If this is true, long press on power button will be available from the non-interactive state -->
     <bool name="config_supportLongPressPowerWhenNonInteractive">false</bool>
     <!-- If this is true, short press on power button will be available whenever the default display
@@ -1553,6 +1536,17 @@
          before the delays get very long. The software rate-limiter also does not count duplicate
          wrong guesses, improving usability. -->
     <bool name="config_softwareLskfRateLimiterEnforcing">false</bool>
+
+    <!-- Default value of the setting that controls whether animations should be disabled while
+         entering the PIN on the lockscreen.
+         False means animations should be enabled by default.
+         True means animations should be disabled by default. -->
+    <bool name="config_lockPinEnhancedPrivacyDefault">false</bool>
+
+    <!-- Default value for the setting that controls whether lock pattern is visible as user enters.
+         True means the pattern should be visible by default.
+         False means the pattern should not be visible by default. -->
+    <bool name="config_lockPatternVisibleDefault">true</bool>
 
     <!-- Control the behavior when the user long presses the home button.
             0 - Nothing
@@ -2879,6 +2873,8 @@
     <integer name="config_whenToStartHubModeDefault">0</integer>
     <!-- Whether to restrict auto-showing glanceable hub to wireless charging. -->
     <bool name="config_onlyShowGlanceableHubWhenWirelessChargingDefault">false</bool>
+    <!-- Whether glanceable hub is enabled by default. -->
+    <bool name="config_glanceableHubEnabledByDefault">false</bool>
 
     <!-- Whether or not low light display behavior is enabled -->
     <bool name="config_lowLightDisplayBehaviorEnabledDefault">true</bool>
@@ -3191,23 +3187,28 @@
     <!-- The default value if the SyncStorageEngine should sync automatically or not -->
     <bool name="config_syncstorageengine_masterSyncAutomatically">true</bool>
 
-    <!--  Maximum number of supported users, including all types of users (profiles, guests, demo,
-          etc.).
-          Setting to 1 enforces a single-user device.
-          For devices that support multiple users, the limit here should be based on overall
-          device storage capabilities and therefore could be set very high.
-          To limit the number of any particular user type, e.g. for UX considerations, set the
+    <!--  Maximum number of supported switchable users (excluding Guests & Demo users).
+          Does not include profiles. See {@link UserManager#getMaxSwitchableUsers()} for details.
+
+          Setting to 1 disables multiple switchable users (e.g. secondary users).
+
+          To limit the number of any particular user type (whether switchable or not), set the
           appropriate maximum in {@link com.android.internal.R.xml#config_user_types}.
-          Normally, storage shouldn't be the limiting factor, so this value should be at least as
-          large as the sum of all individual user type maxima. -->
+
+         Note: If > 1, it is expected that UserManager.USER_TYPE_FULL_SECONDARY users are supported
+         on the device (at least for testing purposes, even if in practice the UI really only allows
+         other switchable types, such as restricted profiles or guests, to be created).
+         -->
     <integer name="config_multiuserMaximumUsers">1</integer>
 
     <!-- Maximum number of users we allow to be running at a time. -->
     <integer name="config_multiuserMaxRunningUsers">3</integer>
 
-    <!-- Number of seconds of uptime after a full user enters the background before we attempt to
-         stop it due to inactivity. Set to -1 to disable scheduling stopping background users. -->
-    <integer name="config_backgroundUserScheduledStopTimeSecs">1800</integer> <!-- 30 minutes -->
+    <!-- Number of seconds of uptime after a full user enters the background before we consider
+         it as no longer important, and therefore can consider automatically stopping it.
+         Set to -1 to disable this feature (i.e. don't auto-stop background users after some elapsed
+         time). -->
+    <integer name="config_backgroundUserConsideredDispensableTimeSecs">93600</integer> <!-- 26 hours -->
 
     <!-- Whether to delay user data locking for background user.
          If false, user switched-out from user switching will still be in running state until
@@ -3269,7 +3270,10 @@
     <bool name="config_disallowRemovingLastAdminUser">true</bool>
 
     <!-- Whether all secondary users (and the system user) are eligible to have profiles.
-         If false, only the MainUser is eligible to have profiles. -->
+         If false, only the MainUser is eligible to have profiles.
+          NOTE: this feature not supported yet, and CTS will fail if it's set to
+          true.
+    -->
     <bool name="config_supportProfilesOnNonMainUser">false</bool>
 
     <!-- Whether the system should create the initial full user on boot.
@@ -3293,7 +3297,15 @@
     headless system user can run in the foreground even though it is not a full user. -->
     <bool name="config_canSwitchToHeadlessSystemUser">false</bool>
 
-    <!-- Whether UI for multi user should be shown -->
+    <!-- Whether UI for multi user should be shown.
+         Note: If true, it is expected that secondary users are supported on the device (at least
+         for testing purposes, even if in practice the UI really only allows other switchable
+         types, such as restricted profiles or guests, to be created).
+         @deprecated  Use config_multiuserMaximumUsers instead.
+         This config will likely be removed in the future; config_multiuserMaximumUsers, which now
+         only applies to full users, not profiles, should be updated accordingly as needed.
+         TODO(b/435521983): Remove this since it's now made redundant by config_multiuserMaximumUsers
+         -->
     <bool name="config_enableMultiUserUI">false</bool>
 
     <!-- Indicates the boot strategy in Headless System User Mode (HSUM)
@@ -3396,6 +3408,12 @@
     <!-- When true, local displays that do not contain any of their own content will automatically
          mirror the content of the default display. -->
     <bool name="config_localDisplaysMirrorContent">true</bool>
+
+    <!-- When true, the {@link Display#FLAG_PRESENTATION} flag is set to all internal displays.
+         When false, presentations are not allowed on internal displays by default, but vendors can
+         still explicitly override this by explicitly adding the flag to the internal display(s).
+    -->
+    <bool name="config_allowPresentationOnInternalDisplay">true</bool>
 
     <!-- When true, udfps vote is ignored. This feature is disabled by default. -->
     <bool name="config_ignoreUdfpsVote">false</bool>
@@ -3710,7 +3728,6 @@
         <item>com.android.server.notification.ZenModeExtractor</item>
         <item>com.android.server.notification.ImportanceExtractor</item>
         <!-- depends on ImportanceExtractor-->
-        <item>com.android.server.notification.NotificationIntrusivenessExtractor</item>
         <item>com.android.server.notification.VisibilityExtractor</item>
         <!-- Depends on ZenModeExtractor -->
         <item>com.android.server.notification.BadgeExtractor</item>
@@ -3897,6 +3914,7 @@
          "users" = list of users
          "restart" = restart device
          "emergency" = Launch emergency dialer
+         "lock" = Lock device without requiring strong authentication
          "lockdown" = Lock down device until the user authenticates
          "logout" =  Logout the current user
          "system_update" = Launch System Update screen
@@ -4399,6 +4417,31 @@
     <!-- The default vibration strength, must be between 1 and 255 inclusive. -->
     <integer name="config_defaultVibrationAmplitude">255</integer>
 
+    <!-- The scale factor to be applied at each vibration intensity level supported by the device,
+     defined by a positive float value.
+     The default framework scaling will be applied if this is not set, based on the user and the
+     default scales for each usage.
+     The number of entries here must be the device supported scale levels for LOW/MEDIUM/HIGH.
+     Example:
+     <string-array name="config_vibrationIntensityScaleFactors" translatable="false">
+       <item>0.5</item> -> Vibrator.VIBRATION_INTENSITY_LOW
+       <item>0.7</item> -> Vibrator.VIBRATION_INTENSITY_MEDIUM
+       <item>1.0</item> -> Vibrator.VIBRATION_INTENSITY_HIGH
+     </string-array> -->
+    <string-array name="config_vibrationIntensityScaleFactors" translatable="false" />
+
+    <!-- The scale factor to be applied for external vibrations only (i.e. audio-coupled haptics),
+         defined by a positive float value.
+         The values from config_vibrationIntensityScaleFactors will be used if this is not set.
+         The number of entries here must be the device supported scale levels for LOW/MEDIUM/HIGH.
+         Example:
+         <string-array name="config_externalVibrationIntensityScaleFactors" translatable="false">
+           <item>0.3</item> -> Vibrator.VIBRATION_INTENSITY_LOW
+           <item>0.5</item> -> Vibrator.VIBRATION_INTENSITY_MEDIUM
+           <item>1.0</item> -> Vibrator.VIBRATION_INTENSITY_HIGH
+         </string-array> -->
+    <string-array name="config_externalVibrationIntensityScaleFactors" translatable="false" />
+
     <!-- The max vibration strength allowed in audio haptic channels, must be positive or zero if
          limit is unknown. -->
     <item name="config_hapticChannelMaxVibrationAmplitude" format="float" type="dimen">0</item>
@@ -4781,7 +4824,8 @@
     <string name="config_defaultDndDeniedPackages" translatable="false"></string>
 
     <!-- User restrictions set on the SYSTEM user when it is first created.
-         Note: Also update appropriate overlay files. -->
+         @deprecated Set the System's default-restrictions in config_user_types.xml, which
+         overwrites this value anyway, instead.  -->
     <string-array translatable="false" name="config_defaultFirstUserRestrictions">
     </string-array>
 
@@ -4850,7 +4894,7 @@
     <bool name="config_allow3rdPartyAppOnInternal">true</bool>
 
     <!-- Specifies the path that is used by AdaptiveIconDrawable class to crop launcher icons. -->
-    <string name="config_icon_mask" translatable="false">"M50,0L92,0C96.42,0 100,4.58 100 8L100,92C100, 96.42 96.42 100 92 100L8 100C4.58, 100 0 96.42 0 92L0 8 C 0 4.42 4.42 0 8 0L50 0Z"</string>
+    <string name="config_icon_mask" translatable="false">"M 50 0 L 92 0 A 8 8 0 0 1 100 8 L 100 92 A 8 8 0 0 1 92 100 L 8 100 A 8 8 0 0 1 0 92 L 0 8 A 8 8 0 0 1 8 0 L 50 0 Z"</string>
     <!-- Specifies the path that is used by AdaptiveIconDrawable class to crop launcher banners. -->
     <string name="config_banner_mask" translatable="false">@string/config_icon_mask</string>
 
@@ -4881,6 +4925,13 @@
         <!--
         <item>com.example.package.first/com.example.class.FirstService</item>
         <item>com.example.package.second/com.example.class.SecondService</item>
+        -->
+    </string-array>
+
+    <string-array translatable="false" name="config_forceInvertPackageBlocklist">
+        <!--
+        <item>com.example.package.first</item>
+        <item>com.example.package.second</item>
         -->
     </string-array>
 
@@ -6799,6 +6850,12 @@
     <bool name="config_cecQuerySadMaxDisabled_allowed">true</bool>
     <bool name="config_cecQuerySadMaxDisabled_default">false</bool>
 
+    <bool name="config_cecTvBehaviorOnStandbyMessage_userConfigurable">false</bool>
+    <bool name="config_cecTvBehaviorOnStandbyMessageGoToSleep_allowed">true</bool>
+    <bool name="config_cecTvBehaviorOnStandbyMessageGoToSleep_default">true</bool>
+    <bool name="config_cecTvBehaviorOnStandbyMessageGoToDream_allowed">true</bool>
+    <bool name="config_cecTvBehaviorOnStandbyMessageGoToDream_default">false</bool>
+
     <!-- eARC Configuration -->
     <bool name="config_earcEnabled_userConfigurable">true</bool>
     <bool name="config_earcFeatureEnabled_allowed">true</bool>
@@ -7503,6 +7560,9 @@
     <!-- Whether the home screen should be shown behind freeform tasks in desktop mode. -->
     <bool name="config_showHomeBehindDesktop">false</bool>
 
+    <!-- List of packages which should be exempt from desktop mode. -->
+    <string-array name="config_desktopExemptPackages" translatable="false"/>
+
     <!-- Frame rate compatibility value for Wallpaper
          FRAME_RATE_COMPATIBILITY_MIN (102) is used by default for lower power consumption -->
     <integer name="config_wallpaperFrameRateCompatibility">102</integer>
@@ -7627,20 +7687,47 @@
     <!-- Maximum number of devices that allows for audio sharing. -->
     <integer name="config_audio_sharing_maximum_sinks">2</integer>
 
-    <!--For App Functions, this configuration lists package names grouped as "Device Settings".
+    <!-- Whether ResolverActivity should highlight the last used app.
+         When false, ResolverActivity shows a list of apps instead of highlighting the last used app
+         and displaying other apps separately. -->
+    <bool name="config_resolverActivityFilterLastUsed">true</bool>
+
+    <!--For App Function, this configuration lists package names grouped as "Device Settings".
         Packages in this list share the same App Function access settings. In the UI, they are
         presented as a single "Device Settings" item rather than individually. -->
-    <string-array name="config_appFunctionsDeviceSettingsPackages" translatable="false">
+    <string-array name="config_appFunctionDeviceSettingsPackages" translatable="false">
     </string-array>
 
     <!-- Package name for developer verification service provider app [DO NOT TRANSLATE] -->
     <string name="config_developerVerificationServiceProviderPackageName" translatable="false"></string>
+    <!-- Package name for developer verification policy delegate app [DO NOT TRANSLATE] -->
+    <string name="config_developerVerificationPolicyDelegatePackageName" translatable="false"></string>
 
     <!-- Whether the system package installer supports the material design. -->
     <bool name="config_enableMaterialDesignInPackageInstaller">true</bool>
+
+    <!-- Whether to enable partial sleep wake locks. -->
+    <bool name="config_allowPartialSleepWakeLocks">false</bool>
+
+    <!-- Maximum partial sleep wake lock duration in milliseconds. -->
+    <integer name="config_maximumPartialSleepWakeLockDuration">1000</integer>
 
     <!-- Package and class info to bind to ProximityProviderService -->
     <string name="proximity_provider_service_package_name" translatable="false">android</string>
     <string name="proximity_provider_service_class_name" translatable="false">android.proximity.DefaultProximityProviderService</string>
 
+    <!-- Action for opening trusted location settings page [CHAR LIMIT=NONE] [DO NOT TRANSLATE] -->
+    <string name="trusted_location_settings_action" translatable="false"></string>
+
+    <!-- The delay in milliseconds to suppress the toast after the user presses the
+         power button. -->
+    <integer name="config_turnOffTvToastSuppressionDelayMs">0</integer>
+
+    <!-- The delay in milliseconds to show the toast after the user presses the power button. -->
+    <integer name="config_turnOffTvToastPostDelayMs">0</integer>
+
+    <!-- A list of permissions to be granted under WatchFaceBehavior role
+        It can only contain non-AOSP permissions outside of the android.*
+        and com.android.* namespace. -->
+    <string-array name="config_watchFacePermissions" translatable="false"/>
 </resources>

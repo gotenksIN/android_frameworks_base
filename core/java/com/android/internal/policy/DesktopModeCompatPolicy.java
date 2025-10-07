@@ -16,10 +16,13 @@
 
 package com.android.internal.policy;
 
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_DREAM;
+
 import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.TaskInfo;
+import android.app.WindowConfiguration;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
@@ -31,7 +34,9 @@ import android.window.DesktopModeFlags;
 import com.android.internal.R;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -41,6 +46,8 @@ public class DesktopModeCompatPolicy {
     private final Context mContext;
     @NonNull
     private final String mSystemUiPackage;
+    @NonNull
+    private final List<String> mConfigExemptPackages;
     private final Map<String, Boolean> mPackageInfoCache = new HashMap<>();
     private PackageManager mPackageManager = null;
 
@@ -49,6 +56,8 @@ public class DesktopModeCompatPolicy {
     public DesktopModeCompatPolicy(@NonNull Context context) {
         mContext = context;
         mSystemUiPackage = context.getResources().getString(R.string.config_systemUi);
+        mConfigExemptPackages = Arrays.asList(context.getResources().getStringArray(
+                R.array.config_desktopExemptPackages));
     }
 
     public void setDefaultHomePackageSupplier(
@@ -82,12 +91,12 @@ public class DesktopModeCompatPolicy {
 
     /**
      * @see #isTopActivityExemptFromDesktopWindowing(ComponentName, boolean, boolean, int, int,
-     * ActivityInfo)
+     * ActivityInfo, int)
      */
     public boolean isTopActivityExemptFromDesktopWindowing(@NonNull TaskInfo task) {
         return isTopActivityExemptFromDesktopWindowing(task.baseActivity,
                 task.isTopActivityNoDisplay, task.isActivityStackTransparent, task.numActivities,
-                task.userId, task.topActivityInfo);
+                task.userId, task.topActivityInfo, task.topActivityType);
     }
 
     /**
@@ -99,7 +108,7 @@ public class DesktopModeCompatPolicy {
      */
     public boolean isTopActivityExemptFromDesktopWindowing(@Nullable ComponentName baseActivity,
             boolean isTopActivityNoDisplay, boolean isActivityStackTransparent, int numActivities,
-            int userId, ActivityInfo info) {
+            int userId, ActivityInfo info, @WindowConfiguration.ActivityType int topActivityType) {
         final String packageName = baseActivity != null ? baseActivity.getPackageName() : null;
         if (packageName == null) {
             return false;
@@ -112,6 +121,16 @@ public class DesktopModeCompatPolicy {
         // unchanged.
         if (isTopActivityNoDisplay) {
             return false;
+        }
+        // Dream activities should be fullscreen and thus should be forced out of desktop.
+        if (DesktopExperienceFlags.ENABLE_DREAM_ACTIVITY_WINDOWING_EXCLUSION.isTrue()
+                && topActivityType == ACTIVITY_TYPE_DREAM) {
+            return true;
+        }
+        // TODO: b/434943016 - Replace with permission.
+        // If activity belongs to package exempt via device config, force out of desktop.
+        if (isPackageExemptViaConfig(packageName) && !isActivityStackTransparent) {
+            return true;
         }
         // If activity belongs to system ui package, safe to force out of desktop.
         if (isSystemUiTask(packageName)) {
@@ -129,7 +148,7 @@ public class DesktopModeCompatPolicy {
                 || hasPlatformSignature(info));
     }
 
-    /** @see #shouldDisableDesktopEntryPoints(String, int, boolean, boolean) */
+    /** @see #shouldDisableDesktopEntryPoints(String, int, boolean, boolean, int) */
     public boolean shouldDisableDesktopEntryPoints(@NonNull TaskInfo task) {
         final String packageName = task.baseActivity != null ? task.baseActivity.getPackageName() :
                 null;
@@ -137,7 +156,8 @@ public class DesktopModeCompatPolicy {
                 packageName,
                 task.numActivities,
                 task.isTopActivityNoDisplay,
-                task.isActivityStackTransparent
+                task.isActivityStackTransparent,
+                task.topActivityType
         );
     }
 
@@ -149,9 +169,16 @@ public class DesktopModeCompatPolicy {
             @Nullable String packageName,
             int numActivities,
             boolean isTopActivityNoDisplay,
-            boolean isActivityStackTransparent) {
+            boolean isActivityStackTransparent,
+            @WindowConfiguration.ActivityType int topActivityType
+    ) {
         // Activity will not be displayed, no need to show desktop entry point.
         if (isTopActivityNoDisplay) {
+            return true;
+        }
+        // Dream activities should be fullscreen and thus not allowed to enter desktop.
+        if (DesktopExperienceFlags.ENABLE_DREAM_ACTIVITY_WINDOWING_EXCLUSION.isTrue()
+                && topActivityType == ACTIVITY_TYPE_DREAM) {
             return true;
         }
         // If activity belongs to system ui package, hide desktop entry point.
@@ -160,6 +187,11 @@ public class DesktopModeCompatPolicy {
         }
         // If activity belongs to default home package, safe to force out of desktop.
         if (isPartOfDefaultHomePackageOrNoHomeAvailable(packageName)) {
+            return true;
+        }
+        // TODO: b/434943016 - Replace with permission.
+        // If activity belongs to package exempt via device config, hide desktop entry point.
+        if (isPackageExemptViaConfig(packageName)) {
             return true;
         }
         // If all activities in task stack are transparent AND package has the relevant fullscreen
@@ -195,6 +227,10 @@ public class DesktopModeCompatPolicy {
 
     private boolean isSystemUiTask(@Nullable String packageName) {
         return Objects.equals(packageName, mSystemUiPackage);
+    }
+
+    private boolean isPackageExemptViaConfig(@Nullable String packageName) {
+        return mConfigExemptPackages.contains(packageName);
     }
 
     // Checks if the app for the given package has the SYSTEM_ALERT_WINDOW permission.

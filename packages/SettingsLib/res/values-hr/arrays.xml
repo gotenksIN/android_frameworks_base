@@ -55,7 +55,7 @@
   </string-array>
   <string-array name="hdcp_checking_summaries">
     <item msgid="4045840870658484038">"Nikad ne upotrebljavaj HDCP provjeru"</item>
-    <item msgid="8254225038262324761">"Upotrebljavaj HDCP provjeru samo za DRM sadržaj"</item>
+    <item msgid="8254225038262324761">"Koristi HDCP provjeru samo za DRM sadržaj"</item>
     <item msgid="6421717003037072581">"Uvijek upotrebljavaj HDCP provjeru"</item>
   </string-array>
   <string-array name="bt_hci_snoop_log_entries">
@@ -75,23 +75,15 @@
     <item msgid="1051534112762023603">"Uklonite u potpunosti"</item>
   </string-array>
   <string-array name="bluetooth_avrcp_versions">
-<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
     <item msgid="6603880723315236832">"AVRCP 1.6 (zadano)"</item>
     <item msgid="1637054408779685086">"AVRCP 1.3"</item>
     <item msgid="5896162189744596291">"AVRCP 1.4"</item>
-<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
     <item msgid="7556896992111771426">"AVRCP 1.5"</item>
   </string-array>
   <string-array name="bluetooth_avrcp_version_values">
-<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
     <item msgid="4041937689950033942">"avrcp16"</item>
     <item msgid="1613629084012791988">"avrcp13"</item>
     <item msgid="99467845610592181">"avrcp14"</item>
-<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
-<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
     <item msgid="1963366694959681026">"avrcp15"</item>
   </string-array>
   <string-array name="bluetooth_map_versions">
@@ -105,7 +97,7 @@
     <item msgid="8147982633566548515">"map14"</item>
   </string-array>
   <string-array name="bluetooth_a2dp_codec_titles">
-    <item msgid="2494959071796102843">"Upotreba odabira sustava (zadano)"</item>
+    <item msgid="2494959071796102843">"Koristi odabir sustava (zadano)"</item>
     <item msgid="4055460186095649420">"SBC"</item>
     <item msgid="720249083677397051">"AAC"</item>
     <item msgid="1049450003868150455">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX">aptX™</xliff:g> audio"</item>
@@ -113,11 +105,7 @@
     <item msgid="3825367753087348007">"LDAC"</item>
     <item msgid="328951785723550863">"LC3"</item>
     <item msgid="506175145534048710">"Opus"</item>
-<!-- QTI_BEGIN: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
-<!-- QTI_END: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
     <item msgid="8711430979086781450">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_ADAPTIVE">aptX™ Adaptive</xliff:g> audio"</item>
-<!-- QTI_BEGIN: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
-<!-- QTI_END: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
     <item msgid="6486050771049225">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_TWSP">aptX™ TWS+</xliff:g> audio"</item>
   </string-array>
   <string-array name="bluetooth_a2dp_codec_summaries">
@@ -129,11 +117,7 @@
     <item msgid="2553206901068987657">"LDAC"</item>
     <item msgid="3940992993241040716">"LC3"</item>
     <item msgid="7940970833006181407">"Opus"</item>
-<!-- QTI_BEGIN: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
-<!-- QTI_END: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
     <item msgid="102988075927343894">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_ADAPTIVE">aptX™ Adaptive</xliff:g> audio"</item>
-<!-- QTI_BEGIN: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
-<!-- QTI_END: 2023-04-05: Android_UI: SettingsLib: fix ArrayIndexOutOfBoundsException-->
     <item msgid="6486050771049481">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_TWSP">aptX™ TWS+</xliff:g> audio"</item>
   </string-array>
   <string-array name="bluetooth_a2dp_codec_sample_rate_titles">
@@ -157,7 +141,7 @@
     <item msgid="1212577207279552119">"32 bita po uzorku"</item>
   </string-array>
   <string-array name="bluetooth_a2dp_codec_bits_per_sample_summaries">
-    <item msgid="9196208128729063711">"Upotreba odabira sustava (zadano)"</item>
+    <item msgid="9196208128729063711">"Koristi odabir sustava (zadano)"</item>
     <item msgid="1084497364516370912">"16 bitova po uzorku"</item>
     <item msgid="2077889391457961734">"24 bita po uzorku"</item>
     <item msgid="3836844909491316925">"32 bita po uzorku"</item>
@@ -168,7 +152,7 @@
     <item msgid="927546067692441494">"Stereo"</item>
   </string-array>
   <string-array name="bluetooth_a2dp_codec_channel_mode_summaries">
-    <item msgid="1997302811102880485">"Upotreba odabira sustava (zadano)"</item>
+    <item msgid="1997302811102880485">"Koristi odabir sustava (zadano)"</item>
     <item msgid="8005696114958453588">"Mono"</item>
     <item msgid="1333279807604675720">"Stereo"</item>
   </string-array>

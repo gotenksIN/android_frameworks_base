@@ -284,10 +284,10 @@
     <string name="adb_pairing_device_dialog_title" msgid="7141739231018530210">"यन्त्रसँग कनेक्ट गर्नुहोस्"</string>
     <string name="adb_pairing_device_dialog_pairing_code_label" msgid="3639239786669722731">"Wi‑Fi मा कनेक्ट गर्ने कोड"</string>
     <string name="adb_pairing_device_dialog_failed_title" msgid="3426758947882091735">"कनेक्ट गर्न सकिएन"</string>
-    <string name="adb_pairing_device_dialog_failed_msg" msgid="6611097519661997148">"यन्त्र उही नेटवर्कमा जोडिएको कुरा सुनिश्चित गर्नुहोस्।"</string>
+    <string name="adb_pairing_device_dialog_failed_msg" msgid="6611097519661997148">"डिभाइस उही नेटवर्कमा कनेक्ट गरिएको छ भन्ने कुरा सुनिश्चित गर्नुहोस्।"</string>
     <string name="adb_wireless_qrcode_summary" msgid="8051414549011801917">"QR कोड स्क्यान गरेर Wi‑Fi प्रयोग गरी डिभाइस कनेक्ट गर्नुहोस्"</string>
     <string name="adb_wireless_verifying_qrcode_text" msgid="6123192424916029207">"डिभाइस कनेक्ट गरिँदै छ…"</string>
-    <string name="adb_qrcode_pairing_device_failed_msg" msgid="6936292092592914132">"यन्त्रसँग जोडा बनाउन सकिएन। कि त QR कोड गलत छ कि यन्त्र उही नेटवर्कमा जोडिएको छैन।"</string>
+    <string name="adb_qrcode_pairing_device_failed_msg" msgid="6936292092592914132">"डिभाइस कनेक्ट गर्न सकिएन। कि त QR कोड गलत छ कि डिभाइस एउटै नेटवर्कमा कनेक्ट गरिएको छैन।"</string>
     <string name="adb_wireless_ip_addr_preference_title" msgid="8335132107715311730">"IP एड्रेस र पोर्ट"</string>
     <string name="adb_wireless_qrcode_pairing_title" msgid="1906409667944674707">"QR कोड स्क्यान गर्नुहोस्"</string>
     <string name="adb_wireless_qrcode_pairing_description" msgid="6014121407143607851">"QR कोड स्क्यान गरी Wi‑Fi मार्फत डिभाइस कनेक्ट गर्नुहोस्"</string>
@@ -295,7 +295,7 @@
     <string name="keywords_adb_wireless" msgid="6507505581882171240">"adb, debug, dev"</string>
     <string name="bugreport_in_power" msgid="8664089072534638709">"बग रिपोर्टको सर्टकट"</string>
     <string name="bugreport_in_power_summary" msgid="1885529649381831775">"बग रिपोर्ट प्राप्त गर्न पावर मेनुमा बटन देखाउनुहोस्"</string>
-    <string name="keep_screen_on" msgid="1187161672348797558">"डिस्प्ले अफ नहोस्"</string>
+    <string name="keep_screen_on" msgid="1187161672348797558">"डिस्प्ले अन नै राख्नुहोस्"</string>
     <string name="keep_screen_on_summary" msgid="1510731514101925829">"चार्ज गर्दा स्क्रिन कहिल्यै अफ हुँदैन।"</string>
     <string name="bt_hci_snoop_log" msgid="7291287955649081448">"ब्लुटुथ HCI snoop लग अन गर्नुहोस्"</string>
     <string name="bt_hci_snoop_log_summary" msgid="6808538971394092284">"ब्लुटुथका प्याकेटहरू समावेश गर्नुहोस्। (यो सेटिङ परिवर्तन गरेपछि ब्लुटुथ टगल गर्नुहोस्)"</string>
@@ -307,7 +307,7 @@
     <string name="mock_location_app_not_set" msgid="6972032787262831155">"कुनै नमूना लोकेसन एप सेट गरिएको छैन"</string>
     <string name="mock_location_app_set" msgid="4706722469342913843">"नमूना स्थान एप: <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="debug_networking_category" msgid="6829757985772659599">"नेटवर्किङ"</string>
-    <string name="wifi_display_certification" msgid="1805579519992520381">"वायरलेस डिस्प्ले प्रयोग गर्ने वा नगर्ने"</string>
+    <string name="wifi_display_certification" msgid="1805579519992520381">"वायरलेस डिस्प्ले सर्टिफिकेसन"</string>
     <string name="wifi_verbose_logging" msgid="1785910450009679371">"Wi-Fi भर्बोज लग अन गर्नुहोस्"</string>
     <string name="wifi_scan_throttling" msgid="2985624788509913617">"Wi‑Fi स्क्यान थ्रोटलिङ"</string>
     <string name="wifi_non_persistent_mac_randomization" msgid="7482769677894247316">"Wi-Fi नन-पर्सिस्टेन्ट MAC र्‍यान्डमाइजेसन"</string>
@@ -368,7 +368,7 @@
     <string name="verify_apps_over_usb_title" msgid="6031809675604442636">"USB मा एपको पुष्टि गर्नुहोस्"</string>
     <string name="verify_apps_over_usb_summary" msgid="1317933737581167839">"हानिकारक व्यवहार पत्ता लगाउन ADB/ADT बाट इन्स्टल गरिएका एपको जाँच गर्नुहोस्"</string>
     <string name="bluetooth_show_devices_without_names_summary" msgid="780964354377854507">"नामकरण नगरिएका ब्लुटुथ डिभाइस (म्याक एड्रेस भएका मात्र) देखाइने छ"</string>
-    <string name="bluetooth_disable_absolute_volume_summary" msgid="2006309932135547681">"यसले रिमोट डिभाइसमा अत्यधिक ठूलो वा अनियन्त्रित भोल्युम बज्नेको जस्ता अवस्थामा ब्लुटुथको निरपेक्ष भोल्युम अफ गर्छ।"</string>
+    <string name="bluetooth_disable_absolute_volume_summary" msgid="2006309932135547681">"यसले रिमोट डिभाइसमा अत्यधिक ठूलो वा अनियन्त्रित भोल्युम बजेको जस्ता अवस्थामा ब्लुटुथको निरपेक्ष भोल्युम अफ गर्छ।"</string>
     <string name="bluetooth_enable_gabeldorsche_summary" msgid="2054730331770712629">"ब्लुटुथ Gabeldorsche सुविधाको स्ट्याक अन गर्नुहोस्।"</string>
     <string name="enhanced_connectivity_summary" msgid="1576414159820676330">"यसले परिष्कृत जडानको सुविधा सक्षम पार्छ।"</string>
     <string name="enable_terminal_title" msgid="3834790541986303654">"स्थानीय टर्मिनल"</string>
@@ -384,7 +384,7 @@
     <string name="debug_app_set" msgid="6599535090477753651">"डिबग गर्ने एप: <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="select_application" msgid="2543228890535466325">"एप चयन गर्नुहोस्"</string>
     <string name="no_application" msgid="9038334538870247690">"केही पनि होइन"</string>
-    <string name="wait_for_debugger" msgid="7461199843335409809">"डिबगरलाई पर्खियोस्"</string>
+    <string name="wait_for_debugger" msgid="7461199843335409809">"डिबगर पर्खिनुहोस्"</string>
     <string name="wait_for_debugger_summary" msgid="6846330006113363286">"डिबग भएको एप चल्नुअघि डिबगरलाई पर्खिन्छ"</string>
     <string name="debug_input_category" msgid="7349460906970849771">"इनपुट"</string>
     <string name="debug_drawing_category" msgid="5066171112313666619">"रेखाचित्र"</string>
@@ -407,7 +407,7 @@
     <string name="show_hw_screen_updates" msgid="2021286231267747506">"भ्यूको अपडेट देखाउनुहोस्"</string>
     <string name="show_hw_screen_updates_summary" msgid="3539770072741435691">"GPU ले बनाएको भ्यू विन्डोमा फ्ल्यास गर्नुहोस्"</string>
     <string name="show_hw_layers_updates" msgid="5268370750002509767">"हार्डवेयर लेयरको अपडेट देखाउनुहोस्"</string>
-    <string name="show_hw_layers_updates_summary" msgid="5850955890493054618">"हार्डवेयर लेयर अपडेट हुँदा ती लेयर हरिया देखिऊन्"</string>
+    <string name="show_hw_layers_updates_summary" msgid="5850955890493054618">"हार्डवेयर लेयर अपडेट हुँदा ती लेयर हरिया देखाउनुहोस्"</string>
     <string name="debug_hw_overdraw" msgid="8944851091008756796">"GPU overdraw डिबग गर्नुहोस्"</string>
     <string name="disable_overlays" msgid="4206590799671557143">"HW ओभरले अफ गर्नुहोस्"</string>
     <string name="disable_overlays_summary" msgid="1954852414363338166">"स्क्रिन कोम्पजिट गर्न लागि सधैँ GPU प्रयोग गर्नुहोस्"</string>
@@ -437,7 +437,7 @@
     <string name="verbose_vendor_logging_preference_summary_will_disable" msgid="6175431593394522553">"एक दिनपछि अफ हुन्छ"</string>
     <string name="verbose_vendor_logging_preference_summary_on" msgid="9017757242481762036">"अनिश्चितकालीन रूपमा अन गरियो"</string>
     <string name="window_animation_scale_title" msgid="5236381298376812508">"विन्डो एनिमेसन स्केल"</string>
-    <string name="transition_animation_scale_title" msgid="1278477690695439337">"संक्रमण एनिमेसन स्केल"</string>
+    <string name="transition_animation_scale_title" msgid="1278477690695439337">"ट्रान्जिसन एनिमेसन स्केल"</string>
     <string name="animator_duration_scale_title" msgid="7082913931326085176">"एनिमेसनको अवधि मापन"</string>
     <string name="overlay_display_devices_title" msgid="5411894622334469607">"सहायक डिस्प्लेको नक्कल गर्नुहोस्"</string>
     <string name="shade_display_awareness_title" msgid="8000009404669495876">"सेड देखाइने स्थिति"</string>
@@ -479,7 +479,7 @@
     <string name="transcode_user_control" msgid="6176368544817731314">"ट्रान्सकोडिङसम्बन्धी डिफल्ट सेटिङ परिवर्तन गर्नुहोस्"</string>
     <string name="transcode_enable_all" msgid="2411165920039166710">"ट्रान्सकोडिङ अन गर्नुहोस्"</string>
     <string name="transcode_default" msgid="3784803084573509491">"एपहरूमा आधुनिक फर्म्याट प्रयोग गर्न मिल्छ भनी मान्नुहोस्"</string>
-    <string name="transcode_notification" msgid="5560515979793436168">"ट्रान्सकोडिङसम्बन्धी सूचना देखाउनुहोस्"</string>
+    <string name="transcode_notification" msgid="5560515979793436168">"ट्रान्सकोडिङसम्बन्धी नोटिफिकेसन देखाउनुहोस्"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"ट्रान्सकोडिङको क्यास अफ गर्नुहोस्"</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"चलिरहेका सेवाहरू"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"हाल चालु भइरहेका सेवाहरू हेर्नुहोस् र नियन्त्रण गर्नुहोस्"</string>
@@ -714,7 +714,7 @@
     <string name="failed_attempts_now_wiping_user" msgid="469060411789668050">"धेरै पटक गलत तरिकाले अनलक गर्ने प्रयास गरियो। यो प्रयोगकर्ता मेटाइने छ।"</string>
     <string name="failed_attempts_now_wiping_profile" msgid="7626589520888963129">"धेरै पटक गलत तरिकाले अनलक गर्ने प्रयास गरियो। यो वर्क प्रोफाइल र यसमा भएको डेटा मेटाइने छ।"</string>
     <string name="failed_attempts_now_wiping_dialog_dismiss" msgid="2749889771223578925">"हटाउनुहोस्"</string>
-    <string name="cached_apps_freezer_device_default" msgid="2616594131750144342">"डिफल्ट डिभाइस"</string>
+    <string name="cached_apps_freezer_device_default" msgid="2616594131750144342">"डिभाइसको डिफल्ट"</string>
     <string name="cached_apps_freezer_disabled" msgid="4816382260660472042">"असक्षम पारिएको छ"</string>
     <string name="cached_apps_freezer_enabled" msgid="8866703500183051546">"सक्षम पारिएको छ"</string>
     <string name="cached_apps_freezer_reboot_dialog_text" msgid="695330563489230096">"यो परिवर्तन लागू गर्न तपाईंको डिभाइस अनिवार्य रूपमा रिबुट गर्नु पर्छ। अहिले नै रिबुट गर्नुहोस् वा रद्द गर्नुहोस्।"</string>

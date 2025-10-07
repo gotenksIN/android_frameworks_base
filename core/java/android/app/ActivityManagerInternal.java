@@ -168,17 +168,16 @@ public abstract class ActivityManagerInternal {
      *
      * The automatic stopping is not guaranteed, and there are cases in which it won't be.
      * Similarly, there is no guarantee that the user will not be stopped prior to the given
-     * duration.
-     *
-     * In the current implementation, this value simply replaces any default inactive stopping time
-     * (from config_backgroundUserScheduledStopTimeSecs), but that is subject to change.
+     * duration (such as if too many users are running, or the user has been in the background for
+     * long enough that it is considered dispensable).
      *
      * Automatically stopping background users is not currently enabled for devices supporting
      * {@link android.os.UserManager#isVisibleBackgroundUsersEnabled() visible background users};
      * on such devices, the user will still be started but not stopped.
      *
      * @param userId ID of the user to start
-     * @param durSecs in how many seconds we should attempt to stop the user
+     * @param durSecs in how many seconds we should attempt to stop the user, typically something on
+     *                the order of a few minutes
      * @return true if the user has been successfully started
      */
     public abstract boolean startUserInBackgroundTemporarily(@UserIdInt int userId, int durSecs);
@@ -375,6 +374,7 @@ public abstract class ActivityManagerInternal {
      */
     public abstract boolean hasRunningActivity(int uid, @Nullable String packageName);
 
+    // TODO: b/425766486 - Define the OOM_ADJ_* value by AppProtoEnums.
     /**
      * Oom Adj Reason: none - internal use only, do not use it.
      * @hide
@@ -522,6 +522,11 @@ public abstract class ActivityManagerInternal {
      */
     public static final int OOM_ADJ_REASON_SERVICE_BINDER_CALL = 25;
 
+    /**
+     * Oom Adj Reason: Batched service binding update request
+     */
+    public static final int OOM_ADJ_REASON_BATCH_UPDATE_REQUEST = 26;
+
     @IntDef(prefix = {"OOM_ADJ_REASON_"}, value = {
         OOM_ADJ_REASON_NONE,
         OOM_ADJ_REASON_ACTIVITY,
@@ -549,6 +554,7 @@ public abstract class ActivityManagerInternal {
         OOM_ADJ_REASON_FOLLOW_UP,
         OOM_ADJ_REASON_RECONFIGURATION,
         OOM_ADJ_REASON_SERVICE_BINDER_CALL,
+        OOM_ADJ_REASON_BATCH_UPDATE_REQUEST,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface OomAdjReason {}
@@ -984,10 +990,10 @@ public abstract class ActivityManagerInternal {
      */
     public abstract @TempAllowListType int getPushMessagingOverQuotaBehavior();
 
-// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
     // Starts a process as empty.
     public abstract int startActivityAsUserEmpty(Bundle options);
-// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
 
     /**
      * Return the startForeground() grace period after calling startForegroundService().

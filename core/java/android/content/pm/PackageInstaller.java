@@ -240,8 +240,8 @@ public class PackageInstaller {
      */
     @SystemApi
     @FlaggedApi(Flags.FLAG_VERIFICATION_SERVICE)
-    public static final String ACTION_NOTIFY_DEVELOPER_VERIFICATION_INCOMPLETE =
-            "android.content.pm.action.NOTIFY_DEVELOPER_VERIFICATION_INCOMPLETE";
+    public static final String ACTION_CONFIRM_DEVELOPER_VERIFICATION =
+            "android.content.pm.action.CONFIRM_DEVELOPER_VERIFICATION";
 
     /**
      * An integer session ID that an operation is working with.
@@ -450,30 +450,56 @@ public class PackageInstaller {
      * installation result returned via the {@link IntentSender} in
      * {@link Session#commit(IntentSender)}. However, along with this reason code, installers can
      * receive different status codes from {@link #EXTRA_STATUS} depending on their target SDK and
-     * privileged status:
-     * <p>
-     *      Non-privileged installers targeting 36 or less will first receive the
+     * permission status:
+     * <ul>
+     * <li>
+     *      Installers without the
+     *      {@link android.Manifest.permission#INSTALL_PACKAGES INSTALL_PACKAGES} permission
+     *      but with the
+     *      {@link android.Manifest.permission#REQUEST_INSTALL_PACKAGES REQUEST_INSTALL_PACKAGES}
+     *      permission and targeting {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM API 35}
+     *      or less will first receive the
      *      {@link #STATUS_PENDING_USER_ACTION} status code without this reason code. They will be
      *      forced through the user action flow to allow the OS to inform the user of such
      *      verification context before continuing to fail the install. If the user has the option
      *      to bypass the verification result and chooses to do so, the installation will proceed.
      *      Otherwise, the installer will receive the {@link #STATUS_FAILURE_ABORTED} status code
      *      along with this reason code that explains why the verification had failed.
-     * </p>
-     * <p>
-     *     Privileged installer targeting 36 or less will directly receive the
+     * </li>
+     * <li>
+     *     Installers with the
+     *     {@link android.Manifest.permission#INSTALL_PACKAGES INSTALL_PACKAGES} permission and
+     *     targeting {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM API 35}
+     *     or less will directly receive the
      *     {@link #STATUS_FAILURE_ABORTED} status code. This is because they are not expected to
      *     have the capability of handling the {@link #STATUS_PENDING_USER_ACTION} flow, so the
      *     installation will directly fail. This reason code will be supplied to them for
      *     providing additional information.
-     * </p>
-     * <p>
-     *     All installers targeting 37 and higher will receive a {@link #STATUS_FAILURE_ABORTED}
+     * </li>
+     * <li>
+     *     For all installers targeting {@link android.os.Build.VERSION_CODES#BAKLAVA API 36}
+     *     or higher:
+     *     <ul>
+     *     <li>For situations that require user input, such as when the developer verification
+     *     policy allows the user to bypass a verification failure caused by network issues,
+     *     the installer will receive a {@link #STATUS_PENDING_USER_ACTION} status code without
+     *     this reason code. The installer will be forced through the user action flow to allow the
+     *     OS to inform the user of such verification context before continuing to fail the
+     *     installation. If the user has the option to bypass the verification result and chooses
+     *     to do so, the installation will proceed. Otherwise, the install will receive the
+     *     {@link #STATUS_FAILURE_ABORTED} status code along with this reason code that explains why
+     *     the verification had failed.
+     *     </li>
+     *     <li>For all other situations, the installer will receive a
+     *     {@link #STATUS_FAILURE_ABORTED}
      *     status code along with this reason code, so the installers can explain the failure to the
      *     user accordingly. An {@link Intent#EXTRA_INTENT} will also be populated with an intent
      *     that can provide additional context where appropriate, should the installer prefer to
      *     defer to the OS to explain the failure to the user.
-     * </p>
+     *     </li>
+     *     </ul>
+     * </li>
+     * </ul>
      */
     @FlaggedApi(Flags.FLAG_VERIFICATION_SERVICE)
     public static final String EXTRA_DEVELOPER_VERIFICATION_FAILURE_REASON =
@@ -947,22 +973,15 @@ public class PackageInstaller {
      */
     @FlaggedApi(Flags.FLAG_VERIFICATION_SERVICE)
     @SystemApi
-    public static final int DEVELOPER_VERIFICATION_USER_RESPONSE_CANCEL = 1;
+    public static final int DEVELOPER_VERIFICATION_USER_RESPONSE_ABORT = 1;
     /**
-     * This indicates that the user has acknowledged that installation cannot be completed due to
-     * a failed / incomplete developer verification.
+     * For an incomplete developer verification with network error, the user has asked to retry the
+     * verification if the developer verification policy for the session is fail_closed.
      * @hide
      */
     @FlaggedApi(Flags.FLAG_VERIFICATION_SERVICE)
     @SystemApi
-    public static final int DEVELOPER_VERIFICATION_USER_RESPONSE_OK = 2;
-    /**
-     * For an incomplete developer verification, the user has asked to retry the verification.
-     * @hide
-     */
-    @FlaggedApi(Flags.FLAG_VERIFICATION_SERVICE)
-    @SystemApi
-    public static final int DEVELOPER_VERIFICATION_USER_RESPONSE_RETRY = 3;
+    public static final int DEVELOPER_VERIFICATION_USER_RESPONSE_RETRY = 2;
     /**
      * For an incomplete developer verification, the user has confirmed proceeding with the
      * installation anyway.
@@ -970,14 +989,13 @@ public class PackageInstaller {
      */
     @FlaggedApi(Flags.FLAG_VERIFICATION_SERVICE)
     @SystemApi
-    public static final int DEVELOPER_VERIFICATION_USER_RESPONSE_INSTALL_ANYWAY = 4;
+    public static final int DEVELOPER_VERIFICATION_USER_RESPONSE_INSTALL_ANYWAY = 3;
     /**
      * @hide
      */
     @IntDef(value = {
             DEVELOPER_VERIFICATION_USER_RESPONSE_ERROR,
-            DEVELOPER_VERIFICATION_USER_RESPONSE_CANCEL,
-            DEVELOPER_VERIFICATION_USER_RESPONSE_OK,
+            DEVELOPER_VERIFICATION_USER_RESPONSE_ABORT,
             DEVELOPER_VERIFICATION_USER_RESPONSE_RETRY,
             DEVELOPER_VERIFICATION_USER_RESPONSE_INSTALL_ANYWAY,
     })
@@ -1748,13 +1766,21 @@ public class PackageInstaller {
     }
 
     /**
-     * Return the current developer verification enforcement policy. This may only be called by the
-     * package currently set by the system as the verifier agent.
+     * Return the current developer verification enforcement policy. This may only be called by:
+     * <ul>
+     *     <li> Packages with {@link android.Manifest.permission#DEVELOPER_VERIFICATION_AGENT}
+     *     permission. </li>
+     *     <li> The package set by the system as the developer verification service provider.</li>
+     *     <li> The package set by the system as the developer verification service policy delegate.
+     *     </li>
+     * </ul>
+     *
      * @hide
      */
     @FlaggedApi(Flags.FLAG_VERIFICATION_SERVICE)
     @SystemApi
-    @RequiresPermission(android.Manifest.permission.DEVELOPER_VERIFICATION_AGENT)
+    @RequiresPermission(value = Manifest.permission.DEVELOPER_VERIFICATION_AGENT,
+            conditional = true)
     public final @DeveloperVerificationPolicy int getDeveloperVerificationPolicy() {
         try {
             return mInstaller.getDeveloperVerificationPolicy(mUserId);
@@ -1765,14 +1791,17 @@ public class PackageInstaller {
 
     /**
      * Set the current developer verification enforcement policy which will be applied to all future
-     * installation sessions. This may only be called by the package currently set by the system as
-     * the verifier agent.
-     * @hide
+     * installation sessions. This may only be called by:
+     * <ul>
+     *     <li> The package set by the system as the developer verification service provider.</li>
+     *     <li> The package set by the system as the developer verification service policy delegate.
+     *     </li>
+     * </ul>
      * @return whether the new policy was successfully set.
+     * @hide
      */
     @FlaggedApi(Flags.FLAG_VERIFICATION_SERVICE)
     @SystemApi
-    @RequiresPermission(android.Manifest.permission.DEVELOPER_VERIFICATION_AGENT)
     public final boolean setDeveloperVerificationPolicy(@DeveloperVerificationPolicy int policy) {
         try {
             return mInstaller.setDeveloperVerificationPolicy(policy, mUserId);
@@ -1792,6 +1821,29 @@ public class PackageInstaller {
     public final @Nullable ComponentName getDeveloperVerificationServiceProvider() {
         try {
             return mInstaller.getDeveloperVerificationServiceProvider();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns the package name of the app that is specified by the system as the delegate of
+     * the developer verification service provider (a.k.a. the verifier) and can change the default
+     * developer verification policy on behalf of the verifier. Only the verifier itself can call
+     * this method to query the package name of the delegate app, and it must also have package
+     * visibility to the delegate app to get the result.
+     *
+     * @return the package name of the delegate, or null if the delegate app is not specified by
+     * the system, or is not available to the caller.
+     * @hide
+     */
+    @FlaggedApi(android.content.pm.Flags.FLAG_VERIFICATION_SERVICE)
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.DEVELOPER_VERIFICATION_AGENT)
+    @Nullable
+    public String getDeveloperVerificationPolicyDelegatePackage() {
+        try {
+            return mInstaller.getDeveloperVerificationPolicyDelegatePackage(mUserId);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -3842,6 +3894,9 @@ public class PackageInstaller {
          *              <li>{@link android.os.Build.VERSION_CODES#TIRAMISU API 33} or higher on
          *              Android V ({@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM API 35})
          *              </li>
+         *              <li>{@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE API 34} or
+         *              higher on Android B ({@link android.os.Build.VERSION_CODES#BAKLAVA API 36})
+         *              </li>
          *          </ul>
          *     </li>
          *     <li>The installer is:
@@ -5058,6 +5113,7 @@ public class PackageInstaller {
         /**
          * Developer verification requires user intervention because only the lite version of the
          * verification was completed on the request, not the full verification.
+         * <p>Notice that it is currently not supported.</p>
          */
         public static final int DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_LITE_VERIFICATION =
                 3;

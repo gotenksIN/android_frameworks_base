@@ -21,7 +21,9 @@ import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.database.ContentObserver
 import android.os.LocaleList
+import android.platform.test.annotations.EnableFlags
 import android.provider.Settings
+import android.security.Flags.FLAG_SECURE_LOCK_DEVICE
 import android.testing.TestableLooper
 import android.util.MathUtils.abs
 import android.view.View
@@ -31,6 +33,7 @@ import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.SceneKey
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.keyguard.KeyguardUpdateMonitorCallback
+import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.dump.DumpManager
@@ -61,6 +64,8 @@ import com.android.systemui.scene.data.repository.Idle
 import com.android.systemui.scene.data.repository.setSceneTransition
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.securelockdevice.data.repository.fakeSecureLockDeviceRepository
+import com.android.systemui.securelockdevice.domain.interactor.secureLockDeviceInteractor
 import com.android.systemui.statusbar.featurepods.media.domain.interactor.mediaControlChipInteractor
 import com.android.systemui.statusbar.notification.collection.provider.OnReorderingAllowedListener
 import com.android.systemui.statusbar.notification.collection.provider.VisualStabilityProvider
@@ -182,6 +187,7 @@ class MediaCarouselControllerTest : SysuiTestCase() {
                 mediaViewControllerFactory = mediaViewControllerFactory,
                 deviceEntryInteractor = kosmos.deviceEntryInteractor,
                 mediaControlChipInteractor = kosmos.mediaControlChipInteractor,
+                secureLockDeviceInteractor = { kosmos.secureLockDeviceInteractor },
             )
         verify(configurationController).addCallback(capture(configListener))
         verify(visualStabilityProvider)
@@ -599,6 +605,29 @@ class MediaCarouselControllerTest : SysuiTestCase() {
         verify(mediaCarousel).visibility = View.VISIBLE
     }
 
+    @EnableFlags(FLAG_SECURE_LOCK_DEVICE)
+    @Test
+    fun testOnSecureLockDeviceMode_hideMediaCarousel() {
+        kosmos.fakeSecureLockDeviceRepository.onSecureLockDeviceEnabled()
+        mediaCarouselController.mediaCarousel = mediaCarousel
+
+        keyguardCallback.value.onStrongAuthStateChanged(context.userId)
+
+        verify(mediaCarousel).visibility = View.GONE
+    }
+
+    @EnableFlags(FLAG_SECURE_LOCK_DEVICE)
+    @Test
+    fun testOnSecureLockDeviceModeOff_showMediaCarousel() {
+        kosmos.fakeSecureLockDeviceRepository.onSecureLockDeviceDisabled()
+        whenever(keyguardUpdateMonitor.isUserUnlocked(context.userId)).thenReturn(true)
+        mediaCarouselController.mediaCarousel = mediaCarousel
+
+        keyguardCallback.value.onStrongAuthStateChanged(context.userId)
+
+        verify(mediaCarousel).visibility = View.VISIBLE
+    }
+
     @DisableSceneContainer
     @Test
     fun testKeyguardGone_showMediaCarousel() =
@@ -879,26 +908,36 @@ class MediaCarouselControllerTest : SysuiTestCase() {
 
     @DisableSceneContainer
     @Test
-    fun swipeToDismiss_pausedAndResumeOff_userInitiated() {
-        verify(mediaDataManager).addListener(capture(listener))
+    fun swipeToDismiss_pausedAndResumeOff_userInitiated() =
+        kosmos.testScope.runTest {
+            verify(mediaDataManager).addListener(capture(listener))
+            transitionRepository.sendTransitionSteps(
+                from = KeyguardState.LOCKSCREEN,
+                to = KeyguardState.GONE,
+                this,
+            )
 
-        // When resumption is disabled, paused media should be dismissed after being swiped away
-        Settings.Secure.putInt(context.contentResolver, Settings.Secure.MEDIA_CONTROLS_RESUME, 0)
-        val pausedMedia = DATA.copy(isPlaying = false)
-        listener.value.onMediaDataLoaded(PAUSED_LOCAL, PAUSED_LOCAL, pausedMedia)
-        runAllReady()
-        mediaCarouselController.onSwipeToDismiss()
+            // When resumption is disabled, paused media should be dismissed after being swiped away
+            Settings.Secure.putInt(
+                context.contentResolver,
+                Settings.Secure.MEDIA_CONTROLS_RESUME,
+                0,
+            )
+            val pausedMedia = DATA.copy(isPlaying = false)
+            listener.value.onMediaDataLoaded(PAUSED_LOCAL, PAUSED_LOCAL, pausedMedia)
+            runAllReady()
+            mediaCarouselController.onSwipeToDismiss()
 
-        // When it can be removed immediately on update
-        whenever(visualStabilityProvider.isReorderingAllowed).thenReturn(true)
-        val inactiveMedia = pausedMedia.copy(active = false)
-        listener.value.onMediaDataLoaded(PAUSED_LOCAL, PAUSED_LOCAL, inactiveMedia)
-        runAllReady()
+            // When it can be removed immediately on update
+            whenever(visualStabilityProvider.isReorderingAllowed).thenReturn(true)
+            val inactiveMedia = pausedMedia.copy(active = false)
+            listener.value.onMediaDataLoaded(PAUSED_LOCAL, PAUSED_LOCAL, inactiveMedia)
+            runAllReady()
 
-        // This is processed as a user-initiated dismissal
-        verify(debugLogger).logMediaRemoved(eq(PAUSED_LOCAL), eq(true))
-        verify(mediaDataManager).dismissMediaData(eq(PAUSED_LOCAL), anyLong(), eq(true))
-    }
+            // This is processed as a user-initiated dismissal
+            verify(debugLogger).logMediaRemoved(eq(PAUSED_LOCAL), eq(true))
+            verify(mediaDataManager).dismissMediaData(eq(PAUSED_LOCAL), anyLong(), eq(true))
+        }
 
     @DisableSceneContainer
     @Test
@@ -923,6 +962,109 @@ class MediaCarouselControllerTest : SysuiTestCase() {
 
         // This is processed as a user-initiated dismissal
         verify(mediaDataManager).dismissMediaData(eq(PAUSED_LOCAL), anyLong(), eq(true))
+    }
+
+    @EnableFlags(Flags.FLAG_MEDIA_CAROUSEL_ARROWS)
+    @DisableSceneContainer
+    @Test
+    fun singleMediaPlayer_disablePageArrows() {
+        verify(mediaDataManager).addListener(capture(listener))
+        listener.value.onMediaDataLoaded(
+            PLAYING_LOCAL,
+            null,
+            DATA.copy(
+                active = true,
+                isPlaying = true,
+                playbackLocation = MediaData.PLAYBACK_LOCAL,
+                resumption = false,
+            ),
+        )
+        runAllReady()
+
+        val player = MediaPlayerData.players().first()
+        verify(player).setPageArrowsVisible(eq(false))
+    }
+
+    @EnableFlags(Flags.FLAG_MEDIA_CAROUSEL_ARROWS)
+    @DisableSceneContainer
+    @Test
+    fun multipleMediaPlayers_enablePageArrows() {
+        verify(mediaDataManager).addListener(capture(listener))
+        listener.value.onMediaDataLoaded(
+            PLAYING_LOCAL,
+            null,
+            DATA.copy(
+                active = true,
+                isPlaying = true,
+                playbackLocation = MediaData.PLAYBACK_LOCAL,
+                resumption = false,
+            ),
+        )
+        listener.value.onMediaDataLoaded(
+            PAUSED_LOCAL,
+            null,
+            DATA.copy(
+                active = true,
+                isPlaying = false,
+                playbackLocation = MediaData.PLAYBACK_LOCAL,
+                resumption = false,
+            ),
+        )
+        runAllReady()
+
+        assertEquals(2, MediaPlayerData.players().size)
+        MediaPlayerData.players().forEachIndexed { index, mediaPlayer ->
+            verify(mediaPlayer, atLeast(1)).setPageArrowsVisible(eq(true))
+            if (index == 0) {
+                verify(mediaPlayer).setPageLeftEnabled(eq(false))
+                verify(mediaPlayer).setPageRightEnabled(eq(true))
+            } else if (index == 1) {
+                verify(mediaPlayer).setPageLeftEnabled(eq(true))
+                verify(mediaPlayer).setPageRightEnabled(eq(false))
+            }
+        }
+    }
+
+    @EnableFlags(Flags.FLAG_MEDIA_CAROUSEL_ARROWS)
+    @DisableSceneContainer
+    @Test
+    fun multipleMediaPlayers_disableScrolling_noPageArrows() {
+        verify(mediaDataManager).addListener(capture(listener))
+
+        // Set carousel host to disable scrolling
+        whenever(mediaHostStatesManager.mediaHostStates)
+            .thenReturn(mutableMapOf(LOCATION_QS to mediaHostState))
+        whenever(mediaHostState.disableScrolling).thenReturn(true)
+        mediaCarouselController.currentEndLocation = LOCATION_QS
+        mediaCarouselController.setCurrentState(LOCATION_QS, LOCATION_QS, 1.0f, true)
+
+        listener.value.onMediaDataLoaded(
+            PLAYING_LOCAL,
+            null,
+            DATA.copy(
+                active = true,
+                isPlaying = true,
+                playbackLocation = MediaData.PLAYBACK_LOCAL,
+                resumption = false,
+            ),
+        )
+        listener.value.onMediaDataLoaded(
+            PAUSED_LOCAL,
+            null,
+            DATA.copy(
+                active = true,
+                isPlaying = false,
+                playbackLocation = MediaData.PLAYBACK_LOCAL,
+                resumption = false,
+            ),
+        )
+        runAllReady()
+
+        assertEquals(2, MediaPlayerData.players().size)
+        MediaPlayerData.players().forEachIndexed { index, mediaPlayer ->
+            verify(mediaPlayer, atLeast(1)).setPageArrowsVisible(eq(false))
+            verify(mediaPlayer, never()).setPageArrowsVisible(eq(true))
+        }
     }
 
     /**

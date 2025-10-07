@@ -18,7 +18,9 @@ package android.content;
 
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER;
 import static android.app.ondeviceintelligence.flags.Flags.FLAG_ENABLE_ON_DEVICE_INTELLIGENCE_MODULE;
+import static android.app.userrecovery.flags.Flags.FLAG_ENABLE_USER_RECOVERY_MANAGER;
 import static android.content.flags.Flags.FLAG_ENABLE_BIND_PACKAGE_ISOLATED_PROCESS;
+import static android.content.flags.Flags.FLAG_ENABLE_UPDATE_SERVICE_BINDINGS;
 import static android.security.Flags.FLAG_SECURE_LOCKDOWN;
 
 import android.annotation.AttrRes;
@@ -95,6 +97,7 @@ import android.provider.E2eeContactKeysManager;
 import android.provider.MediaStore;
 import android.ravenwood.annotation.RavenwoodKeep;
 import android.ravenwood.annotation.RavenwoodKeepPartialClass;
+import android.ravenwood.annotation.RavenwoodSupported;
 import android.ravenwood.annotation.RavenwoodSupported.SupportType;
 import android.telephony.TelephonyRegistryManager;
 import android.util.AttributeSet;
@@ -126,6 +129,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
@@ -779,6 +783,41 @@ public abstract class Context {
             Context.BIND_ALLOW_OOM_MANAGEMENT | Context.BIND_WAIVE_PRIORITY
                     | Context.BIND_NOT_PERCEPTIBLE | Context.BIND_NOT_VISIBLE;
 
+    /**
+     * These bind flags may be updated (i.e. added or removed) for an existing
+     * connection.
+     * @hide
+     */
+    public static final long BIND_UPDATEABLE_FLAGS =
+            Context.BIND_NOT_FOREGROUND
+                    | Context.BIND_ABOVE_CLIENT
+                    | Context.BIND_ALLOW_OOM_MANAGEMENT
+                    | Context.BIND_WAIVE_PRIORITY
+                    | Context.BIND_IMPORTANT
+                    | Context.BIND_ADJUST_WITH_ACTIVITY
+                    | Context.BIND_NOT_PERCEPTIBLE;
+
+    /**
+     * Gets the list of bind flags that may be updated (i.e. added or removed) for an
+     * existing connection.
+     * Includes:
+     * <ul>
+     *     <li>{@link #BIND_NOT_FOREGROUND}</li>
+     *     <li>{@link #BIND_ABOVE_CLIENT}</li>
+     *     <li>{@link #BIND_ALLOW_OOM_MANAGEMENT}</li>
+     *     <li>{@link #BIND_WAIVE_PRIORITY}</li>
+     *     <li>{@link #BIND_IMPORTANT}</li>
+     *     <li>{@link #BIND_ADJUST_WITH_ACTIVITY}</li>
+     *     <li>{@link #BIND_NOT_PERCEPTIBLE}</li>
+     * </ul>
+     * @return The set of flags that may be updated.
+     */
+    @NonNull
+    @FlaggedApi(FLAG_ENABLE_UPDATE_SERVICE_BINDINGS)
+    public BindServiceFlags getUpdateableFlags() {
+        return BindServiceFlags.of(BIND_UPDATEABLE_FLAGS);
+    }
+
     /** @hide */
     @IntDef(flag = true, prefix = { "RECEIVER_VISIBLE" }, value = {
             RECEIVER_VISIBLE_TO_INSTANT_APPS, RECEIVER_EXPORTED, RECEIVER_NOT_EXPORTED,
@@ -847,6 +886,124 @@ public abstract class Context {
     public @interface PermissionRequestState {}
 
     /**
+     * Interface for a single unbind or rebind request within a batch update
+     * operation.
+     */
+    @FlaggedApi(FLAG_ENABLE_UPDATE_SERVICE_BINDINGS)
+    public static final class UpdateBindingParams {
+        private ServiceConnection mConnection;
+        private boolean mUnbind;
+        private BindServiceFlags mFlags;
+
+        private UpdateBindingParams(Builder builder) {
+            mConnection = builder.mConnection;
+            mUnbind = builder.mUnbind;
+            mFlags = builder.mFlags;
+        }
+
+        /**
+         * Modify the request to unbind the connection.
+         */
+        public void setUnbind() {
+            mUnbind = true;
+            mFlags = null;
+        }
+
+        /**
+         * Modify the request to rebind the connection with the specified flags
+         * which will completely replace the existing set of flags.
+         * Only flags returned from {@link #getUpdateableFlags} may be added
+         * or removed.
+         * Any invalid additions or removals will trigger an
+         * {@link IllegalArgumentException} when the update call is made.
+         *
+         * @param flags The BindServiceFlags for the rebind request.
+         */
+        public void setRebind(@NonNull BindServiceFlags flags) {
+            mUnbind = false;
+            mFlags = Objects.requireNonNull(flags);
+        }
+
+        /**
+         * @return Returns connection being updated.
+         */
+        @NonNull
+        public ServiceConnection getConnection() {
+            return mConnection;
+        }
+
+        /**
+         * @return Returns if the request is an unbind request.
+         */
+        public boolean isUnbind() {
+            return mUnbind;
+        }
+
+        /**
+         * @return Returns if the request is an rebind request.
+         */
+        public boolean isRebind() {
+            return !mUnbind;
+        }
+
+        /**
+         * @return Returns updated bind service flags for a rebind request.
+         */
+        @NonNull
+        public BindServiceFlags getFlags() {
+            return mFlags;
+        }
+
+        /**
+         * Builder class for a {@link UpdateBindingParams}
+         */
+        public static final class Builder {
+            private final ServiceConnection mConnection;
+            private boolean mUnbind;
+            private BindServiceFlags mFlags;
+
+            /**
+             * Create a new builder for an unbind request of the connection.
+             *
+             * @param connection The ServiceConnection this update applies to.
+             */
+            public Builder(@NonNull ServiceConnection connection) {
+                mConnection = Objects.requireNonNull(connection);
+                mUnbind = true;
+                mFlags = null;
+            }
+
+            /**
+             * Create a new builder for a rebind request of the connection
+             * with the specified flags which will completely replace the
+             * existing set of flags.
+             * Only flags returned from {@link #getUpdateableFlags} may be added
+             * or removed.
+             * Any invalid additions or removals will trigger an
+             * {@link IllegalArgumentException} when the update call is made.
+             *
+             * @param connection The ServiceConnection this update applies to.
+             * @param flags The BindServiceFlags for the rebind request.
+             */
+            public Builder(@NonNull ServiceConnection connection, @NonNull BindServiceFlags flags) {
+                mConnection = Objects.requireNonNull(connection);
+                mUnbind = false;
+                mFlags = Objects.requireNonNull(flags);
+            }
+
+            /**
+             * Creates a new instance.
+             *
+             * @return The new instance.
+             */
+            @NonNull
+            public UpdateBindingParams build() {
+                return new UpdateBindingParams(this);
+            }
+        }
+    }
+
+    /**
      * Returns an AssetManager instance for the application's package.
      * <p>
      * <strong>Note:</strong> Implementations of this method should return
@@ -857,8 +1014,7 @@ public abstract class Context {
      * @return an AssetManager instance for the application's package
      * @see #getResources()
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract AssetManager getAssets();
 
     /**
@@ -872,14 +1028,12 @@ public abstract class Context {
      * @return a Resources instance for the application's package
      * @see #getAssets()
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract Resources getResources();
 
     /** Return PackageManager instance to find global package information. */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext",
-            comment = "Almost no APIS on PackageManager are supported yet")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Almost no APIs on PackageManager are supported yet")
     public abstract PackageManager getPackageManager();
 
     /** Return a ContentResolver instance for your application's package. */
@@ -896,8 +1050,7 @@ public abstract class Context {
      *
      * @return The main looper.
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract Looper getMainLooper();
 
     /**
@@ -905,8 +1058,7 @@ public abstract class Context {
      * thread associated with this context. This is the thread used to dispatch
      * calls to application components (activities, services, etc).
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public Executor getMainExecutor() {
         // This is pretty inefficient, which is why ContextImpl overrides it
         return new HandlerExecutor(new Handler(getMainLooper()));
@@ -937,8 +1089,7 @@ public abstract class Context {
      * if you forget to unregister, unbind, etc.
      * </ul>
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract Context getApplicationContext();
 
     /** Non-activity related autofill ids are unique in the app */
@@ -1108,8 +1259,7 @@ public abstract class Context {
      *
      * @param resid The style resource describing the theme.
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract void setTheme(@StyleRes int resid);
 
     /** @hide Needed for some internal implementation...  not public because
@@ -1123,8 +1273,7 @@ public abstract class Context {
      * Return the Theme object associated with this Context.
      */
     @ViewDebug.ExportedProperty(deepExport = true)
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract Resources.Theme getTheme();
 
     /**
@@ -1187,13 +1336,11 @@ public abstract class Context {
     /**
      * Return a class loader you can use to retrieve classes in this package.
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract ClassLoader getClassLoader();
 
     /** Return the name of this application's package. */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract String getPackageName();
 
     /**
@@ -1205,6 +1352,7 @@ public abstract class Context {
      */
     @SuppressWarnings("HiddenAbstractMethod")
     @UnsupportedAppUsage
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract String getBasePackageName();
 
     /**
@@ -1214,8 +1362,7 @@ public abstract class Context {
      * This is not generally intended for third party application developers.
      */
     @NonNull
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public String getOpPackageName() {
         throw new RuntimeException("Not implemented. Must override in a subclass.");
     }
@@ -1227,9 +1374,7 @@ public abstract class Context {
      *
      * @return the attribution tag this context is for or {@code null} if this is the default.
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext",
-            comment = "Always returns null (for now)")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public @Nullable String getAttributionTag() {
         return null;
     }
@@ -1239,6 +1384,7 @@ public abstract class Context {
      *
      * @see AttributionSource
      */
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public @NonNull AttributionSource getAttributionSource() {
         return null;
     }
@@ -1256,11 +1402,13 @@ public abstract class Context {
      * Return the set of parameters which this Context was created with, if it
      * was created via {@link #createContext(ContextParams)}.
      */
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public @Nullable ContextParams getParams() {
         return null;
     }
 
     /** Return the full application info for this context's package. */
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract ApplicationInfo getApplicationInfo();
 
     /**
@@ -1273,8 +1421,7 @@ public abstract class Context {
      *
      * @return String Path to the resources.
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract String getPackageResourcePath();
 
     /**
@@ -1392,8 +1539,7 @@ public abstract class Context {
      * @see #deleteFile
      * @see java.io.FileInputStream#FileInputStream(String)
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract FileInputStream openFileInput(String name)
         throws FileNotFoundException;
 
@@ -1415,8 +1561,7 @@ public abstract class Context {
      * @see #deleteFile
      * @see java.io.FileOutputStream#FileOutputStream(String)
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract FileOutputStream openFileOutput(String name, @FileMode int mode)
         throws FileNotFoundException;
 
@@ -1435,8 +1580,7 @@ public abstract class Context {
      * @see #fileList
      * @see java.io.File#delete()
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract boolean deleteFile(String name);
 
     /**
@@ -1455,8 +1599,7 @@ public abstract class Context {
      * @see #getFilesDir
      * @see #getDir
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract File getFileStreamPath(String name);
 
     /**
@@ -1473,8 +1616,7 @@ public abstract class Context {
      * @removed
      */
     @SuppressWarnings("HiddenAbstractMethod")
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract File getSharedPreferencesPath(String name);
 
     /**
@@ -1492,8 +1634,7 @@ public abstract class Context {
      *
      * @see ApplicationInfo#dataDir
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract File getDataDir();
 
     /**
@@ -1511,8 +1652,7 @@ public abstract class Context {
      * @see #getFileStreamPath
      * @see #getDir
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract File getFilesDir();
 
     /**
@@ -1560,8 +1700,7 @@ public abstract class Context {
      * @see #getDir
      * @see android.app.backup.BackupAgent
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract File getNoBackupFilesDir();
 
     /**
@@ -1866,8 +2005,7 @@ public abstract class Context {
      * @see #getDir
      * @see #getExternalCacheDir
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract File getCacheDir();
 
     /**
@@ -1889,8 +2027,7 @@ public abstract class Context {
      *
      * @return The path of the directory holding application code cache files.
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract File getCodeCacheDir();
 
     /**
@@ -2105,8 +2242,7 @@ public abstract class Context {
      *
      * @see #openFileOutput(String, int)
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract File getDir(String name, @FileMode int mode);
 
     /**
@@ -4305,6 +4441,21 @@ public abstract class Context {
     }
 
     /**
+     * Perform a batch update of existing bindings.  Existing bindings can
+     * be rebound with an updated set of flags, or unbound.
+     * Only flags returned from {@link #getUpdateableFlags} may be added
+     * or removed.
+     *
+     * @param params The list of bindings to be updated.
+     * @throws IllegalArgumentException Any invalid additions or removals
+     * will trigger an exception.
+     */
+    @FlaggedApi(FLAG_ENABLE_UPDATE_SERVICE_BINDINGS)
+    public void updateServiceBindings(@NonNull java.util.List<UpdateBindingParams> params) {
+        throw new RuntimeException("Not implemented. Must override in a subclass.");
+    }
+
+    /**
      * Disconnect from an application service.  You will no longer receive
      * calls as the service is restarted, and the service is now allowed to
      * stop at any time.
@@ -4315,6 +4466,24 @@ public abstract class Context {
      * @see #bindService
      */
     public abstract void unbindService(@NonNull ServiceConnection conn);
+
+    /**
+     * Rebind an application service with updated bind service flags
+     *
+     * @param conn The connection interface previously supplied to
+     *             bindService().  This parameter must not be null.
+     * @param flags Updated flags for the binding as per {@link #bindService}.
+     *              Only flags returned from {@link #getUpdateableFlags} may
+     *              be added or removed.
+     *
+     * @see #bindService
+     * @see #updateServiceBindings
+     */
+    @FlaggedApi(FLAG_ENABLE_UPDATE_SERVICE_BINDINGS)
+    public void rebindService(@NonNull ServiceConnection conn,
+            @NonNull BindServiceFlags flags) {
+        throw new RuntimeException("Not implemented. Must override in a subclass.");
+    }
 
     /**
      * Start executing an {@link android.app.Instrumentation} class.  The given
@@ -4421,6 +4590,7 @@ public abstract class Context {
                 // @hide: POWER_WHITELIST_MANAGER,
                 DEVICE_POLICY_SERVICE,
                 UI_MODE_SERVICE,
+                // @hide: THEME_SERVICE,
                 DOWNLOAD_SERVICE,
                 NFC_SERVICE,
                 BLUETOOTH_SERVICE,
@@ -4492,6 +4662,7 @@ public abstract class Context {
                 RANGING_SERVICE,
                 MEDIA_QUALITY_SERVICE,
                 ADVANCED_PROTECTION_SERVICE,
+                ANOMALY_DETECTOR_SERVICE,
             })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ServiceName {}
@@ -4670,8 +4841,7 @@ public abstract class Context {
      * @see #AUTHENTICATION_POLICY_SERVICE
      * @see android.security.authenticationpolicy.AuthenticationPolicyManager
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract Object getSystemService(@ServiceName @NonNull String name);
 
     /**
@@ -4732,8 +4902,7 @@ public abstract class Context {
      * @param serviceClass The class of the desired service.
      * @return The service name or null if the class is not a supported system service.
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract @Nullable String getSystemServiceName(@NonNull Class<?> serviceClass);
 
     /**
@@ -6003,7 +6172,7 @@ public abstract class Context {
      * @see #getSystemService(String)
      * @see android.hardware.serial.SerialManager
      */
-    @FlaggedApi(android.hardware.serial.flags.Flags.FLAG_ENABLE_SERIAL_API)
+    @FlaggedApi(android.hardware.serial.flags.Flags.FLAG_ENABLE_WIRED_SERIAL_API)
     public static final String SERIAL_SERVICE = "serial";
 
     /**
@@ -6299,6 +6468,17 @@ public abstract class Context {
     public static final String PERFORMANCE_HINT_SERVICE = "performance_hint";
 
     /**
+     * Use with {@link #getSystemService(String)} to retrieve an
+     * {@link RecoveryManager} for executing recovery
+     *
+     * @see #getSystemService(String)
+     * @hide
+     */
+    @FlaggedApi(FLAG_ENABLE_USER_RECOVERY_MANAGER)
+    public static final String USER_RECOVERY_SERVICE = "user_recovery";
+
+
+    /**
      * Use with {@link #getSystemService(String)} to retrieve a
      * {@link android.content.pm.ShortcutManager} for accessing the launcher shortcut service.
      *
@@ -6408,6 +6588,18 @@ public abstract class Context {
      * @see android.content.om.OverlayManager
      */
     public static final String OVERLAY_SERVICE = "overlay";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a {@link ThemeManager} for theme
+     * management.
+     *
+     * @see #getSystemService(String)
+     * @see ThemeManager
+     * @hide
+     */
+    @FlaggedApi(android.server.Flags.FLAG_ENABLE_THEME_SERVICE)
+    public static final String THEME_SERVICE = "theme";
+
 
     /**
      * Use with {@link #getSystemService(String)} to manage resources.
@@ -6593,6 +6785,15 @@ public abstract class Context {
      * @hide
      */
     public static final String ATTESTATION_VERIFICATION_SERVICE = "attestation_verification";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve an
+     * {@link android.security.talisman.TalismanManager}.
+     * @see #getSystemService(String)
+     * @see android.security.talisman.TalismanManager
+     * @hide
+     */
+    public static final String TALISMAN_SERVICE = "talisman";
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve an
@@ -6812,7 +7013,6 @@ public abstract class Context {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(android.app.ondeviceintelligence.flags.Flags.FLAG_ENABLE_ON_DEVICE_INTELLIGENCE)
     public static final String ON_DEVICE_INTELLIGENCE_SERVICE = "on_device_intelligence";
 
     /**
@@ -6870,7 +7070,6 @@ public abstract class Context {
      * @see #getSystemService(String)
      * @see android.telephony.satellite.SatelliteManager
      */
-    @FlaggedApi(com.android.internal.telephony.flags.Flags.FLAG_SATELLITE_STATE_CHANGE_LISTENER)
     public static final String SATELLITE_SERVICE = "satellite";
 
     /**
@@ -7014,6 +7213,18 @@ public abstract class Context {
      */
     @FlaggedApi(android.service.chooser.Flags.FLAG_INTERACTIVE_CHOOSER)
     public static final String CHOOSER_SERVICE = "chooser";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve an
+     * {@link android.os.AnomalyDetectorManager}.
+     *
+     * @see #getSystemService(String)
+     *
+     * @hide
+     */
+    @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
+    @FlaggedApi(android.os.profiling.anomaly.flags.Flags.FLAG_ANOMALY_DETECTOR_CORE)
+    public static final String ANOMALY_DETECTOR_SERVICE = "anomaly_detector";
 
     /**
      * Determine whether the given permission is allowed for a particular
@@ -7790,8 +8001,7 @@ public abstract class Context {
     @NonNull
     @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
     @TestApi
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public @CanBeALL @CanBeCURRENT UserHandle getUser() {
         return android.os.Process.myUserHandle();
     }
@@ -7802,8 +8012,7 @@ public abstract class Context {
      */
     @UnsupportedAppUsage
     @TestApi
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public @CanBeALL @CanBeCURRENT @UserIdInt int getUserId() {
         return android.os.UserHandle.myUserId();
     }
@@ -8261,8 +8470,7 @@ public abstract class Context {
      * @see #registerDeviceIdChangeListener(Executor, IntConsumer)
      * @see #isUiContext()
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public int getDeviceId() {
         throw new RuntimeException("Not implemented. Must override in a subclass.");
     }
@@ -8310,8 +8518,7 @@ public abstract class Context {
      *
      * @see #CONTEXT_RESTRICTED
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public boolean isRestricted() {
         return false;
     }
@@ -8322,6 +8529,7 @@ public abstract class Context {
      *
      * @see #createDeviceProtectedStorageContext()
      */
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract boolean isDeviceProtectedStorage();
 
     /**
@@ -8333,6 +8541,7 @@ public abstract class Context {
      */
     @SuppressWarnings("HiddenAbstractMethod")
     @SystemApi
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract boolean isCredentialProtectedStorage();
 
     /**
@@ -8340,8 +8549,7 @@ public abstract class Context {
      * @hide
      */
     @SuppressWarnings("HiddenAbstractMethod")
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract boolean canLoadUnsafeResources();
 
     /**
@@ -8411,8 +8619,7 @@ public abstract class Context {
     /**
      * @hide
      */
-    @android.ravenwood.annotation.RavenwoodSupported(
-            type = SupportType.SUBCLASS, subclass = "RavenwoodContext")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public Handler getMainThreadHandler() {
         throw new RuntimeException("Not implemented. Must override in a subclass.");
     }

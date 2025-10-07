@@ -36,7 +36,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.recyclerview.widget.RecyclerView
 import com.android.media.flags.Flags
-import com.android.settingslib.media.InputMediaDevice
 import com.android.settingslib.media.MediaDevice
 import com.android.systemui.FontStyles.GSF_TITLE_MEDIUM_EMPHASIZED
 import com.android.systemui.FontStyles.GSF_TITLE_SMALL
@@ -53,63 +52,16 @@ import com.google.android.material.slider.Slider
 /** A RecyclerView adapter for the legacy UI media output dialog device list. */
 class MediaOutputAdapter(controller: MediaSwitchingController) :
     MediaOutputAdapterBase(controller) {
-    private var mGroupSelectedItems: Boolean? = null // Unset until the first render.
 
     /** Refreshes the RecyclerView dataset and forces re-render. */
     override fun updateItems() {
-        if (mGroupSelectedItems == null) {
-            // Decide whether to group devices only during the initial render.
-            // Avoid grouping broadcast devices because grouped volume control is not available for
-            // broadcast session.
-            mGroupSelectedItems =
-                mController.selectedMediaDevice.size > 1 &&
-                    (!Flags.enableOutputSwitcherPersonalAudioSharing() ||
-                        mController.isVolumeControlEnabledForSession)
-        }
-
         val newList =
             mController.getMediaItemList(false /* addConnectNewDeviceButton */).toMutableList()
-
-        addSeparatorForTheFirstGroupDivider(newList)
-        coalesceSelectedDevices(newList)
 
         mMediaItemList.clear()
         mMediaItemList.addAll(newList)
 
         notifyDataSetChanged()
-    }
-
-    private fun addSeparatorForTheFirstGroupDivider(newList: MutableList<MediaItem>) {
-        for ((i, item) in newList.withIndex()) {
-            if (item.mediaItemType == TYPE_GROUP_DIVIDER) {
-                newList[i] = MediaItem.createGroupDividerWithSeparatorMediaItem(item.title)
-                break
-            }
-        }
-    }
-
-    /**
-     * If there are 2+ selected devices, adds an "Connected speakers" expandable group divider and
-     * displays a single session control instead of individual device controls.
-     */
-    private fun coalesceSelectedDevices(newList: MutableList<MediaItem>) {
-        val selectedDevices = newList.filter { this.isSelectedDevice(it) }
-
-        if (mGroupSelectedItems == true && selectedDevices.size > 1) {
-            newList.removeAll(selectedDevices.toSet())
-            if (mController.isGroupListCollapsed) {
-                newList.add(0, MediaItem.createDeviceGroupMediaItem())
-            } else {
-                newList.addAll(0, selectedDevices)
-            }
-            newList.add(0, mController.connectedSpeakersExpandableGroupDivider)
-        }
-    }
-
-    private fun isSelectedDevice(mediaItem: MediaItem): Boolean {
-        return mediaItem.mediaDevice.getOrNull()?.let { device ->
-            isDeviceIncluded(mController.selectedMediaDevice, device)
-        } ?: false
     }
 
     override fun getItemId(position: Int): Long {
@@ -342,7 +294,7 @@ class MediaOutputAdapter(controller: MediaSwitchingController) :
                     },
                     settleCallback = { mController.logInteractionAdjustVolume(device) },
                     deviceDrawable = mController.getDeviceIconDrawable(device),
-                    isInputDevice = device is InputMediaDevice,
+                    isInputDevice = device.isInputDevice,
                     isVolumeControlAllowed = mController.isVolumeControlEnabled(device),
                     currentVolume = device.currentVolume,
                     maxVolume = device.maxVolume,
@@ -373,7 +325,7 @@ class MediaOutputAdapter(controller: MediaSwitchingController) :
                 // casting devices without group volume control, so disabling seek bar will be
                 // unnecessary when Flags.enableOutputSwitcherPersonalAudioSharing() is on.
                 isVolumeControlAllowed =
-                    !Flags.enableOutputSwitcherPersonalAudioSharing() &&
+                    Flags.enableOutputSwitcherPersonalAudioSharing() ||
                         mController.isVolumeControlEnabledForSession,
                 currentVolume = mController.sessionVolume,
                 maxVolume = mController.sessionVolumeMax,

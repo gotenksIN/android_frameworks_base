@@ -19,10 +19,10 @@ package android.app;
 import static android.Manifest.permission.MANAGE_EXTERNAL_STORAGE;
 import static android.Manifest.permission.READ_WALLPAPER_INTERNAL;
 import static android.Manifest.permission.SET_WALLPAPER_DIM_AMOUNT;
-import static android.app.Flags.FLAG_LIVE_WALLPAPER_CONTENT_HANDLING;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.os.ParcelFileDescriptor.MODE_READ_ONLY;
 
+import static com.android.server.backup.Flags.FLAG_ENABLE_CROSS_PLATFORM_TRANSFER;
 import static com.android.window.flags.Flags.FLAG_MULTI_CROP;
 import static com.android.window.flags.Flags.multiCrop;
 
@@ -1969,6 +1969,7 @@ public class WallpaperManager {
      *     defined kind of wallpaper, either {@link #FLAG_SYSTEM} or
      *     {@link #FLAG_LOCK}.
      * @param userId The user or profile whose imagery is to be retrieved
+     * @throws SecurityException as described in {@link #getWallpaperFile(int)}
      *
      * @see #FLAG_LOCK
      * @see #FLAG_SYSTEM
@@ -1976,6 +1977,7 @@ public class WallpaperManager {
      * @hide
      */
     @UnsupportedAppUsage
+    @RequiresPermission(anyOf = {MANAGE_EXTERNAL_STORAGE, READ_WALLPAPER_INTERNAL})
     public ParcelFileDescriptor getWallpaperFile(@SetWallpaperFlags int which, int userId) {
         return getWallpaperFile(which, userId, /* getCropped = */ true);
     }
@@ -1992,11 +1994,14 @@ public class WallpaperManager {
      *                   ImageWallpaper wallpaper. Return {@code null} if the wallpaper is not an
      *                   ImageWallpaper. Also return {@code null} when called with
      *                   which={@link #FLAG_LOCK} if there is a shared home + lock wallpaper.
+     * @throws SecurityException as described in {@link #getWallpaperFile(int)}
      * @hide
      */
-    @SuppressLint("UnflaggedApi")
-    @TestApi
+    @FlaggedApi(FLAG_ENABLE_CROSS_PLATFORM_TRANSFER)
+    @UnsupportedAppUsage
+    @SystemApi
     @Nullable
+    @RequiresPermission(anyOf = {MANAGE_EXTERNAL_STORAGE, READ_WALLPAPER_INTERNAL})
     public ParcelFileDescriptor getWallpaperFile(@SetWallpaperFlags int which, boolean getCropped) {
         return getWallpaperFile(which, mContext.getUserId(), getCropped);
     }
@@ -2140,7 +2145,6 @@ public class WallpaperManager {
      * @hide
      */
     @Nullable
-    @FlaggedApi(FLAG_LIVE_WALLPAPER_CONTENT_HANDLING)
     @RequiresPermission(READ_WALLPAPER_INTERNAL)
     @SystemApi
     public WallpaperInstance getWallpaperInstance(@SetWallpaperFlags int which) {
@@ -2159,7 +2163,6 @@ public class WallpaperManager {
      * @hide
      */
     @Nullable
-    @FlaggedApi(FLAG_LIVE_WALLPAPER_CONTENT_HANDLING)
     @RequiresPermission(READ_WALLPAPER_INTERNAL)
     public WallpaperInstance getWallpaperInstance(@SetWallpaperFlags int which,
             boolean createMissingId) {
@@ -2203,6 +2206,7 @@ public class WallpaperManager {
                                 mContext.getUserId());
                         instance = sGlobals.mService.getWallpaperInstance(which,
                                 mContext.getUserId());
+                        bitmap.recycle();
                     }
                 }
                 return instance;
@@ -2435,6 +2439,7 @@ public class WallpaperManager {
      *
      * @throws IOException If an error occurs when attempting to set the wallpaper
      *     to the provided image.
+     * @throws IllegalArgumentException if the Bitmap is null
      */
     @RequiresPermission(android.Manifest.permission.SET_WALLPAPER)
     public void setBitmap(Bitmap bitmap) throws IOException {
@@ -2467,7 +2472,7 @@ public class WallpaperManager {
      * @throws IOException If an error occurs when attempting to set the wallpaper
      *     to the provided image.
      * @throws IllegalArgumentException If the {@code visibleCropHint} rectangle is
-     *     empty or invalid.
+     *     empty or invalid or if the Bitmap is null
      */
     @RequiresPermission(android.Manifest.permission.SET_WALLPAPER)
     public int setBitmap(Bitmap fullImage, Rect visibleCropHint, boolean allowBackup)
@@ -2494,6 +2499,7 @@ public class WallpaperManager {
      * @return An integer ID assigned to the newly active wallpaper; or zero on failure.
      *
      * @throws IOException
+     * @throws IllegalArgumentException if the Bitmap is null
      */
     @RequiresPermission(android.Manifest.permission.SET_WALLPAPER)
     public int setBitmap(Bitmap fullImage, Rect visibleCropHint,
@@ -2507,6 +2513,7 @@ public class WallpaperManager {
      * Like {@link #setBitmap(Bitmap, Rect, boolean, int)}, but allows to pass in an explicit user
      * id. If the user id doesn't match the user id the process is running under, calling this
      * requires permission {@link android.Manifest.permission#INTERACT_ACROSS_USERS_FULL}.
+     * @throws IllegalArgumentException if the Bitmap is null
      * @hide
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
@@ -2560,6 +2567,7 @@ public class WallpaperManager {
      *                  than the screen dimensions to apply a horizontal parallax effect. If the
      *                  map is empty or some entries are missing, the system will apply a default
      *                  strategy to position the wallpaper for any unspecified screen dimensions.
+     * @throws IllegalArgumentException if the Bitmap is null
      * @hide
      */
     @FlaggedApi(FLAG_MULTI_CROP)
@@ -2582,21 +2590,26 @@ public class WallpaperManager {
      * @param allowBackup {@code true} if the OS is permitted to back up this wallpaper
      *                    image for restore to a future device; {@code false} otherwise.
      * @param which       Flags indicating which wallpaper(s) to configure with the new imagery.
+     * @throws IllegalArgumentException if the Bitmap is null
      * @hide
      */
-    @FlaggedApi(FLAG_LIVE_WALLPAPER_CONTENT_HANDLING)
-    @TestApi
+    @FlaggedApi(FLAG_ENABLE_CROSS_PLATFORM_TRANSFER)
+    @UnsupportedAppUsage
+    @SystemApi
     @RequiresPermission(android.Manifest.permission.SET_WALLPAPER)
-    public int setBitmapWithDescription(@Nullable Bitmap fullImage,
+    public int setBitmapWithDescription(@NonNull Bitmap fullImage,
             @NonNull WallpaperDescription description, boolean allowBackup,
             @SetWallpaperFlags int which) throws IOException {
         return setBitmapWithDescription(fullImage, description, allowBackup, which,
                 mContext.getUserId());
     }
 
-    private int setBitmapWithDescription(@Nullable Bitmap fullImage,
+    private int setBitmapWithDescription(@NonNull Bitmap fullImage,
             @NonNull WallpaperDescription description, boolean allowBackup,
             @SetWallpaperFlags int which, int userId) throws IOException {
+        if (fullImage == null) {
+            throw new IllegalArgumentException("Bitmap cannot be null");
+        }
         if (sGlobals.mService == null) {
             Log.w(TAG, "WallpaperService not running");
             throw new RuntimeException(new DeadSystemException());
@@ -2820,7 +2833,6 @@ public class WallpaperManager {
      * @return An integer ID assigned to the newly active wallpaper; or zero on failure.
      * @hide
      */
-    @FlaggedApi(FLAG_LIVE_WALLPAPER_CONTENT_HANDLING)
     @SystemApi
     @RequiresPermission(android.Manifest.permission.SET_WALLPAPER)
     public int setStreamWithDescription(@NonNull InputStream bitmapData,
@@ -3239,7 +3251,6 @@ public class WallpaperManager {
      *
      * @hide
      */
-    @FlaggedApi(FLAG_LIVE_WALLPAPER_CONTENT_HANDLING)
     @SystemApi
     @RequiresPermission(allOf = {android.Manifest.permission.SET_WALLPAPER_COMPONENT,
             Manifest.permission.INTERACT_ACROSS_USERS_FULL}, conditional = true)
@@ -3264,7 +3275,6 @@ public class WallpaperManager {
      *
      * @hide
      */
-    @FlaggedApi(FLAG_LIVE_WALLPAPER_CONTENT_HANDLING)
     @RequiresPermission(allOf = {android.Manifest.permission.SET_WALLPAPER_COMPONENT,
             Manifest.permission.INTERACT_ACROSS_USERS_FULL}, conditional = true)
     public boolean setWallpaperComponentWithDescription(@NonNull WallpaperDescription description,
@@ -3339,7 +3349,7 @@ public class WallpaperManager {
         try {
             //Log.v(TAG, "Sending new wallpaper offsets from app...");
             WindowManagerGlobal.getWindowSession().sendWallpaperCommand(
-                    windowToken, action, x, y, z, extras, false);
+                    windowToken, action, x, y, z, extras);
             //Log.v(TAG, "...app returning after sending offsets!");
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
@@ -3627,10 +3637,12 @@ public class WallpaperManager {
     /**
      * Is the current system wallpaper eligible for backup?
      *
-     * Only the OS itself may use this method.
      * @hide
      */
-    public boolean isWallpaperBackupEligible(int which) {
+    @SystemApi
+    @FlaggedApi(FLAG_ENABLE_CROSS_PLATFORM_TRANSFER)
+    @RequiresPermission(READ_WALLPAPER_INTERNAL)
+    public boolean isWallpaperBackupEligible(@SetWallpaperFlags int which) {
         if (sGlobals.mService == null) {
             Log.w(TAG, "WallpaperService not running");
             throw new RuntimeException(new DeadSystemException());

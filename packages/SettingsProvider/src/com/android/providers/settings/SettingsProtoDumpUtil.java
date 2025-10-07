@@ -1136,11 +1136,11 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Global.NTP_TIMEOUT,
                 GlobalSettingsProto.Ntp.TIMEOUT_MS);
-// QTI_BEGIN: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
+// QTI_BEGIN: 2018-08-11: Core: base: Secondary NTP Server Settings
         dumpSetting(s, p,
                 Settings.Global.NTP_SERVER_2,
                 GlobalSettingsProto.Ntp.SERVER_2);
-// QTI_END: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
+// QTI_END: 2018-08-11: Core: base: Secondary NTP Server Settings
         p.end(ntpToken);
 
         final long uasbToken = p.start(GlobalSettingsProto.USER_ABSENT_SMALL_BATTERY);
@@ -2403,8 +2403,8 @@ class SettingsProtoDumpUtil {
                 Settings.Secure.NAV_BAR_KIDS_MODE,
                 SecureSettingsProto.NavBar.NAV_BAR_KIDS_MODE);
         dumpSetting(s, p,
-                Settings.Secure.NAV_BAR_ORDER,
-                SecureSettingsProto.NavBar.NAV_BAR_ORDER);
+                Settings.Secure.NAVIGATIONBAR_KEY_ORDER,
+                SecureSettingsProto.NavBar.NAVIGATIONBAR_KEY_ORDER);
         p.end(navBar);
 
         dumpSetting(s, p,
@@ -2851,6 +2851,17 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.System.ADVANCED_SETTINGS,
                 SystemSettingsProto.ADVANCED_SETTINGS);
+
+        final long a11yToken = p.start(SystemSettingsProto.ACCESSIBILITY);
+        dumpSetting(s, p,
+                Settings.System.ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_ENABLE,
+                SystemSettingsProto.Accessibility
+                        .ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_ENABLE);
+        dumpSetting(s, p,
+                Settings.System.ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_DISABLE,
+                SystemSettingsProto.Accessibility
+                        .ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_DISABLE);
+        p.end(a11yToken);
 
         final long alarmToken = p.start(SystemSettingsProto.ALARM);
         dumpSetting(s, p,

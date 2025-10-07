@@ -1489,6 +1489,7 @@ public final class Display {
      *
      * @see #isHdr()
      */
+    @Nullable
     public HdrCapabilities getHdrCapabilities() {
         synchronized (mLock) {
             updateDisplayInfoLocked();
@@ -2652,7 +2653,8 @@ public final class Display {
          * @hide
          */
         public boolean equalsExceptRefreshRate(@Nullable Display.Mode other) {
-            return mWidth == other.mWidth && mHeight == other.mHeight;
+            return mWidth == other.mWidth && mHeight == other.mHeight
+                    && mSupportedHdrTypes == other.mSupportedHdrTypes;
         }
 
         /**

@@ -68,6 +68,7 @@ import com.android.systemui.desktop.dagger.DesktopModule;
 import com.android.systemui.deviceentry.DeviceEntryModule;
 import com.android.systemui.display.DisplayModule;
 import com.android.systemui.doze.dagger.DozeComponent;
+import com.android.systemui.doze.dagger.RootDozeModule;
 import com.android.systemui.dreams.dagger.DreamModule;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.FlagDependenciesModule;
@@ -85,6 +86,7 @@ import com.android.systemui.keyguard.ui.composable.LockscreenContent;
 import com.android.systemui.log.dagger.LogModule;
 import com.android.systemui.log.dagger.MonitorLog;
 import com.android.systemui.log.table.TableLogBuffer;
+import com.android.systemui.log.table.impl.TableLogBufferModule;
 import com.android.systemui.lowlight.dagger.LowLightModule;
 import com.android.systemui.lowlightclock.dagger.LowLightClockModule;
 import com.android.systemui.mediaprojection.MediaProjectionModule;
@@ -108,6 +110,7 @@ import com.android.systemui.qs.tiles.impl.qr.ui.model.QRCodeScannerModule;
 import com.android.systemui.recents.Recents;
 import com.android.systemui.recordissue.RecordIssueModule;
 import com.android.systemui.retail.RetailModeModule;
+import com.android.systemui.rotation.impl.RotationModule;
 import com.android.systemui.rotationlock.DeviceStateAutoRotateModule.BoundsDeviceStateAutoRotateModule;
 import com.android.systemui.scene.shared.model.SceneContainerConfig;
 import com.android.systemui.scene.shared.model.SceneDataSource;
@@ -116,6 +119,7 @@ import com.android.systemui.scene.ui.view.WindowRootViewComponent;
 import com.android.systemui.screencapture.common.ScreenCaptureModule;
 import com.android.systemui.screenrecord.ScreenRecordModule;
 import com.android.systemui.screenshot.dagger.ScreenshotModule;
+import com.android.systemui.securelockdevice.dagger.SecureLockDeviceModule;
 import com.android.systemui.security.data.repository.SecurityRepositoryModule;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeController;
@@ -151,6 +155,8 @@ import com.android.systemui.statusbar.notification.row.dagger.NotificationRowCom
 import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.ConfigurationControllerModule;
 import com.android.systemui.statusbar.phone.LetterboxModule;
+import com.android.systemui.statusbar.pipeline.airplane.data.repository.impl.AirplaneModeDataLayerModule;
+import com.android.systemui.statusbar.pipeline.airplane.shared.impl.AirplaneModeSharedModule;
 import com.android.systemui.statusbar.pipeline.dagger.StatusBarPipelineModule;
 import com.android.systemui.statusbar.policy.DeviceStateRotationLockSettingController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
@@ -216,6 +222,8 @@ import javax.inject.Named;
         AmbientModule.class,
         AvControlsChipModule.class,
         AppOpsModule.class,
+        AirplaneModeDataLayerModule.class,
+        AirplaneModeSharedModule.class,
         AssistModule.class,
         AuthenticationModule.class,
         BiometricsModule.class,
@@ -240,6 +248,7 @@ import javax.inject.Named;
         DeviceEntryModule.class,
         DisableFlagsModule.class,
         DisplayModule.class,
+        RootDozeModule.class,
         DreamModule.class,
         EventLogModule.class,
         FalsingModule.class,
@@ -270,8 +279,10 @@ import javax.inject.Named;
         RecordIssueModule.class,
         ReferenceModule.class,
         RetailModeModule.class,
+        RotationModule.class,
         ScreenBrightnessModule.class,
         ScreenshotModule.class,
+        SecureLockDeviceModule.class,
         SensorModule.class,
         SecurityRepositoryModule.class,
         ScreenCaptureModule.class,
@@ -292,6 +303,7 @@ import javax.inject.Named;
         SysUIConcurrencyModule.class,
         SysUICoroutinesModule.class,
         CommonSystemUIUnfoldModule.class,
+        TableLogBufferModule.class,
         TelephonyRepositoryModule.class,
         TemporaryDisplayModule.class,
         ShadeDisplayAwareModule.class,
@@ -341,6 +353,7 @@ public abstract class SystemUIModule {
     @Binds
     public abstract NotificationRowBinder bindNotificationRowBinder(
             NotificationRowBinderImpl notificationRowBinder);
+
 
     @SysUISingleton
     @Provides

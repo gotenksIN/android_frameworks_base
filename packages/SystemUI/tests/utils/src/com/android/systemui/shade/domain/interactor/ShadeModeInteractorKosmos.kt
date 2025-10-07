@@ -16,6 +16,7 @@
 
 package com.android.systemui.shade.domain.interactor
 
+import android.content.applicationContext
 import android.content.testableContext
 import android.provider.Settings
 import com.android.systemui.common.ui.data.repository.fakeConfigurationRepository
@@ -35,6 +36,7 @@ val Kosmos.shadeModeInteractor by Fixture {
     ShadeModeInteractorImpl(
         applicationScope = applicationCoroutineScope,
         backgroundDispatcher = testDispatcher,
+        context = applicationContext,
         repository = shadeRepository,
         secureSettingsRepository = fakeSecureSettingsRepository,
         tableLogBuffer = logcatTableLogBuffer(this, "sceneFrameworkTableLogBuffer"),
@@ -53,6 +55,8 @@ val Kosmos.shadeMode by Fixture { shadeModeInteractor.shadeMode }
  */
 fun Kosmos.enableDualShade(wideLayout: Boolean? = null) {
     runBlocking { fakeSecureSettingsRepository.setBoolean(Settings.Secure.DUAL_SHADE, true) }
+    testableContext.orCreateTestableResources.addOverride(R.bool.config_disableSplitShade, true)
+    fakeConfigurationRepository.onAnyConfigurationChange()
 
     if (wideLayout != null) {
         overrideLargeScreenResources(isLargeScreen = wideLayout)
@@ -64,13 +68,17 @@ fun Kosmos.enableDualShade(wideLayout: Boolean? = null) {
 // TODO(b/391578667): Make this user-aware once supported by FakeSecureSettingsRepository.
 fun Kosmos.disableDualShade() {
     runBlocking { fakeSecureSettingsRepository.setBoolean(Settings.Secure.DUAL_SHADE, false) }
+    testableContext.orCreateTestableResources.addOverride(R.bool.config_disableSplitShade, false)
+    fakeConfigurationRepository.onAnyConfigurationChange()
 }
 
-fun Kosmos.enableSingleShade() {
+fun Kosmos.enableSingleShade(wideLayout: Boolean = false) {
     disableDualShade()
-    overrideLargeScreenResources(isLargeScreen = false)
-    fakeShadeRepository.setShadeLayoutWide(false)
-    displayStateRepository.setIsWideScreen(false)
+    overrideLargeScreenResources(isLargeScreen = wideLayout)
+    fakeShadeRepository.legacyUseSplitShade.value = false
+    fakeShadeRepository.isWideScreen.value = true
+    displayStateRepository.setIsWideScreen(wideLayout)
+    displayStateRepository.setIsLargeScreen(false)
 }
 
 fun Kosmos.enableSplitShade() {
@@ -78,6 +86,7 @@ fun Kosmos.enableSplitShade() {
     overrideLargeScreenResources(isLargeScreen = true)
     fakeShadeRepository.setShadeLayoutWide(true)
     displayStateRepository.setIsWideScreen(true)
+    displayStateRepository.setIsLargeScreen(true)
 }
 
 private fun Kosmos.overrideLargeScreenResources(isLargeScreen: Boolean) {

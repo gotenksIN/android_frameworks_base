@@ -43,16 +43,7 @@ class WindowManagerFlags {
 
     /* Start Available Flags */
 
-    final boolean mWallpaperOffsetAsync = Flags.wallpaperOffsetAsync();
-
-    final boolean mAllowsScreenSizeDecoupledFromStatusBarAndCutout =
-            Flags.allowsScreenSizeDecoupledFromStatusBarAndCutout();
-
-    final boolean mInsetsDecoupledConfiguration = Flags.insetsDecoupledConfiguration();
-
     final boolean mAodTransition = Flags.aodTransition();
-
-    final boolean mDispatchFirstKeyguardLockedState = Flags.dispatchFirstKeyguardLockedState();
 
     /* End Available Flags */
 }

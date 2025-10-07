@@ -28,13 +28,13 @@ import androidx.core.view.isInvisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.app.tracing.coroutines.launchTraced as launch
-import com.android.systemui.customization.clocks.ViewUtils.animateToAlpha
+import com.android.systemui.customization.clocks.utils.ViewUtils.animateToAlpha
 import com.android.systemui.keyguard.shared.model.ClockSizeSetting
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardPreviewSmartspaceViewModel
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardPreviewViewModel
 import com.android.systemui.lifecycle.repeatWhenAttached
-import com.android.systemui.plugins.clocks.ClockPreviewConfig
-import com.android.systemui.plugins.clocks.ClockViewIds
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockPreviewConfig
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockViewIds
 import com.android.systemui.res.R
 import kotlinx.coroutines.flow.combine
 
@@ -56,9 +56,7 @@ object KeyguardPreviewSmartspaceViewBinder {
                     com.android.systemui.shared.R.id.date_smartspace_view_large
                 )
             val smallDateView =
-                parentView.findViewById<View>(
-                    com.android.systemui.shared.R.id.date_smartspace_view
-                )
+                parentView.findViewById<View>(com.android.systemui.shared.R.id.date_smartspace_view)
             parentView.repeatWhenAttached {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     launch("$TAG#viewModel.previewClockSize") {
@@ -124,7 +122,7 @@ object KeyguardPreviewSmartspaceViewBinder {
                                     when (clockSize) {
                                         ClockSizeSetting.DYNAMIC -> {
                                             if (viewModel.shouldDateWeatherBeBelowLargeClock) {
-                                                largeDateView.also { view ->
+                                                largeDateView?.also { view ->
                                                     constrainWidth(
                                                         view.id,
                                                         ConstraintSet.WRAP_CONTENT,

@@ -34,8 +34,11 @@ import com.android.window.flags.Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.common.pip.PipDesktopState
+import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.EnterReason
+import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ExitReason
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFreeformTask
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFullscreenTask
+import com.android.wm.shell.desktopmode.data.DesktopRepository
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Test
@@ -72,6 +75,7 @@ class DesktopPipTransitionControllerTest(flags: FlagsParameterization) : ShellTe
     private val taskInfo =
         createFreeformTask().apply {
             lastParentTaskIdBeforePip = ActivityTaskManager.INVALID_TASK_ID
+            userId = mockDesktopRepository.userId
         }
     private val freeformParentTask =
         createFreeformTask().apply { lastNonFullscreenBounds = FREEFORM_BOUNDS }
@@ -243,7 +247,9 @@ class DesktopPipTransitionControllerTest(flags: FlagsParameterization) : ShellTe
                 deskId = DESK_ID,
                 wct = wct,
                 newTask = taskInfo,
+                userId = mockDesktopRepository.userId,
                 displayId = taskInfo.displayId,
+                enterReason = EnterReason.EXIT_PIP,
             )
         verify(mockDesktopTasksController)
             .addMoveToDeskTaskChanges(wct = wct, task = taskInfo, deskId = DESK_ID)
@@ -308,8 +314,10 @@ class DesktopPipTransitionControllerTest(flags: FlagsParameterization) : ShellTe
                     wct = wct,
                     deskId = DESK_ID,
                     displayId = DEFAULT_DISPLAY,
+                    userId = taskInfo.userId,
                     willExitDesktop = true,
                     removingLastTaskId = taskInfo.taskId,
+                    exitReason = ExitReason.ENTER_PIP,
                 )
         } else {
             verify(mockDesktopTasksController, never())
@@ -317,11 +325,13 @@ class DesktopPipTransitionControllerTest(flags: FlagsParameterization) : ShellTe
                     wct = any(),
                     deskId = anyOrNull(),
                     displayId = any(),
+                    userId = any(),
                     willExitDesktop = any(),
                     removingLastTaskId = anyOrNull(),
                     shouldEndUpAtHome = any(),
                     skipWallpaperAndHomeOrdering = any(),
                     skipUpdatingExitDesktopListener = any(),
+                    exitReason = any(),
                 )
         }
     }

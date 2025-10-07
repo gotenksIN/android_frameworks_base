@@ -81,6 +81,8 @@ import com.android.systemui.statusbar.notification.logging.NotificationPanelLogg
 import com.android.systemui.statusbar.notification.logging.dagger.NotificationsLogModule;
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationContentExtractor;
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationContentExtractorImpl;
+import com.android.systemui.statusbar.notification.promoted.ShowPromotedNotificationsOnAOD;
+import com.android.systemui.statusbar.notification.promoted.ShowPromotedNotificationsOnAODImpl;
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel;
 import com.android.systemui.statusbar.notification.row.NotificationEntryProcessorFactory;
 import com.android.systemui.statusbar.notification.row.NotificationEntryProcessorFactoryLooperImpl;
@@ -93,6 +95,8 @@ import com.android.systemui.statusbar.notification.stack.MagneticNotificationRow
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
 import com.android.systemui.statusbar.notification.stack.NotificationSectionsManager;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
+import com.android.systemui.statusbar.notification.stack.NotificationTargetsHelper;
+import com.android.systemui.statusbar.notification.stack.NotificationTargetsHelperImpl;
 import com.android.systemui.statusbar.notification.stack.OnboardingAffordanceCommands;
 import com.android.systemui.statusbar.notification.stack.StackScrollAlgorithm;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
@@ -332,6 +336,13 @@ public interface NotificationsModule {
     }
 
     /**
+     *  Provides the default implementation of {@link ShowPromotedNotificationsOnAOD}
+     */
+    @Binds
+    @SysUISingleton
+    ShowPromotedNotificationsOnAOD provideShowPromotedNotificationsOnAOD(
+            ShowPromotedNotificationsOnAODImpl impl);
+    /**
      * Provide an implementation of {@link MagneticNotificationRowManager} based on its flag.
      */
     @Provides
@@ -349,5 +360,10 @@ public interface NotificationsModule {
     /** Provides an instance of {@link EntryAdapterFactory} */
     @Binds
     EntryAdapterFactory provideEntryAdapterFactory(EntryAdapterFactoryImpl impl);
+
+    /** Provides the instance of {@link NotificationTargetsHelper} */
+    @Binds
+    @SysUISingleton
+    NotificationTargetsHelper provideNotificationTargetsHelper(NotificationTargetsHelperImpl impl);
 
 }

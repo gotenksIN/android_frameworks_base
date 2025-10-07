@@ -83,7 +83,7 @@ public class TaskLaunchParamsModifierTests extends
         mActivity.info.applicationInfo.targetSdkVersion = Build.VERSION_CODES.N_MR1;
         mActivity.info.applicationInfo.flags |= ApplicationInfo.FLAG_SUPPORTS_SCREEN_DENSITIES;
 
-        mTarget = new TaskLaunchParamsModifier(mSupervisor);
+        mTarget = new TaskLaunchParamsModifier(mSupervisor, mContext);
 
         mCurrent = new LaunchParams();
         mCurrent.reset();
@@ -712,42 +712,6 @@ public class TaskLaunchParamsModifierTests extends
 
         assertEquivalentWindowingMode(WINDOWING_MODE_FULLSCREEN, mResult.mWindowingMode,
                 WINDOWING_MODE_FULLSCREEN);
-    }
-
-
-    @Test
-    public void testKeepsPictureInPictureLaunchModeInOptions() {
-        final TestDisplayContent freeformDisplay = createNewDisplayContent(
-                WINDOWING_MODE_FREEFORM);
-
-        final ActivityOptions options = ActivityOptions.makeBasic();
-        options.setLaunchWindowingMode(WINDOWING_MODE_PINNED);
-
-        mCurrent.mPreferredTaskDisplayArea = freeformDisplay.getDefaultTaskDisplayArea();
-
-        assertEquals(RESULT_CONTINUE,
-                new CalculateRequestBuilder().setOptions(options).calculate());
-
-        assertEquivalentWindowingMode(WINDOWING_MODE_PINNED, mResult.mWindowingMode,
-                WINDOWING_MODE_FREEFORM);
-    }
-
-    @Test
-    public void testKeepsPictureInPictureLaunchModeWithBoundsInOptions() {
-        final TestDisplayContent freeformDisplay = createNewDisplayContent(
-                WINDOWING_MODE_FREEFORM);
-
-        final ActivityOptions options = ActivityOptions.makeBasic();
-        options.setLaunchWindowingMode(WINDOWING_MODE_PINNED);
-        options.setLaunchBounds(new Rect(0, 0, 100, 100));
-
-        mCurrent.mPreferredTaskDisplayArea = freeformDisplay.getDefaultTaskDisplayArea();
-
-        assertEquals(RESULT_CONTINUE,
-                new CalculateRequestBuilder().setOptions(options).calculate());
-
-        assertEquivalentWindowingMode(WINDOWING_MODE_PINNED, mResult.mWindowingMode,
-                WINDOWING_MODE_FREEFORM);
     }
 
     @Test

@@ -28,7 +28,6 @@ import android.os.SystemClock;
 import android.os.Trace;
 import android.text.format.TimeMigrationUtils;
 import android.util.ArrayMap;
-import android.util.CloseGuard;
 import android.util.IndentingPrintWriter;
 import android.util.Log;
 import android.util.LongSparseArray;
@@ -104,7 +103,7 @@ public class AnrTimer<V> implements AutoCloseable {
     /**
      * Enable debug messages.
      */
-    private static boolean DEBUG = false;
+    private static final boolean DEBUG = false;
 
     /**
      * The trace tag is the same usd by ActivityManager.
@@ -150,6 +149,11 @@ public class AnrTimer<V> implements AutoCloseable {
     private static final Injector sDefaultInjector = new Injector();
 
     /**
+     * Token that distinguishes early notifications from timer expirations.
+     */
+    private static final int TOKEN_EXPIRATION = 0;
+
+    /**
      * Token for Long Method Tracing notifications.
      * This token is used in early notifications to trigger long method tracing.
      */
@@ -164,8 +168,20 @@ public class AnrTimer<V> implements AutoCloseable {
      */
     public static class Args {
 
-        /** Represents a point in time (as percent of total) and an associated token. */
-        private record SplitPoint(int percent, int token) {}
+        /**
+         * Represents a point in time (as percent of total) and an associated token. Zero is a
+         * reserved token value.
+         */
+        public record SplitPoint(int percent, int token) {
+            public SplitPoint {
+                if (token == 0) {
+                    throw new IllegalArgumentException("token may not be zero");
+                }
+                if (percent <= 0 || percent > 100) {
+                    throw new IllegalArgumentException("percent must be in (0,100]");
+                }
+            }
+        }
 
         /** Split point for long method tracing, at 50% elapsed time. */
         private static final SplitPoint sLongMethodTracingPoint =
@@ -193,6 +209,9 @@ public class AnrTimer<V> implements AutoCloseable {
                 new TreeSet<>(comparingInt(SplitPoint::percent)
                         .thenComparingInt(SplitPoint::token));
 
+        /** Make this AnrTimer use test-mode clocking.  This is only useful in tests. */
+        private boolean mTestMode = false;
+
         // This is only used for testing, so it is limited to package visibility.
         Args injector(@NonNull Injector injector) {
             mInjector = injector;
@@ -209,6 +228,20 @@ public class AnrTimer<V> implements AutoCloseable {
             return this;
         }
 
+        public Args testMode(boolean flag) {
+            mTestMode = flag;
+            return this;
+        }
+
+        /**
+         * Add a split point.  For the specific purpose of long method tracing, consider using the
+         * {@link #longMethodTracing} method instead.
+         */
+        public Args splitPoint(SplitPoint point) {
+            mSplitPoints.add(point);
+            return this;
+        }
+
         /**
          * Enables or disables long method tracing.
          * When enabled, the timer will trigger long method tracing if it reaches 50%
@@ -218,7 +251,6 @@ public class AnrTimer<V> implements AutoCloseable {
          * @return this {@link Args} instance for chaining.
          */
         public Args longMethodTracing(boolean enabled) {
-            final int percent = 50;
             if (enabled) {
                 mSplitPoints.add(sLongMethodTracingPoint);
             } else {
@@ -263,48 +295,26 @@ public class AnrTimer<V> implements AutoCloseable {
             }
             return tokens;
         }
-
     }
 
     /**
-     * A target process may be modified when its timer expires.  The modification (if any) will be
-     * undone if the expiration is discarded, but is persisted if the expiration is accepted.  If
-     * the expiration is accepted, then a TimerLock is returned to the client.  The client must
-     * close the TimerLock to complete the state machine.
+     * Information about a timer that has expired.
      */
-    private class TimerLock implements AutoCloseable {
-        // Detect failures to close.
-        private final CloseGuard mGuard = new CloseGuard();
+    public static class ExpiredTimer {
+        // The timer ID.
+        final int mTimerId;
 
-        // A lock to ensure closing is thread-safe.
-        private final Object mLock = new Object();
+        // The start uptime of the timer in millis.
+        public final long mStartMs;
 
-        // Allow multiple calls to close().
-        private boolean mClosed = false;
+        // The total duration uptime of the timer in millis.
+        // Includes any extensions.
+        public final long mDurationMs;
 
-        TimerLock() {
-            mGuard.open("AnrTimer.release");
-        }
-
-        @Override
-        public void close() {
-            synchronized (mLock) {
-                if (!mClosed) {
-                    mGuard.close();
-                    mClosed = true;
-                }
-            }
-        }
-
-        @Override
-        protected void finalize() throws Throwable {
-            try {
-                // Note that guard could be null if the constructor threw.
-                if (mGuard != null) mGuard.warnIfOpen();
-                close();
-            } finally {
-                super.finalize();
-            }
+        ExpiredTimer(int id, long startMs, long durationMs) {
+            mTimerId = id;
+            mStartMs = startMs;
+            mDurationMs = durationMs;
         }
     }
 
@@ -369,9 +379,13 @@ public class AnrTimer<V> implements AutoCloseable {
     @GuardedBy("mLock")
     private final ArrayMap<V, Integer> mTimerIdMap = new ArrayMap<>();
 
-    /** Reverse map from timer ID to client argument. */
+    /** Reverse map from timer ID to client argument, needed by the expire() callback. */
     @GuardedBy("mLock")
     private final SparseArray<V> mTimerArgMap = new SparseArray<>();
+
+    /** Map from timer ID to ExpiredTimer. */
+    @GuardedBy("mLock")
+    private final SparseArray<ExpiredTimer> mExpiredTimers = new SparseArray<>();
 
     /** The highwater mark of started, but not closed, timers. */
     @GuardedBy("mLock")
@@ -427,14 +441,14 @@ public class AnrTimer<V> implements AutoCloseable {
         mWhat = what;
         mLabel = label;
         mArgs = args;
-        boolean enabled = args.mEnable && nativeTimersSupported();
-        mFeature = createFeatureSwitch(enabled);
+        mFeature = createFeatureSwitch();
     }
 
     // Return the correct feature.  FeatureEnabled is returned if and only if the feature is
     // flag-enabled and if the native shadow was successfully created.  Otherwise, FeatureDisabled
     // is returned.
-    private FeatureSwitch createFeatureSwitch(boolean enabled) {
+    private FeatureSwitch createFeatureSwitch() {
+        final boolean enabled = mArgs.mEnable && nativeTimersSupported();
         if (!enabled) {
             return new FeatureDisabled();
         } else {
@@ -496,7 +510,7 @@ public class AnrTimer<V> implements AutoCloseable {
         abstract boolean cancel(@NonNull V arg);
 
         @Nullable
-        abstract TimerLock accept(@NonNull V arg);
+        abstract ExpiredTimer accept(@NonNull V arg);
 
         abstract boolean discard(@NonNull V arg);
 
@@ -505,6 +519,8 @@ public class AnrTimer<V> implements AutoCloseable {
         abstract void dump(IndentingPrintWriter pw, boolean verbose);
 
         abstract void close();
+
+        abstract void setTime(long now);
     }
 
     /**
@@ -530,7 +546,7 @@ public class AnrTimer<V> implements AutoCloseable {
         /** accept() is a no-op when the feature is disabled. */
         @Override
         @Nullable
-        TimerLock accept(@NonNull V arg) {
+        ExpiredTimer accept(@NonNull V arg) {
             return null;
         }
 
@@ -559,6 +575,12 @@ public class AnrTimer<V> implements AutoCloseable {
         /** close() is a no-op when the feature is disabled. */
         @Override
         void close() {
+        }
+
+        /** The disabled timer does not support this operation. */
+        @Override
+        void setTime(long now) {
+            throw new UnsupportedOperationException("setTime unavailable in disabled mode");
         }
     }
 
@@ -589,7 +611,7 @@ public class AnrTimer<V> implements AutoCloseable {
         /** Create the native AnrTimerService that will host all timers from this instance. */
         FeatureEnabled() {
             mNative = nativeAnrTimerCreate(mLabel, mArgs.mExtend, mArgs.getSplitPercentArray(),
-                    mArgs.getSplitTokenArray());
+                    mArgs.getSplitTokenArray(), mArgs.mTestMode);
             if (mNative == 0) throw new IllegalArgumentException("unable to create native timer");
             synchronized (sAnrTimerList) {
                 sAnrTimerList.put(mNative, new WeakReference(AnrTimer.this));
@@ -644,28 +666,30 @@ public class AnrTimer<V> implements AutoCloseable {
 
         /**
          * Accept a timer in the framework-level handler.  The timeout has been accepted and the
-         * client's timeout handler is executing.  If the function returns a non-null TimerLock then
-         * the associated process may have been paused (or otherwise modified in preparation for
-         * debugging). The TimerLock must be closed to allow the process to continue, or to be
-         * dumped in an AnrReport.
+         * client's timeout handler is executing.  If the function returns a non-null ExpiredTimer
+         * then the associated process may have been paused (or otherwise modified in preparation
+         * for debugging). The ExpiredTimer must be closed.
          */
         @Override
         @Nullable
-        TimerLock accept(@NonNull V arg) {
+        ExpiredTimer accept(@NonNull V arg) {
             synchronized (mLock) {
-                Integer timer = removeLocked(arg);
+                ExpiredTimer timer = removeLockedTimer(arg);
                 if (timer == null) {
                     notFoundLocked("accept", arg);
                     return null;
                 }
                 // Race conditions may lead to timer acceptance after the service was closed.
                 if (mNative == 0) return null;
-                boolean accepted = nativeAnrTimerAccept(mNative, timer);
+                boolean accepted = nativeAnrTimerAccept(mNative, timer.mTimerId);
                 trace("accept", timer);
                 // If "accepted" is true then the native layer has pending operations against this
-                // timer.  Wrap the timer ID in a TimerLock and return it to the caller.  If
+                // timer.  Wrap the timer ID in a ExpiredTimer and return it to the caller.  If
                 // "accepted" is false then the native later does not have any pending operations.
-                return accepted ? new TimerLock() : null;
+                if (!accepted) {
+                    timer = null;
+                }
+                return timer;
             }
         }
 
@@ -731,16 +755,42 @@ public class AnrTimer<V> implements AutoCloseable {
         }
 
         /**
+         * Delete the entries associated with arg from the maps and return the ExpiredTimer of the
+         * timer, if any.
+         */
+        @GuardedBy("mLock")
+        private ExpiredTimer removeLockedTimer(V arg) {
+            final Integer r = mTimerIdMap.remove(arg);
+            ExpiredTimer l = null;
+            if (r != null) {
+                mTimerArgMap.remove(r);
+                l = mExpiredTimers.removeReturnOld(r);
+            }
+            return l;
+        }
+
+        /**
          * Delete the entries associated with arg from the maps and return the ID of the timer, if
          * any.
          */
         @GuardedBy("mLock")
         private Integer removeLocked(V arg) {
-            Integer r = mTimerIdMap.remove(arg);
+            final Integer r = mTimerIdMap.remove(arg);
             if (r != null) {
                 mTimerArgMap.remove(r);
+                mExpiredTimers.removeReturnOld(r);
             }
             return r;
+        }
+
+        /** This is always safe to call; it does nothing if the timer is not in test mode. */
+        @Override
+        void setTime(long now) {
+            if (!mArgs.mTestMode) {
+                throw new UnsupportedOperationException("setTime called outside test mode");
+            } else if (!nativeAnrTimerSetTime(mNative, now)) {
+                throw new RuntimeException("setTime failure");
+            }
         }
     }
 
@@ -793,9 +843,9 @@ public class AnrTimer<V> implements AutoCloseable {
     /**
      * Accept the expired timer associated with arg.  This indicates that the caller considers the
      * timer expiration to be a true ANR.  (See {@link #discard} for an alternate response.)  The
-     * function stores a {@link TimerLock} in the {@link TimeoutRecord} argument.  The TimerLock
-     * records information about the expired timer for retrieval during ANR report generation.
-     * After this call, the timer does not exist.
+     * function stores a {@link ExpiredTimer} in the {@link TimeoutRecord} argument.  The
+     * ExpiredTimer records information about the expired timer for retrieval during ANR report
+     * generation.  After this call, the timer does not exist.
      *
      * It is a protocol error to accept a running timer, however, the running timer will be
      * canceled.
@@ -835,9 +885,9 @@ public class AnrTimer<V> implements AutoCloseable {
      * message is delivered to the upper layers and false if it could not be delivered.
      */
     @Keep
-    private boolean expire(int timerId, int pid, int uid, long elapsedMs) {
+    private boolean expire(int timerId, int pid, int uid, long startMs, long elapsedMs) {
         trace("expired", timerId, pid, uid, mLabel, elapsedMs);
-        V arg = null;
+        final V arg;
         synchronized (mLock) {
             arg = mTimerArgMap.get(timerId);
             if (arg == null) {
@@ -846,9 +896,15 @@ public class AnrTimer<V> implements AutoCloseable {
                 mTotalErrors++;
                 return false;
             }
+            mExpiredTimers.put(timerId, new ExpiredTimer(timerId, startMs, elapsedMs));
             mTotalExpired++;
         }
-        mHandler.sendMessage(Message.obtain(mHandler, mWhat, arg));
+        final Message msg = Message.obtain(mHandler, mWhat, arg);
+        // arg1 is zero to signal that this is an expiration callback, and not an early notification
+        // callback.
+        // this an expiration.
+        msg.arg1 = TOKEN_EXPIRATION;
+        mHandler.sendMessage(msg);
         return true;
     }
 
@@ -865,15 +921,33 @@ public class AnrTimer<V> implements AutoCloseable {
     @Keep
     private void notifyEarly(int timerId, int pid, int uid,
                             long elapsedMs, int token) {
-        trace("notifyEarly", timerId, pid, uid, mLabel, elapsedMs, token);
-        switch(token) {
-            case TOKEN_LONG_METHOD_TRACING:
-                LongMethodTracer.trigger(pid,
-                        (int) Math.max(MIN_LMT_DURATION_MS, elapsedMs * 1.5));
-                break;
-            default:
-                Log.w(TAG, "Received a notification with an unknown token: " + token);
+        // Long method tracing is a special case for early notifications.  It is handled directly
+        // in this method.
+        if (token == TOKEN_LONG_METHOD_TRACING) {
+            trace("notifyEarly", timerId, pid, uid, mLabel, elapsedMs, token);
+            LongMethodTracer.trigger(pid,
+                    (int) Math.max(MIN_LMT_DURATION_MS, elapsedMs * 1.5));
+            return;
         }
+
+        // The token is not requesting long method tracing.  The event is forwarded to the message
+        // handler.  This path is used during testing although it is allowed in all cases.
+        V arg = null;
+        synchronized (mLock) {
+            arg = mTimerArgMap.get(timerId);
+            if (arg == null) {
+                Log.e(TAG, formatSimple("failed early notiffor for timer %s:%d : arg not found",
+                                mLabel, timerId));
+                mTotalErrors++;
+                return;
+            }
+        }
+
+        final Message msg = Message.obtain(mHandler, mWhat, arg);
+        // arg1 is used to signal early notifications; a non-zero arg1 means this an early
+        // notification, and arg1 is the token that is passed to the callback.
+        msg.arg1 = token;
+        mHandler.sendMessage(msg);
     }
 
     /**
@@ -881,6 +955,28 @@ public class AnrTimer<V> implements AutoCloseable {
      */
     public void close() {
         mFeature.close();
+    }
+
+    /**
+     * Set the current time as seen by this AnrTimer.  This is only effective for native timers
+     * that were created with testMode enabled.
+     */
+    @VisibleForTesting
+    public void setTime(long now) {
+        mFeature.setTime(now);
+    }
+
+    /**
+     * Return the ExpiredTimer associated with a TimeoutRecord.  The TimeoutRecord is not modified.
+     */
+    @Nullable
+    public static ExpiredTimer expiredTimer(TimeoutRecord tr) {
+        Object expiredTimer = tr.getExpiredTimer();
+        if (expiredTimer instanceof ExpiredTimer lock) {
+            return lock;
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -904,13 +1000,6 @@ public class AnrTimer<V> implements AutoCloseable {
             mFeature.dump(pw, false);
             pw.decreaseIndent();
         }
-    }
-
-    /**
-     * Enable or disable debugging.
-     */
-    static void debug(boolean f) {
-        DEBUG = f;
     }
 
     /**
@@ -1037,9 +1126,12 @@ public class AnrTimer<V> implements AutoCloseable {
      * Create a new native timer with the given name and flags.  The name is only for logging.
      * Unlike the other methods, this is an instance method: the "this" parameter is passed into
      * the native layer.
+     *
+     * When testMode is true, the native timer is disconnected from any real clock.  Use
+     * nativeAnrTimerSetTime() to change the time seen by a testMode timer.
      */
     private native long nativeAnrTimerCreate(String name, boolean extend,
-            int[] splitPercent, int[] splitToken);
+            int[] splitPercent, int[] splitToken, boolean testMode);
 
     /** Release the native resources.  No further operations are premitted. */
     private static native int nativeAnrTimerClose(long service);
@@ -1073,4 +1165,11 @@ public class AnrTimer<V> implements AutoCloseable {
 
     /** Retrieve runtime dump information from the native layer. */
     private static native String[] nativeAnrTimerDump(long service);
+
+    /**
+     * Set the clock for a native time service.  If the time service was created in test mode,
+     * this changes the service's view of "now" and returns true.  Otherwise it has no effect and
+     * returns false.
+     */
+    private static native boolean nativeAnrTimerSetTime(long service, long now);
 }

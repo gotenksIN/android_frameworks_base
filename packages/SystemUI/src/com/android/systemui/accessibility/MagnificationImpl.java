@@ -45,8 +45,10 @@ import android.window.InputTransferToken;
 
 import androidx.annotation.NonNull;
 
+import com.android.internal.accessibility.util.AccessibilityUtils;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.graphics.SfVsyncFrameCallbackProvider;
+import com.android.systemui.Flags;
 import com.android.systemui.LauncherProxyService;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -72,7 +74,6 @@ import javax.inject.Inject;
 public class MagnificationImpl implements Magnification, CommandQueue.Callbacks {
     private static final String TAG = "Magnification";
 
-    @VisibleForTesting static final int DELAY_SHOW_MAGNIFICATION_TIMEOUT_MS = 300;
     private static final int MSG_SHOW_MAGNIFICATION_BUTTON_INTERNAL = 1;
 
     private final ModeSwitchesController mModeSwitchesController;
@@ -381,6 +382,16 @@ public class MagnificationImpl implements Magnification, CommandQueue.Callbacks 
         }
     }
 
+    @Override
+    @MainThread
+    public void onDisplayRemoved(int displayId) {
+        if (Flags.cleanupInstancesWhenDisplayRemoved()) {
+            // Cleanup the cached instances for specific display
+            mMagnificationSettingsSupplier.remove(displayId);
+            mModeSwitchesController.onDisplayRemoved(displayId);
+        }
+    }
+
     @MainThread
     void updateSettingsButtonStatus(int displayId,
             @WindowMagnificationSettings.MagnificationSize int index) {
@@ -429,7 +440,7 @@ public class MagnificationImpl implements Magnification, CommandQueue.Callbacks 
         mHandler.sendMessageDelayed(
                 mHandler.obtainMessage(
                         MSG_SHOW_MAGNIFICATION_BUTTON_INTERNAL, displayId, magnificationMode),
-                DELAY_SHOW_MAGNIFICATION_TIMEOUT_MS);
+                AccessibilityUtils.MAGNIFICATION_SHOW_BUTTON_DELAY_MS);
     }
 
     @MainThread

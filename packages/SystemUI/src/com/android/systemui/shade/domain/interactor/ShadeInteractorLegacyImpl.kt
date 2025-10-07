@@ -28,6 +28,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -60,17 +61,17 @@ constructor(
                 keyguardRepository.statusBarState,
                 repository.legacyShadeExpansion,
                 repository.qsExpansion,
-                repository.isShadeLayoutWide,
+                repository.legacyUseSplitShade,
             ) {
                 lockscreenShadeExpansion,
                 statusBarState,
                 legacyShadeExpansion,
                 qsExpansion,
-                isShadeLayoutWide ->
+                useSplitShade ->
                 when (statusBarState) {
                     // legacyShadeExpansion is 1 instead of 0 when QS is expanded
                     StatusBarState.SHADE ->
-                        if (!isShadeLayoutWide && qsExpansion > 0f) 1f - qsExpansion
+                        if (!useSplitShade && qsExpansion > 0f) 1f - qsExpansion
                         else legacyShadeExpansion
                     StatusBarState.KEYGUARD -> lockscreenShadeExpansion
                     // dragDownAmount, which drives lockscreenShadeExpansion resets to 0f when
@@ -81,6 +82,9 @@ constructor(
             .distinctUntilChanged()
             .traceAsCounter("panel_expansion") { (it * 100f).toInt() }
             .stateIn(scope, SharingStarted.Eagerly, 0f)
+
+    @Deprecated("Do not use. isNotificationsExpanded is only relevant in SceneContainer")
+    override val isNotificationsExpanded: StateFlow<Boolean> = MutableStateFlow(false)
 
     override val qsExpansion: StateFlow<Float> = repository.qsExpansion
 
@@ -135,6 +139,18 @@ constructor(
     ) {
         throw UnsupportedOperationException(
             "collapseQuickSettingsShade() is not supported in legacy shade"
+        )
+    }
+
+    override fun toggleNotificationsShade(loggingReason: String, transitionKey: TransitionKey?) {
+        throw UnsupportedOperationException(
+            "toggleNotificationShade() is not supported in legacy shade"
+        )
+    }
+
+    override fun toggleQuickSettingsShade(loggingReason: String, transitionKey: TransitionKey?) {
+        throw UnsupportedOperationException(
+            "toggleQuickSettingsShade() is not supported in legacy shade"
         )
     }
 

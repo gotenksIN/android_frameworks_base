@@ -38,7 +38,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import android.companion.virtual.camera.CameraCharacteristicsBuilder;
 import android.companion.virtual.camera.VirtualCameraCallback;
 import android.companion.virtual.camera.VirtualCameraConfig;
 import android.companion.virtual.camera.VirtualCameraStreamConfig;
@@ -240,7 +239,7 @@ public class VirtualCameraControllerTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_EXTERNAL_VIRTUAL_CAMERAS)
+    @EnableFlags({Flags.FLAG_EXTERNAL_VIRTUAL_CAMERAS, Flags.FLAG_EXTERNAL_CAMERA_DEFAULT_POLICY})
     public void registerCamera_withDefaultCameraPolicy_allowsMultipleExternal() {
         mVirtualCameraController.close();
         mVirtualCameraController = new VirtualCameraController(mVirtualCameraServiceMock,
@@ -259,15 +258,14 @@ public class VirtualCameraControllerTest {
 
     @Test
     @DisableFlags(Flags.FLAG_EXTERNAL_VIRTUAL_CAMERAS)
-    public void registerCamera_withDefaultCameraPolicy_throwsException_whenNotSupported() {
-        mVirtualCameraController.close();
-        mVirtualCameraController = new VirtualCameraController(mVirtualCameraServiceMock,
-                DEVICE_POLICY_DEFAULT, DEVICE_ID);
+    public void registerCamera_withDefaultCameraPolicy_throwsException_whenExternalNotSupported() {
+        verifyRegisterDefaultPolicyCameraThrowsException();
+    }
 
-        assertThrows(IllegalArgumentException.class, () -> mVirtualCameraController.registerCamera(
-                createVirtualCameraConfig(CAMERA_WIDTH_1, CAMERA_HEIGHT_1, CAMERA_FORMAT_1,
-                        CAMERA_MAX_FPS_1, CAMERA_NAME_1, CAMERA_SENSOR_ORIENTATION_1,
-                        LENS_FACING_EXTERNAL), AttributionSource.myAttributionSource()));
+    @Test
+    @DisableFlags(Flags.FLAG_EXTERNAL_CAMERA_DEFAULT_POLICY)
+    public void registerCamera_withDefaultCameraPolicy_throwsException_whenDefaultNotSupported() {
+        verifyRegisterDefaultPolicyCameraThrowsException();
     }
 
     public static void assertVirtualCameraConfigFromCharacteristics(VirtualCameraConfig config,
@@ -323,7 +321,8 @@ public class VirtualCameraControllerTest {
     @Test
     @EnableFlags(Flags.FLAG_VIRTUAL_CAMERA_METADATA)
     public void registerCameraWithCharacteristics_registersCamera(int lensFacing) throws Exception {
-        CameraCharacteristics characteristics = new CameraCharacteristicsBuilder()
+        CameraCharacteristics characteristics = new CameraCharacteristics.Builder(
+                VirtualCameraConfig.DEFAULT_VIRTUAL_CAMERA_CHARACTERISTICS)
                 .set(CameraCharacteristics.SENSOR_ORIENTATION, CAMERA_SENSOR_ORIENTATION_1)
                 .set(CameraCharacteristics.LENS_FACING, lensFacing)
                 .build();
@@ -341,7 +340,8 @@ public class VirtualCameraControllerTest {
     @Test
     @EnableFlags(Flags.FLAG_VIRTUAL_CAMERA_METADATA)
     public void unregisterCameraWithCharacteristics_unregistersCamera() throws Exception {
-        CameraCharacteristics characteristics = new CameraCharacteristicsBuilder()
+        CameraCharacteristics characteristics = new CameraCharacteristics.Builder(
+                VirtualCameraConfig.DEFAULT_VIRTUAL_CAMERA_CHARACTERISTICS)
                 .set(CameraCharacteristics.SENSOR_ORIENTATION, CAMERA_SENSOR_ORIENTATION_1)
                 .set(CameraCharacteristics.LENS_FACING, CAMERA_LENS_FACING_1)
                 .build();
@@ -390,7 +390,8 @@ public class VirtualCameraControllerTest {
     @EnableFlags(Flags.FLAG_VIRTUAL_CAMERA_METADATA)
     public void registerCameraWithCharacteristicsAndPerFrameMetadata_registersCamera(int lensFacing)
             throws Exception {
-        CameraCharacteristics characteristics = new CameraCharacteristicsBuilder()
+        CameraCharacteristics characteristics = new CameraCharacteristics.Builder(
+                VirtualCameraConfig.DEFAULT_VIRTUAL_CAMERA_CHARACTERISTICS)
                 .set(CameraCharacteristics.SENSOR_ORIENTATION, CAMERA_SENSOR_ORIENTATION_1)
                 .set(CameraCharacteristics.LENS_FACING, lensFacing)
                 .build();
@@ -423,6 +424,23 @@ public class VirtualCameraControllerTest {
         assertVirtualCameraConfigurationWithCharacteristics(virtualCameraConfiguration,
                 width, height, format, maxFps, originalConfig.cameraCharacteristics);
     }
+
+    private void verifyRegisterDefaultPolicyCameraThrowsException() {
+        mVirtualCameraController.close();
+        mVirtualCameraController = new VirtualCameraController(mVirtualCameraServiceMock,
+                DEVICE_POLICY_DEFAULT, DEVICE_ID);
+
+        assertThrows(IllegalArgumentException.class, () -> mVirtualCameraController.registerCamera(
+                createVirtualCameraConfig(CAMERA_WIDTH_1, CAMERA_HEIGHT_1, CAMERA_FORMAT_1,
+                        CAMERA_MAX_FPS_1, CAMERA_NAME_1, CAMERA_SENSOR_ORIENTATION_1,
+                        LENS_FACING_EXTERNAL), AttributionSource.myAttributionSource()));
+
+        assertThrows(IllegalArgumentException.class, () -> mVirtualCameraController.registerCamera(
+                createVirtualCameraConfig(CAMERA_WIDTH_1, CAMERA_HEIGHT_1, CAMERA_FORMAT_1,
+                        CAMERA_MAX_FPS_1, CAMERA_NAME_1, CAMERA_SENSOR_ORIENTATION_1,
+                        LENS_FACING_FRONT), AttributionSource.myAttributionSource()));
+    }
+
 
     @SuppressWarnings("unused") // Parameter for parametrized tests
     private static Integer[] getFixedCamerasLensFacingDirections() {

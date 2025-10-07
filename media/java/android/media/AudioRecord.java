@@ -1501,9 +1501,9 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
      */
     public void startRecording()
     throws IllegalStateException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(70);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (mState != STATE_INITIALIZED) {
             throw new IllegalStateException("startRecording() called on an "
                     + "uninitialized AudioRecord.");
@@ -1527,9 +1527,9 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
      */
     public void startRecording(MediaSyncEvent syncEvent)
     throws IllegalStateException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(70);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (mState != STATE_INITIALIZED) {
             throw new IllegalStateException("startRecording() called on an "
                     + "uninitialized AudioRecord.");
@@ -1785,7 +1785,9 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
      * The representation of the data in the buffer will depend on the format specified in
      * the AudioRecord constructor, and will be native endian.
      * @param audioBuffer the direct buffer to which the recorded audio data is written.
-     * Data is written to audioBuffer.position().
+     *    Data is written to the beginning of the byte buffer. Importantly, this
+     *    method ignores the {@link java.nio.Buffer#position()} and
+     *    {@link java.nio.Buffer#limit()} properties.
      * @param sizeInBytes the number of requested bytes. It is recommended but not enforced
      *    that the number of bytes requested be a multiple of the frame size (sample size in
      *    bytes multiplied by the channel count).
@@ -1813,7 +1815,9 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
      * The representation of the data in the buffer will depend on the format specified in
      * the AudioRecord constructor, and will be native endian.
      * @param audioBuffer the direct buffer to which the recorded audio data is written.
-     * Data is written to audioBuffer.position().
+     *    Data is written to the beginning of the byte buffer. Importantly, this
+     *    method ignores the {@link java.nio.Buffer#position()} and
+     *    {@link java.nio.Buffer#limit()} properties.
      * @param sizeInBytes the number of requested bytes. It is recommended but not enforced
      *    that the number of bytes requested be a multiple of the frame size (sample size in
      *    bytes multiplied by the channel count).

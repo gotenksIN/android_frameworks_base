@@ -33,9 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -43,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -56,12 +55,19 @@ import com.android.systemui.res.R
 @Composable
 fun Chip(action: ActionViewModel, modifier: Modifier = Modifier) {
     val backgroundColor = if (isSystemInDarkTheme()) Color.Black else Color.White
+    val density = LocalDensity.current
     val config = LocalConfiguration.current
-    val isBoldTextEnabled by remember { derivedStateOf { config.fontWeightAdjustment > 0 } }
+    val isBoldTextEnabled = config.fontWeightAdjustment > 0
+    val fontScale = config.fontScale
     val chipTextStyle =
         MaterialTheme.typography.labelLarge.copy(
-            fontWeight = if (isBoldTextEnabled) FontWeight.Bold else FontWeight.Medium
+            fontWeight = if (isBoldTextEnabled) FontWeight.Bold else FontWeight.Medium,
+            fontSize =
+                with(density) {
+                    (MaterialTheme.typography.labelLarge.fontSize.value * fontScale).dp.toSp()
+                },
         )
+    val autofillActionLabel = stringResource(id = R.string.ambient_cue_autofill_action)
 
     val haptics = LocalHapticFeedback.current
     Row(
@@ -74,6 +80,7 @@ fun Chip(action: ActionViewModel, modifier: Modifier = Modifier) {
                 .defaultMinSize(minHeight = 48.dp)
                 .widthIn(max = 288.dp)
                 .combinedClickable(
+                    onClickLabel = autofillActionLabel,
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                         action.onClick()
@@ -85,7 +92,7 @@ fun Chip(action: ActionViewModel, modifier: Modifier = Modifier) {
                 )
                 .padding(start = 12.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
     ) {
-        val painter = rememberDrawablePainter(action.icon.drawable)
+        val painter = rememberDrawablePainter(action.icon.large)
         Image(
             painter = painter,
             contentDescription = stringResource(id = R.string.ambient_cue_icon_content_description),

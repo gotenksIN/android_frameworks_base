@@ -176,13 +176,11 @@ public final class MediaFormat {
     public static final String MIMETYPE_VIDEO_RAW = "video/raw";
     public static final String MIMETYPE_VIDEO_DOLBY_VISION = "video/dolby-vision";
     public static final String MIMETYPE_VIDEO_SCRAMBLED = "video/scrambled";
-// QTI_BEGIN: 2024-09-12: Video: base: Define MIMETYPE_VIDEO_MVHEVC and Profile/Level handling for MVHEVC
     /**
     * MV-HEVC mimetype
     * @hide
     */
     public static final String MIMETYPE_VIDEO_MVHEVC = "video/x-mvhevc";
-// QTI_END: 2024-09-12: Video: base: Define MIMETYPE_VIDEO_MVHEVC and Profile/Level handling for MVHEVC
 
     public static final String MIMETYPE_AUDIO_AMR_NB = "audio/3gpp";
     public static final String MIMETYPE_AUDIO_AMR_WB = "audio/amr-wb";
@@ -199,6 +197,7 @@ public final class MediaFormat {
     public static final String MIMETYPE_AUDIO_AC3 = "audio/ac3";
     public static final String MIMETYPE_AUDIO_EAC3 = "audio/eac3";
     public static final String MIMETYPE_AUDIO_EAC3_JOC = "audio/eac3-joc";
+    /** MIME type for AC-4 sync frame transport format audio stream. */
     public static final String MIMETYPE_AUDIO_AC4 = "audio/ac4";
     public static final String MIMETYPE_AUDIO_SCRAMBLED = "audio/scrambled";
     /** MIME type for MPEG-H Audio single stream */
@@ -682,9 +681,17 @@ public final class MediaFormat {
      * When capture rate is different than the frame rate, it means that the
      * video is acquired at a different rate than the playback, which produces
      * slow motion or timelapse effect during playback. Application can use the
-     * value of this key to tell the relative speed ratio between capture and
-     * playback rates when the video was recorded.
+     * value of this key to set a capture rate that differs from the playback
+     * rate. If unspecified, the system uses the playback frame rate as the
+     * capture rate (e.g. normal speed).
      * </p>
+     *
+     * <p>However, Specifying capture rates that are nearly equal to the frame
+     * rate are at risk of causing frame drops and other visual artifacts in
+     * the output. To avoid such artifacts, the capture rate should be at
+     * least a factor of 2 away from the frame rate.
+     * {@code  GraphicBufferSource#calculateCodecTimestamp_l}</p>
+     *
      * <p>
      * The associated value is an integer or a float.
      * </p>

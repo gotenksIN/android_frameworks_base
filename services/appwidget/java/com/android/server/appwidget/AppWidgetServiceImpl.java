@@ -55,6 +55,7 @@ import android.app.PendingIntent;
 import android.app.StatsManager;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.app.admin.DevicePolicyManagerInternal.OnCrossProfileWidgetProvidersChangeListener;
+import android.app.job.JobScheduler;
 import android.app.usage.UsageEvents;
 import android.app.usage.UsageStatsManager;
 import android.app.usage.UsageStatsManagerInternal;
@@ -320,9 +321,6 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     private final Object mWidgetPackagesLock = new Object();
     // Set of packages that has at least one widget bounded by a host, keyed on userId.
     private final SparseArray<ArraySet<String>> mWidgetPackages = new SparseArray<>();
-    // Callback for report widget events alarm.
-    private final AlarmManager.OnAlarmListener mReportWidgetEventsAlarm =
-            () -> reportWidgetEventsToUsageStatsRepeating();
 
     private BackupRestoreController mBackupRestoreController;
 
@@ -333,6 +331,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     private UserManager mUserManager;
     private AppOpsManager mAppOpsManager;
     private KeyguardManager mKeyguardManager;
+    private JobScheduler mJobScheduler;
     private DevicePolicyManagerInternal mDevicePolicyManagerInternal;
     private PackageManagerInternal mPackageManagerInternal;
     private ActivityManagerInternal mActivityManagerInternal;
@@ -387,6 +386,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         mUserManager = (UserManager) mContext.getSystemService(Context.USER_SERVICE);
         mAppOpsManager = (AppOpsManager) mContext.getSystemService(Context.APP_OPS_SERVICE);
         mKeyguardManager = (KeyguardManager) mContext.getSystemService(KEYGUARD_SERVICE);
+        mJobScheduler = (JobScheduler) mContext.getSystemService(Context.JOB_SCHEDULER_SERVICE);
         mDevicePolicyManagerInternal = LocalServices.getService(DevicePolicyManagerInternal.class);
         mPackageManagerInternal = LocalServices.getService(PackageManagerInternal.class);
         if (removeAppWidgetServiceIoFromCriticalPath()) {
@@ -422,7 +422,6 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         mWidgetEventsReportIntervalMs = DeviceConfig.getLong(NAMESPACE_SYSTEMUI,
                 SystemUiDeviceConfigFlags.WIDGET_EVENTS_REPORT_INTERVAL_MS,
                 DEFAULT_WIDGET_EVENTS_REPORT_INTERVAL_MS);
-        updateWidgetEventsReportAlarm();
         DeviceConfig.addOnPropertiesChangedListener(NAMESPACE_SYSTEMUI,
                 new HandlerExecutor(mCallbackHandler), this::handleSystemUiDeviceConfigChange);
 
@@ -461,6 +460,9 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         mAppOpsManagerInternal = LocalServices.getService(AppOpsManagerInternal.class);
         mUsageStatsManagerInternal = LocalServices.getService(UsageStatsManagerInternal.class);
         registerPullCallbacks();
+        // Schedule may take several milliseconds due to lock contention
+        BackgroundThread.getExecutor().execute(
+                () -> ReportWidgetEventsJob.schedule(mJobScheduler, mWidgetEventsReportIntervalMs));
     }
 
     /**
@@ -5641,36 +5643,17 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 mWidgetEventsReportIntervalMs = properties.getLong(
                         SystemUiDeviceConfigFlags.WIDGET_EVENTS_REPORT_INTERVAL_MS,
                         /* defaultValue = */ mWidgetEventsReportIntervalMs);
-                updateWidgetEventsReportAlarm();
+                ReportWidgetEventsJob.schedule(mJobScheduler, mWidgetEventsReportIntervalMs);
             }
         }
     }
 
     /**
-     * Cancels the current report alarm, and sets a new alarm to be run
-     * mWidgetEventsReportIntervalMs milliseconds from now.
+     * Reports any pending widget events to UsageStatsManager.
      */
-    private void updateWidgetEventsReportAlarm() {
-        mAlarmHandler.post(() -> {
-            mAlarmManager.cancel(mReportWidgetEventsAlarm);
-
-            // If mWidgetEventsReportIntervalMs is 0 or less, do not set an alarm. The event will be
-            // reported to UsageStatsManager as soon as it is received from the widget view.
-            if (mWidgetEventsReportIntervalMs <= 0) return;
-
-            mAlarmManager.set(AlarmManager.ELAPSED_REALTIME,
-                    SystemClock.elapsedRealtime() + mWidgetEventsReportIntervalMs,
-                    "AppWidgetService_reportWidgetEvents", mReportWidgetEventsAlarm, mAlarmHandler);
-        });
-    }
-
-    /**
-     * Reports any pending widget events to UsageStatsManager, and schedules an alarm to repeat this
-     * mWidgetEventsReportIntervalMs milliseconds from now.
-     */
-    private void reportWidgetEventsToUsageStatsRepeating() {
+    private void reportWidgetEventsToUsageStats() {
         if (DEBUG) {
-            Slog.i(TAG, "reportWidgetEventsToUsageStatsRepeating");
+            Slog.i(TAG, "reportWidgetEventsToUsageStats");
         }
         synchronized (mLock) {
             final int widgetCount = mWidgets.size();
@@ -5678,10 +5661,6 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 mWidgets.get(i).reportWidgetEventIfNeededLocked(mUsageStatsManagerInternal);
             }
         }
-
-        mAlarmManager.set(AlarmManager.ELAPSED_REALTIME,
-                SystemClock.elapsedRealtime() + mWidgetEventsReportIntervalMs,
-                "AppWidgetService_reportWidgetEvents", mReportWidgetEventsAlarm, mAlarmHandler);
     }
 
     @Override
@@ -6334,7 +6313,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         IAppWidgetHost callbacks;
         boolean zombie; // if we're in safe mode, don't prune this just because nobody references it
 
-        private static final boolean DEBUG = true;
+        private static final boolean DEBUG = false;
 
         private static final String TAG = "AppWidgetServiceHost";
 
@@ -7399,6 +7378,11 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 applyResourceOverlaysToWidgetsLocked(new HashSet<>(packageNames), userId,
                         updateFrameworkRes);
             }
+        }
+
+        @Override
+        public void reportWidgetEventsToUsageStats() {
+            AppWidgetServiceImpl.this.reportWidgetEventsToUsageStats();
         }
     }
 }

@@ -80,6 +80,10 @@ public class VirtualDisplayAdapter extends DisplayAdapter {
     @VisibleForTesting
     static final String UNIQUE_ID_PREFIX = "virtual:";
 
+    // If any of these bits are set, the display is not in the default display group.
+    private static final int VIRTUAL_DISPLAY_FLAGS_NON_DEFAULT_DISPLAY_GROUP =
+            VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP | VIRTUAL_DISPLAY_FLAG_DEVICE_DISPLAY_GROUP;
+
     // Unique id suffix for virtual displays
     private static final AtomicInteger sNextUniqueIndex = new AtomicInteger(0);
 
@@ -165,16 +169,14 @@ public class VirtualDisplayAdapter extends DisplayAdapter {
             return null;
         }
 
-        if (getFeatureFlags().isVirtualDisplayLimitEnabled()
-                && mVirtualDisplayDevices.size() >= mMaxDevices) {
+        if (mVirtualDisplayDevices.size() >= mMaxDevices) {
             Slog.w(TAG, "Rejecting request to create private virtual display because "
                     + mMaxDevices + " devices already exist.");
             return null;
         }
 
         int noOfDevices = mNoOfDevicesPerPackage.get(ownerUid, /* valueIfKeyNotFound= */ 0);
-        if (getFeatureFlags().isVirtualDisplayLimitEnabled()
-                && noOfDevices >= mMaxDevicesPerPackage) {
+        if (noOfDevices >= mMaxDevicesPerPackage) {
             Slog.w(TAG, "Rejecting request to create private virtual display because "
                     + mMaxDevicesPerPackage + " devices already exist for package "
                     + ownerPackageName + ".");
@@ -202,10 +204,8 @@ public class VirtualDisplayAdapter extends DisplayAdapter {
                 projection, mediaProjectionCallback, uniqueId, virtualDisplayConfig);
 
         mVirtualDisplayDevices.put(appToken, device);
-        if (getFeatureFlags().isVirtualDisplayLimitEnabled()) {
-            mNoOfDevicesPerPackage.put(ownerUid, noOfDevices + 1);
-            mOwnerUids.put(appToken, ownerUid);
-        }
+        mNoOfDevicesPerPackage.put(ownerUid, noOfDevices + 1);
+        mOwnerUids.put(appToken, ownerUid);
 
         try {
             if (projection != null) {
@@ -309,24 +309,23 @@ public class VirtualDisplayAdapter extends DisplayAdapter {
     }
 
     private VirtualDisplayDevice removeVirtualDisplayDeviceLocked(IBinder appToken) {
-        if (getFeatureFlags().isVirtualDisplayLimitEnabled()) {
-            Integer ownerUid = mOwnerUids.remove(appToken);
-            if (ownerUid != null) {
-                int noOfDevices = mNoOfDevicesPerPackage.get(ownerUid, /* valueIfKeyNotFound= */ 0);
-                if (noOfDevices <= 1) {
-                    mNoOfDevicesPerPackage.delete(ownerUid);
-                } else {
-                    mNoOfDevicesPerPackage.put(ownerUid, noOfDevices - 1);
-                }
+        Integer ownerUid = mOwnerUids.remove(appToken);
+        if (ownerUid != null) {
+            int noOfDevices = mNoOfDevicesPerPackage.get(ownerUid, /* valueIfKeyNotFound= */ 0);
+            if (noOfDevices <= 1) {
+                mNoOfDevicesPerPackage.delete(ownerUid);
+            } else {
+                mNoOfDevicesPerPackage.put(ownerUid, noOfDevices - 1);
             }
         }
         return mVirtualDisplayDevices.remove(appToken);
     }
 
     private static boolean isNeverBlank(int flags) {
-        // Private non-mirror displays are never blank and always on.
+        // Private non-mirror displays in the default display group are never blank and always on.
         return (flags & VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR) == 0
-                && (flags & VIRTUAL_DISPLAY_FLAG_PUBLIC) == 0;
+                && (flags & VIRTUAL_DISPLAY_FLAG_PUBLIC) == 0
+                && (flags & VIRTUAL_DISPLAY_FLAGS_NON_DEFAULT_DISPLAY_GROUP) == 0;
     }
 
     private final class VirtualDisplayDevice extends DisplayDevice implements DeathRecipient {

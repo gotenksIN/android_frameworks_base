@@ -594,6 +594,46 @@ public final class DisplayManager {
     public static final int SWITCHING_TYPE_RENDER_FRAME_RATE_ONLY = 3;
 
     /**
+     * Default value for {@link ExternalDisplayConnection}.
+     * No saved connection preference, so always show a dialog to ask the user when connecting this
+     * external display.
+     * @hide
+     */
+    public static final int EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_ASK = 0;
+
+    /**
+     * Value for {@link ExternalDisplayConnection}.
+     * Automatically enable desktop mode when connecting this external display.
+     * @hide
+     */
+    public static final int EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_DESKTOP = 1;
+
+    /**
+     * Value for {@link ExternalDisplayConnection}.
+     * Automatically enable mirroring when connecting this external display.
+     * @hide
+     */
+    public static final int EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_MIRROR = 2;
+
+    /**
+     * Constants representing user options for external display connection. Each display can
+     * have a unique connection preference, so there is no settings key, instead a displays's
+     * unique id is the key, with one of the values below as the value. Default value is
+     * {@link #EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_ASK}, which shows a dialog, allowing users
+     * to then select a preference between desktop, mirroring or continually showing the dialog.
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = { "EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_" }, value = {
+            EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_ASK,
+            EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_DESKTOP,
+            EXTERNAL_DISPLAY_CONNECTION_PREFERENCE_MIRROR,
+    })
+    public @interface ExternalDisplayConnection {
+    }
+
+    /**
      * @hide
      */
     @LongDef(flag = true, prefix = {"EVENT_TYPE_"}, value = {
@@ -722,13 +762,22 @@ public final class DisplayManager {
      * maximum respectively.
      */
     @FlaggedApi(Flags.FLAG_SET_BRIGHTNESS_BY_UNIT)
-    public static final int BRIGHTNESS_UNIT_PERCENTAGE = 0;
+    public static final int BRIGHTNESS_UNIT_PERCENTAGE = 1;
+
+    /**
+     * Brightness value type where the value is in nits. The nits range is defined by
+     * screenBrightnessMap in DisplayDeviceConfig. Adjustments such as Reduce Bright Colors might be
+     * applied to the nits value.
+     * @hide
+     */
+    public static final int BRIGHTNESS_UNIT_NITS = 2;
 
     /**
      * @hide
      */
     @IntDef(prefix = { "BRIGHTNESS_UNIT_" }, value = {
-            BRIGHTNESS_UNIT_PERCENTAGE
+            BRIGHTNESS_UNIT_PERCENTAGE,
+            BRIGHTNESS_UNIT_NITS
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface BrightnessUnit {}
@@ -737,11 +786,11 @@ public final class DisplayManager {
      * @hide
      */
     public static String brightnessUnitToString(@BrightnessUnit int unit) {
-        if (Flags.setBrightnessByUnit() && unit == BRIGHTNESS_UNIT_PERCENTAGE) {
-            return "percentage";
-        } else {
-            throw new IllegalStateException("Unexpected value: " + unit);
-        }
+        return switch (unit) {
+            case BRIGHTNESS_UNIT_PERCENTAGE -> "percentage";
+            case BRIGHTNESS_UNIT_NITS -> "nits";
+            default -> throw new IllegalStateException("Unexpected value: " + unit);
+        };
     }
 
     /** @hide */
@@ -1634,7 +1683,7 @@ public final class DisplayManager {
     }
 
     /**
-     * Returns the minimum brightness curve, which guarantess that any brightness curve that dips
+     * Returns the minimum brightness curve, which guarantees that any brightness curve that dips
      * below it is rejected by the system.
      * This prevent auto-brightness from setting the screen so dark as to prevent the user from
      * resetting or disabling it, and maps lux to the absolute minimum nits that are still readable
@@ -1647,6 +1696,31 @@ public final class DisplayManager {
     @SystemApi
     public Pair<float[], float[]> getMinimumBrightnessCurve() {
         return mGlobal.getMinimumBrightnessCurve();
+    }
+
+    /**
+     * Sets the persistent connection preference for a given display.
+     *
+     * @param uniqueId The unique ID of the display.
+     * @param connectionPreference The integer preference value to save.
+     *
+     * @hide
+     */
+    @RequiresPermission(MANAGE_DISPLAYS)
+    public void setExternalDisplayConnectionPreference(String uniqueId, int connectionPreference) {
+        mGlobal.setExternalDisplayConnectionPreference(uniqueId, connectionPreference);
+    }
+
+    /**
+     * Gets the persistent connection preference for a given display.
+     *
+     * @param uniqueId The unique ID of the display.
+     * @return The saved integer preference value.
+     *
+     * @hide
+     */
+    public int getExternalDisplayConnectionPreference(String uniqueId) {
+        return mGlobal.getExternalDisplayConnectionPreference(uniqueId);
     }
 
     /**
@@ -2158,7 +2232,7 @@ public final class DisplayManager {
                 "fixed_refresh_rate_high_ambient_brightness_thresholds";
 
         /**
-         * Key for refresh rate when the device is in high brightness mode for sunlight visility.
+         * Key for refresh rate when the device is in high brightness mode for sunlight visibility.
          *
          * @see android.provider.DeviceConfig#NAMESPACE_DISPLAY_MANAGER
          * @see android.R.integer#config_defaultRefreshRateInHbmSunlight

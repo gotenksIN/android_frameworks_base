@@ -76,6 +76,7 @@ import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
+import android.widget.Toast;
 
 import com.android.internal.R;
 import com.android.internal.accessibility.AccessibilityShortcutController;
@@ -86,6 +87,7 @@ import com.android.internal.policy.KeyInterceptionInfo;
 import com.android.internal.util.ScreenshotHelper;
 import com.android.internal.util.ScreenshotRequest;
 import com.android.server.LocalServices;
+import com.android.server.UiThread;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
@@ -127,6 +129,7 @@ final class KeyGestureController {
     private static final int MSG_LOAD_CUSTOM_GESTURES = 3;
     private static final int MSG_ACCESSIBILITY_SHORTCUT = 4;
     private static final int MSG_SCREENSHOT_SHORTCUT = 5;
+    private static final int MSG_EXIT_FOCUSED_APP = 6;
 
     // must match: config_settingsKeyBehavior in config.xml
     private static final int SETTINGS_KEY_BEHAVIOR_SETTINGS_ACTIVITY = 0;
@@ -147,6 +150,9 @@ final class KeyGestureController {
     // Screenshot trigger states
     // Increase the chord delay when taking a screenshot from the keyguard
     private static final float KEYGUARD_SCREENSHOT_CHORD_DELAY_MULTIPLIER = 2.5f;
+
+    // Duration to long press escape to exit application when app is capturing keyboard keys
+    private static final long LONG_PRESS_DURATION_FOR_EXIT_APP_MS = 1000;
 
     @LongDef(prefix = {"KEY_INTERCEPT_RESULT_"}, value = {
             KEY_INTERCEPT_RESULT_NOT_CONSUMED_GO_FALLBACK,
@@ -563,6 +569,12 @@ final class KeyGestureController {
         return false;
     }
 
+    // Need to handle multi-key combinations before providing keys to A11y services like
+    // talkback, etc.
+    public long interceptKeyCombinationBeforeAccessibility(@NonNull KeyEvent event) {
+        return interceptMultiKeyCombination(event);
+    }
+
     // Shortcut handling stages:
     // 1. Before key capture
     //     - All Meta key shortcuts with "allowCaptureByFocusedWindow" set to false
@@ -593,17 +605,9 @@ final class KeyGestureController {
         }
 
         // Multi-key shortcuts should never be blocked by any focused window configuration
-        if (mKeyCombinationManager.isKeyConsumed(event)) {
-            return KEY_INTERCEPT_RESULT_CONSUMED;
-        }
-
-        if ((event.getFlags() & KeyEvent.FLAG_FALLBACK) == 0) {
-            final long now = SystemClock.uptimeMillis();
-            final long interceptTimeout = mKeyCombinationManager.getKeyInterceptTimeout(
-                    event.getKeyCode());
-            if (now < interceptTimeout) {
-                return interceptTimeout - now;
-            }
+        long result = interceptMultiKeyCombination(event);
+        if (result != KEY_INTERCEPT_RESULT_NOT_CONSUMED) {
+            return result;
         }
 
         // TODO(b/358569822) Remove below once we have nicer API for listening to shortcuts
@@ -640,6 +644,22 @@ final class KeyGestureController {
                 }
             }
             return KEY_INTERCEPT_RESULT_CONSUMED;
+        }
+        return KEY_INTERCEPT_RESULT_NOT_CONSUMED;
+    }
+
+    private long interceptMultiKeyCombination(@NonNull KeyEvent event) {
+        if (mKeyCombinationManager.isKeyConsumed(event)) {
+            return KEY_INTERCEPT_RESULT_CONSUMED;
+        }
+
+        if ((event.getFlags() & KeyEvent.FLAG_FALLBACK) == 0) {
+            final long now = SystemClock.uptimeMillis();
+            final long interceptTimeout = mKeyCombinationManager.getKeyInterceptTimeout(
+                    event.getKeyCode());
+            if (now < interceptTimeout) {
+                return interceptTimeout - now;
+            }
         }
         return KEY_INTERCEPT_RESULT_NOT_CONSUMED;
     }
@@ -804,6 +824,28 @@ final class KeyGestureController {
                     }
                 }
                 return true;
+            case KeyEvent.KEYCODE_ESCAPE:
+                // TODO(b/358569822): Currently implemented long press using handler and delayed
+                //  message here, instead of using SingleKeyGestureDetector because that detection
+                //  logic doesn't have access to focused token. Refactor this so that we don't
+                //  have this custom logic to detect long press.
+                if (firstDown && canFocusedWindowCaptureKeys(focusedToken)) {
+                    // Toast to quit application is shown on key down for ESCAPE key, when the
+                    // focused window is capturing keys.
+                    Toast.makeText(mContext, UiThread.get().getLooper(),
+                            mContext.getString(R.string.exit_toast_on_long_press_escape),
+                            Toast.LENGTH_SHORT).show();
+                    AidlKeyGestureEvent eventToSend = createKeyGestureEvent(event.getDeviceId(),
+                            new int[]{KeyEvent.KEYCODE_ESCAPE},
+                            metaState, KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK,
+                            KeyGestureEvent.ACTION_GESTURE_COMPLETE,
+                            displayId, /* flags= */0, /* appLaunchData= */ null);
+                    Message msg = Message.obtain(mHandler, MSG_EXIT_FOCUSED_APP, eventToSend);
+                    mHandler.sendMessageDelayed(msg, LONG_PRESS_DURATION_FOR_EXIT_APP_MS);
+                } else if (!down) {
+                    mHandler.removeMessages(MSG_EXIT_FOCUSED_APP);
+                }
+                break;
             case KeyEvent.KEYCODE_ASSIST:
                 Slog.wtf(TAG, "KEYCODE_ASSIST should be handled in interceptKeyBeforeQueueing");
                 return true;
@@ -1272,7 +1314,9 @@ final class KeyGestureController {
             case MSG_SCREENSHOT_SHORTCUT:
                 takeScreenshot(msg.arg1, msg.arg2);
                 break;
-
+            case MSG_EXIT_FOCUSED_APP:
+                handleKeyGesture((AidlKeyGestureEvent) msg.obj, /* focusedToken= */null);
+                break;
         }
         return true;
     }

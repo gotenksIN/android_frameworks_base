@@ -31,6 +31,7 @@ import android.util.Log
 import android.view.RemoteAnimationAdapter
 import android.view.View
 import android.view.WindowManager
+import android.window.RemoteTransition
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.systemui.ActivityIntentHelper
 import com.android.systemui.animation.ActivityTransitionAnimator
@@ -40,9 +41,11 @@ import com.android.systemui.camera.CameraIntents
 import com.android.systemui.communal.domain.interactor.CommunalSceneInteractor
 import com.android.systemui.communal.domain.interactor.CommunalSettingsInteractor
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.KeyguardViewMediator
 import com.android.systemui.keyguard.WakefulnessLifecycle
+import com.android.systemui.plugins.ActivityStartOptions
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.res.R
 import com.android.systemui.settings.UserTracker
@@ -91,6 +94,7 @@ constructor(
     private val userTracker: UserTracker,
     private val activityIntentHelper: ActivityIntentHelper,
     @Main private val mainExecutor: DelayableExecutor,
+    @Application private val applicationScope: CoroutineScope,
     private val communalSceneInteractor: CommunalSceneInteractor,
     private val communalSettingsInteractor: CommunalSettingsInteractor,
 ) : ActivityStarterInternal {
@@ -132,13 +136,14 @@ constructor(
                 }
             }
 
-        activityTransitionAnimator.register(cookie, factory, scope)
+        activityTransitionAnimator.registerLongLivedTransitions(cookie, factory, scope)
     }
 
     override fun unregisterTransition(cookie: ActivityTransitionAnimator.TransitionCookie) {
-        activityTransitionAnimator.unregister(cookie)
+        activityTransitionAnimator.unregisterLongLivedTransitions(cookie)
     }
 
+    @Deprecated("Use startActivityDismissingKeyguard(options: ActivityStartOptions) instead")
     override fun startActivityDismissingKeyguard(
         intent: Intent,
         dismissShade: Boolean,
@@ -149,10 +154,29 @@ constructor(
         customMessage: String?,
         disallowEnterPictureInPictureWhileLaunching: Boolean,
         userHandle: UserHandle?,
+        activityOptions: ActivityOptions?,
     ) {
-        val userHandle: UserHandle = userHandle ?: getActivityUserHandle(intent)
+        startActivityDismissingKeyguard(
+            ActivityStartOptions(
+                intent = intent,
+                dismissShade = dismissShade,
+                onlyProvisioned = onlyProvisioned,
+                callback = callback,
+                flags = flags,
+                animationController = animationController,
+                customMessage = customMessage,
+                disallowPipWhileLaunching = disallowEnterPictureInPictureWhileLaunching,
+                userHandle = userHandle,
+                activityOptions = activityOptions,
+            )
+        )
+    }
 
-        if (onlyProvisioned && !deviceProvisionedController.isDeviceProvisioned) return
+    override fun startActivityDismissingKeyguard(options: ActivityStartOptions) {
+        val intent = options.intent
+        val userHandle: UserHandle = options.userHandle ?: getActivityUserHandle(intent)
+
+        if (options.onlyProvisioned && !deviceProvisionedController.isDeviceProvisioned) return
 
         val willLaunchResolverActivity: Boolean =
             activityIntentHelper.wouldLaunchResolverActivity(
@@ -161,19 +185,19 @@ constructor(
             )
 
         val animate =
-            animationController != null &&
+            options.animationController != null &&
                 !willLaunchResolverActivity &&
                 shouldAnimateLaunch(isActivityIntent = true)
         val animController =
             wrapAnimationControllerForShadeOrStatusBar(
-                animationController = animationController,
-                dismissShade = dismissShade,
+                animationController = options.animationController,
+                dismissShade = options.dismissShade,
                 isLaunchForActivity = true,
             )
 
         // If we animate, we will dismiss the shade only once the animation is done. This is
         // taken care of by the StatusBarLaunchAnimationController.
-        val dismissShadeDirectly = dismissShade && animController == null
+        val dismissShadeDirectly = options.dismissShade && animController == null
 
         val runnable = Runnable {
             assistManagerLazy.get().hideAssist()
@@ -183,23 +207,22 @@ constructor(
                 } else {
                     Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 }
-            intent.addFlags(flags)
+            intent.addFlags(options.flags)
             val result = intArrayOf(ActivityManager.START_CANCELED)
-            activityTransitionAnimator.startIntentWithAnimation(
-                animController,
-                animate,
-                intent.getPackage(),
-            ) { adapter: RemoteAnimationAdapter? ->
-                val options =
-                    ActivityOptions(CentralSurfaces.getActivityOptions(displayId, adapter))
+
+            val startIntent = { optionsBundle: Bundle ->
+                val activityOptions = ActivityOptions(optionsBundle)
+                if (options.activityOptions != null) {
+                    activityOptions.update(options.activityOptions)
+                }
 
                 // We know that the intent of the caller is to dismiss the keyguard and
                 // this runnable is called right after the keyguard is solved, so we tell
                 // WM that we should dismiss it to avoid flickers when opening an activity
                 // that can also be shown over the keyguard.
-                options.setDismissKeyguardIfInsecure()
-                options.setDisallowEnterPictureInPictureWhileLaunching(
-                    disallowEnterPictureInPictureWhileLaunching
+                activityOptions.setDismissKeyguardIfInsecure()
+                activityOptions.setDisallowEnterPictureInPictureWhileLaunching(
+                    options.disallowPipWhileLaunching
                 )
                 if (CameraIntents.isInsecureCameraIntent(intent)) {
                     // Normally an activity will set it's requested rotation
@@ -210,7 +233,7 @@ constructor(
                     // with physical reality). So, we ask the WindowManager to
                     // force the cross fade animation if an orientation change
                     // happens to occur during the launch.
-                    options.rotationAnimationHint =
+                    activityOptions.rotationAnimationHint =
                         WindowManager.LayoutParams.ROTATION_ANIMATION_SEAMLESS
                 }
                 if (Settings.Panel.ACTION_VOLUME == intent.action) {
@@ -219,7 +242,7 @@ constructor(
                     // as a result.
                     // So we need to disable picture-in-picture mode here
                     // if it is volume panel.
-                    options.setDisallowEnterPictureInPictureWhileLaunching(true)
+                    activityOptions.setDisallowEnterPictureInPictureWhileLaunching(true)
                 }
                 intent.collectExtraIntentKeys()
                 try {
@@ -236,7 +259,7 @@ constructor(
                                 0,
                                 Intent.FLAG_ACTIVITY_NEW_TASK,
                                 null,
-                                options.toBundle(),
+                                activityOptions.toBundle(),
                                 userHandle.identifier,
                             )
                 } catch (e: RemoteException) {
@@ -244,10 +267,36 @@ constructor(
                 }
                 result[0]
             }
-            callback?.onActivityStarted(result[0])
+
+            if (ActivityTransitionAnimator.shellMigrationEnabled()) {
+                val controllerWithCookie = addCookieIfNeeded(animController)
+                activityTransitionAnimator.startIntentWithAnimation(
+                    controllerWithCookie,
+                    applicationScope,
+                    animate = animate,
+                ) { transition: RemoteTransition? ->
+                    startIntent(
+                        createActivityOptions(
+                            displayId,
+                            transition,
+                            controllerWithCookie?.transitionCookie,
+                        )
+                    )
+                }
+            } else {
+                activityTransitionAnimator.startIntentWithAnimation(
+                    animController,
+                    animate,
+                    intent.getPackage(),
+                ) { adapter: RemoteAnimationAdapter? ->
+                    startIntent(CentralSurfaces.getActivityOptions(displayId, adapter))
+                }
+            }
+
+            options.callback?.onActivityStarted(result[0])
         }
         val cancelRunnable = Runnable {
-            callback?.onActivityStarted(ActivityManager.START_CANCELED)
+            options.callback?.onActivityStarted(ActivityManager.START_CANCELED)
         }
         // Do not deferKeyguard when occluded because, when keyguard is occluded, we do not launch
         // the activity until keyguard is done. The only exception is when we're on the Hub and want
@@ -266,7 +315,7 @@ constructor(
             willLaunchResolverActivity,
             deferred,
             animate,
-            customMessage,
+            options.customMessage,
         )
     }
 
@@ -330,39 +379,66 @@ constructor(
         // collapsing the shade and hiding the keyguard once it is done.
         val collapse = (dismissShade || isCommunalDismissLaunch) && !animate
         val runnable = Runnable {
-            try {
-                activityTransitionAnimator.startPendingIntentWithAnimation(
-                    controller,
-                    animate,
-                    intent.creatorPackage,
-                    actuallyShowOverLockscreen,
-                    object : ActivityTransitionAnimator.LegacyPendingIntentStarter {
-                        override fun startPendingIntent(
-                            animationAdapter: RemoteAnimationAdapter?
-                        ): Int {
-                            val options =
-                                ActivityOptions(
-                                    CentralSurfaces.getActivityOptions(displayId, animationAdapter)
-                                        .apply { extraOptions?.let { putAll(it) } }
-                                )
-                            // TODO b/221255671: restrict this to only be set for
-                            // notifications
-                            options.isEligibleForLegacyPermissionPrompt = true
-                            options.setPendingIntentBackgroundActivityStartMode(
-                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-                            )
-                            return intent.sendAndReturnResult(
-                                context,
-                                0,
-                                fillInIntent,
-                                null,
-                                null,
-                                null,
-                                options.toBundle(),
-                            )
-                        }
-                    },
+            val startIntent = { optionsBundle: Bundle ->
+                extraOptions?.let { optionsBundle.putAll(it) }
+                val options = ActivityOptions(optionsBundle)
+                // TODO b/221255671: restrict this to only be set for notifications
+                options.isEligibleForLegacyPermissionPrompt = true
+                options.setPendingIntentBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
                 )
+
+                intent.sendAndReturnResult(
+                    context,
+                    0,
+                    fillInIntent,
+                    null,
+                    null,
+                    null,
+                    options.toBundle(),
+                )
+            }
+
+            try {
+                if (ActivityTransitionAnimator.shellMigrationEnabled()) {
+                    val controllerWithCookie = addCookieIfNeeded(controller)
+                    activityTransitionAnimator.startPendingIntentWithAnimation(
+                        controller,
+                        applicationScope,
+                        animate = animate,
+                        showOverLockscreen = actuallyShowOverLockscreen,
+                        intentStarter =
+                            object : ActivityTransitionAnimator.PendingIntentStarter {
+                                override fun startPendingIntent(
+                                    transition: RemoteTransition?
+                                ): Int {
+                                    return startIntent(
+                                        createActivityOptions(
+                                            displayId,
+                                            transition,
+                                            controllerWithCookie?.transitionCookie,
+                                        )
+                                    )
+                                }
+                            },
+                    )
+                } else {
+                    activityTransitionAnimator.startPendingIntentWithAnimation(
+                        controller,
+                        animate,
+                        intent.creatorPackage,
+                        actuallyShowOverLockscreen,
+                        object : ActivityTransitionAnimator.LegacyPendingIntentStarter {
+                            override fun startPendingIntent(
+                                animationAdapter: RemoteAnimationAdapter?
+                            ): Int {
+                                return startIntent(
+                                    CentralSurfaces.getActivityOptions(displayId, animationAdapter)
+                                )
+                            }
+                        },
+                    )
+                }
             } catch (e: PendingIntent.CanceledException) {
                 // the stack trace isn't very helpful here.
                 // Just log the exception message.
@@ -446,15 +522,39 @@ constructor(
             centralSurfaces?.awakenDreams()
         }
 
-        activityTransitionAnimator.startIntentWithAnimation(
-            controller,
-            animate,
-            intent.getPackage(),
-            showOverLockscreenWhenLocked,
-        ) { adapter: RemoteAnimationAdapter? ->
-            TaskStackBuilder.create(context)
-                .addNextIntent(intent)
-                .startActivities(CentralSurfaces.getActivityOptions(displayId, adapter), userHandle)
+        if (ActivityTransitionAnimator.shellMigrationEnabled()) {
+            val controllerWithCookie = addCookieIfNeeded(controller)
+            activityTransitionAnimator.startIntentWithAnimation(
+                controllerWithCookie,
+                applicationScope,
+                animate = animate,
+                showOverLockscreen = showOverLockscreenWhenLocked,
+            ) { transition: RemoteTransition? ->
+                TaskStackBuilder.create(context)
+                    .addNextIntent(intent)
+                    .startActivities(
+                        createActivityOptions(
+                            displayId,
+                            transition,
+                            controllerWithCookie?.transitionCookie,
+                        ),
+                        userHandle,
+                    )
+            }
+        } else {
+            activityTransitionAnimator.startIntentWithAnimation(
+                controller,
+                animate,
+                intent.getPackage(),
+                showOverLockscreenWhenLocked,
+            ) { adapter: RemoteAnimationAdapter? ->
+                TaskStackBuilder.create(context)
+                    .addNextIntent(intent)
+                    .startActivities(
+                        CentralSurfaces.getActivityOptions(displayId, adapter),
+                        userHandle,
+                    )
+            }
         }
     }
 

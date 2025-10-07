@@ -19,10 +19,13 @@ package android.media;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_AUDIO;
 import static android.content.Context.DEVICE_ID_DEFAULT;
+import static android.media.audio.Flags.FLAG_ASSISTANT_VOLUME_CONTROL;
+import static android.media.audio.Flags.FLAG_AUDIO_FOCUS_DESKTOP;
 import static android.media.audio.Flags.FLAG_DEPRECATE_STREAM_BT_SCO;
 import static android.media.audio.Flags.FLAG_FOCUS_EXCLUSIVE_WITH_RECORDING;
 import static android.media.audio.Flags.FLAG_FOCUS_FREEZE_TEST_API;
 import static android.media.audio.Flags.FLAG_REGISTER_VOLUME_CALLBACK_API_HARDENING;
+import static android.media.audio.Flags.FLAG_SCO_MANAGED_BY_AUDIO;
 import static android.media.audio.Flags.FLAG_SUPPORTED_DEVICE_TYPES_API;
 import static android.media.audio.Flags.FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT;
 import static android.media.audio.Flags.autoPublicVolumeApiHardening;
@@ -1420,6 +1423,21 @@ public class AudioManager {
     @Retention(RetentionPolicy.SOURCE)
     public @interface PublicStreamTypes {}
 
+    /** @hide */
+    @IntDef(flag = false, prefix = "STREAM", value = {
+            STREAM_VOICE_CALL,
+            STREAM_SYSTEM,
+            STREAM_RING,
+            STREAM_MUSIC,
+            STREAM_ALARM,
+            STREAM_NOTIFICATION,
+            STREAM_DTMF,
+            STREAM_ACCESSIBILITY,
+            STREAM_ASSISTANT }
+    )
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface VolumeControlStreamTypes {}
+
     /**
      * Returns the volume in dB (decibel) for the given stream type at the given volume index, on
      * the given type of audio output device.
@@ -1469,6 +1487,30 @@ public class AudioManager {
             case STREAM_NOTIFICATION:
             case STREAM_DTMF:
             case STREAM_ACCESSIBILITY:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @hide
+     * Checks whether a stream type can be used to control the volume (e.g.: as part of a
+     * {@link VolumeInfo}.
+     * @param streamType
+     * @return true if the stream type can be used to control the volume
+     */
+    public static boolean isVolumeControlStreamType(int streamType) {
+        switch (streamType) {
+            case STREAM_VOICE_CALL:
+            case STREAM_SYSTEM:
+            case STREAM_RING:
+            case STREAM_MUSIC:
+            case STREAM_ALARM:
+            case STREAM_NOTIFICATION:
+            case STREAM_DTMF:
+            case STREAM_ACCESSIBILITY:
+            case STREAM_ASSISTANT:
                 return true;
             default:
                 return false;
@@ -2077,10 +2119,8 @@ public class AudioManager {
      */
     @Deprecated public void setSpeakerphoneOn(boolean on) {
         final IAudioService service = getService();
-// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In setSpeakerphoneOn(), on: " + on + ", calling application: "
                     + mApplicationContext.getOpPackageName());
-// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.setSpeakerphoneOn(mICallBack, on, getAttributionSource());
         } catch (RemoteException e) {
@@ -2101,10 +2141,8 @@ public class AudioManager {
      * @deprecated Use {@link AudioManager#getCommunicationDevice()} instead.
      */
     @Deprecated public boolean isSpeakerphoneOn() {
-// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In isSpeakerphoneOn(), calling application: "
                     + mApplicationContext.getOpPackageName());
-// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         final IAudioService service = getService();
         try {
             return service.isSpeakerphoneOn();
@@ -3209,14 +3247,12 @@ public class AudioManager {
      * @see #startBluetoothSco()
     */
     public boolean isBluetoothScoAvailableOffCall() {
-// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         boolean retval;
         retval = getContext().getResources().getBoolean(
                   com.android.internal.R.bool.config_bluetooth_sco_off_call);
         Log.i(TAG, "In isBluetoothScoAvailableOffCall(), calling appilication: " +
               mApplicationContext.getOpPackageName()+", return value: " + retval);
         return retval;
-// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
     }
 
     /**
@@ -3267,10 +3303,8 @@ public class AudioManager {
      */
     @Deprecated public void startBluetoothSco() {
         final IAudioService service = getService();
-// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In startbluetoothSco(), calling application: "
                      + mApplicationContext.getOpPackageName());
-// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.startBluetoothSco(mICallBack,
                     getContext().getApplicationInfo().targetSdkVersion,
@@ -3297,10 +3331,8 @@ public class AudioManager {
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public void startBluetoothScoVirtualCall() {
-// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In startBluetoothScoVirtualCall(), calling application: "
                     + mApplicationContext.getOpPackageName());
-// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         final IAudioService service = getService();
         try {
             service.startBluetoothScoVirtualCall(mICallBack, getAttributionSource());
@@ -3322,10 +3354,8 @@ public class AudioManager {
     // Also used for connections started with {@link #startBluetoothScoVirtualCall()}
     @Deprecated public void stopBluetoothSco() {
         final IAudioService service = getService();
-// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In stopBluetoothSco(), calling application: "
                     + mApplicationContext.getOpPackageName());
-// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.stopBluetoothSco(mICallBack,  getAttributionSource());
         } catch (RemoteException e) {
@@ -3344,10 +3374,8 @@ public class AudioManager {
      */
     public void setBluetoothScoOn(boolean on){
         final IAudioService service = getService();
-// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In setBluetoothScoOn(), on: " + on + ", calling application: "
                     + mApplicationContext.getOpPackageName());
-// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.setBluetoothScoOn(on);
         } catch (RemoteException e) {
@@ -3364,10 +3392,8 @@ public class AudioManager {
      */
     @Deprecated public boolean isBluetoothScoOn() {
         final IAudioService service = getService();
-// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In isBluetoothScoOn(), calling application: "
                     + mApplicationContext.getOpPackageName());
-// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             return service.isBluetoothScoOn();
         } catch (RemoteException e) {
@@ -3520,14 +3546,16 @@ public class AudioManager {
     /**
      * Sets the audio mode.
      * <p>
-     * The audio mode encompasses audio routing AND the behavior of
+     * The audio mode encompasses audio routing, volume management AND the behavior of
      * the telephony layer. Therefore this method should only be used by applications that
      * replace the platform-wide management of audio settings or the main telephony application.
      * In particular, the {@link #MODE_IN_CALL} mode should only be used by the telephony
      * application when it places a phone call, as it will cause signals from the radio layer
-     * to feed the platform mixer.
+     * to feed the platform mixer. The {@link #MODE_ASSISTANT_CONVERSATION} should only be used
+     * by applications that introduce an interactive assistant communication which would
+     * prioritize the audio management around streams with {@link AudioAttributes#USAGE_ASSISTANT}.
      *
-     * @param mode  the requested audio mode.
+     * @param mode  the requested audio mode. (see {@link AudioManager.AudioMode})
      *              Informs the HAL about the current audio state so that
      *              it can route the audio appropriately.
      */
@@ -3711,6 +3739,12 @@ public class AudioManager {
      */
     public static final int MODE_COMMUNICATION_REDIRECT = AudioSystem.MODE_COMMUNICATION_REDIRECT;
 
+    /**
+     * Use this mode whenever an assistant conversation mode is started.
+     */
+    @FlaggedApi(FLAG_ASSISTANT_VOLUME_CONTROL)
+    public static final int MODE_ASSISTANT_CONVERSATION = AudioSystem.MODE_ASSISTANT_CONVERSATION;
+
     /** @hide */
     @IntDef(flag = false, prefix = "MODE_", value = {
             MODE_NORMAL,
@@ -3719,7 +3753,8 @@ public class AudioManager {
             MODE_IN_COMMUNICATION,
             MODE_CALL_SCREENING,
             MODE_CALL_REDIRECT,
-            MODE_COMMUNICATION_REDIRECT}
+            MODE_COMMUNICATION_REDIRECT,
+            MODE_ASSISTANT_CONVERSATION}
     )
     @Retention(RetentionPolicy.SOURCE)
     public @interface AudioMode {}
@@ -5002,6 +5037,20 @@ public class AudioManager {
 
     /**
      * @hide
+     * Returns whether a client is currently holding audio focus.
+     * @param pckgName the name of the package of the client
+     */
+    @RequiresPermission("android.permission.QUERY_AUDIO_STATE")
+    public boolean hasAudioFocus(@NonNull String pckgName) {
+        try {
+            return getService().hasAudioFocus(pckgName);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
      * Return the duration of the fade out applied when a player of the given AudioAttributes
      * is losing audio focus
      * @param aa the AudioAttributes of the player losing focus with {@link #AUDIOFOCUS_LOSS}
@@ -5788,13 +5837,8 @@ public class AudioManager {
      * @return All currently registered audio policy mixes.
      */
     @TestApi
-    @FlaggedApi(android.media.audiopolicy.Flags.FLAG_AUDIO_MIX_TEST_API)
     @NonNull
     public List<android.media.audiopolicy.AudioMix> getRegisteredPolicyMixes() {
-        if (!android.media.audiopolicy.Flags.audioMixTestApi()) {
-            return Collections.emptyList();
-        }
-
         final IAudioService service = getService();
         try {
             return service.getRegisteredPolicyMixes();
@@ -9195,13 +9239,30 @@ public class AudioManager {
         }
     }
 
-
-    /** @hide
-     * TODO: make this a @SystemApi */
+    /**
+     * @hide
+     * Configures whether multi-audio focus is enabled or not.
+     * @param enabled whether multi-audio focus is enabled or not.
+     */
     @RequiresPermission(Manifest.permission.MODIFY_AUDIO_ROUTING)
     public void setMultiAudioFocusEnabled(boolean enabled) {
         try {
             getService().setMultiAudioFocusEnabled(enabled);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
+     * Queries whether multi-audio focus is enabled or not.
+     * @return true if multi-audio focus is enabled, false otherwise
+     */
+    @FlaggedApi(FLAG_AUDIO_FOCUS_DESKTOP)
+    @TestApi
+    public boolean isMultiAudioFocusEnabled() {
+        try {
+            return getService().isMultiAudioFocusEnabled();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -9778,6 +9839,24 @@ public class AudioManager {
             }
         }
     }
+
+
+    /**
+     * @hide
+     * Queries if Bluetooth SCO audio connection is controlled by the audio framework based on the
+     * feature flag (until removed) and system property states.
+     * @return true if SCO audio is managed by the audio framework, false otherwise.
+     */
+    @SystemApi
+    @FlaggedApi(FLAG_SCO_MANAGED_BY_AUDIO)
+    public boolean isScoManagedByAudio() {
+        try {
+            return getService().isScoManagedByAudio();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
 
     //---------------------------------------------------------
     // audio device connection-dependent muting
@@ -10436,6 +10515,22 @@ public class AudioManager {
         final IAudioService service = getService();
         try {
             service.permissionUpdateBarrier();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
+     * Blocks until all messages on the AudioService handler have been processed.
+     * Only useful in tests.
+     */
+    @TestApi
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
+    public void waitForAudioHandlerBarrier() {
+        final IAudioService service = getService();
+        try {
+            service.waitForAudioHandlerBarrier();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

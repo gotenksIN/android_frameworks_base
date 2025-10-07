@@ -17,6 +17,7 @@
 package android.app;
 
 import static android.Manifest.permission.POST_NOTIFICATIONS;
+import static android.annotation.SystemApi.Client.MODULE_LIBRARIES;
 import static android.app.NotificationChannel.DEFAULT_CHANNEL_ID;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.service.notification.Flags.notificationClassification;
@@ -463,7 +464,7 @@ public class NotificationManager {
      * @hide
      */
     @SdkConstant(SdkConstant.SdkConstantType.BROADCAST_INTENT_ACTION)
-    @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
+    @SystemApi(client = MODULE_LIBRARIES)
     public static final String ACTION_NOTIFICATION_LISTENER_ENABLED_CHANGED =
             "android.app.action.NOTIFICATION_LISTENER_ENABLED_CHANGED";
 
@@ -684,10 +685,8 @@ public class NotificationManager {
 
     private final InstantSource mClock;
     private final RateLimiter mUpdateRateLimiter = new RateLimiter("notify (update)",
-            "notifications.value_client_throttled_notify_update",
             MAX_NOTIFICATION_UPDATE_RATE);
     private final RateLimiter mUnnecessaryCancelRateLimiter = new RateLimiter("cancel (dupe)",
-            "notifications.value_client_throttled_cancel_duplicate",
             MAX_NOTIFICATION_UNNECESSARY_CANCEL_RATE);
     // KnownStatus is KNOWN_STATUS_ENQUEUED/_CANCELLED
     private record KnownNotification(int knownStatus, OptionalInt progressState) {}
@@ -892,16 +891,14 @@ public class NotificationManager {
         private final RateEstimator mInputRateEstimator;
         private final RateEstimator mOutputRateEstimator;
         private final String mName;
-        private final String mCounterName;
         private final float mLimitRate;
 
         private Instant mLogSilencedUntil;
 
-        private RateLimiter(String name, String counterName, float limitRate) {
+        private RateLimiter(String name, float limitRate) {
             mInputRateEstimator = new RateEstimator();
             mOutputRateEstimator = new RateEstimator();
             mName = name;
-            mCounterName = counterName;
             mLimitRate = limitRate;
         }
 
@@ -919,14 +916,6 @@ public class NotificationManager {
             Instant now = mClock.instant();
             if (mLogSilencedUntil != null && now.isBefore(mLogSilencedUntil)) {
                 return;
-            }
-
-            if (Flags.nmBinderPerfLogNmThrottling()) {
-                try {
-                    service().incrementCounter(mCounterName);
-                } catch (RemoteException e) {
-                    Slog.w(TAG, "Ignoring error while trying to log " + mCounterName, e);
-                }
             }
 
             long nowMillis = now.toEpochMilli();
@@ -2364,7 +2353,10 @@ public class NotificationManager {
     }
 
     /** @hide */
-    public void setNotificationPolicyAccessGranted(String pkg, boolean granted) {
+    @FlaggedApi(android.companion.Flags.FLAG_ENABLE_MEDICAL_PROFILE)
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.MANAGE_NOTIFICATIONS)
+    public void setNotificationPolicyAccessGranted(@NonNull String pkg, boolean granted) {
         INotificationManager service = service();
         try {
             service.setNotificationPolicyAccessGranted(pkg, granted);

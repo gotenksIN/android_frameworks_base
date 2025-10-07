@@ -652,7 +652,6 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
 
     void assignRootTaskOrdering(SurfaceControl.Transaction t) {
         if (!mTransitionController.mBuildingTransitionLayers
-                && com.android.window.flags.Flags.updateRootTaskLayerOnlyWithTransition()
                 && mTransitionController.isShellTransitionsEnabled()) {
             // All root tasks can be organized, so handle them centrally by shell transitions.
             return;
@@ -806,7 +805,11 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
             final Task launchParentTask = getLaunchRootTask(resolvedWindowingMode, activityType,
                     options, sourceTask, launchFlags, candidateTask);
             final boolean reparentToTda = (options != null && options.getReparentLeafTaskToTda())
-                    || candidateTask.getRootTask().mReparentLeafTaskIfRelaunch;
+                    || candidateTask.getRootTask().mReparentLeafTaskIfRelaunch
+                    // TODO(b/407669465): remove it once migrated to the new approach
+                    // Before using a root task to manage the bubble tasks, the launching bubble
+                    // task should be re-parented to TDA.
+                    || (sourceTask != null && sourceTask.mLaunchNextToBubble);
             if (launchParentTask != null) {
                 if (candidateTask.getParent() == null) {
                     launchParentTask.addChild(candidateTask, position);

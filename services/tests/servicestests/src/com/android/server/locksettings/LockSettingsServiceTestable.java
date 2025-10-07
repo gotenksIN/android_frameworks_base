@@ -35,12 +35,14 @@ import android.service.gatekeeper.IGateKeeperService;
 
 import com.android.internal.widget.LockscreenCredential;
 import com.android.server.ServiceThread;
+import com.android.server.StorageManagerInternal;
 import com.android.server.locksettings.SyntheticPasswordManager.SyntheticPassword;
 import com.android.server.locksettings.recoverablekeystore.RecoverableKeyStoreManager;
 import com.android.server.pm.UserManagerInternal;
 
 import java.io.FileNotFoundException;
 import java.security.KeyStore;
+import java.time.Duration;
 
 public class LockSettingsServiceTestable extends LockSettingsService {
     private Intent mSavedFrpNotificationIntent = null;
@@ -53,25 +55,34 @@ public class LockSettingsServiceTestable extends LockSettingsService {
         private final LockSettingsStrongAuth mStrongAuth;
         private IActivityManager mActivityManager;
         private IStorageManager mStorageManager;
+        private StorageManagerInternal mStorageManagerInternal;
         private SyntheticPasswordManager mSpManager;
         private FakeGsiService mGsiService;
         private RecoverableKeyStoreManager mRecoverableKeyStoreManager;
         private UserManagerInternal mUserManagerInternal;
         private DeviceStateCache mDeviceStateCache;
+        private Duration mTimeSinceBoot;
 
         public boolean mIsHeadlessSystemUserMode = false;
 
-        public MockInjector(Context context, LockSettingsStorage storage,
+        public MockInjector(
+                Context context,
+                LockSettingsStorage storage,
                 LockSettingsStrongAuth strongAuth,
-                IActivityManager activityManager, IStorageManager storageManager,
-                SyntheticPasswordManager spManager, FakeGsiService gsiService,
+                IActivityManager activityManager,
+                IStorageManager storageManager,
+                StorageManagerInternal storageManagerInternal,
+                SyntheticPasswordManager spManager,
+                FakeGsiService gsiService,
                 RecoverableKeyStoreManager recoverableKeyStoreManager,
-                UserManagerInternal userManagerInternal, DeviceStateCache deviceStateCache) {
+                UserManagerInternal userManagerInternal,
+                DeviceStateCache deviceStateCache) {
             super(context);
             mLockSettingsStorage = storage;
             mStrongAuth = strongAuth;
             mActivityManager = activityManager;
             mStorageManager = storageManager;
+            mStorageManagerInternal = storageManagerInternal;
             mSpManager = spManager;
             mGsiService = gsiService;
             mRecoverableKeyStoreManager = recoverableKeyStoreManager;
@@ -115,6 +126,11 @@ public class LockSettingsServiceTestable extends LockSettingsService {
         }
 
         @Override
+        public StorageManagerInternal getStorageManagerInternal() {
+            return mStorageManagerInternal;
+        }
+
+        @Override
         public SyntheticPasswordManager getSyntheticPasswordManager(LockSettingsStorage storage) {
             return mSpManager;
         }
@@ -147,6 +163,18 @@ public class LockSettingsServiceTestable extends LockSettingsService {
         @Override
         public boolean isHeadlessSystemUserMode() {
             return mIsHeadlessSystemUserMode;
+        }
+
+        void setTimeSinceBoot(Duration time) {
+            mTimeSinceBoot = time;
+        }
+
+        @Override
+        public Duration getTimeSinceBoot() {
+            if (mTimeSinceBoot != null) {
+                return mTimeSinceBoot;
+            }
+            return super.getTimeSinceBoot();
         }
     }
 

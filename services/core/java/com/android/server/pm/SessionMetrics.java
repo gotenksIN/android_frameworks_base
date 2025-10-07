@@ -23,16 +23,20 @@ import android.annotation.Nullable;
 import android.content.pm.DataLoaderType;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageManagerInternal;
+import android.content.pm.verify.developer.DeveloperVerificationSession;
 import android.content.pm.verify.developer.DeveloperVerificationStatus;
 import android.os.Handler;
 
 import com.android.internal.util.FrameworkStatsLog;
+import com.android.server.LocalServices;
 import com.android.server.pm.verify.developer.DeveloperVerificationStatusInternal;
 
 import java.util.Arrays;
 
 final class SessionMetrics {
     private static final String TAG = "SessionMetrics";
+    private final PackageManagerInternal mPackageManagerInternal;
     private final Handler mHandler;
     private final int mSessionId;
     private final int mUserId;
@@ -79,12 +83,11 @@ final class SessionMetrics {
     private long mDeveloperVerifierConnectedMillis;
     private long mDeveloperVerifierRequestSentMillis;
     private long mDeveloperVerificationDurationMillis;
-
     private long mDeveloperVerifierRetryRequestSentMillis;
     private long mDeveloperVerificationRetryDurationMillis;
-
     private int mDeveloperVerifierUid = INVALID_UID;
-    private boolean mIsDeveloperVerificationBypassedByAdb = false;
+    private int mIsDeveloperVerificationBypassedReason =
+            DeveloperVerificationSession.DEVELOPER_VERIFICATION_BYPASSED_REASON_UNSPECIFIED;
     private boolean mIsDeveloperVerificationTimeoutExtensionRequested = false;
     private final boolean mHasDeveloperVerificationExtensionParams;
     private boolean mIsDeveloperVerificationPolicyOverridden = false;
@@ -97,13 +100,14 @@ final class SessionMetrics {
     private @PackageInstaller.DeveloperVerificationUserConfirmationInfo.UserActionNeededReason int
             mDeveloperVerificationUserActionRequiredReason;
     private @PackageInstaller.DeveloperVerificationUserResponse int
-            mDeveloperVerificationUserResponse;
+            mDeveloperVerificationUserResponse = -1;
     private int mDeveloperVerificationRetryCount;
     private @PackageInstaller.DeveloperVerificationFailedReason int
             mDeveloperVerificationFailureReason;
     @Nullable
     private String mPackageNameWhenDeveloperVerificationFailed = null;
     private boolean mDeveloperVerificationCancelled;
+    private int mUidOfPackageInstalled = INVALID_UID;
 
     SessionMetrics(Handler handler,
             int sessionId, int userId, int installerUid,
@@ -111,6 +115,7 @@ final class SessionMetrics {
             boolean committed, @Nullable int[] childSessionIds, int parentSessionId,
             int sessionStatusCode,
             @PackageInstaller.DeveloperVerificationPolicy int defaultDeveloperVerificationPolicy) {
+        mPackageManagerInternal = LocalServices.getService(PackageManagerInternal.class);
         mHandler = handler;
         mSessionId = sessionId;
         mUserId = userId;
@@ -185,9 +190,13 @@ final class SessionMetrics {
         mInternalInstallationFinished = System.currentTimeMillis();
     }
 
-    public void onSessionFinished(int statusCode) {
+    public void onSessionFinished(int statusCode, String packageName) {
         mStatusCode = statusCode;
         mFinishedMillis = System.currentTimeMillis();
+        if (statusCode == PackageManager.INSTALL_SUCCEEDED && packageName != null) {
+            mUidOfPackageInstalled = mPackageManagerInternal.getPackageUid(
+                    packageName, /* flags= */ 0, mUserId);
+        }
         reportStats();
     }
 
@@ -197,26 +206,26 @@ final class SessionMetrics {
         reportStats();
     }
 
-    public void onDeveloperVerificationBindStarted() {
+    public void onDeveloperVerificationBindStarted(int verifierUid) {
         mDeveloperVerifierBindStartedMillis = System.currentTimeMillis();
+        mDeveloperVerifierUid = verifierUid;
     }
 
-    public void onDeveloperVerifierConnectionEstablished(int verifierUid) {
+    public void onDeveloperVerifierConnectionEstablished() {
         mDeveloperVerifierConnectedMillis = System.currentTimeMillis();
-        mDeveloperVerifierUid = verifierUid;
     }
 
     public void onDeveloperVerificationRequestSent() {
         mDeveloperVerifierRequestSentMillis = System.currentTimeMillis();
     }
 
-    public void onDeveloperVerificationRetryRequestSent(int retryCount) {
+    public void onDeveloperVerificationRetryRequestSent() {
         mDeveloperVerifierRetryRequestSentMillis = System.currentTimeMillis();
-        mDeveloperVerificationRetryCount = retryCount;
+        mDeveloperVerificationRetryCount++;
     }
 
-    public void onDeveloperVerificationBypassedByAdb() {
-        mIsDeveloperVerificationBypassedByAdb = true;
+    public void onDeveloperVerificationBypassed(int bypassReason) {
+        mIsDeveloperVerificationBypassedReason = bypassReason;
     }
 
     public void onDeveloperVerificationTimeoutExtensionRequested() {
@@ -234,12 +243,11 @@ final class SessionMetrics {
         final long responseReceivedMillis = System.currentTimeMillis();
         if (mDeveloperVerifierRequestSentMillis != 0
                 && mDeveloperVerifierRetryRequestSentMillis == 0) {
-            mDeveloperVerifierRequestSentMillis =
+            mDeveloperVerificationDurationMillis =
                     responseReceivedMillis - mDeveloperVerifierRequestSentMillis;
         } else if (mDeveloperVerifierRetryRequestSentMillis != 0) {
-            // Calculate the last retry duration
-            // TODO(b/418283971): Change the metrics definition to track multiple retries.
-            mDeveloperVerificationRetryDurationMillis =
+            // Sum the total retry duration
+            mDeveloperVerificationRetryDurationMillis +=
                     responseReceivedMillis - mDeveloperVerifierRetryRequestSentMillis;
         }
     }
@@ -278,74 +286,79 @@ final class SessionMetrics {
                 mInternalInstallationFinished - mInternalInstallationStarted;
         final long sessionLifetimeMillis = mFinishedMillis - mCreatedMillis;
         final long developerVerifierConnectionDurationMillis =
-                mDeveloperVerifierConnectedMillis - mDeveloperVerifierBindStartedMillis;
+                mDeveloperVerifierConnectedMillis == 0
+                        ? 0 // Binding was already established before ths installation
+                        : mDeveloperVerifierConnectedMillis - mDeveloperVerifierBindStartedMillis;
         final long developerVerificationPrepDurationMillis =
-                mDeveloperVerifierRequestSentMillis - mDeveloperVerifierBindStartedMillis;
+                        mDeveloperVerifierRequestSentMillis - mDeveloperVerifierBindStartedMillis;
         // Do this on a handler so that we don't block anything critical
         mHandler.post(() ->
                 FrameworkStatsLog.write(
                         FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED,
-                        mSessionId,
-                        mUserId,
-                        mInstallerUid,
-                        mChildSessionIds,
-                        mParentSessionId,
-                        getTranslatedModeForStats(mMode),
-                        mRequireUserAction,
-                        mInstallFlags,
-                        mInstallLocation,
-                        mInstallReason,
-                        mInstallScenario,
-                        mIsStaged,
-                        mRequiredInstalledVersionCode,
-                        mDataLoaderType,
-                        getTranslatedRollbackDataPolicyForStats(mRollbackDataPolicy),
-                        mRollbackLifetimeMillis,
-                        getTranslatedRollbackImpactLevelForStats(mRollbackImpactLevel),
-                        mForceQueryableOverride,
-                        mApplicationEnabledSettingPersistent,
-                        mIsMultiPackage,
-                        mIsPreapproval,
-                        mIsUnarchive,
-                        mIsAutoInstallDependenciesEnabled,
-                        mApksSizeBytes, // TODO: compute apks size bytes
-                        getTranslatedStatusCodeForStats(installStatusToPublicStatus(mStatusCode)),
-                        mWasUserActionIntentSent,
-                        mIsExpired,
-                        sessionIdleDurationMillis,
-                        sessionCommitDurationMillis,
-                        nativeLibExtractionDurationMillis,
-                        packageVerificationDurationMillis,
-                        internalInstallationDurationMillis,
-                        sessionLifetimeMillis,
-                        getTranslatedPolicyCodeForStats(mDefaultDeveloperVerificationPolicy),
-                        mDeveloperVerifierUid,
-                        getTranslatedBypassedReasonForStats(mIsDeveloperVerificationBypassedByAdb),
-                        mIsDeveloperVerificationTimeoutExtensionRequested,
-                        mHasDeveloperVerificationExtensionParams,
-                        mIsDeveloperVerificationPolicyOverridden,
-                        getTranslatedPolicyCodeForStats(mDeveloperVerificationPolicyOverride),
+                        mSessionId, // 1
+                        mUserId, // 2
+                        mInstallerUid, // 3
+                        mChildSessionIds, // 4
+                        mParentSessionId, // 5
+                        getTranslatedModeForStats(mMode), // 6
+                        mRequireUserAction, // 7
+                        mInstallFlags, // 8
+                        mInstallLocation, // 9
+                        mInstallReason, // 10
+                        mInstallScenario, // 11
+                        mIsStaged, // 12
+                        mRequiredInstalledVersionCode, // 13
+                        mDataLoaderType, // 14
+                        getTranslatedRollbackDataPolicyForStats(mRollbackDataPolicy), // 15
+                        mRollbackLifetimeMillis, // 16
+                        getTranslatedRollbackImpactLevelForStats(mRollbackImpactLevel), // 17
+                        mForceQueryableOverride, // 18
+                        mApplicationEnabledSettingPersistent, // 19
+                        mIsMultiPackage, // 20
+                        mIsPreapproval, // 21
+                        mIsUnarchive, // 22
+                        mIsAutoInstallDependenciesEnabled, // 23
+                        mApksSizeBytes, // 24 // TODO(b/418283971): compute apks size bytes
+                        getTranslatedStatusCodeForStats(
+                                installStatusToPublicStatus(mStatusCode)), // 25
+                        mWasUserActionIntentSent, // 26
+                        mIsExpired, // 27
+                        sessionIdleDurationMillis, // 28
+                        sessionCommitDurationMillis, // 29
+                        nativeLibExtractionDurationMillis, // 30
+                        packageVerificationDurationMillis, // 31
+                        internalInstallationDurationMillis, // 32
+                        sessionLifetimeMillis, // 33
+                        getTranslatedPolicyCodeForStats(mDefaultDeveloperVerificationPolicy), // 34
+                        mDeveloperVerifierUid, // 35
+                        mIsDeveloperVerificationBypassedReason, // 36
+                        mIsDeveloperVerificationTimeoutExtensionRequested, // 37
+                        mHasDeveloperVerificationExtensionParams, // 38
+                        mIsDeveloperVerificationPolicyOverridden, // 39
+                        getTranslatedPolicyCodeForStats(
+                                mDeveloperVerificationPolicyOverride), // 40
                         getTranslatedResponseCodeForStats(
-                                mDeveloperVerificationStatus.getInternalStatus()),
+                                mDeveloperVerificationStatus.getInternalStatus()), // 41
                         getTranslatedAppMetadataVerificationStatusForStats(
-                                mDeveloperVerificationStatus.getAppMetadataVerificationStatus()),
-                        mWasDeveloperVerificationUserActionRequired,
+                                mDeveloperVerificationStatus.getAppMetadataVerificationStatus()
+                        ), // 42
+                        mWasDeveloperVerificationUserActionRequired, // 43
                         getTranslatedDeveloperVerificationUserActionReasonForStats(
-                                mDeveloperVerificationUserActionRequiredReason),
+                                mDeveloperVerificationUserActionRequiredReason), // 44
                         getTranslatedDeveloperVerificationUserResponseForStats(
-                                mDeveloperVerificationUserResponse),
-                        mDeveloperVerificationRetryCount,
-                        mDeveloperVerificationStatus.isLiteVerification(),
-                        getTranslatedDeveloperVerificationFailedReasonForStats(
-                                mDeveloperVerificationFailureReason),
-                        mPackageNameWhenDeveloperVerificationFailed,
-                        mDeveloperVerificationCancelled,
-                        mDeveloperVerificationDurationMillis,
-                        developerVerificationPrepDurationMillis,
-                        mDeveloperVerificationRetryDurationMillis,
-                        developerVerifierConnectionDurationMillis,
-                        mWasUserResponseReceived,
-                        mWasDeveloperVerificationUserResponseReceived
+                                mDeveloperVerificationUserResponse), // 45
+                        mDeveloperVerificationRetryCount, // 46
+                        mDeveloperVerificationStatus.isLiteVerification(), // 47
+                        mDeveloperVerificationFailureReason, // 48
+                        mPackageNameWhenDeveloperVerificationFailed, // 49
+                        mDeveloperVerificationCancelled, // 50
+                        mDeveloperVerificationDurationMillis, // 51
+                        developerVerificationPrepDurationMillis, // 52
+                        mDeveloperVerificationRetryDurationMillis, // 53
+                        developerVerifierConnectionDurationMillis, // 54
+                        mWasUserResponseReceived, // 55
+                        mWasDeveloperVerificationUserResponseReceived, // 56
+                        mUidOfPackageInstalled // 57
                         )
         );
     }
@@ -417,14 +430,6 @@ final class SessionMetrics {
         };
     }
 
-    private static int getTranslatedBypassedReasonForStats(boolean isBypassedByAdb) {
-        if (isBypassedByAdb) {
-            return FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_BYPASSED_REASON__BYPASSED_REASON_ADB;
-        } else {
-            return FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_BYPASSED_REASON__BYPASSED_REASON_UNSPECIFIED;
-        }
-    }
-
     private static int getTranslatedPolicyCodeForStats(
             @PackageInstaller.DeveloperVerificationPolicy int policy) {
         return switch (policy) {
@@ -479,6 +484,8 @@ final class SessionMetrics {
             @PackageInstaller.DeveloperVerificationUserConfirmationInfo.UserActionNeededReason int
                     reason) {
         return switch (reason) {
+            case PackageInstaller.DeveloperVerificationUserConfirmationInfo.DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_UNKNOWN ->
+                    FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_USER_ACTION_REQUIRED_REASON__USER_ACTION_REQUIRED_REASON_UNKNOWN;
             case PackageInstaller.DeveloperVerificationUserConfirmationInfo.DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_NETWORK_UNAVAILABLE ->
                     FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_USER_ACTION_REQUIRED_REASON__USER_ACTION_REQUIRED_REASON_NETWORK_UNAVAILABLE;
             case PackageInstaller.DeveloperVerificationUserConfirmationInfo.DEVELOPER_VERIFICATION_USER_ACTION_NEEDED_REASON_DEVELOPER_BLOCKED ->
@@ -495,28 +502,14 @@ final class SessionMetrics {
         return switch (response) {
             case PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_ERROR ->
                     FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_USER_RESPONSE__USER_RESPONSE_ERROR;
-            case PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_CANCEL ->
-                    FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_USER_RESPONSE__USER_RESPONSE_CANCEL;
-            case PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_OK ->
-                    FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_USER_RESPONSE__USER_RESPONSE_OK;
+            case PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_ABORT ->
+                    FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_USER_RESPONSE__USER_RESPONSE_ABORT;
             case PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_RETRY ->
                     FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_USER_RESPONSE__USER_RESPONSE_RETRY;
             case PackageInstaller.DEVELOPER_VERIFICATION_USER_RESPONSE_INSTALL_ANYWAY ->
                     FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_USER_RESPONSE__USER_RESPONSE_INSTALL_ANYWAY;
             default ->
                     FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_USER_RESPONSE__USER_RESPONSE_UNSPECIFIED;
-        };
-    }
-
-    private static int getTranslatedDeveloperVerificationFailedReasonForStats(
-            @PackageInstaller.DeveloperVerificationFailedReason int reason) {
-        return switch (reason) {
-            case PackageInstaller.DEVELOPER_VERIFICATION_FAILED_REASON_NETWORK_UNAVAILABLE ->
-                    FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_VERIFICATION_FAILED_REASON__DEVELOPER_VERIFICATION_FAILED_REASON_NETWORK_UNAVAILABLE;
-            case PackageInstaller.DEVELOPER_VERIFICATION_FAILED_REASON_DEVELOPER_BLOCKED ->
-                    FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_VERIFICATION_FAILED_REASON__DEVELOPER_VERIFICATION_FAILED_REASON_DEVELOPER_BLOCKED;
-            default ->
-                    FrameworkStatsLog.PACKAGE_INSTALLER_SESSION_REPORTED__ADI_VERIFICATION_FAILED_REASON__DEVELOPER_VERIFICATION_FAILED_REASON_UNSPECIFIED;
         };
     }
 }

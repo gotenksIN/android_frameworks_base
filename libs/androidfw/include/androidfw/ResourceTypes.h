@@ -228,10 +228,10 @@ struct ResChunk_header
     // (if any).
     uint16_t headerSize;
 
-    // Total size of this chunk (in bytes).  This is the chunkSize plus
+    // Total size of this chunk (in bytes).  This is the headerSize plus
     // the size of any data associated with the chunk.  Adding this value
     // to the chunk allows you to completely skip its contents (including
-    // any child chunks).  If this value is the same as chunkSize, there is
+    // any child chunks).  If this value is the same as headerSize, there is
     // no data associated with the chunk.
     uint32_t size;
 };
@@ -262,6 +262,9 @@ enum {
     RES_TABLE_OVERLAYABLE_TYPE        = 0x0204,
     RES_TABLE_OVERLAYABLE_POLICY_TYPE = 0x0205,
     RES_TABLE_STAGED_ALIAS_TYPE       = 0x0206,
+    RES_TABLE_FLAGGED                 = 0x0207,
+    RES_TABLE_FLAG_LIST               = 0x0208,
+
 };
 
 /**
@@ -1599,6 +1602,37 @@ union ResTable_sparseTypeEntry {
 
 static_assert(sizeof(ResTable_sparseTypeEntry) == sizeof(uint32_t),
         "ResTable_sparseTypeEntry must be 4 bytes in size");
+
+/**
+ * A container for other chunks all of whose values are behind a given flag.
+ *
+ * The flag_name_index is the index of the flag name in the value string pool.
+ *
+ * When the android runtime encounters this chunk it will check the flag against its current value.
+ * If the flag is enabled and flag_negated is false or it is disabled and flag_negated is true, the
+ * runtime will then process all of the chunks inside of it normally. Otherwise the entire chunk is
+ * skipped.
+ *
+ * Currently this is chunk should be contained in a ResTable_typeSpec and contain any number of
+ * ResTable_type.
+ */
+struct ResTable_flagged {
+  struct ResChunk_header header;
+
+  ResStringPool_ref flag_name_index;
+  bool flag_negated;
+  uint8_t padding[3];
+};
+
+/**
+ * A chunk that contains a list of the names of all the read/write flags used by the
+ * ResTable_flagged chunks in the file. Specifically, all data after the header is an array of
+ * ResStringPool_ref objects for the flag names in no specific order. References use the global
+ * values stringpool.
+ */
+struct ResTable_flag_list {
+  struct ResChunk_header header;
+};
 
 struct ResTable_map_entry;
 

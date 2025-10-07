@@ -36,7 +36,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.window.InputTransferToken
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
@@ -46,6 +45,7 @@ import androidx.constraintlayout.widget.ConstraintSet.TOP
 import androidx.core.view.isInvisible
 import com.android.app.tracing.coroutines.runBlockingTraced as runBlocking
 import com.android.keyguard.ClockEventController
+import com.android.systemui.Flags
 import com.android.systemui.animation.view.LaunchableImageView
 import com.android.systemui.biometrics.domain.interactor.UdfpsOverlayInteractor
 import com.android.systemui.broadcast.BroadcastDispatcher
@@ -65,10 +65,9 @@ import com.android.systemui.keyguard.ui.viewmodel.KeyguardPreviewViewModel
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardQuickAffordancesCombinedViewModel
 import com.android.systemui.monet.ColorScheme
 import com.android.systemui.monet.Style
-import com.android.systemui.plugins.clocks.ClockController
-import com.android.systemui.plugins.clocks.ClockViewIds
-import com.android.systemui.plugins.clocks.ThemeConfig
-import com.android.systemui.plugins.clocks.WeatherData
+import com.android.systemui.plugins.keyguard.data.model.WeatherData
+import com.android.systemui.plugins.keyguard.ui.clocks.ClockController
+import com.android.systemui.plugins.keyguard.ui.clocks.ThemeConfig
 import com.android.systemui.res.R
 import com.android.systemui.shared.clocks.ClockRegistry
 import com.android.systemui.shared.keyguard.shared.model.KeyguardQuickAffordanceSlots
@@ -122,7 +121,7 @@ constructor(
     private val keyguardQuickAffordanceViewBinder: KeyguardQuickAffordanceViewBinder,
     private val wallpaperFocalAreaInteractor: WallpaperFocalAreaInteractor,
 ) {
-    private var host: SurfaceControlViewHost
+    private lateinit var host: SurfaceControlViewHost
 
     private var _surfacePackage: SurfaceControlViewHost.SurfacePackage? = null
     val surfacePackage: SurfaceControlViewHost.SurfacePackage
@@ -148,19 +147,25 @@ constructor(
             shouldHighlightSelectedAffordance = previewViewModel.shouldHighlightSelectedAffordance,
         )
 
-        runBlocking(context = mainDispatcher) {
-            host =
-                SurfaceControlViewHost(
-                    context,
-                    displayManager.getDisplay(DEFAULT_DISPLAY),
-                    previewViewModel.hostToken?.let { InputTransferToken(it) },
-                    TAG,
-                )
-            disposables += DisposableHandle {
-                _surfacePackage?.release()
-                _surfacePackage = null
-                host.release()
-            }
+        if (Flags.doNotUseRunBlocking()) {
+            mainHandler.post { provideSurfaceControlViewHost(displayManager) }
+        } else {
+            runBlocking(context = mainDispatcher) { provideSurfaceControlViewHost(displayManager) }
+        }
+    }
+
+    private fun provideSurfaceControlViewHost(displayManager: DisplayManager) {
+        host =
+            SurfaceControlViewHost(
+                context,
+                displayManager.getDisplay(DEFAULT_DISPLAY),
+                previewViewModel.hostToken?.let { InputTransferToken(it) },
+                TAG,
+            )
+        disposables += DisposableHandle {
+            _surfacePackage?.release()
+            _surfacePackage = null
+            host.release()
         }
     }
 
@@ -314,12 +319,10 @@ constructor(
             cs.clone(parentView)
             cs.apply {
                 largeDateView =
-                    lockscreenSmartspaceController
-                        .buildAndConnectDateView(parentView, true)
+                    lockscreenSmartspaceController.buildAndConnectDateView(previewContext, true)
 
                 smallDateView =
-                    lockscreenSmartspaceController
-                        .buildAndConnectDateView(parentView, false)
+                    lockscreenSmartspaceController.buildAndConnectDateView(previewContext, false)
                 parentView.addView(largeDateView)
                 parentView.addView(smallDateView)
             }
@@ -327,7 +330,7 @@ constructor(
         } else {
             smartSpaceView =
                 lockscreenSmartspaceController.buildAndConnectDateView(
-                    parent = parentView,
+                    previewContext,
                     isLargeClock = false,
                 )
 

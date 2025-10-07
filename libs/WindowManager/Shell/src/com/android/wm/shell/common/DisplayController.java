@@ -46,7 +46,9 @@ import com.android.wm.shell.shared.desktopmode.DesktopState;
 import com.android.wm.shell.sysui.ShellInit;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -115,6 +117,30 @@ public class DisplayController {
     }
 
     /**
+     * Gets the uniqueId associated with the provided displayId, if it is associated with one.
+     */
+    @Nullable
+    public String getDisplayUniqueId(int displayId) {
+        final DisplayRecord r = mDisplays.get(displayId);
+        return r != null ? r.mUniqueId : null;
+    }
+
+    /**
+     * Gets a map of all displays by uniqueId from DisplayManager.
+     */
+    @Nullable
+    public Map<String, Integer> getAllDisplaysByUniqueId() {
+        HashMap<String, Integer> map = new HashMap<>();
+        for (int i = 0; i < mDisplays.size(); i++) {
+            final String uniqueId = mDisplays.valueAt(i).mUniqueId;
+            if (uniqueId != null) {
+                map.put(uniqueId, mDisplays.keyAt(i));
+            }
+        }
+        return map;
+    }
+
+    /**
      * Returns true if the display with the given displayId is part of the topology.
      */
     public boolean isDisplayInTopology(int displayId) {
@@ -144,6 +170,14 @@ public class DisplayController {
     public InsetsState getInsetsState(int displayId) {
         final DisplayRecord r = mDisplays.get(displayId);
         return r != null ? r.mInsetsState : null;
+    }
+
+    /**
+     * Returns whether animations are disabled for the given displayId.
+     */
+    public boolean isAnimationsDisabled(int displayId) {
+        final DisplayRecord r = mDisplays.get(displayId);
+        return r == null || r.mAnimationsDisabled;
     }
 
     /**
@@ -218,6 +252,10 @@ public class DisplayController {
             final DisplayRecord record = new DisplayRecord(displayId, hasStatusAndNavBars);
             DisplayLayout displayLayout = record.createLayout(context, display);
             record.setDisplayLayout(context, displayLayout);
+            final String uniqueId = display.getUniqueId();
+            if (uniqueId != null) {
+                record.setUniqueId(uniqueId);
+            }
             mDisplays.put(displayId, record);
             for (int i = 0; i < mDisplayChangedListeners.size(); ++i) {
                 mDisplayChangedListeners.get(i).onDisplayAdded(displayId);
@@ -247,13 +285,18 @@ public class DisplayController {
         final Context ctx = getDisplayContext(displayId);
         if (dl == null || ctx == null) return;
 
-        if (endBounds != null) {
-            // Note that endAbsBounds should ignore any potential rotation changes, so
-            // we still need to rotate the layout after if needed.
-            dl.resizeTo(ctx.getResources(), new Size(endBounds.width(), endBounds.height()));
-        }
-        if (fromRotation != toRotation && toRotation != ROTATION_UNDEFINED) {
+        boolean hasRotationChanged = fromRotation != toRotation && toRotation != ROTATION_UNDEFINED;
+        final Size endSize = endBounds != null
+                ? new Size(endBounds.width(), endBounds.height()) : null;
+
+        if (hasRotationChanged && endSize != null) {
+            // If rotation and display size are happening in sync, we have to follow a convention
+            // that DisplayLayout implements.
+            dl.rotateAndResizeTo(ctx.getResources(), toRotation, endSize);
+        } else if (hasRotationChanged) {
             dl.rotateTo(ctx.getResources(), toRotation);
+        } else if (endBounds != null) {
+            dl.resizeTo(ctx.getResources(), endSize);
         }
     }
 
@@ -376,16 +419,28 @@ public class DisplayController {
         }
     }
 
+    private void onAnimationsDisabled(int displayId, boolean disabled) {
+        synchronized (mDisplays) {
+            DisplayRecord r = mDisplays.get(displayId);
+            if (r != null) {
+                r.mAnimationsDisabled = disabled;
+            }
+        }
+    }
+
     private class DisplayRecord {
         private final int mDisplayId;
+        private String mUniqueId;
         private Context mContext;
         private DisplayLayout mDisplayLayout;
         private InsetsState mInsetsState = new InsetsState();
         private boolean mHasStatusAndNavBars;
+        private boolean mAnimationsDisabled;
 
         private DisplayRecord(int displayId, boolean hasStatusAndNavBars) {
             mDisplayId = displayId;
             mHasStatusAndNavBars = hasStatusAndNavBars;
+            mAnimationsDisabled = false;
         }
 
         private DisplayLayout createLayout(Context context, Display display) {
@@ -421,6 +476,10 @@ public class DisplayController {
             mContext = context;
             mDisplayLayout = displayLayout;
             mDisplayLayout.setInsets(mContext.getResources(), mInsetsState);
+        }
+
+        private void setUniqueId(String uniqueId) {
+            mUniqueId = uniqueId;
         }
 
         private void setInsets(InsetsState state) {
@@ -487,6 +546,12 @@ public class DisplayController {
 
         @Override
         public void onDisplayRemoveSystemDecorations(int displayId) { }
+
+        @Override
+        public void onDisplayAnimationsDisabledChanged(int displayId, boolean disabled) {
+            mMainExecutor.execute(
+                    () -> DisplayController.this.onAnimationsDisabled(displayId, disabled));
+        }
     }
 
     /**

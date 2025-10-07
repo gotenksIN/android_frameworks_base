@@ -30,8 +30,6 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.compose.modifiers.resIdToTestTag
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.jank.interactionJankMonitor
-import com.android.systemui.media.controls.ui.controller.mediaCarouselController
-import com.android.systemui.media.controls.ui.view.qsMediaHost
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
 import com.android.systemui.qs.ui.viewmodel.quickSettingsSceneContentViewModelFactory
 import com.android.systemui.qs.ui.viewmodel.quickSettingsUserActionsViewModelFactory
@@ -39,8 +37,10 @@ import com.android.systemui.scene.session.shared.SessionStorage
 import com.android.systemui.scene.session.ui.composable.SaveableSession
 import com.android.systemui.scene.session.ui.composable.Session
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.statusbar.notification.stack.ui.view.NotificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModelFactory
+import com.android.systemui.statusbar.phone.ui.tintedIconManagerFactory
 import com.android.systemui.testKosmos
 import org.junit.Ignore
 import org.junit.Rule
@@ -53,43 +53,43 @@ import org.mockito.Mockito.mock
 @TestableLooper.RunWithLooper
 @EnableSceneContainer
 class QuickSettingsSceneTest : SysuiTestCase() {
-    @get:Rule
-    val composeTestRule = createComposeRule()
+    @get:Rule val composeTestRule = createComposeRule()
 
     private val kosmos = testKosmos()
 
     @Test
     @Ignore("http://b/425752706")
     fun testViewHierarchy() {
-        val shadeSession = object : SaveableSession, Session by Session(SessionStorage()) {
-            @Composable
-            override fun <T : Any> rememberSaveableSession(
-                vararg inputs: Any?,
-                saver: Saver<T, out Any>,
-                key: String?,
-                init: () -> T
-            ): T = rememberSession(key, inputs = inputs, init = init)
-        }
+        val shadeSession =
+            object : SaveableSession, Session by Session(SessionStorage()) {
+                @Composable
+                override fun <T : Any> rememberSaveableSession(
+                    vararg inputs: Any?,
+                    saver: Saver<T, out Any>,
+                    key: String?,
+                    init: () -> T,
+                ): T = rememberSession(key, inputs = inputs, init = init)
+            }
 
         kosmos.usingMediaInComposeFragment = true
 
-        val scene = QuickSettingsScene(
-            shadeSession = shadeSession,
-            notificationStackScrollView = {
-                mock(NotificationScrollView::class.java)
-            },
-            notificationsPlaceholderViewModelFactory = kosmos.notificationsPlaceholderViewModelFactory,
-            actionsViewModelFactory = kosmos.quickSettingsUserActionsViewModelFactory,
-            contentViewModelFactory = kosmos.quickSettingsSceneContentViewModelFactory,
-            mediaCarouselController = kosmos.mediaCarouselController,
-            mediaHost = kosmos.qsMediaHost,
-            jankMonitor = kosmos.interactionJankMonitor,
-        )
+        val scene =
+            QuickSettingsScene(
+                shadeSession = shadeSession,
+                notificationStackScrollView = { mock(NotificationScrollView::class.java) },
+                notificationsPlaceholderViewModelFactory =
+                    kosmos.notificationsPlaceholderViewModelFactory,
+                actionsViewModelFactory = kosmos.quickSettingsUserActionsViewModelFactory,
+                contentViewModelFactory = kosmos.quickSettingsSceneContentViewModelFactory,
+                jankMonitor = kosmos.interactionJankMonitor,
+            )
 
         composeTestRule.setContent {
             PlatformTheme {
-                with(scene) {
-                    TestContentScope(currentScene = Scenes.QuickSettings) { Content(Modifier) }
+                WithStatusIconContext(kosmos.tintedIconManagerFactory) {
+                    with(scene) {
+                        TestContentScope(currentScene = Scenes.QuickSettings) { Content(Modifier) }
+                    }
                 }
             }
         }

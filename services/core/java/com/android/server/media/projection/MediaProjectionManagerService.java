@@ -1392,13 +1392,8 @@ public final class MediaProjectionManagerService extends SystemService
                 return;
             }
 
-            Binder.withCleanCallingIdentity(() -> {
-                String contextualSearchPackage = mContext.getResources().getString(
-                        R.string.config_defaultContextualSearchPackageName);
-                if (packageName.equals(contextualSearchPackage)) {
-                    mIsRecordingOverlay = isRecordingOverlay;
-                }
-            });
+            mIsRecordingOverlay = isRecordingOverlay;
+
         }
 
         @android.annotation.EnforcePermission(android.Manifest.permission.MANAGE_MEDIA_PROJECTION)
@@ -1498,7 +1493,20 @@ public final class MediaProjectionManagerService extends SystemService
         }
 
         public void dump(PrintWriter pw) {
-            pw.println("(" + packageName + ", uid=" + uid + "): " + typeToString(mType));
+            pw.println("Projection:");
+            pw.println("    packageName: " + packageName);
+            pw.println("    uid: " + uid);
+            pw.println("    userHandle: " + userHandle);
+            pw.println("    type: " + typeToString(mType));
+            pw.println("    started: " + mCreateTimeMillis);
+            pw.println("    privileged: " + mIsPrivileged);
+            pw.println("    granted SAW: " + mRestoreSystemAlertWindow);
+            pw.println("    granted SAO: " + mRestoreSystemApplicationOverlay);
+            pw.println("    mIsRecordingOverlay: " + mIsRecordingOverlay);
+            pw.println("    displayId of the mirror display: " + mVirtualDisplayId);
+            pw.println("    displayId of the display to mirror: " + mDisplayId);
+            pw.println("    taskId to mirror: " + mTaskId);
+            pw.println("    mSession: " + mSession.toString());
         }
     }
 

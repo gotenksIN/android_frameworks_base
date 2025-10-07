@@ -5,28 +5,12 @@ container: "system"
 
 flag {
     namespace: "window_surfaces"
-    name: "surface_trusted_overlay"
-    description: "Whether to add trusted overlay flag on the SurfaceControl or the InputWindow"
-    is_fixed_read_only: true
-    bug: "292032926"
-}
-
-flag {
-    namespace: "window_surfaces"
     name: "allow_disable_activity_record_input_sink"
     description: "Whether to allow system activity to disable ActivityRecordInputSink"
     is_fixed_read_only: true
     bug: "262477923"
 }
 
-flag {
-    namespace: "window_surfaces"
-    name: "trusted_presentation_listener_for_window"
-    is_exported: true
-    description: "Enable trustedPresentationListener on windows public API"
-    is_fixed_read_only: true
-    bug: "278027319"
-}
 
 flag {
     namespace: "window_surfaces"
@@ -128,11 +112,10 @@ flag {
 }
 
 flag {
-    name: "update_host_input_transfer_token"
+    name: "use_input_reported_focus_for_accessibility"
     namespace: "window_surfaces"
-    description: "Update host InpuTransferToken on view attach"
-    is_fixed_read_only: true
-    bug: "392965431"
+    description: "Use input-reported focus state when composing accessibility window info"
+    bug: "424253885"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

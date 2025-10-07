@@ -83,6 +83,8 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.dozeInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardEnabledInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
+import com.android.systemui.keyguard.domain.interactor.keyguardOcclusionInteractor
+import com.android.systemui.keyguard.domain.interactor.keyguardSurfaceBehindInteractor
 import com.android.systemui.keyguard.domain.interactor.scenetransition.lockscreenSceneTransitionInteractor
 import com.android.systemui.keyguard.shared.model.FailFingerprintAuthenticationStatus
 import com.android.systemui.keyguard.shared.model.KeyguardState
@@ -115,7 +117,6 @@ import com.android.systemui.shared.system.QuickStepContract
 import com.android.systemui.statusbar.VibratorHelper
 import com.android.systemui.statusbar.disableflags.data.repository.fakeDisableFlagsRepository
 import com.android.systemui.statusbar.disableflags.shared.model.DisableFlagsModel
-import com.android.systemui.statusbar.domain.interactor.keyguardOcclusionInteractor
 import com.android.systemui.statusbar.notification.data.repository.FakeHeadsUpRowRepository
 import com.android.systemui.statusbar.notification.data.repository.HeadsUpRowRepository
 import com.android.systemui.statusbar.notification.stack.data.repository.headsUpNotificationRepository
@@ -133,7 +134,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -176,7 +176,6 @@ class SceneContainerStartableTest : SysuiTestCase() {
         MockitoAnnotations.initMocks(this)
         whenever(kosmos.keyguardUpdateMonitor.isUnlockingWithBiometricAllowed(anyBoolean()))
             .thenReturn(true)
-        runBlocking { kosmos.displayRepository.addDisplay(Display.DEFAULT_DISPLAY) }
         underTest = kosmos.sceneContainerStartable
     }
 
@@ -337,29 +336,32 @@ class SceneContainerStartableTest : SysuiTestCase() {
     fun hydrateVisibility_basedOnOcclusion() =
         kosmos.runTest {
             val isVisible by collectLastValue(sceneInteractor.isVisible)
-            prepareState(isDeviceUnlocked = true, initialSceneKey = Scenes.Lockscreen)
+            val transitionStateFlowValue =
+                prepareState(isDeviceUnlocked = true, initialSceneKey = Scenes.Lockscreen)
 
             underTest.start()
             assertThat(isVisible).isTrue()
 
-            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
-            assertThat(isVisible).isFalse()
+            sceneInteractor.changeScene(Scenes.Occluded, "switch to occluded")
+            transitionStateFlowValue.value = ObservableTransitionState.Idle(Scenes.Occluded)
+            runCurrent()
 
-            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(false)
-            assertThat(isVisible).isTrue()
+            assertThat(isVisible).isFalse()
         }
 
     @Test
     fun hydrateVisibility_basedOnAlternateBouncer() =
         kosmos.runTest {
             val isVisible by collectLastValue(sceneInteractor.isVisible)
-            prepareState(isDeviceUnlocked = false, initialSceneKey = Scenes.Lockscreen)
+            val transitionStateFlowValue =
+                prepareState(isDeviceUnlocked = false, initialSceneKey = Scenes.Lockscreen)
 
             underTest.start()
             assertThat(isVisible).isTrue()
 
             // WHEN the device is occluded,
-            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
+            sceneInteractor.changeScene(Scenes.Occluded, "switch to occluded")
+            transitionStateFlowValue.value = ObservableTransitionState.Idle(Scenes.Occluded)
             // THEN scenes are not visible
             assertThat(isVisible).isFalse()
 
@@ -421,6 +423,38 @@ class SceneContainerStartableTest : SysuiTestCase() {
             runCurrent()
             // THEN scenes are visible
             assertThat(isVisible).isTrue()
+        }
+
+    @Test
+    fun hydrateVisibility_surfaceBehindAnimating() =
+        kosmos.runTest {
+            val isVisible by collectLastValue(sceneInteractor.isVisible)
+
+            val transitionState =
+                prepareState(isDeviceUnlocked = true, initialSceneKey = Scenes.Lockscreen)
+            underTest.start()
+            assertThat(isVisible).isTrue()
+
+            // Unlock, leaving the surface behind animation running even after the transition ends.
+            sceneInteractor.changeScene(
+                Scenes.Gone,
+                "unlocking for test",
+                forceSettleToTargetScene = true,
+            )
+            transitionState.value = ObservableTransitionState.Idle(Scenes.Gone)
+            keyguardSurfaceBehindInteractor.setAnimatingSurface(true)
+            runCurrent()
+
+            // Scene container should remain visible so the flows controlling the surface behind
+            // animation continue emitting.
+            assertThat(isVisible).isTrue()
+
+            // Once the animation settles...
+            keyguardSurfaceBehindInteractor.setAnimatingSurface(false)
+            runCurrent()
+
+            // ...we no longer need to be visible.
+            assertThat(isVisible).isFalse()
         }
 
     @Test
@@ -1201,12 +1235,14 @@ class SceneContainerStartableTest : SysuiTestCase() {
     @Test
     fun hydrateSystemUiState_onLockscreen_basedOnOcclusion() =
         kosmos.runTest {
-            prepareState(initialSceneKey = Scenes.Lockscreen)
+            val transitionStateFlowValue = prepareState(initialSceneKey = Scenes.Lockscreen)
             underTest.start()
             runCurrent()
             clearInvocations(mockSysUiState)
 
-            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
+            sceneInteractor.changeScene(Scenes.Occluded, "switch to occluded")
+            transitionStateFlowValue.value = ObservableTransitionState.Idle(Scenes.Occluded)
+
             runCurrent()
             assertThat(
                     mockSysUiState.flags and
@@ -1224,7 +1260,9 @@ class SceneContainerStartableTest : SysuiTestCase() {
                 )
                 .isFalse()
 
-            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(false)
+            sceneInteractor.changeScene(Scenes.Lockscreen, "switch to lockscreen")
+            transitionStateFlowValue.value = ObservableTransitionState.Idle(Scenes.Lockscreen)
+
             runCurrent()
             assertThat(
                     mockSysUiState.flags and
@@ -2109,6 +2147,46 @@ class SceneContainerStartableTest : SysuiTestCase() {
         }
 
     @Test
+    fun handleOcclusion_exitsToGone() =
+        kosmos.runTest {
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            prepareState()
+            underTest.start()
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
+            runCurrent()
+
+            assertThat(currentScene).isEqualTo(Scenes.Occluded)
+
+            prepareState(isDeviceUnlocked = true)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(false, mock())
+            runCurrent()
+
+            assertThat(currentScene).isEqualTo(Scenes.Gone)
+        }
+
+    @Test
+    fun handleOcclusion_exitsToLockscreen() =
+        kosmos.runTest {
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            prepareState()
+            underTest.start()
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
+            runCurrent()
+
+            assertThat(currentScene).isEqualTo(Scenes.Occluded)
+
+            prepareState(isDeviceUnlocked = false)
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(false, mock())
+            runCurrent()
+
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+        }
+
+    @Test
     fun switchToLockscreen_whenShadeBecomesNotTouchable() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
@@ -2383,6 +2461,8 @@ class SceneContainerStartableTest : SysuiTestCase() {
     fun switchFromDreamToLockscreen_whenLockedAndDreamStopped() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
+
             prepareState(initialSceneKey = Scenes.Dream)
             underTest.start()
             testScope.advanceTimeBy(KeyguardInteractor.IS_ABLE_TO_DREAM_DELAY_MS)
@@ -2391,11 +2471,19 @@ class SceneContainerStartableTest : SysuiTestCase() {
             testScope.advanceTimeBy(KeyguardInteractor.IS_ABLE_TO_DREAM_DELAY_MS)
             runCurrent()
             assertThat(currentScene).isEqualTo(Scenes.Dream)
+            emulateOverlayTransition(
+                transitionStateFlow =
+                    MutableStateFlow(ObservableTransitionState.Idle(Scenes.Dream)),
+                toOverlay = Overlays.Bouncer,
+            )
+            assertThat(currentOverlays).contains(Overlays.Bouncer)
+            runCurrent()
 
             keyguardInteractor.setDreaming(false)
             testScope.advanceTimeBy(KeyguardInteractor.IS_ABLE_TO_DREAM_DELAY_MS)
             runCurrent()
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+            assertThat(currentOverlays).contains(Overlays.Bouncer)
         }
 
     @Test

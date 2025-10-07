@@ -70,7 +70,7 @@ import com.android.internal.policy.IKeyguardService;
 import com.android.internal.policy.IKeyguardStateCallback;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.mediator.ScreenOnCoordinator;
-import com.android.systemui.SystemUIApplication;
+import com.android.systemui.application.SystemUIApplication;
 import com.android.systemui.dagger.qualifiers.Application;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor;
@@ -470,7 +470,8 @@ public class KeyguardService extends Service {
             trace("dismiss message=" + message);
             checkPermission();
             if (SceneContainerFlag.isEnabled()) {
-                mDeviceEntryInteractorLazy.get().attemptDeviceEntry(callback);
+                mDeviceEntryInteractorLazy.get().attemptDeviceEntry(
+                        "KeyguardService.dismiss", callback);
             } else if (KeyguardWmStateRefactor.isEnabled()) {
                 mKeyguardDismissInteractor.dismissKeyguardWithCallback(callback);
             } else {
@@ -549,7 +550,7 @@ public class KeyguardService extends Service {
         }
 
         @Override // Binder interface
-        public void onScreenTurningOn(IKeyguardDrawnCallback callback) {
+        public void onScreenTurningOn(int reason, IKeyguardDrawnCallback callback) {
             trace("onScreenTurningOn");
             Trace.beginSection("KeyguardService.mBinder#onScreenTurningOn");
             checkPermission();
@@ -563,7 +564,7 @@ public class KeyguardService extends Service {
             Trace.beginAsyncSection(onDrawWaitingTraceTag, traceCookie);
 
             // Ensure the drawn callback is only ever called once
-            mScreenOnCoordinator.onScreenTurningOn(new Runnable() {
+            mScreenOnCoordinator.onScreenTurningOn(reason, new Runnable() {
                 boolean mInvoked;
                 @Override
                 public void run() {

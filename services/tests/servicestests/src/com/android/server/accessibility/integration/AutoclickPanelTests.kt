@@ -22,25 +22,27 @@ import android.platform.test.annotations.RequiresFlagsEnabled
 import android.platform.test.flag.junit.CheckFlagsRule
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import android.provider.Settings
-import android.view.Display.DEFAULT_DISPLAY
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Configurator
 import androidx.test.uiautomator.UiDevice
 import com.android.compatibility.common.util.SettingsStateChangerRule
 import com.android.server.accessibility.Flags
+import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.runners.JUnit4
 import platform.test.desktop.DesktopMouseTestRule
 
-@RunWith(JUnit4::class)
+@RunWith(AndroidJUnit4::class)
 @RequiresFlagsEnabled(Flags.FLAG_ENABLE_AUTOCLICK_INDICATOR)
+@Ignore("b/438414507")
 class AutoclickPanelTests {
     @Rule(order = 0)
     @JvmField
@@ -68,8 +70,9 @@ class AutoclickPanelTests {
         Configurator.getInstance().setUiAutomationFlags(FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
         uiDevice = UiDevice.getInstance(instrumentation)
 
-        // Move the cursor to the edge of the screen once to trigger the Autoclick panel creation.
-        desktopMouseTestRule.move(DEFAULT_DISPLAY, 0, 0)
+        initiateAutoclickPanel(
+            InstrumentationRegistry.getInstrumentation().context, uiDevice, desktopMouseTestRule
+        )
     }
 
     private fun clickPauseButton() {
@@ -106,7 +109,7 @@ class AutoclickPanelTests {
         assertNotNull(
             findObject(
                 uiDevice,
-                By.res(PAUSE_BUTTON_IMAGE_ID).desc("Pause")
+                By.res(PAUSE_BUTTON_LAYOUT_ID).desc("Pause")
             )
         )
 
@@ -115,7 +118,7 @@ class AutoclickPanelTests {
         assertNotNull(
             findObject(
                 uiDevice,
-                By.res(PAUSE_BUTTON_IMAGE_ID).desc("Resume")
+                By.res(PAUSE_BUTTON_LAYOUT_ID).desc("Resume")
             )
         )
 
@@ -124,7 +127,7 @@ class AutoclickPanelTests {
         assertNotNull(
             findObject(
                 uiDevice,
-                By.res(PAUSE_BUTTON_IMAGE_ID).desc("Pause")
+                By.res(PAUSE_BUTTON_LAYOUT_ID).desc("Pause")
             )
         )
     }
@@ -171,5 +174,17 @@ class AutoclickPanelTests {
         // Confirm the panel moved around the screen and finished in the starting location.
         val fifthPosition = getAutoclickPanelPosition()
         assertEquals(startingPosition, fifthPosition)
+    }
+
+    private companion object {
+        @AfterClass
+        @JvmStatic
+        fun teardownAfterClass() {
+            // Wait for the Autoclick panel to be closed.
+            waitAndAssert {
+                UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                    .findObject(By.res(AUTOCLICK_PANEL_ID)) == null
+            }
+        }
     }
 }

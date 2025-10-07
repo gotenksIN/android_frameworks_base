@@ -78,6 +78,7 @@ import android.util.apk.ApkSignatureVerifier;
 import android.util.jar.StrictJarFile;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.content.NativeLibraryHelper;
 import com.android.internal.pm.parsing.pkg.ParsedPackage;
 import com.android.internal.pm.pkg.component.ComponentMutateUtils;
 import com.android.internal.pm.pkg.component.ParsedActivity;
@@ -139,8 +140,6 @@ final class ScanPackageUtils {
         final SharedUserSetting sharedUserSetting = request.mSharedUserSetting;
         final UserHandle user = request.mUser;
         final boolean isPlatformPackage = request.mIsPlatformPackage;
-
-        List<String> changedAbiCodePath = null;
 
         if (DEBUG_PACKAGE_SCANNING) {
             if ((parseFlags & ParsingPackageUtils.PARSE_CHATTY) != 0) {
@@ -438,6 +437,12 @@ final class ScanPackageUtils {
                 pkgSetting.getInstallSource().mInitiatingPackageName);
         }
 
+        // If package is upgrading, mPageSizeCompatFlags in PackageSetting should be populated
+        // according to the upgraded package.
+        if (!createNewPackage) {
+            pkgSetting.clearPageSizeAppCompatFlags();
+        }
+
         if (Flags.appCompatOption16kb() && (is16KbDevice || enable4kbChecks)) {
             // Alignment checks are used decide whether this app should run in compat mode when
             // nothing was specified in manifest. Manifest should always take precedence over
@@ -452,32 +457,22 @@ final class ScanPackageUtils {
                         && !isSystemApp
                         && !isApex
                         && !isPlatformPackage) {
-                    int mode =
+                    NativeLibraryHelper.AlignmentResult res =
                             packageAbiHelper.checkPackageAlignment(
                                     parsedPackage,
                                     pkgSetting.getLegacyNativeLibraryPath(),
                                     parsedPackage.isNativeLibraryRootRequiresIsa(),
                                     pkgSetting.getCpuAbiOverride());
-                    if (mode >= ApplicationInfo.PAGE_SIZE_APP_COMPAT_FLAG_UNDEFINED) {
-                        pkgSetting.setPageSizeAppCompatFlags(mode);
+                    if (res != null && res.unalignedLibraries != null
+                            && res.flags >= ApplicationInfo.PAGE_SIZE_APP_COMPAT_FLAG_UNDEFINED) {
+                        pkgSetting.setPageSizeAppCompatFlags(res.flags);
+                        pkgSetting.setLibraryAlignmentInfo(res.unalignedLibraries);
                     } else {
                         Slog.e(TAG, "Error occurred while checking alignment of package : "
                                 + parsedPackage.getPackageName());
                     }
                 }
             }
-        }
-
-        if ((scanFlags & SCAN_BOOTING) == 0 && oldSharedUserSetting != null) {
-            // We don't do this here during boot because we can do it all
-            // at once after scanning all existing packages.
-            //
-            // We also do this *before* we perform dexopt on this package, so that
-            // we can avoid redundant dexopts, and also to make sure we've got the
-            // code and package path correct.
-            changedAbiCodePath = applyAdjustedAbiToSharedUser(oldSharedUserSetting,
-                    parsedPackage, packageAbiHelper.getAdjustedAbiForSharedUser(
-                            oldSharedUserSetting.getPackageStates(), parsedPackage));
         }
 
         parsedPackage.setFactoryTest(isUnderFactoryTest && parsedPackage.getRequestedPermissions()
@@ -551,10 +546,9 @@ final class ScanPackageUtils {
             }
         }
 
-        return new ScanResult(request, pkgSetting, changedAbiCodePath,
-                !createNewPackage /* existingSettingCopied */,
-                Process.INVALID_UID /* previousAppId */ , sdkLibraryInfo,
-                staticSharedLibraryInfo, dynamicSharedLibraryInfos);
+        return new ScanResult(request, pkgSetting, !createNewPackage /* existingSettingCopied */,
+                Process.INVALID_UID /* previousAppId */ , sdkLibraryInfo, staticSharedLibraryInfo,
+                dynamicSharedLibraryInfos);
     }
 
     /**

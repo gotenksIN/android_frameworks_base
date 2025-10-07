@@ -27,6 +27,9 @@ import android.window.WindowContainerTransaction
 import com.android.internal.protolog.ProtoLog
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.common.pip.PipDesktopState
+import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.EnterReason
+import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ExitReason
+import com.android.wm.shell.desktopmode.data.DesktopRepository
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 
 /** Controller to perform extra handling to PiP transitions while in Desktop mode. */
@@ -204,6 +207,8 @@ class DesktopPipTransitionController(
                 wct = wct,
                 newTask = if (shouldAddParentToDesk) parentTask!! else runningTaskInfo,
                 displayId = displayId,
+                userId = desktopRepository.userId,
+                enterReason = EnterReason.EXIT_PIP,
             )
         }
 
@@ -312,8 +317,10 @@ class DesktopPipTransitionController(
                 wct = wct,
                 deskId = deskId,
                 displayId = displayId,
+                userId = taskInfo.userId,
                 willExitDesktop = true,
                 removingLastTaskId = taskId,
+                exitReason = ExitReason.ENTER_PIP,
             )
         desktopExitRunnable?.invoke(transition)
     }

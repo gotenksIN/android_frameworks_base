@@ -139,7 +139,7 @@ final class AppCompatUtils {
             @Nullable ActivityRecord top) {
         final AppCompatTaskInfo appCompatTaskInfo = info.appCompatTaskInfo;
         clearAppCompatTaskInfo(appCompatTaskInfo);
-
+        appCompatTaskInfo.setIsLeafTask(task.isLeafTask());
         if (top == null) {
             return;
         }
@@ -229,11 +229,15 @@ final class AppCompatUtils {
                 !info.isTopActivityTransparent && !appCompatTaskInfo.isTopActivityInSizeCompat()
                         && aspectRatioOverrides.shouldEnableUserAspectRatioSettings();
         appCompatTaskInfo.setEligibleForUserAspectRatioButton(eligibleForAspectRatioButton);
-        appCompatTaskInfo.cameraCompatTaskInfo.freeformCameraCompatMode =
-                AppCompatCameraPolicy.getCameraCompatFreeformMode(top);
-        appCompatTaskInfo.cameraCompatTaskInfo.displayRotation =
-                Flags.enableCameraCompatCheckDeviceRotationBugfix()
-                        ? AppCompatCameraPolicy.getCameraDeviceRotation(top) : ROTATION_UNDEFINED;
+        // Obsolete way of sending camera compat mode data to CameraManager.
+        if (!Flags.enableCameraCompatCompatibilityInfoRotateAndCropBugfix()) {
+            appCompatTaskInfo.cameraCompatTaskInfo.cameraCompatMode =
+                    AppCompatCameraPolicy.getCameraCompatSimReqOrientationMode(top);
+            appCompatTaskInfo.cameraCompatTaskInfo.displayRotation =
+                    Flags.enableCameraCompatCheckDeviceRotationBugfix()
+                            ? AppCompatCameraPolicy.getCameraDeviceRotation(top)
+                            : ROTATION_UNDEFINED;
+        }
         appCompatTaskInfo.setHasMinAspectRatioOverride(top.mAppCompatController
                 .getDesktopAspectRatioPolicy().hasMinAspectRatioOverride(task));
         appCompatTaskInfo.setOptOutEdgeToEdge(top.mOptOutEdgeToEdge);
@@ -317,6 +321,14 @@ final class AppCompatUtils {
     }
 
     /**
+     * Return {@code true} if the given display area is desktop-first.
+     */
+    static boolean isDesktopFirst(@Nullable TaskDisplayArea taskDisplayArea) {
+        return taskDisplayArea != null
+                && taskDisplayArea.getWindowingMode() == WINDOWING_MODE_FREEFORM;
+    }
+
+    /**
      * Creates a {@link AppCompatTransitionInfo} which encapsulate the letterbox
      * information if needed.
      *
@@ -344,8 +356,8 @@ final class AppCompatUtils {
         info.topActivityLetterboxHeight = TaskInfo.PROPERTY_VALUE_UNSET;
         info.topActivityAppBounds.setEmpty();
         info.topActivityLetterboxBounds = null;
-        info.cameraCompatTaskInfo.freeformCameraCompatMode =
-                CameraCompatTaskInfo.CAMERA_COMPAT_FREEFORM_UNSPECIFIED;
+        info.cameraCompatTaskInfo.cameraCompatMode =
+                CameraCompatTaskInfo.CAMERA_COMPAT_UNSPECIFIED;
         info.topNonResizableActivityAspectRatio = TaskInfo.PROPERTY_VALUE_UNSET;
         info.clearTopActivityFlags();
     }

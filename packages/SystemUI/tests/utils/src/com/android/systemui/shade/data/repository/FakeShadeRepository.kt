@@ -24,7 +24,6 @@ import javax.inject.Inject
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /** Fake implementation of [ShadeRepository] */
@@ -74,9 +73,6 @@ class FakeShadeRepository @Inject constructor() : ShadeRepository {
     @Deprecated("Use ShadeInteractor.isUserInteractingWithShade instead")
     override val legacyLockscreenShadeTracking = MutableStateFlow(false)
 
-    private var _isShadeLayoutWide = MutableStateFlow(false)
-    override val isShadeLayoutWide: StateFlow<Boolean> = _isShadeLayoutWide.asStateFlow()
-
     @Deprecated("Use ShadeInteractor instead")
     override fun setLegacyIsQsExpanded(legacyIsQsExpanded: Boolean) {
         _legacyIsQsExpanded.value = legacyIsQsExpanded
@@ -86,6 +82,10 @@ class FakeShadeRepository @Inject constructor() : ShadeRepository {
 
     @Deprecated("Use ShadeInteractor instead")
     override val legacyExpandImmediate = _legacyExpandImmediate.asStateFlow()
+
+    override val legacyUseSplitShade = MutableStateFlow(false)
+
+    override val isWideScreen = MutableStateFlow(false)
 
     @Deprecated("Use ShadeInteractor instead")
     override fun setLegacyExpandImmediate(legacyExpandImmediate: Boolean) {
@@ -154,7 +154,8 @@ class FakeShadeRepository @Inject constructor() : ShadeRepository {
     }
 
     override fun setShadeLayoutWide(isShadeLayoutWide: Boolean) {
-        _isShadeLayoutWide.value = isShadeLayoutWide
+        legacyUseSplitShade.value = isShadeLayoutWide
+        isWideScreen.value = isShadeLayoutWide
     }
 }
 

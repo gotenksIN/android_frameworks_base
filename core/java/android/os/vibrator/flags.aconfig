@@ -119,7 +119,7 @@ flag {
     namespace: "haptics"
     name: "remove_hidl_support"
     description: "Remove framework code to support HIDL vibrator HALs."
-    bug: "308452413"
+    bug: "409002423"
     is_fixed_read_only: true
     metadata {
       purpose: PURPOSE_FEATURE
@@ -142,6 +142,46 @@ flag {
     name: "vibration_thread_handling_hal_failure"
     description: "Fixes how VibrationThread handled HAL failures"
     bug: "419572960"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "haptics"
+    name: "vibration_scale_device_config_enabled"
+    description: "Enables device-configurable vibration scale factors"
+    bug: "427503922"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "haptics"
+    name: "vibration_scale_bounds_fix_enabled"
+    description: "Enables audio-coupled haptics vibration scale bounds fix"
+    bug: "427912736"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "haptics"
+    name: "haptic_pcm_generation"
+    description: "Enables the feature to generate Haptic PCM from vibration effects"
+    bug: "417649629"
+    metadata {
+      purpose: PURPOSE_FEATURE
+    }
+}
+
+flag {
+    namespace: "haptics"
+    name: "decouple_frequency_profile_from_resonance"
+    description: "Removes frequency profiles dependency on resonant frequency when not present"
+    bug: "430503750"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

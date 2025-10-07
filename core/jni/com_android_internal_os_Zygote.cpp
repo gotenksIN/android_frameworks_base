@@ -78,9 +78,9 @@
 #include <stats_socket.h>
 #include <utils/String8.h>
 #include <utils/Trace.h>
-// QTI_BEGIN: 2020-07-29: Performance: Add beluga function
+// QTI_BEGIN: 2020-07-29: Core: Add beluga function
 #include <dlfcn.h>
-// QTI_END: 2020-07-29: Performance: Add beluga function
+// QTI_END: 2020-07-29: Core: Add beluga function
 
 #include <nativehelper/JNIHelp.h>
 #include <nativehelper/ScopedLocalRef.h>
@@ -646,7 +646,7 @@ static void PreApplicationInit() {
 
   // Set the jemalloc decay time to 1.
   mallopt(M_DECAY_TIME, 1);
-// QTI_BEGIN: 2020-07-29: Performance: Add beluga function
+// QTI_BEGIN: 2020-07-29: Core: Add beluga function
 
   void *mBelugaHandle = nullptr;
   void (*mBeluga)() = nullptr;
@@ -660,7 +660,7 @@ static void PreApplicationInit() {
       mBeluga();
     dlclose(mBelugaHandle);
   }
-// QTI_END: 2020-07-29: Performance: Add beluga function
+// QTI_END: 2020-07-29: Core: Add beluga function
 }
 
 static void SetUpSeccompFilter(uid_t uid, bool is_child_zygote) {
@@ -1763,7 +1763,6 @@ std::pair<const char*, const char*> build_version_constants[] = {
         std::pair("RELEASE_OR_PREVIEW_DISPLAY", "ro.build.version.release_or_preview_display"),
         std::pair("BASE_OS", "ro.build.version.base_os"),
         std::pair("SECURITY_PATCH", "ro.build.version.security_patch"),
-        std::pair("SDK", "ro.build.version.sdk"),
         std::pair("PREVIEW_SDK_FINGERPRINT", "ro.build.version.preview_sdk_fingerprint"),
         std::pair("CODENAME", "ro.build.version.codename"),
 };
@@ -1832,7 +1831,6 @@ static void ReloadBuildJavaConstants(JNIEnv* env) {
 
   // Reload the public int/long constants
   ReloadBuildJavaConstant(env, build_cls, "TIME", "J", "ro.build.date.utc");
-  ReloadBuildJavaConstant(env, build_version_cls, "SDK_INT", "I", "ro.build.version.sdk");
   ReloadBuildJavaConstant(env, build_version_cls, "PREVIEW_SDK_INT", "I",
                           "ro.build.version.preview_sdk");
 
@@ -2002,6 +2000,15 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids, 
                                                 "CONFIG_CGROUP_CPUACCT?")
                                  : CREATE_ERROR("createProcessGroup(%d, %d) failed: %s", uid,
                                                 /* pid= */ 0, strerror(-rc)));
+        }
+
+        if (is_system_server && UsePerAppMemcg()) {
+            // Assign system_server to the correct memory cgroup.
+            // Not all devices mount memcg so check if it is mounted first
+            // to avoid unnecessarily printing errors and denials in the logs.
+            if (!SetTaskProfiles(getpid(), std::vector<std::string>{"SystemMemoryProcess"})) {
+                ALOGE("couldn't add process %d into system memcg group", getpid());
+            }
         }
     }
 
@@ -2251,9 +2258,7 @@ static jlong CalculateCapabilities(JNIEnv* env, jint uid, jint gid, jintArray gi
   /*
    *  Grant the following capabilities to the Bluetooth user:
    *    - CAP_WAKE_ALARM
-// QTI_BEGIN: 2019-06-24: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
    *    - CAP_NET_ADMIN
-// QTI_END: 2019-06-24: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
    *    - CAP_NET_RAW
    *    - CAP_NET_BIND_SERVICE (for DHCP client functionality)
    *    - CAP_SYS_NICE (for setting RT priority for audio-related threads)
@@ -2261,15 +2266,11 @@ static jlong CalculateCapabilities(JNIEnv* env, jint uid, jint gid, jintArray gi
 
   if (multiuser_get_app_id(uid) == AID_BLUETOOTH) {
     capabilities |= (1LL << CAP_WAKE_ALARM);
-// QTI_BEGIN: 2019-06-25: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
     capabilities |= (1LL << CAP_NET_ADMIN);
-// QTI_END: 2019-06-25: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
     capabilities |= (1LL << CAP_NET_RAW);
     capabilities |= (1LL << CAP_NET_BIND_SERVICE);
     capabilities |= (1LL << CAP_SYS_NICE);
-// QTI_BEGIN: 2019-06-24: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
     capabilities |= (1LL << CAP_NET_ADMIN);
-// QTI_END: 2019-06-24: Bluetooth: BT: Add CAP_NET_ADMIN for Bluetooth Process
   }
 
   if (multiuser_get_app_id(uid) == AID_NETWORK_STACK) {
@@ -2459,9 +2460,30 @@ pid_t zygote::ForkCommon(JNIEnv* env, bool is_system_server,
                          const std::vector<int>& fds_to_close,
                          const std::vector<int>& fds_to_ignore,
                          bool is_priority_fork,
+                         bool is_top_app,
+                         bool use_fifo_ui,
                          bool purge) {
   ATRACE_CALL();
-  if (is_priority_fork) {
+  /*
+  * Number of processors configured on the device.
+  */
+  static int number_of_processors = sysconf(_SC_NPROCESSORS_CONF);
+
+  if (is_top_app && use_fifo_ui) {
+    // Set SCHED_FIFO for top-app fork where FIFO UI is enabled.
+    struct sched_param rt_param;
+    rt_param.sched_priority = 1; // 98 prio
+
+    if (number_of_processors == 1) {
+      RuntimeAbort(env, __LINE__, "Cannot set SCHED_FIFO on single-core devices.");
+    }
+
+    if (sched_setscheduler(0, SCHED_FIFO, &rt_param) != 0) {
+      ALOGE("Failed to set SCHED_FIFO: %s", strerror(errno));
+    } else {
+      ALOGW("Setting SCHED_FIFO for top-app fork");
+    }
+  } else if (is_priority_fork) {
     setpriority(PRIO_PROCESS, 0, PROCESS_PRIORITY_MAX);
   }
 
@@ -2512,11 +2534,24 @@ pid_t zygote::ForkCommon(JNIEnv* env, bool is_system_server,
   pid_t pid = fork();
 
   if (pid == 0) {
-    if (is_priority_fork) {
-      setpriority(PRIO_PROCESS, 0, PROCESS_PRIORITY_MAX);
-    } else {
-      setpriority(PRIO_PROCESS, 0, PROCESS_PRIORITY_MIN);
-    }
+    if (is_top_app && use_fifo_ui) {
+      // Explicitly set SCHED_FIFO | SCHED_RESET_ON_FORK for child's main thread to avoid other
+      // threads inheriting the main thread's FIFO scheduling policy.
+      // Empirically, SCHED_RESET_ON_FORK also applies to newly created threads.
+      // An app shall have no more than the main and render threads running at
+      // FIFO priority, thus not saturating the device with SCHED_FIFO tasks.
+      struct sched_param child_rt_param = {0};
+      child_rt_param.sched_priority = 1; // 98 prio
+      if (sched_setscheduler(0, SCHED_FIFO | SCHED_RESET_ON_FORK, &child_rt_param) != 0) {
+        ALOGE("Failed to set SCHED_FIFO | SCHED_RESET_ON_FORK: %s", strerror(errno));
+        RuntimeAbort(env, __LINE__, "Failed to set SCHED_FIFO | SCHED_RESET_ON_FORK in child");
+      }
+    } else if (is_priority_fork) {
+        setpriority(PRIO_PROCESS, 0, PROCESS_PRIORITY_MAX);
+      } else {
+        // TODO: Revisit this.
+        setpriority(PRIO_PROCESS, 0, PROCESS_PRIORITY_MIN);
+      }
 
 #if defined(__BIONIC__) && !defined(NO_RESET_STACK_PROTECTOR)
     // Reset the stack guard for the new process.
@@ -2550,7 +2585,17 @@ pid_t zygote::ForkCommon(JNIEnv* env, bool is_system_server,
   // We blocked SIGCHLD prior to a fork, we unblock it here.
   UnblockSignal(SIGCHLD, fail_fn);
 
-  if (is_priority_fork && pid != 0) {
+  if (is_top_app && use_fifo_ui && pid != 0) {
+    // Reset the scheduler to SCHED_OTHER for the Zygote process.
+    struct sched_param zero_param = {0};
+    if (sched_setscheduler(0, SCHED_OTHER, &zero_param) != 0) {
+      ALOGE("Failed to reset scheduler: %s", strerror(errno));
+      RuntimeAbort(env, __LINE__, "Failed to reset scheduler");
+    } else {
+      ALOGD("Reset scheduler to SCHED_OTHER");
+    }
+    setpriority(PRIO_PROCESS, 0, PROCESS_PRIORITY_DEFAULT);
+  } else if (is_priority_fork && pid != 0) {
     setpriority(PRIO_PROCESS, 0, PROCESS_PRIORITY_DEFAULT);
   }
 
@@ -2566,7 +2611,7 @@ static jint com_android_internal_os_Zygote_nativeForkAndSpecialize(
         JNIEnv* env, jclass, jint uid, jint gid, jintArray gids, jint runtime_flags,
         jobjectArray rlimits, jint mount_external, jstring se_info, jstring nice_name,
         jintArray managed_fds_to_close, jintArray managed_fds_to_ignore, jboolean is_child_zygote,
-        jstring instruction_set, jstring app_data_dir, jboolean is_top_app,
+        jstring instruction_set, jstring app_data_dir, jboolean is_top_app, jboolean use_fifo_ui,
         jobjectArray pkg_data_info_list, jobjectArray allowlisted_data_info_list,
         jboolean mount_data_dirs, jboolean mount_storage_dirs, jboolean mount_sysprop_overrides) {
     jlong capabilities = CalculateCapabilities(env, uid, gid, gids, is_child_zygote);
@@ -2605,7 +2650,7 @@ static jint com_android_internal_os_Zygote_nativeForkAndSpecialize(
     }
 
     pid_t pid = zygote::ForkCommon(env, /* is_system_server= */ false, fds_to_close, fds_to_ignore,
-                                   true);
+                                   true, is_top_app == JNI_TRUE, use_fifo_ui == JNI_TRUE);
 
     if (pid == 0) {
         SpecializeCommon(env, uid, gid, gids, runtime_flags, rlimits, capabilities, capabilities,
@@ -2663,15 +2708,6 @@ static jint com_android_internal_os_Zygote_nativeForkSystemServer(
           ALOGE("System server process %d has died. Restarting Zygote!", pid);
           RuntimeAbort(env, __LINE__, "System server process has died. Restarting Zygote!");
       }
-
-      if (UsePerAppMemcg()) {
-          // Assign system_server to the correct memory cgroup.
-          // Not all devices mount memcg so check if it is mounted first
-          // to avoid unnecessarily printing errors and denials in the logs.
-          if (!SetTaskProfiles(pid, std::vector<std::string>{"SystemMemoryProcess"})) {
-              ALOGE("couldn't add process %d into system memcg group", pid);
-          }
-      }
   }
   return pid;
 }
@@ -2704,7 +2740,8 @@ static jint com_android_internal_os_Zygote_nativeForkApp(JNIEnv* env,
       ExtractJIntArray(env, "USAP", nullptr, managed_session_socket_fds)
           .value_or(std::vector<int>());
   return zygote::forkApp(env, read_pipe_fd, write_pipe_fd, session_socket_fds,
-                            args_known == JNI_TRUE, is_priority_fork == JNI_TRUE, true);
+                            args_known == JNI_TRUE, is_priority_fork == JNI_TRUE,
+                            false, false, true);
 }
 
 NO_STACK_PROTECTOR
@@ -2714,6 +2751,8 @@ int zygote::forkApp(JNIEnv* env,
                     const std::vector<int>& session_socket_fds,
                     bool args_known,
                     bool is_priority_fork,
+                    bool is_top_app,
+                    bool use_fifo_ui,
                     bool purge) {
   ATRACE_CALL();
 
@@ -2754,7 +2793,7 @@ int zygote::forkApp(JNIEnv* env,
   }
 
   return zygote::ForkCommon(env, /* is_system_server= */ false, fds_to_close,
-                            fds_to_ignore, is_priority_fork == JNI_TRUE, purge);
+                            fds_to_ignore, is_priority_fork, is_top_app, use_fifo_ui, purge);
 }
 
 static void com_android_internal_os_Zygote_nativeAllowFileAcrossFork(
@@ -3091,7 +3130,7 @@ static void com_android_internal_os_Zygote_nativeAllowFilesOpenedByPreload(JNIEn
 static const JNINativeMethod gMethods[] = {
         {"nativeForkAndSpecialize",
          "(II[II[[IILjava/lang/String;Ljava/lang/String;[I[IZLjava/lang/String;Ljava/lang/"
-         "String;Z[Ljava/lang/String;[Ljava/lang/String;ZZZ)I",
+         "String;ZZ[Ljava/lang/String;[Ljava/lang/String;ZZZ)I",
          (void*)com_android_internal_os_Zygote_nativeForkAndSpecialize},
         {"nativeForkSystemServer", "(II[II[[IJJ)I",
          (void*)com_android_internal_os_Zygote_nativeForkSystemServer},

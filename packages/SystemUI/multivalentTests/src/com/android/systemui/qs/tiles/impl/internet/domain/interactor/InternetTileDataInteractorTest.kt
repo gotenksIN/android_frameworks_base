@@ -68,7 +68,6 @@ import org.mockito.kotlin.whenever
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
-@android.platform.test.annotations.EnabledOnRavenwood
 class InternetTileDataInteractorTest : SysuiTestCase() {
     private val testUser = UserHandle.of(1)
     private val kosmos = testKosmos()
@@ -129,7 +128,9 @@ class InternetTileDataInteractorTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 context,
                 flags,
+// QTI_BEGIN: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
                 mock(),
+// QTI_END: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
             )
 
         context.orCreateTestableResources.apply {

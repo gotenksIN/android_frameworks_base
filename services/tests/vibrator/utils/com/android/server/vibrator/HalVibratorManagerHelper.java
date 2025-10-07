@@ -18,27 +18,40 @@ package com.android.server.vibrator;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.hardware.vibrator.ActivePwle;
+import android.hardware.vibrator.CompositeEffect;
+import android.hardware.vibrator.CompositePwleV2;
 import android.hardware.vibrator.IVibrationSession;
 import android.hardware.vibrator.IVibrator;
 import android.hardware.vibrator.IVibratorCallback;
 import android.hardware.vibrator.IVibratorManager;
+import android.hardware.vibrator.PrimitivePwle;
+import android.hardware.vibrator.PwleV2Primitive;
 import android.hardware.vibrator.VibrationSessionConfig;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.RemoteException;
+import android.os.VibrationEffect;
+import android.os.vibrator.PrimitiveSegment;
+import android.os.vibrator.PwlePoint;
+import android.os.vibrator.RampSegment;
 
 import com.android.server.vibrator.VintfHalVibratorManager.DefaultHalVibratorManager;
+import com.android.server.vibrator.VintfHalVibratorManager.LegacyHalVibratorManager;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Provides real {@link HalVibratorManager} implementations for testing, backed with fake and
  * configurable hardware capabilities.
  */
 public class HalVibratorManagerHelper {
+    private final Map<Integer, HalVibratorHelper> mVibratorHelpers = new HashMap<>();
     private final Handler mHandler;
 
     private FakeVibrationSession mLastSession;
@@ -71,16 +84,39 @@ public class HalVibratorManagerHelper {
 
     /** Create new {@link DefaultHalVibratorManager} for testing. */
     public DefaultHalVibratorManager newDefaultVibratorManager() {
-        FakeVibratorManager fakeManager = new FakeVibratorManager();
-        return new DefaultHalVibratorManager(new FakeVibratorManagerSupplier(fakeManager));
+        HalNativeHandler nativeHandler = new FakeHalNativeHandler();
+        return new DefaultHalVibratorManager(
+                new FakeVibratorManagerSupplier(new FakeVibratorManager()),
+                nativeHandler,
+                id -> mVibratorHelpers.get(id).newDefaultVibrator(id, nativeHandler));
     }
 
-    public void setCapabilities(long capabilities) {
-        mCapabilities = capabilities;
+    /** Create new {@link LegacyHalVibratorManager} for testing. */
+    public LegacyHalVibratorManager newLegacyVibratorManager() {
+        int vibratorId = VintfHalVibratorManager.DEFAULT_VIBRATOR_ID;
+        setVibratorIds(new int[] { vibratorId });
+        HalNativeHandler nativeHandler = new FakeHalNativeHandler();
+        return new LegacyHalVibratorManager(mVibratorHelpers.get(vibratorId).newDefaultVibrator(
+                vibratorId, nativeHandler), nativeHandler);
+    }
+
+    /** Return the helper class for given vibrator, or null if ID not found. */
+    public HalVibratorHelper getVibratorHelper(int vibratorId) {
+        return mVibratorHelpers.get(vibratorId);
+    }
+
+    public void setCapabilities(long... capabilities) {
+        mCapabilities = Arrays.stream(capabilities).reduce(0, (a, b) -> a | b);
     }
 
     public void setVibratorIds(int[] vibratorIds) {
         mVibratorIds = vibratorIds;
+        mVibratorHelpers.clear();
+        if (vibratorIds != null) {
+            for (int id : vibratorIds) {
+                mVibratorHelpers.put(id, new HalVibratorHelper(mHandler.getLooper()));
+            }
+        }
     }
 
     public void setSessionEndDelayMs(long sessionEndDelayMs) {
@@ -172,6 +208,11 @@ public class HalVibratorManagerHelper {
         private HalVibratorManager.Callbacks mCallbacks;
 
         @Override
+        public HalVibrator createVibrator(int vibratorId) {
+            return mVibratorHelpers.get(vibratorId).newVibratorController(vibratorId);
+        }
+
+        @Override
         public void init(HalVibratorManager.Callbacks callback) {
             mConnectCount++;
             mCallbacks = callback;
@@ -223,8 +264,8 @@ public class HalVibratorManagerHelper {
             mStartSessionCount++;
             if (hasCapability(IVibratorManager.CAP_START_SESSIONS)
                     && areVibratorIdsValid(vibratorIds)) {
-                mLastSession = new FakeVibrationSession(new FakeVibratorCallback(
-                        () -> mCallbacks.onVibrationSessionComplete(sessionId)));
+                mLastSession = new FakeVibrationSession(
+                        () -> mCallbacks.onVibrationSessionComplete(sessionId));
                 return true;
             }
             return false;
@@ -252,6 +293,133 @@ public class HalVibratorManagerHelper {
         public void clearSessions() {
             mClearSessionsCount++;
             endLastSessionAbruptly();
+        }
+    }
+
+    /** Provides fake implementation of {@link HalNativeHandler} for testing. */
+    public final class FakeHalNativeHandler implements HalNativeHandler {
+        private HalVibratorManager.Callbacks mManagerCallbacks;
+        private HalVibrator.Callbacks mVibratorCallbacks;
+
+        @Override
+        public void init(@NonNull HalVibratorManager.Callbacks managerCallbacks,
+                @NonNull HalVibrator.Callbacks vibratorCallbacks) {
+            mManagerCallbacks = managerCallbacks;
+            mVibratorCallbacks = vibratorCallbacks;
+        }
+
+        @Override
+        public boolean triggerSyncedWithCallback(long vibrationId) {
+            if (mTriggerSyncedShouldFail) {
+                return false;
+            }
+            mTriggerSyncedCount++;
+            if (hasCapability(IVibratorManager.CAP_SYNC)) {
+                mLastTriggerSyncedCallback = new FakeVibratorCallback(
+                        () -> mManagerCallbacks.onSyncedVibrationComplete(vibrationId));
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public IVibrationSession startSessionWithCallback(long sessionId, int[] vibratorIds) {
+            if (mStartSessionShouldFail) {
+                return null;
+            }
+            mStartSessionCount++;
+            if (hasCapability(IVibratorManager.CAP_START_SESSIONS)
+                    && areVibratorIdsValid(vibratorIds)) {
+                mLastSession = new FakeVibrationSession(
+                        () -> mManagerCallbacks.onVibrationSessionComplete(sessionId));
+                return mLastSession;
+            }
+            return null;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId,
+                int durationMs) {
+            int result = mVibratorHelpers.get(vibratorId).vibrate(durationMs);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, durationMs);
+            }
+            return result;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId,
+                android.hardware.vibrator.VendorEffect effect) {
+            VibrationEffect.VendorEffect vendorEffect = new VibrationEffect.VendorEffect(
+                    effect.vendorData, effect.strength, effect.scale, effect.vendorScale);
+            int result = mVibratorHelpers.get(vibratorId).vibrate(vendorEffect);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, result);
+            }
+            return result;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId, int effectId,
+                int effectStrength) {
+            int result = mVibratorHelpers.get(vibratorId).vibrate(effectId, (byte) effectStrength);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, result);
+            }
+            return result;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId,
+                CompositeEffect[] effects) {
+            PrimitiveSegment[] primitives = new PrimitiveSegment[effects.length];
+            for (int i = 0; i < primitives.length; i++) {
+                primitives[i] = new PrimitiveSegment(effects[i].primitive, effects[i].scale,
+                        effects[i].delayMs);
+            }
+            int result = mVibratorHelpers.get(vibratorId).vibrate(primitives);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, result);
+            }
+            return result;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId,
+                PrimitivePwle[] effects) {
+            RampSegment[] primitives = new RampSegment[effects.length];
+            for (int i = 0; i < primitives.length; i++) {
+                ActivePwle pwle = effects[i].getActive();
+                primitives[i] = new RampSegment(pwle.startAmplitude, pwle.endAmplitude,
+                        pwle.startFrequency, pwle.endFrequency, pwle.duration);
+            }
+            int result = mVibratorHelpers.get(vibratorId).vibrate(primitives);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, result);
+            }
+            return result;
+        }
+
+        @Override
+        public int vibrateWithCallback(int vibratorId, long vibrationId, long stepId,
+                CompositePwleV2 composite) {
+            PwlePoint[] points = new PwlePoint[composite.pwlePrimitives.length];
+            for (int i = 0; i < points.length; i++) {
+                PwleV2Primitive primitive = composite.pwlePrimitives[i];
+                points[i] = new PwlePoint(primitive.amplitude, primitive.frequencyHz,
+                        primitive.timeMillis);
+            }
+            int result = mVibratorHelpers.get(vibratorId).vibrate(points);
+            if (result > 0) {
+                scheduleCallback(vibratorId, vibrationId, stepId, result);
+            }
+            return result;
+        }
+
+        private void scheduleCallback(int vibratorId, long vibrationId, long stepId,
+                int durationMs) {
+            mVibratorHelpers.get(vibratorId).scheduleVibrationCallback(mVibratorCallbacks,
+                    vibratorId, vibrationId, stepId, durationMs);
         }
     }
 
@@ -288,14 +456,17 @@ public class HalVibratorManagerHelper {
 
         @Override
         public void triggerSynced(IVibratorCallback callback) throws RemoteException {
+            if (callback != null) {
+                throw new IllegalArgumentException("HAL java client should not receive callbacks");
+            }
             if (mTriggerSyncedShouldFail) {
                 throw new RemoteException();
             }
             mTriggerSyncedCount++;
-            mLastTriggerSyncedCallback = callback;
             if (!hasCapability(IVibratorManager.CAP_SYNC)) {
                 throw new UnsupportedOperationException();
             }
+            mLastTriggerSyncedCallback = callback;
         }
 
         @Override
@@ -309,18 +480,8 @@ public class HalVibratorManagerHelper {
         @Override
         public IVibrationSession startSession(int[] vibratorIds, VibrationSessionConfig config,
                 IVibratorCallback callback) throws RemoteException {
-            if (mStartSessionShouldFail) {
-                throw new RemoteException();
-            }
-            mStartSessionCount++;
-            if (!hasCapability(IVibratorManager.CAP_START_SESSIONS)) {
-                throw new UnsupportedOperationException();
-            }
-            if (!areVibratorIdsValid(vibratorIds)) {
-                throw new IllegalArgumentException();
-            }
-            mLastSession = new FakeVibrationSession(callback);
-            return mLastSession;
+            throw new UnsupportedOperationException(
+                    "HAL java client should not be used to start sessions");
         }
 
         @Override
@@ -345,10 +506,17 @@ public class HalVibratorManagerHelper {
 
     /** Provides fake implementation of {@link IVibrationSession} for testing. */
     public final class FakeVibrationSession extends IVibrationSession.Stub {
+        private final IBinder mToken;
         private final IVibratorCallback mCallback;
 
-        public FakeVibrationSession(IVibratorCallback callback) {
-            mCallback = callback;
+        public FakeVibrationSession(Runnable callback) {
+            mToken = new Binder();
+            mCallback = new FakeVibratorCallback(callback);
+        }
+
+        @Override
+        public IBinder asBinder() {
+            return mToken;
         }
 
         @Override

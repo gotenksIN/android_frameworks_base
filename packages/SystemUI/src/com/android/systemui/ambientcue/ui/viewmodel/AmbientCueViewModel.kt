@@ -28,6 +28,7 @@ import androidx.core.content.edit
 import com.android.app.tracing.coroutines.coroutineScopeTraced
 import com.android.systemui.Dumpable
 import com.android.systemui.ambientcue.domain.interactor.AmbientCueInteractor
+import com.android.systemui.ambientcue.shared.logger.AmbientCueLogger
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.domain.interactor.SharedPreferencesInteractor
 import com.android.systemui.dump.DumpManager
@@ -45,6 +46,7 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DisposableHandle
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
@@ -53,6 +55,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -66,6 +69,7 @@ constructor(
     private val systemClock: SystemClock,
     private val dumpManager: DumpManager,
     private val sharedPreferencesInteractor: SharedPreferencesInteractor,
+    private val ambientCueLogger: AmbientCueLogger,
     @Application scope: CoroutineScope,
 ) : ExclusiveActivatable(), Dumpable {
 
@@ -113,7 +117,9 @@ constructor(
     private val firstTimeEducationShownAt: Flow<Long?> =
         sharedPreferences
             .flatMapLatestConflated { prefs ->
-                prefs?.observeLong(KEY_FIRST_TIME_ONBOARDING_SHOWN_AT, -1L) ?: flowOf(null)
+                // If the shared preference is not initialized, set the default value to 0L to avoid
+                // showing the first time education.
+                prefs?.observeLong(KEY_FIRST_TIME_ONBOARDING_SHOWN_AT, -1L) ?: flowOf(0L)
             }
             .map { if (it == -1L) null else it }
             .distinctUntilChanged()
@@ -176,47 +182,53 @@ constructor(
                     }
                 },
         )
+
+    @OptIn(FlowPreview::class)
     val actions: List<ActionViewModel> by
         hydrator.hydratedStateOf(
             traceName = "actions",
             initialValue = listOf(),
             source =
-                ambientCueInteractor.actions.map { actions ->
-                    actions.map { action ->
-                        ActionViewModel(
-                            icon =
-                                IconViewModel(
-                                    drawable = action.icon.drawable,
-                                    iconId = action.icon.iconId,
-                                    repeatCount = 0,
-                                ),
-                            label = action.label,
-                            attribution = action.attribution,
-                            onClick = {
-                                action.onPerformAction()
-                                collapse()
-                            },
-                            onLongClick = {
-                                action.onPerformLongClick()
-                                // Long press onboarding only triggers 7 days after the initial
-                                // onboarding. That said, we'd like to suppress it in case the user
-                                // discovers the gesture on their own. For this reason, we don't
-                                // check if the tooltip is visible before updating the shared
-                                // preference.
-                                sharedPreferences.value?.edit {
-                                    putBoolean(KEY_SHOW_LONG_PRESS_ONBOARDING, false)
-                                }
-                            },
-                            actionType =
-                                when (action.actionType) {
-                                    "ma" -> ActionType.MA
-                                    "mr" -> ActionType.MR
-                                    else -> ActionType.Unknown
+                ambientCueInteractor.actions
+                    .debounce { actions -> if (actions.isEmpty()) ACTIONS_DEBOUNCE_MS else 0L }
+                    .map { actions ->
+                        actions.map { action ->
+                            ActionViewModel(
+                                icon =
+                                    IconViewModel(
+                                        large = action.icon.large,
+                                        small = action.icon.small,
+                                        iconId = action.icon.iconId,
+                                        repeatCount = 0,
+                                    ),
+                                label = action.label,
+                                attribution = action.attribution,
+                                onClick = {
+                                    action.onPerformAction()
+                                    collapse()
                                 },
-                            oneTapEnabled = action.oneTapEnabled,
-                        )
-                    }
-                },
+                                onLongClick = {
+                                    action.onPerformLongClick()
+                                    // Long press onboarding only triggers 7 days after the initial
+                                    // onboarding. That said, we'd like to suppress it in case the
+                                    // user discovers the gesture on their own. For this reason, we
+                                    // don't check if the tooltip is visible before updating the
+                                    // shared preference.
+                                    sharedPreferences.value?.edit {
+                                        putBoolean(KEY_SHOW_LONG_PRESS_ONBOARDING, false)
+                                    }
+                                },
+                                actionType =
+                                    when (action.actionType) {
+                                        "ma" -> ActionType.MA
+                                        "mr" -> ActionType.MR
+                                        else -> ActionType.Unknown
+                                    },
+                                oneTapEnabled = action.oneTapEnabled,
+                                oneTapDelayMs = action.oneTapDelayMs,
+                            )
+                        }
+                    },
         )
 
     fun expand() {
@@ -232,10 +244,10 @@ constructor(
     }
 
     fun hide() {
-        // TODO(b/425279501) Log ambient cue close button click status.
         ambientCueInteractor.setDeactivated(true)
         isExpanded = false
         disableFirstTimeHint()
+        ambientCueLogger.setClickedCloseButtonStatus()
     }
 
     private var deactivateCueBarJob: Job? = null
@@ -250,8 +262,8 @@ constructor(
         coroutineScopeTraced("AmbientCueViewModel") {
             deactivateCueBarJob = launch {
                 delay(ambientCueTimeoutMs.milliseconds)
-                // TODO(b/425279501) Log ambient cue timeout status.
                 ambientCueInteractor.setDeactivated(true)
+                ambientCueLogger.setReachedTimeoutStatus()
             }
         }
     }
@@ -277,7 +289,7 @@ constructor(
         }
     }
 
-    private fun disableFirstTimeHint() {
+    fun disableFirstTimeHint() {
         if (showFirstTimeEducation) {
             sharedPreferences.value?.edit {
                 Log.i(TAG, "suppressing first time tooltip")
@@ -319,5 +331,6 @@ constructor(
         private const val SHARED_PREFERENCES_FILE_NAME = "ambientcue_pref"
         private const val KEY_FIRST_TIME_ONBOARDING_SHOWN_AT = "show_first_time_onboarding"
         private const val KEY_SHOW_LONG_PRESS_ONBOARDING = "show_long_press_onboarding"
+        private const val ACTIONS_DEBOUNCE_MS = 300L
     }
 }

@@ -40,11 +40,28 @@ import org.junit.runner.RunWith
 class LetterboxControllerStrategyTest : ShellTestCase() {
 
     @Test
-    fun `LetterboxMode is SINGLE_SURFACE with rounded corners`() {
+    fun `LetterboxMode is SINGLE_SURFACE with rounded corners and Not Translucent`() {
         runTestScenario { r ->
             r.configureRoundedCornerRadius(true)
-            r.configureLetterboxMode()
+            r.configureLetterboxMode(
+                r.SIMPLE_TEST_EVENT.copy(
+                    isTranslucent = false
+                )
+            )
             r.checkLetterboxModeIsSingle()
+        }
+    }
+
+    @Test
+    fun `LetterboxMode is MULTI_SURFACE with rounded corners but Translucent`() {
+        runTestScenario { r ->
+            r.configureRoundedCornerRadius(true)
+            r.configureLetterboxMode(
+                r.SIMPLE_TEST_EVENT.copy(
+                    isTranslucent = true
+                )
+            )
+            r.checkLetterboxModeIsMultiple()
         }
     }
 
@@ -62,11 +79,30 @@ class LetterboxControllerStrategyTest : ShellTestCase() {
     }
 
     @Test
-    fun `LetterboxMode is MULTIPLE_SURFACES with no rounded corners`() {
+    fun `shouldSupportInputSurface comes from the Event`() {
+        runTestScenario { r ->
+            r.configureLetterboxMode(
+                r.SIMPLE_TEST_EVENT.copy(
+                    supportsInput = true
+                )
+            )
+            r.checkShouldSupportInputSurface(expected = true)
+
+            r.configureLetterboxMode(
+                r.SIMPLE_TEST_EVENT.copy(
+                    supportsInput = false
+                )
+            )
+            r.checkShouldSupportInputSurface(expected = false)
+        }
+    }
+
+    @Test
+    fun `LetterboxMode is SINGLE_SURFACE with no rounded corners`() {
         runTestScenario { r ->
             r.configureRoundedCornerRadius(false)
             r.configureLetterboxMode()
-            r.checkLetterboxModeIsMultiple()
+            r.checkLetterboxModeIsSingle()
         }
     }
 
@@ -83,6 +119,7 @@ class LetterboxControllerStrategyTest : ShellTestCase() {
         companion object {
             @JvmStatic
             private val ROUNDED_CORNERS_TRUE = 10
+
             @JvmStatic
             private val ROUNDED_CORNERS_FALSE = 0
         }
@@ -96,7 +133,8 @@ class LetterboxControllerStrategyTest : ShellTestCase() {
 
         init {
             letterboxConfiguration = LetterboxConfiguration(ctx)
-            letterboxStrategy = LetterboxControllerStrategy(letterboxConfiguration)
+            letterboxStrategy =
+                LetterboxControllerStrategy(letterboxConfiguration)
         }
 
         fun configureRoundedCornerRadius(enabled: Boolean) {
@@ -112,6 +150,10 @@ class LetterboxControllerStrategyTest : ShellTestCase() {
         fun checkLetterboxModeIsSingle(expected: Boolean = true) {
             val expectedMode = if (expected) SINGLE_SURFACE else MULTIPLE_SURFACES
             assertEquals(expectedMode, letterboxStrategy.getLetterboxImplementationMode())
+        }
+
+        fun checkShouldSupportInputSurface(expected: Boolean = true) {
+            assertEquals(expected, letterboxStrategy.shouldSupportInputSurface())
         }
 
         fun checkLetterboxModeIsMultiple(expected: Boolean = true) {

@@ -506,13 +506,11 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
         public void forceCurrent() {
             sdkVersion = Build.VERSION.SDK_INT;
 
-            if (android.sdk.Flags.majorMinorVersioningScheme()) {
-                sdkVersionFull = Build.VERSION.SDK_INT_FULL;
-                if (Build.getMajorSdkVersion(sdkVersionFull) != sdkVersion) {
-                    throw new RuntimeException("Build.VERSION.SDK_INT_FULL:" + sdkVersionFull
-                            + " and Build.VERSION.SDK_INT: " + sdkVersion + " don't match."
-                            + " Please check your build configurations!");
-                }
+            sdkVersionFull = Build.VERSION.SDK_INT_FULL;
+            if (Build.getMajorSdkVersion(sdkVersionFull) != sdkVersion) {
+                throw new RuntimeException("Build.VERSION.SDK_INT_FULL:" + sdkVersionFull
+                        + " and Build.VERSION.SDK_INT: " + sdkVersion + " don't match."
+                        + " Please check your build configurations!");
             }
 
             databaseVersion = CURRENT_DATABASE_VERSION;
@@ -833,9 +831,9 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
         return mSnapshot.snapshot();
     }
 
-    private void invalidatePackageCache() {
+    private void invalidatePackageCache(int invalidationReason) {
         ApplicationPackageManager.invalidateQueryIntentActivitiesCache();
-        PackageManagerService.invalidatePackageInfoCache();
+        PackageManagerService.invalidatePackageInfoCache(invalidationReason);
         ChangeIdStateCache.invalidate();
         onChanged();
     }
@@ -2344,7 +2342,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
     }
 
     void writePackageRestrictionsLPr(int userId, boolean sync) {
-        invalidatePackageCache();
+        invalidatePackageCache(
+                PackageMetrics.INVALIDATION_REASON_WRITE_PACKAGE_RESTRICTIONS);
 
         final long startTime = SystemClock.uptimeMillis();
 
@@ -2364,7 +2363,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
     }
 
     void writePackageRestrictions(Integer[] userIds) {
-        invalidatePackageCache();
+        invalidatePackageCache(
+                PackageMetrics.INVALIDATION_REASON_WRITE_PACKAGE_RESTRICTIONS);
         final long startTime = SystemClock.uptimeMillis();
         for (int userId : userIds) {
             writePackageRestrictions(userId, startTime, /*sync=*/true);
@@ -2844,7 +2844,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
         // changed in the form of a settings object change, and it does so under its internal
         // lock --- so if we invalidate the package cache here, we end up invalidating at the
         // right time.
-        invalidatePackageCache();
+        invalidatePackageCache(
+                PackageMetrics.INVALIDATION_REASON_WRITE_SETTINGS);
 
         ArrayList<Signature> writtenSignatures = new ArrayList<>();
 
@@ -3543,9 +3544,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                         final VersionInfo ver = findOrCreateVersion(volumeUuid);
                         ver.sdkVersion = parser.getAttributeInt(null, ATTR_SDK_VERSION);
                         final int defaultSdkVersionFull =
-                                android.sdk.Flags.majorMinorVersioningScheme()
-                                        ? Build.parseFullVersion(String.valueOf(ver.sdkVersion))
-                                        : 0;
+                                Build.parseFullVersion(String.valueOf(ver.sdkVersion));
                         ver.sdkVersionFull = parser.getAttributeInt(null, ATTR_SDK_VERSION_FULL,
                                 defaultSdkVersionFull);
                         ver.databaseVersion = parser.getAttributeInt(null, ATTR_DATABASE_VERSION);

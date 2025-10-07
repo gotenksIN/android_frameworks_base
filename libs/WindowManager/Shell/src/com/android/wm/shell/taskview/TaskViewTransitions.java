@@ -24,10 +24,10 @@ import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 
-import static com.android.window.flags.Flags.FLAG_EXCLUDE_TASK_FROM_RECENTS;
 import static com.android.window.flags.Flags.enableHandlersDebuggingMode;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE;
 import static com.android.wm.shell.bubbles.util.BubbleUtils.getExitBubbleTransaction;
+import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BUBBLES;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BUBBLES_NOISY;
 import static com.android.wm.shell.transition.TransitionDispatchState.CAPTURED_CHANGE_IN_WRONG_TRANSITION;
 import static com.android.wm.shell.transition.TransitionDispatchState.CAPTURED_UNRELATED_CHANGE;
@@ -58,6 +58,7 @@ import androidx.annotation.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
 import com.android.wm.shell.Flags;
 import com.android.wm.shell.ShellTaskOrganizer;
+import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.shared.TransitionUtil;
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
@@ -96,6 +97,13 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
 
     /** A temp transaction used for quick things. */
     private final SurfaceControl.Transaction mTransaction = new SurfaceControl.Transaction();
+
+    /**
+     * A display change transition that also involves a TaskView. The display animation is deferred
+     * until the TaskView's bounds are updated. This object holds the logic to dispatch the display
+     * transition once the TaskView is ready.
+     */
+    private PendingRedirectTransition mPendingRedirectTransition;
 
     /**
      * TaskView makes heavy use of startTransition. Only one shell-initiated transition can be
@@ -208,13 +216,34 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
      * In practice, the external is usually another transition on a different handler.
      */
     public void enqueueExternal(@NonNull TaskViewTaskController taskView, ExternalTransition ext) {
-        ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.enqueueExternal(): taskView=%d pending=%d",
-                taskView.hashCode(), mPending.size());
+        ProtoLog.d(WM_SHELL_BUBBLES,
+                "TaskViewTransitions.enqueueExternal(): transition=%s taskView=%d pending=%d",
+                ext, taskView.hashCode(), mPending.size());
         final PendingTransition pending = new PendingTransition(
                 TRANSIT_NONE, null /* wct */, taskView, null /* cookie */);
         pending.mExternalTransition = ext;
         mPending.add(pending);
         startNextTransition();
+    }
+
+    /**
+     * Add an already running external transition into the pending queue.
+     * This transition has to be started externally. And it will block any new transitions from
+     * starting in the pending queue.
+     *
+     * The external operation *must* call {@link #onExternalDone(IBinder)} once it has finished.
+     */
+    public void enqueueRunningExternal(@NonNull TaskViewTaskController taskView,
+            IBinder transition) {
+        ProtoLog.d(WM_SHELL_BUBBLES,
+                "TaskViewTransitions.enqueueRunningExternal(): "
+                    + "transition=%s taskView=%d pending=%d",
+                transition, taskView.hashCode(), mPending.size());
+        final PendingTransition pending = new PendingTransition(
+                TRANSIT_NONE, null /* wct */, taskView, null /* cookie */);
+        pending.mExternalTransition = () -> transition;
+        pending.mClaimed = transition;
+        mPending.add(pending);
     }
 
     /**
@@ -458,6 +487,15 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
     }
 
     /**
+     * See {@link #setTaskViewVisible(TaskViewTaskController, boolean, boolean, boolean, boolean)}.
+     */
+    public void setTaskViewVisible(TaskViewTaskController taskView, boolean visible,
+            boolean reorder, boolean syncHiddenWithVisibilityOnReorder) {
+        setTaskViewVisible(taskView, visible, reorder, syncHiddenWithVisibilityOnReorder,
+                false /* nonBlockingIfPossible */);
+    }
+
+    /**
      * Starts a new transition to make the given {@code taskView} visible and optionally
      * reordering it.
      *
@@ -469,11 +507,16 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
      *                                          the task with the target visibility when
      *                                          reordering. This only takes effect if {@code
      *                                          reorder} is {@code true}.
-     * @throws IllegalStateException If the flag {@link FLAG_ENABLE_CREATE_ANY_BUBBLE} and
-     *                               {@link FLAG_EXCLUDE_TASK_FROM_RECENTS} are not enabled.
+     * @param nonBlockingIfPossible If true, the wct will be executed in a non-blocking way when
+     *                              possible. It is possible if {@link #mShellExecutor} is an
+     *                              instance of {@link ShellExecutor} that supports posting a
+     *                              Runnable after the current execution.
+     * @throws IllegalStateException If the flag {@link FLAG_ENABLE_CREATE_ANY_BUBBLE} is not
+     *                               enabled.
      */
     public void setTaskViewVisible(TaskViewTaskController taskView, boolean visible,
-            boolean reorder, boolean syncHiddenWithVisibilityOnReorder) {
+            boolean reorder, boolean syncHiddenWithVisibilityOnReorder,
+            boolean nonBlockingIfPossible) {
         final TaskViewRepository.TaskViewState state = useRepo()
                 ? mTaskViewRepo.byTaskView(taskView)
                 : mTaskViews.get(taskView);
@@ -488,11 +531,6 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         wct.setBounds(taskView.getTaskInfo().token, state.mBounds);
         if (reorder && !syncHiddenWithVisibilityOnReorder) {
-            if (!BubbleAnythingFlagHelper.enableCreateAnyBubbleWithForceExcludedFromRecents()) {
-                throw new IllegalStateException(
-                    "Flag " + FLAG_ENABLE_CREATE_ANY_BUBBLE + " and "
-                        + FLAG_EXCLUDE_TASK_FROM_RECENTS + " are not enabled");
-            }
             // Reset hidden state to fix corner case where surface was destroyed before task
             // appeared in #prepareOpenAnimation.
             wct.setHidden(taskView.getTaskInfo().token, false /* hidden */);
@@ -510,7 +548,11 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         final PendingTransition pending = new PendingTransition(
                 visible ? TRANSIT_TO_FRONT : TRANSIT_TO_BACK, wct, taskView, null /* cookie */);
         mPending.add(pending);
-        startNextTransition();
+        if (nonBlockingIfPossible && mShellExecutor instanceof ShellExecutor executor) {
+            executor.executeDelayed(this::startNextTransition, 0);
+        } else {
+            startNextTransition();
+        }
         // visibility is reported in transition.
     }
 
@@ -601,7 +643,9 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         }
         ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.setTaskBoundsInTransition(): taskView=%d "
                         + "bounds=%s", taskView.hashCode(), boundsOnScreen);
-        WindowContainerTransaction wct = new WindowContainerTransaction();
+        // If there is a pending redirect transition, it may have a WCT with other operations.
+        final WindowContainerTransaction wct = mPendingRedirectTransition != null
+                ? mPendingRedirectTransition.takePendingWct() : new WindowContainerTransaction();
         wct.setBounds(taskView.getTaskInfo().token, boundsOnScreen);
         mPending.add(new PendingTransition(TRANSIT_CHANGE, wct, taskView, null /* cookie */));
         startNextTransition();
@@ -642,12 +686,12 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
     @Override
     public void onTransitionConsumed(@NonNull IBinder transition, boolean aborted,
             @NonNull SurfaceControl.Transaction finishTransaction) {
-        if (!aborted) return;
+        if (!Flags.fixTaskViewRotationAnimation() && !aborted) return;
         final PendingTransition pending = findPending(transition);
         if (pending == null) return;
         ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.onTransitionConsumed(): taskView=%d "
-                + "consumed type=%s transition=%s", pending.mTaskView.hashCode(),
-                transitTypeToString(pending.mType), transition);
+                + "consumed type=%s transition=%s aborted=%b", pending.mTaskView.hashCode(),
+                transitTypeToString(pending.mType), transition, aborted);
         mPending.remove(pending);
         startNextTransition();
     }
@@ -736,6 +780,7 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             return false;
         }
         boolean stillNeedsMatchingLaunch = pending != null && pending.mLaunchCookie != null;
+        int changingDisplayId = -1;
         WindowContainerTransaction wct = null;
 
         // Collect all the tasks views that this handler can handle
@@ -750,6 +795,11 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
                 }
             } else {
                 alienChanges.add(chg);
+                if (Flags.fixTaskViewRotationAnimation()
+                        && chg.hasFlags(TransitionInfo.FLAG_IS_DISPLAY)
+                        && chg.getMode() == TRANSIT_CHANGE && mPendingRedirectTransition == null) {
+                    changingDisplayId = chg.getEndDisplayId();
+                }
             }
         }
         if (inDataCollectionModeOnly) {
@@ -805,6 +855,13 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
                         if (wct == null) wct = new WindowContainerTransaction();
                         updateBounds(infoTv, boundsOnScreen, startTransaction, finishTransaction,
                                 taskInfo, leash, wct);
+                        if (changingDisplayId == task.getEndDisplayId()) {
+                            ProtoLog.d(WM_SHELL_BUBBLES, "Transitions.startAnimation(): "
+                                    + "display change, taskView=%d", infoTv.hashCode());
+                            // Remove the change from TransitionInfo to avoid the transition from
+                            // being handled by another TaskViewTransitions instance.
+                            info.getChanges().remove(task);
+                        }
                     } else {
                         startTransaction.reparent(leash, infoTv.getSurfaceControl());
                         finishTransaction.reparent(leash, infoTv.getSurfaceControl())
@@ -847,6 +904,20 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             // Just some house-keeping, let another handler animate.
             return false;
         }
+        if (changingDisplayId > -1) {
+            // Wait for setTaskBoundsInTransition -> mergeAnimation to let DefaultTransitionHandler
+            // run display level animation after the new bounds of TaskView is set.
+            mPendingRedirectTransition = new PendingRedirectTransition(() ->
+                    mTransitions.dispatchTransition(transition, info, startTransaction,
+                            finishTransaction, finishCallback, this), wct);
+            mTransitions.getMainExecutor().executeDelayed(() -> {
+                if (mPendingRedirectTransition != null) {
+                    Slog.w(TAG, "Timed out to wait for transition of setTaskBounds");
+                    executePendingRedirectTransition();
+                }
+            }, PendingRedirectTransition.TIMEOUT_MS);
+            return true;
+        }
         // No animation, just show it immediately.
         startTransaction.apply();
         finishCallback.onTransitionFinished(wct);
@@ -873,10 +944,17 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             return false;
         }
         boolean stillNeedsMatchingLaunch = pending != null && pending.mLaunchCookie != null;
+        ArrayList<TransitionInfo.Change> taskViewChanges = null;
+        int changingDisplayId = -1;
         int changesHandled = 0;
         WindowContainerTransaction wct = null;
         for (int i = 0; i < info.getChanges().size(); ++i) {
             final TransitionInfo.Change chg = info.getChanges().get(i);
+            if (Flags.fixTaskViewRotationAnimation() && chg.hasFlags(TransitionInfo.FLAG_IS_DISPLAY)
+                    && chg.getMode() == TRANSIT_CHANGE && mPendingRedirectTransition == null) {
+                changingDisplayId = chg.getEndDisplayId();
+                continue;
+            }
             final ActivityManager.RunningTaskInfo taskInfo = chg.getTaskInfo();
             if (taskInfo == null) continue;
             if (TransitionUtil.isClosingType(chg.getMode())) {
@@ -955,6 +1033,10 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
                     }
                     continue;
                 }
+                if (taskViewChanges == null) {
+                    taskViewChanges = new ArrayList<>();
+                }
+                taskViewChanges.add(chg);
                 final Rect boundsOnScreen = tv.prepareOpen(chg.getTaskInfo(), chg.getLeash());
                 if (boundsOnScreen != null) {
                     if (wct == null) wct = new WindowContainerTransaction();
@@ -976,6 +1058,25 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         } else if (wct == null && pending == null && changesHandled != info.getChanges().size()) {
             // Just some house-keeping, let another handler animate.
             return false;
+        }
+        if (changingDisplayId > -1 && taskViewChanges != null) {
+            ProtoLog.d(WM_SHELL_BUBBLES, "Transitions.startAnimationLegacy(): "
+                    + "handle display change");
+            // Remove the change from TransitionInfo to avoid being handled by
+            // another TaskViewTransitions instance.
+            info.getChanges().removeAll(taskViewChanges);
+            // Wait for setTaskBoundsInTransition -> mergeAnimation to let DefaultTransitionHandler
+            // run display level animation after the new bounds of TaskView is set.
+            mPendingRedirectTransition = new PendingRedirectTransition(() ->
+                    mTransitions.dispatchTransition(transition, info, startTransaction,
+                            finishTransaction, finishCallback, this), wct);
+            mTransitions.getMainExecutor().executeDelayed(() -> {
+                if (mPendingRedirectTransition != null) {
+                    Slog.w(TAG, "Timed out to wait for transition of setTaskBounds");
+                    executePendingRedirectTransition();
+                }
+            }, PendingRedirectTransition.TIMEOUT_MS);
+            return true;
         }
         // No animation, just show it immediately.
         startTransaction.apply();
@@ -1041,18 +1142,26 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
 
         mPending.remove(pendingTransition);
 
-        // reparent the task under the task view surface and set the bounds on it
-        startTransaction.reparent(leash, taskView.getSurfaceControl())
-                .setPosition(leash, 0, 0)
-                .setWindowCrop(leash, bounds.width(), bounds.height())
-                .show(leash);
-        // the finish transaction would reparent the task back to the transition root, so reparent
-        // it again to the task view surface
-        finishTransaction.reparent(leash, taskView.getSurfaceControl())
-                .setPosition(leash, 0, 0)
-                .setWindowCrop(leash, bounds.width(), bounds.height());
+        updateSurface(leash, startTransaction, finishTransaction, taskView,
+                bounds.width(), bounds.height());
         updateBoundsState(taskView, bounds);
         return true;
+    }
+
+    /** Updates the surface properties for a TaskView's task leash. */
+    private void updateSurface(@NonNull SurfaceControl leash,
+            @NonNull SurfaceControl.Transaction startT, @NonNull SurfaceControl.Transaction finishT,
+            @NonNull TaskViewTaskController taskView, int width, int height) {
+        // Reparent the task under the task view surface and set the bounds on it.
+        startT.reparent(leash, taskView.getSurfaceControl())
+                .setPosition(leash, 0, 0)
+                .setWindowCrop(leash, width, height)
+                .show(leash);
+        // The finish transaction would reparent the task back to the window hierarchy parent, so
+        // reparent it to the task view surface.
+        finishT.reparent(leash, taskView.getSurfaceControl())
+                .setPosition(leash, 0, 0)
+                .setWindowCrop(leash, width, height);
     }
 
     private void updateBounds(TaskViewTaskController taskView, Rect boundsOnScreen,
@@ -1079,6 +1188,44 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         taskView.applyCaptionInsetsIfNeeded();
     }
 
+    private void executePendingRedirectTransition() {
+        if (mPendingRedirectTransition != null) {
+            mPendingRedirectTransition.dispatchTransition();
+            mPendingRedirectTransition = null;
+        }
+    }
+
+    @Override
+    public void mergeAnimation(@NonNull IBinder transition, @NonNull TransitionInfo info,
+            @NonNull SurfaceControl.Transaction startT, @NonNull SurfaceControl.Transaction finishT,
+            @NonNull IBinder mergeTarget,
+            @NonNull Transitions.TransitionFinishCallback finishCallback) {
+        if (!Flags.fixTaskViewRotationAnimation()) return;
+        final PendingTransition pending = findPending(transition);
+        if (pending != null) {
+            mPending.remove(pending);
+        }
+        executePendingRedirectTransition();
+        boolean hasHandledTaskView = false;
+        for (int i = 0; i < info.getChanges().size(); ++i) {
+            final TransitionInfo.Change change = info.getChanges().get(i);
+            final ActivityManager.RunningTaskInfo taskInfo = change.getTaskInfo();
+            if (taskInfo == null) continue;
+            final TaskViewTaskController taskView = findTaskView(taskInfo);
+            if (taskView == null) continue;
+            final SurfaceControl leash = change.getLeash();
+            final Rect endBounds = change.getEndAbsBounds();
+            updateSurface(leash, startT, finishT, taskView, endBounds.width(), endBounds.height());
+            hasHandledTaskView = true;
+        }
+        ProtoLog.d(WM_SHELL_BUBBLES, "mergeAnimation(): matchedPending=%b hasHandledTaskView=%b",
+                pending != null, hasHandledTaskView);
+        if (hasHandledTaskView) {
+            startT.apply();
+            finishCallback.onTransitionFinished(null /* wct */);
+        }
+    }
+
     /** Dumps TaskViewTransitions state. */
     public void dump(PrintWriter pw) {
         pw.println("TaskViewTransitions state:");
@@ -1088,6 +1235,34 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         }
         if (useRepo()) {
             mTaskViewRepo.dump(pw, "  ");
+        }
+    }
+
+    /**
+     * This holds a transition that is deferred, for example a display-change that also affects a
+     * TaskView. The transition is dispatched once the TaskView reports its new bounds (i.e.
+     * {@link #setTaskBounds}), which happens via a {@link #mergeAnimation} call, or on timeout.
+     */
+    private static class PendingRedirectTransition {
+        static final long TIMEOUT_MS = 500;
+        private final Runnable mDispatchTransition;
+        private WindowContainerTransaction mWct;
+
+        PendingRedirectTransition(@NonNull Runnable dispatch,
+                @Nullable WindowContainerTransaction wct) {
+            mDispatchTransition = dispatch;
+            mWct = wct;
+        }
+
+        @NonNull
+        WindowContainerTransaction takePendingWct() {
+            final WindowContainerTransaction wct = mWct;
+            mWct = null;
+            return wct != null ? wct : new WindowContainerTransaction();
+        }
+
+        void dispatchTransition() {
+            mDispatchTransition.run();
         }
     }
 

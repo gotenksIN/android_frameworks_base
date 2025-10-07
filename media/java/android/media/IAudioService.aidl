@@ -106,6 +106,8 @@ interface IAudioService {
 
     void permissionUpdateBarrier();
 
+    void waitForAudioHandlerBarrier();
+
     // Java-only methods below.
     void adjustStreamVolume(int streamType, int direction, int flags, String callingPackage);
 
@@ -373,10 +375,10 @@ interface IAudioService {
     oneway void setCsd(float csd);
 
     @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
-    oneway void forceUseFrameworkMel(boolean useFrameworkMel);
+    void forceUseFrameworkMel(boolean useFrameworkMel);
 
     @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
-    oneway void forceComputeCsdOnAllDevices(boolean computeCsdOnAllDevices);
+    void forceComputeCsdOnAllDevices(boolean computeCsdOnAllDevices);
 
     @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
     boolean isCsdEnabled();
@@ -552,6 +554,9 @@ interface IAudioService {
     void cacheParameters(in String keyValuePairs);
 
 // QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
+
+    boolean isMultiAudioFocusEnabled();
+
     int setPreferredDevicesForCapturePreset(
             in int capturePreset, in List<AudioDeviceAttributes> devices);
 
@@ -758,6 +763,9 @@ interface IAudioService {
     @EnforcePermission("MODIFY_AUDIO_ROUTING")
     List<AudioFocusInfo> getFocusStack();
 
+    @EnforcePermission("QUERY_AUDIO_STATE")
+    boolean hasAudioFocus(String packageName);
+
     @EnforcePermission("MODIFY_AUDIO_ROUTING")
     oneway void sendFocusLossAndUpdate(in AudioFocusInfo focusLoser, in IAudioPolicyCallback apcb);
 
@@ -850,4 +858,8 @@ interface IAudioService {
     @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED)")
     void setEnableHardening(in boolean shouldEnable);
+
+    @EnforcePermission("BLUETOOTH_PRIVILEGED")
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_PRIVILEGED)")
+    boolean isScoManagedByAudio();
 }

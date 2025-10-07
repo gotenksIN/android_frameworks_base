@@ -44,6 +44,7 @@ import static com.android.server.am.BroadcastRecord.getReceiverPackageName;
 import static com.android.server.am.BroadcastRecord.getReceiverProcessName;
 import static com.android.server.am.BroadcastRecord.getReceiverUid;
 import static com.android.server.am.BroadcastRecord.isDeliveryStateTerminal;
+import static com.android.window.flags.Flags.balCheckBroadcastWhenDispatched;
 
 import android.annotation.CheckResult;
 import android.annotation.NonNull;
@@ -826,9 +827,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
 
             // If this receiver is going to be skipped, skip it now itself and don't even enqueue
             // it.
-            final String skipReason = Flags.avoidNoteOpAtEnqueue()
-                    ? mSkipPolicy.shouldSkipAtEnqueueMessage(r, receiver)
-                    : mSkipPolicy.shouldSkipMessage(r, receiver);
+            final String skipReason = mSkipPolicy.shouldSkipAtEnqueueMessage(r, receiver);
             if (skipReason != null) {
                 setDeliveryState(null, null, r, i, receiver, BroadcastRecord.DELIVERY_SKIPPED,
                         "skipped by policy at enqueue: " + skipReason);
@@ -1151,7 +1150,9 @@ class BroadcastQueueImpl extends BroadcastQueue {
             queue.setTimeoutScheduled(false);
         }
 
-        if (r.mBackgroundStartPrivileges.allowsAny()) {
+        if (r.mBackgroundStartPrivileges.allowsAny()
+                && (r.realCallingUid != app.uid || !balCheckBroadcastWhenDispatched())) {
+            // allow the broadcast receiver potential privileges if it is not sent to itself
             app.addOrUpdateBackgroundStartPrivileges(r, r.mBackgroundStartPrivileges);
 
             final long timeout = r.isForeground() ? mFgConstants.ALLOW_BG_ACTIVITY_START_TIMEOUT
@@ -1192,14 +1193,14 @@ class BroadcastQueueImpl extends BroadcastQueue {
                     mService.mPackageManagerInt.grantImplicitAccess(r.userId, r.intent,
                             UserHandle.getAppId(app.uid), r.callingUid, true);
                 }
-                queue.lastProcessState = app.mState.getCurProcState();
+                queue.lastProcessState = app.getCurProcState();
                 if (receiver instanceof BroadcastFilter) {
                     notifyScheduleRegisteredReceiver(app, r, (BroadcastFilter) receiver);
                     thread.scheduleRegisteredReceiver(
                             ((BroadcastFilter) receiver).receiverList.receiver,
                             receiverIntent, r.resultCode, r.resultData, r.resultExtras,
                             r.ordered, r.initialSticky, assumeDelivered, r.userId,
-                            app.mState.getReportedProcState(),
+                            app.getReportedProcState(),
                             r.shareIdentity ? r.callingUid : Process.INVALID_UID,
                             r.shareIdentity ? r.callerPackage : null);
                     // TODO: consider making registered receivers of unordered
@@ -1214,7 +1215,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
                     thread.scheduleReceiver(receiverIntent, ((ResolveInfo) receiver).activityInfo,
                             null, r.resultCode, r.resultData, r.resultExtras, r.ordered,
                             assumeDelivered, r.userId,
-                            app.mState.getReportedProcState(),
+                            app.getReportedProcState(),
                             r.shareIdentity ? r.callingUid : Process.INVALID_UID,
                             r.shareIdentity ? r.callerPackage : null);
                 }
@@ -1264,7 +1265,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
                         r.resultTo, r.intent,
                         r.resultCode, r.resultData, r.resultExtras, false, r.initialSticky,
                         assumeDelivered, r.userId,
-                        app.mState.getReportedProcState(),
+                        app.getReportedProcState(),
                         r.shareIdentity ? r.callingUid : Process.INVALID_UID,
                         r.shareIdentity ? r.callerPackage : null);
             } catch (RemoteException e) {
@@ -2101,7 +2102,8 @@ class BroadcastQueueImpl extends BroadcastQueue {
             mService.mProcessStateController.noteBroadcastDeliveryStarted(queue.app,
                     queue.getPreferredSchedulingGroupLocked());
             if (queue.runningOomAdjusted) {
-                queue.app.mState.forceProcessStateUpTo(ActivityManager.PROCESS_STATE_RECEIVER);
+                mService.mProcessStateController.forceProcessStateUpTo(queue.app,
+                        ActivityManager.PROCESS_STATE_RECEIVER);
                 mService.enqueueOomAdjTargetLocked(queue.app);
             }
         }

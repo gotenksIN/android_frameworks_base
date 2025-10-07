@@ -69,10 +69,11 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.animation.DialogTransitionAnimator;
 import com.android.systemui.bluetooth.qsdialog.DeviceItem;
 import com.android.systemui.bluetooth.qsdialog.DeviceItemType;
-import com.android.systemui.common.domain.interactor.SysUIStateDisplaysInteractor;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.qs.shared.QSSettingsPackageRepository;
 import com.android.systemui.res.R;
+import com.android.systemui.shade.domain.interactor.FakeShadeDialogContextInteractor;
+import com.android.systemui.shade.domain.interactor.ShadeDialogContextInteractor;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
 import com.android.systemui.statusbar.phone.SystemUIDialogManager;
 import com.android.systemui.util.concurrency.FakeExecutor;
@@ -111,11 +112,11 @@ public class HearingDevicesDialogDelegateTest extends SysuiTestCase {
     private static final String TEST_PRESET_NAME = "test_preset";
     private static final String SETTINGS_PACKAGE_NAME = "com.android.settings";
     private final FakeExecutor mExecutor = new FakeExecutor(new FakeSystemClock());
+    private final ShadeDialogContextInteractor mShadeDialogContextInteractor =
+            new FakeShadeDialogContextInteractor(mContext);
 
     @Mock
     private SystemUIDialogManager mSystemUIDialogManager;
-    @Mock
-    private SysUIStateDisplaysInteractor mSysUiStateInteractor;
     @Mock
     private DialogTransitionAnimator mDialogTransitionAnimator;
     @Mock
@@ -386,7 +387,6 @@ public class HearingDevicesDialogDelegateTest extends SysuiTestCase {
         mDialogFactory = new SystemUIDialog.Factory(
                 mContext,
                 mSystemUIDialogManager,
-                mSysUiStateInteractor,
                 getFakeBroadcastDispatcher(),
                 mDialogTransitionAnimator
         );
@@ -402,7 +402,8 @@ public class HearingDevicesDialogDelegateTest extends SysuiTestCase {
                 mAudioManager,
                 mUiEventLogger,
                 mQSSettingsPackageRepository,
-                mInputRoutingFactory
+                mInputRoutingFactory,
+                mShadeDialogContextInteractor
         );
         mDialog = mDialogDelegate.createDialog();
     }

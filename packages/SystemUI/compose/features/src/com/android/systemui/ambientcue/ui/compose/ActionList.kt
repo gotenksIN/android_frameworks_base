@@ -21,10 +21,16 @@ import android.os.VibrationEffect.Composition.PRIMITIVE_LOW_TICK
 import android.os.VibrationEffect.Composition.PRIMITIVE_THUD
 import android.os.VibrationEffect.Composition.PRIMITIVE_TICK
 import android.os.Vibrator
+import android.view.Surface.ROTATION_270
+import android.view.Surface.ROTATION_90
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -53,6 +59,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -68,6 +75,7 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -90,20 +98,25 @@ fun ActionList(
     modifier: Modifier = Modifier,
     padding: PaddingValues = PaddingValues(0.dp),
     horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
+    portrait: Boolean = true,
+    pillCenter: Offset = Offset.Unspecified,
+    pillWidth: Float = 0f,
+    rotation: Int = 0,
+    inTaskBarOr3ButtonMode: Boolean = false,
 ) {
     val density = LocalDensity.current
     val minOverscrollDelta = (-8).dp
     val maxOverscrollDelta = 0.dp
     val columnSpacing = 8.dp
-    val topPadding = 32.dp
     val minGradientHeight = 70.dp
-    val edgeAligned = horizontalAlignment == Alignment.Start || horizontalAlignment == Alignment.End
+    val scrimVerticalPadding = 32.dp
+    val scrimHorizontalPadding = 42.dp
     val smartScrimAlpha by
         animateFloatAsState(
             if (expanded) {
-                0.25f
-            } else if (visible && !edgeAligned) {
-                0.1f
+                0.5f
+            } else if (visible) {
+                0.3f
             } else {
                 0f
             }
@@ -114,9 +127,18 @@ fun ActionList(
     val translateStiffnessMultiplier = 50
     val overscrollStiffness = 2063f
     var containerHeightPx by remember { mutableIntStateOf(0) }
+    var radius by remember { mutableFloatStateOf(0f) }
+    var wasEverExpanded by remember { mutableStateOf(false) }
+    var actionListCenterPositionX by remember { mutableFloatStateOf(0f) }
 
-    val leftGradientColor = MaterialTheme.colorScheme.tertiary
-    val rightGradientColor = MaterialTheme.colorScheme.primaryFixedDim
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            wasEverExpanded = true
+        }
+    }
+
+    val leftGradientColor = MaterialTheme.colorScheme.tertiaryContainer
+    val rightGradientColor = MaterialTheme.colorScheme.primary
 
     // User should be able to drag down vertically to dismiss the action list.
     // The list will shrink as the user drags.
@@ -127,6 +149,7 @@ fun ActionList(
     val maxOverscrollDeltaPx = with(density) { maxOverscrollDelta.toPx() }
     val columnSpacingPx = with(density) { columnSpacing.toPx() }
     val minGradientHeightPx = with(density) { minGradientHeight.toPx() }
+    val scrimVerticalPaddingPx = with(density) { scrimVerticalPadding.toPx() }
 
     val scope = rememberCoroutineScope()
     val overscrollEffect = remember {
@@ -161,6 +184,45 @@ fun ActionList(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
                     stiffness = Spring.StiffnessLow,
                 ),
+        )
+
+    var smartScrimAlphaBoost by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(visible) {
+        if (visible) {
+            animate(
+                initialValue = 0f,
+                targetValue = 0f,
+                animationSpec =
+                    keyframes {
+                        durationMillis = 2000
+                        0f at 0
+                        0.2f at 500
+                        0.2f at 1500
+                        0f at 2000
+                    },
+            ) { value, _ ->
+                smartScrimAlphaBoost = value
+            }
+        } else {
+            smartScrimAlphaBoost = 0f
+        }
+    }
+
+    val scrimOffsetY by
+        animateFloatAsState(
+            targetValue =
+                if (!expanded) containerHeightPx - scrimVerticalPaddingPx
+                else containerHeightPx - radius,
+            animationSpec =
+                if (expanded || wasEverExpanded) {
+                    // Enable animation only when user expands/collapses the action list.
+                    tween(250, delayMillis = 200)
+                } else {
+                    // Disable animation during Compose initialization.
+                    snap()
+                },
+            label = "scrimOffsetY",
         )
 
     LaunchedEffect(visible, expanded) {
@@ -234,6 +296,8 @@ fun ActionList(
                 )
                 .onGloballyPositioned { layoutCoordinates ->
                     containerHeightPx = layoutCoordinates.size.height
+                    actionListCenterPositionX =
+                        layoutCoordinates.positionInWindow().x + layoutCoordinates.size.width / 2
                     anchoredDraggableState.updateAnchors(
                         DraggableAnchors {
                             Start at 0f // Hidden
@@ -243,8 +307,11 @@ fun ActionList(
                 }
                 .drawBehind {
                     val sidePaddingPx =
-                        with(density) { padding.calculateLeftPadding(layoutDirection).toPx() }
-                    val radius = size.width - sidePaddingPx * 2f
+                        if (inTaskBarOr3ButtonMode && portrait) {
+                            pillCenter.x - actionListCenterPositionX
+                        } else {
+                            with(density) { scrimHorizontalPadding.toPx() }
+                        }
                     if (!(radius > 0)) return@drawBehind
 
                     val minScaleY = minGradientHeightPx / (radius * 2f)
@@ -252,38 +319,37 @@ fun ActionList(
 
                     scale(scaleX = 1f, scaleY = scaleY, pivot = Offset(0f, size.height)) {
                         val leftGradientCenter =
-                            Offset(size.width / 2 + sidePaddingPx, size.height - radius)
+                            Offset(size.width / 2 - sidePaddingPx, scrimOffsetY)
                         val rightGradientCenter =
-                            Offset(size.width / 2 - sidePaddingPx, size.height - radius)
+                            Offset(size.width / 2 + sidePaddingPx, scrimOffsetY)
                         val leftBrush =
                             Brush.radialGradient(
                                 colors =
                                     listOf(leftGradientColor, leftGradientColor.copy(alpha = 0f)),
-                                center = rightGradientCenter,
+                                center = leftGradientCenter,
                                 radius = radius,
                             )
                         val rightBrush =
                             Brush.radialGradient(
                                 colors =
                                     listOf(rightGradientColor, rightGradientColor.copy(alpha = 0f)),
-                                center = leftGradientCenter,
-                                radius = radius,
+                                center = rightGradientCenter,
+                                radius = radius * 0.85f,
                             )
                         drawCircle(
-                            brush = rightBrush,
-                            alpha = smartScrimAlpha,
+                            brush = leftBrush,
+                            alpha = smartScrimAlpha + smartScrimAlphaBoost,
                             radius = radius,
                             center = leftGradientCenter,
                         )
                         drawCircle(
-                            brush = leftBrush,
-                            alpha = smartScrimAlpha,
+                            brush = rightBrush,
+                            alpha = smartScrimAlpha + smartScrimAlphaBoost,
                             radius = radius,
                             center = rightGradientCenter,
                         )
                     }
                 }
-                .padding(top = topPadding)
                 .padding(padding),
         verticalArrangement = Arrangement.spacedBy(columnSpacing, Alignment.Bottom),
         horizontalAlignment = horizontalAlignment,
@@ -328,6 +394,8 @@ fun ActionList(
                         columnSpacingPx * max((childHeights.size - index - 1f), 0f)
             }
 
+            var chipWidthPx by remember { mutableIntStateOf(0) }
+
             Chip(
                 action = action,
                 modifier =
@@ -335,12 +403,43 @@ fun ActionList(
                             if (index < childHeights.size) {
                                 childHeights[index] = it.height
                             }
+                            chipWidthPx = it.width
                         }
+                        .onGloballyPositioned { radius = max(radius, it.size.width / 2f) }
                         .graphicsLayer {
-                            translationY = (1f - translation) * appxColumnY
+                            val chipsTotalHeightPx =
+                                childHeights.sum().toFloat() +
+                                    columnSpacingPx * (childHeights.size - 1)
+                            if (portrait) {
+                                translationY = (1f - translation) * appxColumnY
+                                translationX = 0f
+                            } else {
+                                if (rotation == ROTATION_90) {
+                                    translationY =
+                                        (1f - translation) *
+                                            (pillCenter.y - pillWidth - chipsTotalHeightPx +
+                                                appxColumnY)
+                                    translationX = (1f - translation) * chipWidthPx.toFloat()
+                                } else if (rotation == ROTATION_270) {
+                                    translationY =
+                                        (1f - translation) *
+                                            (pillCenter.y - pillWidth - chipsTotalHeightPx +
+                                                appxColumnY)
+                                    translationX = (translation - 1f) * chipWidthPx.toFloat()
+                                }
+                            }
                             scaleX = scale
                             scaleY = scale
-                            transformOrigin = TransformOrigin(0.5f, 1f)
+                            transformOrigin =
+                                if (portrait) {
+                                    TransformOrigin(0.5f, 1f)
+                                } else {
+                                    if (rotation == ROTATION_90) {
+                                        TransformOrigin(1f, 0f)
+                                    } else {
+                                        TransformOrigin(0f, 0f)
+                                    }
+                                }
                         },
             )
         }

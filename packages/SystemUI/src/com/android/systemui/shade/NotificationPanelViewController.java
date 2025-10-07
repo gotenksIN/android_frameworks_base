@@ -125,6 +125,7 @@ import com.android.systemui.keyguard.ui.viewmodel.KeyguardTouchHandlingViewModel
 import com.android.systemui.media.controls.domain.pipeline.MediaDataManager;
 import com.android.systemui.media.controls.ui.controller.KeyguardMediaController;
 import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager;
+import com.android.systemui.media.remedia.shared.flag.MediaControlsInComposeFlag;
 import com.android.systemui.model.StateChange;
 import com.android.systemui.model.SysUiState;
 import com.android.systemui.navigationbar.NavigationBarController;
@@ -2270,7 +2271,7 @@ public final class NotificationPanelViewController implements
             mOpenCloseListener.onClosingFinished();
         }
         setClosingWithAlphaFadeout(false);
-        if (!Flags.mediaControlsInCompose()) {
+        if (!MediaControlsInComposeFlag.isEnabled()) {
             mMediaHierarchyManager.closeGuts();
         }
     }
@@ -2311,6 +2312,10 @@ public final class NotificationPanelViewController implements
     @Deprecated
     public void onStatusBarLongPress(MotionEvent event) {
         Log.i(TAG, "Status Bar was long pressed.");
+        if (mTouchDisabled) {
+            mShadeLog.d("Touch disabled. Long press expansion ignored.");
+            return;
+        }
         if (mBarState == KEYGUARD) {
             mShadeLog.d("Lockscreen Status Bar was long pressed. Expansion not supported.");
             return;

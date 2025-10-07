@@ -20,6 +20,7 @@ import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_M
 
 import android.annotation.IntDef;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.BlendMode;
 import android.graphics.BlendModeColorFilter;
 import android.graphics.Color;
@@ -76,19 +77,19 @@ public class AutoclickScrollPanel {
     @Retention(RetentionPolicy.SOURCE)
     public @interface ScrollDirection {}
 
-    private final Context mContext;
-    private final AutoclickLinearLayout mContentView;
+    private Context mContext;
+    private AutoclickLinearLayout mContentView;
     private final WindowManager mWindowManager;
     private final WindowManager.LayoutParams mParams;
     private ScrollPanelControllerInterface mScrollPanelController;
     private final AutoclickScrollPointIndicator mAutoclickScrollPointIndicator;
 
     // Scroll panel buttons.
-    private final ImageButton mUpButton;
-    private final ImageButton mDownButton;
-    private final ImageButton mLeftButton;
-    private final ImageButton mRightButton;
-    private final ImageButton mExitButton;
+    private ImageButton mUpButton;
+    private ImageButton mDownButton;
+    private ImageButton mLeftButton;
+    private ImageButton mRightButton;
+    private ImageButton mExitButton;
 
     private final int mStatusBarHeight;
 
@@ -122,10 +123,16 @@ public class AutoclickScrollPanel {
         mWindowManager = windowManager;
         mScrollPanelController = controller;
         mAutoclickScrollPointIndicator = new AutoclickScrollPointIndicator(context);
-        mContentView = (AutoclickLinearLayout) LayoutInflater.from(context).inflate(
-                R.layout.accessibility_autoclick_scroll_panel, null);
         mParams = getDefaultLayoutParams();
         mStatusBarHeight = SystemBarUtils.getStatusBarHeight(context);
+
+        inflateViewAndResources();
+    }
+
+    private void inflateViewAndResources() {
+        // Inflate the panel layout.
+        mContentView = (AutoclickLinearLayout) LayoutInflater.from(mContext).inflate(
+                R.layout.accessibility_autoclick_scroll_panel, null);
 
         // Initialize buttons.
         mUpButton = mContentView.findViewById(R.id.scroll_up);
@@ -293,12 +300,12 @@ public class AutoclickScrollPanel {
     private void toggleSelectedButtonStyle(ImageButton button, boolean hovered) {
         if (hovered) {
             int tintColor = mContext.getColor(
-                    com.android.internal.R.color.materialColorOnPrimary);
+                    com.android.internal.R.color.materialColorOnSurface);
 
-            // Apply semi-transparent (22%) tint.
+            // Apply semi-transparent (11%) tint.
             // SRC_ATOP preserves the button's texture and shadows while applying the tint.
             button.getBackground().setColorFilter(new BlendModeColorFilter(
-                    Color.argb(56, Color.red(tintColor), Color.green(tintColor),
+                    Color.argb(28, Color.red(tintColor), Color.green(tintColor),
                             Color.blue(tintColor)),
 
                     BlendMode.SRC_ATOP));
@@ -309,13 +316,43 @@ public class AutoclickScrollPanel {
     }
 
     /**
+     * Updates the autoclick scroll panel when the system configuration is changed.
+     * @param newConfig The new system configuration.
+     */
+    public void onConfigurationChanged(@android.annotation.NonNull Configuration newConfig) {
+        mContext.getMainThreadHandler().post(() -> {
+            // Only remove the view if it's currently shown.
+            if (mInScrollMode) {
+                mWindowManager.removeView(mContentView);
+            }
+
+            // Update mContext with the new configuration.
+            mContext = mContext.createConfigurationContext(newConfig);
+
+            // Always re-inflate the views and resources to adopt the new configuration.
+            // This is important even if the panel is hidden.
+            inflateViewAndResources();
+
+            // If the panel was shown before the configuration change, add the newly
+            // inflated view back to the window to restore its state.
+            if (mInScrollMode) {
+                mWindowManager.addView(mContentView, mParams);
+            }
+        });
+    }
+
+    public boolean isHovered() {
+        return mContentView.isHovered();
+    }
+
+    /**
      * Retrieves the layout params for AutoclickScrollPanel, used when it's added to the Window
      * Manager.
      */
     @NonNull
     private WindowManager.LayoutParams getDefaultLayoutParams() {
         final WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
-        layoutParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        layoutParams.type = WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
         layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
         layoutParams.privateFlags |= WindowManager.LayoutParams.SYSTEM_FLAG_SHOW_FOR_ALL_USERS;
         layoutParams.setFitInsetsTypes(
@@ -333,11 +370,6 @@ public class AutoclickScrollPanel {
     @VisibleForTesting
     public boolean isVisible() {
         return mInScrollMode;
-    }
-
-    @VisibleForTesting
-    public boolean isHovered() {
-        return mContentView.isHovered();
     }
 
     @VisibleForTesting

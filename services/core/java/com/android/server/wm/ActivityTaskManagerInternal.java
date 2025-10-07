@@ -44,6 +44,7 @@ import android.window.TaskSnapshot;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IVoiceInteractor;
+import com.android.server.am.ActiveUids;
 import com.android.server.am.PendingIntentRecord;
 import com.android.server.am.UserState;
 
@@ -57,7 +58,7 @@ import java.util.Set;
  * Activity Task manager local system service interface.
  * @hide Only for use within system server
  */
-public abstract class ActivityTaskManagerInternal {
+public abstract class ActivityTaskManagerInternal implements ActiveUids.Observer {
 
     /**
      * Type for {@link #notifyAppTransitionStarting}: The transition was started because we drew
@@ -130,6 +131,10 @@ public abstract class ActivityTaskManagerInternal {
         default void onKeyguardGoingAway() {}
     }
 
+    public interface HandoffEnablementListener {
+        default void onHandoffEnabledChanged(int taskId, boolean isEnabled) {}
+    }
+
     /**
      * Returns home activity for the specified user.
      *
@@ -142,20 +147,23 @@ public abstract class ActivityTaskManagerInternal {
             IVoiceInteractor mInteractor);
 
     /**
-     * Returns the top activity from each of the currently visible root tasks, and the related task
-     * id. The first entry will be the focused activity.
+     * @return a list of {@link ActivityAssistInfo} of the visible activities in the all displays.
+     * Visible activities in the focused root Task are at the front of the list.
      *
-     * <p>NOTE: If the top activity is in the split screen, the other activities in the same split
-     * screen will also be returned.
+     * <p>NOTE: This includes all visible activities, even if one is paused, which means it is
+     * behind a translucent container.
      */
     public abstract List<ActivityAssistInfo> getTopVisibleActivities();
 
     /**
-     * Returns the top activity from each of the currently visible root tasks of the given
-     * display, and the related task id. The first entry will be the focused activity.
+     * @return a list of {@link ActivityAssistInfo} of the visible activities in the given display.
+     * Visible activities in the focused root Task are at the front of the list.
      *
-     * <p>NOTE: If the top activity is in the split screen, the other activities in the same split
-     * screen will also be returned.
+     * <p>NOTE: This includes all visible activities, even if one is paused, which means it is
+     * behind a translucent container.
+     *
+     * @param displayId if the displayId is not found, this will return visible activities in all
+     *                  displays.
      */
     public abstract List<ActivityAssistInfo> getTopVisibleActivities(int displayId);
 
@@ -557,8 +565,6 @@ public abstract class ActivityTaskManagerInternal {
     public abstract int finishTopCrashedActivities(
             WindowProcessController crashedApp, String reason);
 
-    public abstract void onUidActive(int uid, int procState);
-    public abstract void onUidInactive(int uid);
     public abstract void onUidProcStateChanged(int uid, int procState);
 
     /** Handle app crash event in {@link android.app.IActivityController} if there is one. */
@@ -821,4 +827,21 @@ public abstract class ActivityTaskManagerInternal {
     public abstract void requestHandoffTaskData(
         int taskId,
         @NonNull IHandoffTaskDataReceiver receiver);
+
+    /** Requests to remove a Task by the given Task ID, along with the corresponding reason. */
+    public abstract boolean removeTask(int taskId, @NonNull String reason);
+
+    /** Returns the current lock task mode state. */
+    public abstract int getLockTaskModeState();
+
+    /** Returns whether handoff is enabled for the given task. */
+    public abstract boolean isHandoffEnabledForTask(int taskId);
+
+    /** Registers a listener for handoff enablement changes. */
+    public abstract void registerHandoffEnablementListener(
+        @NonNull HandoffEnablementListener listener);
+
+    /** Unregisters a listener for handoff enablement changes. */
+    public abstract void unregisterHandoffEnablementListener(
+        @NonNull HandoffEnablementListener listener);
 }

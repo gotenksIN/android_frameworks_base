@@ -265,7 +265,6 @@ filegroup {
     visibility: ["//visibility:public"],
 }
 
-// QTI_BEGIN: 2021-03-11: Bluetooth: BT fwk: Changes to compile only when bt_adv_audio present
 soong_config_module_type_import {
     from: "device/qcom/qssi/Android.bp",
     module_types: [
@@ -273,7 +272,6 @@ soong_config_module_type_import {
     ],
 }
 
-// QTI_END: 2021-03-11: Bluetooth: BT fwk: Changes to compile only when bt_adv_audio present
 java_defaults {
     name: "framework-minus-apex-defaults",
     defaults: [
@@ -343,11 +341,9 @@ java_defaults {
             "media/aidl",
         ],
         include_dirs: [
-            "frameworks/av/aidl",
+            "frameworks/av/media/aidl",
             "frameworks/native/libs/permission/aidl",
-// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
             "packages/modules/Bluetooth/framework/aidl-export",
-// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
             "packages/modules/Connectivity/framework/aidl-export",
             "packages/modules/Media/apex/aidl/stable",
             "hardware/interfaces/biometrics/common/aidl",
@@ -409,9 +405,11 @@ java_defaults {
         "bouncycastle-repackaged-unbundled",
         "com.android.sysprop.foldlockbehavior",
         "com.android.sysprop.view",
+        "com.android.sysprop.nativebinderstats",
         "framework-internal-utils",
         "dropboxmanager_aidl-java",
         "dynamic_instrumentation_manager_aidl-java",
+        "process_info_service_aidl-java",
         // If MimeMap ever becomes its own APEX, then this dependency would need to be removed
         // in favor of an API stubs dependency in java_library "framework" below.
         "mimemap",
@@ -436,6 +434,7 @@ java_defaults {
         "perfetto_trace_javastream_protos_jarjar",
         "libaconfig_java_proto_nano",
         "aconfig_device_paths_java",
+        "perfetto_trace_lib_framework_java",
     ],
 }
 
@@ -445,6 +444,7 @@ java_library {
     name: "framework-non-updatable-unbundled-impl-libs",
     static_libs: [
         "framework-location.impl",
+        "framework-virtualization.impl",
     ] + select(soong_config_variable("ANDROID", "release_crashrecovery_module"), {
         "true": [],
         default: [
@@ -453,6 +453,9 @@ java_library {
     }) + select(release_flag("RELEASE_ONDEVICE_INTELLIGENCE_MODULE"), {
         true: [],
         default: ["framework-ondeviceintelligence-platform.impl"],
+    }) + select(release_flag("RELEASE_TELEPHONY_MODULE"), {
+        true: [],
+        default: ["framework-platformtelephony.impl"],
     }),
     sdk_version: "core_platform",
     installable: false,
@@ -463,7 +466,6 @@ java_defaults {
     name: "framework-minus-apex-with-libs-defaults",
     defaults: ["framework-minus-apex-defaults"],
     libs: [
-        "framework-virtualization.stubs.module_lib",
         "framework-non-updatable-unbundled-impl-libs",
     ],
 }
@@ -497,6 +499,9 @@ java_library {
     visibility: [
         "//frameworks/base:__subpackages__",
         "//packages/modules/NeuralNetworks:__subpackages__",
+        // TODO(b/429127828): Clean this up along with RELEASE_TELEPHONY_MODULE
+        "//packages/modules/Telephony/framework:__subpackages__",
+        "//packages/modules/Virtualization:__subpackages__",
     ],
     compile_dex: false,
     headers_only: true,
@@ -552,6 +557,7 @@ java_library {
         enabled: false,
 
     },
+    javac_shard_size: 150,
 }
 
 // This "framework" module is NOT installed to the device. It's
@@ -589,7 +595,7 @@ java_library {
         "documents-ui-compat-config",
         "calendar-provider-compat-config",
         "contacts-provider-platform-compat-config",
-        "SystemUI-core-compat-config",
+        "SystemUI-application-compat-config",
     ] + select(soong_config_variable("ANDROID", "release_crashrecovery_module"), {
         "true": [],
         default: [
@@ -598,6 +604,9 @@ java_library {
     }) + select(release_flag("RELEASE_ONDEVICE_INTELLIGENCE_MODULE"), {
         true: [],
         default: ["framework-ondeviceintelligence-platform-compat-config"],
+    }) + select(release_flag("RELEASE_TELEPHONY_MODULE"), {
+        true: [],
+        default: ["framework-platformtelephony-compat-config"],
     }),
 }
 
@@ -612,7 +621,6 @@ filegroup {
     srcs: [
         "core/java/com/android/internal/util/HexDump.java",
         "core/java/com/android/internal/util/WakeupMessage.java",
-        "packages/Vcn/framework-b/src/android/net/vcn/util/PersistableBundleUtils.java",
         "telephony/java/android/telephony/Annotation.java",
     ],
 }

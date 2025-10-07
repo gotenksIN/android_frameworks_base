@@ -333,10 +333,10 @@
     <string name="bluetooth_select_a2dp_codec_ldac_playback_quality_dialog_title" msgid="7274396574659784285">"ਬਲੂਟੁੱਥ ਆਡੀਓ LDAC\nਕੋਡੇਕ ਚੋਣ ਨੂੰ ਟ੍ਰਿਗਰ ਕਰੋ: ਪਲੇਬੈਕ ਕੁਆਲਿਟੀ"</string>
     <string name="bluetooth_select_a2dp_codec_streaming_label" msgid="2040810756832027227">"ਸਟ੍ਰੀਮਿੰਗ: <xliff:g id="STREAMING_PARAMETER">%1$s</xliff:g>"</string>
     <string name="select_private_dns_configuration_title" msgid="7887550926056143018">"ਪ੍ਰਾਈਵੇਟ DNS"</string>
-    <string name="select_private_dns_configuration_dialog_title" msgid="3731422918335951912">"ਨਿੱਜੀ DNS ਮੋਡ ਚੁਣੋ"</string>
+    <string name="select_private_dns_configuration_dialog_title" msgid="3731422918335951912">"ਪ੍ਰਾਈਵੇਟ DNS ਮੋਡ ਚੁਣੋ"</string>
     <string name="private_dns_mode_off" msgid="7065962499349997041">"ਬੰਦ"</string>
     <string name="private_dns_mode_opportunistic" msgid="1947864819060442354">"ਸਵੈਚਲਿਤ"</string>
-    <string name="private_dns_mode_provider" msgid="3619040641762557028">"ਨਿੱਜੀ DNS ਪ੍ਰਦਾਨਕ ਹੋਸਟਨਾਮ"</string>
+    <string name="private_dns_mode_provider" msgid="3619040641762557028">"ਪ੍ਰਾਈਵੇਟ DNS ਪ੍ਰਦਾਨਕ ਦਾ ਹੋਸਟਨਾਮ"</string>
     <string name="private_dns_mode_provider_hostname_hint" msgid="6564868953748514595">"DNS ਪ੍ਰਦਾਨਕ ਦਾ ਹੋਸਟਨਾਮ ਦਾਖਲ ਕਰੋ"</string>
     <string name="private_dns_mode_provider_failure" msgid="8356259467861515108">"ਕਨੈਕਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ"</string>
     <string name="wifi_display_certification_summary" msgid="8111151348106907513">"ਵਾਇਰਲੈੱਸ ਡਿਸਪਲੇ ਪ੍ਰਮਾਣੀਕਰਨ ਲਈ ਵਿਕਲਪ ਦਿਖਾਓ"</string>
@@ -385,7 +385,7 @@
     <string name="select_application" msgid="2543228890535466325">"ਐਪਲੀਕੇਸ਼ਨ ਚੁਣੋ"</string>
     <string name="no_application" msgid="9038334538870247690">"ਕੁਝ ਨਹੀਂ"</string>
     <string name="wait_for_debugger" msgid="7461199843335409809">"ਡੀਬੱਗਰ ਦੀ ਉਡੀਕ ਕਰੋ"</string>
-    <string name="wait_for_debugger_summary" msgid="6846330006113363286">"ਡੀਬੱਗ ਕੀਤੀ ਐਪਲੀਕੇਸ਼ਨ ਚਲਾਉਣ ਤੋਂ ਪਹਿਲਾਂ ਅਟੈਚ ਕਰਨ ਲਈ ਡੀਬੱਗਰ ਦੀ ਉਡੀਕ ਕਰਦੀ ਹੈ"</string>
+    <string name="wait_for_debugger_summary" msgid="6846330006113363286">"ਡੀਬੱਗ ਕੀਤੀ ਐਪਲੀਕੇਸ਼ਨ, ਪ੍ਰਕਿਰਿਆ ਸ਼ੁਰੂ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਡੀਬੱਗਰ ਦੇ ਅਟੈਚ ਹੋਣ ਦੀ ਉਡੀਕ ਕਰਦੀ ਹੈ"</string>
     <string name="debug_input_category" msgid="7349460906970849771">"ਇਨਪੁੱਟ"</string>
     <string name="debug_drawing_category" msgid="5066171112313666619">"ਡਰਾਇੰਗ"</string>
     <string name="debug_hw_drawing_category" msgid="5830815169336975162">"ਹਾਰਡਵੇਅਰ ਐਕਸੈੱਲਰੇਟਿਡ ਰੈਂਡਰਿੰਗ"</string>
@@ -395,13 +395,13 @@
     <string name="strict_mode" msgid="889864762140862437">"ਸਟ੍ਰਿਕਟ ਮੋਡ ਚਾਲੂ ਹੈ"</string>
     <string name="strict_mode_summary" msgid="1838248687233554654">"ਐਪਾਂ ਵੱਲੋਂ ਮੁੱਖ ਥ੍ਰੈੱਡ \'ਤੇ ਲੰਬੀਆਂ ਕਾਰਵਾਈਆਂ ਕਰਨ \'ਤੇ ਸਕ੍ਰੀਨ ਫਲੈਸ਼ ਕਰੋ"</string>
     <string name="pointer_location" msgid="7516929526199520173">"ਪੁਆਇੰਟਰ ਟਿਕਾਣਾ"</string>
-    <string name="pointer_location_summary" msgid="957120116989798464">"ਸਕ੍ਰੀਨ ਓਵਰਲੇ ਮੌਜੂਦਾ ਸਪਰਸ਼ ਡਾਟਾ ਦਿਖਾ ਰਿਹਾ ਹੈ"</string>
+    <string name="pointer_location_summary" msgid="957120116989798464">"ਸਕ੍ਰੀਨ ਓਵਰਲੇ ਵਿੱਚ ਮੌਜੂਦਾ ਸਪਰਸ਼ ਡਾਟਾ ਦੇਖੋ"</string>
     <string name="show_touches" msgid="8437666942161289025">"ਟੈਪ ਦਿਖਾਓ"</string>
     <string name="show_touches_summary" msgid="3692861665994502193">"ਟੈਪਾਂ ਲਈ ਦ੍ਰਿਸ਼ਟੀਗਤ ਪ੍ਰਤੀਕਰਮ ਦਿਖਾਓ"</string>
     <string name="show_key_presses" msgid="6360141722735900214">"ਕੁੰਜੀ ਦਬਾਉਣ ਸੰਬੰਧੀ ਜਾਣਕਾਰੀ ਦਿਖਾਓ"</string>
-    <string name="show_key_presses_summary" msgid="725387457373015024">"ਭੌਤਿਕ ਕੁੰਜੀ ਦਬਾਉਣ ਸੰਬੰਧੀ ਦ੍ਰਿਸ਼ਟੀਗਤ ਵਿਚਾਰ ਦਿਖਾਓ"</string>
+    <string name="show_key_presses_summary" msgid="725387457373015024">"ਭੌਤਿਕ ਕੁੰਜੀ ਦਬਾਉਣ \'ਤੇ ਦ੍ਰਿਸ਼ਟੀਗਤ ਪ੍ਰਤੀਕਰਮ ਦਿਖਾਓ"</string>
     <string name="touchpad_visualizer" msgid="3707916068870825115">"ਟੱਚਪੈਡ ਇਨਪੁੱਟ ਦਿਖਾਓ"</string>
-    <string name="touchpad_visualizer_summary" msgid="4056080018119847449">"ਸਕ੍ਰੀਨ ਓਵਰਲੇ ਵਿੱਚ ਟੱਚਪੈਡ ਇਨਪੁੱਟ ਡਾਟਾ ਅਤੇ ਪਛਾਣੇ ਗਏ ਇਸ਼ਾਰੇ ਦਿਖਾਈ ਦੇ ਰਹੇ ਹਨ"</string>
+    <string name="touchpad_visualizer_summary" msgid="4056080018119847449">"ਸਕ੍ਰੀਨ ਓਵਰਲੇ ਵਿੱਚ ਟੱਚਪੈਡ ਇਨਪੁੱਟ ਡਾਟਾ ਅਤੇ ਪਛਾਣੇ ਗਏ ਇਸ਼ਾਰੇ ਦੇਖੋ"</string>
     <string name="show_screen_updates" msgid="2078782895825535494">"ਸਰਫ਼ੇਸ ਅੱਪਡੇਟ ਦਿਖਾਓ"</string>
     <string name="show_screen_updates_summary" msgid="2126932969682087406">"ਅੱਪਡੇਟ ਹੋਣ \'ਤੇ, ਸਮੁੱਚੀਆਂ ਵਿੰਡੋ ਸਰਫ਼ੇਸਾਂ ਫਲੈਸ਼ ਕਰੋ"</string>
     <string name="show_hw_screen_updates" msgid="2021286231267747506">"\'ਅੱਪਡੇਟ ਦੇਖੋ\' ਨੂੰ ਦਿਖਾਓ"</string>
@@ -660,7 +660,7 @@
     <string name="user_add_profile_item_title" msgid="3111051717414643029">"ਪ੍ਰਤਿਬੰਧਿਤ ਪ੍ਰੋਫਾਈਲ"</string>
     <string name="user_add_user_title" msgid="5457079143694924885">"ਕੀ ਨਵਾਂ ਵਰਤੋਂਕਾਰ ਸ਼ਾਮਲ ਕਰਨਾ ਹੈ?"</string>
     <string name="user_add_user_message_long" msgid="1527434966294733380">"ਤੁਸੀਂ ਵਾਧੂ ਵਰਤੋਂਕਾਰ ਬਣਾ ਕੇ ਹੋਰਾਂ ਲੋਕਾਂ ਨਾਲ ਇਹ ਡੀਵਾਈਸ ਸਾਂਝਾ ਕਰ ਸਕਦੇ ਹੋ। ਹਰੇਕ ਵਰਤੋਂਕਾਰ ਦੀ ਆਪਣੀ ਖੁਦ ਦੀ ਜਗ੍ਹਾ ਹੁੰਦੀ ਹੈ, ਜਿਸਨੂੰ ਉਹ ਐਪਾਂ ਅਤੇ ਵਾਲਪੇਪਰ ਆਦਿ ਨਾਲ ਵਿਉਂਤਬੱਧ ਕਰ ਸਕਦੇ ਹਨ। ਵਰਤੋਂਕਾਰ ਵਾਈ-ਫਾਈ ਵਰਗੀਆਂ ਡੀਵਾਈਸ ਸੈਟਿੰਗਾਂ ਨੂੰ ਵੀ ਵਿਵਸਥਿਤ ਕਰ ਸਕਦੇ ਹਨ, ਜਿਸ ਨਾਲ ਹਰੇਕ ਵਰਤੋਂਕਾਰ \'ਤੇ ਅਸਰ ਪੈਂਦਾ ਹੈ।\n\nਜਦੋਂ ਤੁਸੀਂ ਇੱਕ ਨਵਾਂ ਵਰਤੋਂਕਾਰ ਸ਼ਾਮਲ ਕਰਦੇ ਹੋ, ਉਸ ਵਿਅਕਤੀ ਨੂੰ ਆਪਣੀ ਜਗ੍ਹਾ ਸੈੱਟ ਅੱਪ ਕਰਨੀ ਪੈਂਦੀ ਹੈ।\n\nਕੋਈ ਵੀ ਵਰਤੋਂਕਾਰ ਬਾਕੀ ਸਾਰੇ ਵਰਤੋਂਕਾਰਾਂ ਦੀਆਂ ਐਪਾਂ ਨੂੰ ਅੱਪਡੇਟ ਕਰ ਸਕਦਾ ਹੈ। ਸ਼ਾਇਦ ਪਹੁੰਚਯੋਗਤਾ ਸੈਟਿੰਗਾਂ ਅਤੇ ਸੇਵਾਵਾਂ ਨੂੰ ਕਿਸੇ ਨਵੇਂ ਵਰਤੋਂਕਾਰ ਨੂੰ ਟ੍ਰਾਂਸਫਰ ਨਾ ਕੀਤਾ ਜਾ ਸਕੇ।"</string>
-    <string name="user_add_user_message_short" msgid="3295959985795716166">"ਜਦੋਂ ਤੁਸੀਂ ਇੱਕ ਨਵਾਂ ਵਰਤੋਂਕਾਰ ਸ਼ਾਮਲ ਕਰਦੇ ਹੋ, ਉਸ ਵਿਅਕਤੀ ਨੂੰ ਆਪਣੀ ਜਗ੍ਹਾ ਸੈੱਟਅੱਪ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ।\n\nਕੋਈ ਵੀ ਵਰਤੋਂਕਾਰ ਹੋਰ ਸਾਰੇ ਵਰਤੋਂਕਾਰਾਂ ਦੀਆਂ ਐਪਾਂ ਨੂੰ ਅੱਪਡੇਟ ਕਰ ਸਕਦਾ ਹੈ।"</string>
+    <string name="user_add_user_message_short" msgid="3295959985795716166">"ਜਦੋਂ ਤੁਸੀਂ ਕੋਈ ਨਵਾਂ ਵਰਤੋਂਕਾਰ ਸ਼ਾਮਲ ਕਰਦੇ ਹੋ, ਤਾਂ ਉਸ ਵਿਅਕਤੀ ਨੂੰ ਆਪਣੀ ਜਗ੍ਹਾ ਸੈੱਟਅੱਪ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ।\n\nਕੋਈ ਵੀ ਵਰਤੋਂਕਾਰ ਬਾਕੀ ਸਾਰੇ ਵਰਤੋਂਕਾਰਾਂ ਲਈ ਐਪਾਂ ਨੂੰ ਅੱਪਡੇਟ ਕਰ ਸਕਦਾ ਹੈ।"</string>
     <string name="user_grant_admin_title" msgid="5157031020083343984">"ਕੀ ਇਸ ਵਰਤੋਂਕਾਰ ਨੂੰ ਪ੍ਰਸ਼ਾਸਕ ਬਣਾਉਣਾ ਹੈ?"</string>
     <string name="user_grant_admin_message" msgid="1673791931033486709">"ਪ੍ਰਸ਼ਾਸਕਾਂ ਕੋਲ ਵਿਸ਼ੇਸ਼ ਅਧਿਕਾਰ ਹੁੰਦੇ ਹਨ ਜੋ ਹੋਰ ਵਰਤੋਂਕਾਰਾਂ ਕੋਲ ਨਹੀਂ ਹੁੰਦੇ। ਇੱਕ ਪ੍ਰਸ਼ਾਸਕ ਸਾਰੇ ਵਰਤੋਂਕਾਰਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰ ਸਕਦਾ ਹੈ, ਇਸ ਡੀਵਾਈਸ ਨੂੰ ਅੱਪਡੇਟ ਜਾਂ ਰੀਸੈੱਟ ਕਰ ਸਕਦਾ ਹੈ, ਸੈਟਿੰਗਾਂ ਨੂੰ ਸੋਧ ਸਕਦਾ ਹੈ, ਸਾਰੀਆਂ ਸਥਾਪਤ ਐਪਾਂ ਨੂੰ ਦੇਖ ਸਕਦਾ ਹੈ, ਅਤੇ ਦੂਜਿਆਂ ਲਈ ਪ੍ਰਸ਼ਾਸਕ ਦੇ ਅਧਿਕਾਰਾਂ ਨੂੰ ਮਨਜ਼ੂਰ ਜਾਂ ਰੱਦ ਕਰ ਸਕਦਾ ਹੈ।"</string>
     <string name="user_grant_admin_button" msgid="5441486731331725756">"ਪ੍ਰਸ਼ਾਸਕ ਬਣਾਓ"</string>

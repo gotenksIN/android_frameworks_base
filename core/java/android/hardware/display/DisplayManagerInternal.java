@@ -70,7 +70,7 @@ public abstract class DisplayManagerInternal {
      */
     public abstract int createVirtualDisplay(VirtualDisplayConfig config,
             IVirtualDisplayCallback callback, IVirtualDevice virtualDevice,
-            DisplayWindowPolicyController dwpc, String packageName);
+            DisplayWindowPolicyController dwpc, String packageName, int ownerUid);
 
     /**
      * Called by the power manager to request a new power state.
@@ -124,6 +124,23 @@ public abstract class DisplayManagerInternal {
      * @return The buffer or null if we have failed.
      */
     public abstract ScreenCaptureInternal.ScreenshotHardwareBuffer systemScreenshot(int displayId);
+
+    /**
+     * Captures a screenshot of the specified display for internal system use.
+     *
+     * <p>This method allows for more granular control over the screenshot process
+     * compared to {@link #systemScreenshot(int)}.
+     *
+     * @param displayId The display id to take the screenshot of.
+     * @param argsBuilder A {@link ScreenCaptureInternal.DisplayCaptureArgs.Builder}
+     *                    to specify screenshot parameters.
+     * @param callback A {@link ScreenCaptureInternal.ScreenCaptureListener} to receive
+     *                 the screenshot result or an error.
+     */
+    public abstract void systemScreenshot(
+            int displayId,
+            ScreenCaptureInternal.DisplayCaptureArgs.Builder argsBuilder,
+            ScreenCaptureInternal.ScreenCaptureListener callback);
 
     /**
      * General screenshot functionality that excludes secure layers and applies appropriate rotation
@@ -348,6 +365,25 @@ public abstract class DisplayManagerInternal {
      * is obstructing the proximity sensor.
      */
     public abstract void ignoreProximitySensorUntilChanged();
+
+    /**
+     * Sets the persistent connection preference for a given display. This preference
+     * determines whether to show a dialog, mirror, or use desktop mode automatically.
+     *
+     * @param uniqueId The unique ID of the display.
+     * @param preference The integer constant for the new preference to save.
+     * @hide
+     */
+    public abstract void setConnectionPreference(String uniqueId, int preference);
+
+    /**
+     * Retrieves the saved connection preference for a given display.
+     *
+     * @param uniqueId The unique ID of the display.
+     * @return The integer constant for the saved preference.
+     * @hide
+     */
+    public abstract int getConnectionPreference(String uniqueId);
 
     /**
      * Returns the refresh rate switching type.

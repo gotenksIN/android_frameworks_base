@@ -17,7 +17,7 @@
 package com.android.server.pm;
 
 import static android.app.admin.DevicePolicyResources.Strings.Core.PACKAGE_DELETED_BY_DO;
-import static android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_WARN;
+import static android.content.pm.PackageInstaller.DEVELOPER_VERIFICATION_POLICY_NONE;
 import static android.content.pm.PackageInstaller.LOCATION_DATA_APP;
 import static android.content.pm.PackageInstaller.SessionParams.MAX_PERMISSION_STATES_SIZE;
 import static android.content.pm.PackageInstaller.SessionParams.MAX_URI_LENGTH;
@@ -44,6 +44,7 @@ import android.Manifest;
 import android.annotation.EnforcePermission;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.app.ActivityManager;
 import android.app.AppGlobals;
 import android.app.AppOpsManager;
@@ -123,6 +124,7 @@ import com.android.internal.content.InstallLocationUtils;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.notification.SystemNotificationChannels;
 import com.android.internal.pm.parsing.PackageParser2;
+import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.ImageUtils;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.modules.utils.TypedXmlPullParser;
@@ -175,6 +177,10 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
 
     /** XML constants used in {@link #mSessionsFile} */
     private static final String TAG_SESSIONS = "sessions";
+    private static final String TAG_DEVELOPER_VERIFICATION_POLICY_PER_USER =
+            "developerVerificationPolicyPerUser";
+    private static final String ATTR_USER_ID = "userId";
+    private static final String ATTR_DEVELOPER_VERIFICATION_POLICY = "developerVerificationPolicy";
 
     /** Automatically destroy sessions older than this */
     private static final long MAX_AGE_MILLIS = 3 * DateUtils.DAY_IN_MILLIS;
@@ -288,11 +294,12 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
     /**
      * Default verification policy for incoming installation sessions, mapped from userId to policy.
      */
-    @GuardedBy("mVerificationPolicyPerUser")
+    @GuardedBy("mDeveloperVerificationPolicyPerUser")
     private final SparseIntArray mDeveloperVerificationPolicyPerUser = new SparseIntArray(1);
-    // TODO(b/360129657): update the default policy.
-    private static final int DEFAULT_VERIFICATION_POLICY =
-            DEVELOPER_VERIFICATION_POLICY_BLOCK_FAIL_WARN;
+    /**
+     * Default developer verification policy for a new user.
+     */
+    private static final int DEFAULT_VERIFICATION_POLICY = DEVELOPER_VERIFICATION_POLICY_NONE;
 
     private static final class Lifecycle extends SystemService {
         private final PackageInstallerService mPackageInstallerService;
@@ -351,13 +358,6 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         mPackageArchiver = new PackageArchiver(mContext, mPm);
         mDeveloperVerifierController = DeveloperVerifierController.getInstance(context,
                 mInstallHandler, developerVerificationServiceProvider);
-        synchronized (mDeveloperVerificationPolicyPerUser) {
-            int[] users = mPm.mUserManager.getUserIds();
-            for (int i = 0; i < users.length; i++) {
-                // TODO(b/360129657): preserve the overridden policy across reboots.
-                mDeveloperVerificationPolicyPerUser.put(users[i], DEFAULT_VERIFICATION_POLICY);
-            }
-        }
         mInstallDependencyHelper = new InstallDependencyHelper(mContext,
                 mPm.mInjector.getSharedLibrariesImpl(), this);
 
@@ -402,12 +402,30 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
                 Slog.w(TAG, "Deleting orphan icon " + icon);
                 icon.delete();
             }
-
-            // Invalid sessions might have been marked while parsing. Re-write the database with
-            // the updated information.
-            mSettingsWriteRequest.runNow();
-
         }
+
+        // Clean up the per-user developer verification policies in case some previous users have
+        // been removed since the last reboot.
+        final int[] users = mPm.mUserManager.getUserIds();
+        synchronized (mDeveloperVerificationPolicyPerUser) {
+            int size = mDeveloperVerificationPolicyPerUser.size();
+            for (int i = size - 1; i >= 0; i--) {
+                if (!ArrayUtils.contains(users, mDeveloperVerificationPolicyPerUser.keyAt(i))) {
+                    mDeveloperVerificationPolicyPerUser.removeAt(i);
+                }
+            }
+            // If the per-user developer verification policy was never set before for any user,
+            // add a default policy for the user.
+            for (int i = 0; i < users.length; i++) {
+                if (mDeveloperVerificationPolicyPerUser.indexOfKey(users[i]) < 0) {
+                    mDeveloperVerificationPolicyPerUser.put(users[i], DEFAULT_VERIFICATION_POLICY);
+                }
+            }
+        }
+
+        // Invalid sessions might have been marked while parsing. Re-write the database with
+        // the updated information.
+        mSettingsWriteRequest.runNow();
     }
 
     private void onBroadcastReady() {
@@ -568,6 +586,19 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
                         }
                         mSessions.put(session.sessionId, session);
                         mAllocatedSessions.put(session.sessionId, true);
+                    } else if (TAG_DEVELOPER_VERIFICATION_POLICY_PER_USER.equals(tag)) {
+                        int userId = in.getAttributeInt(null, ATTR_USER_ID, -1);
+                        if (userId == -1) {
+                            continue;
+                        }
+                        int policy =
+                                in.getAttributeInt(null, ATTR_DEVELOPER_VERIFICATION_POLICY, -1);
+                        if (policy == -1) {
+                            continue;
+                        }
+                        synchronized (mDeveloperVerificationPolicyPerUser) {
+                            mDeveloperVerificationPolicyPerUser.put(userId, policy);
+                        }
                     }
                 }
             }
@@ -672,6 +703,18 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
                 session.write(out, mSessionsDir);
             }
             out.endTag(null, TAG_SESSIONS);
+
+            // Preserve current developer verification policy per user to disk.
+            synchronized (mDeveloperVerificationPolicyPerUser) {
+                for (int i = 0; i < mDeveloperVerificationPolicyPerUser.size(); i++) {
+                    out.startTag(null, TAG_DEVELOPER_VERIFICATION_POLICY_PER_USER);
+                    out.attributeInt(null, ATTR_USER_ID,
+                            mDeveloperVerificationPolicyPerUser.keyAt(i));
+                    out.attributeInt(null, ATTR_DEVELOPER_VERIFICATION_POLICY,
+                            mDeveloperVerificationPolicyPerUser.valueAt(i));
+                    out.endTag(null, TAG_DEVELOPER_VERIFICATION_POLICY_PER_USER);
+                }
+            }
             out.endDocument();
 
             mSessionsFile.finishWrite(fos);
@@ -713,9 +756,9 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
     int createSessionInternal(SessionParams params, String installerPackageName,
             String installerAttributionTag, int callingUid, int userId)
             throws IOException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(90);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         final Computer snapshot = mPm.snapshotComputer();
         snapshot.enforceCrossUserPermission(callingUid, userId, true, true, "createSession");
 
@@ -1113,7 +1156,7 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
                 null, null, false, false, false, false, null, SessionInfo.INVALID_ID,
                 false, false, false, PackageManager.INSTALL_UNKNOWN, "", null,
                 mDeveloperVerifierController, verificationPolicy, verificationPolicy,
-                mInstallDependencyHelper);
+                mInstallDependencyHelper, /* restoredOnReboot= */ false);
 
         synchronized (mSessions) {
             mSessions.put(sessionId, session);
@@ -1969,10 +2012,20 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
     }
 
     @Override
-    @EnforcePermission(android.Manifest.permission.DEVELOPER_VERIFICATION_AGENT)
+    @RequiresPermission(value = Manifest.permission.DEVELOPER_VERIFICATION_AGENT,
+            conditional = true)
     public @PackageInstaller.DeveloperVerificationPolicy int getDeveloperVerificationPolicy(
             int userId) {
-        getDeveloperVerificationPolicy_enforcePermission();
+        final int callingUid = getCallingUid();
+        final int callingPid = getCallingPid();
+        if (mContext.checkPermission(Manifest.permission.DEVELOPER_VERIFICATION_AGENT, callingPid,
+                callingUid) != PackageManager.PERMISSION_GRANTED) {
+            if (!isCallerDeveloperVerificationPolicyDelegate(
+                    mPm.snapshotComputer(), callingUid, userId)) {
+                throw new SecurityException(
+                        "Caller is not allowed to read the developer verification policy");
+            }
+        }
         synchronized (mDeveloperVerificationPolicyPerUser) {
             if (mDeveloperVerificationPolicyPerUser.indexOfKey(userId) < 0) {
                 throw new IllegalStateException(
@@ -1984,18 +2037,20 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
     }
 
     @Override
-    @EnforcePermission(android.Manifest.permission.DEVELOPER_VERIFICATION_AGENT)
     public boolean setDeveloperVerificationPolicy(
             @PackageInstaller.DeveloperVerificationPolicy int policy, int userId) {
-        setDeveloperVerificationPolicy_enforcePermission();
+        // Write is more restrictive than read. Having the permission granted is not enough.
+        // Only the verifier or the delegate app can change the developer verification policy.
+        final int callingUid = getCallingUid();
+        final Computer snapshot = mPm.snapshotComputer();
+        if (!isCallerDeveloperVerifier(snapshot, callingUid, userId)
+                && !isCallerDeveloperVerificationPolicyDelegate(snapshot, callingUid, userId)) {
+            throw new SecurityException(
+                    "Caller is not allowed to change the developer verification policy");
+        }
         if (mDeveloperVerifierController.getVerifierPackageName() == null) {
             // The system doesn't have a specified verifier package.
             return false;
-        }
-        final int callingUid = getCallingUid();
-        // Only the verifier currently bound by the system can change the policy, except for Shell
-        if (!PackageManagerServiceUtils.isRootOrShell(callingUid)) {
-            mDeveloperVerifierController.assertCallerIsCurrentVerifier(callingUid);
         }
         if (!isValidVerificationPolicy(policy)) {
             return false;
@@ -2008,9 +2063,59 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             }
             if (policy != mDeveloperVerificationPolicyPerUser.get(userId)) {
                 mDeveloperVerificationPolicyPerUser.put(userId, policy);
+                // Preserve the change to disk
+                mSettingsWriteRequest.schedule();
             }
         }
         return true;
+    }
+
+    @Override
+    @android.annotation.EnforcePermission(android.Manifest.permission.DEVELOPER_VERIFICATION_AGENT)
+    @Nullable
+    public String getDeveloperVerificationPolicyDelegatePackage(int userId) {
+        getDeveloperVerificationPolicyDelegatePackage_enforcePermission();
+        // This method can only be called by the verifier app
+        final Computer snapshot = mPm.snapshotComputer();
+        final int callingUid = getCallingUid();
+        if (!isCallerDeveloperVerifier(snapshot, callingUid, userId)) {
+            throw new SecurityException("The caller is not the developer verifier and cannot query"
+                    + " the policy delegate app.");
+        }
+        final String delegatePackageName = mPm.getDeveloperVerificationPolicyDelegatePackageName();
+        if (delegatePackageName == null) {
+            return null;
+        }
+        // Check that the delegate app is installed and that the caller can see the delegate app.
+        final PackageStateInternal delegatePs = snapshot.getPackageStateFiltered(
+                delegatePackageName, callingUid, userId);
+        if (delegatePs == null || !delegatePs.getUserStateOrDefault(userId).isInstalled()) {
+            return null;
+        }
+        return delegatePs.getPackageName();
+    }
+
+    private boolean isCallerDeveloperVerifier(Computer snapshot, int callingUid, int userId) {
+        final String verifierPackageName = mDeveloperVerifierController.getVerifierPackageName();
+        if (verifierPackageName == null) {
+            return false;
+        }
+        // Here we only care about the UID of the verifier app, so we don't do apps filter
+        final int verifierUid = snapshot.getPackageUidInternal(
+                verifierPackageName, 0 /* flags */, userId, SYSTEM_UID);
+        return UserHandle.isSameApp(callingUid, verifierUid);
+    }
+
+    private boolean isCallerDeveloperVerificationPolicyDelegate(
+            Computer snapshot, int callingUid, int userId) {
+        final String delegatePackageName = mPm.getDeveloperVerificationPolicyDelegatePackageName();
+        if (delegatePackageName == null) {
+            return false;
+        }
+        // Here we only care about the UID of the delegate app, so we don't do apps filter
+        final int delegateUid = snapshot.getPackageUidInternal(
+                delegatePackageName, 0 /* flags */, userId, SYSTEM_UID);
+        return UserHandle.isSameApp(callingUid, delegateUid);
     }
 
     @Override
@@ -2028,6 +2133,16 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             return null;
         }
         return verifierComponentName;
+    }
+
+    @Override
+    public void addDeveloperVerificationExperiment(String packageName, int verificationPolicy,
+            int[] results) {
+        List<Integer> resultsList = new ArrayList<>(results.length);
+        for (int i = 0; i < results.length; i++) {
+            resultsList.add(results[i]);
+        }
+        mDeveloperVerifierController.addExperiment(packageName, verificationPolicy, resultsList);
     }
 
     void onUserAdded(int userId) {

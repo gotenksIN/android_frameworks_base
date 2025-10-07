@@ -17,7 +17,6 @@
 package com.android.systemui.keyguard.ui.composable
 
 import android.view.View
-import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
@@ -31,9 +30,12 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.transition.KeyguardTransitionAnimationCallback
 import com.android.systemui.keyguard.ui.composable.blueprint.ComposableLockscreenSceneBlueprint
+import com.android.systemui.keyguard.ui.viewmodel.LockscreenBehindScrimViewModel
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenContentViewModel
+import com.android.systemui.keyguard.ui.viewmodel.LockscreenFrontScrimViewModel
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.notifications.ui.composable.NotificationLockscreenScrim
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationLockscreenScrimViewModel
 
 /**
@@ -45,6 +47,8 @@ import com.android.systemui.statusbar.notification.stack.ui.viewmodel.Notificati
 class LockscreenContent(
     private val viewModelFactory: LockscreenContentViewModel.Factory,
     private val notificationScrimViewModelFactory: NotificationLockscreenScrimViewModel.Factory,
+    private val lockscreenFrontScrimViewModelFactory: LockscreenFrontScrimViewModel.Factory,
+    private val lockscreenBehindScrimViewModelFactory: LockscreenBehindScrimViewModel.Factory,
     private val blueprints: Set<@JvmSuppressWildcards ComposableLockscreenSceneBlueprint>,
     private val clockInteractor: KeyguardClockInteractor,
     private val interactionJankMonitor: InteractionJankMonitor,
@@ -64,28 +68,38 @@ class LockscreenContent(
                 )
             }
         val notificationLockscreenScrimViewModel =
-            rememberViewModel("LockscreenContent-scrimViewModel") {
+            rememberViewModel("LockscreenContent-notificationScrimViewModel") {
                 notificationScrimViewModelFactory.create()
             }
-        if (!viewModel.isContentVisible) {
-            // If the content isn't supposed to be visible, show a large empty box as it's needed
-            // for scene transition animations (can't just skip rendering everything or shared
-            // elements won't have correct final/initial bounds from animating in and out of the
-            // lockscreen scene).
-            Box(modifier)
-            return
-        }
+        val lockscreenFrontScrimViewModel =
+            rememberViewModel("LockscreenContent-frontScrimViewModel") {
+                lockscreenFrontScrimViewModelFactory.create()
+            }
+        val lockscreenBehindScrimViewModel =
+            rememberViewModel("LockscreenContent-behindScrimViewModel") {
+                lockscreenBehindScrimViewModelFactory.create()
+            }
+
+        // Ensure clock events are connected. This is a no-op if they are already registered.
+        clockInteractor.clockEventController.registerListeners()
 
         DisposableEffect(view) {
-            clockInteractor.clockEventController.registerListeners(view)
-
-            onDispose { clockInteractor.clockEventController.unregisterListeners() }
+            val handle = clockInteractor.clockEventController.bind(view)
+            onDispose { handle.dispose() }
         }
 
         val blueprint = blueprintByBlueprintId[viewModel.blueprintId] ?: return
         with(blueprint) {
-            Content(viewModel, modifier.sysuiResTag("keyguard_root_view"))
+            LockscreenBehindScrim(
+                lockscreenBehindScrimViewModel,
+                Modifier.element(LockscreenElementKeys.BehindScrim),
+            )
+            Content(
+                viewModel,
+                modifier.sysuiResTag("keyguard_root_view").element(LockscreenElementKeys.Root),
+            )
             NotificationLockscreenScrim(notificationLockscreenScrimViewModel)
+            LockscreenFrontScrim(lockscreenFrontScrimViewModel)
         }
     }
 }

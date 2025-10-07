@@ -71,13 +71,18 @@
     <string name="CLIRDefaultOnNextCallOff" msgid="5036749051007098105">"ਪ੍ਰਤਿਬੰਧਿਤ ਕਰਨ ਲਈ ਕਾਲਰ ਆਈ.ਡੀ. ਪੂਰਵ-ਨਿਰਧਾਰਤ। ਅਗਲੀ ਕਾਲ: ਪ੍ਰਤਿਬੰਧਿਤ ਨਹੀਂ"</string>
     <string name="CLIRDefaultOffNextCallOn" msgid="1022781126694885017">"ਪ੍ਰਤਿਬੰਧਿਤ ਨਾ ਕਰਨ ਲਈ ਕਾਲਰ ਆਈ.ਡੀ. ਪੂਰਵ-ਨਿਰਧਾਰਤ। ਅਗਲੀ ਕਾਲ: ਪ੍ਰਤਿਬੰਧਿਤ"</string>
     <string name="CLIRDefaultOffNextCallOff" msgid="2491576172356463443">"ਪ੍ਰਤਿਬੰਧਿਤ ਨਾ ਕਰਨ ਲਈ ਕਾਲਰ ਆਈ.ਡੀ. ਪੂਰਵ-ਨਿਰਧਾਰਤ। ਅਗਲੀ ਕਾਲ: ਪ੍ਰਤਿਬੰਧਿਤ ਨਹੀਂ"</string>
-    <string name="page_size_compat_apk_warning" msgid="2982396798449041224">"ਇਹ ਐਪ 16 KB ਦੇ ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। APK ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਇਹ ਐਪ ਪੰਨੇ ਦੇ ਆਕਾਰ ਦੇ ਅਨੁਰੂਪ ਮੋਡ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਚੱਲੇਗੀ। ਬਿਹਤਰ ਅਨੁਰੂਪਤਾ ਲਈ, ਕਿਰਪਾ ਕਰਕੇ 16 KB ਵਾਲੇ ਪੰਨਿਆਂ ਨਾਲ ਐਪਲੀਕੇਸ਼ਨ ਦਾ ਮੁੜ-ਸੰਕਲਨ ਕਰੋ। ਹੋਰ ਜਾਣਕਾਰੀ ਲਈ, &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; ਦੇਖੋ"</string>
-    <string name="page_size_compat_elf_warning" msgid="6753874059564812651">"ਇਹ ਐਪ 16 KB ਦੇ ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। ELF ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਇਹ ਐਪ ਪੰਨੇ ਦੇ ਆਕਾਰ ਦੇ ਅਨੁਰੂਪ ਮੋਡ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਚੱਲੇਗੀ। ਬਿਹਤਰ ਅਨੁਰੂਪਤਾ ਲਈ, ਕਿਰਪਾ ਕਰਕੇ 16 KB ਵਾਲੇ ਪੰਨਿਆਂ ਨਾਲ ਐਪਲੀਕੇਸ਼ਨ ਦਾ ਮੁੜ-ਸੰਕਲਨ ਕਰੋ। ਹੋਰ ਜਾਣਕਾਰੀ ਲਈ, &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; ਦੇਖੋ"</string>
-    <string name="page_size_compat_apk_and_elf_warning" msgid="7628675779500605390">"ਇਹ ਐਪ 16 KB ਦੇ ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। APK ਅਤੇ ELF ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਇਹ ਐਪ ਪੰਨੇ ਦੇ ਆਕਾਰ ਦੇ ਅਨੁਰੂਪ ਮੋਡ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਚੱਲੇਗੀ। ਬਿਹਤਰ ਅਨੁਰੂਪਤਾ ਲਈ, ਕਿਰਪਾ ਕਰਕੇ 16 KB ਵਾਲੇ ਪੰਨਿਆਂ ਨਾਲ ਐਪਲੀਕੇਸ਼ਨ ਦਾ ਮੁੜ-ਸੰਕਲਨ ਕਰੋ। ਹੋਰ ਜਾਣਕਾਰੀ ਲਈ, &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; ਦੇਖੋ"</string>
-    <string name="page_size_compat_apk_warning_4kb" msgid="2104642120436642689">"ਇਹ ਚਿਤਾਵਨੀ ਇਸ ਲਈ ਦਿਖਾਈ ਜਾ ਰਹੀ ਹੈ ਕਿਉਂਕਿ ਇਹ ਡੀਬੱਗਯੋਗ ਐਪ ਹੈ ਜਿਸਦੀ ਫ਼ਿਲਹਾਲ ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ। ਜੇ ਤੁਸੀਂ ਵਿਕਾਸਕਾਰ ਨਹੀਂ ਹੋ, ਤਾਂ ਕਿਰਪਾ ਕਰਕੇ ਵਿਕਾਸਕਾਰ ਨੂੰ ਇਸਦੀ ਰਿਪੋਰਟ ਕਰੋ ਅਤੇ ਗੈਰ-ਡੀਬੱਗਯੋਗ ਐਪ ਲਈ ਕਹੋ। ਇਹ ਐਪ 16 KB ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। APK ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਕਿਰਪਾ ਕਰਕੇ &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; \'ਤੇ ਜਾ ਕੇ ਪੜਾਵਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ"</string>
-    <string name="page_size_compat_elf_warning_4kb" msgid="8038334656395476900">"ਇਹ ਚਿਤਾਵਨੀ ਇਸ ਲਈ ਦਿਖਾਈ ਜਾ ਰਹੀ ਹੈ ਕਿਉਂਕਿ ਇਹ ਡੀਬੱਗਯੋਗ ਐਪ ਹੈ ਜਿਸਦੀ ਫ਼ਿਲਹਾਲ ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ। ਜੇ ਤੁਸੀਂ ਵਿਕਾਸਕਾਰ ਨਹੀਂ ਹੋ, ਤਾਂ ਕਿਰਪਾ ਕਰਕੇ ਵਿਕਾਸਕਾਰ ਨੂੰ ਇਸਦੀ ਰਿਪੋਰਟ ਕਰੋ ਅਤੇ ਗੈਰ-ਡੀਬੱਗਯੋਗ ਐਪ ਲਈ ਕਹੋ। ਇਹ ਐਪ 16 KB ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। ELF ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਕਿਰਪਾ ਕਰਕੇ &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; \'ਤੇ ਜਾ ਕੇ ਪੜਾਵਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ"</string>
-    <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="5417036941497610850">"ਇਹ ਚਿਤਾਵਨੀ ਇਸ ਲਈ ਦਿਖਾਈ ਜਾ ਰਹੀ ਹੈ ਕਿਉਂਕਿ ਇਹ ਡੀਬੱਗਯੋਗ ਐਪ ਹੈ ਜਿਸਦੀ ਫ਼ਿਲਹਾਲ ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ। ਜੇ ਤੁਸੀਂ ਵਿਕਾਸਕਾਰ ਨਹੀਂ ਹੋ, ਤਾਂ ਕਿਰਪਾ ਕਰਕੇ ਵਿਕਾਸਕਾਰ ਨੂੰ ਇਸਦੀ ਰਿਪੋਰਟ ਕਰੋ ਅਤੇ ਗੈਰ-ਡੀਬੱਗਯੋਗ ਐਪ ਲਈ ਕਹੋ। ਇਹ ਐਪ 16 KB ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। APK ਅਤੇ ELF ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਕਿਰਪਾ ਕਰਕੇ &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; \'ਤੇ ਜਾ ਕੇ ਪੜਾਵਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ"</string>
+    <string name="page_size_compat_apk_warning" msgid="2297836366674721648">"ਇਹ ਐਪ 16 KB ਦੇ ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। APK ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਇਹ ਐਪ ਪੰਨੇ ਦੇ ਆਕਾਰ ਦੇ ਅਨੁਰੂਪ ਮੋਡ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਚੱਲੇਗੀ। ਬਿਹਤਰ ਅਨੁਰੂਪਤਾ ਲਈ, ਕਿਰਪਾ ਕਰਕੇ 16 KB ਸਮਰਥਿਤ ਪੰਨਿਆਂ ਨਾਲ ਐਪਲੀਕੇਸ਼ਨ ਦਾ ਮੁੜ-ਸੰਕਲਨ ਕਰੋ। ਹੋਰ ਜਾਣਕਾਰੀ ਲਈ, &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; ਦੇਖੋ &lt;br&gt;&lt;br&gt; ਅੱਗੇ ਦਿੱਤੀਆਂ ਲਾਇਬ੍ਰੇਰੀਆਂ 16 KB ਮੁਤਾਬਕ ਇਕਸਾਰ ਨਹੀਂ ਹਨ: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_elf_warning" msgid="8613720928493005883">"ਇਹ ਐਪ 16 KB ਦੇ ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। ELF ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਇਹ ਐਪ ਪੰਨੇ ਦੇ ਆਕਾਰ ਦੇ ਅਨੁਰੂਪ ਮੋਡ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਚੱਲੇਗੀ। ਬਿਹਤਰ ਅਨੁਰੂਪਤਾ ਲਈ, ਕਿਰਪਾ ਕਰਕੇ 16 KB ਸਮਰਥਿਤ ਪੰਨਿਆਂ ਨਾਲ ਐਪਲੀਕੇਸ਼ਨ ਦਾ ਮੁੜ-ਸੰਕਲਨ ਕਰੋ। ਹੋਰ ਜਾਣਕਾਰੀ ਲਈ, &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; ਦੇਖੋ &lt;br&gt;&lt;br&gt; ਅੱਗੇ ਦਿੱਤੀਆਂ ਲਾਇਬ੍ਰੇਰੀਆਂ 16 KB ਮੁਤਾਬਕ ਇਕਸਾਰ ਨਹੀਂ ਹਨ: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_warning" msgid="9034695801295605229">"ਇਹ ਐਪ 16 KB ਦੇ ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। APK ਅਤੇ ELF ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਇਹ ਐਪ ਪੰਨੇ ਦੇ ਆਕਾਰ ਦੇ ਅਨੁਰੂਪ ਮੋਡ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਚੱਲੇਗੀ। ਬਿਹਤਰ ਅਨੁਰੂਪਤਾ ਲਈ, ਕਿਰਪਾ ਕਰਕੇ 16 KB ਸਮਰਥਿਤ ਪੰਨਿਆਂ ਨਾਲ ਐਪਲੀਕੇਸ਼ਨ ਦਾ ਮੁੜ-ਸੰਕਲਨ ਕਰੋ। ਹੋਰ ਜਾਣਕਾਰੀ ਲਈ, &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; ਦੇਖੋ &lt;br&gt;&lt;br&gt; ਅੱਗੇ ਦਿੱਤੀਆਂ ਲਾਇਬ੍ਰੇਰੀਆਂ 16 KB ਮੁਤਾਬਕ ਇਕਸਾਰ ਨਹੀਂ ਹਨ: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_warning_4kb" msgid="5676451039424864495">"ਇਹ ਚਿਤਾਵਨੀ ਇਸ ਲਈ ਦਿਖਾਈ ਜਾ ਰਹੀ ਹੈ ਕਿਉਂਕਿ ਇਹ ਡੀਬੱਗਯੋਗ ਐਪ ਹੈ ਜਿਸਦੀ ਫ਼ਿਲਹਾਲ ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ। ਜੇ ਤੁਸੀਂ ਵਿਕਾਸਕਾਰ ਨਹੀਂ ਹੋ, ਤਾਂ ਕਿਰਪਾ ਕਰਕੇ ਵਿਕਾਸਕਾਰ ਨੂੰ ਇਸਦੀ ਰਿਪੋਰਟ ਕਰੋ ਅਤੇ ਗੈਰ-ਡੀਬੱਗਯੋਗ ਐਪ ਲਈ ਕਹੋ। &lt;br&gt;&lt;br&gt; ਇਹ ਐਪ 16 KB ਦੇ ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। APK ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਕਿਰਪਾ ਕਰਕੇ &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; \'ਤੇ ਜਾ ਕੇ ਪੜਾਵਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ &lt;br&gt;&lt;br&gt; ਅੱਗੇ ਦਿੱਤੀਆਂ ਲਾਇਬ੍ਰੇਰੀਆਂ 16 KB ਮੁਤਾਬਕ ਇਕਸਾਰ ਨਹੀਂ ਹਨ: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_elf_warning_4kb" msgid="5005239480522831311">"ਇਹ ਚਿਤਾਵਨੀ ਇਸ ਲਈ ਦਿਖਾਈ ਜਾ ਰਹੀ ਹੈ ਕਿਉਂਕਿ ਇਹ ਡੀਬੱਗਯੋਗ ਐਪ ਹੈ ਜਿਸਦੀ ਫ਼ਿਲਹਾਲ ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ। ਜੇ ਤੁਸੀਂ ਵਿਕਾਸਕਾਰ ਨਹੀਂ ਹੋ, ਤਾਂ ਕਿਰਪਾ ਕਰਕੇ ਵਿਕਾਸਕਾਰ ਨੂੰ ਇਸਦੀ ਰਿਪੋਰਟ ਕਰੋ ਅਤੇ ਗੈਰ-ਡੀਬੱਗਯੋਗ ਐਪ ਲਈ ਕਹੋ। &lt;br&gt;&lt;br&gt; ਇਹ ਐਪ 16 KB ਦੇ ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। ELF ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਕਿਰਪਾ ਕਰਕੇ &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; \'ਤੇ ਜਾ ਕੇ ਪੜਾਵਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ &lt;br&gt;&lt;br&gt; ਅੱਗੇ ਦਿੱਤੀਆਂ ਲਾਇਬ੍ਰੇਰੀਆਂ 16 KB ਮੁਤਾਬਕ ਇਕਸਾਰ ਨਹੀਂ ਹਨ: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="997926487776340721">"ਇਹ ਚਿਤਾਵਨੀ ਇਸ ਲਈ ਦਿਖਾਈ ਜਾ ਰਹੀ ਹੈ ਕਿਉਂਕਿ ਇਹ ਡੀਬੱਗਯੋਗ ਐਪ ਹੈ ਜਿਸਦੀ ਫ਼ਿਲਹਾਲ ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ। ਜੇ ਤੁਸੀਂ ਵਿਕਾਸਕਾਰ ਨਹੀਂ ਹੋ, ਤਾਂ ਕਿਰਪਾ ਕਰਕੇ ਵਿਕਾਸਕਾਰ ਨੂੰ ਇਸਦੀ ਰਿਪੋਰਟ ਕਰੋ ਅਤੇ ਗੈਰ-ਡੀਬੱਗਯੋਗ ਐਪ ਲਈ ਕਹੋ। &lt;br&gt;&lt;br&gt; ਇਹ ਐਪ 16 KB ਦੇ ਅਨੁਰੂਪ ਨਹੀਂ ਹੈ। APK ਅਤੇ ELF ਦੀ ਇਕਸਾਰਤਾ ਦੀ ਜਾਂਚ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ। ਕਿਰਪਾ ਕਰਕੇ &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; \'ਤੇ ਜਾ ਕੇ ਪੜਾਵਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ। &lt;br&gt;&lt;br&gt; ਅੱਗੇ ਦਿੱਤੀਆਂ ਲਾਇਬ੍ਰੇਰੀਆਂ 16 KB ਮੁਤਾਬਕ ਇਕਸਾਰ ਨਹੀਂ ਹਨ: &lt;br&gt;&lt;br&gt;"</string>
     <string name="page_size_compat_never_show" msgid="3391282612422783097">"ਦੁਬਾਰਾ ਨਾ ਦਿਖਾਓ"</string>
+    <string name="page_size_compat_title" msgid="6497719153872572204">"Android ਐਪ ਦੀ ਅਨੁਰੂਪਤਾ"</string>
+    <string name="page_size_compat_elf_not_aligned" msgid="4404128993555194313">"&amp;#8226; %1$s : ਲੋਡ ਹਿੱਸਾ ਇਕਸਾਰ ਨਹੀਂ ਹੈ&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_not_aligned" msgid="1434875607880657092">"&amp;#8226; %1$s : ਅਸੰਕੁਚਿਤ ਲਾਇਬ੍ਰੇਰੀ ਇਕਸਾਰ ਨਹੀਂ ਹੈ&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_not_aligned" msgid="7140216083697701972">"&amp;#8226; %1$s : ਲੋਡ ਹਿੱਸਾ ਅਤੇ ਅਸੰਕੁਚਿਤ ਲਾਇਬ੍ਰੇਰੀ ਇਕਸਾਰ ਨਹੀਂ ਹਨ&lt;br&gt;"</string>
+    <string name="page_size_compat_unknown" msgid="5183026525148169891">"&amp;#8226; %1$s : ਅਗਿਆਤ ਗੜਬੜ&lt;br&gt;"</string>
     <string name="serviceNotProvisioned" msgid="8289333510236766193">"ਸੇਵਾ ਪ੍ਰਬੰਧਿਤ ਨਹੀਂ ਹੈ।"</string>
     <string name="CLIRPermanent" msgid="166443681876381118">"ਤੁਸੀਂ ਕਾਲਰ ਆਈ.ਡੀ. ਸੈਟਿੰਗ ਨਹੀਂ ਬਦਲ ਸਕਦੇ।"</string>
     <string name="auto_data_switch_title" msgid="3286350716870518297">"ਡਾਟੇ ਨੂੰ <xliff:g id="CARRIERDISPLAY">%s</xliff:g> \'ਤੇ ਸਵਿੱਚ ਕੀਤਾ ਗਿਆ"</string>
@@ -164,14 +169,10 @@
     <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"ਮੋਬਾਈਲ ਨੈੱਟਵਰਕ ਸੁਰੱਖਿਆ"</string>
     <string name="scCellularNetworkSecuritySummary" msgid="7042036754550545005">"ਇਨਕ੍ਰਿਪਸ਼ਨ, ਅਣ-ਇਨਕ੍ਰਿਪਟਡ ਨੈੱਟਵਰਕਾਂ ਲਈ ਸੂਚਨਾਵਾਂ"</string>
     <string name="scIdentifierDisclosureIssueTitle" msgid="2898888825129970328">"ਡੀਵਾਈਸ ਆਈਡੀ ਤੱਕ ਪਹੁੰਚ ਕੀਤੀ ਗਈ"</string>
-    <!-- no translation found for scIDIssueSummaryNotificationWithCellularID (8371590113242615316) -->
-    <skip />
-    <!-- no translation found for scIdentifierDisclosureIssueSummaryNotification (7106922007150754222) -->
-    <skip />
-    <!-- no translation found for scIDIssueSummaryWithCellularID (1189965658392583067) -->
-    <skip />
-    <!-- no translation found for scIdentifierDisclosureIssueSummary (4362014471570210380) -->
-    <skip />
+    <string name="scIDIssueSummaryNotificationWithCellularID" msgid="8371590113242615316">"<xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> ਵਜੇ, ਕਿਸੇ ਨਜ਼ਦੀਕੀ ਨੈੱਟਵਰਕ ਵੱਲੋਂ ਤੁਹਾਡੇ <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> ਸਿਮ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਤੁਹਾਡੇ ਡੀਵਾਈਸ ਦੀ ਵਿਲੱਖਣ ਆਈਡੀ (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>) ਨੂੰ ਰਿਕਾਰਡ ਕੀਤਾ ਗਿਆ"</string>
+    <string name="scIdentifierDisclosureIssueSummaryNotification" msgid="7106922007150754222">"<xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> ਵਜੇ, ਕਿਸੇ ਨਜ਼ਦੀਕੀ ਨੈੱਟਵਰਕ ਵੱਲੋਂ ਤੁਹਾਡੇ <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> ਸਿਮ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਤੁਹਾਡੇ ਡੀਵਾਈਸ ਦੀ ਵਿਲੱਖਣ ਆਈਡੀ ਨੂੰ ਰਿਕਾਰਡ ਕੀਤਾ ਗਿਆ"</string>
+    <string name="scIDIssueSummaryWithCellularID" msgid="1189965658392583067">"<xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> ਵਜੇ, ਕਿਸੇ ਨਜ਼ਦੀਕੀ ਨੈੱਟਵਰਕ ਵੱਲੋਂ ਤੁਹਾਡੇ ਆਪਣੇ <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> ਸਿਮ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਤੁਹਾਡੇ ਡੀਵਾਈਸ ਦੀ ਵਿਲੱਖਣ ਆਈਡੀ (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>) ਨੂੰ ਰਿਕਾਰਡ ਕੀਤਾ ਗਿਆ।\n\nਇਸ ਦਾ ਮਤਲਬ ਹੈ ਕਿ ਤੁਹਾਡਾ ਟਿਕਾਣਾ, ਸਰਗਰਮੀ ਜਾਂ ਪਛਾਣ ਨੂੰ ਲੌਗ ਕੀਤਾ ਗਿਆ ਹੈ। ਇਹ ਆਮ ਅਭਿਆਸ ਹੈ, ਪਰ ਪਰਦੇਦਾਰੀ ਬਾਰੇ ਚਿੰਤਤ ਲੋਕਾਂ ਲਈ ਇਹ ਸਮੱਸਿਆ ਹੋ ਸਕਦੀ ਹੈ।"</string>
+    <string name="scIdentifierDisclosureIssueSummary" msgid="4362014471570210380">"<xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> ਵਜੇ, ਕਿਸੇ ਨਜ਼ਦੀਕੀ ਨੈੱਟਵਰਕ ਵੱਲੋਂ ਤੁਹਾਡੇ ਆਪਣੇ <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> ਸਿਮ ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਤੁਹਾਡੇ ਡੀਵਾਈਸ ਦੀ ਵਿਲੱਖਣ ਆਈਡੀ ਨੂੰ ਰਿਕਾਰਡ ਕੀਤਾ ਗਿਆ।\n\nਇਸ ਦਾ ਮਤਲਬ ਹੈ ਕਿ ਤੁਹਾਡਾ ਟਿਕਾਣਾ, ਸਰਗਰਮੀ ਜਾਂ ਪਛਾਣ ਨੂੰ ਲੌਗ ਕੀਤਾ ਗਿਆ ਹੈ। ਇਹ ਆਮ ਅਭਿਆਸ ਹੈ, ਪਰ ਪਰਦੇਦਾਰੀ ਬਾਰੇ ਚਿੰਤਤ ਲੋਕਾਂ ਲਈ ਇਹ ਸਮੱਸਿਆ ਹੋ ਸਕਦੀ ਹੈ।"</string>
     <string name="scNullCipherIssueEncryptedTitle" msgid="234717016411824969">"ਇਨਕ੍ਰਿਪਟਡ ਨੈੱਟਵਰਕ <xliff:g id="NETWORK_NAME">%1$s</xliff:g> ਨਾਲ ਕਨੈਕਟ ਕੀਤਾ ਗਿਆ"</string>
     <string name="scNullCipherIssueEncryptedSummary" msgid="8577510708842150475">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> ਸਿਮ ਕਨੈਕਸ਼ਨ ਹੁਣ ਜ਼ਿਆਦਾ ਸੁਰੱਖਿਅਤ ਹੈ"</string>
     <string name="scNullCipherIssueNonEncryptedTitle" msgid="3978071464929453915">"ਇਨਕ੍ਰਿਪਟਡ ਨੈੱਟਵਰਕ ਨਾਲ ਕਨੈਕਟ ਕੀਤਾ ਗਿਆ"</string>
@@ -299,6 +300,7 @@
     <string name="global_action_assist" msgid="2517047220311505805">"ਸਹਾਇਤਾ ਕਰੋ"</string>
     <string name="global_action_voice_assist" msgid="6655788068555086695">"ਅਵਾਜ਼ੀ ਸਹਾਇਕ"</string>
     <string name="global_action_lockdown" msgid="2475471405907902963">"ਲਾਕਡਾਊਨ"</string>
+    <string name="global_action_unrestricted_lock" msgid="7933224393323064116">"ਲਾਕ ਕਰੋ"</string>
     <string name="status_bar_notification_info_overflow" msgid="3330152558746563475">"999+"</string>
     <string name="notification_compact_heads_up_reply" msgid="2425293958371284340">"ਜਵਾਬ ਦਿਓ"</string>
     <string name="notification_hidden_text" msgid="2835519769868187223">"ਨਵੀਂ ਸੂਚਨਾ"</string>
@@ -364,12 +366,12 @@
     <string name="permgroupdesc_sensors" msgid="2610631290633747752">"ਆਪਣੇ ਸਰੀਰ ਦੇ ਅਹਿਮ ਚਿੰਨ੍ਹਾਂ ਬਾਰੇ ਸੰਵੇਦਕ ਡਾਟਾ ਤੱਕ ਪਹੁੰਚ ਕਰਨ"</string>
     <string name="permgrouplab_notifications" msgid="5472972361980668884">"ਸੂਚਨਾਵਾਂ"</string>
     <string name="permgroupdesc_notifications" msgid="4608679556801506580">"ਸੂਚਨਾਵਾਂ ਦਿਖਾਓ"</string>
-    <string name="permgrouplab_xr_eye_sensitive" msgid="2099659100156643683">"ਅੱਖ ਦੀ ਟਰੈਕਿੰਗ ਸੰਬੰਧੀ XR ਸੰਵੇਦਨਸ਼ੀਲ ਡਾਟਾ"</string>
-    <string name="permgroupdesc_xr_eye_sensitive" msgid="1414121516133760271">"ਅੱਖਾਂ ਦੀ ਹਲਚਲ ਸੰਬੰਧੀ ਸੰਵੇਦਨਸ਼ੀਲ ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰੋ"</string>
-    <string name="permgrouplab_xr_tracking" msgid="7418994009794287471">"XR ਟਰੈਕਿੰਗ ਡਾਟਾ"</string>
-    <string name="permgroupdesc_xr_tracking" msgid="6777198859446500821">"ਆਪਣੇ ਅਤੇ ਆਪਣੇ ਆਲੇ-ਦੁਆਲੇ ਦੇ ਵਾਤਾਵਰਨ ਬਾਰੇ XR ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰੋ"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="2993940754322250652">"ਸੰਵੇਦਨਸ਼ੀਲ XR ਟਰੈਕਿੰਗ ਡਾਟਾ"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="8498501397939308918">"ਆਪਣੇ ਅਤੇ ਆਪਣੇ ਆਲੇ-ਦੁਆਲੇ ਦੇ ਵਾਤਾਵਰਨ ਬਾਰੇ ਸੰਵੇਦਨਸ਼ੀਲ ਟਰੈਕਿੰਗ ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰੋ"</string>
+    <string name="permgrouplab_xr_eye_sensitive" msgid="1709596126334620353">"ਅੱਖ ਦੀ ਟਰੈਕਿੰਗ ਸੰਬੰਧੀ ਡਾਟਾ"</string>
+    <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"ਅੱਖ ਦੀ ਹਲਚਲ ਨੂੰ ਸਟੀਕਤਾ ਨਾਲ ਟਰੈਕ ਕਰੋ"</string>
+    <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"ਹਲਚਲ ਅਤੇ ਖੇਤਰ ਸੰਬੰਧੀ ਡਾਟਾ"</string>
+    <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"ਅੱਖਾਂ, ਚਿਹਰੇ, ਸਰੀਰ ਨੂੰ ਟਰੈਕ ਕਰੋ ਅਤੇ ਖੇਤਰ ਨੂੰ ਸਕੈਨ ਕਰੋ"</string>
+    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"ਸਿਰ ਦੀ ਹਲਚਲ ਅਤੇ ਖੇਤਰ ਸੰਬੰਧੀ ਸਟੀਕ ਡਾਟਾ"</string>
+    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"ਸਿਰ ਨੂੰ ਸਟੀਕਤਾ ਨਾਲ ਟਰੈਕ ਕਰੋ ਅਤੇ ਖੇਤਰ ਨੂੰ ਸਕੈਨ ਕਰੋ"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"ਵਿੰਡੋ ਸਮੱਗਰੀ ਮੁੜ-ਪ੍ਰਾਪਤ ਕਰਨਾ"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"ਉਸ ਵਿੰਡੋ ਸਮੱਗਰੀ ਦੀ ਜਾਂਚ ਕਰੋ, ਜਿਸ ਨਾਲ ਤੁਸੀਂ ਅੰਤਰਕਿਰਿਆ ਕਰ ਰਹੇ ਹੋ"</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"\'ਸਪੱਰਸ਼ ਰਾਹੀਂ ਪੜਚੋਲ ਕਰੋ\' ਚਾਲੂ ਕਰਨਾ"</string>
@@ -667,22 +669,22 @@
     <string name="permdesc_imagesWrite" msgid="5195054463269193317">"ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਫ਼ੋਟੋ ਸੰਗ੍ਰਹਿ ਨੂੰ ਸੋਧਣ ਦਿੰਦੀ ਹੈ।"</string>
     <string name="permlab_mediaLocation" msgid="7368098373378598066">"ਤੁਹਾਡੇ ਮੀਡੀਆ ਸੰਗ੍ਰਹਿ ਦੇ ਟਿਕਾਣਿਆਂ ਨੂੰ ਪੜ੍ਹਨਾ"</string>
     <string name="permdesc_mediaLocation" msgid="597912899423578138">"ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਮੀਡੀਆ ਸੰਗ੍ਰਹਿ ਦੇ ਟਿਕਾਣਿਆਂ ਨੂੰ ਪੜ੍ਹਨ ਦਿੰਦੀ ਹੈ।"</string>
-    <string name="permlab_eye_tracking_coarse" msgid="7989596289790269059">"ਆਪਣੀ ਅੰਦਾਜ਼ਨ ਅੱਖਾਂ ਦੀ ਹਲਚਲ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
-    <string name="permdesc_eye_tracking_coarse" msgid="870510233930553355">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੀਆਂ ਅੱਖਾਂ ਦੀ ਹਲਚਲ ਨੂੰ ਟਰੈਕ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
-    <string name="permlab_eye_tracking_fine" msgid="6914457357027049512">"ਇਹ ਟਰੈਕ ਕਰੋ ਕਿ ਤੁਸੀਂ ਕਿੱਥੇ ਦੇਖ ਰਹੇ ਹੋ"</string>
-    <string name="permdesc_eye_tracking_fine" msgid="5788889152304524730">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੀਆਂ ਅੱਖਾਂ ਦੀ ਹਲਚਲ ਦੇ ਸਟੀਕ ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
-    <string name="permlab_face_tracking" msgid="2272048395128283324">"ਆਪਣੇ ਚਿਹਰੇ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
-    <string name="permdesc_face_tracking" msgid="2622783922311211866">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਚਿਹਰਾ ਟਰੈਕਿੰਗ ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
-    <string name="permlab_hand_tracking" msgid="6478233866595566940">"ਆਪਣੇ ਹੱਥਾਂ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
-    <string name="permdesc_hand_tracking" msgid="8639715900104966456">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਹੱਥ ਟਰੈਕਿੰਗ ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
-    <string name="permlab_head_tracking" msgid="1309731456372087270">"ਆਪਣੇ ਸਿਰ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
-    <string name="permdesc_head_tracking" msgid="231597390513699188">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਹੈੱਡ ਟਰੈਕਿੰਗ ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
-    <string name="permlab_scene_understanding_coarse" msgid="6518646430502858641">"ਆਪਣੇ ਮੌਜੂਦਾ ਵਾਤਾਵਰਨ ਨੂੰ ਸਮਝੋ"</string>
-    <string name="permdesc_scene_understanding_coarse" msgid="4508880777646198656">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ ਦੇ ਵਾਤਾਵਰਨ ਦੇ ਟਰੈਕਿੰਗ ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
-    <string name="permlab_scene_understanding_fine" msgid="409126403264393251">"ਆਪਣੇ ਮੌਜੂਦਾ ਵਾਤਾਵਰਨ ਨੂੰ ਬਰੀਕੀ ਨਾਲ ਸਮਝੋ"</string>
-    <string name="permdesc_scene_understanding_fine" msgid="6223368011593524179">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ ਦੇ ਵਾਤਾਵਰਨ ਬਾਰੇ ਬਰੀਕੀ ਨਾਲ ਟਰੈਕਿੰਗ ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
-    <string name="permlab_xr_tracking_in_background" msgid="7117098718465619023">"ਫੋਰਗ੍ਰਾਊਂਡ ਸੇਵਾ ਨਾ ਹੋਣ \'ਤੇ ਵੀ XR ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰੋ"</string>
-    <string name="permdesc_xr_tracking_in_background" msgid="939504041387836853">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ XR ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ, ਭਾਵੇਂ ਉਸ ਵਿੱਚ ਫੋਰਗ੍ਰਾਊਂਡ ਸੇਵਾ ਨਾ ਹੋਵੇ।"</string>
+    <string name="permlab_eye_tracking_coarse" msgid="1266477998416112440">"ਅੱਖ ਦੀ ਹਲਚਲ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
+    <string name="permdesc_eye_tracking_coarse" msgid="1652112796672085320">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੀ ਨਿਗ੍ਹਾ ਦੀ ਅੰਦਾਜ਼ਨ ਦਿਸ਼ਾ ਨੂੰ ਟਰੈਕ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
+    <string name="permlab_eye_tracking_fine" msgid="6208991021186455002">"ਅੱਖ ਦੀ ਹਲਚਲ ਨੂੰ ਸਟੀਕਤਾ ਨਾਲ ਟਰੈਕ ਕਰੋ"</string>
+    <string name="permdesc_eye_tracking_fine" msgid="9215360948852654836">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੀ ਨਿਗ੍ਹਾ ਦੀ ਦਿਸ਼ਾ ਨੂੰ ਟਰੈਕ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
+    <string name="permlab_face_tracking" msgid="6052126246676474909">"ਚਿਹਰੇ ਦੀਆਂ ਹਲਚਲਾਂ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
+    <string name="permdesc_face_tracking" msgid="185815778490412574">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਚਿਹਰੇ ਦੀਆਂ ਹਲਚਲਾਂ ਅਤੇ ਹਾਵਾਂ-ਭਾਵਾਂ ਨੂੰ ਟਰੈਕ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
+    <string name="permlab_hand_tracking" msgid="21944950887649088">"ਹੱਥ ਦੀਆਂ ਹਲਚਲਾਂ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
+    <string name="permdesc_hand_tracking" msgid="8083783248481460669">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਹੱਥ ਦੀਆਂ ਹਲਚਲਾਂ ਨੂੰ ਟਰੈਕ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
+    <string name="permlab_head_tracking" msgid="4304699038992159853">"ਸਿਰ ਦੀਆਂ ਹਲਚਲਾਂ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
+    <string name="permdesc_head_tracking" msgid="2232184518548944223">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਸਿਰ ਦੀਆਂ ਹਲਚਲਾਂ ਨੂੰ ਟਰੈਕ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
+    <string name="permlab_scene_understanding_coarse" msgid="8765236119358852920">"ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ ਦੇ ਖੇਤਰ ਨੂੰ ਸਕੈਨ ਕਰੋ"</string>
+    <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ ਨੂੰ ਸਕੈਨ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
+    <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ ਦੇ ਖੇਤਰ ਨੂੰ ਸਟੀਕਤਾ ਨਾਲ ਸਕੈਨ ਕਰੋ"</string>
+    <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ ਨੂੰ ਸਟੀਕਤਾ ਨਾਲ ਸਕੈਨ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
+    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ XR ਡਾਟਾ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
+    <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ XR ਡਾਟਾ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"ਕੁੰਜੀਆਂ ਕੈਪਚਰ ਕਰੋ"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"ਸਿਸਟਮ ਵੱਲੋਂ ਸਿਸਟਮ ਸ਼ਾਰਟਕੱਟਾਂ ਅਤੇ ਕਾਰਵਾਈਆਂ \'ਤੇ ਪ੍ਰਕਿਰਿਆ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਐਪ ਨੂੰ ਕੁੰਜੀਆਂ ਕੈਪਚਰ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿੰਦੀ ਹੈ।"</string>
     <string name="biometric_app_setting_name" msgid="3339209978734534457">"ਬਾਇਓਮੈਟ੍ਰਿਕ ਦੀ ਵਰਤੋਂ ਕਰੋ"</string>
@@ -690,6 +692,8 @@
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"ਆਪਣੀ ਪਛਾਣ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੇ ਬਾਇਓਮੈਟ੍ਰਿਕ ਦੀ ਵਰਤੋਂ ਕਰੋ"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣਾ ਬਾਇਓਮੈਟ੍ਰਿਕ ਜਾਂ ਸਕ੍ਰੀਨ ਲਾਕ ਵਰਤੋ"</string>
+    <string name="biometric_dialog_secondary_display_toast" product="default" msgid="256544327174107086">"ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੇ ਫ਼ੋਨ \'ਤੇ ਪਛਾਣ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ"</string>
+    <string name="biometric_dialog_secondary_display_toast" product="tablet" msgid="2855203015454795660">"ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੇ ਟੈਬਲੈੱਟ \'ਤੇ ਪਛਾਣ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ"</string>
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"ਬਾਇਓਮੈਟ੍ਰਿਕ ਹਾਰਡਵੇਅਰ ਉਪਲਬਧ ਨਹੀਂ ਹੈ"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"ਪ੍ਰਮਾਣੀਕਰਨ ਰੱਦ ਕੀਤਾ ਗਿਆ"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"ਪਛਾਣ ਨਹੀਂ ਹੋਈ"</string>
@@ -913,6 +917,7 @@
     <string name="policydesc_disableCamera" msgid="3204405908799676104">"ਸਾਰੇ ਡੀਵਾਈਸ ਕੈਮਰਿਆਂ ਦੀ ਵਰਤੋਂ ਰੋਕੋ।"</string>
     <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"ਸਕ੍ਰੀਨ ਲਾਕ ਦੀਆਂ ਕੁਝ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਬੰਦ ਕਰੋ"</string>
     <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"ਸਕ੍ਰੀਨ ਲਾਕ ਦੀਆਂ ਕੁਝ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਦੀ ਵਰਤੋਂ ਰੋਕੋ।"</string>
+    <string name="exit_toast_on_long_press_escape" msgid="2983932499112557277">"ਇਸ ਐਪ ਨੂੰ ਬੰਦ ਕਰਨ ਲਈ Esc ਕੁੰਜੀ ਨੂੰ ਦਬਾਈ ਰੱਖੋ"</string>
   <string-array name="phoneTypes">
     <item msgid="8996339953292723951">"ਘਰ"</item>
     <item msgid="7740243458912727194">"ਮੋਬਾਈਲ"</item>
@@ -1123,6 +1128,7 @@
     <string name="keyguard_accessibility_sim_pin_unlock" msgid="4895939120871890557">"ਸਿਮ ਪਿੰਨ ਅਣਲਾਕ।"</string>
     <string name="keyguard_accessibility_sim_puk_unlock" msgid="3459003464041899101">"ਸਿਮ Puk ਅਣਲਾਕ।"</string>
     <string name="keyguard_accessibility_password_unlock" msgid="6130186108581153265">"ਪਾਸਵਰਡ ਅਣਲਾਕ।"</string>
+    <string name="keyguard_accessibility_secure_lock_device_biometric_unlock" msgid="1884638289137214044">"ਜਦੋਂ ਸੁਰੱਖਿਆ ਲਾਕ ਚਾਲੂ ਹੋਵੇ, ਤਾਂ ਆਪਣੇ ਡੀਵਾਈਸ ਨੂੰ ਅਣਲਾਕ ਕਰਨ ਲਈ ਬਾਇਓਮੈਟ੍ਰਿਕ ਦੀ ਵਰਤੋਂ ਕਰੋ।"</string>
     <string name="keyguard_accessibility_pattern_area" msgid="1419570880512350689">"ਪੈਟਰਨ ਖੇਤਰ।"</string>
     <string name="keyguard_accessibility_slide_area" msgid="4331399051142520176">"ਖੇਤਰ ਸਲਾਈਡ ਕਰੋ।"</string>
     <string name="password_keyboard_label_symbol_key" msgid="2716255580853511949">"?123"</string>
@@ -1480,8 +1486,6 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"ਅਸਵੀਕਾਰ ਕਰੋ"</string>
     <string name="select_input_method" msgid="3971267998568587025">"ਇਨਪੁਟ ਵਿਧੀ ਚੁਣੋ"</string>
     <string name="input_method_language_settings" msgid="8069089418056819437">"ਭਾਸ਼ਾ ਸੈਟਿੰਗਾਂ"</string>
-    <string name="show_ime" msgid="6406112007347443383">"ਭੌਤਿਕ ਕੀ-ਬੋਰਡ ਸਰਗਰਮ ਹੋਣ ਦੌਰਾਨ ਇਸ ਨੂੰ ਸਕ੍ਰੀਨ \'ਤੇ ਬਣਾਈ ਰੱਖੋ"</string>
-    <string name="hardware" msgid="3611039921284836033">"ਆਨ-ਸਕ੍ਰੀਨ ਕੀ-ਬੋਰਡ ਨੂੰ ਵਰਤੋ"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"<xliff:g id="DEVICE_NAME">%s</xliff:g> ਦਾ ਸੰਰੂਪਣ ਕਰੋ"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"ਭੌਤਿਕ ਕੀ-ਬੋਰਡਾਂ ਦਾ ਸੰਰੂਪਣ ਕਰੋ"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"ਭਾਸ਼ਾ ਅਤੇ ਖਾਕਾ ਚੁਣਨ ਲਈ ਟੈਪ ਕਰੋ"</string>
@@ -1839,6 +1843,7 @@
     <string name="owner_name" msgid="8713560351570795743">"ਮਾਲਕ"</string>
     <string name="guest_name" msgid="8502103277839834324">"ਮਹਿਮਾਨ"</string>
     <string name="headless_system_user_name" msgid="1849150903255530049">"ਸਿਸਟਮ ਯੂਜ਼ਰ"</string>
+    <string name="unnamed_user_name" msgid="6096699110534542980">"ਵਰਤੋਂਕਾਰ"</string>
     <string name="error_message_title" msgid="4082495589294631966">"ਅਸ਼ੁੱਧੀ"</string>
     <string name="error_message_change_not_allowed" msgid="843159705042381454">"ਤੁਹਾਡੇ ਪ੍ਰਸ਼ਾਸਕ ਵੱਲੋਂ ਇਸ ਤਬਦੀਲੀ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ"</string>
     <string name="app_not_found" msgid="3429506115332341800">"ਇਸ ਕਾਰਵਾਈ ਨੂੰ ਸੰਭਾਲਣ ਲਈ ਕੋਈ ਐਪਲੀਕੇਸ਼ਨ ਨਹੀਂ ਮਿਲੀ।"</string>
@@ -2042,6 +2047,12 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"ਵੱਡਾ ਕਰੋ"</string>
     <string name="close_button_text" msgid="10603510034455258">"ਬੰਦ ਕਰੋ"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
+    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
+    <skip />
+    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
+    <skip />
+    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
+    <skip />
     <string name="call_notification_answer_action" msgid="5999246836247132937">"ਜਵਾਬ ਦਿਓ"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"ਵੀਡੀਓ"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"ਅਸਵੀਕਾਰ ਕਰੋ"</string>
@@ -2510,7 +2521,7 @@
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"ਐਪ ਸਮੱਗਰੀ ਨੂੰ ਸੁਰੱਖਿਆ ਲਈ ਸਕ੍ਰੀਨ ਸਾਂਝਾਕਰਨ ਤੋਂ ਲੁਕਾਇਆ ਗਿਆ ਹੈ"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"ਸੈਟੇਲਾਈਟ ਨਾਲ ਸਵੈ-ਕਨੈਕਟ ਹੋਇਆ"</string>
     <string name="satellite_notification_summary" msgid="5207364139430767162">"ਤੁਸੀਂ ਮੋਬਾਈਲ ਜਾਂ ਵਾਈ-ਫਾਈ ਨੈੱਟਵਰਕ ਤੋਂ ਬਿਨਾਂ ਸੁਨੇਹੇ ਭੇਜ ਅਤੇ ਪ੍ਰਾਪਤ ਕਰ ਸਕਦੇ ਹੋ"</string>
-    <string name="satellite_notification_summary_with_data" msgid="6486843676720429049">"ਤੁਸੀਂ ਸੁਨੇਹੇ ਭੇਜ ਅਤੇ ਪ੍ਰਾਪਤ ਕਰ ਸਕਦੇ ਹੋ ਅਤੇ ਸੈਟੇਲਾਈਟ ਰਾਹੀਂ ਸੀਮਤ ਡਾਟਾ ਵਰਤ ਸਕਦੇ ਹੋ"</string>
+    <string name="satellite_notification_summary_with_data" msgid="8290202758586475712">"ਤੁਸੀਂ ਸੈਟੇਲਾਈਟ \'ਤੇ ਸੁਨੇਹੇ ਭੇਜ ਅਤੇ ਪ੍ਰਾਪਤ ਕਰ ਸਕਦੇ ਹੋ ਅਤੇ ਚੋਣਵੀਆਂ ਐਪਾਂ ਵਰਤ ਸਕਦੇ ਹੋ"</string>
     <string name="satellite_notification_manual_title" msgid="1097504441849466279">"ਕੀ ਸੈਟੇਲਾਈਟ ਸੁਨੇਹੇ ਦੀ ਵਰਤੋਂ ਕਰਨੀ ਹੈ?"</string>
     <string name="satellite_notification_manual_summary" msgid="901206289846283445">"ਮੋਬਾਈਲ ਜਾਂ ਵਾਈ-ਫਾਈ ਨੈੱਟਵਰਕ ਤੋਂ ਬਿਨਾਂ ਸੁਨੇਹੇ ਭੇਜੋ ਅਤੇ ਪ੍ਰਾਪਤ ਕਰੋ"</string>
     <string name="satellite_notification_open_message" msgid="4149234979688273729">"Messages ਐਪ ਖੋਲ੍ਹੋ"</string>
@@ -2565,23 +2576,37 @@
     <string name="keyboard_shortcut_group_applications_calendar" msgid="3571770335653387606">"Calendar"</string>
     <string name="keyboard_shortcut_group_applications_calculator" msgid="6753209559716091507">"Calculator"</string>
     <string name="keyboard_shortcut_group_applications_maps" msgid="7950000659522589471">"Maps"</string>
+    <string name="keyboard_shortcut_group_applications_files" msgid="863938400765838051">"Files"</string>
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"ਐਪਲੀਕੇਸ਼ਨਾਂ"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"ਤੁਹਾਡੇ ਫਿੰਗਰਪ੍ਰਿੰਟਾਂ ਦੀ ਹੁਣ ਪਛਾਣ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ। ਫਿੰਗਰਪ੍ਰਿੰਟ ਅਣਲਾਕ ਦਾ ਦੁਬਾਰਾ ਸੈੱਟਅੱਪ ਕਰੋ।"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"ਸੁਰੱਖਿਆ ਅਤੇ ਪਰਦੇਦਾਰੀ"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="7202983697003493711">"ਸਭ ਤੋਂ ਪਹਿਲਾਂ ਆਪਣੀ ਸਕ੍ਰੀਨ ਨੂੰ ਅਣਲਾਕ ਕਰੋ"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="2648733588653060170">"ਸਕ੍ਰੀਨ ਨੂੰ ਅਣਲਾਕ ਕਰੋ ਅਤੇ ਮੁੜ-ਕਨੈਕਟ ਕਰੋ"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_text" msgid="1628936399413661929">"ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵੇਲੇ, USB ਨਾਲ ਡਾਟਾ ਟ੍ਰਾਂਸਫ਼ਰ ਕਰਨ ਲਈ ਤੁਹਾਡੀ ਸਕ੍ਰੀਨ ਨੂੰ ਆਮ ਤਰੀਕੇ ਨਾਲ ਅਣਲਾਕ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="608846071408348658">"ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵੇਲੇ, USB ਨਾਲ ਡਾਟਾ ਟ੍ਰਾਂਸਫ਼ਰ ਕਰਨ ਲਈ ਤੁਹਾਡੀ ਸਕ੍ਰੀਨ ਨੂੰ ਆਮ ਤਰੀਕੇ ਨਾਲ ਅਣਲਾਕ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_low_power_charge_notification_text" msgid="1240936298914360256">"ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵੇਲੇ, USB ਨਾਲ ਟ੍ਰਾਂਸਫ਼ਰ ਕਰਨ ਅਤੇ ਤੇਜ਼ ਚਾਰਜਿੰਗ ਲਈ ਤੁਹਾਡੀ ਸਕ੍ਰੀਨ ਨੂੰ ਅਣਲਾਕ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_low_power_charge_replug_notification_text" msgid="6370672468652821937">"ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵੇਲੇ, USB ਨਾਲ ਟ੍ਰਾਂਸਫ਼ਰ ਕਰਨ ਅਤੇ ਤੇਜ਼ ਚਾਰਜਿੰਗ ਲਈ ਤੁਹਾਡੀ ਸਕ੍ਰੀਨ ਨੂੰ ਅਣਲਾਕ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
-    <string name="usb_apm_usb_plugged_in_for_power_brick_notification_text" msgid="1673711307740787848">"ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵੇਲੇ, USB ਨਾਲ ਤੇਜ਼ ਚਾਰਜਿੰਗ ਲਈ ਤੁਹਾਡੀ ਸਕ੍ਰੀਨ ਨੂੰ ਆਮ ਤਰੀਕੇ ਨਾਲ ਅਣਲਾਕ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
-    <string name="usb_apm_usb_plugged_in_for_power_brick_replug_notification_text" msgid="1244847752922938852">"ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵੇਲੇ, USB ਨਾਲ ਤੇਜ਼ ਚਾਰਜਿੰਗ ਲਈ ਤੁਹਾਡੀ ਸਕ੍ਰੀਨ ਨੂੰ ਆਮ ਤਰੀਕੇ ਨਾਲ ਅਣਲਾਕ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
+    <skip />
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"ਖਮੋਸ਼ੀ"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"ਸੂਚਨਾਵਾਂ ਨੂੰ ਖਮੋਸ਼ ਕੀਤਾ ਗਿਆ"</string>
-    <string name="usb_apm_usb_notification_silenced_text" msgid="6414815636131602513">"ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਡੀਵਾਈਸ ਨੂੰ ਮੁੜ-ਸ਼ੁਰੂ ਨਹੀਂ ਕਰਦੇ, ਉਦੋਂ ਤੱਕ ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ USB ਸੂਚਨਾਵਾਂ ਖਮੋਸ਼ ਰਹਿਣਗੀਆਂ"</string>
+    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
+    <skip />
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"ਸ਼ੱਕੀ USB ਸਰਗਰਮੀ"</string>
-    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="6537085605929303187">"USB ਡਾਟਾ ਸਿਗਨਲ ਬੰਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ।"</string>
+    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
+    <skip />
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"ਕੀ ਫਿੰਗਰਪ੍ਰਿੰਟ ਅਣਲਾਕ ਸੰਬੰਧੀ ਕੋਈ ਸਮੱਸਿਆ ਆ ਰਹੀ ਹੈ?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"ਆਪਣੇ ਅਣਲਾਕ ਕਰਨ ਸੰਬੰਧੀ ਅਨੁਭਵ ਨੂੰ ਬਿਹਤਰ ਬਣਾਉਣ ਵਾਸਤੇ ਸੁਝਾਵਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"ਪਲਕਾਂ ਨਾ ਝਪਕੋ"</string>
+    <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"ਟੀਵੀ ਬੰਦ ਕਰਨ ਲਈ ਪਾਵਰ ਬਟਨ ਨੂੰ ਦਬਾਈ ਰੱਖੋ"</string>
+    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
+    <skip />
+    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
+    <skip />
+    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
+    <skip />
 </resources>

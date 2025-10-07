@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 
 package com.android.server.am;
 
@@ -43,7 +45,7 @@ import static android.app.ActivityManager.PROCESS_STATE_TOP;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_ACTIVITY;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_ALLOWLIST;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_BACKUP;
-import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_SERVICE_BINDER_CALL;
+import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_BATCH_UPDATE_REQUEST;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_BIND_SERVICE;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_COMPONENT_DISABLED;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_EXECUTING_SERVICE;
@@ -57,6 +59,7 @@ import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_RECONFIGURATION
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_REMOVE_PROVIDER;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_REMOVE_TASK;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_RESTRICTION_CHANGE;
+import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_SERVICE_BINDER_CALL;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_SHELL;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_SHORT_FGS_TIMEOUT;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_START_RECEIVER;
@@ -74,26 +77,25 @@ import static android.os.Process.THREAD_GROUP_TOP_APP;
 import static android.os.Process.THREAD_PRIORITY_DISPLAY;
 import static android.os.Process.THREAD_PRIORITY_TOP_APP_BOOST;
 import static android.os.Process.setProcessGroup;
-// QTI_BEGIN: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
+// QTI_BEGIN: 2020-04-03: Core: cgroup follow for procs in the same cgroup.procs
 import static android.os.Process.setCgroupProcsProcessGroup;
-// QTI_END: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
+// QTI_END: 2020-04-03: Core: cgroup follow for procs in the same cgroup.procs
 
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_ALL;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_LRU;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_OOM_ADJ;
-import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_OOM_ADJ_REASON;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_PROCESS_OBSERVERS;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_PSS;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_UID_OBSERVERS;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_USAGE_STATS;
-import static com.android.server.am.ActivityManagerService.DISPATCH_OOM_ADJ_OBSERVER_MSG;
 import static com.android.server.am.ActivityManagerService.FOLLOW_UP_OOMADJUSTER_UPDATE_MSG;
 import static com.android.server.am.ActivityManagerService.IDLE_UIDS_MSG;
 import static com.android.server.am.ActivityManagerService.TAG_LRU;
 import static com.android.server.am.ActivityManagerService.TAG_OOM_ADJ;
 import static com.android.server.am.ActivityManagerService.TAG_UID_OBSERVERS;
 import static com.android.server.am.AppProfiler.TAG_PSS;
-import static com.android.server.am.PlatformCompatCache.CACHED_COMPAT_CHANGE_USE_SHORT_FGS_USAGE_INTERACTION_TIME;
+import static com.android.server.am.OomAdjusterImpl.Connection.CPU_TIME_TRANSMISSION_LEGACY;
+import static com.android.server.am.OomAdjusterImpl.Connection.CPU_TIME_TRANSMISSION_NONE;
 import static com.android.server.am.ProcessList.CACHED_APP_IMPORTANCE_LEVELS;
 import static com.android.server.am.ProcessList.CACHED_APP_MAX_ADJ;
 import static com.android.server.am.ProcessList.CACHED_APP_MIN_ADJ;
@@ -114,20 +116,24 @@ import static com.android.server.am.ProcessList.SERVICE_ADJ;
 import static com.android.server.am.ProcessList.TAG_PROCESS_OBSERVERS;
 import static com.android.server.am.ProcessList.UNKNOWN_ADJ;
 import static com.android.server.am.ProcessList.VISIBLE_APP_ADJ;
+import static com.android.server.am.ProcessList.VISIBLE_APP_MAX_ADJ;
+import static com.android.server.am.psc.PlatformCompatCache.CACHED_COMPAT_CHANGE_USE_SHORT_FGS_USAGE_INTERACTION_TIME;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_SWITCH;
+import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_PAUSING_OR_PAUSED;
+import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_STOPPING;
+import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_STOPPING_FINISHING;
+import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_VISIBLE;
+import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER;
 
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.app.ActivityManagerInternal.OomAdjReason;
 import android.app.ActivityThread;
-import android.app.AppProtoEnums;
 import android.app.ApplicationExitInfo;
 import android.app.usage.UsageEvents;
-import android.compat.annotation.ChangeId;
-import android.compat.annotation.EnabledAfter;
-import android.compat.annotation.EnabledSince;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -137,20 +143,17 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.ServiceInfo;
 import android.net.NetworkPolicyManager;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.PowerManagerInternal;
 import android.os.Process;
-import android.os.RemoteException;
 import android.os.SystemClock;
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
 import android.os.SystemProperties;
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
 import android.os.Trace;
-import android.util.ArrayMap;
 import android.util.ArraySet;
-// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-06-26: Core: perf: Use get API for perf Properties.
 import android.util.BoostFramework;
-// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2019-06-26: Core: perf: Use get API for perf Properties.
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 
@@ -158,10 +161,21 @@ import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
-import com.android.server.am.PlatformCompatCache.CachedCompatChangeId;
+import com.android.server.am.psc.ActiveUidsInternal;
+import com.android.server.am.psc.ConnectionRecordInternal;
+import com.android.server.am.psc.ContentProviderConnectionInternal;
+import com.android.server.am.psc.PlatformCompatCache;
+import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
+import com.android.server.am.psc.ProcessProviderRecordInternal;
+import com.android.server.am.psc.ProcessRecordInternal;
+import com.android.server.am.psc.ProcessServiceRecordInternal;
+import com.android.server.am.psc.ServiceRecordInternal;
+import com.android.server.am.psc.UidRecordInternal;
 import com.android.server.wm.WindowProcessController;
 
 import java.io.PrintWriter;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -173,63 +187,64 @@ import java.util.List;
 public abstract class OomAdjuster {
     static final String TAG = "OomAdjuster";
 
-    public static final int oomAdjReasonToProto(@OomAdjReason int oomReason) {
-        switch (oomReason) {
-            case OOM_ADJ_REASON_NONE:
-                return AppProtoEnums.OOM_ADJ_REASON_NONE;
-            case OOM_ADJ_REASON_ACTIVITY:
-                return AppProtoEnums.OOM_ADJ_REASON_ACTIVITY;
-            case OOM_ADJ_REASON_FINISH_RECEIVER:
-                return AppProtoEnums.OOM_ADJ_REASON_FINISH_RECEIVER;
-            case OOM_ADJ_REASON_START_RECEIVER:
-                return AppProtoEnums.OOM_ADJ_REASON_START_RECEIVER;
-            case OOM_ADJ_REASON_BIND_SERVICE:
-                return AppProtoEnums.OOM_ADJ_REASON_BIND_SERVICE;
-            case OOM_ADJ_REASON_UNBIND_SERVICE:
-                return AppProtoEnums.OOM_ADJ_REASON_UNBIND_SERVICE;
-            case OOM_ADJ_REASON_START_SERVICE:
-                return AppProtoEnums.OOM_ADJ_REASON_START_SERVICE;
-            case OOM_ADJ_REASON_GET_PROVIDER:
-                return AppProtoEnums.OOM_ADJ_REASON_GET_PROVIDER;
-            case OOM_ADJ_REASON_REMOVE_PROVIDER:
-                return AppProtoEnums.OOM_ADJ_REASON_REMOVE_PROVIDER;
-            case OOM_ADJ_REASON_UI_VISIBILITY:
-                return AppProtoEnums.OOM_ADJ_REASON_UI_VISIBILITY;
-            case OOM_ADJ_REASON_ALLOWLIST:
-                return AppProtoEnums.OOM_ADJ_REASON_ALLOWLIST;
-            case OOM_ADJ_REASON_PROCESS_BEGIN:
-                return AppProtoEnums.OOM_ADJ_REASON_PROCESS_BEGIN;
-            case OOM_ADJ_REASON_PROCESS_END:
-                return AppProtoEnums.OOM_ADJ_REASON_PROCESS_END;
-            case OOM_ADJ_REASON_SHORT_FGS_TIMEOUT:
-                return AppProtoEnums.OOM_ADJ_REASON_SHORT_FGS_TIMEOUT;
-            case OOM_ADJ_REASON_SYSTEM_INIT:
-                return AppProtoEnums.OOM_ADJ_REASON_SYSTEM_INIT;
-            case OOM_ADJ_REASON_BACKUP:
-                return AppProtoEnums.OOM_ADJ_REASON_BACKUP;
-            case OOM_ADJ_REASON_SHELL:
-                return AppProtoEnums.OOM_ADJ_REASON_SHELL;
-            case OOM_ADJ_REASON_REMOVE_TASK:
-                return AppProtoEnums.OOM_ADJ_REASON_REMOVE_TASK;
-            case OOM_ADJ_REASON_UID_IDLE:
-                return AppProtoEnums.OOM_ADJ_REASON_UID_IDLE;
-            case OOM_ADJ_REASON_STOP_SERVICE:
-                return AppProtoEnums.OOM_ADJ_REASON_STOP_SERVICE;
-            case OOM_ADJ_REASON_EXECUTING_SERVICE:
-                return AppProtoEnums.OOM_ADJ_REASON_EXECUTING_SERVICE;
-            case OOM_ADJ_REASON_RESTRICTION_CHANGE:
-                return AppProtoEnums.OOM_ADJ_REASON_RESTRICTION_CHANGE;
-            case OOM_ADJ_REASON_COMPONENT_DISABLED:
-                return AppProtoEnums.OOM_ADJ_REASON_COMPONENT_DISABLED;
-            case OOM_ADJ_REASON_FOLLOW_UP:
-                return AppProtoEnums.OOM_ADJ_REASON_FOLLOW_UP;
-            case OOM_ADJ_REASON_RECONFIGURATION:
-                return AppProtoEnums.OOM_ADJ_REASON_RECONFIGURATION;
-            case OOM_ADJ_REASON_SERVICE_BINDER_CALL:
-                return AppProtoEnums.OOM_ADJ_REASON_SERVICE_BINDER_CALL;
-            default:
-                return AppProtoEnums.OOM_ADJ_REASON_UNKNOWN_TO_PROTO;
-        }
+    /** To be used when the process does not have PROCESS_CAPABILITY_CPU_TIME. */
+    public static final int CPU_TIME_REASON_NONE = 0;
+    /** The process has PROCESS_CAPABILITY_CPU_TIME, but the reason is not interesting for logs. */
+    public static final int CPU_TIME_REASON_OTHER = 0x1;
+    /**
+     * The process has PROCESS_CAPABILITY_CPU_TIME because it was transmitted over a connection
+     * from a client. This is interesting because this reason will cease to exist if all the
+     * responsible bindings started using {@link Context#BIND_ALLOW_FREEZE}.
+     */
+    public static final int CPU_TIME_REASON_TRANSMITTED = 0x2;
+    /**
+     * The process has PROCESS_CAPABILITY_CPU_TIME because it was transmitted over a connection
+     * from a client transitively only because of {@link Context#BIND_SIMULATE_ALLOW_FREEZE}.
+     * This indicates that this reason will soon go away and in absence of other reasons, the app
+     * will not have PROCESS_CAPABILITY_CPU_TIME.
+     */
+    public static final int CPU_TIME_REASON_TRANSMITTED_LEGACY = 0x4;
+
+    @IntDef(flag = true, prefix = "CPU_TIME_REASON_", value = {
+            CPU_TIME_REASON_NONE,
+            CPU_TIME_REASON_OTHER,
+            CPU_TIME_REASON_TRANSMITTED,
+            CPU_TIME_REASON_TRANSMITTED_LEGACY,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface CpuTimeReasons {
+    }
+
+    /** To be used when the process does not have PROCESS_CAPABILITY_IMPLICIT_CPU_TIME. */
+    public static final int IMPLICIT_CPU_TIME_REASON_NONE = 0;
+    /**
+     * The process has PROCESS_CAPABILITY_IMPLICIT_CPU_TIME, but the reason is not interesting for
+     * logs.
+     */
+    public static final int IMPLICIT_CPU_TIME_REASON_OTHER = 0x1;
+    /**
+     * The process has PROCESS_CAPABILITY_IMPLICIT_CPU_TIME because it was transmitted over a
+     * connection from a client. This is interesting because this reason will cease to exist if all
+     * the responsible bindings started using {@link Context#BIND_ALLOW_FREEZE}.
+     */
+    public static final int IMPLICIT_CPU_TIME_REASON_TRANSMITTED = 0x2;
+    /**
+     * The process has PROCESS_CAPABILITY_IMPLICIT_CPU_TIME because it was transmitted over a
+     * connection from a client transitively only because of
+     * {@link Context#BIND_SIMULATE_ALLOW_FREEZE}.
+     * This indicates that this reason will soon go away and in absence of other reasons, the app
+     * will not have PROCESS_CAPABILITY_IMPLICIT_CPU_TIME.
+     */
+    public static final int IMPLICIT_CPU_TIME_REASON_TRANSMITTED_LEGACY = 0x4;
+
+    @IntDef(flag = true, prefix = "IMPLICIT_CPU_TIME_REASON_", value = {
+            IMPLICIT_CPU_TIME_REASON_NONE,
+            IMPLICIT_CPU_TIME_REASON_OTHER,
+            IMPLICIT_CPU_TIME_REASON_TRANSMITTED,
+            IMPLICIT_CPU_TIME_REASON_TRANSMITTED_LEGACY,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface ImplicitCpuTimeReasons {
     }
 
     public static final String oomAdjReasonToString(@OomAdjReason int oomReason) {
@@ -287,42 +302,12 @@ public abstract class OomAdjuster {
                 return OOM_ADJ_REASON_METHOD + "_reconfiguration";
             case OOM_ADJ_REASON_SERVICE_BINDER_CALL:
                 return OOM_ADJ_REASON_METHOD + "_serviceBinderCall";
+            case OOM_ADJ_REASON_BATCH_UPDATE_REQUEST:
+                return OOM_ADJ_REASON_METHOD + "_batchUpdateRequest";
             default:
                 return "_unknown";
         }
     }
-
-    /**
-     * Flag {@link android.content.Context#BIND_INCLUDE_CAPABILITIES} is used
-     * to pass while-in-use capabilities from client process to bound service. In targetSdkVersion
-     * R and above, if client is a TOP activity, when this flag is present, bound service gets all
-     * while-in-use capabilities; when this flag is not present, bound service gets no while-in-use
-     * capability from client.
-     */
-    @ChangeId
-    @EnabledAfter(targetSdkVersion=android.os.Build.VERSION_CODES.Q)
-    static final long PROCESS_CAPABILITY_CHANGE_ID = 136274596L;
-
-    /**
-     * In targetSdkVersion R and above, foreground service has camera and microphone while-in-use
-     * capability only when the {@link android.R.attr#foregroundServiceType} is configured as
-     * {@link android.content.pm.ServiceInfo#FOREGROUND_SERVICE_TYPE_CAMERA} and
-     * {@link android.content.pm.ServiceInfo#FOREGROUND_SERVICE_TYPE_MICROPHONE} respectively in the
-     * manifest file.
-     * In targetSdkVersion below R, foreground service automatically have camera and microphone
-     * capabilities.
-     */
-    @ChangeId
-    @EnabledAfter(targetSdkVersion=android.os.Build.VERSION_CODES.Q)
-    static final long CAMERA_MICROPHONE_CAPABILITY_CHANGE_ID = 136219221L;
-
-    /**
-     * For apps targeting S+, this determines whether to use a shorter timeout before elevating the
-     * standby bucket to ACTIVE when apps start a foreground service.
-     */
-    @ChangeId
-    @EnabledSince(targetSdkVersion = android.os.Build.VERSION_CODES.S)
-    static final long USE_SHORT_FGS_USAGE_INTERACTION_TIME = 183972877L;
 
     /**
      * Service for optimizing resource usage from background apps.
@@ -336,8 +321,6 @@ public abstract class OomAdjuster {
     CacheOomRanker mCacheOomRanker;
 
     ActivityManagerConstants mConstants;
-
-    final long[] mTmpLong = new long[3];
 
     /**
      * Current sequence id for oom_adj computation traversal.
@@ -382,49 +365,51 @@ public abstract class OomAdjuster {
     final ProcessList mProcessList;
     final ActivityManagerGlobalLock mProcLock;
 
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
     // Min aging threshold in milliseconds to consider a B-service
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
-// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-06-26: Core: perf: Use get API for perf Properties.
     int mMinBServiceAgingTime = 5000;
-// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_END: 2019-06-26: Core: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
     // Threshold for B-services when in memory pressure
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
-// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-06-26: Core: perf: Use get API for perf Properties.
     int mBServiceAppThreshold = 5;
-// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_END: 2019-06-26: Core: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
     // Enable B-service aging propagation on memory pressure.
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
-// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-06-26: Core: perf: Use get API for perf Properties.
     boolean mEnableBServicePropagation = false;
-// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
-// QTI_BEGIN: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
+// QTI_END: 2019-06-26: Core: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2020-04-03: Core: cgroup follow for procs in the same cgroup.procs
     // Process in same process Group keep in same cgroup
     boolean mEnableProcessGroupCgroupFollow = false;
     boolean mProcessGroupCgroupFollowDex2oatOnly = false;
-// QTI_END: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
-// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_END: 2020-04-03: Core: cgroup follow for procs in the same cgroup.procs
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
     // Enable hooks for background apps transition
     boolean mEnableBgt = false;
-// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
-// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
     boolean mLazyLmkKillMainProc = false;
+// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+// QTI_BEGIN: 2019-06-26: Core: perf: Use get API for perf Properties.
 
     public static BoostFramework mPerf = new BoostFramework();
+// QTI_END: 2019-06-26: Core: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
     private int mLegacyUiPerfHandler = -1;
-// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 
     private final int mNumSlots;
-    protected final ArrayList<ProcessRecord> mTmpProcessList = new ArrayList<ProcessRecord>();
-    protected final ArrayList<ProcessRecord> mTmpProcessList2 = new ArrayList<ProcessRecord>();
-    protected final ArrayList<UidRecord> mTmpBecameIdle = new ArrayList<UidRecord>();
+    protected final ArrayList<ProcessRecordInternal> mTmpProcessList = new ArrayList<>();
+    protected final ArrayList<UidRecordInternal> mTmpBecameIdle = new ArrayList<>();
     protected final ActiveUids mTmpUidRecords;
-    protected final ArrayDeque<ProcessRecord> mTmpQueue;
-    protected final ArraySet<ProcessRecord> mTmpProcessSet = new ArraySet<>();
-    protected final ArraySet<ProcessRecord> mPendingProcessSet = new ArraySet<>();
-    protected final ArraySet<ProcessRecord> mProcessesInCycle = new ArraySet<>();
+    protected final ArrayDeque<ProcessRecordInternal> mTmpQueue;
+    protected final ArraySet<ProcessRecordInternal> mTmpProcessSet = new ArraySet<>();
+    protected final ArraySet<ProcessRecordInternal> mPendingProcessSet = new ArraySet<>();
 
     /**
      * List of processes that we want to batch for LMKD to adjust their respective
@@ -464,7 +449,7 @@ public abstract class OomAdjuster {
     protected int mProcessStateCurTop = PROCESS_STATE_TOP;
 
     @GuardedBy("mService")
-    private final ArraySet<ProcessRecord> mFollowUpUpdateSet = new ArraySet<>();
+    private final ArraySet<ProcessRecordInternal> mFollowUpUpdateSet = new ArraySet<>();
 
     protected static final long NO_FOLLOW_UP_TIME = Long.MAX_VALUE;
     @GuardedBy("mService")
@@ -500,18 +485,22 @@ public abstract class OomAdjuster {
             ProcessList.batchSetOomAdj(procsToOomAdj);
         }
 
+// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         void batchSetOomAdjExt(ArrayList<ProcessRecord> procsToOomAdj) {
             ProcessList.batchSetOomAdjExt(procsToOomAdj);
         }
 
+// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         void setOomAdj(int pid, int uid, int adj) {
             ProcessList.setOomAdj(pid, uid, adj);
         }
 
+// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         void setOomAdjExt(int pid, int uid, int adj, int isSystemApp, int isMainProc) {
             ProcessList.setOomAdjExt(pid, uid, adj, isSystemApp, isMainProc);
         }
 
+// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         void setThreadPriority(int tid, int priority) {
             Process.setThreadPriority(tid, priority);
         }
@@ -538,19 +527,19 @@ public abstract class OomAdjuster {
         boolean hasExpandedNotificationShade();
 
         /** The current Top process. */
-        @Nullable ProcessRecord getTopProcess();
+        @Nullable ProcessRecordInternal getTopProcess();
 
         /** The current Home process. */
-        @Nullable ProcessRecord getHomeProcess();
+        @Nullable ProcessRecordInternal getHomeProcess();
 
         /** The current Heavy Weight process. */
-        @Nullable ProcessRecord getHeavyWeightProcess();
+        @Nullable ProcessRecordInternal getHeavyWeightProcess();
 
         /** The current process showing UI if the device is in doze. */
-        @Nullable ProcessRecord getShowingUiWhileDozingProcess();
+        @Nullable ProcessRecordInternal getShowingUiWhileDozingProcess();
 
         /** The previous process that showed an activity. */
-        @Nullable ProcessRecord getPreviousProcess();
+        @Nullable ProcessRecordInternal getPreviousProcess();
     }
 
     boolean isChangeEnabled(@CachedCompatChangeId int cachedCompatChangeId,
@@ -582,24 +571,26 @@ public abstract class OomAdjuster {
         mCacheOomRanker = new CacheOomRanker(service);
 
         mLogger = new OomAdjusterDebugLogger(this, mService.mConstants);
-// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2019-06-26: Core: perf: Use get API for perf Properties.
         if(mPerf != null) {
             mMinBServiceAgingTime = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_age", "5000"));
             mBServiceAppThreshold = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_limit", "5"));
             mEnableBServicePropagation = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_enable", "false"));
-// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
-// QTI_BEGIN: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
+// QTI_END: 2019-06-26: Core: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2020-04-03: Core: cgroup follow for procs in the same cgroup.procs
             mEnableProcessGroupCgroupFollow = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.cgroup_follow.enable", "false"));
             mProcessGroupCgroupFollowDex2oatOnly = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.cgroup_follow.dex2oat_only", "false"));
-// QTI_END: 2020-04-03: Performance: cgroup follow for procs in the same cgroup.procs
-// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_END: 2020-04-03: Core: cgroup follow for procs in the same cgroup.procs
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
             mEnableBgt = Boolean.parseBoolean(mPerf.perfGetProp("vendor.perf.bgt.enable","false"));
-// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
-// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             mLazyLmkKillMainProc = Boolean.parseBoolean(mPerf.perfGetProp("ro.lmk.lazy_killing_3rd_app_main_proc","false"));
+// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+// QTI_BEGIN: 2019-06-26: Core: perf: Use get API for perf Properties.
         }
 
-// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
+// QTI_END: 2019-06-26: Core: perf: Use get API for perf Properties.
         mProcessGroupHandler = new Handler(adjusterThread.getLooper(), msg -> {
             final int group = msg.what;
             final ProcessRecord app = (ProcessRecord) msg.obj;
@@ -607,8 +598,8 @@ public abstract class OomAdjuster {
             mService.mPhantomProcessList.setProcessGroupForPhantomProcessOfApp(app, group);
             return true;
         });
-        mTmpUidRecords = new ActiveUids(service, false);
-        mTmpQueue = new ArrayDeque<ProcessRecord>(mConstants.CUR_MAX_CACHED_PROCESSES << 1);
+        mTmpUidRecords = new ActiveUids(null);
+        mTmpQueue = new ArrayDeque<>(mConstants.CUR_MAX_CACHED_PROCESSES << 1);
         mNumSlots = ((CACHED_APP_MAX_ADJ - CACHED_APP_MIN_ADJ + 1) >> 1)
                 / CACHED_APP_IMPORTANCE_LEVELS;
     }
@@ -681,7 +672,7 @@ public abstract class OomAdjuster {
         if (!includeWarmPkg) {
             return;
         }
-        final ProcessServiceRecord psr = app.mServices;
+        final ProcessServiceRecordInternal psr = app.mServices;
         for (int j = psr.numberOfRunningServices() - 1; j >= 0; j--) {
             psr.getRunningServiceAt(j).updateKeepWarmLocked();
         }
@@ -776,7 +767,7 @@ public abstract class OomAdjuster {
      */
     @GuardedBy({"mService", "mProcLock"})
     protected abstract void collectReachableProcessesLSP(
-            @NonNull ArrayList<ProcessRecord> reachables);
+            @NonNull ArrayList<ProcessRecordInternal> reachables);
 
     /**
      * Collect the reachable processes from the given {@code apps}, the result will be
@@ -784,14 +775,15 @@ public abstract class OomAdjuster {
      * the given {@code apps}.
      */
     @GuardedBy("mService")
-    protected boolean collectReachableProcessesLocked(ArraySet<ProcessRecord> apps,
-            ArrayList<ProcessRecord> processes, ActiveUids uids) {
-        final ArrayDeque<ProcessRecord> queue = mTmpQueue;
+    protected boolean collectReachableProcessesLocked(ArraySet<ProcessRecordInternal> apps,
+            ArrayList<ProcessRecordInternal> processes) {
+        final ActiveUidsInternal uids = mTmpUidRecords;
+        final ArrayDeque<ProcessRecordInternal> queue = mTmpQueue;
         queue.clear();
         processes.clear();
         for (int i = 0, size = apps.size(); i < size; i++) {
-            final ProcessRecord app = apps.valueAt(i);
-            app.mState.setReachable(true);
+            final ProcessRecordInternal app = apps.valueAt(i);
+            app.setReachable(true);
             queue.offer(app);
         }
 
@@ -800,24 +792,26 @@ public abstract class OomAdjuster {
         // Track if any of them reachables could include a cycle
         boolean containsCycle = false;
         // Scan downstreams of the process record
-        for (ProcessRecord pr = queue.poll(); pr != null; pr = queue.poll()) {
+        while (!queue.isEmpty()) {
+            final ProcessRecordInternal pr = queue.poll();
             processes.add(pr);
-            final UidRecord uidRec = pr.getUidRecord();
+            final UidRecordInternal uidRec = pr.getUidRecord();
             if (uidRec != null) {
                 uids.put(uidRec.getUid(), uidRec);
             }
-            final ProcessServiceRecord psr = pr.mServices;
+            final ProcessServiceRecordInternal psr = pr.getServices();
             for (int i = psr.numberOfConnections() - 1; i >= 0; i--) {
-                ConnectionRecord cr = psr.getConnectionAt(i);
-                ProcessRecord service = cr.hasFlag(ServiceInfo.FLAG_ISOLATED_PROCESS)
-                        ? cr.binding.service.isolationHostProc : cr.binding.service.app;
+                ConnectionRecordInternal cr = psr.getConnectionAt(i);
+                ProcessRecordInternal service = cr.hasFlag(ServiceInfo.FLAG_ISOLATED_PROCESS)
+                        ? cr.getService().getIsolationHostProcess()
+                        : cr.getService().getHostProcess();
                 if (service == null || service == pr
-                        || ((service.mState.getMaxAdj() >= ProcessList.SYSTEM_ADJ)
-                                && (service.mState.getMaxAdj() < FOREGROUND_APP_ADJ))) {
+                        || ((service.getMaxAdj() >= ProcessList.SYSTEM_ADJ)
+                                && (service.getMaxAdj() < FOREGROUND_APP_ADJ))) {
                     continue;
                 }
-                containsCycle |= service.mState.isReachable();
-                if (service.mState.isReachable()) {
+                containsCycle |= service.isReachable();
+                if (service.isReachable()) {
                     continue;
                 }
                 if (cr.hasFlag(Context.BIND_WAIVE_PRIORITY)
@@ -826,23 +820,23 @@ public abstract class OomAdjuster {
                     continue;
                 }
                 queue.offer(service);
-                service.mState.setReachable(true);
+                service.setReachable(true);
             }
-            final ProcessProviderRecord ppr = pr.mProviders;
+            final ProcessProviderRecordInternal ppr = pr.getProviders();
             for (int i = ppr.numberOfProviderConnections() - 1; i >= 0; i--) {
-                ContentProviderConnection cpc = ppr.getProviderConnectionAt(i);
-                ProcessRecord provider = cpc.provider.proc;
+                ContentProviderConnectionInternal cpc = ppr.getProviderConnectionAt(i);
+                ProcessRecordInternal provider = cpc.getProvider().getHostProcess();
                 if (provider == null || provider == pr
-                        || ((provider.mState.getMaxAdj() >= ProcessList.SYSTEM_ADJ)
-                                && (provider.mState.getMaxAdj() < FOREGROUND_APP_ADJ))) {
+                        || ((provider.getMaxAdj() >= ProcessList.SYSTEM_ADJ)
+                                && (provider.getMaxAdj() < FOREGROUND_APP_ADJ))) {
                     continue;
                 }
-                containsCycle |= provider.mState.isReachable();
-                if (provider.mState.isReachable()) {
+                containsCycle |= provider.isReachable();
+                if (provider.isReachable()) {
                     continue;
                 }
                 queue.offer(provider);
-                provider.mState.setReachable(true);
+                provider.setReachable(true);
             }
             // See if this process has any corresponding SDK sandbox processes running, and if so
             // scan them as well.
@@ -851,34 +845,34 @@ public abstract class OomAdjuster {
             final int numSdkSandboxes = sdkSandboxes != null ? sdkSandboxes.size() : 0;
             for (int i = numSdkSandboxes - 1; i >= 0; i--) {
                 ProcessRecord sdkSandbox = sdkSandboxes.get(i);
-                containsCycle |= sdkSandbox.mState.isReachable();
-                if (sdkSandbox.mState.isReachable()) {
+                containsCycle |= sdkSandbox.isReachable();
+                if (sdkSandbox.isReachable()) {
                     continue;
                 }
                 queue.offer(sdkSandbox);
-                sdkSandbox.mState.setReachable(true);
+                sdkSandbox.setReachable(true);
             }
             // If this process is a sandbox itself, also scan the app on whose behalf its running
             if (pr.isSdkSandbox) {
                 for (int is = psr.numberOfRunningServices() - 1; is >= 0; is--) {
-                    ServiceRecord s = psr.getRunningServiceAt(is);
-                    ArrayMap<IBinder, ArrayList<ConnectionRecord>> serviceConnections =
-                            s.getConnections();
-                    for (int conni = serviceConnections.size() - 1; conni >= 0; conni--) {
-                        ArrayList<ConnectionRecord> clist = serviceConnections.valueAt(conni);
+                    ServiceRecordInternal s = psr.getRunningServiceAt(is);
+                    for (int conni = s.getConnectionsSize() - 1; conni >= 0; conni--) {
+                        ArrayList<? extends ConnectionRecordInternal> clist =
+                                s.getConnectionAt(conni);
                         for (int i = clist.size() - 1; i >= 0; i--) {
-                            ConnectionRecord cr = clist.get(i);
+                            // TODO(b/425766486): Switch to use ConnectionRecordInternal.
+                            ConnectionRecord cr = (ConnectionRecord) clist.get(i);
                             ProcessRecord attributedApp = cr.binding.attributedClient;
                             if (attributedApp == null || attributedApp == pr
-                                    || ((attributedApp.mState.getMaxAdj() >= ProcessList.SYSTEM_ADJ)
-                                    && (attributedApp.mState.getMaxAdj() < FOREGROUND_APP_ADJ))) {
+                                    || ((attributedApp.getMaxAdj() >= ProcessList.SYSTEM_ADJ)
+                                    && (attributedApp.getMaxAdj() < FOREGROUND_APP_ADJ))) {
                                 continue;
                             }
-                            if (attributedApp.mState.isReachable()) {
+                            if (attributedApp.isReachable()) {
                                 continue;
                             }
                             queue.offer(attributedApp);
-                            attributedApp.mState.setReachable(true);
+                            attributedApp.setReachable(true);
                         }
                     }
                 }
@@ -889,10 +883,10 @@ public abstract class OomAdjuster {
         if (size > 0) {
             // Reverse the process list, since the updateOomAdjInnerLSP scans from the end of it.
             for (int l = 0, r = size - 1; l < r; l++, r--) {
-                final ProcessRecord t = processes.get(l);
-                final ProcessRecord u = processes.get(r);
-                t.mState.setReachable(false);
-                u.mState.setReachable(false);
+                final ProcessRecordInternal t = processes.get(l);
+                final ProcessRecordInternal u = processes.get(r);
+                t.setReachable(false);
+                u.setReachable(false);
                 processes.set(l, u);
                 processes.set(r, t);
             }
@@ -906,7 +900,7 @@ public abstract class OomAdjuster {
      */
     @GuardedBy("mService")
     void enqueueOomAdjTargetLocked(ProcessRecord app) {
-        if (app != null && app.mState.getMaxAdj() > FOREGROUND_APP_ADJ) {
+        if (app != null && app.getMaxAdj() > FOREGROUND_APP_ADJ) {
             mPendingProcessSet.add(app);
         }
     }
@@ -979,8 +973,8 @@ public abstract class OomAdjuster {
         long nextFollowUpUptimeMs = Long.MAX_VALUE;
         mNextFollowUpUpdateUptimeMs = NO_FOLLOW_UP_TIME;
         for (int i = mFollowUpUpdateSet.size() - 1; i >= 0; i--) {
-            final ProcessRecord proc = mFollowUpUpdateSet.valueAtUnchecked(i);
-            final long followUpUptimeMs = proc.mState.getFollowupUpdateUptimeMs();
+            final ProcessRecordInternal proc = mFollowUpUpdateSet.valueAtUnchecked(i);
+            final long followUpUptimeMs = proc.getFollowupUpdateUptimeMs();
 
             if (proc.isKilled()) {
                 // Process is dead, just remove from follow up set.
@@ -988,7 +982,7 @@ public abstract class OomAdjuster {
             } else if (followUpUptimeMs <= now) {
                 // Add processes that need a follow up update.
                 mPendingProcessSet.add(proc);
-                proc.mState.setFollowupUpdateUptimeMs(NO_FOLLOW_UP_TIME);
+                proc.setFollowupUpdateUptimeMs(NO_FOLLOW_UP_TIME);
                 mFollowUpUpdateSet.removeAt(i);
             } else if (followUpUptimeMs < nextFollowUpUptimeMs) {
                 // Figure out when to schedule the next follow up update.
@@ -1016,8 +1010,7 @@ public abstract class OomAdjuster {
         mNumNonCachedProcs = 0;
         mNumCachedHiddenProcs = 0;
 
-        updateAndTrimProcessLSP(now, nowElapsed, oldTime, activeUids,
-                oomAdjReason, doingAll);
+        updateAndTrimProcessLSP(now, nowElapsed, oldTime, oomAdjReason, doingAll);
         mNumServiceProcs = mNewNumServiceProcs;
 
         if (mService.mAlwaysFinishActivities) {
@@ -1053,6 +1046,7 @@ public abstract class OomAdjuster {
     @GuardedBy({"mService", "mProcLock"})
     protected void applyLruAdjust(ArrayList<ProcessRecord> lruList) {
         final int numLru = lruList.size();
+        int nextVisibleAppAdj = VISIBLE_APP_ADJ;
         int nextPreviousAppAdj = PREVIOUS_APP_ADJ;
         if (mConstants.USE_TIERED_CACHED_ADJ) {
             final long now = mInjector.getUptimeMillis();
@@ -1061,21 +1055,23 @@ public abstract class OomAdjuster {
             final int uiTierMaxAdj = 10 + mConstants.TIERED_CACHED_ADJ_UI_TIER_SIZE;
             for (int i = numLru - 1; i >= 0; i--) {
                 ProcessRecord app = lruList.get(i);
-                final ProcessStateRecord state = app.mState;
-                final ProcessCachedOptimizerRecord opt = app.mOptRecord;
+                final ProcessRecordInternal state = app;
                 final int curAdj = state.getCurAdj();
-                if (PREVIOUS_APP_ADJ <= curAdj && curAdj <= PREVIOUS_APP_MAX_ADJ) {
+                if (VISIBLE_APP_ADJ <= curAdj && curAdj <= VISIBLE_APP_MAX_ADJ) {
+                    state.setCurAdj(nextVisibleAppAdj);
+                    nextVisibleAppAdj = Math.min(nextVisibleAppAdj + 1, VISIBLE_APP_MAX_ADJ);
+                } else if (PREVIOUS_APP_ADJ <= curAdj && curAdj <= PREVIOUS_APP_MAX_ADJ) {
                     state.setCurAdj(nextPreviousAppAdj);
                     nextPreviousAppAdj = Math.min(nextPreviousAppAdj + 1, PREVIOUS_APP_MAX_ADJ);
-                } else if (!app.isKilledByAm() && app.getThread() != null && (curAdj >= UNKNOWN_ADJ
-                            || (state.hasShownUi() && curAdj >= CACHED_APP_MIN_ADJ))) {
+                } else if (!app.isKilledByAm() && app.isProcessRunning() && (curAdj >= UNKNOWN_ADJ
+                            || (state.getHasShownUi() && curAdj >= CACHED_APP_MIN_ADJ))) {
                     final ProcessServiceRecord psr = app.mServices;
                     int targetAdj = CACHED_APP_MIN_ADJ;
 
-                    if (opt != null && opt.isFreezeExempt()) {
+                    if (app.isFreezeExempt()) {
                         // BIND_WAIVE_PRIORITY and the like get oom_adj 900
                         targetAdj += 0;
-                    } else if (state.hasShownUi() && uiTargetAdj < uiTierMaxAdj) {
+                    } else if (state.getHasShownUi() && uiTargetAdj < uiTierMaxAdj) {
                         // The most recent UI-showing apps get [910, 910 + ui tier size).
                         targetAdj += uiTargetAdj++;
                     } else if ((state.getSetAdj() >= CACHED_APP_MIN_ADJ)
@@ -1088,7 +1084,7 @@ public abstract class OomAdjuster {
                         targetAdj += 10 + mConstants.TIERED_CACHED_ADJ_UI_TIER_SIZE;
                     }
                     state.setCurRawAdj(targetAdj);
-                    state.setCurAdj(psr.modifyRawOomAdj(targetAdj));
+                    state.setCurAdj(applyBindAboveClientToAdj(psr.isHasAboveClient(), targetAdj));
                 }
             }
         } else {
@@ -1134,15 +1130,17 @@ public abstract class OomAdjuster {
 
             for (int i = numLru - 1; i >= 0; i--) {
                 ProcessRecord app = lruList.get(i);
-                final ProcessStateRecord state = app.mState;
+                final ProcessRecordInternal state = app;
                 final int curAdj = state.getCurAdj();
-                if (PREVIOUS_APP_ADJ <= curAdj && curAdj <= PREVIOUS_APP_MAX_ADJ) {
+                if (VISIBLE_APP_ADJ <= curAdj && curAdj <= VISIBLE_APP_MAX_ADJ) {
+                    state.setCurAdj(nextVisibleAppAdj);
+                    nextVisibleAppAdj = Math.min(nextVisibleAppAdj + 1, VISIBLE_APP_MAX_ADJ);
+                } else if (PREVIOUS_APP_ADJ <= curAdj && curAdj <= PREVIOUS_APP_MAX_ADJ) {
                     state.setCurAdj(nextPreviousAppAdj);
                     nextPreviousAppAdj = Math.min(nextPreviousAppAdj + 1, PREVIOUS_APP_MAX_ADJ);
-                } else if (!app.isKilledByAm() && app.getThread() != null
-                               && curAdj >= UNKNOWN_ADJ) {
+                } else if (!app.isKilledByAm() && app.isProcessRunning() && curAdj >= UNKNOWN_ADJ) {
                     // If we haven't yet assigned the final cached adj to the process, do that now.
-                    final ProcessServiceRecord psr = app.mServices;
+                    final ProcessServiceRecordInternal psr = app.mServices;
                     switch (state.getCurProcState()) {
                         case PROCESS_STATE_LAST_ACTIVITY:
                         case PROCESS_STATE_CACHED_ACTIVITY:
@@ -1186,8 +1184,10 @@ public abstract class OomAdjuster {
                             // This process is a cached process holding activities...
                             // assign it the next cached value for that type, and then
                             // step that cached level.
-                            state.setCurRawAdj(curCachedAdj + curCachedImpAdj);
-                            state.setCurAdj(psr.modifyRawOomAdj(curCachedAdj + curCachedImpAdj));
+                            final int rawAdj = curCachedAdj + curCachedImpAdj;
+                            state.setCurRawAdj(rawAdj);
+                            state.setCurAdj(
+                                    applyBindAboveClientToAdj(psr.isHasAboveClient(), rawAdj));
                             if (DEBUG_LRU) {
                                 Slog.d(TAG_LRU, "Assigning activity LRU #" + i
                                         + " adj: " + state.getCurAdj()
@@ -1214,7 +1214,8 @@ public abstract class OomAdjuster {
                             // cached level will be treated as empty (since their process
                             // state is still as a service), which is what we want.
                             state.setCurRawAdj(curEmptyAdj);
-                            state.setCurAdj(psr.modifyRawOomAdj(curEmptyAdj));
+                            state.setCurAdj(applyBindAboveClientToAdj(psr.isHasAboveClient(),
+                                    curEmptyAdj));
                             if (DEBUG_LRU) {
                                 Slog.d(TAG_LRU, "Assigning empty LRU #" + i
                                         + " adj: " + state.getCurAdj()
@@ -1237,7 +1238,7 @@ public abstract class OomAdjuster {
 
     @GuardedBy({"mService", "mProcLock"})
     private void updateAndTrimProcessLSP(final long now, final long nowElapsed,
-            final long oldTime, final ActiveUids activeUids, @OomAdjReason int oomAdjReason,
+            final long oldTime, @OomAdjReason int oomAdjReason,
             boolean doingAll) {
         ArrayList<ProcessRecord> lruList = mProcessList.getLruProcessesLOSP();
         final int numLru = lruList.size();
@@ -1259,11 +1260,11 @@ public abstract class OomAdjuster {
         int numCachedExtraGroup = 0;
         int numEmpty = 0;
         int numTrimming = 0;
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
         ProcessRecord selectedAppRecord = null;
         long serviceLastActivity = 0;
         int numBServices = 0;
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
 
         boolean proactiveKillsEnabled = mConstants.PROACTIVE_KILLS_ENABLED;
         double lowSwapThresholdPercent = mConstants.LOW_SWAP_THRESHOLD_PERCENT;
@@ -1272,21 +1273,23 @@ public abstract class OomAdjuster {
 
         for (int i = numLru - 1; i >= 0; i--) {
             ProcessRecord app = lruList.get(i);
-            if (mEnableBServicePropagation && app.mState.isServiceB()
-                    && (app.mState.getCurAdj() == ProcessList.SERVICE_B_ADJ)) {
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+            if (mEnableBServicePropagation && app.isServiceB()
+                    && (app.getCurAdj() == ProcessList.SERVICE_B_ADJ)) {
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                 numBServices++;
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                 for (int s = app.mServices.numberOfRunningServices() - 1; s >= 0; s--) {
                     ServiceRecord sr = app.mServices.getRunningServiceAt(s);
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                     if (DEBUG_OOM_ADJ) Slog.d(TAG,"app.processName = " + app.processName
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
-                            + " serviceb = " + app.mState.isServiceB() + " s = " + s + " sr.lastActivity = "
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
-                            + sr.lastActivity + " packageName = " + sr.packageName
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
+                            + " serviceb = " + app.isServiceB() + " s = " + s + " sr.lastActivity = "
+                            + sr.getLastActivity() + " packageName = " + sr.packageName
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                             + " processName = " + sr.processName);
-                    if (SystemClock.uptimeMillis() - sr.lastActivity
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
+                    if (SystemClock.uptimeMillis() - sr.getLastActivity()
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                             < mMinBServiceAgingTime) {
                         if (DEBUG_OOM_ADJ) {
                             Slog.d(TAG,"Not aged enough!!!");
@@ -1294,20 +1297,24 @@ public abstract class OomAdjuster {
                         continue;
                     }
                     if (serviceLastActivity == 0) {
-                        serviceLastActivity = sr.lastActivity;
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
+                        serviceLastActivity = sr.getLastActivity();
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                         selectedAppRecord = app;
-                    } else if (sr.lastActivity < serviceLastActivity) {
-                        serviceLastActivity = sr.lastActivity;
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
+                    } else if (sr.getLastActivity() < serviceLastActivity) {
+                        serviceLastActivity = sr.getLastActivity();
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                         selectedAppRecord = app;
                     }
                 }
             }
             if (DEBUG_OOM_ADJ && selectedAppRecord != null) Slog.d(TAG,
                     "Identified app.processName = " + selectedAppRecord.processName
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                     + " app.pid = " + selectedAppRecord.getPid());
-            final ProcessStateRecord state = app.mState;
-            if (!app.isKilledByAm() && app.getThread() != null) {
+            final ProcessRecordInternal state = app;
+            if (!app.isKilledByAm() && app.isProcessRunning()) {
                 if (!Flags.fixApplyOomadjOrder()) {
                     // We don't need to apply the update for the process which didn't get computed
                     if (state.getCompletedAdjSeq() == mAdjSeq) {
@@ -1396,7 +1403,7 @@ public abstract class OomAdjuster {
                     app.killLocked("isolated not needed", ApplicationExitInfo.REASON_OTHER,
                             ApplicationExitInfo.SUBREASON_ISOLATED_NOT_NEEDED, true);
                 } else if (app.isSdkSandbox && psr.numberOfRunningServices() <= 0
-                        && app.getActiveInstrumentation() == null) {
+                        && !app.hasActiveInstrumentation()) {
                     // If this is an SDK sandbox process and there are no services running it, we
                     // aggressively kill the sandbox as we usually don't want to re-use the same
                     // sandbox again.
@@ -1420,19 +1427,21 @@ public abstract class OomAdjuster {
             for (int i = 0; i < numLru; i++) {
                 ProcessRecord app = lruList.get(i);
                 // We don't need to apply the update for the process which didn't get computed
-                if (!app.isKilledByAm() && app.getThread() != null
-                        && app.mState.getCompletedAdjSeq() == mAdjSeq) {
+                if (!app.isKilledByAm() && app.isProcessRunning()
+                        && app.getCompletedAdjSeq() == mAdjSeq) {
                     applyOomAdjLSP(app, doingAll, now, nowElapsed, oomAdjReason, true);
                 }
             }
         }
 
         if (!mProcsToOomAdj.isEmpty()) {
+// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             if (mLazyLmkKillMainProc) {
                 mInjector.batchSetOomAdjExt(mProcsToOomAdj);
             } else {
                 mInjector.batchSetOomAdj(mProcsToOomAdj);
             }
+// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             mProcsToOomAdj.clear();
         }
 
@@ -1451,8 +1460,10 @@ public abstract class OomAdjuster {
         mLastFreeSwapPercent = freeSwapPercent;
 
         if ((numBServices > mBServiceAppThreshold) && (true == mService.mAppProfiler.allowLowerMemLevelLocked())
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                 && (selectedAppRecord != null)) {
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             if (mLazyLmkKillMainProc) {
                 String packageName = selectedAppRecord.info.packageName;
                 String processName = selectedAppRecord.processName;
@@ -1467,27 +1478,29 @@ public abstract class OomAdjuster {
                 ProcessList.setOomAdjExt(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
                     ProcessList.CACHED_APP_MAX_ADJ, isSystemApp, isMainProc);
             } else {
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                 ProcessList.setOomAdj(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                     ProcessList.CACHED_APP_MAX_ADJ);
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             }
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
-            selectedAppRecord.mState.setSetAdj(selectedAppRecord.mState.getCurAdj());
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+            selectedAppRecord.setSetAdj(selectedAppRecord.getCurAdj());
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
             if (DEBUG_OOM_ADJ) Slog.d(TAG,"app.processName = " + selectedAppRecord.processName
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
                         + " app.pid = " + selectedAppRecord.getPid() + " is moved to higher adj");
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
         }
 
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_END: 2019-02-12: Core: Refactor B-services from AMS to OomAdjuster.
         mService.mAppProfiler.updateLowMemStateLSP(numCached, numEmpty, numTrimming, now);
     }
 
     @GuardedBy({"mService", "mProcLock"})
     protected void updateAppUidRecIfNecessaryLSP(final ProcessRecord app) {
-        if (!app.isKilledByAm() && app.getThread() != null) {
+        if (!app.isKilledByAm() && app.isProcessRunning()) {
             if (app.isolated && app.mServices.numberOfRunningServices() <= 0
                     && app.getIsolatedEntryPoint() == null) {
                 // No op.
@@ -1500,15 +1513,15 @@ public abstract class OomAdjuster {
 
     @GuardedBy({"mService", "mProcLock"})
     private void updateAppUidRecLSP(ProcessRecord app) {
-        final UidRecord uidRec = app.getUidRecord();
+        final UidRecordInternal uidRec = app.getUidRecord();
         if (uidRec != null) {
-            final ProcessStateRecord state = app.mState;
+            final ProcessRecordInternal state = app;
             uidRec.setEphemeral(app.info.isInstantApp());
             if (uidRec.getCurProcState() > state.getCurProcState()) {
                 uidRec.setCurProcState(state.getCurProcState());
             }
             if (app.mServices.hasForegroundServices()) {
-                uidRec.setForegroundServices(true);
+                uidRec.setHasForegroundServices(true);
             }
             uidRec.setCurCapability(uidRec.getCurCapability() | state.getCurCapability());
         }
@@ -1521,7 +1534,7 @@ public abstract class OomAdjuster {
         // we update the UidRecord's procstate by calling {@link UidRecord#setSetProcState}.
         mProcessList.incrementProcStateSeqAndNotifyAppsLOSP(activeUids);
 
-        ArrayList<UidRecord> becameIdle = mTmpBecameIdle;
+        ArrayList<UidRecordInternal> becameIdle = mTmpBecameIdle;
         becameIdle.clear();
 
         // Update from any uid changes.
@@ -1617,7 +1630,7 @@ public abstract class OomAdjuster {
                     uidRec.setSetCapability(uidRec.getCurCapability());
                     uidRec.setSetAllowListed(uidRec.isCurAllowListed());
                     uidRec.setSetIdle(uidRec.isIdle());
-                    uidRec.clearProcAdjChanged();
+                    uidRec.setProcAdjChanged(false);
                     if (shouldLog
                             && ((uidRec.getSetProcState() != oldProcState)
                             || (uidRec.getSetCapability() != oldCapability))) {
@@ -1646,7 +1659,7 @@ public abstract class OomAdjuster {
                     if ((uidChange & UidRecord.CHANGE_PROCSTATE) != 0) {
                         mService.noteUidProcessState(uidRec.getUid(), uidRec.getCurProcState());
                     }
-                    if (uidRec.hasForegroundServices()) {
+                    if (uidRec.getHasForegroundServices()) {
                         mService.mServices.foregroundServiceProcStateChangedLocked(uidRec);
                     }
                 }
@@ -1686,114 +1699,176 @@ public abstract class OomAdjuster {
         return true;
     }
 
-    protected final ComputeOomAdjWindowCallback mTmpComputeOomAdjWindowCallback =
-            new ComputeOomAdjWindowCallback();
+    protected final OomAdjWindowCalculator mTmpOomAdjWindowCalculator =
+            new OomAdjWindowCalculator();
 
-    /** These methods are called inline during computeOomAdjLSP(), on the same thread */
-    final class ComputeOomAdjWindowCallback {
+    /**
+     * The computeOomAdjFromActivitiesIfNecessary method computes the initial importance of the
+     * process which contains activities and is not the global top. The importance are stored at the
+     * ProcessRecordInternal's cached fields.
+     * The method is called during computeOomAdjLSP(), on the same thread.
+     */
+    final class OomAdjWindowCalculator {
+        private ProcessRecordInternal mApp;
+        private int mAdj;
+        private boolean mForegroundActivities;
+        private boolean mHasVisibleActivities;
+        private int mProcState;
+        private int mSchedGroup;
+        private int mProcessStateCurTop;
+        private String mAdjType;
+        private boolean mReportDebugMsgs;
 
-        ProcessRecord app;
-        int adj;
-        boolean foregroundActivities;
-        boolean mHasVisibleActivities;
-        int procState;
-        int schedGroup;
-        int appUid;
-        int logUid;
-        int processStateCurTop;
-        String mAdjType;
-        ProcessStateRecord mState;
+        @GuardedBy("this.OomAdjuster.mService")
+        int getAdj() {
+            return mAdj;
+        }
 
-        void initialize(ProcessRecord app, int adj, boolean foregroundActivities,
-                boolean hasVisibleActivities, int procState, int schedGroup, int appUid,
-                int logUid, int processStateCurTop) {
-            this.app = app;
-            this.adj = adj;
-            this.foregroundActivities = foregroundActivities;
+        @GuardedBy("this.OomAdjuster.mService")
+        void computeOomAdjFromActivitiesIfNecessary(ProcessRecordInternal app, int adj,
+                boolean foregroundActivities, boolean hasVisibleActivities, int procState,
+                int schedGroup, int processCurTop, boolean reportDebugMsgs) {
+            if (app.getCachedAdj() != ProcessList.INVALID_ADJ) {
+                return;
+            }
+            initialize(app, adj, foregroundActivities, hasVisibleActivities, procState,
+                    schedGroup, processCurTop, reportDebugMsgs);
+
+            final int flags;
+            if (Flags.pushActivityStateToOomadjuster()) {
+                flags = mApp.getActivityStateFlags();
+            } else {
+                flags = mApp.getActivityStateFlagsLegacy();
+            }
+
+            if ((flags & ACTIVITY_STATE_FLAG_IS_VISIBLE) != 0) {
+                onVisibleActivity(flags);
+            } else if ((flags & ACTIVITY_STATE_FLAG_IS_PAUSING_OR_PAUSED) != 0) {
+                onPausedActivity();
+            } else if ((flags & ACTIVITY_STATE_FLAG_IS_STOPPING) != 0) {
+                onStoppingActivity((flags & ACTIVITY_STATE_FLAG_IS_STOPPING_FINISHING) != 0);
+            } else {
+                final long ts;
+                if (Flags.pushActivityStateToOomadjuster()) {
+                    ts = mApp.getPerceptibleTaskStoppedTimeMillis();
+                } else {
+                    ts = mApp.getPerceptibleTaskStoppedTimeMillisLegacy();
+                }
+                onOtherActivity(ts);
+            }
+
+            if (Flags.oomadjusterVisLaddering() && Flags.removeLruSpamPrevention()) {
+                // Do nothing.
+                // When these flags are enabled, processes within the vis oom score range will
+                // have vis+X oom scores according their position in the LRU list with respect
+                // to the other vis processes, rather than their activity's taskLayer, which is
+                // not handling all the cases for apps with multi-activities and multi-processes,
+                // because there is no direct connection between the activities and bindings
+                // (processes) of an app.
+            } else {
+                if (mAdj == ProcessList.VISIBLE_APP_ADJ) {
+                    final int taskLayer = flags & ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER;
+                    final int minLayer = Math.min(ProcessList.VISIBLE_APP_LAYER_MAX, taskLayer);
+                    mAdj += minLayer;
+                }
+            }
+
+            mApp.setCachedAdj(mAdj);
+            mApp.setCachedForegroundActivities(mForegroundActivities);
+            mApp.setCachedHasVisibleActivities(mHasVisibleActivities);
+            mApp.setCachedProcState(mProcState);
+            mApp.setCachedSchedGroup(mSchedGroup);
+            mApp.setCachedAdjType(mAdjType);
+        }
+
+        void initialize(ProcessRecordInternal app, int adj, boolean foregroundActivities,
+                boolean hasVisibleActivities, int procState, int schedGroup,
+                int processStateCurTop, boolean reportDebugMsgs) {
+            this.mApp = app;
+            this.mAdj = adj;
+            this.mForegroundActivities = foregroundActivities;
             this.mHasVisibleActivities = hasVisibleActivities;
-            this.procState = procState;
-            this.schedGroup = schedGroup;
-            this.appUid = appUid;
-            this.logUid = logUid;
-            this.processStateCurTop = processStateCurTop;
-            mAdjType = app.mState.getAdjType();
-            this.mState = app.mState;
+            this.mProcState = procState;
+            this.mSchedGroup = schedGroup;
+            this.mProcessStateCurTop = processStateCurTop;
+            this.mAdjType = app.getAdjType();
+            this.mReportDebugMsgs = reportDebugMsgs;
         }
 
         void onVisibleActivity(int flags) {
             // App has a visible activity; only upgrade adjustment.
-            if (adj > VISIBLE_APP_ADJ) {
-                adj = VISIBLE_APP_ADJ;
+            if (mAdj > VISIBLE_APP_ADJ) {
+                mAdj = VISIBLE_APP_ADJ;
                 mAdjType = "vis-activity";
-                if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
-                    reportOomAdjMessageLocked(TAG_OOM_ADJ, "Raise adj to vis-activity: " + app);
+                if (mReportDebugMsgs) {
+                    reportOomAdjMessageLocked(TAG_OOM_ADJ, "Raise adj to vis-activity: " + mApp);
                 }
             }
-            if (procState > processStateCurTop) {
-                procState = processStateCurTop;
+            if (mProcState > mProcessStateCurTop) {
+                mProcState = mProcessStateCurTop;
                 mAdjType = "vis-activity";
-                if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
+                if (mReportDebugMsgs) {
                     reportOomAdjMessageLocked(TAG_OOM_ADJ,
-                            "Raise procstate to vis-activity (top): " + app);
+                            "Raise procstate to vis-activity (top): " + mApp);
                 }
             }
-            if (schedGroup < SCHED_GROUP_DEFAULT) {
-                schedGroup = SCHED_GROUP_DEFAULT;
+            if (mSchedGroup < SCHED_GROUP_DEFAULT) {
+                mSchedGroup = SCHED_GROUP_DEFAULT;
             }
             if ((flags & WindowProcessController.ACTIVITY_STATE_FLAG_RESUMED_SPLIT_SCREEN) != 0) {
                 // Another side of split should be the current global top. Use the same top
                 // priority for this non-top split.
-                schedGroup = SCHED_GROUP_TOP_APP;
+                mSchedGroup = SCHED_GROUP_TOP_APP;
                 mAdjType = "resumed-split-screen-activity";
             } else if ((flags
                     & WindowProcessController.ACTIVITY_STATE_FLAG_PERCEPTIBLE_FREEFORM) != 0) {
                 // The recently used non-top visible freeform app.
-                schedGroup = SCHED_GROUP_TOP_APP;
+                mSchedGroup = SCHED_GROUP_TOP_APP;
                 mAdjType = "perceptible-freeform-activity";
             } else if ((flags
                     & WindowProcessController.ACTIVITY_STATE_FLAG_VISIBLE_MULTI_WINDOW_MODE) != 0) {
                 // Currently the only case is from freeform apps which are not close to top.
-                schedGroup = SCHED_GROUP_FOREGROUND_WINDOW;
+                mSchedGroup = SCHED_GROUP_FOREGROUND_WINDOW;
                 mAdjType = "vis-multi-window-activity";
             } else if ((flags
                     & WindowProcessController.ACTIVITY_STATE_FLAG_OCCLUDED_FREEFORM) != 0) {
-                schedGroup = SCHED_GROUP_BACKGROUND;
+                mSchedGroup = SCHED_GROUP_BACKGROUND;
                 mAdjType = "occluded-freeform-activity";
             }
-            foregroundActivities = true;
+            mForegroundActivities = true;
             mHasVisibleActivities = true;
         }
 
         void onPausedActivity() {
-            if (adj > PERCEPTIBLE_APP_ADJ) {
-                adj = PERCEPTIBLE_APP_ADJ;
+            if (mAdj > PERCEPTIBLE_APP_ADJ) {
+                mAdj = PERCEPTIBLE_APP_ADJ;
                 mAdjType = "pause-activity";
-                if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
-                    reportOomAdjMessageLocked(TAG_OOM_ADJ, "Raise adj to pause-activity: "  + app);
+                if (mReportDebugMsgs) {
+                    reportOomAdjMessageLocked(TAG_OOM_ADJ, "Raise adj to pause-activity: "  + mApp);
                 }
             }
-            if (procState > processStateCurTop) {
-                procState = processStateCurTop;
+            if (mProcState > mProcessStateCurTop) {
+                mProcState = mProcessStateCurTop;
                 mAdjType = "pause-activity";
-                if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
+                if (mReportDebugMsgs) {
                     reportOomAdjMessageLocked(TAG_OOM_ADJ,
-                            "Raise procstate to pause-activity (top): "  + app);
+                            "Raise procstate to pause-activity (top): "  + mApp);
                 }
             }
-            if (schedGroup < SCHED_GROUP_DEFAULT) {
-                schedGroup = SCHED_GROUP_DEFAULT;
+            if (mSchedGroup < SCHED_GROUP_DEFAULT) {
+                mSchedGroup = SCHED_GROUP_DEFAULT;
             }
-            foregroundActivities = true;
+            mForegroundActivities = true;
             mHasVisibleActivities = false;
         }
 
         void onStoppingActivity(boolean finishing) {
-            if (adj > PERCEPTIBLE_APP_ADJ) {
-                adj = PERCEPTIBLE_APP_ADJ;
+            if (mAdj > PERCEPTIBLE_APP_ADJ) {
+                mAdj = PERCEPTIBLE_APP_ADJ;
                 mAdjType = "stop-activity";
-                if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
+                if (mReportDebugMsgs) {
                     reportOomAdjMessageLocked(TAG_OOM_ADJ,
-                            "Raise adj to stop-activity: "  + app);
+                            "Raise adj to stop-activity: "  + mApp);
                 }
             }
 
@@ -1804,46 +1879,46 @@ public abstract class OomAdjuster {
             // since there can be an arbitrary number of stopping processes and they should soon all
             // go into the cached state.
             if (!finishing) {
-                if (procState > PROCESS_STATE_LAST_ACTIVITY) {
-                    procState = PROCESS_STATE_LAST_ACTIVITY;
+                if (mProcState > PROCESS_STATE_LAST_ACTIVITY) {
+                    mProcState = PROCESS_STATE_LAST_ACTIVITY;
                     mAdjType = "stop-activity";
-                    if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
+                    if (mReportDebugMsgs) {
                         reportOomAdjMessageLocked(TAG_OOM_ADJ,
-                                "Raise procstate to stop-activity: " + app);
+                                "Raise procstate to stop-activity: " + mApp);
                     }
                 }
             }
-            foregroundActivities = true;
+            mForegroundActivities = true;
             mHasVisibleActivities = false;
         }
 
         void onOtherActivity(long perceptibleTaskStoppedTimeMillis) {
-            if (procState > PROCESS_STATE_CACHED_ACTIVITY) {
-                procState = PROCESS_STATE_CACHED_ACTIVITY;
+            if (mProcState > PROCESS_STATE_CACHED_ACTIVITY) {
+                mProcState = PROCESS_STATE_CACHED_ACTIVITY;
                 mAdjType = "cch-act";
-                if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
+                if (mReportDebugMsgs) {
                     reportOomAdjMessageLocked(TAG_OOM_ADJ,
-                            "Raise procstate to cached activity: " + app);
+                            "Raise procstate to cached activity: " + mApp);
                 }
             }
-            if (Flags.perceptibleTasks() && adj > PERCEPTIBLE_MEDIUM_APP_ADJ) {
+            if (Flags.perceptibleTasks() && mAdj > PERCEPTIBLE_MEDIUM_APP_ADJ) {
                 if (perceptibleTaskStoppedTimeMillis >= 0) {
                     final long now = mInjector.getUptimeMillis();
                     if (now - perceptibleTaskStoppedTimeMillis < PERCEPTIBLE_TASK_TIMEOUT_MILLIS) {
-                        adj = PERCEPTIBLE_MEDIUM_APP_ADJ;
+                        mAdj = PERCEPTIBLE_MEDIUM_APP_ADJ;
                         mAdjType = "perceptible-act";
-                        if (procState > PROCESS_STATE_IMPORTANT_BACKGROUND) {
-                            procState = PROCESS_STATE_IMPORTANT_BACKGROUND;
+                        if (mProcState > PROCESS_STATE_IMPORTANT_BACKGROUND) {
+                            mProcState = PROCESS_STATE_IMPORTANT_BACKGROUND;
                         }
 
-                        maybeSetProcessFollowUpUpdateLocked(app,
+                        maybeSetProcessFollowUpUpdateLocked(mApp,
                                 perceptibleTaskStoppedTimeMillis + PERCEPTIBLE_TASK_TIMEOUT_MILLIS,
                                 now);
-                    } else if (adj > PREVIOUS_APP_ADJ) {
-                        adj = PREVIOUS_APP_ADJ;
+                    } else if (mAdj > PREVIOUS_APP_ADJ) {
+                        mAdj = PREVIOUS_APP_ADJ;
                         mAdjType = "stale-perceptible-act";
-                        if (procState > PROCESS_STATE_LAST_ACTIVITY) {
-                            procState = PROCESS_STATE_LAST_ACTIVITY;
+                        if (mProcState > PROCESS_STATE_LAST_ACTIVITY) {
+                            mProcState = PROCESS_STATE_LAST_ACTIVITY;
                         }
                     }
                 }
@@ -1860,11 +1935,11 @@ public abstract class OomAdjuster {
         }
     }
 
-    protected boolean isScreenOnOrAnimatingLocked(ProcessStateRecord state) {
+    protected boolean isScreenOnOrAnimatingLocked(ProcessRecordInternal state) {
         return isDeviceFullyAwake() || state.isRunningRemoteAnimation();
     }
 
-    protected boolean isBackupProcess(ProcessRecord app) {
+    protected boolean isBackupProcess(ProcessRecordInternal app) {
         if (Flags.pushGlobalStateToOomadjuster()) {
             return app == mGlobalState.getBackupTarget(app.userId);
         } else {
@@ -1884,11 +1959,11 @@ public abstract class OomAdjuster {
         }
     }
 
-    protected boolean isReceivingBroadcast(ProcessRecord app) {
+    protected boolean isReceivingBroadcast(ProcessRecordInternal app) {
         if (Flags.pushBroadcastStateToOomadjuster()) {
-            return app.mReceivers.isReceivingBroadcast();
+            return app.getReceivers().isReceivingBroadcast();
         } else {
-            return app.mState.getCachedIsReceivingBroadcast(mTmpSchedGroup);
+            return app.getCachedIsReceivingBroadcast(mTmpSchedGroup);
         }
     }
 
@@ -1916,7 +1991,7 @@ public abstract class OomAdjuster {
         }
     }
 
-    protected ProcessRecord getTopProcess() {
+    protected ProcessRecordInternal getTopProcess() {
         if (Flags.pushActivityStateToOomadjuster()) {
             return mGlobalState.getTopProcess();
         } else {
@@ -1924,35 +1999,35 @@ public abstract class OomAdjuster {
         }
     }
 
-    protected boolean isHomeProcess(ProcessRecord proc) {
+    protected boolean isHomeProcess(ProcessRecordInternal proc) {
         if (Flags.pushActivityStateToOomadjuster()) {
             return mGlobalState.getHomeProcess() == proc;
         } else {
-            return proc.mState.getCachedIsHomeProcess();
+            return proc.getCachedIsHomeProcess();
         }
     }
 
-    protected boolean isHeavyWeightProcess(ProcessRecord proc) {
+    protected boolean isHeavyWeightProcess(ProcessRecordInternal proc) {
         if (Flags.pushActivityStateToOomadjuster()) {
             return mGlobalState.getHeavyWeightProcess() == proc;
         } else {
-            return proc.mState.getCachedIsHeavyWeight();
+            return proc.getCachedIsHeavyWeight();
         }
     }
 
-    protected boolean isVisibleDozeUiProcess(ProcessRecord proc) {
+    protected boolean isVisibleDozeUiProcess(ProcessRecordInternal proc) {
         if (Flags.pushActivityStateToOomadjuster()) {
             return mGlobalState.getShowingUiWhileDozingProcess() == proc;
         } else {
-            return proc.getWindowProcessController().isShowingUiWhileDozing();
+            return proc.isShowingUiWhileDozing();
         }
     }
 
-    protected boolean isPreviousProcess(ProcessRecord proc) {
+    protected boolean isPreviousProcess(ProcessRecordInternal proc) {
         if (Flags.pushActivityStateToOomadjuster()) {
             return mGlobalState.getPreviousProcess() == proc;
         } else {
-            return proc.mState.getCachedIsPreviousProcess();
+            return proc.getCachedIsPreviousProcess();
         }
     }
 
@@ -1960,37 +2035,60 @@ public abstract class OomAdjuster {
      * @return The proposed change to the schedGroup.
      */
     @GuardedBy({"mService", "mProcLock"})
-    protected int setIntermediateAdjLSP(ProcessRecord app, int adj, int schedGroup) {
-        final ProcessStateRecord state = app.mState;
-        state.setCurRawAdj(adj);
+    protected int setIntermediateAdjLSP(ProcessRecordInternal app, int adj, int schedGroup) {
+        app.setCurRawAdj(adj);
 
-        adj = app.mServices.modifyRawOomAdj(adj);
-        if (adj > state.getMaxAdj()) {
-            adj = state.getMaxAdj();
+        adj = applyBindAboveClientToAdj(app.getServices().isHasAboveClient(), adj);
+        if (adj > app.getMaxAdj()) {
+            adj = app.getMaxAdj();
             if (adj <= PERCEPTIBLE_LOW_APP_ADJ) {
                 schedGroup = SCHED_GROUP_DEFAULT;
             }
         }
 
-        state.setCurAdj(adj);
-
+        app.setCurAdj(adj);
         return schedGroup;
     }
 
+    private static int applyBindAboveClientToAdj(boolean hasAboveClient, int adj) {
+        if (hasAboveClient) {
+            // If this process has bound to any services with BIND_ABOVE_CLIENT,
+            // then we need to drop its adjustment to be lower than the service's
+            // in order to honor the request.  We want to drop it by one adjustment
+            // level...  but there is special meaning applied to various levels so
+            // we will skip some of them.
+            if (adj < ProcessList.FOREGROUND_APP_ADJ) {
+                // System process will not get dropped, ever
+            } else if (adj < ProcessList.VISIBLE_APP_ADJ) {
+                adj = ProcessList.VISIBLE_APP_ADJ;
+            } else if (adj < ProcessList.PERCEPTIBLE_APP_ADJ) {
+                adj = ProcessList.PERCEPTIBLE_APP_ADJ;
+            } else if (adj < ProcessList.PERCEPTIBLE_LOW_APP_ADJ) {
+                adj = ProcessList.PERCEPTIBLE_LOW_APP_ADJ;
+            } else if (adj < ProcessList.SERVICE_ADJ) {
+                adj = ProcessList.SERVICE_ADJ;
+            } else if (adj < ProcessList.CACHED_APP_MIN_ADJ) {
+                adj = ProcessList.CACHED_APP_MIN_ADJ;
+            } else if (adj < ProcessList.CACHED_APP_MAX_ADJ) {
+                adj++;
+            }
+        }
+        return adj;
+    }
+
     @GuardedBy({"mService", "mProcLock"})
-    protected void setIntermediateProcStateLSP(ProcessRecord app, int procState) {
-        final ProcessStateRecord state = app.mState;
+    protected void setIntermediateProcStateLSP(ProcessRecordInternal state, int procState) {
         state.setCurProcState(procState);
         state.setCurRawProcState(procState);
     }
 
     @GuardedBy({"mService", "mProcLock"})
-    protected void setIntermediateSchedGroupLSP(ProcessStateRecord state, int schedGroup) {
+    protected void setIntermediateSchedGroupLSP(ProcessRecordInternal state, int schedGroup) {
         // Put bound foreground services in a special sched group for additional
         // restrictions on screen off
         if (state.getCurProcState() >= PROCESS_STATE_BOUND_FOREGROUND_SERVICE
                 && !isDeviceFullyAwake()
-                && !state.shouldScheduleLikeTopApp()) {
+                && !state.getScheduleLikeTopApp()) {
             if (schedGroup > SCHED_GROUP_RESTRICTED) {
                 schedGroup = SCHED_GROUP_RESTRICTED;
             }
@@ -2003,17 +2101,17 @@ public abstract class OomAdjuster {
      * Computes the impact on {@code app} the service connections from {@code client} has.
      */
     @GuardedBy({"mService", "mProcLock"})
-    public abstract boolean computeServiceHostOomAdjLSP(ConnectionRecord cr, ProcessRecord app,
-            ProcessRecord client, long now, boolean dryRun);
+    public abstract boolean computeServiceHostOomAdjLSP(ConnectionRecordInternal cr,
+            ProcessRecordInternal app, ProcessRecordInternal client, long now, boolean dryRun);
 
     /**
      * Computes the impact on {@code app} the provider connections from {@code client} has.
      */
     @GuardedBy({"mService", "mProcLock"})
-    public abstract boolean computeProviderHostOomAdjLSP(ContentProviderConnection conn,
-            ProcessRecord app, ProcessRecord client, boolean dryRun);
+    public abstract boolean computeProviderHostOomAdjLSP(ContentProviderConnectionInternal conn,
+            ProcessRecordInternal app, ProcessRecordInternal client, boolean dryRun);
 
-    protected int getDefaultCapability(ProcessRecord app, int procState) {
+    protected int getDefaultCapability(ProcessRecordInternal app, int procState) {
         final int networkCapabilities =
                 NetworkPolicyManager.getDefaultProcessNetworkCapabilities(procState);
         final int baseCapabilities;
@@ -2024,7 +2122,7 @@ public abstract class OomAdjuster {
                 baseCapabilities = PROCESS_CAPABILITY_ALL; // BFSL allowed
                 break;
             case PROCESS_STATE_BOUND_TOP:
-                if (app.getActiveInstrumentation() != null) {
+                if (app.hasActiveInstrumentation()) {
                     baseCapabilities = PROCESS_CAPABILITY_BFSL |
                             PROCESS_CAPABILITY_ALL_IMPLICIT;
                 } else {
@@ -2032,7 +2130,7 @@ public abstract class OomAdjuster {
                 }
                 break;
             case PROCESS_STATE_FOREGROUND_SERVICE:
-                if (app.getActiveInstrumentation() != null) {
+                if (app.hasActiveInstrumentation()) {
                     baseCapabilities = PROCESS_CAPABILITY_ALL_IMPLICIT;
                 } else {
                     // Capability from foreground service is conditional depending on
@@ -2048,40 +2146,53 @@ public abstract class OomAdjuster {
         return baseCapabilities | networkCapabilities;
     }
 
-    protected static int getCpuCapability(ProcessRecord app, long nowUptime,
+    @CpuTimeReasons
+    private static int getCpuTimeReasons(ProcessRecordInternal app,
             boolean hasForegroundActivities) {
-        // Note: persistent processes get all capabilities, including CPU_TIME.
-        final UidRecord uidRec = app.getUidRecord();
+        // Note: persistent processes always get CPU_TIME with reason CPU_TIME_REASON_OTHER.
+        // Currently, we only cite CPU_TIME_REASON_OTHER for all reasons. More specific reasons
+        // can be used when they become interesting to observe.
+        final UidRecordInternal uidRec = app.getUidRecord();
         if (uidRec != null && uidRec.isCurAllowListed()) {
             // Process is in the power allowlist.
-            return PROCESS_CAPABILITY_CPU_TIME;
+            return CPU_TIME_REASON_OTHER;
         }
         if (hasForegroundActivities) {
             // TODO: b/402987519 - This grants the Top Sleeping process CPU_TIME but eventually
             //  should not.
             // Process has user perceptible activities.
-            return PROCESS_CAPABILITY_CPU_TIME;
+            return CPU_TIME_REASON_OTHER;
         }
-        if (app.mServices.hasForegroundServices()) {
-            return PROCESS_CAPABILITY_CPU_TIME;
+        if (app.getServices().hasExecutingServices()) {
+            // Ensure that services get cpu time during start-up and tear-down.
+            return CPU_TIME_REASON_OTHER;
         }
-        if (app.mReceivers.isReceivingBroadcast()) {
-            return PROCESS_CAPABILITY_CPU_TIME;
+        if (app.getServices().hasForegroundServices()) {
+            return CPU_TIME_REASON_OTHER;
+        }
+        if (app.getReceivers().isReceivingBroadcast()) {
+            return CPU_TIME_REASON_OTHER;
         }
         if (app.hasActiveInstrumentation()) {
-            return PROCESS_CAPABILITY_CPU_TIME;
+            return CPU_TIME_REASON_OTHER;
         }
         // TODO(b/370817323): Populate this method with all of the reasons to keep a process
         //  unfrozen.
-        return 0;
+        return CPU_TIME_REASON_NONE;
+    }
+
+    protected static int getCpuCapability(ProcessRecordInternal app,
+            boolean hasForegroundActivities) {
+        final int reasons = getCpuTimeReasons(app, hasForegroundActivities);
+        app.addCurCpuTimeReasons(reasons);
+        return (reasons != CPU_TIME_REASON_NONE) ? PROCESS_CAPABILITY_CPU_TIME : 0;
     }
 
     // Grant PROCESS_CAPABILITY_IMPLICIT_CPU_TIME to processes based on oom adj score.
-    protected int getImplicitCpuCapability(ProcessRecord app, int adj) {
-        if (adj < mConstants.FREEZER_CUTOFF_ADJ) {
-            return PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
-        }
-        if (app.mState.getMaxAdj() < mConstants.FREEZER_CUTOFF_ADJ) {
+    protected int getImplicitCpuCapability(ProcessRecordInternal app, int adj) {
+        if (adj < mConstants.FREEZER_CUTOFF_ADJ
+                || app.getMaxAdj() < mConstants.FREEZER_CUTOFF_ADJ) {
+            app.addCurImplicitCpuTimeReasons(IMPLICIT_CPU_TIME_REASON_OTHER);
             return PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
         }
         return 0;
@@ -2090,10 +2201,10 @@ public abstract class OomAdjuster {
     /**
      * @return the BFSL capability from a client (of a service binding or provider).
      */
-    protected int getBfslCapabilityFromClient(ProcessRecord client) {
+    protected int getBfslCapabilityFromClient(ProcessRecordInternal client) {
         // Procstates above FGS should always have this flag. We shouldn't need this logic,
         // but let's do it just in case.
-        if (client.mState.getCurProcState() < PROCESS_STATE_FOREGROUND_SERVICE) {
+        if (client.getCurProcState() < PROCESS_STATE_FOREGROUND_SERVICE) {
             return PROCESS_CAPABILITY_BFSL;
         }
         // Otherwise, use the process's cur capability.
@@ -2131,41 +2242,66 @@ public abstract class OomAdjuster {
         //
         // However, again, because #2 is bound by App 1, which is BFSL-allowed (because of #1A)
         // App 2 would still BFSL-allowed, due to the aforementioned check in ActiveServices.
-        return client.mState.getCurCapability() & PROCESS_CAPABILITY_BFSL;
+        return client.getCurCapability() & PROCESS_CAPABILITY_BFSL;
     }
 
     /**
      * @return the CPU capability from a client (of a service binding or provider).
      */
-    protected static int getCpuCapabilityFromClient(OomAdjusterImpl.Connection conn,
-            ProcessRecord client) {
-        if (conn == null || conn.transmitsCpuTime()) {
-            return client.mState.getCurCapability() & ALL_CPU_TIME_CAPABILITIES;
-        } else {
+    protected static int getCpuCapabilitiesFromClient(ProcessRecordInternal app,
+            ProcessRecordInternal client, OomAdjusterImpl.Connection conn) {
+        final int clientCpuCaps = client.getCurCapability() & ALL_CPU_TIME_CAPABILITIES;
+        final @CpuTimeReasons int clientCpuReasons = client.getCurCpuTimeReasons();
+        final @ImplicitCpuTimeReasons int clientImplicitCpuReasons =
+                client.getCurImplicitCpuTimeReasons();
+
+        final @OomAdjusterImpl.Connection.CpuTimeTransmissionType int transmissionType =
+                (conn != null) ? conn.cpuTimeTransmissionType() : CPU_TIME_TRANSMISSION_NONE;
+
+        if (transmissionType == CPU_TIME_TRANSMISSION_NONE) {
+            // The binding does not transmit CPU_TIME capabilities in any way.
             return 0;
         }
+
+        @CpuTimeReasons int cpuReasons = CPU_TIME_REASON_NONE;
+        @ImplicitCpuTimeReasons int implicitCpuReasons = IMPLICIT_CPU_TIME_REASON_NONE;
+
+        if ((clientCpuCaps & PROCESS_CAPABILITY_CPU_TIME) != 0) {
+            if (clientCpuReasons == CPU_TIME_REASON_TRANSMITTED_LEGACY) {
+                // Client has CPU_TIME only for a legacy reason.
+                cpuReasons = CPU_TIME_REASON_TRANSMITTED_LEGACY;
+            } else if (transmissionType == CPU_TIME_TRANSMISSION_LEGACY) {
+                // Binding only transmits CPU_TIME for a legacy reason.
+                cpuReasons = CPU_TIME_REASON_TRANSMITTED_LEGACY;
+            } else {
+                cpuReasons = CPU_TIME_REASON_TRANSMITTED;
+            }
+        }
+        if ((clientCpuCaps & PROCESS_CAPABILITY_IMPLICIT_CPU_TIME) != 0) {
+            if (clientImplicitCpuReasons == IMPLICIT_CPU_TIME_REASON_TRANSMITTED_LEGACY) {
+                // Client has IMPLICIT_CPU_TIME only for a legacy reason.
+                implicitCpuReasons = IMPLICIT_CPU_TIME_REASON_TRANSMITTED_LEGACY;
+            } else if (transmissionType == CPU_TIME_TRANSMISSION_LEGACY) {
+                // Binding only transmits IMPLICIT_CPU_TIME for a legacy reason.
+                implicitCpuReasons = IMPLICIT_CPU_TIME_REASON_TRANSMITTED_LEGACY;
+            } else {
+                implicitCpuReasons = IMPLICIT_CPU_TIME_REASON_TRANSMITTED;
+            }
+        }
+        app.addCurCpuTimeReasons(cpuReasons);
+        app.addCurImplicitCpuTimeReasons(implicitCpuReasons);
+        return clientCpuCaps;
     }
 
     /** Inform the oomadj observer of changes to oomadj. Used by tests. */
     @GuardedBy("mService")
     protected void reportOomAdjMessageLocked(String tag, String msg) {
         Slog.d(tag, msg);
-        synchronized (mService.mOomAdjObserverLock) {
-            if (mService.mCurOomAdjObserver != null) {
-                mService.mUiHandler.obtainMessage(DISPATCH_OOM_ADJ_OBSERVER_MSG, msg)
-                        .sendToTarget();
-            }
-        }
+        mService.reportOomAdjMessageLocked(msg);
     }
 
     void onWakefulnessChanged(int wakefulness) {
         mCachedAppOptimizer.onWakefulnessChanged(wakefulness);
-    }
-
-    @GuardedBy({"mService", "mProcLock"})
-    protected boolean applyOomAdjLSP(ProcessRecord app, boolean doingAll, long now,
-            long nowElapsed, @OomAdjReason int oomAdjReason) {
-        return applyOomAdjLSP(app, doingAll, now, nowElapsed, oomAdjReason, false);
     }
 
     /** Applies the computed oomadj, procstate and sched group values and freezes them in set* */
@@ -2173,17 +2309,20 @@ public abstract class OomAdjuster {
     protected boolean applyOomAdjLSP(ProcessRecord app, boolean doingAll, long now,
             long nowElapsed, @OomAdjReason int oomAdjReson, boolean isBatchingOomAdj) {
         boolean success = true;
-        final ProcessStateRecord state = app.mState;
-        final UidRecord uidRec = app.getUidRecord();
+        final ProcessRecordInternal state = app;
+        final UidRecordInternal uidRec = app.getUidRecord();
+
+        final boolean reportDebugMsgs =
+                DEBUG_SWITCH || DEBUG_OOM_ADJ || mService.mCurOomAdjUid == app.info.uid;
 
         if (state.getCurRawAdj() != state.getSetRawAdj()) {
             state.setSetRawAdj(state.getCurRawAdj());
         }
 
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
         ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
         if (freezer != null && freezer.useFreezerManager()) {
             // unfreeze process if user press home key before the first frame appeared
             if ((state.getSetAdj() >= ProcessList.FOREGROUND_APP_ADJ &&
@@ -2202,7 +2341,7 @@ public abstract class OomAdjuster {
             }
         }
 
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
         int changes = 0;
 
         if (state.getCurAdj() != state.getSetAdj()) {
@@ -2211,48 +2350,49 @@ public abstract class OomAdjuster {
 
         final int oldOomAdj = state.getSetAdj();
         if (state.getCurAdj() != state.getSetAdj()) {
-// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
             // Hooks for background apps transition
             if (mEnableBgt) {
-// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
                 if ((state.getSetAdj() >= ProcessList.CACHED_APP_MIN_ADJ &&
                         state.getSetAdj() <= ProcessList.CACHED_APP_MAX_ADJ) &&
                         state.getCurAdj() == ProcessList.FOREGROUND_APP_ADJ &&
-                            state.hasForegroundActivities()) {
-// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
+                            state.getHasForegroundActivities()) {
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
                     Slog.d(TAG,"App adj change from cached state to fg state : "
-// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
                             + app.getPid() + " " + app.processName);
-// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
                     if (mPerf != null) {
-// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
                         int fgAppPerfLockArgs[] = {BoostFramework.MPCTLV3_GPU_IS_APP_FG, app.getPid()};
-// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
                         mPerf.perfLockAcquire(10, fgAppPerfLockArgs);
                     }
                 }
-// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
                 if(state.getSetAdj() == ProcessList.PREVIOUS_APP_ADJ &&
                         (state.getCurAdj() >= ProcessList.CACHED_APP_MIN_ADJ &&
                         state.getCurAdj() <= ProcessList.CACHED_APP_MAX_ADJ) &&
-// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
                             app.hasActivities()) {
                     Slog.d(TAG,"App adj change from previous state to cached state : "
-// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
                             + app.getPid() + " " + app.processName);
-// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
                     if (mPerf != null) {
-// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
                         int bgAppPerfLockArgs[] = {BoostFramework.MPCTLV3_GPU_IS_APP_BG, app.getPid()};
-// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
                         mPerf.perfLockAcquire(10, bgAppPerfLockArgs);
                     }
                 }
             }
-// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
+// QTI_END: 2020-07-09: Core: Hooks for background apps transition
             if (isBatchingOomAdj && mConstants.ENABLE_BATCHING_OOM_ADJ) {
                 mProcsToOomAdj.add(app);
             } else {
+// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                 if (mLazyLmkKillMainProc) {
                     String packageName = app.info.packageName;
                     String processName = app.processName;
@@ -2264,35 +2404,40 @@ public abstract class OomAdjuster {
                     if (app.info.isSystemApp()) {
                         isSystemApp = 1;
                     }
-                    mInjector.setOomAdjExt(app.getPid(), app.uid, app.mState.getCurAdj(), isSystemApp, isMainProc);
+// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+                    mInjector.setOomAdjExt(app.getPid(), app.uid, app.getCurAdj(), isSystemApp, isMainProc);
+// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                 } else {
-                    mInjector.setOomAdj(app.getPid(), app.uid, app.mState.getCurAdj());
+// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+                    mInjector.setOomAdj(app.getPid(), app.uid, app.getCurAdj());
+// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                 }
+// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             }
 
-            if (DEBUG_SWITCH || DEBUG_OOM_ADJ || mService.mCurOomAdjUid == app.info.uid) {
+            if (reportDebugMsgs) {
                 String msg = "Set " + app.getPid() + " " + app.processName + " adj "
                         + state.getCurAdj() + ": " + state.getAdjType();
                 reportOomAdjMessageLocked(TAG_OOM_ADJ, msg);
             }
             state.setSetAdj(state.getCurAdj());
             if (uidRec != null) {
-                uidRec.noteProcAdjChanged();
+                uidRec.setProcAdjChanged(true);
             }
             state.setVerifiedAdj(INVALID_ADJ);
         }
 
         final int curSchedGroup = state.getCurrentSchedulingGroup();
-        if (app.getWaitingToKill() != null && !app.mReceivers.isReceivingBroadcast()
+        if (app.getWaitingToKill() != null && !app.getReceivers().isReceivingBroadcast()
                 && ActivityManager.isProcStateBackground(state.getCurProcState())
-                && !state.hasStartedServices()) {
+                && !state.getHasStartedServices()) {
             app.killLocked(app.getWaitingToKill(), ApplicationExitInfo.REASON_USER_REQUESTED,
                     ApplicationExitInfo.SUBREASON_REMOVE_TASK, true);
             success = false;
         } else if (state.getSetSchedGroup() != curSchedGroup) {
             int oldSchedGroup = state.getSetSchedGroup();
             state.setSetSchedGroup(curSchedGroup);
-            if (DEBUG_SWITCH || DEBUG_OOM_ADJ || mService.mCurOomAdjUid == app.uid) {
+            if (reportDebugMsgs) {
                 String msg = "Setting sched group of " + app.processName
                         + " to " + curSchedGroup + ": " + state.getAdjType();
                 reportOomAdjMessageLocked(TAG_OOM_ADJ, msg);
@@ -2320,7 +2465,7 @@ public abstract class OomAdjuster {
             try {
                 final int renderThreadTid = app.getRenderThreadTid();
                 if (curSchedGroup == SCHED_GROUP_TOP_APP) {
-                    /* QTI_BEGIN */
+// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
                     if (mLegacyUiPerfHandler == -1) {
                         int hint = mPerf.getLegacyUiPerfHint(mService.mContext,
                                                              app.info.packageName);
@@ -2336,10 +2481,10 @@ public abstract class OomAdjuster {
                             mLegacyUiPerfHandler = -1;
                         }
                     }
-                    /* QTI_END */
+// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
                     // do nothing if we already switched to RT
                     if (oldSchedGroup != SCHED_GROUP_TOP_APP) {
-                        app.getWindowProcessController().onTopProcChanged();
+                        app.notifyTopProcChanged();
                         if (app.useFifoUiScheduling()) {
                             // Switch UI pipeline for app to SCHED_FIFO
                             state.setSavedPriority(Process.getThreadPriority(app.getPid()));
@@ -2360,7 +2505,7 @@ public abstract class OomAdjuster {
                     }
                 } else if (oldSchedGroup == SCHED_GROUP_TOP_APP
                         && curSchedGroup != SCHED_GROUP_TOP_APP) {
-                    app.getWindowProcessController().onTopProcChanged();
+                    app.notifyTopProcChanged();
                     if (app.useFifoUiScheduling()) {
                         // Reset UI pipeline to SCHED_OTHER
                         ActivityManagerService.setFifoPriority(app, false /* enable */);
@@ -2380,8 +2525,8 @@ public abstract class OomAdjuster {
                 }
             }
         }
-        if (state.hasRepForegroundActivities() != state.hasForegroundActivities()) {
-            state.setRepForegroundActivities(state.hasForegroundActivities());
+        if (state.getHasRepForegroundActivities() != state.getHasForegroundActivities()) {
+            state.setRepForegroundActivities(state.getHasForegroundActivities());
             changes |= ActivityManagerService.ProcessChangeItem.CHANGE_ACTIVITIES;
         }
 
@@ -2389,17 +2534,7 @@ public abstract class OomAdjuster {
 
         if (state.getReportedProcState() != state.getCurProcState()) {
             state.setReportedProcState(state.getCurProcState());
-            if (app.getThread() != null) {
-                try {
-                    if (false) {
-                        //RuntimeException h = new RuntimeException("here");
-                        Slog.i(TAG, "Sending new process state " + state.getReportedProcState()
-                                + " to " + app /*, h*/);
-                    }
-                    app.getThread().setProcessState(state.getReportedProcState());
-                } catch (RemoteException e) {
-                }
-            }
+            app.setProcessStateToThread(state.getReportedProcState());
         }
         boolean forceUpdatePssTime = false;
         if (state.getSetProcState() == PROCESS_STATE_NONEXISTENT
@@ -2415,13 +2550,13 @@ public abstract class OomAdjuster {
             }
         }
         synchronized (mService.mAppProfiler.mProfilerLock) {
-            app.mProfile.updateProcState(app.mState);
+            app.mProfile.updateProcState(app);
             mService.mAppProfiler.updateNextPssTimeLPf(
                     state.getCurProcState(), app.mProfile, now, forceUpdatePssTime);
         }
         int oldProcState = state.getSetProcState();
         if (state.getSetProcState() != state.getCurProcState()) {
-            if (DEBUG_SWITCH || DEBUG_OOM_ADJ || mService.mCurOomAdjUid == app.uid) {
+            if (reportDebugMsgs) {
                 String msg = "Proc state change of " + app.processName
                         + " to " + ProcessList.makeProcStateString(state.getCurProcState())
                         + " (" + state.getCurProcState() + ")" + ": " + state.getAdjType();
@@ -2448,10 +2583,8 @@ public abstract class OomAdjuster {
                     mService.setProcessTrackerStateLOSP(app,
                             mService.mProcessStats.getMemFactorLocked());
                 }
-            } else {
-                state.setProcStateChanged(true);
             }
-        } else if (state.hasReportedInteraction()) {
+        } else if (state.getHasReportedInteraction()) {
             final boolean fgsInteractionChangeEnabled = state.getCachedCompatChange(
                     CACHED_COMPAT_CHANGE_USE_SHORT_FGS_USAGE_INTERACTION_TIME);
             final long interactionThreshold = fgsInteractionChangeEnabled
@@ -2476,6 +2609,8 @@ public abstract class OomAdjuster {
 
         if (state.getCurCapability() != state.getSetCapability()) {
             state.setSetCapability(state.getCurCapability());
+            state.setSetCpuTimeReasons(state.getCurCpuTimeReasons());
+            state.setSetImplicitCpuTimeReasons(state.getCurImplicitCpuTimeReasons());
         }
 
         final boolean curBoundByNonBgRestrictedApp = state.isCurBoundByNonBgRestrictedApp();
@@ -2495,11 +2630,11 @@ public abstract class OomAdjuster {
             if (DEBUG_PROCESS_OBSERVERS) Slog.i(TAG_PROCESS_OBSERVERS,
                     "Changes in " + app + ": " + changes);
             mProcessList.enqueueProcessChangeItemLocked(app.getPid(), app.info.uid,
-                    changes, state.hasRepForegroundActivities());
+                    changes, state.getHasRepForegroundActivities());
             if (DEBUG_PROCESS_OBSERVERS) Slog.i(TAG_PROCESS_OBSERVERS,
                     "Enqueued process change item for "
                             + app.toShortString() + ": changes=" + changes
-                            + " foreground=" + state.hasRepForegroundActivities()
+                            + " foreground=" + state.getHasRepForegroundActivities()
                             + " type=" + state.getAdjType() + " source=" + state.getAdjSource()
                             + " target=" + state.getAdjTarget());
         }
@@ -2533,28 +2668,27 @@ public abstract class OomAdjuster {
     }
 
     @GuardedBy({"mService", "mProcLock"})
-    void setAttachingProcessStatesLSP(ProcessRecord app) {
+    void setAttachingProcessStatesLSP(ProcessRecordInternal app) {
         int initialSchedGroup = SCHED_GROUP_DEFAULT;
         int initialProcState = PROCESS_STATE_CACHED_EMPTY;
             // Avoid freezing a freshly attached process.
         int initialCapability = ALL_CPU_TIME_CAPABILITIES;
-        final ProcessStateRecord state = app.mState;
-        final int prevProcState = state.getCurProcState();
-        final int prevAdj = state.getCurRawAdj();
+        final int prevProcState = app.getCurProcState();
+        final int prevAdj = app.getCurRawAdj();
         // If the process has been marked as foreground, it is starting as the top app (with
         // Zygote#START_AS_TOP_APP_ARG), so boost the thread priority of its default UI thread.
-        if (state.hasForegroundActivities()) {
+        if (app.getHasForegroundActivities()) {
             try {
                 // The priority must be the same as how does {@link #applyOomAdjLSP} set for
                 // {@link SCHED_GROUP_TOP_APP}. We don't check render thread because it
                 // is not ready when attaching.
-                app.getWindowProcessController().onTopProcChanged();
+                app.notifyTopProcChanged();
                 if (app.useFifoUiScheduling()) {
                     mService.scheduleAsFifoPriority(app.getPid(), true);
                 } else {
                     mInjector.setThreadPriority(app.getPid(), THREAD_PRIORITY_TOP_APP_BOOST);
                 }
-                if (isScreenOnOrAnimatingLocked(state)) {
+                if (isScreenOnOrAnimatingLocked(app)) {
                     initialSchedGroup = SCHED_GROUP_TOP_APP;
                     initialProcState = PROCESS_STATE_TOP;
                 }
@@ -2564,15 +2698,17 @@ public abstract class OomAdjuster {
             }
         }
 
-        state.setCurrentSchedulingGroup(initialSchedGroup);
-        state.setCurProcState(initialProcState);
-        state.setCurRawProcState(initialProcState);
-        state.setCurCapability(initialCapability);
+        app.setCurrentSchedulingGroup(initialSchedGroup);
+        app.setCurProcState(initialProcState);
+        app.setCurRawProcState(initialProcState);
+        app.setCurCapability(initialCapability);
+        app.addCurCpuTimeReasons(CPU_TIME_REASON_OTHER);
+        app.addCurImplicitCpuTimeReasons(IMPLICIT_CPU_TIME_REASON_OTHER);
 
-        state.setCurAdj(ProcessList.FOREGROUND_APP_ADJ);
-        state.setCurRawAdj(ProcessList.FOREGROUND_APP_ADJ);
-        state.setForcingToImportant(null);
-        state.setHasShownUi(false);
+        app.setCurAdj(ProcessList.FOREGROUND_APP_ADJ);
+        app.setCurRawAdj(ProcessList.FOREGROUND_APP_ADJ);
+        app.setForcingToImportant(null);
+        app.setHasShownUi(false);
 
         onProcessStateChanged(app, prevProcState);
         onProcessOomAdjChanged(app, prevAdj);
@@ -2590,7 +2726,7 @@ public abstract class OomAdjuster {
 
     @GuardedBy({"mService", "mProcLock"})
     private void maybeUpdateUsageStatsLSP(ProcessRecord app, long nowElapsed) {
-        final ProcessStateRecord state = app.mState;
+        final ProcessRecordInternal state = app;
         if (DEBUG_USAGE_STATS) {
             Slog.d(TAG, "Checking proc [" + Arrays.toString(app.getPackageList())
                     + "] state changes: old = " + state.getSetProcState() + ", new = "
@@ -2627,7 +2763,7 @@ public abstract class OomAdjuster {
                 ? mConstants.USAGE_STATS_INTERACTION_INTERVAL_POST_S
                 : mConstants.USAGE_STATS_INTERACTION_INTERVAL_PRE_S;
         if (isInteraction
-                && (!state.hasReportedInteraction()
+                && (!state.getHasReportedInteraction()
                     || (nowElapsed - state.getInteractionEventTime()) > interactionThreshold)) {
             state.setInteractionEventTime(nowElapsed);
             String[] packages = app.getPackageList();
@@ -2638,13 +2774,13 @@ public abstract class OomAdjuster {
                 }
             }
         }
-        state.setReportedInteraction(isInteraction);
+        state.setHasReportedInteraction(isInteraction);
         if (!isInteraction) {
             state.setInteractionEventTime(0);
         }
     }
 
-    private void maybeUpdateLastTopTime(ProcessStateRecord state, long nowUptime) {
+    private void maybeUpdateLastTopTime(ProcessRecordInternal state, long nowUptime) {
         if (state.getSetProcState() <= PROCESS_STATE_TOP
                 && state.getCurProcState() > PROCESS_STATE_TOP) {
             state.setLastTopTime(nowUptime);
@@ -2768,16 +2904,16 @@ public abstract class OomAdjuster {
     /**
      * Return whether or not a process should be frozen.
      */
-    static boolean getFreezePolicy(ProcessRecord proc) {
+    static boolean getFreezePolicy(ProcessRecordInternal proc) {
         if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
-            if ((proc.mState.getCurCapability() & ALL_CPU_TIME_CAPABILITIES) != 0) {
+            if ((proc.getCurCapability() & ALL_CPU_TIME_CAPABILITIES) != 0) {
                 /// App is important enough (see {@link #getCpuCapability} and
                 /// {@link #getImplicitCpuCapability}) or bound by something important enough to
-                /// not be frozen (see {@link #getCpuCapabilityFromClient}).
+                /// not be frozen (see {@link #getCpuCapabilitiesFromClient}).
                 return false;
             }
 
-            if (proc.mOptRecord.isFreezeExempt()) {
+            if (proc.isFreezeExempt()) {
                 return false;
             }
 
@@ -2786,16 +2922,16 @@ public abstract class OomAdjuster {
         } else {
             // The CPU capability handling covers all setShouldNotFreeze paths. Must check
             // shouldNotFreeze, if the CPU capability is not being used.
-            if (proc.mOptRecord.shouldNotFreeze()) {
+            if (proc.shouldNotFreeze()) {
                 return false;
             }
 
-            if (proc.mOptRecord.isFreezeExempt()) {
+            if (proc.isFreezeExempt()) {
                 return false;
             }
 
             // Reasons to freeze:
-            if (proc.mState.getCurAdj() >= CACHED_APP_MIN_ADJ) {
+            if (proc.getCurAdj() >= CACHED_APP_MIN_ADJ) {
                 // Oomscore is in a high enough state, it is safe to freeze.
                 return true;
             }
@@ -2806,43 +2942,43 @@ public abstract class OomAdjuster {
     }
 
     @GuardedBy({"mService", "mProcLock"})
-    void updateAppFreezeStateLSP(ProcessRecord app, @OomAdjReason int oomAdjReason,
+    void updateAppFreezeStateLSP(ProcessRecordInternal app, @OomAdjReason int oomAdjReason,
             boolean immediate, int oldOomAdj) {
         if (!mCachedAppOptimizer.useFreezer()) {
             return;
         }
 
         final boolean freezePolicy = getFreezePolicy(app);
-        final ProcessCachedOptimizerRecord opt = app.mOptRecord;
-        final ProcessStateRecord state = app.mState;
         if (Flags.traceUpdateAppFreezeStateLsp()) {
-            final boolean oomAdjChanged = (state.getCurAdj() >= mConstants.FREEZER_CUTOFF_ADJ
+            final boolean oomAdjChanged = (app.getCurAdj() >= mConstants.FREEZER_CUTOFF_ADJ
                     ^ oldOomAdj >= mConstants.FREEZER_CUTOFF_ADJ) || oldOomAdj == UNKNOWN_ADJ;
-            final boolean shouldNotFreezeChanged = opt.shouldNotFreezeAdjSeq() == mAdjSeq;
+            final boolean shouldNotFreezeChanged = app.shouldNotFreezeAdjSeq() == mAdjSeq;
             final boolean hasCpuCapability =
-                    (PROCESS_CAPABILITY_CPU_TIME & app.mState.getCurCapability())
+                    (PROCESS_CAPABILITY_CPU_TIME & app.getCurCapability())
                             == PROCESS_CAPABILITY_CPU_TIME;
             final boolean usedToHaveCpuCapability =
-                    (PROCESS_CAPABILITY_CPU_TIME & app.mState.getSetCapability())
+                    (PROCESS_CAPABILITY_CPU_TIME & app.getSetCapability())
                             == PROCESS_CAPABILITY_CPU_TIME;
             final boolean cpuCapabilityChanged = hasCpuCapability != usedToHaveCpuCapability;
             final boolean hasImplicitCpuCapability =
-                    (PROCESS_CAPABILITY_IMPLICIT_CPU_TIME & app.mState.getCurCapability())
+                    (PROCESS_CAPABILITY_IMPLICIT_CPU_TIME & app.getCurCapability())
                             == PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
             final boolean usedToHaveImplicitCpuCapability =
-                    (PROCESS_CAPABILITY_IMPLICIT_CPU_TIME & app.mState.getSetCapability())
+                    (PROCESS_CAPABILITY_IMPLICIT_CPU_TIME & app.getSetCapability())
                             == PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
             final boolean implicitCpuCapabilityChanged =
                     hasImplicitCpuCapability != usedToHaveImplicitCpuCapability;
+            final int cpuTimeReasons = app.getCurCpuTimeReasons();
+            final int implicitCpuTimeReasons = app.getCurImplicitCpuTimeReasons();
             if ((oomAdjChanged || shouldNotFreezeChanged || cpuCapabilityChanged
                     || implicitCpuCapabilityChanged)
                     && Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                 Trace.instantForTrack(Trace.TRACE_TAG_ACTIVITY_MANAGER,
                         "FreezeLite",
-                        (opt.isFrozen() ? "F" : "-")
-                        + (opt.isPendingFreeze() ? "P" : "-")
-                        + (opt.isFreezeExempt() ? "E" : "-")
-                        + (opt.shouldNotFreeze() ? "N" : "-")
+                        (app.isFrozen() ? "F" : "-")
+                        + (app.isPendingFreeze() ? "P" : "-")
+                        + (app.isFreezeExempt() ? "E" : "-")
+                        + (app.shouldNotFreeze() ? "N" : "-")
                         + (hasCpuCapability ? "T" : "-")
                         + (hasImplicitCpuCapability ? "X" : "-")
                         + (immediate ? "I" : "-")
@@ -2850,54 +2986,59 @@ public abstract class OomAdjuster {
                         + (Flags.cpuTimeCapabilityBasedFreezePolicy() ? "t" : "-")
                         + (Flags.prototypeAggressiveFreezing() ? "a" : "-")
                         + "/" + app.getPid()
-                        + "/" + state.getCurAdj()
+                        + "/" + app.getCurAdj()
                         + "/" + oldOomAdj
-                        + "/" + opt.shouldNotFreezeReason());
+                        + "/" + app.shouldNotFreezeReason()
+                        + "/" + cpuTimeReasons
+                        + "/" + implicitCpuTimeReasons);
                 Trace.instantForTrack(Trace.TRACE_TAG_ACTIVITY_MANAGER,
                         CachedAppOptimizer.ATRACE_FREEZER_TRACK,
                         "updateAppFreezeStateLSP " + app.processName
                         + " pid: " + app.getPid()
-                        + " isFreezeExempt: " + opt.isFreezeExempt()
-                        + " isFrozen: " + opt.isFrozen()
-                        + " shouldNotFreeze: " + opt.shouldNotFreeze()
-                        + " shouldNotFreezeReason: " + opt.shouldNotFreezeReason()
-                        + " curAdj: " + state.getCurAdj()
+                        + " isFreezeExempt: " + app.isFreezeExempt()
+                        + " isFrozen: " + app.isFrozen()
+                        + " shouldNotFreeze: " + app.shouldNotFreeze()
+                        + " shouldNotFreezeReason: " + app.shouldNotFreezeReason()
+                        + " curAdj: " + app.getCurAdj()
                         + " oldOomAdj: " + oldOomAdj
                         + " immediate: " + immediate
                         + " cpuCapability: " + hasCpuCapability
-                        + " implicitCpuCapability: " + hasImplicitCpuCapability);
+                        + " implicitCpuCapability: " + hasImplicitCpuCapability
+                        + " cpuTimeReasons: 0x" + Integer.toHexString(cpuTimeReasons)
+                        + " implicitCpuTimeReasons: 0x"
+                                + Integer.toHexString(implicitCpuTimeReasons));
             }
         }
 
+        // TODO: b/425766486 - Consider how to pass ProcessRecordInternal to CachedAppOptimizer.
         if (freezePolicy) {
             // This process should be frozen.
-            if (immediate && !opt.isFrozen()) {
+            if (immediate && !app.isFrozen()) {
                 // And it will be frozen immediately.
-                mCachedAppOptimizer.freezeAppAsyncAtEarliestLSP(app);
-            } else if (!opt.isFrozen() || !opt.isPendingFreeze()) {
-                mCachedAppOptimizer.freezeAppAsyncLSP(app);
+                mCachedAppOptimizer.freezeAppAsyncAtEarliestLSP((ProcessRecord) app);
+            } else if (!app.isFrozen() && !app.isPendingFreeze()) {
+                mCachedAppOptimizer.freezeAppAsyncLSP((ProcessRecord) app);
             }
         } else {
             // This process should not be frozen.
-            if (opt.isFrozen() || opt.isPendingFreeze()) {
-                mCachedAppOptimizer.unfreezeAppLSP(app,
+            if (app.isFrozen() || app.isPendingFreeze()) {
+                mCachedAppOptimizer.unfreezeAppLSP((ProcessRecord) app,
                         CachedAppOptimizer.getUnfreezeReasonCodeFromOomAdjReason(oomAdjReason));
             }
         }
     }
 
     @GuardedBy("mService")
-    void unfreezeTemporarily(ProcessRecord app, @OomAdjReason int reason) {
+    void unfreezeTemporarily(ProcessRecordInternal app, @OomAdjReason int reason) {
         if (!mCachedAppOptimizer.useFreezer()) {
             return;
         }
 
-        final ProcessCachedOptimizerRecord opt = app.mOptRecord;
-        if (!opt.isFrozen() && !opt.isPendingFreeze()) {
+        if (!app.isFrozen() && !app.isPendingFreeze()) {
             return;
         }
 
-        final ArrayList<ProcessRecord> processes = mTmpProcessList;
+        final ArrayList<ProcessRecordInternal> processes = mTmpProcessList;
 
         if (Flags.consolidateCollectReachable()) {
             processes.add(app);
@@ -2905,15 +3046,15 @@ public abstract class OomAdjuster {
                 collectReachableProcessesLSP(processes);
             }
         } else {
-            final ActiveUids uids = mTmpUidRecords;
             mTmpProcessSet.add(app);
-            collectReachableProcessesLocked(mTmpProcessSet, processes, uids);
+            collectReachableProcessesLocked(mTmpProcessSet, processes);
             mTmpProcessSet.clear();
         }
         // Now processes contains app's downstream and app
         final int size = processes.size();
         for (int i = 0; i < size; i++) {
-            ProcessRecord proc = processes.get(i);
+            // TODO: b/425766486 - Consider how to pass ProcessRecordInternal to CachedAppOptimizer.
+            ProcessRecord proc = (ProcessRecord) processes.get(i);
             mCachedAppOptimizer.unfreezeTemporarily(proc,
                     CachedAppOptimizer.getUnfreezeReasonCodeFromOomAdjReason(reason));
         }
@@ -2921,19 +3062,19 @@ public abstract class OomAdjuster {
     }
 
     @GuardedBy("mService")
-    abstract void onProcessEndLocked(@NonNull ProcessRecord app);
+    abstract void onProcessEndLocked(@NonNull ProcessRecordInternal app);
 
     /**
      * Called when the process state is changed outside of the OomAdjuster.
      */
     @GuardedBy("mService")
-    abstract void onProcessStateChanged(@NonNull ProcessRecord app, int prevProcState);
+    abstract void onProcessStateChanged(@NonNull ProcessRecordInternal app, int prevProcState);
 
     /**
      * Called when the oom adj is changed outside of the OomAdjuster.
      */
     @GuardedBy("mService")
-    abstract void onProcessOomAdjChanged(@NonNull ProcessRecord app, int prevAdj);
+    abstract void onProcessOomAdjChanged(@NonNull ProcessRecordInternal app, int prevAdj);
 
     @VisibleForTesting
     abstract void resetInternal();
@@ -2944,7 +3085,7 @@ public abstract class OomAdjuster {
      * connection.
      */
     @GuardedBy("mService")
-    boolean evaluateServiceConnectionAdd(ProcessRecord client, ProcessRecord app,
+    boolean evaluateServiceConnectionAdd(ProcessRecordInternal client, ProcessRecordInternal app,
             ConnectionRecord cr) {
         if (evaluateConnectionPrelude(client, app)) {
             return true;
@@ -2971,7 +3112,7 @@ public abstract class OomAdjuster {
         } else if (cr.hasFlag(Context.BIND_WAIVE_PRIORITY | Context.BIND_ALLOW_OOM_MANAGEMENT)) {
             // These bind flags can grant the shouldNotFreeze state to the service.
             needDryRun = true;
-        } else if (client.mOptRecord.shouldNotFreeze() && !app.mOptRecord.shouldNotFreeze()) {
+        } else if (client.shouldNotFreeze() && !app.shouldNotFreeze()) {
             // The shouldNotFreeze state can be propagated and needs to be checked.
             needDryRun = true;
         }
@@ -2986,8 +3127,8 @@ public abstract class OomAdjuster {
     }
 
     @GuardedBy("mService")
-    boolean evaluateServiceConnectionRemoval(ProcessRecord client, ProcessRecord app,
-            ConnectionRecord cr) {
+    boolean evaluateServiceConnectionRemoval(ProcessRecordInternal client,
+            ProcessRecordInternal app, ConnectionRecord cr) {
         if (evaluateConnectionPrelude(client, app)) {
             return true;
         }
@@ -3003,7 +3144,7 @@ public abstract class OomAdjuster {
             return true;
         } else if (cr.hasFlag(Context.BIND_WAIVE_PRIORITY | Context.BIND_ALLOW_OOM_MANAGEMENT)) {
             return true;
-        } else if (app.mOptRecord.shouldNotFreeze() && client.mOptRecord.shouldNotFreeze()) {
+        } else if (app.shouldNotFreeze() && client.shouldNotFreeze()) {
             // Process has shouldNotFreeze and it could have gotten it from the client.
             return true;
         } else if (Flags.cpuTimeCapabilityBasedFreezePolicy()
@@ -3015,7 +3156,7 @@ public abstract class OomAdjuster {
     }
 
     @GuardedBy("mService")
-    boolean evaluateProviderConnectionAdd(ProcessRecord client, ProcessRecord app) {
+    boolean evaluateProviderConnectionAdd(ProcessRecordInternal client, ProcessRecordInternal app) {
         if (evaluateConnectionPrelude(client, app)) {
             return true;
         }
@@ -3025,7 +3166,7 @@ public abstract class OomAdjuster {
             needDryRun = true;
         } else if (app.getSetProcState() > client.getSetProcState()) {
             needDryRun = true;
-        } else if (client.mOptRecord.shouldNotFreeze() && !app.mOptRecord.shouldNotFreeze()) {
+        } else if (client.shouldNotFreeze() && !app.shouldNotFreeze()) {
             needDryRun = true;
         } else if (Flags.cpuTimeCapabilityBasedFreezePolicy()
                 && (client.getSetCapability() & ~app.getSetCapability()
@@ -3041,7 +3182,8 @@ public abstract class OomAdjuster {
     }
 
     @GuardedBy("mService")
-    boolean evaluateProviderConnectionRemoval(ProcessRecord client, ProcessRecord app) {
+    boolean evaluateProviderConnectionRemoval(ProcessRecordInternal client,
+            ProcessRecordInternal app) {
         if (evaluateConnectionPrelude(client, app)) {
             return true;
         }
@@ -3050,7 +3192,7 @@ public abstract class OomAdjuster {
             return true;
         } else if (app.getSetProcState() >= client.getSetProcState()) {
             return true;
-        } else if (app.mOptRecord.shouldNotFreeze() && client.mOptRecord.shouldNotFreeze()) {
+        } else if (app.shouldNotFreeze() && client.shouldNotFreeze()) {
             // Process has shouldNotFreeze and it could have gotten it from the client.
             return true;
         } else if (Flags.cpuTimeCapabilityBasedFreezePolicy()
@@ -3062,7 +3204,8 @@ public abstract class OomAdjuster {
         return false;
     }
 
-    private boolean evaluateConnectionPrelude(ProcessRecord client, ProcessRecord app) {
+    private boolean evaluateConnectionPrelude(ProcessRecordInternal client,
+            ProcessRecordInternal app) {
         if (client == null || app == null) {
             return true;
         }
@@ -3074,7 +3217,7 @@ public abstract class OomAdjuster {
     }
 
     @GuardedBy("mService")
-    protected void maybeSetProcessFollowUpUpdateLocked(ProcessRecord proc,
+    protected void maybeSetProcessFollowUpUpdateLocked(ProcessRecordInternal proc,
             long updateUptimeMs, long now) {
         if (updateUptimeMs <= now) {
             // Time sensitive period has already passed. No need to schedule a follow up.
@@ -3082,7 +3225,7 @@ public abstract class OomAdjuster {
         }
 
         mFollowUpUpdateSet.add(proc);
-        proc.mState.setFollowupUpdateUptimeMs(updateUptimeMs);
+        proc.setFollowupUpdateUptimeMs(updateUptimeMs);
 
         scheduleFollowUpOomAdjusterUpdateLocked(updateUptimeMs, now);
     }

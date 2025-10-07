@@ -72,20 +72,22 @@ constructor(
                 numberOfChildren ?: 0,
             )
 
+    val headerContentDescription: String
+        get() =
+            context.resources.getString(
+                R.string.notification_bundle_header_joined_description,
+                context.resources.getString(titleText),
+                numberOfChildrenContentDescription,
+            )
+
     /** Filters the list of AppData based on time of last collapse by user. */
     private fun filterByCollapseTime(
         rawAppDataList: List<AppData>,
         collapseTime: Long,
     ): List<AppData> {
-        return if (collapseTime == 0L) {
-            rawAppDataList
-        } else {
-            rawAppDataList.filter { appData ->
-                val addedTime = appData.timeAddedToBundle
-                val shouldKeep = addedTime > collapseTime
-                shouldKeep
-            }
-        }
+        // Always show app icons in bundle header
+        // and keep filtering infra for now
+        return rawAppDataList
     }
 
     /** Converts a list of AppData to a list of Drawables by fetching icons */
@@ -120,11 +122,16 @@ constructor(
             if (isExpanded) BundleHeader.Scenes.Expanded else BundleHeader.Scenes.Collapsed,
             composeScope!!,
         )
+        if (!isExpanded) {
+            repository.lastCollapseTime = systemClock.uptimeMillis()
+        }
     }
 
     fun setTargetScene(scene: SceneKey) {
         state?.setTargetScene(scene, composeScope!!)
-        if (state?.currentScene == BundleHeader.Scenes.Collapsed) {
+
+        // [setTargetScene] does not immediately update [currentScene] so we must check [scene]
+        if (scene == BundleHeader.Scenes.Collapsed) {
             repository.lastCollapseTime = systemClock.uptimeMillis()
         }
     }

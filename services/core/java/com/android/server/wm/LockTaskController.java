@@ -472,7 +472,9 @@ public class LockTaskController {
         // 3. Telephony then starts the default package for making the call
         final TelecomManager tm = getTelecomManager();
         final String dialerPackage = tm != null ? tm.getSystemDialerPackage() : null;
-        if (dialerPackage != null && dialerPackage.equals(intent.getComponent().getPackageName())) {
+        final String intentPackage =
+                intent.getComponent() == null ? null : intent.getComponent().getPackageName();
+        if (dialerPackage != null && dialerPackage.equals(intentPackage)) {
             return true;
         }
 
@@ -677,8 +679,7 @@ public class LockTaskController {
                 stopLockTaskMode(/* task= */ null, /* stopAppPinning= */ true, callingUid);
             }
         }
-
-        // When a task is locked, dismiss the root pinned task if it exists 
+        // When a task is locked, dismiss the root pinned task if it exists
         mSupervisor.mRootWindowContainer.removeRootTasksInWindowingModes(WINDOWING_MODE_PINNED);
 
         // System can only initiate screen pinning, not full lock task mode

@@ -23,7 +23,9 @@ import android.telephony.TelephonyManager.NETWORK_TYPE_UMTS
 import com.android.settingslib.SignalIcon.MobileIconGroup
 import com.android.settingslib.mobile.TelephonyIcons
 import com.android.systemui.log.table.TableLogBuffer
+// QTI_BEGIN: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
+// QTI_END: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.util.MobileMappingsProxy
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,12 +93,14 @@ class FakeMobileIconsInteractor(
 
     override val isDeviceInEmergencyCallsOnlyMode = MutableStateFlow(false)
 
+// QTI_BEGIN: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
     override val showVowifiIcon = MutableStateFlow(false)
     override val showVolteIcon = MutableStateFlow(false)
     override val networkTypeIconCustomization = MutableStateFlow(MobileIconCustomizationMode())
     override val hideNoInternetState = MutableStateFlow(false)
     override val alwaysUseRsrpLevelForLte = MutableStateFlow(false)
 
+// QTI_END: 2025-04-07: Data: SystemUI: Readapt Mobile Icon Features For Kairos(2/2)
     override fun getMobileConnectionInteractorForSubId(subId: Int): FakeMobileIconInteractor {
         return interactorCache
             .getOrElse(subId) { FakeMobileIconInteractor(tableLogBuffer) }

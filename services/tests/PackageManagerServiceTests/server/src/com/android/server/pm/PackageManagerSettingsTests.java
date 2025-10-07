@@ -60,7 +60,6 @@ import android.os.PersistableBundle;
 import android.os.Process;
 import android.os.UserHandle;
 import android.platform.test.annotations.Presubmit;
-import android.platform.test.annotations.RequiresFlagsDisabled;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
 import android.platform.test.flag.junit.DeviceFlagsValueProvider;
@@ -681,20 +680,6 @@ public class PackageManagerSettingsTests {
         assertThat(readPus3.getDistractionFlags(), is(distractionFlags3));
     }
 
-    @RequiresFlagsDisabled(android.sdk.Flags.FLAG_MAJOR_MINOR_VERSIONING_SCHEME)
-    @Test
-    public void testReadSettingsVersionCodeWithNoSdkVersionFull_zero() {
-        /* write out files and read */
-        writeNoSdkVersionFullPackageFile();
-        Settings settings = makeSettings();
-        assertThat(settings.readLPw(computer, createFakeUsers()), is(true));
-
-        assertThat(settings.getInternalVersion().sdkVersion,
-                is(Build.VERSION.SDK_INT));
-        assertThat(settings.getInternalVersion().sdkVersionFull, is(0));
-    }
-
-    @RequiresFlagsEnabled(android.sdk.Flags.FLAG_MAJOR_MINOR_VERSIONING_SCHEME)
     @Test
     public void testReadSettingsVersionCodeWithNoSdkVersionFull_fromSdkVersion() {
         /* write out files and read */
@@ -702,13 +687,12 @@ public class PackageManagerSettingsTests {
         Settings settings = makeSettings();
         assertThat(settings.readLPw(computer, createFakeUsers()), is(true));
 
-        assertThat(settings.getInternalVersion().sdkVersion,
-                is(Build.VERSION.SDK_INT));
+        final int expectedSdkInt = 36;
+        assertThat(settings.getInternalVersion().sdkVersion, is(expectedSdkInt));
         assertThat(settings.getInternalVersion().sdkVersionFull,
-                is(Build.parseFullVersion(String.valueOf(Build.VERSION.SDK_INT))));
+                is(Build.parseFullVersion(String.valueOf(expectedSdkInt))));
     }
 
-    @RequiresFlagsEnabled(android.sdk.Flags.FLAG_MAJOR_MINOR_VERSIONING_SCHEME)
     @Test
     public void testReadWriteSettingsVersionCodeWithSdkVersionFull() {
         final Settings settingsUnderTest = makeSettings();
@@ -726,18 +710,6 @@ public class PackageManagerSettingsTests {
         assertThat(readVersionInfo.sdkVersion, is(Build.VERSION.SDK_INT));
     }
 
-    @RequiresFlagsDisabled(android.sdk.Flags.FLAG_MAJOR_MINOR_VERSIONING_SCHEME)
-    @Test
-    public void testSettingsGetInternalVersionNoSdkVersionFull() {
-        final Settings settingsUnderTest = makeSettings();
-        settingsUnderTest.writeLPr(computer, /*sync=*/ true);
-        assertThat(settingsUnderTest.readLPw(computer, createFakeUsers()), is(true));
-        assertThat(settingsUnderTest.getInternalVersion().sdkVersionFull, is(0));
-        assertThat(settingsUnderTest.getInternalVersion().sdkVersion,
-                is(Build.VERSION.SDK_INT));
-    }
-
-    @RequiresFlagsEnabled(android.sdk.Flags.FLAG_MAJOR_MINOR_VERSIONING_SCHEME)
     @Test
     public void testSettingsGetInternalVersionWithSdkVersionFull() {
         final Settings settingsUnderTest = makeSettings();
@@ -2583,7 +2555,7 @@ public class PackageManagerSettingsTests {
                 ("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>"
                         + "<packages>"
                         + "<version sdkVersion=\"36\" databaseVersion=\"3\" buildFingerprint=\"123456:userdebug\" fingerprint=\"64bc7e5656eb8ec3821157973e6eee7449333661\" />"
-                        + "<version volumeUuid=\"primary_physical\" sdkVersion=\"36\" databaseVersion=\"3\" buildFingerprint=\"123456:userdebug\""
+                        + "<version volumeUuid=\"primary_physical\" sdkVersion=\"36\" databaseVersion=\"3\" buildFingerprint=\"123456:userdebug\" />"
                         + "<permission-trees>"
                         + "<item name=\"com.google.android.permtree\" package=\"com.google.android.permpackage\" />"
                         + "</permission-trees>"

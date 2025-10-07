@@ -2750,6 +2750,13 @@ public class Intent implements Parcelable, Cloneable {
      * To receive this broadcast, your receiver component must be marked as
      * being {@link ComponentInfo#directBootAware}.
      * <p class="note">
+     *
+     * <p>
+     * Starting from Android {@link Build.VERSION_CODES#VANILLA_ICE_CREAM}, this broadcast is
+     * not only sent after the device boots but also delivered to an app when it is
+     * removed from the {@link ApplicationInfo#FLAG_STOPPED Stopped} state, such as the first
+     * launch after force-stopping the app.
+     *
      * This is a protected intent that can only be sent by the system.
      *
      * @see Context#createDeviceProtectedStorageContext()
@@ -2773,6 +2780,13 @@ public class Intent implements Parcelable, Cloneable {
      * their lock pattern or PIN for the first time), you can listen for the
      * {@link #ACTION_LOCKED_BOOT_COMPLETED} broadcast.
      * <p class="note">
+     *
+     * <p>
+     * Starting from Android {@link Build.VERSION_CODES#VANILLA_ICE_CREAM}, this broadcast is
+     * not only sent after the device boots but also delivered to an app when it is
+     * removed from the {@link ApplicationInfo#FLAG_STOPPED Stopped} state and the user is
+     * unlocked, such as the first launch after force-stopping the app.
+     *
      * This is a protected intent that can only be sent by the system.
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
@@ -3243,7 +3257,7 @@ public class Intent implements Parcelable, Cloneable {
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_PACKAGE_NEEDS_VERIFICATION = "android.intent.action.PACKAGE_NEEDS_VERIFICATION";
 
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
     /**
      * Broadcast Action: Sent to the optional package verifier when a package
      * needs to be verified. The data contains the package URI.
@@ -3256,7 +3270,7 @@ public class Intent implements Parcelable, Cloneable {
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_PACKAGE_NEEDS_OPTIONAL_VERIFICATION = "com.qualcomm.qti.intent.action.PACKAGE_NEEDS_OPTIONAL_VERIFICATION";
 
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
     /**
      * Broadcast Action: Sent to the system package verifier when a package is
      * verified. The data contains the package URI.
@@ -3747,7 +3761,7 @@ public class Intent implements Parcelable, Cloneable {
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_MEDIA_UNMOUNTABLE = "android.intent.action.MEDIA_UNMOUNTABLE";
 
-   /**
+    /**
      * Broadcast Action:  User has expressed the desire to remove the external storage media.
      * Applications should close all files they have open within the mount point when they receive this intent.
      * The path to the mount point for the media to be ejected is contained in the Intent.mData field.
@@ -3762,7 +3776,7 @@ public class Intent implements Parcelable, Cloneable {
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_MEDIA_SCANNER_STARTED = "android.intent.action.MEDIA_SCANNER_STARTED";
 
-   /**
+    /**
      * Broadcast Action:  The media scanner has finished scanning a directory.
      * The path to the scanned directory is contained in the Intent.mData field.
      */
@@ -3783,7 +3797,7 @@ public class Intent implements Parcelable, Cloneable {
     @Deprecated
     public static final String ACTION_MEDIA_SCANNER_SCAN_FILE = "android.intent.action.MEDIA_SCANNER_SCAN_FILE";
 
-   /**
+    /**
      * Broadcast Action:  The "Media Button" was pressed.  Includes a single
      * extra field, {@link #EXTRA_KEY_EVENT}, containing the key event that
      * caused the broadcast.
@@ -13006,7 +13020,7 @@ public class Intent implements Parcelable, Cloneable {
         if (mComponent != null) {
             out.attribute(null, ATTR_COMPONENT, mComponent.flattenToShortString());
         }
-        if (android.content.flags.Flags.intentSaveToXmlPackage() && mPackage != null) {
+        if (mPackage != null) {
             out.attribute(null, ATTR_PACKAGE, mPackage);
         }
         out.attribute(null, ATTR_FLAGS, Integer.toHexString(getFlags()));
@@ -13042,8 +13056,7 @@ public class Intent implements Parcelable, Cloneable {
                 intent.setComponent(ComponentName.unflattenFromString(attrValue));
             } else if (ATTR_FLAGS.equals(attrName)) {
                 intent.setFlags(Integer.parseInt(attrValue, 16));
-            } else if (android.content.flags.Flags.intentSaveToXmlPackage()
-                    && ATTR_PACKAGE.equals(attrName)) {
+            } else if (ATTR_PACKAGE.equals(attrName)) {
                 intent.setPackage(attrValue);
             } else {
                 Log.e(TAG, "restoreFromXml: unknown attribute=" + attrName);
@@ -13178,9 +13191,9 @@ public class Intent implements Parcelable, Cloneable {
                 case ACTION_MEDIA_SCANNER_SCAN_FILE:
                 case ACTION_PACKAGE_NEEDS_VERIFICATION:
                 case ACTION_PACKAGE_NEEDS_INTEGRITY_VERIFICATION:
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
                 case ACTION_PACKAGE_NEEDS_OPTIONAL_VERIFICATION:
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
                 case ACTION_PACKAGE_VERIFIED:
                 case ACTION_PACKAGE_ENABLE_ROLLBACK:
                     // Ignore legacy actions

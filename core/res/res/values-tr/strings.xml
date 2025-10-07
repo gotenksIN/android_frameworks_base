@@ -71,13 +71,18 @@
     <string name="CLIRDefaultOnNextCallOff" msgid="5036749051007098105">"Arayan kimliği varsayılanları kısıtlanmıştır. Sonraki çağrı: Kısıtlanmamış"</string>
     <string name="CLIRDefaultOffNextCallOn" msgid="1022781126694885017">"Arayan kimliği varsayılanları kısıtlanmamıştır. Sonraki çağrı: Kısıtlanmış"</string>
     <string name="CLIRDefaultOffNextCallOff" msgid="2491576172356463443">"Arayan kimliği varsayılanları kısıtlanmamıştır. Sonraki çağrı: Kısıtlanmamış"</string>
-    <string name="page_size_compat_apk_warning" msgid="2982396798449041224">"Bu uygulama 16 KB ile uyumlu değil. APK uyumluluk kontrolü başarısız oldu. Bu uygulama, sayfa boyutuna uyumlu mod kullanılarak çalıştırılacak. En iyi uyumluluk için lütfen uygulamayı 16 KB desteğiyle yeniden derleyin. Daha fazla bilgi için &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresini ziyaret edin."</string>
-    <string name="page_size_compat_elf_warning" msgid="6753874059564812651">"Bu uygulama 16 KB ile uyumlu değil. ELF uyumluluk kontrolü başarısız oldu. Bu uygulama, sayfa boyutuna uyumlu mod kullanılarak çalıştırılacak. En iyi uyumluluk için lütfen uygulamayı 16 KB desteğiyle yeniden derleyin. Daha fazla bilgi için &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresini ziyaret edin."</string>
-    <string name="page_size_compat_apk_and_elf_warning" msgid="7628675779500605390">"Bu uygulama 16 KB ile uyumlu değil. APK ve ELF uyumluluk kontrolleri başarısız oldu. Bu uygulama, sayfa boyutuna uyumlu mod kullanılarak çalıştırılacak. En iyi uyumluluk için lütfen uygulamayı 16 KB desteğiyle yeniden derleyin. Daha fazla bilgi için &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresini ziyaret edin."</string>
-    <string name="page_size_compat_apk_warning_4kb" msgid="2104642120436642689">"Bu uyarı, şu anda test edilmekte olan hata ayıklanabilir bir uygulama olduğu için gösteriliyor. Geliştirici değilseniz lütfen bunu geliştiriciye bildirin ve hata ayıklanamayan bir uygulama isteyin. Bu uygulama 16 KB ile uyumlu değil. APK uyumluluk kontrolü başarısız oldu. Lütfen &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresindeki adımları uygulayın."</string>
-    <string name="page_size_compat_elf_warning_4kb" msgid="8038334656395476900">"Bu uyarı, şu anda test edilmekte olan hata ayıklanabilir bir uygulama olduğu için gösteriliyor. Geliştirici değilseniz lütfen bunu geliştiriciye bildirin ve hata ayıklanamayan bir uygulama isteyin. Bu uygulama 16 KB ile uyumlu değil. ELF uyumluluk kontrolü başarısız oldu. Lütfen &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresindeki adımları uygulayın."</string>
-    <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="5417036941497610850">"Bu uyarı, şu anda test edilmekte olan hata ayıklanabilir bir uygulama olduğu için gösteriliyor. Geliştirici değilseniz lütfen bunu geliştiriciye bildirin ve hata ayıklanamayan bir uygulama isteyin. Bu uygulama 16 KB ile uyumlu değil. APK ve ELF uyumluluk kontrolleri başarısız oldu. Lütfen &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresindeki adımları uygulayın."</string>
+    <string name="page_size_compat_apk_warning" msgid="2297836366674721648">"Bu uygulama 16 KB ile uyumlu değil. APK uyumluluk kontrolü başarısız oldu. Bu uygulama, sayfa boyutuna uyumlu mod kullanılarak çalıştırılacak. En iyi uyumluluk için lütfen uygulamayı 16 KB desteğiyle yeniden derleyin. Daha fazla bilgi için &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresini ziyaret edin.&lt;br&gt;&lt;br&gt; Aşağıdaki kitaplıklar 16 KB ile uyumlu değil: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_elf_warning" msgid="8613720928493005883">"Bu uygulama 16 KB ile uyumlu değil. ELF uyumluluk kontrolü başarısız oldu. Bu uygulama, sayfa boyutuna uyumlu mod kullanılarak çalıştırılacak. En iyi uyumluluk için lütfen uygulamayı 16 KB desteğiyle yeniden derleyin. Daha fazla bilgi için &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresini ziyaret edin.&lt;br&gt;&lt;br&gt; Aşağıdaki kitaplıklar 16 KB ile uyumlu değil: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_warning" msgid="9034695801295605229">"Bu uygulama 16 KB ile uyumlu değil. APK ve ELF uyumluluk kontrolleri başarısız oldu. Bu uygulama, sayfa boyutuna uyumlu mod kullanılarak çalıştırılacak. En iyi uyumluluk için lütfen uygulamayı 16 KB desteğiyle yeniden derleyin. Daha fazla bilgi için &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresini ziyaret edin.&lt;br&gt;&lt;br&gt; Aşağıdaki kitaplıklar 16 KB ile uyumlu değil: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_warning_4kb" msgid="5676451039424864495">"Bu uyarı, kullanılan uygulamanın şu anda test edilmekte olan hata ayıklanabilir bir uygulama olması nedeniyle gösteriliyor. Geliştirici değilseniz lütfen bunu geliştiriciye bildirin ve hata ayıklama yapılmayan bir uygulama isteyin. &lt;br&gt;&lt;br&gt; Bu uygulama 16 KB ile uyumlu değil. APK uyumluluk kontrolü başarısız oldu. Lütfen &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresindeki adımları uygulayın. &lt;br&gt;&lt;br&gt; Aşağıdaki kitaplıklar 16 KB ile uyumlu değil: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_elf_warning_4kb" msgid="5005239480522831311">"Bu uyarı, kullanılan uygulamanın şu anda test edilmekte olan hata ayıklanabilir bir uygulama olması nedeniyle gösteriliyor. Geliştirici değilseniz lütfen bunu geliştiriciye bildirin ve hata ayıklama yapılmayan bir uygulama isteyin. &lt;br&gt;&lt;br&gt; Bu uygulama 16 KB ile uyumlu değil. ELF uyumluluk kontrolü başarısız oldu. Lütfen &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresindeki adımları uygulayın. &lt;br&gt;&lt;br&gt; Aşağıdaki kitaplıklar 16 KB ile uyumlu değil: &lt;br&gt;&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_warning_4kb" msgid="997926487776340721">"Bu uyarı, kullanılan uygulamanın şu anda test edilmekte olan hata ayıklanabilir bir uygulama olması nedeniyle gösteriliyor. Geliştirici değilseniz lütfen bunu geliştiriciye bildirin ve hata ayıklama yapılmayan bir uygulama isteyin. &lt;br&gt;&lt;br&gt; Bu uygulama 16 KB ile uyumlu değil. APK ve ELF uyumluluk kontrolleri başarısız oldu. Lütfen &lt;a href=\"https://developer.android.com/16kb-page-size\"&gt;https://developer.android.com/16kb-page-size&lt;/a&gt; adresindeki adımları uygulayın. &lt;br&gt;&lt;br&gt; Aşağıdaki kitaplıklar 16 KB ile uyumlu değil: &lt;br&gt;&lt;br&gt;"</string>
     <string name="page_size_compat_never_show" msgid="3391282612422783097">"Bir Daha Gösterme"</string>
+    <string name="page_size_compat_title" msgid="6497719153872572204">"Android Uygulaması Uyumluluğu"</string>
+    <string name="page_size_compat_elf_not_aligned" msgid="4404128993555194313">"&amp;#8226; %1$s : LOAD segmenti hizalanmadı&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_not_aligned" msgid="1434875607880657092">"&amp;#8226; %1$s : Sıkıştırılmamış kitaplık hizalanmadı&lt;br&gt;"</string>
+    <string name="page_size_compat_apk_and_elf_not_aligned" msgid="7140216083697701972">"&amp;#8226; %1$s : LOAD segmenti ve sıkıştırılmamış kitaplık hizalanmadı&lt;br&gt;"</string>
+    <string name="page_size_compat_unknown" msgid="5183026525148169891">"&amp;#8226; %1$s : Bilinmeyen hata&lt;br&gt;"</string>
     <string name="serviceNotProvisioned" msgid="8289333510236766193">"Hizmet sağlanamadı."</string>
     <string name="CLIRPermanent" msgid="166443681876381118">"Arayanın kimliği ayarını değiştiremezsiniz."</string>
     <string name="auto_data_switch_title" msgid="3286350716870518297">"Veriler şuraya aktarıldı: <xliff:g id="CARRIERDISPLAY">%s</xliff:g>"</string>
@@ -164,14 +169,10 @@
     <string name="scCellularNetworkSecurityTitle" msgid="7752521808690294384">"Mobil ağ güvenliği"</string>
     <string name="scCellularNetworkSecuritySummary" msgid="7042036754550545005">"Şifreleme, şifrelenmemiş ağlarla ilgili bildirimler"</string>
     <string name="scIdentifierDisclosureIssueTitle" msgid="2898888825129970328">"Cihaz kimliğine erişildi"</string>
-    <!-- no translation found for scIDIssueSummaryNotificationWithCellularID (8371590113242615316) -->
-    <skip />
-    <!-- no translation found for scIdentifierDisclosureIssueSummaryNotification (7106922007150754222) -->
-    <skip />
-    <!-- no translation found for scIDIssueSummaryWithCellularID (1189965658392583067) -->
-    <skip />
-    <!-- no translation found for scIdentifierDisclosureIssueSummary (4362014471570210380) -->
-    <skip />
+    <string name="scIDIssueSummaryNotificationWithCellularID" msgid="8371590113242615316">"Yakındaki bir ağ, <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> civarında <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> SIM\'inizi kullanırken cihazınızın benzersiz kimliğini (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>) kaydetti"</string>
+    <string name="scIdentifierDisclosureIssueSummaryNotification" msgid="7106922007150754222">"Yakındaki bir ağ, <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> civarında <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> SIM\'inizi kullanırken cihazınızın benzersiz kimliğini kaydetti"</string>
+    <string name="scIDIssueSummaryWithCellularID" msgid="1189965658392583067">"Yakındaki bir ağ, <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> civarında <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> SIM\'inizi kullanırken cihazınızın benzersiz kimliğini (<xliff:g id="CELLULAR_IDENTIFIER">%2$s</xliff:g>) kaydetti.\n\nDolayısıyla konumunuz, etkinliğiniz veya kimliğiniz günlüğe kaydedildi. Bu yaygın bir uygulama olsa da gizlilik konusunda endişe duyan kişiler açısından sorun olabilir."</string>
+    <string name="scIdentifierDisclosureIssueSummary" msgid="4362014471570210380">"Yakındaki bir ağ, <xliff:g id="DISCLOSURE_TIME">%1$s</xliff:g> civarında <xliff:g id="DISCLOSURE_NETWORK">%3$s</xliff:g> SIM\'inizi kullanırken cihazınızın benzersiz kimliğini kaydetti.\n\nDolayısıyla konumunuz, etkinliğiniz veya kimliğiniz günlüğe kaydedildi. Bu yaygın bir uygulama olsa da gizlilik konusunda endişe duyan kişiler açısından sorun olabilir."</string>
     <string name="scNullCipherIssueEncryptedTitle" msgid="234717016411824969">"Şifrelenmiş <xliff:g id="NETWORK_NAME">%1$s</xliff:g> ağına bağlanıldı"</string>
     <string name="scNullCipherIssueEncryptedSummary" msgid="8577510708842150475">"<xliff:g id="NETWORK_NAME">%1$s</xliff:g> SIM bağlantısı artık daha güvenli"</string>
     <string name="scNullCipherIssueNonEncryptedTitle" msgid="3978071464929453915">"Şifrelenmemiş ağa bağlanıldı"</string>
@@ -299,6 +300,7 @@
     <string name="global_action_assist" msgid="2517047220311505805">"Asist"</string>
     <string name="global_action_voice_assist" msgid="6655788068555086695">"Sesli Yardım"</string>
     <string name="global_action_lockdown" msgid="2475471405907902963">"Tam kilitleme"</string>
+    <string name="global_action_unrestricted_lock" msgid="7933224393323064116">"Kilitle"</string>
     <string name="status_bar_notification_info_overflow" msgid="3330152558746563475">"999+"</string>
     <string name="notification_compact_heads_up_reply" msgid="2425293958371284340">"Yanıtla"</string>
     <string name="notification_hidden_text" msgid="2835519769868187223">"Yeni bildirim"</string>
@@ -364,12 +366,12 @@
     <string name="permgroupdesc_sensors" msgid="2610631290633747752">"hayati belirtilerinizle ilgili sensör verilerine erişme"</string>
     <string name="permgrouplab_notifications" msgid="5472972361980668884">"Bildirimler"</string>
     <string name="permgroupdesc_notifications" msgid="4608679556801506580">"bildirimleri göster"</string>
-    <string name="permgrouplab_xr_eye_sensitive" msgid="2099659100156643683">"XR hassas göz takibi verileri"</string>
-    <string name="permgroupdesc_xr_eye_sensitive" msgid="1414121516133760271">"hassas göz hareketi verilerine erişme"</string>
-    <string name="permgrouplab_xr_tracking" msgid="7418994009794287471">"XR takip verileri"</string>
-    <string name="permgroupdesc_xr_tracking" msgid="6777198859446500821">"sizinle ve çevrenizdeki ortamla ilgili XR verilerine erişme"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="2993940754322250652">"Hassas XR takip verileri"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="8498501397939308918">"sizinle ve çevrenizdeki ortamla ilgili hassas takip verilerine erişme"</string>
+    <string name="permgrouplab_xr_eye_sensitive" msgid="1709596126334620353">"Göz takibi verileri"</string>
+    <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"göz hareketlerini tam olarak takip etme"</string>
+    <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Hareket ve alan verileri"</string>
+    <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"göz, yüz, vücut ve tarama alanını takip etme"</string>
+    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Hassas baş hareketi ve alan verileri"</string>
+    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"baş ve tarama alanını tam olarak takip etme"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Pencere içeriğini alma"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Etkileşim kurduğunuz pencerenin içeriğini inceler."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"Dokunarak Keşfet\'i açma"</string>
@@ -667,22 +669,22 @@
     <string name="permdesc_imagesWrite" msgid="5195054463269193317">"Uygulamanın fotoğraf koleksiyonunuzu değiştirmesine izin verir."</string>
     <string name="permlab_mediaLocation" msgid="7368098373378598066">"medya koleksiyonunuzdaki konumları okuma"</string>
     <string name="permdesc_mediaLocation" msgid="597912899423578138">"Uygulamanın medya koleksiyonunuzdaki konumları okumasına izin verir."</string>
-    <string name="permlab_eye_tracking_coarse" msgid="7989596289790269059">"yaklaşık göz hareketinizi takip etme"</string>
-    <string name="permdesc_eye_tracking_coarse" msgid="870510233930553355">"Uygulamanın, yaklaşık göz hareketinizi takip etmesine izin verir."</string>
-    <string name="permlab_eye_tracking_fine" msgid="6914457357027049512">"baktığınız noktayı takip etme"</string>
-    <string name="permdesc_eye_tracking_fine" msgid="5788889152304524730">"Uygulamanın, tam göz hareketiyle ilgili verilere erişmesine izin verir."</string>
-    <string name="permlab_face_tracking" msgid="2272048395128283324">"yüzünüzü takip etme"</string>
-    <string name="permdesc_face_tracking" msgid="2622783922311211866">"Uygulamanın, yüz takibi verilerine erişmesine izin verir."</string>
-    <string name="permlab_hand_tracking" msgid="6478233866595566940">"ellerinizi takip etme"</string>
-    <string name="permdesc_hand_tracking" msgid="8639715900104966456">"Uygulamanın, el takibi verilerine erişmesine izin verir."</string>
-    <string name="permlab_head_tracking" msgid="1309731456372087270">"başınızı takip etme"</string>
-    <string name="permdesc_head_tracking" msgid="231597390513699188">"Uygulamanın, baş takibi verilerine erişmesine izin verir."</string>
-    <string name="permlab_scene_understanding_coarse" msgid="6518646430502858641">"yakın çevrenizi anlama"</string>
-    <string name="permdesc_scene_understanding_coarse" msgid="4508880777646198656">"Uygulamanın, hemen etrafınızdaki ortamla ilgili takip verilerine erişmesine izin verir."</string>
-    <string name="permlab_scene_understanding_fine" msgid="409126403264393251">"yakın çevrenizi ayrıntılı bir şekilde anlama"</string>
-    <string name="permdesc_scene_understanding_fine" msgid="6223368011593524179">"Uygulamanın, hemen etrafınızdaki ortamla ilgili takip verilerine çok ayrıntılı bir şekilde erişmesine izin verir."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="7117098718465619023">"ön planda değilken XR verilerine erişme"</string>
-    <string name="permdesc_xr_tracking_in_background" msgid="939504041387836853">"Uygulamanın, ön planda değilken XR verilerine erişmesine izin verir."</string>
+    <string name="permlab_eye_tracking_coarse" msgid="1266477998416112440">"göz hareketini takip etme"</string>
+    <string name="permdesc_eye_tracking_coarse" msgid="1652112796672085320">"Uygulamanın, göz hareketinizin yaklaşık yönünü takip etmesine izin verir."</string>
+    <string name="permlab_eye_tracking_fine" msgid="6208991021186455002">"göz hareketlerini tam olarak takip etme"</string>
+    <string name="permdesc_eye_tracking_fine" msgid="9215360948852654836">"Uygulamanın, göz hareketinizin yönünü takip etmesine izin verir."</string>
+    <string name="permlab_face_tracking" msgid="6052126246676474909">"yüz hareketlerini takip etme"</string>
+    <string name="permdesc_face_tracking" msgid="185815778490412574">"Uygulamanın, yüz hareketlerinizi ve ifadelerinizi takip etmesine izin verir."</string>
+    <string name="permlab_hand_tracking" msgid="21944950887649088">"el hareketlerini takip etme"</string>
+    <string name="permdesc_hand_tracking" msgid="8083783248481460669">"Uygulamanın, el hareketlerinizi takip etmesine izin verir."</string>
+    <string name="permlab_head_tracking" msgid="4304699038992159853">"baş hareketlerini takip etme"</string>
+    <string name="permdesc_head_tracking" msgid="2232184518548944223">"Uygulamanın, baş hareketlerinizi takip etmesine izin verir."</string>
+    <string name="permlab_scene_understanding_coarse" msgid="8765236119358852920">"çevrenizdeki alanı tarama"</string>
+    <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Uygulamanın etrafınızı taramasına izin verir."</string>
+    <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"çevrenizdeki alanı hassas bir şekilde tarama"</string>
+    <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Uygulamanın etrafınızı tam olarak taramasına izin verir."</string>
+    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"arka planda XR verilerini takip etme"</string>
+    <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Uygulamanın, arka planda XR verilerine erişmesine izin verir."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"tuşları yakala"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Sistem tarafından kısayollar ve işlemler işlenmeden önce uygulamanın tuşları yakalamasına izin verir."</string>
     <string name="biometric_app_setting_name" msgid="3339209978734534457">"Biyometri kullan"</string>
@@ -690,6 +692,8 @@
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"Kimliğinizi doğrulayın"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"Devam etmek için biyometri kullanın"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"Devam etmek için biyometrik kimlik bilginizi veya ekran kilidinizi kullanın"</string>
+    <string name="biometric_dialog_secondary_display_toast" product="default" msgid="256544327174107086">"Devam etmek için telefonunuzda kimliğinizi doğrulayın"</string>
+    <string name="biometric_dialog_secondary_display_toast" product="tablet" msgid="2855203015454795660">"Devam etmek için tabletinizde kimliğinizi doğrulayın"</string>
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Biyometrik donanım kullanılamıyor"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"Kimlik doğrulama iptal edildi"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"Tanınmadı"</string>
@@ -892,7 +896,7 @@
     <string name="policydesc_resetPassword" msgid="4626419138439341851">"Ekran kilidini değiştirir."</string>
     <string name="policylab_forceLock" msgid="7360335502968476434">"Ekranı kilitleme"</string>
     <string name="policydesc_forceLock" msgid="1008844760853899693">"Ekranın nasıl ve ne zaman kilitleneceğini denetler."</string>
-    <string name="policylab_wipeData" msgid="1359485247727537311">"Tüm verileri sil"</string>
+    <string name="policylab_wipeData" msgid="1359485247727537311">"Tüm verileri silme"</string>
     <string name="policydesc_wipeData" product="tablet" msgid="7245372676261947507">"Fabrika verilerine sıfırlama işlemi gerçekleştirerek tabletteki verileri uyarıda bulunmadan siler."</string>
     <string name="policydesc_wipeData" product="tv" msgid="513862488950801261">"Fabrika verilerine sıfırlama işlemi gerçekleştirerek Android TV cihazınızdaki verileri uyarıda bulunmadan siler."</string>
     <string name="policydesc_wipeData" product="automotive" msgid="660804547737323300">"Fabrika verilerine sıfırlama işlemi gerçekleştirerek bilgi-eğlence sistemindeki veriler uyarıda bulunmadan silinir."</string>
@@ -913,6 +917,7 @@
     <string name="policydesc_disableCamera" msgid="3204405908799676104">"Tüm cihaz kameralarının kullanımını engeller."</string>
     <string name="policylab_disableKeyguardFeatures" msgid="5071855750149949741">"Ekran kilidinin bazı özelliklerini devre dışı bırakma"</string>
     <string name="policydesc_disableKeyguardFeatures" msgid="6641673177041195957">"Bazı ekran kilidi özelliklerinin kullanılmasını engeller."</string>
+    <string name="exit_toast_on_long_press_escape" msgid="2983932499112557277">"Bu uygulamayı kapatmak için Esc tuşuna uzun basın"</string>
   <string-array name="phoneTypes">
     <item msgid="8996339953292723951">"Ev"</item>
     <item msgid="7740243458912727194">"Mobil"</item>
@@ -1123,6 +1128,7 @@
     <string name="keyguard_accessibility_sim_pin_unlock" msgid="4895939120871890557">"SIM PIN kilidini açın."</string>
     <string name="keyguard_accessibility_sim_puk_unlock" msgid="3459003464041899101">"SIM PUK kilidini açın."</string>
     <string name="keyguard_accessibility_password_unlock" msgid="6130186108581153265">"Şifreyle kilit açma."</string>
+    <string name="keyguard_accessibility_secure_lock_device_biometric_unlock" msgid="1884638289137214044">"Cihazı güvenli bir şekilde kilitlemek için biyometrik kilit açma."</string>
     <string name="keyguard_accessibility_pattern_area" msgid="1419570880512350689">"Desen alanı."</string>
     <string name="keyguard_accessibility_slide_area" msgid="4331399051142520176">"Kaydırma alanı."</string>
     <string name="password_keyboard_label_symbol_key" msgid="2716255580853511949">"?123"</string>
@@ -1480,8 +1486,6 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"REDDET"</string>
     <string name="select_input_method" msgid="3971267998568587025">"Giriş yöntemini seçin"</string>
     <string name="input_method_language_settings" msgid="8069089418056819437">"Dil Ayarları"</string>
-    <string name="show_ime" msgid="6406112007347443383">"Fiziksel klavye etkin durumdayken ekranda tut"</string>
-    <string name="hardware" msgid="3611039921284836033">"Ekran klavyesi kullanın"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"<xliff:g id="DEVICE_NAME">%s</xliff:g> ayarlarını yapılandır"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"Fiziksel klavyeleri yapılandırın"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"Dili ve düzeni seçmek için dokunun"</string>
@@ -1839,6 +1843,7 @@
     <string name="owner_name" msgid="8713560351570795743">"Sahip"</string>
     <string name="guest_name" msgid="8502103277839834324">"Misafir"</string>
     <string name="headless_system_user_name" msgid="1849150903255530049">"Sistem Kullanıcısı"</string>
+    <string name="unnamed_user_name" msgid="6096699110534542980">"Kullanıcı"</string>
     <string name="error_message_title" msgid="4082495589294631966">"Hata"</string>
     <string name="error_message_change_not_allowed" msgid="843159705042381454">"Yöneticiniz bu değişikliğe izin vermiyor"</string>
     <string name="app_not_found" msgid="3429506115332341800">"Bu eylemi gerçekleştirecek bir uygulama bulunamadı"</string>
@@ -2000,7 +2005,7 @@
     <string name="zen_mode_rule_name_combination" msgid="7174598364351313725">"<xliff:g id="FIRST">%1$s</xliff:g> / <xliff:g id="REST">%2$s</xliff:g>"</string>
     <string name="toolbar_collapse_description" msgid="8009920446193610996">"Daralt"</string>
     <string name="zen_mode_feature_name" msgid="3785547207263754500">"Rahatsız etmeyin"</string>
-    <string name="zen_mode_downtime_feature_name" msgid="5886005761431427128">"Bildirim istenmeyen zaman"</string>
+    <string name="zen_mode_downtime_feature_name" msgid="5886005761431427128">"Dinlenme zamanı"</string>
     <string name="zen_mode_default_weeknights_name" msgid="7902108149994062847">"Hafta içi gece"</string>
     <string name="zen_mode_default_weekends_name" msgid="4707200272709377930">"Hafta sonu"</string>
     <string name="zen_mode_default_events_name" msgid="2280682960128512257">"Etkinlik"</string>
@@ -2042,6 +2047,12 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"Ekranı Kapla"</string>
     <string name="close_button_text" msgid="10603510034455258">"Kapat"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
+    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
+    <skip />
+    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
+    <skip />
+    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
+    <skip />
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Yanıtla"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Video"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Reddet"</string>
@@ -2510,7 +2521,7 @@
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Uygulama içerikleri, güvenlik nedeniyle ekran paylaşımında gizlendi"</string>
     <string name="satellite_notification_title" msgid="4026338973463121526">"Uyduya otomatik olarak bağlandı"</string>
     <string name="satellite_notification_summary" msgid="5207364139430767162">"Mobil veya kablosuz ağa bağlı olmadan mesaj alıp gönderebilirsiniz"</string>
-    <string name="satellite_notification_summary_with_data" msgid="6486843676720429049">"Uydu üzerinden mesaj gönderip alabilir ve sınırlı miktarda veri kullanabilirsiniz"</string>
+    <string name="satellite_notification_summary_with_data" msgid="8290202758586475712">"Uydu üzerinden mesaj gönderip alabilir ve belirli uygulamaları kullanabilirsiniz"</string>
     <string name="satellite_notification_manual_title" msgid="1097504441849466279">"Uydu üzerinden mesajlaşma kullanılsın mı?"</string>
     <string name="satellite_notification_manual_summary" msgid="901206289846283445">"Mobil veya kablosuz ağ kullanmadan mesaj gönderip alın"</string>
     <string name="satellite_notification_open_message" msgid="4149234979688273729">"Mesajlar\'ı aç"</string>
@@ -2565,23 +2576,37 @@
     <string name="keyboard_shortcut_group_applications_calendar" msgid="3571770335653387606">"Takvim"</string>
     <string name="keyboard_shortcut_group_applications_calculator" msgid="6753209559716091507">"Hesap Makinesi"</string>
     <string name="keyboard_shortcut_group_applications_maps" msgid="7950000659522589471">"Haritalar"</string>
+    <string name="keyboard_shortcut_group_applications_files" msgid="863938400765838051">"Files"</string>
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"Uygulamalar"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"Parmak izleriniz artık tanınamıyor. Parmak İzi Kilidi\'ni tekrar kurun."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Güvenlik ve gizlilik"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="7202983697003493711">"Önce ekranınızın kilidini açın"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="2648733588653060170">"Ekran kilidini açın ve yeniden bağlanın"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_text" msgid="1628936399413661929">"Gelişmiş Koruma, USB ile veri aktarımı için normal ekran kilidinizi açmanızı gerektirir"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="608846071408348658">"Gelişmiş Koruma, USB ile veri aktarımı için normal ekran kilidinizi açmanızı gerektirir"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_low_power_charge_notification_text" msgid="1240936298914360256">"Gelişmiş Koruma, USB ile aktarım veya hızlı şarj için ekran kilidinizi açmanızı gerektirir"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_low_power_charge_replug_notification_text" msgid="6370672468652821937">"Gelişmiş Koruma, USB ile aktarım veya hızlı şarj için ekran kilidinizi açmanızı gerektirir"</string>
-    <string name="usb_apm_usb_plugged_in_for_power_brick_notification_text" msgid="1673711307740787848">"Gelişmiş Koruma, USB ile hızlı şarj için normal ekran kilidinizi açmanızı gerektirir"</string>
-    <string name="usb_apm_usb_plugged_in_for_power_brick_replug_notification_text" msgid="1244847752922938852">"Gelişmiş Koruma, USB ile hızlı şarj için normal ekran kilidinizi açmanızı gerektirir"</string>
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
+    <skip />
+    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
+    <skip />
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Sesi kapat"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Bildirimlerin sesi kapatıldı"</string>
-    <string name="usb_apm_usb_notification_silenced_text" msgid="6414815636131602513">"Gelişmiş Koruma USB bildirimlerinin sesi cihaz yeniden başlatılana kadar kapatıldı"</string>
+    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
+    <skip />
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"Şüpheli USB etkinliği"</string>
-    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="6537085605929303187">"USB veri sinyali devre dışı bırakıldı."</string>
+    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
+    <skip />
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Parmak İzi Kilidi ile ilgili sorun mu yaşıyorsunuz?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Kilit açma deneyiminizi daha iyi hale getirmeyle ilgili ipuçlarına göz atmak için dokunun"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Yanıp sönmesin"</string>
+    <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"TV\'yi kapatmak için güç düğmesine uzun basın"</string>
+    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
+    <skip />
+    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
+    <skip />
+    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
+    <skip />
 </resources>

@@ -69,3 +69,11 @@ flag {
     description: "This flag controls VPN metrics collection."
     bug: "306313287"
 }
+
+flag {
+  name: "create_app_specific_network_permission"
+  namespace: "android_core_networking"
+  is_exported: true
+  description: "Flag for adding CREATE_APP_SPECIFIC_NETWORK permission"
+  bug: "435313135"
+}

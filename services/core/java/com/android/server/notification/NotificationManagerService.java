@@ -1601,6 +1601,12 @@ public class NotificationManagerService extends SystemService {
                         // Report to usage stats that notification was made visible
                         if (DBG) Slog.d(TAG, "Marking notification as visible " + nv.key);
                         reportSeen(r);
+
+                        // Also report to UserManagerService if this notification was shown on HSU
+                        // (headless system user)
+                        if (shouldLogHsuNotification(r)) {
+                            mUmInternal.logShownHsuNotification(r.getSbn());
+                        }
                     }
                     r.setVisibility(true, nv.rank, nv.count, mNotificationRecordLogger);
                     mAssistants.notifyAssistantVisibilityChangedLocked(r, true);
@@ -2003,6 +2009,21 @@ public class NotificationManagerService extends SystemService {
         return false;
     }
 
+    private boolean shouldLogHsuNotification(NotificationRecord r) {
+        if (!android.multiuser.Flags.hsuAllowlistNotifications()
+                || !UserManager.isHeadlessSystemUserMode()) {
+            return false;
+        }
+        UserHandle user = r.getUser();
+        if (user.isSystem()) {
+            return true;
+        }
+        if (user.getIdentifier() != UserHandle.USER_ALL) {
+            return false;
+        }
+        return mAmi.getCurrentUserId() == UserHandle.USER_SYSTEM;
+    }
+
     @VisibleForTesting
     void unclassifyNotification(final String key) {
         if (!(notificationClassificationUi() && notificationRegroupOnClassification())) {
@@ -2380,6 +2401,15 @@ public class NotificationManagerService extends SystemService {
                         unhideNotificationsForPackages(pkgList, uidList);
                     }
                 }
+
+                if (Flags.fixManagedServicesDoubleBinding()) {
+                    if (queryRemove && !removingPackage) {
+                        // For PACKAGE_REMOVED with EXTRA_REPLACING, this will be immediately
+                        // followed by a PACKAGE_ADDED, so this one is safe to ignore.
+                        return;
+                    }
+                }
+
                 mHandler.scheduleOnPackageChanged(removingPackage, changeUserId, pkgList, uidList);
             }
         }
@@ -11589,8 +11619,9 @@ public class NotificationManagerService extends SystemService {
     }
 
     /**
-     * Cancels all notifications from a given package that have all of the
-     * {@code mustHaveFlags} and none of the {@code mustNotHaveFlags}.
+     * Cancels all notifications from a given package (or, optionally, in a specific channel from
+     * said package) that have all of the {@code mustHaveFlags} and none of the
+     * {@code mustNotHaveFlags}.
      */
     void cancelAllNotificationsInt(int callingUid, int callingPid, String pkg,
             @Nullable String channelId, int mustHaveFlags, int mustNotHaveFlags, int userId,
@@ -11701,7 +11732,9 @@ public class NotificationManagerService extends SystemService {
             if (pkg != null && !r.getSbn().getPackageName().equals(pkg)) {
                 continue;
             }
-            if (channelId != null && !channelId.equals(r.getChannel().getId())) {
+            if (channelId != null // Compare against possibly bundled channel AND original channel
+                    && !channelId.equals(r.getChannel().getId())
+                    && !channelId.equals(r.getNotification().getChannelId())) {
                 continue;
             }
             if (r.getSbn().isGroup() && r.getNotification().isGroupChild()) {

@@ -6764,6 +6764,14 @@
     <permission android:name="android.permission.USE_COMPANION_TRANSPORTS"
         android:protectionLevel="signature" />
 
+    <!-- @SystemApi Allows an application to send and receive PCC messages via CDM transports.
+        @FlaggedApi(android.companion.Flags.FLAG_TRUSTED_DEVICES)
+         @hide -->
+    <permission android:name="android.permission.ACCESS_COMPANION_MESSAGE_PCC"
+        android:protectionLevel="signature|knownSigner"
+        android:knownCerts="@array/config_cdmKnownSignersPCC"
+        android:featureFlag="android.companion.trusted_devices" />
+
     <!-- Allows an application to create new companion device associations.
          @SystemApi
          @hide -->
@@ -8808,14 +8816,6 @@
         android:protectionLevel="signature" />
 
     <!-- Allows an application to perform actions on behalf of users inside of
-         applications.
-         <p>This permission is currently only granted to privileged system apps.
-         <p>Protection level: internal|privileged -->
-    <permission android:name="android.permission.EXECUTE_APP_FUNCTIONS"
-        android:featureFlag="!android.permission.flags.app_function_access_api_enabled"
-        android:protectionLevel="internal|privileged" />
-
-    <!-- Allows an application to perform actions on behalf of users inside of
      applications.
      <p>To execute a function in another app, an application must first hold the
         android.permission.EXECUTE_APP_FUNCTIONS permission. In addition, the application must be
@@ -8825,6 +8825,14 @@
     <permission android:name="android.permission.EXECUTE_APP_FUNCTIONS"
         android:featureFlag="android.permission.flags.app_function_access_api_enabled"
         android:protectionLevel="normal" />
+
+    <!-- Allows an application to perform actions on behalf of users inside of
+         applications.
+         <p>This permission is currently only granted to privileged system apps.
+         <p>Protection level: internal|privileged -->
+    <permission android:name="android.permission.EXECUTE_APP_FUNCTIONS"
+        android:featureFlag="!android.permission.flags.app_function_access_api_enabled"
+        android:protectionLevel="internal|privileged" />
 
     <!-- Allows an application to display its suggestions using the autofill framework.
          <p>For now, this permission is only granted to the Browser application.
@@ -9128,7 +9136,7 @@
         android:featureFlag="android.permission.flags.health_connect_backup_restore_permission_enabled" />
 
     <!-- @hide @SystemApi Allows an app to write device level data to Health Connect.
-             <p>Protection level: privileged
+             <p>Protection level: signature|privileged
          @FlaggedApi(android.permission.flags.Flags.FLAG_HEALTH_CONNECT_PROVIDE_DEVICE_DATA_PERMISSION_ENABLED)
     -->
     <permission
@@ -9514,6 +9522,28 @@
         android:protectionLevel="signature|privileged|recents"
         android:featureFlag="android.companion.enable_task_continuity" />
 
+    <!-- Allows an application to read Handoff settings on the device (such as if it is enabled).
+         <p>Protection level: signature|privileged|recents
+         @FlaggedApi(android.companion.Flags.FLAG_ENABLE_TASK_CONTINUITY)
+         @SystemApi
+         @hide
+    -->
+    <permission
+        android:name="android.permission.READ_HANDOFF_SETTINGS"
+        android:protectionLevel="signature|privileged"
+        android:featureFlag="android.companion.enable_task_continuity" />
+
+    <!-- Allows an application to modify Handoff settings on the device (such as if it is enabled).
+         <p>Protection level: signature|privileged
+         @FlaggedApi(android.companion.Flags.FLAG_ENABLE_TASK_CONTINUITY)
+         @SystemApi
+         @hide
+    -->
+    <permission
+        android:name="android.permission.MODIFY_HANDOFF_SETTINGS"
+        android:protectionLevel="signature|privileged"
+        android:featureFlag="android.companion.enable_task_continuity" />
+
     <!-- Permission required to access TV Watchdog Metrics
      <p>Not for use by third-party applications.</p>
      @hide -->
@@ -9527,6 +9557,18 @@
     <permission android:name="android.permission.CONTROL_TV_WATCHDOG_CONFIG"
         android:protectionLevel="signature|privileged"
         android:featureFlag="android.media.tv.flags.enable_tv_watchdog_emmc_protection" />
+
+    <!-- Permission required to set or update the anomaly detector configuration via
+         {@see android.os.AnomalyDetectorManager}.
+         Only one app per device is permitted to hold this permission and set or update the config.
+         <p>Protection level: signature|privileged
+         @FlaggedApi(android.os.profiling.anomaly.flags.Flags.FLAG_ANOMALY_DETECTOR_CORE)
+         @SystemApi
+         @hide
+    -->
+    <permission android:name="android.permission.CONFIGURE_ANOMALY_DETECTOR"
+        android:protectionLevel="signature|privileged"
+        android:featureFlag="android.os.profiling.anomaly.flags.anomaly_detector_core" />
 
     <!-- @FlaggedApi(android.media.audio.Flags.FLAG_GUARD_STREAM_VOLUME_APIS)
     Purpose guarded permission to query volume-related APIs.

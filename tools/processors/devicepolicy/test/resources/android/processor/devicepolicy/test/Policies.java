@@ -16,6 +16,8 @@
 
 package android.app.admin.metadata;
 
+import android.app.admin.PolicyIdentifier;
+import java.lang.String;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -35,7 +37,9 @@ public class Policies {
                 1,
                 2
             ),
-            /* affectedResource= */ 2
+            /* affectedResource= */ 2,
+            /* requiredPermission= */ "android.permission.MANAGE_POLICY_SIMPLE_BOOLEAN",
+            /* requiredCrossUserPermission= */ "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL"
         ));
         policies.add(new EnumPolicyMetadata(
             /* id= */ android.app.admin.PolicyIdentifier.SIMPLE_ENUM_POLICY,
@@ -44,6 +48,8 @@ public class Policies {
                 3
             ),
             /* affectedResource= */ 1,
+            /* requiredPermission= */ "android.permission.MANAGE_POLICY_SIMPLE_ENUM",
+            /* requiredCrossUserPermission= */ "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS",
             /* allowedValues= */ Set.of(
                 0,
                 1,
@@ -55,7 +61,30 @@ public class Policies {
             /* allowedScopes= */ Set.of(
                 1
             ),
-            /* affectedResource= */ 1
+            /* affectedResource= */ 1,
+            /* requiredPermission= */ null,
+            /* requiredCrossUserPermission= */ null
+        ));
+        policies.add(new StringPolicyMetadata(
+            /* id= */ android.app.admin.PolicyIdentifier.SIMPLE_STRING_POLICY,
+            /* allowedScopes= */ Set.of(
+                1
+            ),
+            /* affectedResource= */ 1,
+            /* requiredPermission= */ null,
+            /* requiredCrossUserPermission= */ null
+        ));
+        policies.add(new ListPolicyMetadata<String>(
+            /* id= */ android.app.admin.PolicyIdentifier.SIMPLE_STRING_LIST_POLICY,
+            /* elementMetadata= */ new StringPolicyMetadata(
+                /* id= */ new PolicyIdentifier<String>(android.app.admin.PolicyIdentifier.SIMPLE_STRING_LIST_POLICY.getId() + "#elements"),
+                /* allowedScopes= */ Set.of(
+                    1
+                ),
+                /* affectedResource= */ 1,
+                /* requiredPermission= */ null,
+                /* requiredCrossUserPermission= */ null
+            )
         ));
         return policies;
     }

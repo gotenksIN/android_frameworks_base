@@ -19,11 +19,14 @@ package com.android.systemui.statusbar.phone
 import android.content.res.Configuration
 import android.content.testableContext
 import android.graphics.Rect
+import android.platform.test.annotations.EnableFlags
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.ObservableTransitionState.Idle
 import com.android.compose.animation.scene.OverlayKey
 import com.android.internal.policy.SystemBarUtils
+import com.android.systemui.Flags
+import com.android.systemui.Flags.FLAG_DUAL_SHADE
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.communal.data.repository.fakeCommunalSceneRepository
 import com.android.systemui.communal.shared.model.CommunalScenes
@@ -58,16 +61,19 @@ import org.mockito.kotlin.whenever
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class ShadeTouchableRegionManagerTest : SysuiTestCase() {
+
     private val kosmos = testKosmos().useUnconfinedTestDispatcher()
-    private val Kosmos.underTest by Kosmos.Fixture { kosmos.shadeTouchableRegionManager }
+    private val Kosmos.underTest by Kosmos.Fixture { shadeTouchableRegionManager }
 
     @Before
     fun setUp() {
-        kosmos.notificationShadeWindowView.apply {
-            whenever(width).thenReturn(1000)
-            whenever(height).thenReturn(1000)
+        with(kosmos) {
+            notificationShadeWindowView.apply {
+                whenever(width).thenReturn(1000)
+                whenever(height).thenReturn(1000)
+            }
+            underTest.setup(notificationShadeWindowView)
         }
-        kosmos.underTest.setup(kosmos.notificationShadeWindowView)
     }
 
     @Test
@@ -126,17 +132,17 @@ class ShadeTouchableRegionManagerTest : SysuiTestCase() {
         kosmos.runTest {
             assertThat(underTest.shouldMakeEntireScreenTouchable()).isFalse()
 
-            kosmos.fakeCommunalSceneRepository.instantlyTransitionTo(CommunalScenes.Communal)
+            fakeCommunalSceneRepository.instantlyTransitionTo(CommunalScenes.Communal)
 
             assertThat(underTest.shouldMakeEntireScreenTouchable()).isTrue()
 
-            kosmos.fakeCommunalSceneRepository.instantlyTransitionTo(CommunalScenes.Blank)
+            fakeCommunalSceneRepository.instantlyTransitionTo(CommunalScenes.Blank)
 
             assertThat(underTest.shouldMakeEntireScreenTouchable()).isFalse()
         }
 
     @Test
-    @EnableSceneContainer
+    @EnableFlags(Flags.FLAG_SCENE_CONTAINER, Flags.FLAG_DUAL_SHADE)
     fun entireScreenTouchable_desktopMode() =
         kosmos.runTest {
             enableStatusBarForDesktop()
@@ -146,7 +152,7 @@ class ShadeTouchableRegionManagerTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableSceneContainer
+    @EnableFlags(Flags.FLAG_SCENE_CONTAINER, Flags.FLAG_DUAL_SHADE)
     fun calculateTouchableRegionForDesktop_sceneGone_withShadeBounds() =
         kosmos.runTest {
             val bounds = Rect(0, 0, 100, 100)
@@ -162,7 +168,7 @@ class ShadeTouchableRegionManagerTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableSceneContainer
+    @EnableFlags(Flags.FLAG_SCENE_CONTAINER, Flags.FLAG_DUAL_SHADE)
     fun calculateTouchableRegionForDesktop_sceneVisible_withoutShadeBounds() =
         kosmos.runTest {
             enableStatusBarForDesktop()
@@ -187,10 +193,6 @@ class ShadeTouchableRegionManagerTest : SysuiTestCase() {
         setSceneTransition(Idle(initialScene, checkNotNull(currentOverlays)))
         assertThat(currentScene).isEqualTo(initialScene)
         assertThat(currentOverlays).contains(overlay)
-    }
-
-    private fun Kosmos.closeShadeOverlay(overlay: OverlayKey) {
-        sceneInteractor.hideOverlay(overlay, "test")
     }
 
     private fun Kosmos.enableStatusBarForDesktop() {

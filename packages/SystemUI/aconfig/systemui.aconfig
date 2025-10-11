@@ -646,16 +646,6 @@ flag {
 }
 
 flag {
-    name: "fix_shade_header_wrong_icon_size"
-    namespace: "lse_desktop_experience"
-    description: "Fix system icon size in shade header on connected displays"
-    bug: "412409667"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "screenshot_force_shutter_sound"
     namespace: "systemui"
     description: "Force screenshot sound when camera sound is forced and camera is open"
@@ -842,23 +832,6 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
-}
-
-flag {
-    name: "qs_ui_refactor_compose_fragment"
-    namespace: "systemui"
-    description: "Uses a different QS fragment in NPVC that uses the new compose UI and recommended architecture. This flag depends on qs_ui_refactor flag."
-    bug: "325099249"
-}
-
-flag {
-    name: "qs_edit_mode_tooltip"
-    namespace: "systemui"
-    description: "Displays an educational tooltip on the edit mode icon from the expanded shade. This flag depends on qs_ui_refactor_compose_fragment flag."
-    bug: "403596182"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1552,13 +1525,6 @@ flag {
 }
 
 flag {
-   name: "notification_animated_actions_treatment"
-   namespace: "systemui"
-   description: "Special UI treatment for animated actions and replys"
-   bug: "383567383"
-}
-
-flag {
     name: "show_audio_sharing_slider_in_volume_panel"
     namespace: "cross_device_experiences"
     description: "Show two sliders in volume panel when audio sharing."
@@ -2096,6 +2062,13 @@ flag {
 }
 
 flag {
+    name: "delete_after_scroll_capture"
+    namespace: "systemui"
+    description: "Delete original screenshot if scroll capture output is saved."
+    bug: "445482750"
+}
+
+flag {
     name: "wakefulness_for_animations"
     namespace: "systemui"
     description: "Changes the signal used for animation wakefulness on keyguard"
@@ -2120,4 +2093,24 @@ flag {
     namespace: "systemui"
     description: "Enable blur on more lockscreen surfaces"
     bug: "444141641"
+}
+
+flag {
+  name: "fix_dot_not_visible_race"
+  namespace: "systemui"
+  description: "Fix privacy indicator dot not visible due to a possible race condition"
+  bug: "447129739"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "fix_privacy_indicator_both_dot_chip_visible_qs"
+  namespace: "systemui"
+  description: "Fix privacy indicator both dot and chip visible in QS"
+  bug: "443507159"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }

@@ -141,7 +141,6 @@ import static com.android.server.wm.SensitiveContentPackages.PackageInfo;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_ALL;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_WINDOW_ANIMATION;
 import static com.android.server.wm.WindowContainer.AnimationFlags.CHILDREN;
-import static com.android.server.wm.WindowContainer.SYNC_STATE_WAITING_FOR_DRAW;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_DISPLAY;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_INPUT_METHOD;
@@ -2869,33 +2868,18 @@ public class WindowManagerService extends IWindowManager.Stub
                 } else {
                     outRelayoutResult.syncSeqId = -1;
                     if (mAlwaysSeqId && (result & RELAYOUT_RES_CANCEL_AND_REDRAW) == 0
-                            && win.cancelAndRedraw(syncSeqId)) {
-                        // Surface-placement has resulted in a new configuration or a new sync,
-                        // so this current layout is invalid until subsequent reportResized.
-
-                        // However, make a targeted optimization to let the client draw early if the
-                        // relayout result won't change even after the client receives the new
-                        // configuration. If there is an explicit sync, though, the user-perceived
-                        // latency will be worse due to the client drawing content that won't be
-                        // presented; so, don't "optimize" in that case.
-                        final boolean inExplicitSync = syncSeqId <= win.mBufferSeqId
-                                || win.mSyncState == SYNC_STATE_WAITING_FOR_DRAW;
-                        if (!inExplicitSync && win.layoutIgnoresClientConfig()) {
-                            // Returning a seqId indicates, to the client, that it can use this
-                            // result even though it's configuration is out-dated.
-                            outRelayoutResult.syncSeqId = win.mSyncSeqId;
-                            if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
-                                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "ignoreCancelDraw seqId="
-                                        + win.mSyncSeqId);
-                            }
-                        } else {
-                            result |= RELAYOUT_RES_CANCEL_AND_REDRAW;
-                            if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
-                                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "lateCancelDraw "
-                                        + " clientSeqId=" + syncSeqId
-                                        + " serverSeqId=" + win.mSyncSeqId
-                                        + " bufferSeqId=" + win.mBufferSeqId);
-                            }
+                            && win.cancelAndRedraw(syncSeqId)
+                            && !displayContent.mWaitingForConfig) {
+                        // Surface-placement has resulted in a new configuration or a new sync.
+                        // This means the layout is technically invalid; however, it's very unlikely
+                        // that this will matter and we can often save a frame of latency by
+                        // returning the config/seqId here.
+                        // Returning a seqId indicates, to the client, that it can use this
+                        // result even though it called relayout with out-of-date config.
+                        outRelayoutResult.syncSeqId = win.mSyncSeqId;
+                        if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+                            Trace.instant(TRACE_TAG_WINDOW_MANAGER, "ignoreCancelDraw seqId="
+                                    + win.mSyncSeqId);
                         }
                     }
                 }
@@ -3984,81 +3968,108 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     /** Update the current user. */
-    public void setCurrentUser(@UserIdInt int newUserId, UserState uss) {
+    public void setCurrentUser(@UserIdInt int newUserId) {
+        if (DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()) return;
         synchronized (mGlobalLock) {
-            if (DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()) {
-                mRoot.mTaskSupervisor.mStartingUsers.add(uss);
-            }
             final TransitionController controller = mAtmService.getTransitionController();
-            final Runnable applyUserChange = () -> {
-                mCurrentUserId = newUserId;
-                mDisplayWindowSettingsProvider.setOverrideSettingsForUser(newUserId);
-                mPolicy.setCurrentUserLw(newUserId);
-                mKeyguardDisableHandler.setCurrentUser(newUserId);
-
-                // Hide windows that should not be seen by the new user.
-                mRoot.switchUser(newUserId);
-                if (DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()) {
-                    // Restore the new user's previous windows or home.
-                    mRoot.switchUser(newUserId, uss);
-                }
-                mWindowPlacerLocked.performSurfacePlacement();
-
-                // Notify whether the root docked task exists for the current user
-                final DisplayContent displayContent = getDefaultDisplayContentLocked();
-
-                if (mDisplayReady) {
-                    // If the display is already prepared, update the density.
-                    // Otherwise, we'll update it when it's prepared.
-                    final int forcedDensity = getForcedDisplayDensityForUserLocked(newUserId);
-                    final int targetDensity = forcedDensity != 0
-                            ? forcedDensity : displayContent.getInitialDisplayDensity();
-                    displayContent.setForcedDensity(targetDensity, UserHandle.USER_CURRENT);
-
-                    // Because DisplayWindowSettingsProvider.mOverrideSettings has been reset for
-                    // the new user, we need to update DisplayWindowSettings.mShouldShowSystemDecors
-                    // to ensure it reflects the latest value.
-                    if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
-                        final int displayCount = mRoot.mChildren.size();
-                        for (int i = 0; i < displayCount; ++i) {
-                            final DisplayContent dc = mRoot.mChildren.get(i);
-                            dc.updateShouldShowSystemDecorations();
-                        }
-                    }
-                }
-
-                // This call is crucial on user switch to ensure the Magnify IME state
-                // is correctly re-evaluated and applied for the new user.
-                mSettingsObserver.updateMagnifyIme();
-                mAtmService.mChainTracker.end();
-            };
-            if (!controller.isShellTransitionsEnabled()) {
-                applyUserChange.run();
-                return;
+            final ActionChain chain = mAtmService.mChainTracker.startTransit("setUser");
+            if (!chain.isCollecting() && controller.isShellTransitionsEnabled()) {
+                chain.attachTransition(controller.createTransition(TRANSIT_OPEN));
+                controller.requestStartTransition(chain.getTransition(),
+                        null /* trigger */, null /* remote */, null /* disp */);
             }
-            if (!DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()) {
-                final ActionChain chain = mAtmService.mChainTracker.startTransit("setUser");
-                if (!chain.isCollecting()) {
-                    chain.attachTransition(controller.createTransition(TRANSIT_OPEN));
-                    controller.requestStartTransition(chain.getTransition(),
-                            null /* trigger */, null /* remote */, null /* disp */);
-                }
-                applyUserChange.run();
+            prepareUserStart(newUserId);
+            switchUserInternal(newUserId);
+            mAtmService.mChainTracker.end();
+        }
+    }
+
+    /**
+     * Called when a new user is about to start.
+     */
+    public void prepareUserStart(@UserIdInt int newUserId) {
+        synchronized (mGlobalLock) {
+            mCurrentUserId = newUserId;
+            mDisplayWindowSettingsProvider.setOverrideSettingsForUser(newUserId);
+            mPolicy.setCurrentUserLw(newUserId);
+            mKeyguardDisableHandler.setCurrentUser(newUserId);
+            // This call is crucial on user switch to ensure the Magnify IME state
+            // is correctly re-evaluated and applied for the new user.
+            mSettingsObserver.updateMagnifyIme();
+        }
+    }
+
+    /**
+     * Starts a user-switch transition to the given user.
+     */
+    public void startUserSwitchTransition(@UserIdInt int oldUserId, @UserIdInt int newUserId,
+            UserState uss) {
+        synchronized (mGlobalLock) {
+            mRoot.mTaskSupervisor.mStartingUsers.add(uss);
+            final Runnable switchUserRunnable = () -> {
+                switchUserInternal(newUserId);
+                moveUserToForeground(newUserId, uss, "startUserSwitchTransition");
+            };
+
+            final TransitionController controller = mAtmService.getTransitionController();
+            if (!controller.isShellTransitionsEnabled()) {
+                switchUserRunnable.run();
                 return;
             }
             final Transition transition = new Transition(TRANSIT_OPEN, 0 /* flags */,
                     controller, mAtmService.mWindowManager.mSyncEngine);
             controller.startCollectOrQueue(transition, (deferred) -> {
-                final ActionChain chain = mAtmService.mChainTracker.start("setUser",
-                        transition);
+                final ActionChain chain = mAtmService.mChainTracker.start("setUser", transition);
                 final TransitionRequestInfo.UserChange userChange =
-                        DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()
-                                ? new TransitionRequestInfo.UserChange(mCurrentUserId,
-                                newUserId)
-                                : null;
+                           new TransitionRequestInfo.UserChange(oldUserId, newUserId);
                 controller.requestStartUserTransition(chain.getTransition(), userChange);
-                applyUserChange.run();
+                switchUserRunnable.run();
+                mAtmService.mChainTracker.end();
             });
+        }
+    }
+
+    private void switchUserInternal(@UserIdInt int newUserId) {
+        synchronized (mGlobalLock) {
+            // Hide windows that should not be seen by the new user.
+            mRoot.switchUser(newUserId);
+            mWindowPlacerLocked.performSurfacePlacement();
+
+            // Notify whether the root docked task exists for the current user
+            final DisplayContent displayContent = getDefaultDisplayContentLocked();
+
+            if (mDisplayReady) {
+                // If the display is already prepared, update the density.
+                // Otherwise, we'll update it when it's prepared.
+                final int forcedDensity = getForcedDisplayDensityForUserLocked(newUserId);
+                final int targetDensity = forcedDensity != 0
+                        ? forcedDensity : displayContent.getInitialDisplayDensity();
+                displayContent.setForcedDensity(targetDensity, UserHandle.USER_CURRENT);
+
+                // Because DisplayWindowSettingsProvider.mOverrideSettings has been reset for
+                // the new user, we need to update DisplayWindowSettings.mShouldShowSystemDecors
+                // to ensure it reflects the latest value.
+                if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
+                    final int displayCount = mRoot.mChildren.size();
+                    for (int i = 0; i < displayCount; ++i) {
+                        final DisplayContent dc = mRoot.mChildren.get(i);
+                        dc.updateShouldShowSystemDecorations();
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Moves a user to the foreground, either by starting its home activity or restoring its
+     * previous tasks.
+     */
+    public void moveUserToForeground(@UserIdInt int newUserId, UserState uss, String reason) {
+        boolean homeInFront = mAtmService.mInternal.switchUser(newUserId, uss);
+        if (homeInFront) {
+            mAtmService.mInternal.startHomeActivity(newUserId, reason);
+        } else {
+            mAtmService.mInternal.resumeTopActivities(false /* scheduleIdle */);
         }
     }
 
@@ -5215,9 +5226,11 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized (mGlobalLock) {
             final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
             if (displayContent == null) {
-                throw new IllegalArgumentException(
+                Slog.w(
+                        TAG,
                         "Trying to unregister system gesture exclusion event for invalid display: "
                                 + displayId);
+                return;
             }
             displayContent.unregisterSystemGestureExclusionListener(listener);
         }

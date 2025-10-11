@@ -15,7 +15,7 @@ package com.android.systemui.clocks.sample
 
 import android.content.Context
 import android.icu.util.TimeZone
-import com.android.systemui.customization.clocks.DigitalTimeFormatter
+import com.android.systemui.customization.clocks.DigitalFormatter
 import com.android.systemui.customization.clocks.TimeKeeper
 import com.android.systemui.plugins.keyguard.data.model.AlarmData
 import com.android.systemui.plugins.keyguard.data.model.WeatherData
@@ -37,7 +37,7 @@ class SampleClockController(
     private val messageBuffers: ClockMessageBuffers,
     private val timeKeeper: TimeKeeper,
 ) : ClockController {
-    val timeFormatter = DigitalTimeFormatter("hh:mm", timeKeeper)
+    val timeFormatter = DigitalFormatter.Time("hh:mm", timeKeeper)
 
     // Small clock above notifications
     override val smallClock =
@@ -72,8 +72,6 @@ class SampleClockController(
 
     override val events =
         object : ClockEvents {
-            override var isReactiveTouchInteractionEnabled = false
-
             override fun onTimeZoneChanged(timeZone: TimeZone) {
                 timeFormatter.timeKeeper.timeZone = timeZone
 

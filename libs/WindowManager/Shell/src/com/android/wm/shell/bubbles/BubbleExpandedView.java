@@ -747,11 +747,22 @@ public class BubbleExpandedView extends LinearLayout {
      * and setting {@code false} actually means rendering the contents in transparent.
      */
     public void setContentVisibility(boolean visibility) {
+        BubbleLog.d(
+                "BubbleExpandedView.setContentVisibility: visible = %b, task view exists = %b, "
+                        + "animating = %b", visibility, mTaskView != null, mIsAnimating);
         mIsContentVisible = visibility;
         if (mTaskView != null && !mIsAnimating) {
             mTaskView.setAlpha(visibility ? 1f : 0f);
             mPointerView.setAlpha(visibility ? 1f : 0f);
         }
+    }
+
+    /**
+     * Returns whether the contents of the task view is visible or not (does not account for
+     * alpha or view visibility).
+     */
+    public boolean getContentVisibility() {
+        return mIsContentVisible;
     }
 
     @Nullable

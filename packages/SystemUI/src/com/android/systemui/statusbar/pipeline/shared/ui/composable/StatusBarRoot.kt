@@ -58,6 +58,7 @@ import com.android.compose.theme.PlatformTheme
 import com.android.compose.theme.colorAttr
 import com.android.keyguard.AlphaOptimizedLinearLayout
 import com.android.systemui.Flags
+import com.android.systemui.clock.ClockModernization
 import com.android.systemui.clock.ui.composable.Clock
 import com.android.systemui.clock.ui.viewmodel.AmPmStyle
 import com.android.systemui.clock.ui.viewmodel.ClockViewModel
@@ -423,7 +424,7 @@ private fun addStartSideComposable(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                     )
                     .apply {
-                        if (showDate) {
+                        if (showDate || ClockModernization.isEnabled) {
                             gravity = android.view.Gravity.CENTER_VERTICAL
                         }
                     }
@@ -438,30 +439,40 @@ private fun addStartSideComposable(
                     }
 
                 var clockViewModel: ClockViewModel? = null
-                if (showDate || Flags.clockModernization()) {
+                if (showDate || ClockModernization.isEnabled) {
                     clockViewModel =
                         rememberViewModel("HomeStatusBar.Clock") {
                             clockViewModelFactory.create(AmPmStyle.Gone)
                         }
                 }
 
-                if (Flags.clockModernization()) {
+                if (ClockModernization.isEnabled) {
                     clockView.visibility = View.GONE
-                    Clock(
-                        clockViewModel = checkNotNull(clockViewModel),
-                        modifier =
-                            Modifier.onGloballyPositioned { coordinates ->
-                                val boundsInWindow = coordinates.boundsInWindow()
-                                val bounds =
-                                    Rect(
-                                        boundsInWindow.left.toInt(),
-                                        boundsInWindow.top.toInt(),
-                                        boundsInWindow.right.toInt(),
-                                        boundsInWindow.bottom.toInt(),
-                                    )
-                                statusBarBoundsViewModel.updateComposeClockBounds(bounds)
-                            },
-                    )
+                    WithAdaptiveTint(
+                        isDarkProvider = { bounds ->
+                            statusBarViewModel.areaDark.isDarkTheme(bounds)
+                        },
+                        isHighlighted = false,
+                    ) { tint ->
+                        Clock(
+                            clockViewModel = checkNotNull(clockViewModel),
+                            textColor = tint,
+                            modifier =
+                                Modifier.padding(end = 2.dp)
+                                    .wrapContentSize()
+                                    .onGloballyPositioned { coordinates ->
+                                        val boundsInWindow = coordinates.boundsInWindow()
+                                        val bounds =
+                                            Rect(
+                                                boundsInWindow.left.toInt(),
+                                                boundsInWindow.top.toInt(),
+                                                boundsInWindow.right.toInt(),
+                                                boundsInWindow.bottom.toInt(),
+                                            )
+                                        statusBarBoundsViewModel.updateComposeClockBounds(bounds)
+                                    },
+                        )
+                    }
                 }
 
                 if (showDate) {

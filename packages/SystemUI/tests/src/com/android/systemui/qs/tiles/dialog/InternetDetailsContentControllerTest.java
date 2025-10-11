@@ -259,8 +259,7 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
                 mock(KeyguardUpdateMonitor.class), mGlobalSettings, mKeyguardStateController,
                 mWindowManager, mToastFactory, mWorkerHandler, mCarrierConfigTracker,
                 mLocationController, mDialogTransitionAnimator, mWifiStateWorker, mFlags,
-                mKosmos.getShadeDialogContextInteractor(),
-                mCarrierNameCustomization);
+                mKosmos.getShadeDialogContextInteractor(), mCarrierNameCustomization);
         mSubscriptionManager.addOnSubscriptionsChangedListener(mExecutor,
                 mInternetDetailsContentController.mOnSubscriptionsChangedListener);
         mInternetDetailsContentController.onStart(mInternetDialogCallback, true);

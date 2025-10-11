@@ -99,6 +99,7 @@ import android.app.IServiceConnection;
 import android.app.KeyguardManager;
 import android.app.admin.SecurityLog.SecurityEvent;
 import android.app.admin.flags.Flags;
+import android.app.admin.metadata.PolicyTransportValueConvertor;
 import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
@@ -17279,6 +17280,29 @@ public class DevicePolicyManager {
     }
 
     /**
+     * Specifies enabled Common Criteria Mode.
+     * When the device is in Common Criteria mode, certain device functionalities are tuned to meet
+     * the higher security level required by Common Criteria certification.
+     *
+     * @hide
+     */
+    public static final int COMMON_CRITERIA_MODE_ENABLED = 0;
+
+    /**
+     * Specifies disabled Common Criteria Mode.
+     *
+     * @hide
+     */
+    public static final int COMMON_CRITERIA_MODE_DISABLED = 1;
+
+    /** @hide */
+    @IntDef(
+            prefix = {"COMMON_CRITERIA_MODE_"},
+            value = {COMMON_CRITERIA_MODE_ENABLED, COMMON_CRITERIA_MODE_DISABLED})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface CommonCriteriaMode {}
+
+    /**
      * Called by device owner or profile owner of an organization-owned managed profile to toggle
      * Common Criteria mode for the device. When the device is in Common Criteria mode,
      * certain device functionalities are tuned to meet the higher
@@ -18732,7 +18756,7 @@ public class DevicePolicyManager {
         if (mService != null) {
             try {
                 mService.setPolicy(mContext.getPackageName(), id.getId(), scope,
-                        policyValueToTransport(value));
+                        policyValueToTransport(id, value));
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -18740,15 +18764,30 @@ public class DevicePolicyManager {
     }
 
     @Nullable
-    private static PolicyValueTransport policyValueToTransport(@Nullable Object value) {
-        return switch (value) {
-            case null -> null;
-            case Integer i -> PolicyValueTransport.integerField(i);
-            case Boolean b -> PolicyValueTransport.booleanField(b);
-            default -> throw new IllegalArgumentException(
-                    "Type of policy is not supported: " + value + "(" + value.getClass().getName()
-                            + ")");
-        };
+    private static <T> PolicyValueTransport policyValueToTransport(
+            @NonNull PolicyIdentifier<T> id,
+            @Nullable T value
+    ) {
+        if (value == null) {
+            return null;
+        }
+
+        return PolicyTransportValueConvertor.getInstance(id).toTransport(value);
+    }
+
+    /**
+     * Template free version of setPolicy to clear policies. The other type specific versions
+     * defined below don't allow specifying null as a value.
+     *
+     * @hide
+     */
+    @TestApi
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
+    public void clearPolicy(
+            @NonNull String key,
+            @PolicyScope int scope) {
+        // TODO(b/434920631): Remove this method and use {@link #setPolicy} in tests directly.
+        setPolicy(new PolicyIdentifier(key), scope, null);
     }
 
     /**

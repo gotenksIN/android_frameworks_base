@@ -25,4 +25,6 @@ package android.app.admin;
 union PolicyValueTransport {
     int integerField;
     boolean booleanField;
+    String stringField;
+    List<String> listOfStringField;
 }

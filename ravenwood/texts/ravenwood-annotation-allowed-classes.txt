@@ -38,6 +38,7 @@ android.content.ClipboardManager
 android.content.ComponentCallbacksController
 android.content.ComponentName
 android.content.ContentProvider
+android.content.ContentResolver
 android.content.ContentUris
 android.content.ContentValues
 android.content.Context
@@ -685,7 +686,7 @@ com.android.server.ServiceThread
 com.android.server.SystemService
 com.android.server.SystemServiceManager
 
-com.android.server.am.BoundServiceSession
+com.android.server.am.BinderSession
 com.android.server.am.ConnectionRecord
 com.android.server.am.OomAdjuster
 com.android.server.am.psc.AsyncBatchSession

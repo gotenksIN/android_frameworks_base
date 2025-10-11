@@ -167,12 +167,9 @@
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"रेकर्ड गर्नुहोस्"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"सेयर गर्नुहोस्"</string>
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"सेयर गर्न कुनै एप चयन गर्नुहोस्"</string>
-    <!-- no translation found for screen_share_audio_sharing_text (7829391478284315787) -->
-    <skip />
-    <!-- no translation found for screen_share_app_window_sharing_title (2063554880747318383) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer (3953761426122528262) -->
-    <skip />
+    <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"अडियो सेयर गर्नुहोस्"</string>
+    <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"एपको विन्डो सेयर गर्नुहोस्"</string>
+    <string name="screen_share_disclaimer" msgid="3953761426122528262">"तपाईंले स्क्रिन सेयर गर्दा तपाईंको स्क्रिनमा भएका सामग्री देखिन्छन्"</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"विन्डोको स्क्रिनसट लिनुहोस्"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"विन्डो रेकर्ड गर्नुहोस्"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"चयन गरिएको भागको स्क्रिनसट लिनुहोस्"</string>
@@ -368,6 +365,8 @@
     <string name="accessibility_location_active" msgid="2845747916764660369">"स्थान अनुरोधहरू सक्रिय"</string>
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"सेन्सर निष्क्रिय नामक सुविधा सक्रिय छ"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"सबै सूचनाहरू हटाउनुहोस्।"</string>
+    <!-- no translation found for accessibility_notification_bell (7149451526721220526) -->
+    <skip />
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{समूहभित्र थप # सूचना छ।}other{समूहभित्र थप # वटा सूचना छन्।}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"स्क्रिनलाई ल्यान्डस्केप अवस्थामा बन्द गरिएको छ।"</string>
@@ -429,6 +428,14 @@
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Wi-Fi वा इन्टरनेट कनेक्सन छैन"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"डिस्कनेक्ट गर्नुहोस्"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"हालको माइक"</string>
+    <!-- no translation found for quick_settings_audio_output_section_title (3448300919285193209) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_section_title (9203723659866975215) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_disclaimer_text (442891508001590727) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_effects_section_title (6770520531879816578) -->
+    <skip />
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"ब्राइटनेस"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"कलर इन्भर्सन"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"कलर करेक्सन"</string>
@@ -755,11 +762,9 @@
     <string name="monitoring_description_personal_profile_named_vpn" msgid="5083909710727365452">"तपाईंका व्यक्तिगत एपहरू <xliff:g id="VPN_APP">%1$s</xliff:g> मार्फत इन्टरनेटमा कनेक्ट गरिएका छन्। तपाईंको VPN प्रदायक तपाईंको इमेल र ब्राउजिङ डेटासहित नेटवर्कसम्बन्धी क्रियाकलाप हेर्न सक्छन्।"</string>
     <string name="monitoring_description_vpn_settings_separator" msgid="8292589617720435430">" "</string>
     <string name="monitoring_description_vpn_settings" msgid="5264167033247632071">"VPN सम्बन्धी सेटिङहरू खोल्नुहोस्"</string>
-    <!-- no translation found for monitoring_description_parental_controls_legacy (3331029441820725897) -->
-    <skip />
+    <string name="monitoring_description_parental_controls_legacy" msgid="3331029441820725897">"यो डिभाइस तपाईंका अभिभावक व्यवस्थापन गर्नुहुन्छ। तपाईंका अभिभावक तपाईंले प्रयोग गर्ने एप, तपाईंको लोकेसन र तपाईंको स्क्रिन टाइम जस्ता जानकारी हेर्न तथा व्यवस्थापन गर्न सक्नुहुन्छ।"</string>
     <string name="monitoring_description_pin_protection" msgid="1983580207046670355">"तपाईंको डिभाइसमा सेट गरिएका दैनिक सीमा र डाउनटाइम जस्ता केही कन्ट्रोलहरू PIN प्रयोग गरेर मात्र परिवर्तन गर्न सकिन्छ।"</string>
-    <!-- no translation found for monitoring_description_parental_controls (4255592993669461543) -->
-    <skip />
+    <string name="monitoring_description_parental_controls" msgid="4255592993669461543">"केही कन्ट्रोलहरू तपाईंका अभिभावकले मात्र बदल्न मिल्छ"</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"TrustAgent ले खुला राखेको"</string>
     <string name="kg_prompt_after_adaptive_auth_lock" msgid="6065186971000690782">"स्क्रिन लक गरिएको छ। धेरै पटक प्रमाणीकरण गर्ने प्रयास गरिएको छ।"</string>
@@ -1144,6 +1149,8 @@
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"<xliff:g id="ID_2">%2$d</xliff:g> मध्ये पृष्ठ <xliff:g id="ID_1">%1$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"<xliff:g id="ID_1">%1$s</xliff:g> अन गर्ने हो?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"एक्सन "<annotation id="action_key_icon">"आइकन"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> भनेको <xliff:g id="ID_3">^3</xliff:g> प्रयोग गर्ने किबोर्ड सर्टकट हो। <xliff:g id="ID_4">^4</xliff:g>"</string>
+    <!-- no translation found for accessibility_key_gesture_dialog_screen_reader_tts (1298171063228024716) -->
+    <skip />
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"<xliff:g id="ID_1">%1$s</xliff:g> को किबोर्डका सर्टकट अन गर्ने हो?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"अन नगर्नुहोस्"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"सर्टकट अन गर्नुहोस्"</string>
@@ -1151,8 +1158,7 @@
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572">"एक्सन "<annotation id="action_key_icon">"आइकन"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> भनेको <xliff:g id="ID_3">^3</xliff:g> अर्थात् सर्वसुलभता कायम गर्ने सुविधा प्रयोग गर्नका लागि किबोर्डको सर्टकट हो। तपाईं यसका सहायताले स्क्रिनमा तुरुन्तै जुम इन गरेर त्यसमा भएको कन्टेन्ट अझ ठुलो बनाउन सक्नुहुन्छ। जुम इन गर्ने सुविधा अन भएपछि जुम मिलाउन एक्सन "<annotation id="action_key_icon">"आइकन"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> र \"+\" वा \"-\" थिच्नुहोस्।"</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"सर्टकट अफ गर्नुहोस्"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"अन राखिरहनुहोस्"</string>
-    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_content (389338862762665003) -->
-    <skip />
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003">"एक्सन "<annotation id="action_key_icon">"आइकन"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> भनेको <xliff:g id="ID_3">^3</xliff:g> प्रयोग गर्नका लागि किबोर्डको सर्टकट हो। <xliff:g id="ID_4">^3</xliff:g> भनेको वस्तुहरू ठुलो आवाजमा पढेर सुनाउने स्क्रिन रिडर हो। स्क्रिनमा भएको कुरा देख्न गाह्रो हुने मान्छेहरूका लागि यो सुविधा उपयोगी हुन सक्छ। यसले तपाईंको डिभाइसले काम गर्ने तरिका परिवर्तन गर्न सक्छ।"</string>
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"तपाईंले कारबाही "<annotation id="action_key_icon">"आइकन"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> थिच्नुभयो भने <xliff:g id="ID_3">^3</xliff:g> अन हुन्छ। यो सर्वसुलभता कायम गर्ने एउटा सुविधा हो। तपाईं यो सुविधा प्रयोग गरेर आफ्नो डिभाइस ह्यान्ड्सफ्री तरिकाले नियन्त्रण गर्न सक्नुहुन्छ।"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"लक स्क्रिन"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"सट डाउन गरिँदै छ..."</string>
@@ -1712,8 +1718,7 @@
     <string name="back_button_on_bouncer" msgid="809134628434396761">"पछाडि"</string>
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"अघिल्लो"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"अर्को"</string>
-    <!-- no translation found for accessibility_pager_dots_navigate_to_next_page_action (7662720613169169465) -->
-    <skip />
+    <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"अर्को पेजमा जानुहोस्"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"स्वतः भर्नुहोस्"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"एक्स्पान्ड गर्नुहोस्"</string>
 </resources>

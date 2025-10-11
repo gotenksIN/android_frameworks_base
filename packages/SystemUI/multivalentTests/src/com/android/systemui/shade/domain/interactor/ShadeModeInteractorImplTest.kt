@@ -16,10 +16,13 @@
 
 package com.android.systemui.shade.domain.interactor
 
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
 import android.provider.Settings
 import androidx.compose.ui.Alignment
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.android.systemui.Flags.FLAG_DUAL_SHADE
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.common.ui.data.repository.fakeConfigurationRepository
 import com.android.systemui.display.data.repository.displayStateRepository
@@ -46,6 +49,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
     private val Kosmos.underTest by Kosmos.Fixture { shadeModeInteractor }
 
     @Test
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun legacyShadeMode_narrowScreen_singleShade() =
         kosmos.runTest {
             val shadeMode by collectLastValue(underTest.shadeMode)
@@ -55,6 +59,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun legacyShadeMode_narrowLargeScreen_singleShade() =
         kosmos.runTest {
             val shadeMode by collectLastValue(underTest.shadeMode)
@@ -66,6 +71,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun legacyShadeMode_wideScreen_singleShade() =
         kosmos.runTest {
             val shadeMode by collectLastValue(underTest.shadeMode)
@@ -75,6 +81,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun legacyShadeMode_wideScreen_splitShade() =
         kosmos.runTest {
             val shadeMode by collectLastValue(underTest.shadeMode)
@@ -84,27 +91,14 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
-    fun defaultShadeMode_splitShadeOverridden_dualShade() =
-        kosmos.runTest {
-            enableSplitShade()
-            val shadeMode by collectLastValue(underTest.shadeMode)
-            assertThat(shadeMode).isEqualTo(ShadeMode.Split)
-
-            overrideResource(R.bool.config_useDualShadeSetting, false)
-            overrideResource(R.bool.config_dualShadeEnabledByDefault, true)
-            fakeConfigurationRepository.onConfigurationChange()
-
-            assertThat(shadeMode).isEqualTo(ShadeMode.Dual)
-        }
-
-    @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun defaultShadeMode_singleShadeOverridden_dualShade() =
         kosmos.runTest {
             enableSingleShade()
             val shadeMode by collectLastValue(underTest.shadeMode)
             assertThat(shadeMode).isEqualTo(ShadeMode.Single)
 
-            overrideResource(R.bool.config_useDualShadeSetting, false)
+            overrideResource(com.android.settingslib.R.bool.config_useDualShadeSetting, false)
             overrideResource(R.bool.config_dualShadeEnabledByDefault, true)
             fakeConfigurationRepository.onConfigurationChange()
 
@@ -112,6 +106,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun shadeMode_wideScreen_isDual() =
         kosmos.runTest {
             val shadeMode by collectLastValue(underTest.shadeMode)
@@ -121,6 +116,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun shadeMode_narrowScreen_isDual() =
         kosmos.runTest {
             val shadeMode by collectLastValue(underTest.shadeMode)
@@ -130,6 +126,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun isDualShade_settingEnabledSceneContainerEnabled_returnsTrue() =
         kosmos.runTest {
             // TODO(b/391578667): Add a test case for user switching once the bug is fixed.
@@ -141,6 +138,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun isDualShade_settingDisabled_returnsFalse() =
         kosmos.runTest {
             val shadeMode by collectLastValue(underTest.shadeMode)
@@ -151,6 +149,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun isFullWidthShade_largeScreenPortrait() =
         kosmos.runTest {
             val isFullWidthShade by collectLastValue(underTest.isFullWidthShade)
@@ -172,6 +171,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun isFullWidthShade_largeScreenLandscape() =
         kosmos.runTest {
             val isFullWidthShade by collectLastValue(underTest.isFullWidthShade)
@@ -193,6 +193,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun isFullWidthShade_compactScreenPortrait() =
         kosmos.runTest {
             val isFullWidthShade by collectLastValue(underTest.isFullWidthShade)
@@ -214,6 +215,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun isFullWidthShade_compactScreenLandscape() =
         kosmos.runTest {
             val isFullWidthShade by collectLastValue(underTest.isFullWidthShade)
@@ -245,6 +247,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun notificationStackHorizontalAlignment_splitShade_endAligned() =
         kosmos.runTest {
             val alignment by collectLastValue(underTest.notificationStackHorizontalAlignment)
@@ -255,6 +258,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun notificationStackHorizontalAlignment_dualShadeNarrow_centeredHorizontally() =
         kosmos.runTest {
             val alignment by collectLastValue(underTest.notificationStackHorizontalAlignment)
@@ -265,6 +269,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun notificationStackHorizontalAlignment_dualShadeWide_startAligned() =
         kosmos.runTest {
             val alignment by collectLastValue(underTest.notificationStackHorizontalAlignment)
@@ -275,6 +280,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun notificationStackHorizontalAlignment_desktopWithTopEndConfig_endAligned() =
         kosmos.runTest {
             overrideResource(R.bool.config_notificationShadeOnTopEnd, true)
@@ -287,6 +293,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
         }
 
     @Test
+    @EnableFlags(FLAG_DUAL_SHADE)
     fun notificationStackHorizontalAlignment_desktopWithoutTopEndConfig_startAligned() =
         kosmos.runTest {
             overrideResource(R.bool.config_notificationShadeOnTopEnd, false)

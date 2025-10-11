@@ -167,12 +167,9 @@
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"ရုပ်သံဖမ်းရန်"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"မျှဝေရန်"</string>
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"မျှဝေရန် အက်ပ်ရွေးပါ"</string>
-    <!-- no translation found for screen_share_audio_sharing_text (7829391478284315787) -->
-    <skip />
-    <!-- no translation found for screen_share_app_window_sharing_title (2063554880747318383) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer (3953761426122528262) -->
-    <skip />
+    <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"အသံမျှဝေရန်"</string>
+    <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"အက်ပ်ဝင်းဒိုးကို မျှဝေခြင်း"</string>
+    <string name="screen_share_disclaimer" msgid="3953761426122528262">"မျှဝေသောအခါ သင့်စခရင်ရှိ ဒစ်ဂျစ်တယ်မီဒီယာများကို မြင်ရသည်"</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"ဝင်ဒိုးကို ဖန်သားပြင်ဓာတ်ပုံ ရိုက်ရန်"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"ဝင်းဒိုးကို ရိုက်ကူးရန်"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"ရွေးထားသောနေရာကို ဖန်သားပြင်ဓာတ်ပုံရိုက်ရန်"</string>
@@ -368,6 +365,8 @@
     <string name="accessibility_location_active" msgid="2845747916764660369">"တည်နေရာပြ တောင်းဆိုချက်များ အသက်ဝင်ရန်"</string>
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"အာရုံခံစနစ်များ ပိတ်ထားသည်"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"အကြောင်းကြားချက်အားလုံးကို ထုတ်ပစ်သည်။"</string>
+    <!-- no translation found for accessibility_notification_bell (7149451526721220526) -->
+    <skip />
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{အထဲတွင် နောက်ထပ်အကြောင်းကြားချက် # ခု ရှိသည်။}other{အထဲတွင် နောက်ထပ်အကြောင်းကြားချက် # ခု ရှိသည်။}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"ဖန်သားပြင် အနေအထားက အလျားလိုက်အဖြစ် ပုံသေ လုပ်ထားပါသည်"</string>
@@ -429,6 +428,14 @@
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Wi-Fi (သို့) အီသာနက်ချိတ်ဆက်မှု မရှိပါ"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"ချိတ်ဆက်မှုဖြုတ်ရန်"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"လက်ရှိမိုက်မှာ"</string>
+    <!-- no translation found for quick_settings_audio_output_section_title (3448300919285193209) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_section_title (9203723659866975215) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_disclaimer_text (442891508001590727) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_effects_section_title (6770520531879816578) -->
+    <skip />
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"အလင်းတောက်ပမှု"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"အရောင်ပြောင်းပြန်ပြုလုပ်ရန်"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"အရောင် အမှန်ပြင်ခြင်း"</string>
@@ -755,11 +762,9 @@
     <string name="monitoring_description_personal_profile_named_vpn" msgid="5083909710727365452">"သင့်ကိုယ်ရေးသုံးအက်ပ်များကို <xliff:g id="VPN_APP">%1$s</xliff:g> မှတစ်ဆင့် အင်တာနက်ချိတ်ထားသည်။ အီးမေးလ်များနှင့် ဖွင့်ကြည့်ထားသည့်မှတ်တမ်းဒေတာများ အပါအဝင် သင့်ကွန်ရက်လုပ်ဆောင်ချက်များကို VPN ပံ့ပိုးသူက မြင်ရသည်။"</string>
     <string name="monitoring_description_vpn_settings_separator" msgid="8292589617720435430">" "</string>
     <string name="monitoring_description_vpn_settings" msgid="5264167033247632071">"VPN ဆက်တင်များကို ဖွင့်ရန်"</string>
-    <!-- no translation found for monitoring_description_parental_controls_legacy (3331029441820725897) -->
-    <skip />
+    <string name="monitoring_description_parental_controls_legacy" msgid="3331029441820725897">"ဤစက်ကို သင့်မိဘက စီမံသည်။ သင့်မိဘက သင်သုံးသောအက်ပ်များ၊ သင်၏တည်နေရာနှင့် အသုံးပြုချိန်ကဲ့သို့သော အချက်အလက်များကို ကြည့်နိုင်၊ စီမံနိုင်သည်။"</string>
     <string name="monitoring_description_pin_protection" msgid="1983580207046670355">"နေ့စဉ်ကန့်သတ်ချက်နှင့် နားချိန် ကဲ့သို့သော သင့်စက်ပေါ်ရှိ သတ်မှတ်ချက်အချို့ကို ပင်နံပါတ်ဖြင့်သာ ပြောင်းနိုင်သည်။"</string>
-    <!-- no translation found for monitoring_description_parental_controls (4255592993669461543) -->
-    <skip />
+    <string name="monitoring_description_parental_controls" msgid="4255592993669461543">"သတ်မှတ်ချက်အချို့ကို သင့်မိဘကသာ ပြောင်းနိုင်သည်"</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"TrustAgent ဖြင့် ဆက်ဖွင့်ထားရန်"</string>
     <string name="kg_prompt_after_adaptive_auth_lock" msgid="6065186971000690782">"စခရင်လော့ခ်ကျနေသည်။ အထောက်အထားစိစစ်ကြိမ်ရေ များလွန်းသည်။"</string>
@@ -1144,6 +1149,8 @@
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"စာမျက်နှာ <xliff:g id="ID_2">%2$d</xliff:g> အနက်မှ စာမျက်နှာ <xliff:g id="ID_1">%1$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"<xliff:g id="ID_1">%1$s</xliff:g> ကို ဖွင့်မလား။"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"လုပ်ဆောင်ချက် "<annotation id="action_key_icon">"သင်္ကေတ"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> သည် <xliff:g id="ID_3">^3</xliff:g> အသုံးပြုရန် လက်ကွက်ဖြတ်လမ်းဖြစ်သည်။ <xliff:g id="ID_4">^4</xliff:g>"</string>
+    <!-- no translation found for accessibility_key_gesture_dialog_screen_reader_tts (1298171063228024716) -->
+    <skip />
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"<xliff:g id="ID_1">%1$s</xliff:g> လက်ကွက်ဖြတ်လမ်းကို ဖွင့်မလား"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"မဖွင့်ပါနှင့်"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"ဖြတ်လမ်းလင့်ခ် ဖွင့်ရန်"</string>
@@ -1151,8 +1158,7 @@
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572">"လုပ်ဆောင်ချက် "<annotation id="action_key_icon">"သင်္ကေတ"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> သည် အများသုံးနိုင်သည့် ဝန်ဆောင်မှု <xliff:g id="ID_3">^3</xliff:g> ကို သုံးရန် လက်ကွက်ဖြတ်လမ်းဖြစ်သည်။ ၎င်းသည် အကြောင်းအရာကို ပိုကြီးအောင်လုပ်ရန်အတွက် ဖန်သားပြင်တွင် အမြန်ဇူးမ်ဆွဲခွင့်ပြုသည်။ ချဲ့ခြင်းကို ဖွင့်ပြီးသည်နှင့် ‘လုပ်ဆောင်ချက်’ "<annotation id="action_key_icon">"သင်္ကေတ"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> နှင့် ဇူးမ်ချိန်ညှိရန် “+” (သို့) “-” ကို နှိပ်ပါ။"</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"ဖြတ်လမ်းလင့်ခ်ကို ပိတ်ရန်"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"ဖွင့်ထားရန်"</string>
-    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_content (389338862762665003) -->
-    <skip />
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003">"လုပ်ဆောင်ချက် "<annotation id="action_key_icon">"သင်္ကေတ"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> သည် <xliff:g id="ID_3">^3</xliff:g> အသုံးပြုရန် လက်ကွက်ဖြတ်လမ်းဖြစ်သည်။ <xliff:g id="ID_4">^3</xliff:g> သည် ဖန်သားပြင်ဖတ်အက်ပ်ဖြစ်ပြီး သင့်အတွက် အကြောင်းအရာများကို အသံထွက်ဖတ်ပြပေးသည်။ ၎င်းသည် စခရင်ကိုကြည့်ရန် အခက်အခဲရှိသူများအတွက် အထောက်အကူဖြစ်စေသည်။ ၎င်းက သင့်စက်အလုပ်လုပ်ပုံကို ပြောင်းလဲနိုင်သည်။"</string>
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"‘လုပ်ဆောင်ချက်’ "<annotation id="action_key_icon">"သင်္ကေတ"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> ကို နှိပ်ခြင်းဖြင့် အများသုံးနိုင်သည့် ဝန်ဆောင်မှု <xliff:g id="ID_3">^3</xliff:g> ကို ဖွင့်နိုင်သည်။ ၎င်းက သင့်စက်ပစ္စည်းကို လက်လွတ်ထိန်းချုပ်ခွင့်ပြုသည်။"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"လော့ခ်မျက်နှာပြင်"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"စက်ပိတ်နေသည်…"</string>

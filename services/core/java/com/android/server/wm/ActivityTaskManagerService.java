@@ -68,6 +68,7 @@ import static android.provider.Settings.Global.DEVELOPMENT_ENABLE_NON_RESIZABLE_
 import static android.provider.Settings.Global.DEVELOPMENT_FORCE_RESIZABLE_ACTIVITIES;
 import static android.provider.Settings.Global.DEVELOPMENT_FORCE_RTL;
 import static android.provider.Settings.Global.HIDE_ERROR_DIALOGS;
+import static android.provider.Settings.System.DEFAULT_DEVICE_FONT_SCALE;
 import static android.provider.Settings.System.FONT_SCALE;
 import static android.service.controls.flags.Flags.homePanelDream;
 import static android.service.dreams.Flags.dreamsV2;
@@ -2903,6 +2904,20 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         stopLockTaskModeInternal(null, true /* isSystemCaller */);
     }
 
+    @Override
+    public void rebuildSystemLockTaskPinnedMode() {
+        enforceTaskPermission("rebuildSystemLockTaskPinnedMode");
+        // This makes inner call to look as if it was initiated by system.
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            synchronized (mGlobalLock) {
+                getLockTaskController().rebuildSystemLockTaskPinnedMode();
+            }
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+    }
+
     void startLockTaskMode(@Nullable Task task, boolean isSystemCaller) {
         ProtoLog.w(WM_DEBUG_LOCKTASK, "startLockTaskMode: %s", task);
         if (task == null || task.mLockTaskAuth == LOCK_TASK_AUTH_DONT_LOCK) {
@@ -5664,8 +5679,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             return;
         }
 
+        final float defaultFontScale = Settings.System.getFloatForUser(
+                mContext.getContentResolver(), DEFAULT_DEVICE_FONT_SCALE, 1.0f, userId);
         final float scaleFactor = Settings.System.getFloatForUser(mContext.getContentResolver(),
-                FONT_SCALE, 1.0f, userId);
+                FONT_SCALE, defaultFontScale, userId);
 
         synchronized (mGlobalLock) {
             if (getGlobalConfiguration().fontScale == scaleFactor) {
@@ -6431,7 +6448,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     @Override
-    public void setRunningRemoteTransitionDelegate(IApplicationThread delegate) {
+    public void setRunningRemoteTransitionDelegate(IBinder transitionToken) {
+        final Transition transition = Transition.fromBinder(transitionToken);
+        if (transition == null) return;
+        final IApplicationThread delegate = transition.mRemoteDelegate;
         final TransitionController controller = getTransitionController();
         // A quick path without entering WM lock.
         if (delegate != null && controller.mRemotePlayer.reportRunning(delegate)) {

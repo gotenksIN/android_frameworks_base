@@ -167,12 +167,9 @@
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Spela in"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Dela"</string>
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Välj en app att dela"</string>
-    <!-- no translation found for screen_share_audio_sharing_text (7829391478284315787) -->
-    <skip />
-    <!-- no translation found for screen_share_app_window_sharing_title (2063554880747318383) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer (3953761426122528262) -->
-    <skip />
+    <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Dela ljud"</string>
+    <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Dela appfönster"</string>
+    <string name="screen_share_disclaimer" msgid="3953761426122528262">"När du delar är innehållet på skärmen synligt"</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Ta en skärmbild av fönstret"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Spela in fönstret"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Ta en skärmbild av det markerade området"</string>
@@ -368,6 +365,8 @@
     <string name="accessibility_location_active" msgid="2845747916764660369">"Det finns aktiva platsförfrågningar"</string>
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"Sensorer har inaktiverats"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"Ta bort alla meddelanden."</string>
+    <!-- no translation found for accessibility_notification_bell (7149451526721220526) -->
+    <skip />
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"<xliff:g id="NUMBER">%s</xliff:g> till"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{# till avisering i gruppen.}other{# till aviseringar i gruppen.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"Bildskärmens riktning är nu låst i liggande format."</string>
@@ -429,6 +428,14 @@
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Ingen wifi- eller Ethernet-anslutning"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"Koppla från"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"Nuvarande mikrofon är"</string>
+    <!-- no translation found for quick_settings_audio_output_section_title (3448300919285193209) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_section_title (9203723659866975215) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_disclaimer_text (442891508001590727) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_effects_section_title (6770520531879816578) -->
+    <skip />
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"Ljusstyrka"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"Färg­invertering"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"Färg­korrigering"</string>
@@ -755,11 +762,9 @@
     <string name="monitoring_description_personal_profile_named_vpn" msgid="5083909710727365452">"Dina privata appar är anslutna till internet via <xliff:g id="VPN_APP">%1$s</xliff:g>. Din nätverksaktivitet, till exempel e-post och webbinformation, är synlig för VPN-leverantören."</string>
     <string name="monitoring_description_vpn_settings_separator" msgid="8292589617720435430">" "</string>
     <string name="monitoring_description_vpn_settings" msgid="5264167033247632071">"Öppna VPN-inställningarna"</string>
-    <!-- no translation found for monitoring_description_parental_controls_legacy (3331029441820725897) -->
-    <skip />
+    <string name="monitoring_description_parental_controls_legacy" msgid="3331029441820725897">"Den här enheten hanteras av din förälder. Föräldern kan se och hantera information som vilka appar du använder, din plats och din skärmtid."</string>
     <string name="monitoring_description_pin_protection" msgid="1983580207046670355">"Vissa inställningar på enheten, som dagliga gränser och avbrottstid, går bara att ändra med pinkoden."</string>
-    <!-- no translation found for monitoring_description_parental_controls (4255592993669461543) -->
-    <skip />
+    <string name="monitoring_description_parental_controls" msgid="4255592993669461543">"Vissa inställningar kan bara ändras av din förälder"</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"Hålls olåst med TrustAgent"</string>
     <string name="kg_prompt_after_adaptive_auth_lock" msgid="6065186971000690782">"Skärmen har låsts. För många autentiseringsförsök."</string>
@@ -1144,6 +1149,8 @@
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"Sida <xliff:g id="ID_1">%1$d</xliff:g> av <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"Vill du aktivera <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"Åtgärden "<annotation id="action_key_icon">"ikon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> är kortkommandot till <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
+    <!-- no translation found for accessibility_key_gesture_dialog_screen_reader_tts (1298171063228024716) -->
+    <skip />
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"Vill du aktivera kortkommandot för <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"Aktivera inte"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Aktivera kortkommandot"</string>
@@ -1151,8 +1158,7 @@
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572"><annotation id="action_key_icon">"Åtgärdsikonen"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> är kortkommandot för att använda tillgänglighetsfunktionen <xliff:g id="ID_3">^3</xliff:g>. På så sätt kan du snabbt zooma in så att innehåll på skärmen förstoras. När förstoring är aktiverat trycker du på "<annotation id="action_key_icon">"åtgärdsikonen"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> och + eller – för att justera zoomnivån."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Inaktivera kortkommandot"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Behåll aktiverade"</string>
-    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_content (389338862762665003) -->
-    <skip />
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003">"Åtgärden "<annotation id="action_key_icon">"ikon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> är kortkommandot för att använda <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^3</xliff:g> är en skärmläsare som gör att du kan få objekt upplästa. Det kan vara till hjälp för personer som har svårt att se skärmen. Det kan leda till att enheten fungerar annorlunda."</string>
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"Om du trycker på "<annotation id="action_key_icon">"åtgärdsikonen"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> aktiveras tillgänglighetsfunktionen <xliff:g id="ID_3">^3</xliff:g>. Då kan du styra enheten med rösten."</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Låsskärm"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Avslutar …"</string>
@@ -1708,7 +1714,7 @@
     <string name="underlay_close_button_content_description" msgid="6518481455548869894">"Stäng"</string>
     <string name="ambient_cue_icon_content_description" msgid="1403264595520777373">"Ikon för förslag på skärmsläckare"</string>
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"Svep från övre vänstra hörnet för att öppna aviseringar"</string>
-    <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"Svep från det övre högra hörnet för att öppna snabbinställningar"</string>
+    <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"Svep nedåt från det övre högra hörnet för att öppna snabbinställningar"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"Tillbaka"</string>
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"Föregående"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"Nästa"</string>

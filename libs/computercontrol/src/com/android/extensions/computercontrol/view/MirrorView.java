@@ -146,9 +146,46 @@ public class MirrorView extends FrameLayout {
         });
     }
 
+    /**
+     * Sets the corner radius for all corners of the mirror view.
+     *
+     * @param cornerRadius The new radius of the corners in pixels.
+     */
+    public void setCornerRadius(int cornerRadius) {
+        mMirrorSurface.setCornerRadius(cornerRadius);
+    }
+
     private void init() {
         mHandlerThread.start();
+
+        // Add a placeholder view that's always visible to prevent the MirrorView from collapsing
+        // to a zero-size view when the mirror surface is GONE. The visibility of the SurfaceView
+        // is controlled carefully for performance reasons to avoid creating or maintaining a
+        // surface when a computer control session is not set.
+        // TODO: b/448896612 - Reimplement this as an optimization within the SurfaceView.
+        addView(new View(mContext), new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
         mMirrorSurface.setVisibility(View.GONE);
+        mMirrorSurface.getHolder().addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(@NonNull SurfaceHolder holder) {
+            }
+
+            @Override
+            public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width,
+                    int height) {
+                mHandlerThread.getThreadExecutor().execute(() -> {
+                    if (mInteractiveMirror != null) {
+                        mInteractiveMirror.resize(width, height);
+                    }
+                });
+            }
+
+            @Override
+            public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+            }
+        });
         addView(mMirrorSurface, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
     }
@@ -191,28 +228,28 @@ public class MirrorView extends FrameLayout {
         @Nullable
         private Transformation mCurrentTransformation = null;
 
-        private final SurfaceHolder.Callback mCallback = new SurfaceHolder.Callback() {
-
-            @Override
-            public void surfaceCreated(@NonNull SurfaceHolder holder) {
-            }
-
-            @Override
-            public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width,
-                    int height) {
-                // Force the mirror surface to be updated.
-                mCurrentMirrorSurface = null;
-            }
-
-            @Override
-            public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
-            }
-        };
-
         MirrorSurface(Context context) {
             super(context);
             setCompositionOrder(0);
-            getHolder().addCallback(mCallback);
+            // Force the mirror surface to be updated.
+            SurfaceHolder.Callback callback = new SurfaceHolder.Callback() {
+
+                @Override
+                public void surfaceCreated(@NonNull SurfaceHolder holder) {
+                }
+
+                @Override
+                public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width,
+                        int height) {
+                    // Force the mirror surface to be updated.
+                    mCurrentMirrorSurface = null;
+                }
+
+                @Override
+                public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+                }
+            };
+            getHolder().addCallback(callback);
         }
 
         @Override

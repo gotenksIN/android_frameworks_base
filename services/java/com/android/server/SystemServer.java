@@ -17,6 +17,7 @@
 package com.android.server;
 
 import static android.app.lskfreset.flags.Flags.enableLskfResetManager;
+import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.media.tv.flags.Flags.mediaQualityFw;
 import static android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
@@ -246,6 +247,7 @@ import com.android.server.power.hint.HintManagerService;
 import com.android.server.power.thermal.ThermalManagerService;
 import com.android.server.powerstats.PowerStatsService;
 import com.android.server.print.PrintManagerService;
+import com.android.server.privatecompute.PccSandboxManagerService;
 import com.android.server.profcollect.ProfcollectForwardingService;
 import com.android.server.recoverysystem.RecoverySystemService;
 import com.android.server.resources.ResourcesManagerService;
@@ -1840,6 +1842,12 @@ public final class SystemServer implements Dumpable {
             if (AppFunctionManagerConfiguration.isSupported(context)) {
                 t.traceBegin("StartAppFunctionManager");
                 mSystemServiceManager.startService(AppFunctionManagerService.class);
+                t.traceEnd();
+            }
+
+            if (enablePccFrameworkSupport()) {
+                t.traceBegin("StartPccSandboxManagerService");
+                mSystemServiceManager.startService(PccSandboxManagerService.class);
                 t.traceEnd();
             }
 

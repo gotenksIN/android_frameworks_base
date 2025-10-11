@@ -8267,6 +8267,7 @@ package android.app.admin {
     field public static final String AUTO_TIME_POLICY = "autoTime";
     field public static final String BACKUP_SERVICE_POLICY = "backupService";
     field public static final String CAMERA_DISABLED_POLICY = "cameraDisabled";
+    field @FlaggedApi("android.app.admin.flags.common_criteria_mode_coexistence") public static final String COMMON_CRITERIA_MODE_POLICY = "commonCriteriaMode";
     field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final String CONTENT_PROTECTION_POLICY = "contentProtection";
     field @FlaggedApi("android.app.admin.flags.cross_profile_widget_provider_bulk_apis") public static final String CROSS_PROFILE_WIDGET_PROVIDER_POLICY = "crossProfileWidgetProvider";
     field public static final String KEYGUARD_DISABLED_FEATURES_POLICY = "keyguardDisabledFeatures";
@@ -10347,7 +10348,7 @@ package android.companion {
     field @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_NEARBY_DEVICE_STREAMING) public static final String DEVICE_PROFILE_NEARBY_DEVICE_STREAMING = "android.app.role.COMPANION_DEVICE_NEARBY_DEVICE_STREAMING";
     field @FlaggedApi("android.companion.virtualdevice.flags.enable_limited_vdm_role") @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_VIRTUAL_DEVICE) public static final String DEVICE_PROFILE_VIRTUAL_DEVICE = "android.app.role.COMPANION_DEVICE_VIRTUAL_DEVICE";
     field public static final String DEVICE_PROFILE_WATCH = "android.app.role.COMPANION_DEVICE_WATCH";
-    field @FlaggedApi("android.companion.association_extra_permission") public static final String PERMISSION_NEARBY = "NEARBY_DEVICES";
+    field @FlaggedApi("android.companion.association_extra_permission") public static final String PERMISSION_GROUP_NEARBY = "NEARBY_DEVICES";
   }
 
   public static final class AssociationRequest.Builder {
@@ -12819,6 +12820,7 @@ package android.content.pm {
     ctor public ApplicationInfo();
     ctor public ApplicationInfo(android.content.pm.ApplicationInfo);
     method public boolean areAttributionsUserVisible();
+    method public int canOverrideRes();
     method public int describeContents();
     method public void dump(android.util.Printer, String);
     method public static CharSequence getCategoryTitle(android.content.Context, int);
@@ -12833,6 +12835,7 @@ package android.content.pm {
     method public boolean isResourceOverlay();
     method public boolean isVirtualPreload();
     method public CharSequence loadDescription(android.content.pm.PackageManager);
+    method public void setOverrideRes(int);
     field public static final int CATEGORY_ACCESSIBILITY = 8; // 0x8
     field public static final int CATEGORY_AUDIO = 1; // 0x1
     field public static final int CATEGORY_GAME = 0; // 0x0
@@ -12905,6 +12908,8 @@ package android.content.pm {
     field public String manageSpaceActivityName;
     field public int minSdkVersion;
     field public String nativeLibraryDir;
+    field public int overrideDensity;
+    field public int overrideRes;
     field public String permission;
     field public String processName;
     field public String publicSourceDir;
@@ -14199,7 +14204,7 @@ package android.content.pm {
     field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_CAMERA}, anyOf={android.Manifest.permission.CAMERA}, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_CAMERA = 64; // 0x40
     field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE}, anyOf={android.Manifest.permission.BLUETOOTH_ADVERTISE, android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.CHANGE_NETWORK_STATE, android.Manifest.permission.CHANGE_WIFI_STATE, android.Manifest.permission.CHANGE_WIFI_MULTICAST_STATE, android.Manifest.permission.NFC, android.Manifest.permission.TRANSMIT_IR, android.Manifest.permission.UWB_RANGING, android.Manifest.permission.RANGING}, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE = 16; // 0x10
     field @RequiresPermission(value=android.Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_DATA_SYNC = 1; // 0x1
-    field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_HEALTH}, anyOf={android.Manifest.permission.ACTIVITY_RECOGNITION, android.Manifest.permission.HIGH_SAMPLING_RATE_SENSORS, android.health.connect.HealthPermissions.READ_HEART_RATE, android.health.connect.HealthPermissions.READ_SKIN_TEMPERATURE, android.health.connect.HealthPermissions.READ_OXYGEN_SATURATION}) public static final int FOREGROUND_SERVICE_TYPE_HEALTH = 256; // 0x100
+    field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_HEALTH}, anyOf={android.Manifest.permission.ACTIVITY_RECOGNITION, android.Manifest.permission.HIGH_SAMPLING_RATE_SENSORS, android.health.connect.HealthPermissions.READ_HEART_RATE, android.health.connect.HealthPermissions.READ_SKIN_TEMPERATURE, android.health.connect.HealthPermissions.READ_OXYGEN_SATURATION, android.health.connect.HealthPermissions.READ_BLOOD_PRESSURE, android.health.connect.HealthPermissions.READ_HEART_RATE_VARIABILITY, android.health.connect.HealthPermissions.READ_RESPIRATORY_RATE, android.health.connect.HealthPermissions.READ_VO2_MAX}) public static final int FOREGROUND_SERVICE_TYPE_HEALTH = 256; // 0x100
     field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_LOCATION}, anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_LOCATION = 8; // 0x8
     field public static final int FOREGROUND_SERVICE_TYPE_MANIFEST = -1; // 0xffffffff
     field @RequiresPermission(value=android.Manifest.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK = 2; // 0x2
@@ -16892,6 +16897,7 @@ package android.graphics {
   public static final class ImageDecoder.DecodeException extends java.io.IOException {
     method public int getError();
     method @NonNull public android.graphics.ImageDecoder.Source getSource();
+    field @FlaggedApi("com.android.graphics.hwui.flags.image_decoder_gainmap_fail") public static final int GAINMAP_EXTRACTION_FAILED = 4; // 0x4
     field public static final int SOURCE_EXCEPTION = 1; // 0x1
     field public static final int SOURCE_INCOMPLETE = 2; // 0x2
     field public static final int SOURCE_MALFORMED_DATA = 3; // 0x3
@@ -19029,12 +19035,16 @@ package android.hardware {
 
   @Deprecated public static class Camera.Face {
     ctor @Deprecated public Camera.Face();
+    field @Deprecated public int blinkDetected;
+    field @Deprecated public int faceRecognised;
     field @Deprecated public int id;
     field @Deprecated public android.graphics.Point leftEye;
     field @Deprecated public android.graphics.Point mouth;
     field @Deprecated public android.graphics.Rect rect;
     field @Deprecated public android.graphics.Point rightEye;
     field @Deprecated public int score;
+    field @Deprecated public int smileDegree;
+    field @Deprecated public int smileScore;
   }
 
   @Deprecated public static interface Camera.FaceDetectionListener {
@@ -22318,6 +22328,7 @@ package android.media {
     method @NonNull public java.util.List<android.media.AudioMixerAttributes> getSupportedMixerAttributes(@NonNull android.media.AudioDeviceInfo);
     method @Deprecated public int getVibrateSetting(int);
     method public int getVolumeGroupIdForAttributes(@NonNull android.media.AudioAttributes);
+    method public void handleBluetoothA2dpActiveDeviceChange(android.bluetooth.BluetoothDevice, int, int, boolean, int);
     method @Deprecated public boolean isBluetoothA2dpOn();
     method public boolean isBluetoothScoAvailableOffCall();
     method @Deprecated public boolean isBluetoothScoOn();
@@ -34007,6 +34018,7 @@ package android.os {
     field public static final int BAKLAVA = 36; // 0x24
     field public static final int BASE = 1; // 0x1
     field public static final int BASE_1_1 = 2; // 0x2
+    field @FlaggedApi("android.sdk.version_codes_cinnamon_bun") public static final int CINNAMON_BUN = 10000; // 0x2710
     field public static final int CUPCAKE = 3; // 0x3
     field public static final int CUR_DEVELOPMENT = 10000; // 0x2710
     field public static final int DONUT = 4; // 0x4
@@ -34048,6 +34060,7 @@ package android.os {
     field public static final int BAKLAVA_1 = 3600001; // 0x36ee81
     field public static final int BASE = 100000; // 0x186a0
     field public static final int BASE_1_1 = 200000; // 0x30d40
+    field @FlaggedApi("android.sdk.version_codes_cinnamon_bun") public static final int CINNAMON_BUN = 1000000000; // 0x3b9aca00
     field public static final int CUPCAKE = 300000; // 0x493e0
     field public static final int DONUT = 400000; // 0x61a80
     field public static final int ECLAIR = 500000; // 0x7a120
@@ -34310,6 +34323,20 @@ package android.os {
     field public static final int SHOW_FULL_DETAIL = 1; // 0x1
     field public static final int SHOW_INITIALIZED = 4; // 0x4
     field @Deprecated public static final int TRACE_COUNT_ALLOCS = 1; // 0x1
+  }
+
+  public static class Debug.DmaBuffer {
+    ctor public Debug.DmaBuffer();
+    method public long Pss();
+    field public long count;
+    field public String exporter;
+    field public java.util.Map<java.lang.Integer,java.lang.Integer> fdRefs;
+    field public long inode;
+    field public java.util.Map<java.lang.Integer,java.lang.Integer> mapRefs;
+    field public String name;
+    field public java.util.List<java.lang.Integer> pids;
+    field public long size;
+    field public long totalRefs;
   }
 
   @Deprecated public static class Debug.InstructionCount {
@@ -35121,6 +35148,7 @@ package android.os {
     method public static boolean isApplicationUid(int);
     method public static final boolean isIsolated();
     method public static final boolean isIsolatedUid(int);
+    method @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final boolean isPccUid(int);
     method public static final boolean isSdkSandbox();
     method public static final boolean isSdkSandboxUid(int);
     method public static final void killProcess(int);
@@ -38969,6 +38997,7 @@ package android.provider {
     field @Deprecated public static final String INSTALL_NON_MARKET_APPS = "install_non_market_apps";
     field public static final String MODE_RINGER = "mode_ringer";
     field public static final String NETWORK_PREFERENCE = "network_preference";
+    field public static final String NTP_SERVER_2 = "ntp_server_2";
     field public static final String RADIO_BLUETOOTH = "bluetooth";
     field public static final String RADIO_CELL = "cell";
     field public static final String RADIO_NFC = "nfc";
@@ -46846,6 +46875,7 @@ package android.telephony {
     method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_NETWORK_STATE, android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.READ_BASIC_PHONE_STATE}) public boolean isDataRoamingEnabled();
     method public boolean isDeviceSmsCapable();
     method public boolean isDeviceVoiceCapable();
+    method public static boolean isDsdsTransitionSupported();
     method public boolean isEmergencyNumber(@NonNull String);
     method public boolean isHearingAidCompatibilitySupported();
     method @RequiresPermission(anyOf={android.Manifest.permission.READ_PRECISE_PHONE_STATE, "android.permission.READ_PRIVILEGED_PHONE_STATE"}) public boolean isManualNetworkSelectionAllowed();
@@ -47075,6 +47105,10 @@ package android.telephony {
     field public static final int SIM_STATE_PUK_REQUIRED = 3; // 0x3
     field public static final int SIM_STATE_READY = 5; // 0x5
     field public static final int SIM_STATE_UNKNOWN = 0; // 0x0
+    field @FlaggedApi("com.android.server.telecom.flags.move_get_tty_mode_to_telephony_manager") public static final int TTY_MODE_FULL = 1; // 0x1
+    field @FlaggedApi("com.android.server.telecom.flags.move_get_tty_mode_to_telephony_manager") public static final int TTY_MODE_HCO = 2; // 0x2
+    field @FlaggedApi("com.android.server.telecom.flags.move_get_tty_mode_to_telephony_manager") public static final int TTY_MODE_OFF = 0; // 0x0
+    field @FlaggedApi("com.android.server.telecom.flags.move_get_tty_mode_to_telephony_manager") public static final int TTY_MODE_VCO = 3; // 0x3
     field public static final int UNINITIALIZED_CARD_ID = -2; // 0xfffffffe
     field public static final int UNKNOWN_CARRIER_ID = -1; // 0xffffffff
     field public static final int UNSUPPORTED_CARD_ID = -1; // 0xffffffff

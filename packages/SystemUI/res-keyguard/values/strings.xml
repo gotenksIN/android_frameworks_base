@@ -102,6 +102,10 @@
     <string name="keyguard_accessibility_sim_pin_area">SIM PIN area</string>
     <!-- Accessibility description of the SIM PUK password view. [CHAR_LIMIT=none] -->
     <string name="keyguard_accessibility_sim_puk_area">SIM PUK area</string>
+    <!-- Accessibility description for long-click action on the delete button of the PIN security bouncer [CHAR_LIMIT=none] -->
+    <string name="keyguard_accessibility_pin_delete_long_click">Double-tap and hold to long press to delete all</string>
+    <!-- Accessibility description for long-click action on the delete button of the PIN security bouncer, without the initiating action mentioned [CHAR_LIMIT=none] -->
+    <string name="keyguard_accessibility_pin_delete_long_click_partial">long press to delete all</string>
 
     <!-- KeyguardPinView - accessibility support --><skip />
     <!-- Description of the Delete button in a KeyboardView. [CHAR LIMIT=NONE] -->
@@ -248,6 +252,36 @@
     <string name="kg_too_many_failed_attempts_countdown">{count, plural,
         =1 {Try again in # second.}
         other {Try again in # seconds.}
+    }
+    </string>
+    <!-- Countdown message shown after too many failed unlock attempts, in seconds. [CHAR LIMIT=48]-->
+    <string name="kg_too_many_failed_attempts_countdown_seconds">{count, plural,
+        =1 {Try again in # second}
+        other {Try again in # seconds}
+    }
+    </string>
+    <!-- Countdown message shown after too many failed unlock attempts, in minutes. [CHAR LIMIT=48]-->
+    <string name="kg_too_many_failed_attempts_countdown_minutes">{count, plural,
+        =1 {Try again in # minute}
+        other {Try again in # minutes}
+    }
+    </string>
+    <!-- Countdown message shown after too many failed unlock attempts, in hours. [CHAR LIMIT=48]-->
+    <string name="kg_too_many_failed_attempts_countdown_hours">{count, plural,
+        =1 {Try again in # hour}
+        other {Try again in # hours}
+    }
+    </string>
+    <!-- Countdown message shown after too many failed unlock attempts, in days. [CHAR LIMIT=48]-->
+    <string name="kg_too_many_failed_attempts_countdown_days">{count, plural,
+        =1 {Try again in # day}
+        other {Try again in # days}
+    }
+    </string>
+    <!-- Countdown message shown after too many failed unlock attempts, in years. [CHAR LIMIT=48]-->
+    <string name="kg_too_many_failed_attempts_countdown_years">{count, plural,
+        =1 {Try again in # year}
+        other {Try again in # years}
     }
     </string>
     <!-- Instructions for using the SIM PIN unlock screen -->

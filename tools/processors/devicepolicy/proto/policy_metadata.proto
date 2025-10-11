@@ -32,8 +32,8 @@ message PolicyMetadata {
     // LINT.ThenChange(/core/java/android/app/admin/DevicePolicyManager.java:resource_type)
     ResourceType affected_resource = 6;
 
-    string required_permission = 7;
-    string required_cross_user_permission = 8;
+    optional string required_permission = 7;
+    optional string required_cross_user_permission = 8;
 }
 
 message TypeSpecificPolicyMetadata {
@@ -57,10 +57,19 @@ message TypeSpecificPolicyMetadata {
         repeated EnumValue values = 4;
     }
 
+    message StringPolicyMetadata {
+    }
+
+    message ListOfStringPolicyMetadata {
+        StringPolicyMetadata element_metadata = 1;
+    }
+
     oneof type_metadata {
         BooleanPolicyMetadata boolean_metadata = 1;
         IntegerPolicyMetadata integer_metadata = 2;
         EnumPolicyMetadata enum_metadata = 3;
+        StringPolicyMetadata string_metadata = 4;
+        ListOfStringPolicyMetadata list_of_string_metadata = 5;
     }
 }
 

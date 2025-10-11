@@ -219,7 +219,7 @@ android_ravenwood_test {
     ],
     srcs: [
         "src/com/android/server/am/psc/**/*.java",
-        "src/com/android/server/am/BoundServiceSessionTests.java",
+        "src/com/android/server/am/BinderSessionTests.java",
     ],
 }
 
@@ -1122,4 +1122,14 @@ test_module_config {
         "device-tests",
     ],
     include_filters: ["com.android.server.adb"],
+}
+
+test_module_config {
+    name: "FrameworksServicesTests_companion_virtual",
+    base: "FrameworksServicesTests",
+    test_suites: [
+        "automotive-tests",
+        "device-tests",
+    ],
+    include_filters: ["com.android.server.companion.virtual"],
 }

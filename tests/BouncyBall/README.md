@@ -38,8 +38,6 @@ You can change boolean constants in
 `app/src/main/java/com/android/test/bouncyball/BouncyBallActivity.java` to aid
 debugging. Recompile the app after any changes.
 
-*   `LOG_DROPPED_FRAMES`: Log every detected frame drop.
-*   `LOG_EVERY_FRAME`: Log every non-dropped frame.
 *   `FORCE_DROPPED_FRAMES`: Intentionally drop every 64th frame to test
     detection.
 *   `ASSUMPTION_FAILURE_FORCES_EXIT`: Set to `false` to prevent the app from
@@ -93,7 +91,8 @@ $ ../../../../prebuilts/tools/linux-x86_64/perfetto/trace_processor_shell \
   --summary-spec trace_metrics_v2_spec.pbtx bouncy_trace
 ```
 
-A successful run will show `missed_frames_bouncyball` as 0.
+A successful run will show `bouncyball_failing_jank_instance_count`, the last
+"value" in the output, as 0.
 
 ### Cleanup
 

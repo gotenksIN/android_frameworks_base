@@ -35,6 +35,13 @@ flag {
 }
 
 flag {
+  name: "headline_prototypes"
+  namespace: "notifications"
+  description: "This flag adds static control for enabling prototypes for the headline project"
+  bug: "449676256"
+}
+
+flag {
   name: "api_metric_style"
   is_exported: true
   namespace: "notifications"
@@ -213,10 +220,10 @@ flag {
 }
 
 flag {
-  name: "set_notification_background_color_refactor"
+  name: "notification_transparent_badge_ring"
   namespace: "systemui"
-  description: "Skips #setNotificationBackgroundColor when unnecessary."
-  bug: "442592454"
+  description: "Makes notification badge ring transparent and skips no longer necessary method."
+  bug: "409346132"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

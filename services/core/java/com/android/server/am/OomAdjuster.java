@@ -153,6 +153,7 @@ import com.android.server.am.psc.ConnectionRecordInternal;
 import com.android.server.am.psc.ContentProviderConnectionInternal;
 import com.android.server.am.psc.PlatformCompatCache;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
+import com.android.server.am.psc.ProcessListInternal;
 import com.android.server.am.psc.ProcessProviderRecordInternal;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.am.psc.ProcessServiceRecordInternal;
@@ -439,6 +440,9 @@ public abstract class OomAdjuster {
 
         /** Notifies when the process group for an application process has been updated. */
         void onProcessGroupUpdated(ProcessRecordInternal app, int group);
+
+        /** Notifies when the process state sequence number has been incremented for active UIDs. */
+        void onProcStateSeqIncremented(ActiveUidsInternal activeUids);
     }
 
     @VisibleForTesting
@@ -488,6 +492,22 @@ public abstract class OomAdjuster {
          * "almost perceptible" after leaving the TOP process state.
          */
         public volatile long mServiceBindAlmostPerceptibleTimeoutMs;
+        /**
+         * The timeout duration (in milliseconds) for a service designated as
+         * `FOREGROUND_SERVICE_TYPE_SHORT_SERVICE` before it is considered timed out.
+         */
+        public volatile long mShortFgsTimeoutDuration;
+        /**
+         * The additional duration (in milliseconds) after `mShortFgsTimeoutDuration`
+         * before the process state of a timed-out short FGS is demoted.
+         */
+        public volatile long mShortFgsProcStateExtraWaitDuration;
+        /** The maximum number of cached processes to keep before killing them. */
+        public volatile int mCurMaxCachedProcesses;
+        /** The maximum number of empty app processes to keep. */
+        public volatile int mCurMaxEmptyProcesses;
+        /** The number of empty processes to maintain before starting to trim old ones. */
+        public volatile int mCurTrimEmptyProcesses;
     }
 
     // TODO(b/346822474): hook up global state usage.
@@ -573,7 +593,7 @@ public abstract class OomAdjuster {
             return true;
         });
         mTmpUidRecords = new ActiveUids(null);
-        mTmpQueue = new ArrayDeque<>(mConstants.CUR_MAX_CACHED_PROCESSES << 1);
+        mTmpQueue = new ArrayDeque<>(mOomConstants.mCurMaxCachedProcesses << 1);
         mNumSlots = ((CACHED_APP_MAX_ADJ - CACHED_APP_MIN_ADJ + 1) >> 1)
                 / CACHED_APP_IMPORTANCE_LEVELS;
     }
@@ -984,9 +1004,8 @@ public abstract class OomAdjuster {
         int curEmptyAdj = CACHED_APP_MIN_ADJ + CACHED_APP_IMPORTANCE_LEVELS;
         int nextEmptyAdj = curEmptyAdj + (CACHED_APP_IMPORTANCE_LEVELS * 2);
 
-        final int emptyProcessLimit = mConstants.CUR_MAX_EMPTY_PROCESSES;
-        final int cachedProcessLimit = mConstants.CUR_MAX_CACHED_PROCESSES
-                                        - emptyProcessLimit;
+        final int emptyProcessLimit = mOomConstants.mCurMaxEmptyProcesses;
+        final int cachedProcessLimit = mOomConstants.mCurMaxCachedProcesses - emptyProcessLimit;
         // Let's determine how many processes we have running vs.
         // how many slots we have for background processes; we may want
         // to put multiple processes in a slot of there are enough of
@@ -1137,9 +1156,9 @@ public abstract class OomAdjuster {
             }
         }
         final int emptyProcessLimit = doKillExcessiveProcesses
-                ? mConstants.CUR_MAX_EMPTY_PROCESSES : Integer.MAX_VALUE;
+                ? mOomConstants.mCurMaxEmptyProcesses : Integer.MAX_VALUE;
         final int cachedProcessLimit = doKillExcessiveProcesses
-                ? (mConstants.CUR_MAX_CACHED_PROCESSES - emptyProcessLimit) : Integer.MAX_VALUE;
+                ? (mOomConstants.mCurMaxCachedProcesses - emptyProcessLimit) : Integer.MAX_VALUE;
         int lastCachedGroup = 0;
         int lastCachedGroupUid = 0;
         int numCached = 0;
@@ -1235,7 +1254,7 @@ public abstract class OomAdjuster {
                         }
                         break;
                     case PROCESS_STATE_CACHED_EMPTY:
-                        if (numEmpty > mConstants.CUR_TRIM_EMPTY_PROCESSES
+                        if (numEmpty > mOomConstants.mCurTrimEmptyProcesses
                                 && app.getLastActivityTime() < oldTime) {
                             app.killLocked("empty for " + ((now
                                     - app.getLastActivityTime()) / 1000) + "s",
@@ -1389,7 +1408,8 @@ public abstract class OomAdjuster {
         // This compares previously set procstate to the current procstate in regards to whether
         // or not the app's network access will be blocked. So, this needs to be called before
         // we update the UidRecord's procstate by calling {@link UidRecord#setSetProcState}.
-        mProcessList.incrementProcStateSeqAndNotifyAppsLOSP(activeUids);
+        mProcessList.incrementProcStateSeqLOSP(activeUids);
+        mCallback.onProcStateSeqIncremented(activeUids);
 
         ArrayList<UidRecordInternal> becameIdle = mTmpBecameIdle;
         becameIdle.clear();
@@ -2349,7 +2369,7 @@ public abstract class OomAdjuster {
         }
         if (state.getHasRepForegroundActivities() != state.getHasForegroundActivities()) {
             state.setRepForegroundActivities(state.getHasForegroundActivities());
-            changes |= ActivityManagerService.ProcessChangeItem.CHANGE_ACTIVITIES;
+            changes |= ProcessListInternal.ProcessChangeItem.CHANGE_ACTIVITIES;
         }
 
         updateAppFreezeStateLSP(state, oomAdjReason, false, oldOomAdj);

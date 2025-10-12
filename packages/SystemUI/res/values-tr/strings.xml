@@ -167,12 +167,9 @@
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Kaydet"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Paylaş"</string>
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Paylaşmak için bir uygulama seçin"</string>
-    <!-- no translation found for screen_share_audio_sharing_text (7829391478284315787) -->
-    <skip />
-    <!-- no translation found for screen_share_app_window_sharing_title (2063554880747318383) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer (3953761426122528262) -->
-    <skip />
+    <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Sesi paylaş"</string>
+    <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Uygulama penceresini paylaşın"</string>
+    <string name="screen_share_disclaimer" msgid="3953761426122528262">"Paylaşım sırasında ekranınızdaki içerikler görünür"</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Pencerenin ekran görüntüsünü al"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Pencereyi kaydet"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Seçili alanın ekran görüntüsünü al"</string>
@@ -368,6 +365,8 @@
     <string name="accessibility_location_active" msgid="2845747916764660369">"Konum bilgisi istekleri etkin"</string>
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"Sensörler kapalı ayarı etkin"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"Tüm bildirimleri temizle"</string>
+    <!-- no translation found for accessibility_notification_bell (7149451526721220526) -->
+    <skip />
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{Grup içinde # bildirim daha var.}other{Grup içinde # bildirim daha var.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"Ekran yatay yönde kilitlendi."</string>
@@ -429,6 +428,14 @@
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Kablosuz bağlantı veya ethernet bağlantısı yok"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"Bağlantıyı kes"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"Şu anda kullanılan mikrofon"</string>
+    <!-- no translation found for quick_settings_audio_output_section_title (3448300919285193209) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_section_title (9203723659866975215) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_disclaimer_text (442891508001590727) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_effects_section_title (6770520531879816578) -->
+    <skip />
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"Parlaklık"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"Rengi ters çevirme"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"Renk düzeltme"</string>
@@ -755,11 +762,9 @@
     <string name="monitoring_description_personal_profile_named_vpn" msgid="5083909710727365452">"Kişisel uygulamalarınız internete <xliff:g id="VPN_APP">%1$s</xliff:g> üzerinden bağlı. E-postalar ve tarama verileri dahil olmak üzere ağ etkinliğiniz, VPN sağlayıcınıza görünür."</string>
     <string name="monitoring_description_vpn_settings_separator" msgid="8292589617720435430">" "</string>
     <string name="monitoring_description_vpn_settings" msgid="5264167033247632071">"VPN ayarlarını aç"</string>
-    <!-- no translation found for monitoring_description_parental_controls_legacy (3331029441820725897) -->
-    <skip />
+    <string name="monitoring_description_parental_controls_legacy" msgid="3331029441820725897">"Bu cihaz ebeveyniniz tarafından yönetiliyor. Kullandığınız uygulamalar, konumunuz ve ekran başında kalma süreniz gibi bilgiler ebeveyniniz tarafından görülüp yönetilebilir."</string>
     <string name="monitoring_description_pin_protection" msgid="1983580207046670355">"Cihazınızdaki günlük sınırlar ve dinlenme zamanı gibi bazı kontroller yalnızca PIN ile değiştirilebilir."</string>
-    <!-- no translation found for monitoring_description_parental_controls (4255592993669461543) -->
-    <skip />
+    <string name="monitoring_description_parental_controls" msgid="4255592993669461543">"Bazı kontrolleri yalnızca ebeveyniniz değiştirebilir"</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"TrustAgent tarafından kilit açık tutuldu"</string>
     <string name="kg_prompt_after_adaptive_auth_lock" msgid="6065186971000690782">"Çok fazla kimlik doğrulama denemesi yapıldığından ekran kilitlendi."</string>
@@ -1144,6 +1149,8 @@
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"Sayfa <xliff:g id="ID_1">%1$d</xliff:g> / <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"<xliff:g id="ID_1">%1$s</xliff:g> etkinleştirilsin mi?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"<xliff:g id="ID_3">^3</xliff:g> için klavye kısayolu, işlem "<annotation id="action_key_icon">"simgesi"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> şeklindedir. <xliff:g id="ID_4">^4</xliff:g>"</string>
+    <!-- no translation found for accessibility_key_gesture_dialog_screen_reader_tts (1298171063228024716) -->
+    <skip />
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"<xliff:g id="ID_1">%1$s</xliff:g> klavye kısayolu açılsın mı?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"Açma"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Kısayolu aç"</string>
@@ -1151,8 +1158,7 @@
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572">"Bir erişilebilirlik özelliği olan <xliff:g id="ID_3">^3</xliff:g> için klavye kısayolu, işlem "<annotation id="action_key_icon">"simgesi"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> şeklindedir. Bu sayede, içerikleri büyütmek için ekranı hızlıca yakınlaştırabilirsiniz. Büyütme özelliği açıldıktan sonra yakınlaştırmayı ayarlamak için İşlem "<annotation id="action_key_icon">"simgesi"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> ve \"+\" veya \"-\" tuşlarına basın."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Kısayolu kapat"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Açık tut"</string>
-    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_content (389338862762665003) -->
-    <skip />
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003">"<xliff:g id="ID_3">^3</xliff:g> için klavye kısayolu, işlem "<annotation id="action_key_icon">"simgesi"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> şeklindedir. <xliff:g id="ID_4">^3</xliff:g>, öğelerin sesli olarak okunmasını sağlayan bir ekran okuyucudur. Ekranı görmekte zorluk yaşayan kullanıcılar için faydalı olabilir. Bu, cihazınızın çalışma şeklini değiştirebilir."</string>
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"İşlem "<annotation id="action_key_icon">"simgesi"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> tuşlarına basıldığında bir erişilebilirlik özelliği olan <xliff:g id="ID_3">^3</xliff:g> etkinleştirilir. Bu şekilde cihazınızı ellerinizi kullanmadan kontrol edebilirsiniz."</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Kilit ekranı"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Kapanıyor…"</string>

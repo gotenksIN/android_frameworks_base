@@ -765,6 +765,7 @@ public abstract class WMShellModule {
             ShellInit shellInit,
             Optional<SplitScreenController> splitScreenOptional,
             @Nullable PipTransitionController pipTransitionController,
+            Optional<PinnedLayerController> pinnedLayerController,
             Optional<RecentsTransitionHandler> recentsTransitionHandler,
             KeyguardTransitionHandler keyguardTransitionHandler,
             Optional<DesktopTasksController> desktopTasksController,
@@ -777,6 +778,7 @@ public abstract class WMShellModule {
                 transitions,
                 splitScreenOptional,
                 pipTransitionController,
+                pinnedLayerController.orElse(null),
                 recentsTransitionHandler,
                 keyguardTransitionHandler,
                 desktopTasksController,
@@ -985,7 +987,8 @@ public abstract class WMShellModule {
             Optional<DesktopFirstListenerManager> desktopFirstListenerManager,
             TaskSnapshotManager taskSnapshotManager,
             TransactionPool transactionPool,
-            PipTransitionState pipTransitionState) {
+            PipTransitionState pipTransitionState,
+            LockTaskChangeListener lockTaskChangeListener) {
         return new DesktopTasksController(
                 context,
                 shellInit,
@@ -1039,7 +1042,8 @@ public abstract class WMShellModule {
                 taskSnapshotManager,
                 transactionPool,
                 PipFlags.isPip2ExperimentEnabled() ? Optional.of(pipTransitionState)
-                        : Optional.empty());
+                        : Optional.empty(),
+                lockTaskChangeListener);
     }
 
     @WMSingleton
@@ -1223,12 +1227,17 @@ public abstract class WMShellModule {
     @WMSingleton
     @Provides
     static Optional<DisplayDisconnectTransitionHandler> provideDisplayDisconnectTransitionHandler(
-            ShellInit shellInit, Transitions transitions) {
+            ShellInit shellInit, Transitions transitions,
+            Optional<DesktopTasksController> desktopTasksController,
+            DisplayController displayController,
+            RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer) {
         if (!DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()) {
             return Optional.empty();
         } else {
             return Optional.of(
-                    new DisplayDisconnectTransitionHandler(transitions, shellInit)
+                    new DisplayDisconnectTransitionHandler(transitions, shellInit,
+                            desktopTasksController, displayController,
+                            rootTaskDisplayAreaOrganizer)
             );
         }
     }

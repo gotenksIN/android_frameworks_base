@@ -82,6 +82,7 @@ import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
 import android.view.accessibility.AccessibilityManager;
 import android.widget.DateTimeView;
+import android.window.IRemoteTransition;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.Lifecycle;
@@ -3046,7 +3047,19 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 }
 
                 @Override
-                public void hideKeyguardWithAnimation(IRemoteAnimationRunner runner) {
+                public void hideKeyguardWithAnimation(@Nullable IRemoteTransition transition) {
+                    // We post to the main thread for 2 reasons:
+                    //   1. KeyguardViewMediator is not thread-safe.
+                    //   2. To ensure that ViewMediatorCallback#keyguardDonePending is called before
+                    //      ViewMediatorCallback#readyForKeyguardDone. The wrong order could occur
+                    //      when doing
+                    //      dismissKeyguardThenExecute { hideKeyguardWithAnimation(transition) }.
+                    mMainExecutor.execute(
+                            () -> mKeyguardViewMediator.hideWithAnimation(transition));
+                }
+
+                @Override
+                public void hideKeyguardWithAnimation(@Nullable IRemoteAnimationRunner runner) {
                     // We post to the main thread for 2 reasons:
                     //   1. KeyguardViewMediator is not thread-safe.
                     //   2. To ensure that ViewMediatorCallback#keyguardDonePending is called before

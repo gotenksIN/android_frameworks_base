@@ -167,12 +167,9 @@
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Rekodi"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Onyesha skrini"</string>
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Chagua programu ili utume"</string>
-    <!-- no translation found for screen_share_audio_sharing_text (7829391478284315787) -->
-    <skip />
-    <!-- no translation found for screen_share_app_window_sharing_title (2063554880747318383) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer (3953761426122528262) -->
-    <skip />
+    <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Sikiliza pamoja na wengine"</string>
+    <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Ruhusu dirisha la programu lifikiwe"</string>
+    <string name="screen_share_disclaimer" msgid="3953761426122528262">"Unaporuhusu ufikiaji, maudhui yaliyo kwenye skrini yako huonekana"</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Piga picha ya skrini ya dirisha"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Rekodi dirisha"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Piga picha ya skrini ya sehemu uliyochagua"</string>
@@ -368,6 +365,8 @@
     <string name="accessibility_location_active" msgid="2845747916764660369">"Maombi ya eneo yanatumika"</string>
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"Kipengele cha kuzima vitambuzi kimewashwa"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"Futa arifa zote."</string>
+    <!-- no translation found for accessibility_notification_bell (7149451526721220526) -->
+    <skip />
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{Kuna arifa # zaidi ndani ya kikundi.}other{Kuna arifa # zaidi ndani ya kikundi.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"Skrini imefungwa sasa katika uelekezo wa mandhari."</string>
@@ -429,6 +428,14 @@
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Hakuna Muunganisho wa Wi-Fi au ethaneti"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"Ondoa"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"Maikrofoni ya sasa"</string>
+    <!-- no translation found for quick_settings_audio_output_section_title (3448300919285193209) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_section_title (9203723659866975215) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_disclaimer_text (442891508001590727) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_effects_section_title (6770520531879816578) -->
+    <skip />
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"Ung\'avu"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"Ugeuzaji rangi"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"Usahihishaji wa rangi"</string>
@@ -755,11 +762,9 @@
     <string name="monitoring_description_personal_profile_named_vpn" msgid="5083909710727365452">"Programu zako binafsi zimeunganishwa kwenye intaneti kupitia <xliff:g id="VPN_APP">%1$s</xliff:g>. Shughuli zako za mtandaoni kwenye programu za kazini, ikijumuisha barua pepe na data ya kuvinjari, zinaonekana kwa mtoa huduma wako wa VPN."</string>
     <string name="monitoring_description_vpn_settings_separator" msgid="8292589617720435430">" "</string>
     <string name="monitoring_description_vpn_settings" msgid="5264167033247632071">"Fungua mipangilio ya VPN"</string>
-    <!-- no translation found for monitoring_description_parental_controls_legacy (3331029441820725897) -->
-    <skip />
+    <string name="monitoring_description_parental_controls_legacy" msgid="3331029441820725897">"Kifaa hiki kinadhibitiwa na mzazi wako. Mzazi wako anaweza kuona na kudhibiti maelezo kama vile programu unazotumia, mahali ulipo na muda wa kutumia kifaa."</string>
     <string name="monitoring_description_pin_protection" msgid="1983580207046670355">"Baadhi ya vidhibiti kwenye kifaa chako, kama vile wakati wa kupumzika na vikomo vya kila siku, vinaweza tu kubadilishwa kwa kutumia PIN."</string>
-    <!-- no translation found for monitoring_description_parental_controls (4255592993669461543) -->
-    <skip />
+    <string name="monitoring_description_parental_controls" msgid="4255592993669461543">"Baadhi ya vidhibiti vinaweza kubadilishwa na mzazi wako pekee"</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"Imefunguliwa na kipengele cha kutathmini hali ya kuaminika"</string>
     <string name="kg_prompt_after_adaptive_auth_lock" msgid="6065186971000690782">"Skrini imefungwa. Majaribio mengi mno ya uthibitishaji."</string>
@@ -1144,6 +1149,8 @@
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"Ukurasa wa <xliff:g id="ID_1">%1$d</xliff:g> kati ya <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"Ungependa kuwasha <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"Aikoni ya "<annotation id="action_key_icon">"kitendo"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> ni mikato ya kibodi inayopaswa kutumia <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
+    <!-- no translation found for accessibility_key_gesture_dialog_screen_reader_tts (1298171063228024716) -->
+    <skip />
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"Ungependa kuwasha mikato ya kibodi ya <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"Usiwashe"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Washa njia ya mkato"</string>
@@ -1151,8 +1158,7 @@
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572"><annotation id="action_key_icon">"Aikoni"</annotation>" ya kitendo + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> ni mikato ya kibodi ya kutumia <xliff:g id="ID_3">^3</xliff:g>, kipengele cha ufikivu. Hali hii hukuruhusu uvute karibu kwa haraka kwenye skrini ili ufanye maudhui yawe makubwa zaidi. Baada ya kuwasha kipengele cha ukuzaji, bonyeza "<annotation id="action_key_icon">"Aikoni"</annotation>" ya kitendo + <xliff:g id="ID_4">^1</xliff:g> na \"+\" au \"-\" ili urekebishe kiwango cha ukuzaji."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Zima kipengele cha njia ya mkato"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Usizime"</string>
-    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_content (389338862762665003) -->
-    <skip />
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003"><annotation id="action_key_icon">"Aikoni"</annotation>" ya Kitendo + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> ndio mikato ya kibodi unayopaswa kutumia <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^3</xliff:g> ni kisoma skrini kinachokuruhusu usikie vipengee vikitamkwa kwa sauti. Kinaweza kuwasaidia watu walio na matatizo ya kuona skrini. Huenda hatua hii ikabadilisha jinsi kifaa chako kinafanya kazi."</string>
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"Kubonyeza "<annotation id="action_key_icon">"Aikoni"</annotation>" ya kitendo + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> huwasha <xliff:g id="ID_3">^3</xliff:g>, kipengele cha ufikivu. Mipangilio hii hukuwezesha kudhibiti kifaa chako bila kugusa."</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Skrini iliyofungwa"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Inazima…"</string>

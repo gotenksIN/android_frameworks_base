@@ -54,7 +54,6 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
     private final ActivityEmbeddingController mActivityEmbeddingController;
     @Nullable
     private final DesktopTasksController mDesktopTasksController;
-    private final BubbleTransitions mBubbleTransitions;
 
     DefaultMixedTransition(int type, IBinder transition, Transitions player,
             MixedTransitionHandler mixedHandler, PipTransitionController pipHandler,
@@ -63,11 +62,11 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             ActivityEmbeddingController activityEmbeddingController,
             @Nullable DesktopTasksController desktopTasksController,
             BubbleTransitions bubbleTransitions) {
-        super(type, transition, player, mixedHandler, pipHandler, splitHandler, keyguardHandler);
+        super(type, transition, player, mixedHandler, pipHandler, splitHandler, keyguardHandler,
+                bubbleTransitions);
         mUnfoldHandler = unfoldHandler;
         mActivityEmbeddingController = activityEmbeddingController;
         mDesktopTasksController = desktopTasksController;
-        mBubbleTransitions = bubbleTransitions;
 
         switch (type) {
             case TYPE_UNFOLD:
@@ -292,6 +291,8 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
 
             // Dispatch the rest of the transition normally.
             if (mLeftoversHandler != null
+                    // PiP-specific parts of the transition are already dispatched by this point.
+                    && mLeftoversHandler != mPipHandler
                     && mLeftoversHandler.startAnimation(mTransition, info,
                     startTransaction, finishTransaction, finishCB)) {
                 return true;

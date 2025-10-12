@@ -2141,6 +2141,10 @@ final class ActivityManagerConstants extends ContentObserver {
         CUR_TRIM_EMPTY_PROCESSES = computeTrimEmptyApps(rawMaxEmptyProcesses);
         CUR_TRIM_CACHED_PROCESSES = (Integer.min(CUR_MAX_CACHED_PROCESSES, MAX_CACHED_PROCESSES)
                     - rawMaxEmptyProcesses) / 3;
+
+        mService.mProcessStateController.setCurMaxCachedProcesses(CUR_MAX_CACHED_PROCESSES);
+        mService.mProcessStateController.setCurMaxEmptyProcesses(CUR_MAX_EMPTY_PROCESSES);
+        mService.mProcessStateController.setCurTrimEmptyProcesses(CUR_TRIM_EMPTY_PROCESSES);
     }
 
     private void updateProactiveKillsEnabled() {
@@ -2295,6 +2299,7 @@ final class ActivityManagerConstants extends ContentObserver {
                 DeviceConfig.NAMESPACE_ACTIVITY_MANAGER,
                 KEY_SHORT_FGS_TIMEOUT_DURATION,
                 DEFAULT_SHORT_FGS_TIMEOUT_DURATION);
+        mService.mProcessStateController.setShortFgsTimeoutDuration(mShortFgsTimeoutDuration);
     }
 
     private void updateShortFgsProcStateExtraWaitDuration() {
@@ -2302,6 +2307,8 @@ final class ActivityManagerConstants extends ContentObserver {
                 DeviceConfig.NAMESPACE_ACTIVITY_MANAGER,
                 KEY_SHORT_FGS_PROC_STATE_EXTRA_WAIT_DURATION,
                 DEFAULT_SHORT_FGS_PROC_STATE_EXTRA_WAIT_DURATION);
+        mService.mProcessStateController.setShortFgsProcStateExtraWaitDuration(
+                mShortFgsProcStateExtraWaitDuration);
     }
 
     private void updateShortFgsAnrExtraWaitDuration() {
@@ -2414,6 +2421,11 @@ final class ActivityManagerConstants extends ContentObserver {
         OomAdjuster.Constants oomConstants = new OomAdjuster.Constants();
         oomConstants.mServiceBindAlmostPerceptibleTimeoutMs =
                 mServiceBindAlmostPerceptibleTimeoutMs;
+        oomConstants.mShortFgsTimeoutDuration = mShortFgsTimeoutDuration;
+        oomConstants.mShortFgsProcStateExtraWaitDuration = mShortFgsProcStateExtraWaitDuration;
+        oomConstants.mCurMaxCachedProcesses = CUR_MAX_CACHED_PROCESSES;
+        oomConstants.mCurMaxEmptyProcesses = CUR_MAX_EMPTY_PROCESSES;
+        oomConstants.mCurTrimEmptyProcesses = CUR_TRIM_EMPTY_PROCESSES;
         return oomConstants;
     }
 

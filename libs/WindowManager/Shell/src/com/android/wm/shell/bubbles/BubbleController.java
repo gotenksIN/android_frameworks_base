@@ -112,6 +112,7 @@ import com.android.wm.shell.bubbles.logging.BubbleLogger;
 import com.android.wm.shell.bubbles.logging.BubbleProtoLog;
 import com.android.wm.shell.bubbles.logging.BubbleSessionTracker;
 import com.android.wm.shell.bubbles.logging.BubbleSessionTracker.SessionEvent;
+import com.android.wm.shell.bubbles.util.BubbleShellCommandHandler;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayImeController;
 import com.android.wm.shell.common.DisplayInsetsController;
@@ -247,6 +248,7 @@ public class BubbleController implements ConfigurationChangeListener,
     private final Lazy<Optional<SplitScreenController>> mSplitScreenController;
     private final BubblesFoldLockSettingsObserver mFoldLockSettingsObserver;
     private final BubbleSessionTracker mSessionTracker;
+    private final BubbleShellCommandHandler mBubbleShellCommandHandler;
 
     // Used to post to main UI thread
     private final ShellExecutor mMainExecutor;
@@ -446,6 +448,7 @@ public class BubbleController implements ConfigurationChangeListener,
         mSplitScreenController = splitScreenController;
         mFoldLockSettingsObserver = foldLockSettingsObserver;
         mSessionTracker = sessionTracker;
+        mBubbleShellCommandHandler = new BubbleShellCommandHandler(this);
         shellInit.addInitCallback(this::onInit, this);
 
         if (unfoldProgressProvider.isPresent() && Flags.enableBubbleBar()) {
@@ -621,6 +624,7 @@ public class BubbleController implements ConfigurationChangeListener,
         mShellController.addExternalInterface(IBubbles.DESCRIPTOR,
                 this::createExternalInterface, this);
         mShellCommandHandler.addDumpCallback(this::dump, this);
+        mShellCommandHandler.addCommandCallback("bubbles", mBubbleShellCommandHandler, this);
 
         if (com.android.window.flags.Flags.enableExperimentalBubblesController()) {
             try {
@@ -2365,7 +2369,6 @@ public class BubbleController implements ConfigurationChangeListener,
      * <p>
      * Must be called from the main thread.
      */
-    @VisibleForTesting
     @MainThread
     public void removeAllBubbles(@Bubbles.DismissReason int reason) {
         mBubbleData.dismissAll(reason);
@@ -3313,8 +3316,9 @@ public class BubbleController implements ConfigurationChangeListener,
         @Override
         public void showShortcutBubble(ShortcutInfo info, EntryPoint entryPoint,
                 @Nullable BubbleBarLocation location) {
-            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.showShortcutBubble: info=%s loc=%s",
-                    info, location);
+            BubbleLog.record("IBubbles.showShortcutBubble() info=%s loc=%s", info, location);
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.showShortcutBubble() info=%s loc=%s", info,
+                    location);
             executeRemoteCallWithTaskPermission(
                     mController,
                     "showShortcutBubble",
@@ -3325,7 +3329,9 @@ public class BubbleController implements ConfigurationChangeListener,
         @Override
         public void showAppBubble(Intent intent, UserHandle user,
                 EntryPoint entryPoint, @Nullable BubbleBarLocation location) {
-            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.showAppBubble: intent=%s user=%s loc=%s",
+            BubbleLog.record("IBubbles.showAppBubble() intent=%s user=%s loc=%s", intent, user,
+                    location);
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.showAppBubble() intent=%s user=%s loc=%s",
                     intent, user, location);
             executeRemoteCallWithTaskPermission(
                     mController,
@@ -3337,9 +3343,11 @@ public class BubbleController implements ConfigurationChangeListener,
 
         @Override
         public void showBubble(String key, int bubbleBarTopToScreenBottom) {
+            BubbleLog.record("IBubbles.showBubble() key=%s bubbleBarTopToScreenBottom=%d", key,
+                    bubbleBarTopToScreenBottom);
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY,
-                    "IBubbles.showBubble: key=%s bubbleBarTopToScreenBottom=%d",
-                    key, bubbleBarTopToScreenBottom);
+                    "IBubbles.showBubble() key=%s bubbleBarTopToScreenBottom=%d", key,
+                    bubbleBarTopToScreenBottom);
             executeRemoteCallWithTaskPermission(
                     mController,
                     "showBubble",
@@ -3350,7 +3358,8 @@ public class BubbleController implements ConfigurationChangeListener,
 
         @Override
         public void removeAllBubbles() {
-            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.removeAllBubbles");
+            BubbleLog.record("IBubbles.removeAllBubbles()");
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.removeAllBubbles()");
             executeRemoteCallWithTaskPermission(
                     mController,
                     "removeAllBubbles",
@@ -3359,7 +3368,8 @@ public class BubbleController implements ConfigurationChangeListener,
 
         @Override
         public void collapseBubbles() {
-            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.collapseBubbles");
+            BubbleLog.record("IBubbles.collapseBubbles()");
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.collapseBubbles()");
             executeRemoteCallWithTaskPermission(
                     mController,
                     "collapseBubbles",
@@ -3380,7 +3390,7 @@ public class BubbleController implements ConfigurationChangeListener,
 
         @Override
         public void startBubbleDrag(String bubbleKey) {
-            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.startBubbleDrag: key=%s", bubbleKey);
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.startBubbleDrag() key=%s", bubbleKey);
             executeRemoteCallWithTaskPermission(
                     mController,
                     "startBubbleDrag",
@@ -3390,8 +3400,8 @@ public class BubbleController implements ConfigurationChangeListener,
         @Override
         public void stopBubbleDrag(BubbleBarLocation location, int bubbleBarTopToScreenBottom) {
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY,
-                    "IBubbles.stopBubbleDrag: log=%s bubbleBarTopToScreenBottom=%d",
-                    location, bubbleBarTopToScreenBottom);
+                    "IBubbles.stopBubbleDrag() loc=%s bubbleBarTopToScreenBottom=%d", location,
+                    bubbleBarTopToScreenBottom);
             executeRemoteCallWithTaskPermission(
                     mController,
                     "stopBubbleDrag",
@@ -3401,8 +3411,9 @@ public class BubbleController implements ConfigurationChangeListener,
 
         @Override
         public void dragBubbleToDismiss(String key, long timestamp) {
-            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.dragBubbleToDismiss: key=%s time=%d",
-                    key, timestamp);
+            BubbleLog.record("IBubbles.dragBubbleToDismiss() key=%s time=%d", key, timestamp);
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.dragBubbleToDismiss() key=%s time=%d", key,
+                    timestamp);
             executeRemoteCallWithTaskPermission(
                     mController,
                     "dragBubbleToDismiss",
@@ -3411,7 +3422,7 @@ public class BubbleController implements ConfigurationChangeListener,
 
         @Override
         public void showUserEducation(int positionX, int positionY) {
-            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.showUserEducation: pos=[%d, %d]",
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.showUserEducation() pos=[%d, %d]",
                     positionX, positionY);
             executeRemoteCallWithTaskPermission(
                     mController,
@@ -3422,7 +3433,7 @@ public class BubbleController implements ConfigurationChangeListener,
         @Override
         public void setBubbleBarLocation(BubbleBarLocation location,
                 @UpdateSource int source) {
-            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.setBubbleBarLocation: loc=%s src=%d",
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.setBubbleBarLocation() loc=%s src=%d",
                     location, source);
             executeRemoteCallWithTaskPermission(
                     mController,
@@ -3433,7 +3444,7 @@ public class BubbleController implements ConfigurationChangeListener,
         @Override
         public void updateBubbleBarTopToScreenBottom(int bubbleBarTopToScreenBottom) {
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY,
-                    "IBubbles.updateBubbleBarTopOnScreen: bubbleBarTopToScreenBottom=%d",
+                    "IBubbles.updateBubbleBarTopOnScreen() bubbleBarTopToScreenBottom=%d",
                     bubbleBarTopToScreenBottom);
             executeRemoteCallWithTaskPermission(
                     mController,
@@ -3453,7 +3464,7 @@ public class BubbleController implements ConfigurationChangeListener,
 
         @Override
         public void showExpandedView() {
-            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.showExpandedView");
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.showExpandedView()");
             executeRemoteCallWithTaskPermission(
                     mController,
                     "showExpandedView",
@@ -3469,8 +3480,8 @@ public class BubbleController implements ConfigurationChangeListener,
 
         @Override
         public void moveDraggedBubbleToFullscreen(String key, Point dropLocation) {
-            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.moveDraggedBubbleToFullscreen: key=%s "
-                            + "loc=%s", key, dropLocation);
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "IBubbles.moveDraggedBubbleToFullscreen() key=%s "
+                    + "loc=%s", key, dropLocation);
             executeRemoteCallWithTaskPermission(
                     mController,
                     "moveDraggedBubbleToFullscreen",

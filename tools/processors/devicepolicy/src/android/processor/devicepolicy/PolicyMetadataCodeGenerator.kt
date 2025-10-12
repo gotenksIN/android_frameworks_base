@@ -99,7 +99,9 @@ object PolicyMetadataCodeGenerator {
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .returns(listOfPolicyMetadataType)
                 .addStatement(
-                    "\$T policies = new \$T()", listOfPolicyMetadataType, arrayListOfPolicyMetadataType
+                    "\$T policies = new \$T()",
+                    listOfPolicyMetadataType,
+                    arrayListOfPolicyMetadataType
                 ).addJavadoc(
                     "Generated method that returns a list of all policy metadata"
                 )
@@ -125,6 +127,14 @@ object PolicyMetadataCodeGenerator {
         )
 
         TypeSpecificPolicyMetadata.TypeMetadataCase.INTEGER_METADATA -> generateIntegerPolicyAdder(
+            policy
+        )
+
+        TypeSpecificPolicyMetadata.TypeMetadataCase.STRING_METADATA -> generateStringPolicyAdder(
+            policy
+        )
+
+        TypeSpecificPolicyMetadata.TypeMetadataCase.LIST_OF_STRING_METADATA -> generateListOfStringPolicyAdder(
             policy
         )
 
@@ -155,13 +165,38 @@ object PolicyMetadataCodeGenerator {
         return builder.build()
     }
 
-    private fun CodeBlock.Builder.addPolicyArguments(policy: PolicyMetadata) =
+    private fun CodeBlock.Builder.addPolicyId(name: String) =
+        this.add("/* id= */ \$L,\n", name)
+
+    private fun CodeBlock.Builder.addPolicyId(nameGenerator: CodeBlock) =
+        this.add("/* id= */ \$L,\n", nameGenerator)
+
+    private fun CodeBlock.Builder.addPolicyInformation(policy: PolicyMetadata): CodeBlock.Builder {
+        add(
+            "/* allowedScopes= */ \$L,\n",
+            generateSetBuilder(policy.allowedScopesList.map { it.number })
+        )
+        add("/* affectedResource= */ \$L,\n", policy.affectedResource.number)
+
+        if (policy.requiredPermission.isEmpty()) {
+            add("/* requiredPermission= */ null,\n")
+        } else {
+            add("/* requiredPermission= */ \$S,\n", policy.requiredPermission)
+        }
+
+        if (policy.requiredCrossUserPermission.isEmpty()) {
+            add("/* requiredCrossUserPermission= */ null")
+        } else {
+            add("/* requiredCrossUserPermission= */ \$S", policy.requiredCrossUserPermission)
+        }
+
+        return this
+    }
+
+    private fun CodeBlock.Builder.addPolicyArguments(policy: PolicyMetadata): CodeBlock.Builder =
         this
-            .add("/* id= */ \$L,\n", policy.name)
-            .add("/* allowedScopes= */ \$L,\n",
-                generateSetBuilder(policy.allowedScopesList.map { it.number })
-            )
-            .add("/* affectedResource= */ \$L", policy.affectedResource.number)
+            .addPolicyId(policy.name)
+            .addPolicyInformation(policy)
 
     private fun genericPolicyAdder(policy: PolicyMetadata, type: ClassName) =
         CodeBlock.builder()
@@ -182,7 +217,8 @@ object PolicyMetadataCodeGenerator {
             .indent()
             .addPolicyArguments(policy)
             .add(",\n")
-            .add("/* allowedValues= */ \$L\n",
+            .add(
+                "/* allowedValues= */ \$L\n",
                 generateSetBuilder(
                     policy.typeSpecificMetadata.enumMetadata.valuesList.map { it.intValue }
                 )
@@ -203,6 +239,58 @@ object PolicyMetadataCodeGenerator {
     private fun generateIntegerPolicyAdder(policy: PolicyMetadata) =
         genericPolicyAdder(policy, integerPolicyMetadataType)
 
+    private val stringPolicyMetadataType =
+        ClassName.get(METADATA_PACKAGE, "StringPolicyMetadata")
+
+
+    private fun generateStringPolicyAdder(policy: PolicyMetadata) =
+        genericPolicyAdder(policy, stringPolicyMetadataType)
+
+    private val listPolicyMetadataType =
+        ClassName.get(METADATA_PACKAGE, "ListPolicyMetadata")
+
+    private fun generateListPolicyAdder(
+        policy: PolicyMetadata,
+        elementType: ClassName,
+        elementMetadataType: ClassName,
+    ) =
+        CodeBlock.builder()
+            .add(
+                "policies.add(new \$T(\n",
+                ParameterizedTypeName.get(
+                    listPolicyMetadataType,
+                    elementType,
+                )
+            )
+            .indent()
+            .addPolicyId(policy.name)
+            .add("/* elementMetadata= */ new \$T(\n", elementMetadataType)
+            .indent()
+            .addPolicyId(
+                CodeBlock
+                    .builder()
+                    .add(
+                        "new \$T(\$L.getId() + \$S)",
+                        ParameterizedTypeName.get(
+                            policyIdentifierType,
+                            elementType
+                        ),
+                        policy.name,
+                        "#elements"
+                    )
+                    .build()
+            )
+            .addPolicyInformation(policy)
+            .unindent()
+            .add("\n)\n")
+            .unindent()
+            .addStatement("))")
+            .build()
+
+    private fun generateListOfStringPolicyAdder(policy: PolicyMetadata) =
+        generateListPolicyAdder(policy, stringType, stringPolicyMetadataType)
+
+    private val stringType = ClassName.get(String::class.java)
     private val setType = ClassName.get(Set::class.java)
     private val listType = ClassName.get(List::class.java)
     private val arrayListType = ClassName.get(ArrayList::class.java)
@@ -216,4 +304,7 @@ object PolicyMetadataCodeGenerator {
     private val arrayListOfPolicyMetadataType = ParameterizedTypeName.get(
         arrayListType, policyMetadataType
     )
+
+    private val policyIdentifierType =
+        ClassName.get("android.app.admin", "PolicyIdentifier")
 }

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,8 +39,7 @@ import com.android.systemui.keyguard.shared.model.KeyguardState.LOCKSCREEN
 import com.android.systemui.keyguard.shared.model.KeyguardState.OCCLUDED
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.lifecycle.Activatable
-import com.android.systemui.lifecycle.ExclusiveActivatable
-import com.android.systemui.lifecycle.Hydrator
+import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.log.table.TableLogBufferFactory
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.plugins.DarkIconDispatcher
@@ -67,7 +66,6 @@ import com.android.systemui.statusbar.layout.ui.viewmodel.AppHandlesViewModel
 import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarBoundsViewModel
 import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarContentInsetsViewModelStore
 import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor
-import com.android.systemui.statusbar.notification.domain.interactor.HeadsUpNotificationInteractor
 import com.android.systemui.statusbar.notification.icon.domain.interactor.StatusBarNotificationIconsInteractor
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi
 import com.android.systemui.statusbar.phone.domain.interactor.DarkIconInteractor
@@ -268,7 +266,6 @@ constructor(
     notificationsInteractor: ActiveNotificationsInteractor,
     desktopInteractor: DesktopInteractor,
     darkIconInteractor: DarkIconInteractor,
-    headsUpNotificationInteractor: HeadsUpNotificationInteractor,
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
     keyguardInteractor: KeyguardInteractor,
     statusBarNotificationIconsInteractor: StatusBarNotificationIconsInteractor,
@@ -285,9 +282,7 @@ constructor(
     @Background bgDispatcher: CoroutineDispatcher,
     shadeDisplaysInteractor: Provider<ShadeDisplaysInteractor>,
     private val uiEventLogger: StatusBarChipsUiEventLogger,
-) : HomeStatusBarViewModel, ExclusiveActivatable() {
-
-    private val hydrator = Hydrator(traceName = "HomeStatusBarViewModel.hydrator")
+) : HomeStatusBarViewModel, HydratedActivatable() {
 
     val tableLogger = tableLoggerFactory.getOrCreate(tableLogBufferName(thisDisplayId), 200)
 
@@ -441,11 +436,9 @@ constructor(
             .flowOn(bgDispatcher)
 
     override val areaDark: IsAreaDark by
-        hydrator.hydratedStateOf(
-            traceName = "areaDark",
-            initialValue = IsAreaDark { true },
-            source = darkIconInteractor.isAreaDark(thisDisplayId),
-        )
+        darkIconInteractor
+            .isAreaDark(thisDisplayId)
+            .hydratedStateOf(traceName = "areaDark", initialValue = IsAreaDark { true })
 
     private val currentKeyguardState: Flow<KeyguardState> =
         keyguardTransitionInteractor.currentKeyguardState.onEach {
@@ -457,31 +450,27 @@ constructor(
         }
 
     override val useDesktopStatusBar: Boolean by
-        hydrator.hydratedStateOf(
+        desktopInteractor.useDesktopStatusBar.hydratedStateOf(
             traceName = "useDesktopStatusBar",
             initialValue = false,
-            source = desktopInteractor.useDesktopStatusBar,
         )
 
     override val isQuickSettingsChipHighlighted: Boolean by
-        hydrator.hydratedStateOf(
+        shadeInteractor.isQsExpanded.hydratedStateOf(
             traceName = "isQsChipHighlighted",
             initialValue = false,
-            source = shadeInteractor.isQsExpanded,
         )
 
     override val isNotificationsChipHighlighted: Boolean by
-        hydrator.hydratedStateOf(
+        shadeInteractor.isNotificationsExpanded.hydratedStateOf(
             traceName = "isNotificationsChipHighlighted",
             initialValue = false,
-            source = shadeInteractor.isNotificationsExpanded,
         )
 
     override val hasStatusBarNotifications: Boolean by
-        hydrator.hydratedStateOf(
+        statusBarNotificationIconsInteractor.hasStatusBarNotifications.hydratedStateOf(
             traceName = "hasStatusBarNotifications",
             initialValue = false,
-            source = statusBarNotificationIconsInteractor.hasStatusBarNotifications,
         )
 
     /**
@@ -520,13 +509,11 @@ constructor(
         combine(
                 isHomeStatusBarAllowed,
                 keyguardInteractor.isSecureCameraActive,
-                headsUpNotificationInteractor.statusBarHeadsUpStatus,
                 isTransitioningFromGoneToDream,
                 keyguardInteractor.isKeyguardVisible,
             ) {
                 isHomeStatusBarAllowed,
                 isSecureCameraActive,
-                headsUpState,
                 isGoneToDream,
                 isKeyguardVisible ->
                 // When launching the camera over the lockscreen, the status icons would typically
@@ -597,14 +584,13 @@ constructor(
             )
 
     override val ongoingActivityChips: ChipsVisibilityModel by
-        hydrator.hydratedStateOf(
+        chipsVisibilityModel.hydratedStateOf(
             traceName = "ongoingActivityChips",
             initialValue =
                 ChipsVisibilityModel(
                     chips = MultipleOngoingActivityChipsModel(),
                     areChipsAllowed = false,
                 ),
-            source = chipsVisibilityModel,
         )
 
     override fun onChipBoundsChanged(key: String, bounds: RectF) {
@@ -727,9 +713,8 @@ constructor(
     @View.Visibility
     private fun Boolean.toVisibleOrInvisible(): Int = if (this) View.VISIBLE else View.INVISIBLE
 
-    override suspend fun onActivated(): Nothing {
+    override suspend fun onActivated() {
         coroutineScope {
-            launch { hydrator.activate() }
             if (StatusBarPopupChips.isEnabled) {
                 launch { statusBarPopupChips.activate() }
             }

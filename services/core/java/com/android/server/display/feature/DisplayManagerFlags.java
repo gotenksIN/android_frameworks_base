@@ -55,10 +55,6 @@ public class DisplayManagerFlags {
             Flags.FLAG_DISPLAY_TOPOLOGY_API,
             Flags::displayTopologyApi);
 
-    private final FlagState mConnectedDisplayErrorHandlingFlagState = new FlagState(
-            Flags.FLAG_ENABLE_CONNECTED_DISPLAY_ERROR_HANDLING,
-            Flags::enableConnectedDisplayErrorHandling);
-
     private final FlagState mPowerThrottlingClamperFlagState = new FlagState(
             Flags.FLAG_ENABLE_POWER_THROTTLING_CLAMPER,
             Flags::enablePowerThrottlingClamper);
@@ -86,11 +82,6 @@ public class DisplayManagerFlags {
     private final FlagState mSensorBasedBrightnessThrottling = new FlagState(
             Flags.FLAG_SENSOR_BASED_BRIGHTNESS_THROTTLING,
             Flags::sensorBasedBrightnessThrottling
-    );
-
-    private final FlagState mRefactorDisplayPowerController = new FlagState(
-            Flags.FLAG_REFACTOR_DISPLAY_POWER_CONTROLLER,
-            Flags::refactorDisplayPowerController
     );
 
     private final FlagState mDozeBrightnessStrategy = new FlagState(
@@ -254,11 +245,6 @@ public class DisplayManagerFlags {
         return mDisplayOffloadFlagState.isEnabled();
     }
 
-    /** Returns whether error notifications for connected displays are enabled on not */
-    public boolean isConnectedDisplayErrorHandlingEnabled() {
-        return mConnectedDisplayErrorHandlingFlagState.isEnabled();
-    }
-
     /** Returns whether brightness range is allowed to extend below traditional range. */
     public boolean isEvenDimmerEnabled() {
         return mEvenDimmerFlagState.isEnabled();
@@ -282,10 +268,6 @@ public class DisplayManagerFlags {
 
     public boolean isSensorBasedBrightnessThrottlingEnabled() {
         return mSensorBasedBrightnessThrottling.isEnabled();
-    }
-
-    public boolean isRefactorDisplayPowerControllerEnabled() {
-        return mRefactorDisplayPowerController.isEnabled();
     }
 
     public boolean isDozeBrightnessStrategyEnabled() {
@@ -467,7 +449,6 @@ public class DisplayManagerFlags {
     public void dump(PrintWriter pw) {
         pw.println("DisplayManagerFlags:");
         pw.println("--------------------");
-        pw.println(" " + mConnectedDisplayErrorHandlingFlagState);
         pw.println(" " + mDisplayOffloadFlagState);
         pw.println(" " + mDisplayTopology);
         pw.println(" " + mDisplayTopologyApi);
@@ -477,7 +458,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mSyncedResolutionSwitch);
         pw.println(" " + mFastHdrTransitions);
         pw.println(" " + mSensorBasedBrightnessThrottling);
-        pw.println(" " + mRefactorDisplayPowerController);
         pw.println(" " + mDozeBrightnessStrategy);
         pw.println(" " + mResolutionBackupRestore);
         pw.println(" " + mUseFusionProxSensor);

@@ -138,6 +138,7 @@ import android.os.UserManager.QuietModeFlag;
 import android.os.UserManager.UserLogoutability;
 import android.os.storage.StorageManager;
 import android.provider.Settings;
+import android.service.notification.StatusBarNotification;
 import android.service.voice.VoiceInteractionManagerInternal;
 import android.stats.devicepolicy.DevicePolicyEnums;
 import android.telecom.TelecomManager;
@@ -5038,10 +5039,12 @@ public class UserManagerService extends IUserManager.Stub {
                 final String newUserType;
                 if (newHeadlessSystemUserMode) {
                     newUserType = UserManager.USER_TYPE_SYSTEM_HEADLESS;
-                    newSysFlags = oldSysFlags & ~UserInfo.FLAG_FULL & ~UserInfo.FLAG_MAIN;
+                    newSysFlags = oldSysFlags & ~UserInfo.FLAG_FULL & ~UserInfo.FLAG_MAIN
+                            & (android.multiuser.Flags.hsuNotAdmin() ? ~UserInfo.FLAG_ADMIN : ~0);
                 } else {
                     newUserType = UserManager.USER_TYPE_FULL_SYSTEM;
-                    newSysFlags = oldSysFlags | UserInfo.FLAG_FULL | UserInfo.FLAG_MAIN;
+                    newSysFlags = oldSysFlags | UserInfo.FLAG_FULL | UserInfo.FLAG_MAIN
+                            | (android.multiuser.Flags.hsuNotAdmin() ? UserInfo.FLAG_ADMIN : 0);
                 }
 
                 if (systemUserData.info.userType.equals(newUserType)) {
@@ -8364,15 +8367,6 @@ public class UserManagerService extends IUserManager.Stub {
             }
         } // synchronized (mPackagesLock)
 
-        pw.println();
-        mUserVisibilityMediator.dump(pw, args);
-        pw.println();
-
-        if (mHam != null) {
-            mHam.dump(pw, args);
-            pw.println();
-        }
-
         // Dump some capabilities
         pw.println();
         if (isCreationOverrideEnabled()) {
@@ -8422,9 +8416,19 @@ public class UserManagerService extends IUserManager.Stub {
             pw.println("  System user allocations: " + mUser0Allocations.get());
         }
         synchronized (mUsersLock) {
-            printNullableUser(pw, "Boot user", mBootUser);
-            printNullableUser(pw, "Device owner user", mDeviceOwnerUserId);
+            printNullableUser(pw, "  Boot user", mBootUser);
+            printNullableUser(pw, "  Device owner user", mDeviceOwnerUserId);
         }
+
+        pw.println();
+        mUserVisibilityMediator.dump(pw, args);
+        pw.println();
+
+        if (mHam != null) {
+            mHam.dump(pw, args);
+            pw.println();
+        }
+
         // TODO(b/413464199): This confusing line is, regrettably, currently required by Tradefed.
         pw.println("Can add private profile: "+ canAddPrivateProfile(currentUserId));
 
@@ -8457,7 +8461,7 @@ public class UserManagerService extends IUserManager.Stub {
             mSystemPackageInstaller.dump(ipw);
 
             ipw.println();
-            ipw.println("Non-multiuser-compliant events:");
+            ipw.println("Non-compliant events:");
             ipw.increaseIndent();
             mNonComplianceLogger.dump(ipw);
             ipw.decreaseIndent();
@@ -9158,8 +9162,25 @@ public class UserManagerService extends IUserManager.Stub {
         }
 
         @Override
+        public boolean isActivityAllowlistedForHsu(ComponentName activity) {
+            Preconditions.checkState(mHam != null, "Called when flag is disabled or device is not "
+                    + "HSUM");
+            return mHam.isActivityAllowed(ComponentName.flattenToShortString(activity));
+        }
+
+        @Override
         public void logLaunchedHsuActivity(ComponentName activity) {
             mNonComplianceLogger.logLaunchedHsuActivity(activity);
+        }
+
+        @Override
+        public void logBlockedHsuActivity(ComponentName activity) {
+            mNonComplianceLogger.logBlockedHsuActivity(activity);
+        }
+
+        @Override
+        public void logShownHsuNotification(StatusBarNotification sbn) {
+            mNonComplianceLogger.logShownHsuNotification(sbn);
         }
 
         @Override
@@ -9349,7 +9370,14 @@ public class UserManagerService extends IUserManager.Stub {
      * last admin user on a device that requires there to always be at least one admin.
      */
     @GuardedBy("mUsersLock")
-    private boolean isNonRemovableLastAdminUserLU(UserInfo userInfo) {
+    @VisibleForTesting
+    boolean isNonRemovableLastAdminUserLU(UserInfo userInfo) {
+        var dpmi = getDevicePolicyManagerInternal();
+        if (dpmi != null && dpmi.isDeviceOrganizationManaged()) {
+            // If device is organization managed, then the user is not a non-removable last admin,
+            // because the device can still be managed remotely without the last admin.
+            return false;
+        }
         return android.multiuser.Flags.disallowRemovingLastAdminUser()
                 && getContextResources().getBoolean(R.bool.config_disallowRemovingLastAdminUser)
                 // For HSUM, the headless system user is currently flagged as an admin user now.

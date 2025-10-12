@@ -18,6 +18,8 @@ package com.android.server.companion.datatransfer.continuity;
 
 import static android.Manifest.permission.READ_REMOTE_TASKS;
 import static android.Manifest.permission.REQUEST_TASK_HANDOFF;
+import static android.Manifest.permission.MODIFY_HANDOFF_SETTINGS;
+import static android.Manifest.permission.READ_HANDOFF_SETTINGS;
 
 import android.annotation.EnforcePermission;
 import android.annotation.NonNull;
@@ -42,6 +44,7 @@ import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskR
 import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskUpdatedMessage;
 import com.android.server.companion.datatransfer.continuity.messages.TaskContinuityMessage;
 import com.android.server.companion.datatransfer.continuity.tasks.RemoteTaskStore;
+import com.android.server.companion.datatransfer.continuity.tasks.TaskBroadcaster;
 
 import com.android.server.SystemService;
 
@@ -68,7 +71,7 @@ public final class TaskContinuityManagerService extends SystemService
     public TaskContinuityManagerService(Context context) {
         super(context);
 
-        mTaskContinuityMessenger = new TaskContinuityMessenger(context, this);
+        mTaskContinuityMessenger = new TaskContinuityMessenger(context);
         mTaskBroadcaster = new TaskBroadcaster(context, mTaskContinuityMessenger);
         mRemoteTaskStore = new RemoteTaskStore();
         mOutboundHandoffRequestController =
@@ -81,7 +84,7 @@ public final class TaskContinuityManagerService extends SystemService
     @Override
     public void onStart() {
         mTaskContinuityManagerService = new TaskContinuityManagerServiceImpl();
-        mTaskContinuityMessenger.enable();
+        mTaskContinuityMessenger.addListener(this);
         publishBinderService(Context.TASK_CONTINUITY_SERVICE, mTaskContinuityManagerService);
     }
 
@@ -120,19 +123,28 @@ public final class TaskContinuityManagerService extends SystemService
         }
 
         @Override
+        @EnforcePermission(MODIFY_HANDOFF_SETTINGS)
         public void enableHandoffForDevice(boolean enabled) {
+            enableHandoffForDevice_enforcePermission();
+
             // TODO: Implement this method.
         }
 
         @Override
+        @EnforcePermission(READ_HANDOFF_SETTINGS)
         public void registerHandoffFeatureStateListener(
-            @NonNull IHandoffFeatureStateListener listener) {
+                @NonNull IHandoffFeatureStateListener listener) {
+            registerHandoffFeatureStateListener_enforcePermission();
+
             // TODO: Implement this method.
         }
 
         @Override
+        @EnforcePermission(READ_HANDOFF_SETTINGS)
         public void unregisterHandoffFeatureStateListener(
-            @NonNull IHandoffFeatureStateListener listener) {
+                @NonNull IHandoffFeatureStateListener listener) {
+            unregisterHandoffFeatureStateListener_enforcePermission();
+
             // TODO: Implement this method.
         }
     }

@@ -241,6 +241,15 @@ public final class Call {
             "android.telecom.extra.SILENT_RINGING_REQUESTED";
 
     /**
+     * Connection event used to notify InCallService of phoneaccount changes.
+     * Dialer uses phone account capability to decide whether to enable
+     * some options like RTT. This event will be used for such cases.
+     */
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_PHONE_ACCOUNT_CHANGED)
+    public static final String EVENT_PHONE_ACCOUNT_CHANGED =
+            "android.telecom.event.PHONE_ACCOUNT_CHANGED";
+
+    /**
      * Event reported from the Telecom stack to report an in-call diagnostic message which the
      * dialer app may opt to display to the user.  A diagnostic message is used to communicate
      * scenarios the device has detected which may impact the quality of the ongoing call.
@@ -1816,11 +1825,11 @@ public final class Call {
      * Instructs this {@code Call} to be transferred to another number.
      *
      * @param targetNumber The address to which the call will be transferred.
-     * @param isConfirmationRequired if {@code true} it will initiate a confirmed transfer,
-     * if {@code false}, it will initiate an unconfirmed transfer.
-     *
-     * @hide
+     * @param isConfirmationRequired if {@code true} it will initiate a confirmed(assured) transfer,
+     * if {@code false}, it will initiate an unconfirmed(blind) transfer.
+     * See 3GPP TS 24.629 for more details.
      */
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_EXPLICIT_CALL_TRANSFER)
     public void transfer(@NonNull Uri targetNumber, boolean isConfirmationRequired) {
         mInCallAdapter.transferCall(mTelecomCallId, targetNumber, isConfirmationRequired);
     }
@@ -1829,9 +1838,9 @@ public final class Call {
      * Instructs this {@code Call} to be transferred to another ongoing call.
      * This will initiate CONSULTATIVE transfer.
      * @param toCall The other ongoing {@code Call} to which this call will be transferred.
-     *
-     * @hide
+     * See 3GPP TS 24.629 for more details.
      */
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_EXPLICIT_CALL_TRANSFER)
     public void transfer(@NonNull android.telecom.Call toCall) {
         mInCallAdapter.transferCall(mTelecomCallId, toCall.mTelecomCallId);
     }

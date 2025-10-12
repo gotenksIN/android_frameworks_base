@@ -167,12 +167,9 @@
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"ថត"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"ចែករំលែក"</string>
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"ជ្រើសរើសកម្មវិធីដើម្បីចែករំលែក"</string>
-    <!-- no translation found for screen_share_audio_sharing_text (7829391478284315787) -->
-    <skip />
-    <!-- no translation found for screen_share_app_window_sharing_title (2063554880747318383) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer (3953761426122528262) -->
-    <skip />
+    <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"ស្ដាប់សំឡេងរួមគ្នា"</string>
+    <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"បង្ហាញវិនដូកម្មវិធី"</string>
+    <string name="screen_share_disclaimer" msgid="3953761426122528262">"នៅពេលបង្ហាញ អ្នកផ្សេងអាចមើលឃើញខ្លឹមសារអេក្រង់របស់អ្នក"</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"ថតរូបអេក្រង់វិនដូ"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"ថត​វិនដូ"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"ថតរូបអេក្រង់នៃតំបន់ដែលបានជ្រើសរើស"</string>
@@ -368,6 +365,8 @@
     <string name="accessibility_location_active" msgid="2845747916764660369">"សំណើ​ទីតាំង​សកម្ម"</string>
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"ឧបករណ៍​ចាប់សញ្ញា​បានបិទ"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"សម្អាត​ការ​ជូន​ដំណឹង​ទាំងអស់។"</string>
+    <!-- no translation found for accessibility_notification_bell (7149451526721220526) -->
+    <skip />
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{មានការជូនដំណឹង # ទៀតនៅខាងក្នុង។}other{មាន​ការ​ជូនដំណឹង # ទៀត​នៅ​ខាង​ក្នុង។}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"អេក្រង់​ជាប់​សោ​ក្នុង​ទិស​ផ្ដេក។"</string>
@@ -429,6 +428,14 @@
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"គ្មានការតភ្ជាប់​អ៊ីសឺរណិត ឬ Wi‑Fi ទេ"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"ផ្ដាច់"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"មីក្រូហ្វូនបច្ចុប្បន្នគឺ"</string>
+    <!-- no translation found for quick_settings_audio_output_section_title (3448300919285193209) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_section_title (9203723659866975215) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_disclaimer_text (442891508001590727) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_effects_section_title (6770520531879816578) -->
+    <skip />
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"ពន្លឺ"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"ការបញ្ច្រាស​ពណ៌"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"ការ​កែតម្រូវ​ពណ៌"</string>
@@ -755,11 +762,9 @@
     <string name="monitoring_description_personal_profile_named_vpn" msgid="5083909710727365452">"កម្មវិធី​ផ្ទាល់ខ្លួនរបស់អ្នកត្រូវបានភ្ជាប់អ៊ីនធឺណិតតាមរយៈ <xliff:g id="VPN_APP">%1$s</xliff:g>។ ក្រុមហ៊ុន​ផ្តល់សេវា VPN របស់អ្នកអាចមើលឃើញសកម្មភាពបណ្ដាញរបស់អ្នក រួមទាំងអ៊ីមែល និងទិន្នន័យរុករកផងដែរ។"</string>
     <string name="monitoring_description_vpn_settings_separator" msgid="8292589617720435430">" "</string>
     <string name="monitoring_description_vpn_settings" msgid="5264167033247632071">"បើក​ការកំណត់ VPN"</string>
-    <!-- no translation found for monitoring_description_parental_controls_legacy (3331029441820725897) -->
-    <skip />
+    <string name="monitoring_description_parental_controls_legacy" msgid="3331029441820725897">"ឧបករណ៍​នេះ​ស្ថិត​ក្រោម​ការ​គ្រប់គ្រង​របស់មាតាបិតាអ្នក។ មាតាបិតារបស់អ្នកអាចមើល និងគ្រប់គ្រងព័ត៌មាន​ដូចជា កម្មវិធីដែលអ្នកប្រើ ទីតាំងរបស់អ្នក និងរយៈពេលប្រើប្រាស់ឧបករណ៍របស់អ្នកជាដើម។"</string>
     <string name="monitoring_description_pin_protection" msgid="1983580207046670355">"ការគ្រប់គ្រងមួយចំនួនលើឧបករណ៍របស់អ្នក ដូចជារយៈពេល​កំណត់​ប្រចាំ​ថ្ងៃ និងពេលបិទដំណើរការ អាចប្ដូរបានតាមរយៈកូដ PIN តែប៉ុណ្ណោះ។"</string>
-    <!-- no translation found for monitoring_description_parental_controls (4255592993669461543) -->
-    <skip />
+    <string name="monitoring_description_parental_controls" msgid="4255592993669461543">"ការគ្រប់គ្រងមួយចំនួនអាចត្រូវបានផ្លាស់ប្ដូរដោយមាតាបិតាតែប៉ុណ្ណោះ"</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"បាន​ដោះសោ​ដោយភ្នាក់ងារ​​ទុកចិត្ត"</string>
     <string name="kg_prompt_after_adaptive_auth_lock" msgid="6065186971000690782">"បានចាក់សោ​អេក្រង់។ បានព្យាយាមផ្ទៀងផ្ទាត់ច្រើនដងពេក។"</string>
@@ -1144,6 +1149,8 @@
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"ទំព័រ <xliff:g id="ID_1">%1$d</xliff:g> នៃ <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"បើក <xliff:g id="ID_1">%1$s</xliff:g> ឬ?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"សកម្មភាព "<annotation id="action_key_icon">"icon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> គឺជាផ្លូវកាត់​ក្ដារ​ចុចដើម្បីប្រើ <xliff:g id="ID_3">^3</xliff:g>។ <xliff:g id="ID_4">^4</xliff:g>"</string>
+    <!-- no translation found for accessibility_key_gesture_dialog_screen_reader_tts (1298171063228024716) -->
+    <skip />
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"បើកផ្លូវកាត់​ក្ដារ​ចុច <xliff:g id="ID_1">%1$s</xliff:g> ឬ?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"កុំបើក"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"បើកផ្លូវ​កាត់"</string>
@@ -1151,8 +1158,7 @@
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572"><annotation id="action_key_icon">"រូប"</annotation>"សកម្មភាព + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> គឺជាផ្លូវកាត់​ក្ដារ​ចុចសម្រាប់ប្រើ <xliff:g id="ID_3">^3</xliff:g> ដែលជាមុខងារភាពងាយស្រួល។ វាអនុញ្ញាតឱ្យអ្នកពង្រីកនៅលើអេក្រង់យ៉ាងរហ័ស ដើម្បីធ្វើឱ្យខ្លឹមសារកាន់តែធំ។ នៅពេលការ​ពង្រីកត្រូវបានបើក សូមចុច"<annotation id="action_key_icon">"រូប"</annotation>"សកម្មភាព + <xliff:g id="ID_4">^1</xliff:g> and \"+\" ឬ \"-\" ដើម្បីកែតម្រូវការពង្រីកបង្រួម។"</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"បិទ​ផ្លូវកាត់"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"បន្តបើក"</string>
-    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_content (389338862762665003) -->
-    <skip />
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003"><annotation id="action_key_icon">"រូប"</annotation>"សកម្មភាព + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> គឺជាផ្លូវកាត់​ក្ដារ​ចុចសម្រាប់ប្រើ<xliff:g id="ID_3">^3</xliff:g>។ <xliff:g id="ID_4">^3</xliff:g> គឺជាកម្មវិធី​អាន​អេក្រង់ដែលអាចឱ្យអ្នកស្ដាប់ឮការអានធាតុឮៗ។ វាអាច​មានប្រយោជន៍​ចំពោះអ្នក​ដែល​មាន​ភាពលំបាក​ក្នុងការ​មើល​អេក្រង់។ វាអាចផ្លាស់ប្ដូររបៀបដែលឧបករណ៍របស់អ្នកដំណើរការ។"</string>
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"ការចុច"<annotation id="action_key_icon">"រូប"</annotation>"សកម្មភាព + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> នឹងបើក <xliff:g id="ID_3">^3</xliff:g> ដែលជាមុខងារភាពងាយស្រួល។ ការធ្វើបែបនេះអនុញ្ញាតឱ្យអ្នកគ្រប់គ្រងឧបករណ៍របស់អ្នកដោយមិនប្រើដៃ។"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"អេក្រង់​ចាក់សោ"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"កំពុង​បិទ…"</string>

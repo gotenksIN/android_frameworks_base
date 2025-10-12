@@ -2046,6 +2046,13 @@ public final class SystemServiceRegistry {
         return new Object[sServiceCacheSize];
     }
 
+    @RavenwoodRedirect
+    private static void onUnknownSystemServiceError(String name) {
+        if (sEnableServiceNotFoundWtf) {
+            Slog.wtf(TAG, "Unknown manager requested: " + name);
+        }
+    }
+
     @RavenwoodKeep
     private static ServiceFetcher<?> getSystemServiceFetcher(String name) {
         if (name == null) {
@@ -2053,9 +2060,7 @@ public final class SystemServiceRegistry {
         }
         final ServiceFetcher<?> fetcher = SYSTEM_SERVICE_FETCHERS.get(name);
         if (fetcher == null) {
-            if (sEnableServiceNotFoundWtf) {
-                Slog.wtf(TAG, "Unknown manager requested: " + name);
-            }
+            onUnknownSystemServiceError(name);
             return null;
         }
         return fetcher;
@@ -2173,9 +2178,9 @@ public final class SystemServiceRegistry {
             return null;
         }
         final String serviceName = SYSTEM_SERVICE_NAMES.get(serviceClass);
-        if (sEnableServiceNotFoundWtf && serviceName == null) {
+        if (serviceName == null) {
             // This should be a caller bug.
-            Slog.wtf(TAG, "Unknown manager requested: " + serviceClass.getCanonicalName());
+            onUnknownSystemServiceError(serviceClass.getCanonicalName());
         }
         return serviceName;
     }

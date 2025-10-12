@@ -27,6 +27,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.TestContentScope
 import com.android.compose.theme.PlatformTheme
+import com.android.systemui.Flags.FLAG_EXPANDED_AUDIO_DETAILED_VIEW
 import com.android.systemui.Flags.FLAG_QS_TILE_DETAILED_VIEW
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.compose.modifiers.resIdToTestTag
@@ -42,6 +43,7 @@ import com.android.systemui.res.R
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.statusbar.phone.ui.tintedIconManagerFactory
 import com.android.systemui.testKosmos
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.runner.RunWith
 import kotlin.test.Test
@@ -88,10 +90,8 @@ class QuickSettingsShadeOverlayTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(FLAG_QS_TILE_DETAILED_VIEW)
+    @EnableFlags(FLAG_QS_TILE_DETAILED_VIEW, FLAG_EXPANDED_AUDIO_DETAILED_VIEW)
     fun testVolumeSlider() = kosmos.runTest {
-        overrideResource(R.bool.config_enableDesktopAudioTileDetailsView, true)
-
         composeTestRule.setContent {
             PlatformTheme {
                 WithStatusIconContext(kosmos.tintedIconManagerFactory) {

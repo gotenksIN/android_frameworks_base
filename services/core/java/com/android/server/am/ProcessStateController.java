@@ -47,7 +47,6 @@ import com.android.server.am.psc.SyncBatchSession;
 import com.android.server.am.psc.annotation.RequiresEnclosingBatchSession;
 import com.android.server.wm.WindowProcessController;
 
-import java.lang.ref.WeakReference;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -111,6 +110,26 @@ public class ProcessStateController {
 
     public void setServiceBindAlmostPerceptibleTimeoutMs(long value) {
         mOomConstants.mServiceBindAlmostPerceptibleTimeoutMs = value;
+    }
+
+    public void setShortFgsTimeoutDuration(long value) {
+        mOomConstants.mShortFgsTimeoutDuration = value;
+    }
+
+    public void setShortFgsProcStateExtraWaitDuration(long value) {
+        mOomConstants.mShortFgsProcStateExtraWaitDuration = value;
+    }
+
+    public void setCurMaxCachedProcesses(int value) {
+        mOomConstants.mCurMaxCachedProcesses = value;
+    }
+
+    public void setCurMaxEmptyProcesses(int value) {
+        mOomConstants.mCurMaxEmptyProcesses = value;
+    }
+
+    public void setCurTrimEmptyProcesses(int value) {
+        mOomConstants.mCurTrimEmptyProcesses = value;
     }
 
     /**
@@ -264,7 +283,7 @@ public class ProcessStateController {
             return connectionRecord.mBoundServiceSession;
         }
         connectionRecord.mBoundServiceSession = new BoundServiceSession(mServiceBinderCallUpdater,
-                new WeakReference<>(connectionRecord), connectionRecord.toShortString());
+                connectionRecord);
         return connectionRecord.mBoundServiceSession;
     }
 
@@ -536,19 +555,15 @@ public class ProcessStateController {
      * @return true if the state changed, otherwise returns false.
      */
     @GuardedBy("mLock")
-    public boolean setRunningRemoteAnimation(@NonNull ProcessRecord proc,
+    public void setRunningRemoteAnimation(@NonNull ProcessRecord proc,
             boolean runningRemoteAnimation) {
-        if (proc.isRunningRemoteAnimation() == runningRemoteAnimation) return false;
+        if (proc.isRunningRemoteAnimation() == runningRemoteAnimation) return;
         if (DEBUG_OOM_ADJ) {
             Slog.i(TAG, "Setting runningRemoteAnimation=" + runningRemoteAnimation
                     + " for pid=" + proc.getPid());
         }
         proc.setIsRunningRemoteAnimation(runningRemoteAnimation);
-
-        if (Flags.autoTriggerOomadjUpdates()) {
-            runUpdate(proc, OOM_ADJ_REASON_UI_VISIBILITY);
-        }
-        return true;
+        runUpdate(proc, OOM_ADJ_REASON_UI_VISIBILITY);
     }
 
     /**

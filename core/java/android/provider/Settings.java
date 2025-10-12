@@ -6951,6 +6951,16 @@ public final class Settings {
         public static final String CLOCKWORK_BLUETOOTH_SETTINGS_PREF = "cw_bt_settings_pref";
 
         /**
+         * Controls whether alerting notifications should be displayed without a tap or tilt.
+         *
+         * <p>The valid values for this key are: 0 (disabled) or 1 (enabled).
+         *
+         * @hide
+         */
+        public static final String ENABLE_NOTIFICATION_WITHOUT_TAP_OR_TILT =
+                "enable_notification_without_tap_or_tilt";
+
+        /**
          * Controls whether the unread notification dot indicator is shown on wearable devices.
          *
          * <p>The valid values for this key are: 0 (disabled) or 1 (enabled).
@@ -10517,6 +10527,9 @@ public final class Settings {
          * Note that this value is used for projected mode.
          * @hide
          */
+        @TestApi
+        @Readable
+        @SuppressLint({"UnflaggedApi", "NoSettingsProvider"}) // @TestApi purely for CTS support.
         public static final String INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY =
                 "include_default_display_in_topology";
 
@@ -13096,7 +13109,7 @@ public final class Settings {
 
         /**
          * Whether to always expand notification bundles in the notification shade.
-         * 1 = expand, 0 = collapse.
+         * 1 = always expand, 0 = auto, -1 always collapse.
          * @hide
          */
         public static final String NOTIFICATION_BUNDLES_ALWAYS_EXPAND =

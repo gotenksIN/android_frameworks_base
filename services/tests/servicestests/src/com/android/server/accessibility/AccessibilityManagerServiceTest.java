@@ -28,7 +28,6 @@ import static android.provider.Settings.Secure.NAVIGATION_MODE;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL;
 import static android.view.accessibility.Flags.FLAG_ENABLE_TRUSTED_ACCESSIBILITY_SERVICE_API;
-import static android.view.accessibility.Flags.FLAG_SKIP_ACCESSIBILITY_WARNING_DIALOG_FOR_TRUSTED_SERVICES;
 
 import static com.android.input.flags.Flags.FLAG_KEYBOARD_REPEAT_KEYS;
 import static com.android.internal.accessibility.AccessibilityShortcutController.ACCESSIBILITY_HEARING_AIDS_COMPONENT_NAME;
@@ -42,6 +41,7 @@ import static com.android.internal.accessibility.common.ShortcutConstants.UserSh
 import static com.android.internal.accessibility.dialog.AccessibilityButtonChooserActivity.EXTRA_TYPE_TO_CHOOSE;
 import static com.android.server.accessibility.AccessibilityManagerService.ACTION_LAUNCH_HEARING_DEVICES_DIALOG;
 import static com.android.server.accessibility.AccessibilityManagerService.ACTION_LAUNCH_KEY_GESTURE_CONFIRM_DIALOG;
+import static com.android.server.accessibility.AccessibilityManagerService.ACTION_DISMISS_KEY_GESTURE_CONFIRM_DIALOG;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -1213,7 +1213,6 @@ public class AccessibilityManagerServiceTest {
     }
 
     @Test
-    @EnableFlags(FLAG_SKIP_ACCESSIBILITY_WARNING_DIALOG_FOR_TRUSTED_SERVICES)
     public void testIsAccessibilityServiceWarningRequired_notRequiredIfAllowlisted() {
         mFakePermissionEnforcer.grant(Manifest.permission.MANAGE_ACCESSIBILITY);
         final AccessibilityServiceInfo info_a = mockAccessibilityServiceInfo(
@@ -2438,7 +2437,6 @@ public class AccessibilityManagerServiceTest {
     @Test
     @EnableFlags(com.android.hardware.input.Flags.FLAG_ENABLE_TALKBACK_KEY_GESTURES)
     public void handleKeyGestureEvent_activateTalkBack_trustedService() {
-        setupAccessibilityServiceConnection(FLAG_REQUEST_ACCESSIBILITY_BUTTON);
         mFakePermissionEnforcer.grant(Manifest.permission.MANAGE_ACCESSIBILITY);
 
         final AccessibilityServiceInfo trustedService = mockAccessibilityServiceInfo(
@@ -2475,7 +2473,54 @@ public class AccessibilityManagerServiceTest {
     }
 
     @Test
-    public void displayListReturnsDisplays() {
+    @EnableFlags(com.android.hardware.input.Flags.FLAG_ENABLE_TALKBACK_KEY_GESTURES)
+    public void handleKeyGestureEvent_afterTalkBackEnabled_sendDismissDialog_trustedService() {
+        mFakePermissionEnforcer.grant(Manifest.permission.MANAGE_ACCESSIBILITY);
+        final AccessibilityServiceInfo trustedService =
+                mockAccessibilityServiceInfo(
+                        new ComponentName("package_a", "class_a"),
+                        /* isSystemApp= */ true,
+                        /* isAlwaysOnService= */ true);
+        final String targetName = trustedService.getComponentName().flattenToString();
+        AccessibilityUserState userState = mA11yms.getCurrentUserState();
+        userState.mInstalledServices.add(trustedService);
+        mTestableContext
+                .getOrCreateTestableResources()
+                .addOverride(R.string.config_defaultAccessibilityService, targetName);
+        mTestableContext
+                .getOrCreateTestableResources()
+                .addOverride(
+                        R.array.config_trustedAccessibilityServices, new String[] {targetName});
+        // In production code, we enable shortcut in SysUi. For test here, we assume it already
+        // enabled before the second-time pressing "Action + Alt + T".
+        userState.updateShortcutTargetsLocked(Set.of(targetName), KEY_GESTURE);
+        mTestableLooper.processAllMessages();
+        assertThat(
+                        mA11yms.getAccessibilityShortcutTargets(
+                                KEY_GESTURE, mA11yms.getCurrentUserIdLocked()))
+                .containsExactly(targetName);
+
+        // Simulate the second-time pressing "Action + Alt + T"
+        sendKeyGestureEventComplete(
+                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER,
+                KeyEvent.META_META_ON | KeyEvent.META_ALT_ON,
+                KeyEvent.KEYCODE_T);
+
+        // Send the expected broadcast for dismissing the system ui dialog
+        ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
+        verify(mTestableContext.getMockContext())
+                .sendBroadcastAsUser(intentCaptor.capture(), eq(UserHandle.SYSTEM));
+        assertThat(intentCaptor.getValue().getAction())
+                .isEqualTo(ACTION_DISMISS_KEY_GESTURE_CONFIRM_DIALOG);
+        assertThat(
+                        intentCaptor
+                                .getValue()
+                                .getIntExtra(KeyGestureEventConstants.KEY_GESTURE_TYPE, 0))
+                .isEqualTo(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER);
+    }
+
+    @Test
+    public void displayListReturnsDisplays_containsAddedDisplays() {
         mTestDisplayManagerWrapper.mDisplays = createFakeDisplayList(
                         Display.TYPE_INTERNAL,
                         Display.TYPE_EXTERNAL,
@@ -2483,6 +2528,10 @@ public class AccessibilityManagerServiceTest {
                         Display.TYPE_OVERLAY,
                         Display.TYPE_VIRTUAL
         );
+        List<Integer> expectedDisplayIds = mTestDisplayManagerWrapper.mDisplays.stream()
+                .map(Display::getDisplayId)
+                .toList();
+
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
             // In #setUp() we already have TYPE_INTERNAL and TYPE_EXTERNAL. Call the rest.
             for (int i = 2; i < mTestDisplayManagerWrapper.mDisplays.size(); i++) {
@@ -2495,12 +2544,8 @@ public class AccessibilityManagerServiceTest {
         assertThat(displays).hasSize(5);
         assertThat(displays)
                 .comparingElementsUsing(
-                        Correspondence.transforming(Display::getType, "has a type of"))
-                .containsExactly(Display.TYPE_INTERNAL,
-                        Display.TYPE_EXTERNAL,
-                        Display.TYPE_WIFI,
-                        Display.TYPE_OVERLAY,
-                        Display.TYPE_VIRTUAL);
+                        Correspondence.transforming(Display::getDisplayId, "has display ID of"))
+                .containsExactlyElementsIn(expectedDisplayIds);
     }
 
     @Test

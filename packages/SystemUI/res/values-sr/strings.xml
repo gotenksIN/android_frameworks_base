@@ -167,12 +167,9 @@
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Снимање екрана"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Дели"</string>
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Изаберите апликацију за дељење"</string>
-    <!-- no translation found for screen_share_audio_sharing_text (7829391478284315787) -->
-    <skip />
-    <!-- no translation found for screen_share_app_window_sharing_title (2063554880747318383) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer (3953761426122528262) -->
-    <skip />
+    <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Дели звук"</string>
+    <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Прозор за дељење апликације"</string>
+    <string name="screen_share_disclaimer" msgid="3953761426122528262">"Када делите, садржај екрана је видљив"</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Направи снимак екрана прозора апликације"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Сними прозор апликације"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Направи снимак екрана изабране области"</string>
@@ -368,6 +365,8 @@
     <string name="accessibility_location_active" msgid="2845747916764660369">"Има активних захтева за локацију"</string>
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"Сензори су искључени"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"Обриши сва обавештења."</string>
+    <!-- no translation found for accessibility_notification_bell (7149451526721220526) -->
+    <skip />
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"и још <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{Унутра је још # обавештење.}one{Унутра је још # обавештење.}few{Унутра су још # обавештења.}other{Унутра је још # обавештења.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"Екран је закључан у хоризонталном положају."</string>
@@ -429,6 +428,14 @@
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Нема WiFi нити етернет везе"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"Прекини везу"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"Тренутни микрофон је"</string>
+    <!-- no translation found for quick_settings_audio_output_section_title (3448300919285193209) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_section_title (9203723659866975215) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_input_disclaimer_text (442891508001590727) -->
+    <skip />
+    <!-- no translation found for quick_settings_audio_effects_section_title (6770520531879816578) -->
+    <skip />
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"Осветљеност"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"Инверзија боја"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"Корекција боја"</string>
@@ -755,11 +762,9 @@
     <string name="monitoring_description_personal_profile_named_vpn" msgid="5083909710727365452">"Ваше личне апликације су повезане на интернет преко: <xliff:g id="VPN_APP">%1$s</xliff:g>. Ваша активност на мрежи, укључујући имејлове и податке прегледања, видљива је добављачу VPN-а."</string>
     <string name="monitoring_description_vpn_settings_separator" msgid="8292589617720435430">" "</string>
     <string name="monitoring_description_vpn_settings" msgid="5264167033247632071">"Отвори подешавања VPN-а"</string>
-    <!-- no translation found for monitoring_description_parental_controls_legacy (3331029441820725897) -->
-    <skip />
+    <string name="monitoring_description_parental_controls_legacy" msgid="3331029441820725897">"Овим уређајем управља родитељ. Родитељ може да види информације, као што су апликације које користиш, твоју локацију и време испред екрана, и да управља њима."</string>
     <string name="monitoring_description_pin_protection" msgid="1983580207046670355">"Неке контроле на уређају, попут дневних ограничења и периода за одмор, могу да се промене само помоћу PIN-а."</string>
-    <!-- no translation found for monitoring_description_parental_controls (4255592993669461543) -->
-    <skip />
+    <string name="monitoring_description_parental_controls" msgid="4255592993669461543">"Неке контроле може да промени само родитељ"</string>
     <string name="legacy_vpn_name" msgid="4174223520162559145">"VPN"</string>
     <string name="keyguard_indication_trust_unlocked" msgid="7395154975733744547">"Поуздани агент спречава закључавање"</string>
     <string name="kg_prompt_after_adaptive_auth_lock" msgid="6065186971000690782">"Екран је закључан. Превише покушаја потврде идентитета."</string>
@@ -1144,6 +1149,8 @@
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"<xliff:g id="ID_1">%1$d</xliff:g>. страна од <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"Желите да укључите функцију <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"Радња "<annotation id="action_key_icon">"icon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> је тастерска пречица за коришћење функције <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
+    <!-- no translation found for accessibility_key_gesture_dialog_screen_reader_tts (1298171063228024716) -->
+    <skip />
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"Желите да укључите тастерску пречицу за <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"Не укључуј"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Укључи пречицу"</string>
@@ -1151,8 +1158,7 @@
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572"><annotation id="action_key_icon">"Икона"</annotation>" Радња + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> је тастерска пречица за коришћење функције приступачности за <xliff:g id="ID_3">^3</xliff:g>. То вам омогућава да брзо зумирате екран да би садржај био већи. Када је увећање укључено, притисните "<annotation id="action_key_icon">"икону"</annotation>" Радња + <xliff:g id="ID_4">^1</xliff:g> и „+“ или „–“ да бисте прилагодили зумирање."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Искључи пречицу"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Не искључуј"</string>
-    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_content (389338862762665003) -->
-    <skip />
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003"><annotation id="action_key_icon">"Икона"</annotation>" Радња + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> је тастерска пречица за коришћење функције <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^3</xliff:g> је читач екрана који вам омогућава да чујете наглас изговорене називе ставки. Може да буде користан особама које слабо виде екран. То може да промени начин рада уређаја."</string>
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"Када притиснете "<annotation id="action_key_icon">"икону"</annotation>" Радња + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g>, укључује се функцијa приступачности за <xliff:g id="ID_3">^3</xliff:g>. Ово вам омогућава да контролишете уређај хендсфри."</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Закључан екран"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Искључује се…"</string>

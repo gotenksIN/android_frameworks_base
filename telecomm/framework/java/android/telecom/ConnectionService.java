@@ -3294,7 +3294,7 @@ public abstract class ConnectionService extends Service {
                     connection.getExtras(),
                     conferenceId,
                     connection.getCallDirection(),
-                    Connection.VERIFICATION_STATUS_NOT_VERIFIED);
+                    connection.getCallerNumberVerificationStatus());
             mAdapter.addExistingConnection(id, parcelableConnection);
         }
     }

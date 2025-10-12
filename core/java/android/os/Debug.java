@@ -2083,67 +2083,41 @@ public final class Debug
     /** @hide */
     public static final int MEMINFO_PAGE_TABLES = 13;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_SEC_PAGE_TABLES = 14;
-    /** @hide */
-    public static final int MEMINFO_KERNEL_STACK = 15;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_KERNEL_STACK = 14;
     /**
      * Note: MEMINFO_KRECLAIMABLE includes MEMINFO_SLAB_RECLAIMABLE (see KReclaimable field
      * description in kernel documentation).
      * @hide
      */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_KRECLAIMABLE = 16;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_KRECLAIMABLE = 15;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_ACTIVE = 17;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_ACTIVE = 16;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_INACTIVE = 18;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_INACTIVE = 17;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_UNEVICTABLE = 19;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_UNEVICTABLE = 18;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_AVAILABLE = 20;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_AVAILABLE = 19;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_ACTIVE_ANON = 21;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_ACTIVE_ANON = 20;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_INACTIVE_ANON = 22;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_INACTIVE_ANON = 21;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_ACTIVE_FILE = 23;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_ACTIVE_FILE = 22;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_INACTIVE_FILE = 24;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_INACTIVE_FILE = 23;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_CMA_TOTAL = 25;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_CMA_TOTAL = 24;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_CMA_FREE = 26;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_CMA_FREE = 25;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_SWAP_CACHED = 27;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_SWAP_CACHED = 26;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_COUNT = 28;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_SEC_PAGE_TABLES = 27;
+    /** @hide */
+    public static final int MEMINFO_PERCPU = 28;
+    /** @hide */
+    public static final int MEMINFO_COUNT = 29;
 
     /**
      * Retrieves /proc/meminfo.  outSizes is filled with fields

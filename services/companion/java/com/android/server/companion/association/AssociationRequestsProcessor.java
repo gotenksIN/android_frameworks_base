@@ -435,8 +435,8 @@ public class AssociationRequestsProcessor {
         DeviceId newDeviceId = null;
 
         if (deviceId != null) {
-            newDeviceId = new DeviceId(
-                    deviceId.getCustomId(), deviceId.getMacAddress(), generateRandom128BitKey());
+            newDeviceId = new DeviceId.Builder().setCustomId(deviceId.getCustomId()).setMacAddress(
+                    deviceId.getMacAddress()).setKey(generateRandom128BitKey()).build();
         }
         association = (new AssociationInfo.Builder(association)).setDeviceId(newDeviceId).build();
         mAssociationStore.updateAssociation(association);
@@ -447,7 +447,7 @@ public class AssociationRequestsProcessor {
     /**
      * Grants requested extra runtime permissions to the specified package for the given user.
      */
-    private void grantExtraPermissionsForNonProfile(@NonNull AssociationInfo association) {
+    public void grantExtraPermissionsForNonProfile(@NonNull AssociationInfo association) {
         String packageName = association.getPackageName();
         Set<String> permissionSetKeys = association.getExtraPermissions();
         int userId = association.getUserId();

@@ -147,7 +147,6 @@ import com.android.server.ServiceThread;
 import com.android.server.StorageManagerInternal;
 import com.android.server.SystemConfig;
 import com.android.server.Watchdog;
-import com.android.server.am.ActivityManagerService.ProcessChangeItem;
 import com.android.server.am.psc.PlatformCompatCache;
 import com.android.server.am.psc.ProcessListInternal;
 import com.android.server.am.psc.ProcessRecordInternal;
@@ -183,8 +182,8 @@ import java.util.function.Function;
 /**
  * Activity manager code dealing with processes.
  */
-public final class ProcessList implements ProcessListInternal,
-        ProcessStateController.ProcessLruUpdater {
+public final class ProcessList extends ProcessListInternal
+        implements ProcessStateController.ProcessLruUpdater {
     static final String TAG = TAG_WITH_CLASS_NAME ? "ProcessList" : TAG_AM;
 
     static final String TAG_PROCESS_OBSERVERS = TAG + POSTFIX_PROCESS_OBSERVERS;
@@ -199,6 +198,11 @@ public final class ProcessList implements ProcessListInternal,
 
     private static final String APPLY_SDK_SANDBOX_AUDIT_RESTRICTIONS = ":isSdkSandboxAudit";
     private static final String APPLY_SDK_SANDBOX_NEXT_RESTRICTIONS = ":isSdkSandboxNext";
+
+    // Number of bytes in a Kilobyte.
+    private static final int BYTES_IN_KB = 1024;
+    // Divisor used to calculate the cached restore threshold from the kernel cache reserve.
+    private static final int CACHED_RESTORE_THRESHOLD_DIVISOR = 3;
 
     // OOM adjustments for processes in various states:
 
@@ -432,8 +436,6 @@ public final class ProcessList implements ProcessListInternal,
 
     private final long mTotalMemMb;
 
-    private long mCachedRestoreLevel;
-
     private boolean mHaveDisplaySize;
 
     private static LmkdConnection sLmkdConnection = null;
@@ -497,12 +499,6 @@ public final class ProcessList implements ProcessListInternal,
      */
     @CompositeRWLock({"mService", "mProcLock"})
     private int mLruProcessServiceStart = 0;
-
-    /**
-     * Current sequence id for process LRU updating.
-     */
-    @CompositeRWLock({"mService", "mProcLock"})
-    private int mLruSeq = 0;
 
     @CompositeRWLock({"mService", "mProcLock"})
     ActiveUids mActiveUids;
@@ -896,12 +892,14 @@ public final class ProcessList implements ProcessListInternal,
     ProcessList() {
         MemInfoReader minfo = new MemInfoReader();
         minfo.readMemInfo();
-        mTotalMemMb = minfo.getTotalSize()/(1024*1024);
+        mTotalMemMb = minfo.getTotalSize() / (BYTES_IN_KB * BYTES_IN_KB);
         updateOomLevels(0, 0, false);
     }
 
     void init(ActivityManagerService service, ActiveUids activeUids,
             PlatformCompat platformCompat) {
+        super.init(service, service.mProcLock);
+
         mService = service;
         mActiveUids = activeUids;
         mPlatformCompat = platformCompat;
@@ -1119,11 +1117,12 @@ public final class ProcessList implements ProcessListInternal,
         // The maximum size we will restore a process from cached to background, when under
         // memory duress, is 1/3 the size we have reserved for kernel caches and other overhead
         // before killing background processes.
-        mCachedRestoreLevel = (getMemLevel(ProcessList.CACHED_APP_MAX_ADJ) / 1024) / 3;
+        setCachedRestoreThresholdKb((getMemLevel(CACHED_APP_MAX_ADJ) / BYTES_IN_KB)
+                / CACHED_RESTORE_THRESHOLD_DIVISOR);
 
         // Ask the kernel to try to keep enough memory free to allocate 3 full
         // screen 32bpp buffers without entering direct reclaim.
-        int reserve = displayWidth * displayHeight * 4 * 3 / 1024;
+        int reserve = displayWidth * displayHeight * 4 * 3 / BYTES_IN_KB;
         int reserve_adj = Resources.getSystem().getInteger(
                 com.android.internal.R.integer.config_extraFreeKbytesAdjust);
         int reserve_abs = Resources.getSystem().getInteger(
@@ -1144,7 +1143,7 @@ public final class ProcessList implements ProcessListInternal,
             ByteBuffer buf = ByteBuffer.allocate(4 * (2 * mOomAdj.length + 1));
             buf.putInt(LMK_TARGET);
             for (int i = 0; i < mOomAdj.length; i++) {
-                buf.putInt((mOomMinFree[i] * 1024)/PAGE_SIZE);
+                buf.putInt((mOomMinFree[i] * BYTES_IN_KB) / PAGE_SIZE);
                 buf.putInt(mOomAdj[i]);
             }
 
@@ -1554,18 +1553,10 @@ public final class ProcessList implements ProcessListInternal,
     long getMemLevel(int adjustment) {
         for (int i = 0; i < mOomAdj.length; i++) {
             if (adjustment <= mOomAdj[i]) {
-                return mOomMinFree[i] * 1024;
+                return mOomMinFree[i] * BYTES_IN_KB;
             }
         }
-        return mOomMinFree[mOomAdj.length - 1] * 1024;
-    }
-
-    /**
-     * Return the maximum pss size in kb that we consider a process acceptable to
-     * restore from its cached state for running in the background when RAM is low.
-     */
-    long getCachedRestoreThresholdKb() {
-        return mCachedRestoreLevel;
+        return mOomMinFree[mOomAdj.length - 1] * BYTES_IN_KB;
     }
 
     AppStartInfoTracker getAppStartInfoTracker() {
@@ -1778,7 +1769,7 @@ public final class ProcessList implements ProcessListInternal,
                 buf = ByteBuffer.allocate(4 * (2 * mOomAdj.length + 1));
                 buf.putInt(LMK_TARGET);
                 for (int i = 0; i < mOomAdj.length; i++) {
-                    buf.putInt((mOomMinFree[i] * 1024)/PAGE_SIZE);
+                    buf.putInt((mOomMinFree[i] * BYTES_IN_KB) / PAGE_SIZE);
                     buf.putInt(mOomAdj[i]);
                 }
                 ostream.write(buf.array(), 0, buf.position());
@@ -3546,6 +3537,16 @@ public final class ProcessList implements ProcessListInternal,
                 hostingRecord.getDefiningUid(), hostingRecord.getDefiningProcessName());
         final ProcessRecordInternal state = r;
 
+        if (android.app.Flags.logAppRestartOccurred()) {
+            // Let WM know about the last exit info for the app process.
+            if (proc.equals(info.packageName)) {
+                r.getWindowProcessController()
+                        .initLastExitInfo(
+                                mAppExitInfoTracker.getLastExitInfoForUiProcess(
+                                        info.packageName, uid, proc));
+            }
+        }
+
         final boolean wasStopped = info.isStopped();
         // Check if we should mark the processrecord for first launch after force-stopping
         if (wasStopped) {
@@ -3872,7 +3873,7 @@ public final class ProcessList implements ProcessListInternal,
             if (DEBUG_LRU) Slog.d(TAG_LRU, "Moving dep from " + lrui + " to " + index
                     + " in LRU list: " + app);
             mLruProcesses.add(index, app);
-            app.setLruSeq(mLruSeq);
+            app.setLruSeq(getLruSeqLOSP());
 
             if (isActivity) {
                 nextActivityIndex = index;
@@ -4115,7 +4116,7 @@ public final class ProcessList implements ProcessListInternal,
     @GuardedBy({"mService", "mProcLock"})
     private void updateLruProcessLSP(ProcessRecord app, ProcessRecord client,
             boolean hasActivity, boolean hasService) {
-        mLruSeq++;
+        incrementLruSeq();
         final long now = SystemClock.uptimeMillis();
         final ProcessServiceRecord psr = app.mServices;
         app.setLastActivityTime(now);
@@ -4280,7 +4281,7 @@ public final class ProcessList implements ProcessListInternal,
             }
         }
 
-        app.setLruSeq(mLruSeq);
+        app.setLruSeq(getLruSeqLOSP());
 
         // Key of the indices array holds the current index of the process in the LRU list and the
         // value is a boolean indicating whether the process is an activity process or not.
@@ -4297,7 +4298,7 @@ public final class ProcessList implements ProcessListInternal,
             ConnectionRecord cr = psr.getConnectionAt(j);
             if (cr.binding != null && !cr.serviceDead && cr.binding.service != null
                     && cr.binding.service.app != null
-                    && cr.binding.service.app.getLruSeq() != mLruSeq
+                    && cr.binding.service.app.getLruSeq() != getLruSeqLOSP()
                     && cr.notHasFlag(Context.BIND_REDUCTION_FLAGS)
                     && !cr.binding.service.app.isPersistent()) {
                 if (cr.binding.service.app.mServices.hasClientActivities()) {
@@ -4314,7 +4315,7 @@ public final class ProcessList implements ProcessListInternal,
         final ProcessProviderRecord ppr = app.getProviders();
         for (int j = ppr.numberOfProviderConnections() - 1; j >= 0; j--) {
             ContentProviderRecord cpr = ppr.getProviderConnectionAt(j).provider;
-            if (cpr.proc != null && cpr.proc.getLruSeq() != mLruSeq
+            if (cpr.proc != null && cpr.proc.getLruSeq() != getLruSeqLOSP()
                     && !cpr.proc.isPersistent()) {
                 indices.append(offerLruProcessInternalLSP(cpr.proc, now,
                         "provider reference", cpr, app), false);
@@ -4522,11 +4523,6 @@ public final class ProcessList implements ProcessListInternal,
     @GuardedBy(anyOf = {"mService", "mProcLock"})
     boolean isInLruListLOSP(ProcessRecord app) {
         return mLruProcesses.contains(app);
-    }
-
-    @GuardedBy(anyOf = {"mService", "mProcLock"})
-    int getLruSeqLOSP() {
-        return mLruSeq;
     }
 
     @GuardedBy(anyOf = {"mService", "mProcLock"})
@@ -4911,13 +4907,13 @@ public final class ProcessList implements ProcessListInternal,
                         makeProcStateProtoEnum(state.getSetProcState()));
                 writeProcessCapabilitiesListToProto(proto, state.getCurCapability());
                 proto.write(ProcessOomProto.Detail.LAST_PSS, DebugUtils.sizeValueToString(
-                        r.mProfile.getLastPss() * 1024, new StringBuilder()));
+                        r.mProfile.getLastPss() * BYTES_IN_KB, new StringBuilder()));
                 proto.write(ProcessOomProto.Detail.LAST_SWAP_PSS, DebugUtils.sizeValueToString(
-                        r.mProfile.getLastSwapPss() * 1024, new StringBuilder()));
+                        r.mProfile.getLastSwapPss() * BYTES_IN_KB, new StringBuilder()));
                 // TODO(b/296454553): This proto field should be replaced with last cached RSS once
                 // AppProfiler is no longer collecting PSS.
                 proto.write(ProcessOomProto.Detail.LAST_CACHED_PSS, DebugUtils.sizeValueToString(
-                        r.mProfile.getLastCachedPss() * 1024, new StringBuilder()));
+                        r.mProfile.getLastCachedPss() * BYTES_IN_KB, new StringBuilder()));
                 proto.write(ProcessOomProto.Detail.CACHED, state.isCached());
                 proto.write(ProcessOomProto.Detail.EMPTY, state.isEmpty());
                 proto.write(ProcessOomProto.Detail.HAS_ABOVE_CLIENT, psr.isHasAboveClient());
@@ -5052,16 +5048,16 @@ public final class ProcessList implements ProcessListInternal,
                 // These values won't be collected if the flag is enabled.
                 if (service.mAppProfiler.isProfilingPss()) {
                     pw.print(" lastPss=");
-                    DebugUtils.printSizeValue(pw, r.mProfile.getLastPss() * 1024);
+                    DebugUtils.printSizeValue(pw, r.mProfile.getLastPss() * BYTES_IN_KB);
                     pw.print(" lastSwapPss=");
-                    DebugUtils.printSizeValue(pw, r.mProfile.getLastSwapPss() * 1024);
+                    DebugUtils.printSizeValue(pw, r.mProfile.getLastSwapPss() * BYTES_IN_KB);
                     pw.print(" lastCachedPss=");
-                    DebugUtils.printSizeValue(pw, r.mProfile.getLastCachedPss() * 1024);
+                    DebugUtils.printSizeValue(pw, r.mProfile.getLastCachedPss() * BYTES_IN_KB);
                 } else {
                     pw.print(" lastRss=");
-                    DebugUtils.printSizeValue(pw, r.mProfile.getLastRss() * 1024);
+                    DebugUtils.printSizeValue(pw, r.mProfile.getLastRss() * BYTES_IN_KB);
                     pw.print(" lastCachedRss=");
-                    DebugUtils.printSizeValue(pw, r.mProfile.getLastCachedRss() * 1024);
+                    DebugUtils.printSizeValue(pw, r.mProfile.getLastCachedRss() * BYTES_IN_KB);
                 }
                 pw.println();
                 pw.print(prefix);
@@ -5102,7 +5098,7 @@ public final class ProcessList implements ProcessListInternal,
         pw.print(": ");
         pw.print(name);
         pw.print(" (");
-        pw.print(ActivityManagerService.stringifySize(getMemLevel(adj), 1024));
+        pw.print(ActivityManagerService.stringifySize(getMemLevel(adj), BYTES_IN_KB));
         pw.println(")");
     }
 
@@ -5244,7 +5240,7 @@ public final class ProcessList implements ProcessListInternal,
     @GuardedBy({"mService", "mProcessChangeLock"})
     private ProcessChangeItem enqueueProcessChangeItemLocked(int pid, int uid) {
         int i = mPendingProcessChanges.size() - 1;
-        ActivityManagerService.ProcessChangeItem item = null;
+        ProcessChangeItem item = null;
         while (i >= 0) {
             item = mPendingProcessChanges.get(i);
             if (item.pid == pid) {
@@ -5265,7 +5261,7 @@ public final class ProcessList implements ProcessListInternal,
                     Slog.i(TAG_PROCESS_OBSERVERS, "Retrieving available item: " + item);
                 }
             } else {
-                item = new ActivityManagerService.ProcessChangeItem();
+                item = new ProcessChangeItem();
                 if (DEBUG_PROCESS_OBSERVERS) {
                     Slog.i(TAG_PROCESS_OBSERVERS, "Allocating new item: " + item);
                 }
@@ -5535,16 +5531,28 @@ public final class ProcessList implements ProcessListInternal,
 
     /**
      * Increments the {@link UidRecord#curProcStateSeq} for all uids using global seq counter
-     * {@link ProcessList#mProcStateSeqCounter} and checks if any uid is coming
-     * from background to foreground or vice versa and if so, notifies the app if it needs to block.
+     * {@link ProcessList#mProcStateSeqCounter}.
      */
     @VisibleForTesting
     @GuardedBy(anyOf = {"mService", "mProcLock"})
-    void incrementProcStateSeqAndNotifyAppsLOSP(ActiveUids activeUids) {
+    void incrementProcStateSeqLOSP(ActiveUids activeUids) {
         for (int i = activeUids.size() - 1; i >= 0; --i) {
             final UidRecord uidRec = activeUids.valueAt(i);
             uidRec.curProcStateSeq = getNextProcStateSeq();
         }
+    }
+
+    /**
+     * Notifies applications about potential network access changes after the process state
+     * sequence has been incremented.
+     * <p>This method checks if any UID is transitioning between background and foreground states
+     * and, if so, notifies the corresponding application if network access might be blocked.
+     * This logic is triggered via a callback from the {@link OomAdjuster}.
+     *
+     * @param activeUids The set of UIDs whose proc state sequence was just incremented.
+     */
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
+    void notifyProcStateChangedForNetworkLOSP(ActiveUids activeUids) {
         if (mService.mConstants.mNetworkAccessTimeoutMs <= 0) {
             return;
         }

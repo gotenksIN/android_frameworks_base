@@ -158,7 +158,7 @@ public class KeyguardIndicationController {
     private static final long TRANSIENT_BIOMETRIC_ERROR_TIMEOUT = 1300;
     public static final long DEFAULT_MESSAGE_TIME = 3500;
     public static final long DEFAULT_HIDE_DELAY_MS =
-            DEFAULT_MESSAGE_TIME + KeyguardIndicationTextView.Y_IN_DURATION;
+            DEFAULT_MESSAGE_TIME + KeyguardIndicationTextView.Y_TRANSLATE_DURATION;
 
     private final Context mContext;
     private final BroadcastDispatcher mBroadcastDispatcher;
@@ -250,8 +250,8 @@ public class KeyguardIndicationController {
                 }
             };
     @VisibleForTesting
-    final Consumer<Boolean> mIsLogoutEnabledCallback =
-            (Boolean isLogoutEnabled) -> {
+    final Consumer<Boolean> mIsPolicyManagerLogoutEnabledCallback =
+            (Boolean isPolicyManagerLogoutEnabled) -> {
                 if (mVisible) {
                     updateDeviceEntryIndication(false);
                 }
@@ -461,8 +461,8 @@ public class KeyguardIndicationController {
         collectFlow(mIndicationArea, mDeviceEntryFingerprintAuthInteractor.isEngaged(),
                 mIsFingerprintEngagedCallback);
         collectFlow(mIndicationArea,
-                mUserLogoutInteractor.isLogoutEnabled(),
-                mIsLogoutEnabledCallback);
+                mUserLogoutInteractor.isPolicyManagerLogoutEnabled(),
+                mIsPolicyManagerLogoutEnabledCallback);
         collectFlow(mIndicationArea,
                 mDeviceEntryBiometricSettingsInteractor.getAuthenticationFlags(),
                 mDeviceEntryBiometricSettingsInteractorCallback);
@@ -793,7 +793,7 @@ public class KeyguardIndicationController {
     }
 
     private void updateLockScreenLogoutView() {
-        if (mUserLogoutInteractor.isLogoutEnabled().getValue()) {
+        if (mUserLogoutInteractor.isPolicyManagerLogoutEnabled().getValue()) {
             mRotateTextViewController.updateIndication(
                     INDICATION_TYPE_LOGOUT,
                     new KeyguardIndication.Builder()

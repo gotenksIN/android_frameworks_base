@@ -2879,6 +2879,9 @@
 
     <!-- Whether there is to be a chosen Dock User who is the only user allowed to dream. -->
     <bool name="config_dreamsOnlyEnabledForDockUser">false</bool>
+
+    <!-- Whether to support restricting dreams to wireless charging. -->
+    <bool name="config_supportDreamWirelessChargingRestriction">false</bool>
     <!-- Whether dreams are disabled when ambient mode is suppressed. -->
     <bool name="config_dreamsDisabledByAmbientModeSuppressionConfig">false</bool>
     <!-- Whether to restrict dreams to wireless charging. -->
@@ -7813,25 +7816,6 @@
 
     <!-- Whether the device supports Interactive Doze mode. -->
     <bool name="config_enableInteractiveDoze">false</bool>
-
-    <!-- Services for Personal Context triggers. -->
-    <string-array name="config_personalContextTriggerComponents" translatable="false">
-    </string-array>
-
-    <!-- Services for Personal Context refiners. -->
-    <string-array name="config_personalContextRefinerComponents" translatable="false">
-    </string-array>
-
-    <!-- Services for Personal Context understander. -->
-    <string name="config_personalContextUnderstanderComponent" translatable="false"></string>
-
-    <!-- Services for Personal Context transformers. -->
-    <string-array name="config_personalContextTransformerComponents" translatable="false">
-    </string-array>
-
-    <!-- Services for Personal Context renderers. -->
-    <string-array name="config_personalContextRendererComponents" translatable="false">
-    </string-array>
 
     <!-- Whether to force color fade. -->
     <bool name="config_forceColorFade">false</bool>

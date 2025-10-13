@@ -1581,6 +1581,23 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
+    private boolean doesInternalMaskRequiresPermissionCheck(
+            int callingPid, @InternalEventFlag long internalEventFlagsMask) {
+        synchronized (mSyncRoot) {
+            if ((internalEventFlagsMask
+                    & DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED) == 0) {
+                // No need to check permission because protected event flag is not set
+                return false;
+            }
+
+            CallbackRecord record = mCallbacks.get(callingPid);
+            // Need to check permissions if there is no callback registered yet
+            // Or the current callback mask does not have protected flag yet
+            return record == null || (record.getCurrentMask()
+                    & DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED) == 0;
+        }
+    }
+
     private void registerCallbackInternal(IDisplayManagerCallback callback, int callingPid,
             int callingUid, @InternalEventFlag long internalEventFlagsMask) {
         synchronized (mSyncRoot) {
@@ -4627,6 +4644,10 @@ public final class DisplayManagerService extends SystemService {
             mInternalEventFlagsMask.set(internalEventFlag);
         }
 
+        private long getCurrentMask() {
+            return mInternalEventFlagsMask.get();
+        }
+
         /**
          * Return true if the process can accept events.
          */
@@ -5097,9 +5118,7 @@ public final class DisplayManagerService extends SystemService {
             final int callingPid = Binder.getCallingPid();
             final int callingUid = Binder.getCallingUid();
 
-            if ((internalEventFlagsMask
-                    & DisplayManagerGlobal
-                    .INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED) != 0) {
+            if (doesInternalMaskRequiresPermissionCheck(callingPid, internalEventFlagsMask)) {
                 mContext.enforceCallingOrSelfPermission(MANAGE_DISPLAYS,
                         "Permission required to get signals about connection events.");
             }

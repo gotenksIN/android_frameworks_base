@@ -22,6 +22,7 @@ import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.Activity;
+import android.app.Notification;
 import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
@@ -134,6 +135,26 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     }
 
     /**
+     * Reason indicating that the session was blocked due to secure content being present.
+     */
+    public static final int BLOCK_REASON_SECURE_CONTENT = 1;
+
+    /**
+     * Reason indicating that the session was blocked due to a disallowed activity being launched
+     * in the session.
+     */
+    public static final int BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH = 2;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = "BLOCK_REASON_", value = {
+            BLOCK_REASON_SECURE_CONTENT,
+            BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH})
+    @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
+    public @interface SessionBlockReason {
+    }
+
+    /**
      * Computer control action that performs back navigation.
      */
     public static final int ACTION_GO_BACK = 1;
@@ -158,7 +179,7 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     private ImageReader mImageReader;
 
     @GuardedBy("mLifecycle")
-    private final SessionLifecycleTracker mLifecycle = new SessionLifecycleTracker();
+    private final LifecycleStateTracker mLifecycle = new LifecycleStateTracker();
     @GuardedBy("mLifecycle")
     private LifecycleCallback mRegisteredLifecycleCallback = null;
 
@@ -421,6 +442,17 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
             }
             mRegisteredLifecycleCallback = new LifecycleCallback() {
                 @Override
+                public void onActive() {
+                    Binder.withCleanCallingIdentity(() -> executor.execute(callback::onActive));
+                }
+
+                @Override
+                public void onBlocked(@SessionBlockReason int reason) {
+                    Binder.withCleanCallingIdentity(
+                            () -> executor.execute(() -> callback.onBlocked(reason)));
+                }
+
+                @Override
                 public void onClosed(@SessionCloseReason int reason) {
                     Binder.withCleanCallingIdentity(
                             () -> executor.execute(() -> callback.onClosed(reason)));
@@ -447,6 +479,20 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     }
 
     @Override
+    public void onActive() {
+        synchronized (mLifecycle) {
+            mLifecycle.onActive();
+        }
+    }
+
+    @Override
+    public void onBlocked(@SessionBlockReason int reason) {
+        synchronized (mLifecycle) {
+            mLifecycle.onBlocked(reason);
+        }
+    }
+
+    @Override
     public void onClosed(@SessionCloseReason int closeReason) {
         releaseResources();
         synchronized (mLifecycle) {
@@ -461,6 +507,29 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     @NonNull
     public List<AccessibilityWindowInfo> getAccessibilityWindows() {
         return mAccessibilityProxy.getWindows();
+    }
+
+    /**
+     * Attaches notification information to the session, to make the notification non-dismissible.
+     *
+     * <p>This must be called before posting the notification.</p>
+     *
+     * <p>The caller must still call {@link Notification.Builder#setOngoing(boolean)}
+     * with {@code true}, to make the notification non-dismissible.</p>
+     *
+     * @param notificationId id of the notification, as per
+     * {@link android.app.NotificationManager#notify(String, int, Notification)}
+     * @param notificationTag tag of the notification, as per
+     * {@link android.app.NotificationManager#notify(String, int, Notification)}
+     *
+     * @throws IllegalStateException if a notification was already attached.
+     */
+    public void attachNotificationInfo(int notificationId, @Nullable String notificationTag) {
+        try {
+            mSession.attachNotificationInfo(notificationId, notificationTag);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
     }
 
     @Override
@@ -534,8 +603,55 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
 
     /**
      * Callback to be notified about the computer control session lifecycle changes.
+     *
+     * <p>When the callback is first added, implementers of the callback should not make any
+     * assumptions about the starting state of the session. The callback will be notified of the
+     * starting state after being added.
+     *
+     * @see #setLifecycleCallback(Executor, LifecycleCallback)
      */
     public interface LifecycleCallback {
+
+        /**
+         * Called when the computer control session enters the active state.
+         *
+         * <p>When the session is active, the following will apply:
+         *
+         * <ul>
+         *   <li>Interactions with the session (e.g. {@link #tap(int, int)} are allowed.
+         *   <li>Taking screenshots of the content using {@link #getScreenshot()} is allowed.
+         *   <li>Getting Accessibility windows for the session using
+         *     {@link #getAccessibilityWindows()} is allowed.
+         * </ul>
+         */
+        void onActive();
+
+        /**
+         * Called when the computer control session enters the blocked state.
+         *
+         * <p>When the session is blocked, the application will generally not be able to interact
+         * with or access the content of the session:
+         *
+         * <ul>
+         *   <li>Interactions with the session (e.g. {@link #tap(int, int)} are NOT allowed.
+         *   <li>Taking screenshots of the content using {@link #getScreenshot()} is NOT allowed.
+         *   <li>Getting Accessibility windows for the session using
+         *     {@link #getAccessibilityWindows()} is NOT allowed.
+         * </ul>
+         *
+         * <p>However, users can still interact with the contents of the session using the
+         * interactive mirror. The application may choose to guide users to take over the session
+         * using either the {@link #handOverApplications()} API or the interactive mirror.
+         *
+         * @param reason the reason that the session initially entered the blocked
+         *               state.
+         */
+        // TODO: b/441475896: Block interactions and screenshots for
+        //  BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH. Until then, a dialog indicating the blockage
+        //  will show up in the session, and the agent must dismiss it by interacting with the
+        //  session to exit the blocked state.
+        void onBlocked(@SessionBlockReason int reason);
+
         /**
          * Called when the computer control session is closed. This marks the end of the session's
          * lifecycle, and no further lifecycle updates will take place.

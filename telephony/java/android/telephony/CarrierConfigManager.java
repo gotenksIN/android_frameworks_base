@@ -2785,7 +2785,7 @@ public class CarrierConfigManager {
      * When {@code false}, indicates that adding a call is disabled when there is an ongoing video
      * call or when there is an ongoing call on wifi which was downgraded from video and VoWifi is
      * turned off.
-     * When {@code true), indicates that another call can be added during an ongoing video call.
+     * When {@code true}, indicates that another call can be added during an ongoing video call.
      * <p>
      * This is {@code true} by default.
      */
@@ -10237,7 +10237,7 @@ public class CarrierConfigManager {
      * If the carrier would like to allow the device to use satellite connection when data roaming
      * is off, this key should be set to {@code true}.
      *
-     * The default value is {@code false} i.e. disallow satellite data when data roaming is off.
+     * The default value is {@code true} i.e. allow satellite data when data roaming is off.
      */
     @FlaggedApi(Flags.FLAG_SATELLITE_25Q4_APIS)
     public static final String KEY_SATELLITE_IGNORE_DATA_ROAMING_SETTING_BOOL =
@@ -10260,7 +10260,7 @@ public class CarrierConfigManager {
      * An integer key holds the time interval for refreshing or re-querying the satellite
      * entitlement status from the entitlement server to ensure it is the latest.
      *
-     * The default value is 7 days.
+     * The default value is 1 day.
      */
     public static final String KEY_SATELLITE_ENTITLEMENT_STATUS_REFRESH_DAYS_INT =
             "satellite_entitlement_status_refresh_days_int";
@@ -11152,9 +11152,8 @@ public class CarrierConfigManager {
     /**
      * Auto data network switch policy between primary and opportunistic profiles in the same
      * subscription group: switching is disabled.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_EXPOSE_OPPT_AUTO_DATA_SWITCH_POLICIES)
     public static final int OPP_AUTO_DATA_SWITCH_POLICY_DISABLED = 0;
 
     /**
@@ -11167,9 +11166,8 @@ public class CarrierConfigManager {
      *
      * <p>The system behavior may change over releases. Carriers can override with specific policies
      * below if carriers would like a consistent behavior.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_EXPOSE_OPPT_AUTO_DATA_SWITCH_POLICIES)
     public static final int OPP_AUTO_DATA_SWITCH_POLICY_FOLLOW_SYSTEM = Integer.MAX_VALUE;
 
     /**
@@ -11181,9 +11179,8 @@ public class CarrierConfigManager {
      *
      * <p>The availability-based switch is also restricted by the device resource config
      * {@code auto_data_switch_availability_stability_time_threshold_millis}.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_EXPOSE_OPPT_AUTO_DATA_SWITCH_POLICIES)
     public static final int OPP_AUTO_DATA_SWITCH_POLICY_FOR_AVAILABILITY =
             OPP_AUTO_DATA_SWITCH_POLICY_BITMASK_AVAILABILITY;
 
@@ -11200,9 +11197,8 @@ public class CarrierConfigManager {
      * <p>Performance based policy implicitly include availability based policy, that is, when
      * primary or opportunistic is out of service, follow the same behavior for policy
      * {@link #OPP_AUTO_DATA_SWITCH_POLICY_FOR_AVAILABILITY}.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_EXPOSE_OPPT_AUTO_DATA_SWITCH_POLICIES)
     public static final int OPP_AUTO_DATA_SWITCH_POLICY_FOR_PERFORMANCE =
             OPP_AUTO_DATA_SWITCH_POLICY_BITMASK_AVAILABILITY
                     | OPP_AUTO_DATA_SWITCH_POLICY_BITMASK_PERFORMANCE;
@@ -11221,8 +11217,8 @@ public class CarrierConfigManager {
      * policies or specific policy according to the business user cases.
      *
      * <p>None of the policies here impact the auto data switch between primary networks.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_EXPOSE_OPPT_AUTO_DATA_SWITCH_POLICIES)
     public static final String KEY_OPP_AUTO_DATA_SWITCH_POLICY_INT =
             "opp_auto_data_switch_policy_int";
 
@@ -12000,9 +11996,9 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_REMOVE_SATELLITE_PLMN_IN_MANUAL_NETWORK_SCAN_BOOL, true);
         sDefaults.putInt(KEY_SATELLITE_DATA_SUPPORT_MODE_INT,
                 CarrierConfigManager.SATELLITE_DATA_SUPPORT_ONLY_RESTRICTED);
-        sDefaults.putBoolean(KEY_SATELLITE_IGNORE_DATA_ROAMING_SETTING_BOOL, false);
+        sDefaults.putBoolean(KEY_SATELLITE_IGNORE_DATA_ROAMING_SETTING_BOOL, true);
         sDefaults.putBoolean(KEY_OVERRIDE_WFC_ROAMING_MODE_WHILE_USING_NTN_BOOL, true);
-        sDefaults.putInt(KEY_SATELLITE_ENTITLEMENT_STATUS_REFRESH_DAYS_INT, 7);
+        sDefaults.putInt(KEY_SATELLITE_ENTITLEMENT_STATUS_REFRESH_DAYS_INT, 1);
         sDefaults.putBoolean(KEY_SATELLITE_ENTITLEMENT_SUPPORTED_BOOL, false);
         sDefaults.putString(KEY_SATELLITE_ENTITLEMENT_APP_NAME_STRING, "androidSatmode");
         sDefaults.putString(KEY_SATELLITE_INFORMATION_REDIRECT_URL_STRING, "");

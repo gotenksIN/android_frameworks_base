@@ -156,7 +156,6 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerInternal.OnWindowRemovedListener;
 import static com.android.server.wm.WindowManagerInternal.WindowFocusChangeListener;
 import static com.android.systemui.shared.Flags.enableLppAssistInvocationEffect;
-import static com.android.window.flags.Flags.enableDeviceStateAutoRotateSettingRefactor;
 import static com.android.window.flags.Flags.multiCrop;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
 
@@ -1750,19 +1749,19 @@ public class WindowManagerService extends IWindowManager.Stub
                     final Bundle options = mWindowContextListenerController
                             .getOptions(windowContextToken);
                     token = new WindowToken.Builder(this, binder, type)
-                            .setDisplayContent(displayContent)
                             .setOwnerCanManageAppTokens(session.mCanAddInternalSystemWindow)
                             .setRoundedCornerOverlay(isRoundedCornerOverlay)
                             .setFromClientToken(true)
                             .setOptions(options)
                             .build();
+                    displayContent.addWindowToken(token);
                 } else {
                     final IBinder binder = attrs.token != null ? attrs.token : client.asBinder();
                     token = new WindowToken.Builder(this, binder, type)
-                            .setDisplayContent(displayContent)
                             .setOwnerCanManageAppTokens(session.mCanAddInternalSystemWindow)
                             .setRoundedCornerOverlay(isRoundedCornerOverlay)
                             .build();
+                    displayContent.addWindowToken(token);
                 }
             } else if (rootType >= FIRST_APPLICATION_WINDOW
                     && rootType <= LAST_APPLICATION_WINDOW) {
@@ -1834,9 +1833,9 @@ public class WindowManagerService extends IWindowManager.Stub
                 // instead make a new token for it (as if null had been passed in for the token).
                 attrs.token = null;
                 token = new WindowToken.Builder(this, client.asBinder(), type)
-                        .setDisplayContent(displayContent)
                         .setOwnerCanManageAppTokens(session.mCanAddInternalSystemWindow)
                         .build();
+                displayContent.addWindowToken(token);
             }
 
             final WindowState win = new WindowState(this, session, client, token, parentWindow,
@@ -3070,16 +3069,15 @@ public class WindowManagerService extends IWindowManager.Stub
                 return;
             }
             if (type == TYPE_WALLPAPER) {
-                new WallpaperWindowToken(this, binder, true, dc,
-                        true /* ownerCanManageAppTokens */, options);
+                token = new WallpaperWindowToken(this, binder, options);
             } else {
-                new WindowToken.Builder(this, binder, type)
-                        .setDisplayContent(dc)
+                token = new WindowToken.Builder(this, binder, type)
                         .setPersistOnEmpty(true)
                         .setOwnerCanManageAppTokens(true)
                         .setOptions(options)
                         .build();
             }
+            dc.addWindowToken(token);
         }
     }
 
@@ -4786,11 +4784,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 "setDeviceStateAutoRotateSetting()")) {
             throw new SecurityException("Requires SET_ORIENTATION permission");
         }
-        if (!enableDeviceStateAutoRotateSettingRefactor()) {
-            throw new UnsupportedOperationException(
-                    "API setDeviceStateAutoRotateSetting should not be used when "
-                            + "enableDeviceStateAutoRotateSettingRefactor is disabled");
-        }
         synchronized (mGlobalLock) {
             final DisplayContent display = mRoot.getDefaultDisplay();
             display.getDisplayRotation().requestDeviceStateAutoRotateSettingChange(deviceState,
@@ -4899,11 +4892,6 @@ public class WindowManagerService extends IWindowManager.Stub
         if (!checkCallingPermission(android.Manifest.permission.SET_ORIENTATION,
                 "setRotationAtAngleIfAllowed()")) {
             throw new SecurityException("Requires SET_ORIENTATION permission");
-        }
-        if (!enableDeviceStateAutoRotateSettingRefactor()) {
-            throw new UnsupportedOperationException(
-                    "API setRotationAtAngleIfAllowed should not be used when "
-                            + "enableDeviceStateAutoRotateSettingRefactor is disabled");
         }
         final long origId = Binder.clearCallingIdentity();
         try {

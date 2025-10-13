@@ -223,15 +223,10 @@ class ActivityClientController extends IActivityClientController.Stub {
     public void activityTopResumedStateLost(IBinder token) {
         final long origId = Binder.clearCallingIdentity();
         synchronized (mGlobalLock) {
-            if (com.android.window.flags.Flags.fixRapidTopResumedSwitch()) {
-                final ActivityRecord r = ActivityRecord.forTokenLocked(token);
-                if (r != null) {
-                    mTaskSupervisor.handleTopResumedStateReleasedIfNeeded(r, false /* timeout */);
-                }
-            } else {
-                mTaskSupervisor.handleTopResumedStateReleasedIfNeeded(null, false /* timeout */);
+            final ActivityRecord r = ActivityRecord.forTokenLocked(token);
+            if (r != null) {
+                mTaskSupervisor.handleTopResumedStateReleasedIfNeeded(r, false /* timeout */);
             }
-
         }
         Binder.restoreCallingIdentity(origId);
     }
@@ -1294,8 +1289,7 @@ class ActivityClientController extends IActivityClientController.Stub {
 
     private Task getMultiwindowFullscreenTargetTask() {
         Task task = mService.getTopDisplayFocusedRootTask();
-        if (DesktopExperienceFlags.ENABLE_REQUEST_FULLSCREEN_RESTORE_FREEFORM_BUGFIX.isTrue()
-                && task.mCreatedByOrganizer) {
+        if (task.mCreatedByOrganizer) {
             final Task topMostChild = task.getTopLeafTask();
             if (topMostChild != null) {
                 task = topMostChild;

@@ -58,6 +58,7 @@ import static android.os.Process.INVALID_UID;
 import static android.security.Flags.preventIntentRedirectAbortOrThrowException;
 import static android.security.Flags.preventIntentRedirectShowToast;
 import static android.view.Display.DEFAULT_DISPLAY;
+import static android.view.Display.INVALID_DISPLAY;
 import static android.view.WindowManager.TRANSIT_FLAG_AVOID_MOVE_TO_FRONT;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.window.TaskFragmentOperation.OP_TYPE_START_ACTIVITY_IN_TASK_FRAGMENT;
@@ -153,7 +154,6 @@ import com.android.server.wm.ActivityMetricsLogger.LaunchingState;
 import com.android.server.wm.BackgroundActivityStartController.BalVerdict;
 import com.android.server.wm.LaunchParamsController.LaunchParams;
 import com.android.server.wm.TaskFragment.EmbeddingCheckResult;
-import com.android.window.flags.Flags;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -1355,9 +1355,12 @@ class ActivityStarter {
 
         final TaskDisplayArea suggestedLaunchDisplayArea =
                 computeSuggestedLaunchDisplayArea(inTask, sourceRecord, checkedOptions);
+        final int sourceDisplayId =
+                sourceRecord != null ? sourceRecord.getDisplayId() : INVALID_DISPLAY;
         mInterceptor.setStates(userId, realCallingPid, realCallingUid, startFlags,
                 callingPackage,
-                callingFeatureId);
+                callingFeatureId,
+                sourceDisplayId);
         if (mInterceptor.intercept(intent, rInfo, aInfo, resolvedType, inTask, inTaskFragment,
                 callingPid, callingUid, checkedOptions, suggestedLaunchDisplayArea,
                 request.componentSpecified)) {
@@ -3097,16 +3100,11 @@ class ActivityStarter {
         Task intentTask = intentActivity.getTask();
         // The intent task might be reparented while in getOrCreateRootTask, caches the original
         // root task to distinguish if it is moving to front or not.
-        final Task origRootTask;
-        if (Flags.fixBalReparentExistingTask()) {
-            origRootTask = intentTask.getRootTask();
-        } else {
-            origRootTask = intentTask != null ? intentTask.getRootTask() : null;
-        }
+        final Task origRootTask = intentTask.getRootTask();
 
         // Update launch target task when it is not indicated.
         if (mTargetRootTask == null) {
-            if (Flags.fixBalReparentExistingTask() && mBalVerdict.blocks()) {
+            if (mBalVerdict.blocks()) {
                 // Stays on the same root task if the activity launch is not allowed.
                 mTargetRootTask = origRootTask;
             } else if (mSourceRecord != null && mSourceRecord.mLaunchRootTask != null) {

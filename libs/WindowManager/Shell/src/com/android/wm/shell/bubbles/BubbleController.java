@@ -660,6 +660,8 @@ public class BubbleController implements ConfigurationChangeListener,
                                 return;
                             }
                             mAppBubbleRootTaskInfo = taskInfo;
+                            mBubbleTransitions.mTaskViewTransitions.setTaskViewRootTaskInfo(
+                                    taskInfo);
 
                             final WindowContainerTransaction wct = new WindowContainerTransaction();
                             wct.reorder(taskInfo.token, false /* onTop */);
@@ -3213,7 +3215,7 @@ public class BubbleController implements ConfigurationChangeListener,
                 return;
             }
             BubbleLog.d("BubbleController.BubblesImeListener.onImeVisibilityChanged visible=%b"
-                    + "runnable=%s stackView=%s", imeVisible, mOnImeHidden, mStackView);
+                    + " runnable=%s stackView=%s", imeVisible, mOnImeHidden, mStackView);
             // the imeHeight here is actually the ime inset; it only includes the part of the ime
             // that overlaps with the Bubbles window. adjust it to include the bottom screen inset,
             // so we have the total height of the ime.
@@ -3907,20 +3909,8 @@ public class BubbleController implements ConfigurationChangeListener,
                     return;
                 }
 
-                final WindowContainerTransaction wct;
-                if (BubbleAnythingFlagHelper.enableRootTaskForBubble() && shouldBeAppBubble(
-                        taskView.getTaskInfo())) {
-                    wct = new WindowContainerTransaction();
-                    if (visible) {
-                        wct.reorder(taskView.getTaskInfo().token, true /* onTop */);
-                        wct.setAlwaysOnTop(mAppBubbleRootTaskInfo.token, true /* alwaysOnTop */);
-                    } else if (!mBubbleData.isExpanded()) {
-                        wct.setAlwaysOnTop(mAppBubbleRootTaskInfo.token, false /* alwaysOnTop */);
-                        wct.reorder(mAppBubbleRootTaskInfo.token, false /* onTop */);
-                    }
-                } else {
-                    wct = null;
-                }
+                final WindowContainerTransaction wct = getTransactionToUpdateVisibility(taskView,
+                        visible);
 
                 // The transaction to hide the TaskView can be executed on the executor to avoid
                 // blocking the calling thread.
@@ -3931,6 +3921,50 @@ public class BubbleController implements ConfigurationChangeListener,
             } else {
                 mBaseTransitions.setTaskViewVisible(taskView, visible);
             }
+        }
+
+        /**
+         * Returns the WindowContainerTransaction that contains the necessary operation when a
+         * TaskView becomes visible or invisible. Returns {@code null} if no operation needed.
+         */
+        @Nullable
+        private WindowContainerTransaction getTransactionToUpdateVisibility(
+                TaskViewTaskController taskView, boolean visible) {
+            if (!BubbleAnythingFlagHelper.enableRootTaskForBubble()) {
+                return null;
+            } else if (!shouldBeAppBubble(taskView.getTaskInfo())) {
+                return null;
+            }
+
+            final WindowContainerTransaction wct = new WindowContainerTransaction();
+            if (visible) {
+                wct.reorder(taskView.getTaskInfo().token, true /* onTop */);
+                wct.setAlwaysOnTop(mAppBubbleRootTaskInfo.token, true /* alwaysOnTop */);
+                return wct;
+            }
+
+            boolean hideRootTask = false;
+            if (!mBubbleData.isExpanded()) {
+                hideRootTask = true;
+            } else if (!mLayerView.isExpanded()) {
+                // When bubble is being dragged in launcher, layerView is collapsed while
+                // bubbleData is not
+                hideRootTask = true;
+            } else if (mBubbleData.getSelectedBubble() != null) {
+                // Hide the app bubble root task if the selected bubble is no longer an app bubble
+                final Bubble selectedBubble = mBubbleData.getBubbleInStackWithTaskId(
+                        mBubbleData.getSelectedBubble().getTaskId());
+                if (selectedBubble == null || !shouldBeAppBubble(
+                        selectedBubble.getTaskView().getTaskInfo())) {
+                    hideRootTask = true;
+                }
+            }
+
+            if (hideRootTask) {
+                wct.setAlwaysOnTop(mAppBubbleRootTaskInfo.token, false /* alwaysOnTop */);
+                wct.reorder(mAppBubbleRootTaskInfo.token, false /* onTop */);
+            }
+            return wct;
         }
 
         @Override

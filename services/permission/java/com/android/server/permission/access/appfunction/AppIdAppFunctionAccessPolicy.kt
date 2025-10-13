@@ -224,7 +224,7 @@ class AppIdAppFunctionAccessPolicy : SchemePolicy() {
             return false
         }
 
-        return allowedAgent.certificateDigestOrNull == null ||
+        return !allowedAgent.hasCertificateDigest() ||
             possibleAgent.androidPackage
                 ?.signingDetails
                 ?.hasSha256Certificate(allowedAgent.certificateDigest) == true
@@ -321,6 +321,9 @@ class AppIdAppFunctionAccessPolicy : SchemePolicy() {
         packageNames.forEachIndexed { _, packageName ->
             val packageState =
                 newState.externalState.packageStates[packageName] ?: return@forEachIndexed
+            // The package may still be unavailable if the storage volume is removed before fully
+            // scanned, in which case we should skip it and wait for the next time.
+            packageState.androidPackage ?: return@forEachIndexed
             trimAccessFlags(packageState.appId)
         }
     }

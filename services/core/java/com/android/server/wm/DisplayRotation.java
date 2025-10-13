@@ -91,7 +91,6 @@ import com.android.settingslib.devicestate.DeviceStateAutoRotateSettingManager;
 import com.android.settingslib.devicestate.DeviceStateAutoRotateSettingManagerImpl;
 import com.android.settingslib.devicestate.PostureDeviceStateConverter;
 import com.android.settingslib.devicestate.SecureSettings;
-import com.android.window.flags.Flags;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -1807,29 +1806,24 @@ public class DisplayRotation {
             return null;
         }
 
-        DeviceStateAutoRotateSettingController deviceStateAutoRotateSettingController = null;
-
         final SecureSettings secureSettings = new AndroidSecureSettings(
                 context.getContentResolver());
 
         new DeviceStateAutoRotateSettingIssueLogger(SystemClock::elapsedRealtime, secureSettings,
                 deviceStateController, wmService.mH);
 
-        if (Flags.enableDeviceStateAutoRotateSettingRefactor()) {
-            final DeviceStateManager deviceStateManager = context.getSystemService(
-                    DeviceStateManager.class);
-            final PostureDeviceStateConverter postureDeviceStateController =
-                    new PostureDeviceStateConverter(context, deviceStateManager);
-            final DeviceStateAutoRotateSettingManager deviceStateAutoRotateSettingManager =
-                    new DeviceStateAutoRotateSettingManagerImpl(
-                            context, BackgroundThread.getExecutor(), secureSettings, wmService.mH,
-                            postureDeviceStateController);
-            deviceStateAutoRotateSettingController = new DeviceStateAutoRotateSettingController(
-                    deviceStateController, deviceStateAutoRotateSettingManager, wmService,
-                    postureDeviceStateController);
-        }
+        final DeviceStateManager deviceStateManager = context.getSystemService(
+                DeviceStateManager.class);
+        final PostureDeviceStateConverter postureDeviceStateController =
+                new PostureDeviceStateConverter(context, deviceStateManager);
+        final DeviceStateAutoRotateSettingManager deviceStateAutoRotateSettingManager =
+                new DeviceStateAutoRotateSettingManagerImpl(
+                        context, BackgroundThread.getExecutor(), secureSettings, wmService.mH,
+                        postureDeviceStateController);
+        return new DeviceStateAutoRotateSettingController(
+                deviceStateController, deviceStateAutoRotateSettingManager, wmService,
+                postureDeviceStateController);
 
-        return deviceStateAutoRotateSettingController;
     }
 
     class FoldController {

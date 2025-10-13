@@ -30,6 +30,8 @@ import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_POWER_QUICK
 import static com.android.server.am.BroadcastConstants.DEFER_BOOT_COMPLETED_BROADCAST_BACKGROUND_RESTRICTED_ONLY;
 import static com.android.server.am.BroadcastConstants.DEFER_BOOT_COMPLETED_BROADCAST_TARGET_T_ONLY;
 import static com.android.server.am.BroadcastConstants.getDeviceConfigBoolean;
+import static com.android.server.am.psc.Constants.CACHED_APP_MIN_ADJ;
+import static com.android.server.am.psc.Constants.HOME_APP_ADJ;
 
 import android.annotation.NonNull;
 import android.app.ActivityManagerInternal;
@@ -271,8 +273,7 @@ final class ActivityManagerConstants extends ContentObserver {
 
     /** The default value to {@link #KEY_FREEZER_CUTOFF_ADJ} */
     private static final int DEFAULT_FREEZER_CUTOFF_ADJ =
-            Flags.prototypeAggressiveFreezing() ? ProcessList.HOME_APP_ADJ
-                    : ProcessList.CACHED_APP_MIN_ADJ;
+            Flags.prototypeAggressiveFreezing() ? HOME_APP_ADJ : CACHED_APP_MIN_ADJ;
 
     /**
      * Same as {@link TEMPORARY_ALLOW_LIST_TYPE_FOREGROUND_SERVICE_NOT_ALLOWED}
@@ -2201,6 +2202,7 @@ final class ActivityManagerConstants extends ContentObserver {
         mProcStateDebugSetUidStateDelay = 0;
         if (val.length() == 0) {
             mProcStateDebugUids = new SparseBooleanArray(0);
+            mService.mProcessStateController.setProcStateDebugUids(mProcStateDebugUids);
             return;
         }
         final String[] uids = val.split(",");
@@ -2244,6 +2246,7 @@ final class ActivityManagerConstants extends ContentObserver {
             }
         }
         mProcStateDebugUids = newArray;
+        mService.mProcessStateController.setProcStateDebugUids(mProcStateDebugUids);
     }
 
     private void updateMinAssocLogDuration() {
@@ -2394,28 +2397,6 @@ final class ActivityManagerConstants extends ContentObserver {
                 DEFAULT_ENABLE_BATCHING_OOM_ADJ);
     }
 
-    boolean shouldDebugUidForProcState(int uid) {
-        SparseBooleanArray ar = mProcStateDebugUids;
-        final var size = ar.size();
-        if (size == 0) { // Most common case.
-            return false;
-        }
-        // If the array is small (also common), avoid the binary search.
-        if (size <= 8) {
-            for (int i = 0; i < size; i++) {
-                if (ar.keyAt(i) == uid) {
-                    return ar.valueAt(i);
-                }
-            }
-            return false;
-        }
-        return ar.get(uid, false);
-    }
-
-    boolean shouldEnableProcStateDebug() {
-        return mProcStateDebugUids.size() > 0;
-    }
-
     /** Creates and initializes an {@link OomAdjuster.Constants} instance with values. */
     OomAdjuster.Constants createOomConstants() {
         OomAdjuster.Constants oomConstants = new OomAdjuster.Constants();
@@ -2426,6 +2407,7 @@ final class ActivityManagerConstants extends ContentObserver {
         oomConstants.mCurMaxCachedProcesses = CUR_MAX_CACHED_PROCESSES;
         oomConstants.mCurMaxEmptyProcesses = CUR_MAX_EMPTY_PROCESSES;
         oomConstants.mCurTrimEmptyProcesses = CUR_TRIM_EMPTY_PROCESSES;
+        oomConstants.mProcStateDebugUids = mProcStateDebugUids;
         return oomConstants;
     }
 

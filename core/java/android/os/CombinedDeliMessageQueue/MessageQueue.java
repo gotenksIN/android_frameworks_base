@@ -23,11 +23,15 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.TestApi;
+import android.app.compat.CompatChanges;
 import android.app.ActivityThread;
+import android.app.Instrumentation;
+import android.compat.annotation.ChangeId;
+import android.compat.annotation.Disabled;
+import android.compat.annotation.EnabledAfter;
+import android.compat.annotation.Overridable;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
-import android.ravenwood.annotation.RavenwoodRedirect;
-import android.ravenwood.annotation.RavenwoodRedirectionClass;
 import android.ravenwood.annotation.RavenwoodThrow;
 import android.util.Log;
 import android.util.Printer;
@@ -55,11 +59,19 @@ import java.util.concurrent.locks.LockSupport;
  * {@link Looper#myQueue() Looper.myQueue()}.
  */
 @RavenwoodKeepWholeClass
-@RavenwoodRedirectionClass("MessageQueue_ravenwood")
 public final class MessageQueue {
     private static final String TAG_L = "LegacyMessageQueue";
     private static final String TAG_D = "DeliQueue";
     private static final boolean DEBUG = false;
+
+    /**
+     * Enables concurrent message queue implementation in all applications.
+     *
+     * @hide
+     */
+    @ChangeId
+    @EnabledAfter(targetSdkVersion = android.os.Build.VERSION_CODES.BAKLAVA)
+    public static final long USE_NEW_MESSAGEQUEUE = 421623328L;
 
     // True if the message queue can be quit.
     @UnsupportedAppUsage
@@ -123,7 +135,7 @@ public final class MessageQueue {
     private static final VarHandle sMptrRefCount;
     private volatile long mMptrRefCountValue = 0;
 
-    private static final VarHandle sSyncBarrier;
+
     private volatile Message mSyncBarrier = null;
 
     /* ------------------------------------------------------------------------------------------ */
@@ -153,8 +165,16 @@ public final class MessageQueue {
     }
 
     private static boolean computeUseDeliQueue() {
-        if (Flags.useConcurrentMessageQueueInApps()) {
-            return true;
+        if (CompatChanges.isChangeEnabled(USE_NEW_MESSAGEQUEUE)
+                || Flags.useConcurrentMessageQueueInApps()) {
+            // b/447778739: Some Robolectric tests still use legacy LooperMode.
+            try {
+                Class.forName("org.robolectric.Robolectric");
+                // This is a Robolectric test. Concurrent MessageQueue is not supported yet.
+                return false;
+            } catch (ClassNotFoundException e) {
+                return true;
+            }
         }
 
         final String processName = Process.myProcessName();
@@ -169,16 +189,6 @@ public final class MessageQueue {
         if (UserHandle.isCore(Process.myUid())) {
             return true;
         }
-
-        // Also explicitly allow SystemUI processes.
-        // SystemUI doesn't run in a core UID, but we want to give it the performance boost,
-        // and we know that it's safe to use the concurrent implementation in SystemUI.
-        if (processName.equals("com.android.systemui")
-                || processName.startsWith("com.android.systemui:")) {
-            return true;
-        }
-        // On Android distributions where SystemUI has a different process name,
-        // the above condition may need to be adjusted accordingly.
 
         // We can lift these restrictions in the future after we've made it possible for test
         // authors to test Looper and MessageQueue without resorting to reflection.
@@ -201,21 +211,14 @@ public final class MessageQueue {
         sSkipEpollWaitForZeroTimeoutInitialized = true;
     }
 
-    @RavenwoodRedirect
     private native static long nativeInit();
-    @RavenwoodRedirect
     private native static void nativeDestroy(long ptr);
     @UnsupportedAppUsage
-    @RavenwoodRedirect
     private native void nativePollOnce(long ptr, int timeoutMillis); /*non-static for callbacks*/
 
-    @RavenwoodRedirect
     private native static void nativeWake(long ptr);
-    @RavenwoodRedirect
     private native static boolean nativeIsPolling(long ptr);
-    @RavenwoodRedirect
     private native static void nativeSetFileDescriptorEvents(long ptr, int fd, int events);
-    @RavenwoodRedirect
     private native static void nativeSetSkipEpollWaitForZeroTimeout(long ptr);
 
     @UnsupportedAppUsage
@@ -241,8 +244,6 @@ public final class MessageQueue {
                     long.class);
             sMptrRefCount = l.findVarHandle(MessageQueue.class, "mMptrRefCountValue",
                     long.class);
-            sSyncBarrier = l.findVarHandle(MessageQueue.class, "mSyncBarrier",
-                    Message.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -415,8 +416,7 @@ public final class MessageQueue {
             long waitState = mWaitState;
             long newWaitState;
             boolean needWake = false;
-            Message barrier = msg.isAsynchronous() ? null :
-                    (Message) sSyncBarrier.getVolatile(this);
+            Message barrier = msg.isAsynchronous() ? null : mSyncBarrier;
             boolean reCheckBarrier = false;
 
             if (WaitState.isCounter(waitState)) {
@@ -434,7 +434,7 @@ public final class MessageQueue {
                 }
             }
             if (sWaitState.compareAndSet(this, waitState, newWaitState)) {
-                if (reCheckBarrier && barrier != (Message) sSyncBarrier.getVolatile(this)) {
+                if (reCheckBarrier && barrier != mSyncBarrier) {
                     /*
                      * If barrier state changed underneath us and we chose not to wake the
                      * looper thread, we have to recheck to ensure that the barrier we saw was
@@ -696,7 +696,7 @@ public final class MessageQueue {
                 }
             }
 
-            sSyncBarrier.setVolatile(this, syncBarrier);
+            mSyncBarrier = syncBarrier;
             /*
              * Try to swap waitstate back from a counter to a deadline. If we can't then that means
              * the counter was incremented and we need to loop back to pick up any new items.

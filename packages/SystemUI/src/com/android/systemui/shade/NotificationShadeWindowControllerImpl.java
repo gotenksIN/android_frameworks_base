@@ -48,7 +48,6 @@ import android.window.WindowContext;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.systemui.Dumpable;
-import com.android.systemui.Flags;
 import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.communal.domain.interactor.CommunalInteractor;
@@ -368,6 +367,11 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
                 mCommunalInteractor.get().isCommunalVisible(),
                 this::onCommunalVisibleChanged
         );
+        collectFlow(
+                mWindowRootView,
+                mNotificationShadeWindowModel.isAnimatingGoneToAod(),
+                this::setIsAnimatingGoneToAod
+        );
         if (dreamsV2() && mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_alwaysAllowDreamRotation)) {
             collectFlow(
@@ -553,13 +557,11 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
     }
 
     private boolean isExpanded(NotificationShadeWindowState state) {
-        boolean areScrimsNotTransparent = state.scrimsVisibility != ScrimController.TRANSPARENT;
-        boolean shouldScrimVisibilityKeepWindowVisible = !Flags.scrimFix();
         boolean isExpanded = !state.forceWindowCollapsed && (state.isKeyguardShowingAndNotOccluded()
                 || state.panelVisible || state.keyguardFadingAway || state.bouncerShowing
-                || state.headsUpNotificationShowing
-                || (shouldScrimVisibilityKeepWindowVisible && areScrimsNotTransparent))
-                || state.launchingActivityFromNotification;
+                || state.headsUpNotificationShowing)
+                || state.launchingActivityFromNotification
+                || state.isAnimatingGoneToAod;
 
         if (state.launchingActivityFromNotification && state.forceHideAfterActivityLaunch) {
             // If we're at the end of a launch animation, we must force the window to be hidden to
@@ -571,7 +573,8 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
                 state.isKeyguardShowingAndNotOccluded(), state.panelVisible,
                 state.keyguardFadingAway, state.bouncerShowing, state.headsUpNotificationShowing,
                 state.scrimsVisibility != ScrimController.TRANSPARENT,
-                state.launchingActivityFromNotification, state.forceHideAfterActivityLaunch);
+                state.launchingActivityFromNotification, state.forceHideAfterActivityLaunch,
+                state.isAnimatingGoneToAod);
         return isExpanded;
     }
 
@@ -691,7 +694,8 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
                 state.backgroundBlurRadius,
                 state.communalVisible,
                 state.isOnOrGoingToDream,
-                state.isAnimatingSurfaceBehind
+                state.isAnimatingSurfaceBehind,
+                state.isAnimatingGoneToAod
         );
     }
 
@@ -861,6 +865,11 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
         mCurrentState.launchingActivityFromNotification = launching;
         // Whenever we start or end a launch, reset the hide value.
         mCurrentState.forceHideAfterActivityLaunch = false;
+        apply(mCurrentState);
+    }
+
+    void setIsAnimatingGoneToAod(boolean isAnimating) {
+        mCurrentState.isAnimatingGoneToAod = isAnimating;
         apply(mCurrentState);
     }
 

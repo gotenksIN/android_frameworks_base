@@ -2,22 +2,6 @@ package: "android.app.supervision.flags"
 container: "system"
 
 flag {
-  name: "supervision_api"
-  is_exported: true
-  namespace: "supervision"
-  description: "Flag to enable the SupervisionService"
-  bug: "340351729"
-}
-
-flag {
-  name: "supervision_api_on_wear"
-  is_exported: true
-  namespace: "supervision"
-  description: "Flag to enable the SupervisionService on Wear devices"
-  bug: "373358935"
-}
-
-flag {
   name: "enable_sync_with_dpm"
   is_exported: true
   namespace: "supervision"
@@ -130,14 +114,6 @@ flag {
     namespace: "supervision"
     description: "Flag that enables app store filters screen with Supervision settings entry point"
     bug: "438298503"
-}
-
-flag {
-    name: "enable_app_store_filters_screen_fallback"
-    is_exported: false
-    namespace: "supervision"
-    description: "Flag that enables fallback UI for app store filters screen with Supervision settings entry point"
-    bug: "446954309"
 }
 
 flag {

@@ -499,7 +499,8 @@ public class TransitionTests extends WindowTestsBase {
         }
 
         final WallpaperWindowToken wallpaperWindowToken = spy(new WallpaperWindowToken(mWm,
-                mock(IBinder.class), true, mDisplayContent, true /* ownerCanManageAppTokens */));
+                mock(IBinder.class), null /* options */));
+        mDisplayContent.addWindowToken(wallpaperWindowToken);
         final WindowState wallpaperWindow = newWindowBuilder("wallpaperWindow",
                 TYPE_WALLPAPER).setWindowToken(wallpaperWindowToken).build();
         wallpaperWindowToken.setVisibleRequested(false);
@@ -695,13 +696,15 @@ public class TransitionTests extends WindowTestsBase {
         ArrayMap<WindowContainer, Transition.ChangeInfo> changes = transition.mChanges;
         ArraySet<WindowContainer> participants = transition.mParticipants;
 
-        final WallpaperWindowToken wallpaper1 =  new WallpaperWindowToken(mWm,
-                mock(IBinder.class), true, otherDisplay, true /* ownerCanManageAppTokens */);
+        final WallpaperWindowToken wallpaper1 =  new WallpaperWindowToken(mWm, mock(IBinder.class),
+                null /* options */);
+        otherDisplay.addWindowToken(wallpaper1);
         final WindowState wallpaperWindow1 = newWindowBuilder("closing",
                 TYPE_WALLPAPER).setWindowToken(wallpaper1).build();
 
-        final WallpaperWindowToken wallpaper2 =  new WallpaperWindowToken(mWm,
-                mock(IBinder.class), true, otherDisplay, true /* ownerCanManageAppTokens */);
+        final WallpaperWindowToken wallpaper2 =  new WallpaperWindowToken(mWm, mock(IBinder.class),
+                null /* options */);
+        otherDisplay.addWindowToken(wallpaper2);
         final WindowState wallpaperWindow2 = newWindowBuilder("opening",
                 TYPE_WALLPAPER).setWindowToken(wallpaper2).build();
 
@@ -739,7 +742,8 @@ public class TransitionTests extends WindowTestsBase {
         final Transition transition = createTestTransition(TRANSIT_OPEN);
 
         final WallpaperWindowToken wallpaperWindowToken = new WallpaperWindowToken(mWm,
-                mock(IBinder.class), true, mDisplayContent, true /* ownerCanManageAppTokens */);
+                mock(IBinder.class), null /* options */);
+        mDisplayContent.addWindowToken(wallpaperWindowToken);
         // Make DA organized so we can check that they don't get included.
         WindowContainer parent = wallpaperWindowToken.getParent();
         makeDisplayAreaOrganized(parent, mDisplayContent);
@@ -1231,8 +1235,8 @@ public class TransitionTests extends WindowTestsBase {
         final WindowState navBar = newWindowBuilder("navBar", TYPE_NAVIGATION_BAR).build();
         final WindowState ime = newWindowBuilder("ime", TYPE_INPUT_METHOD).build();
         final WindowToken decorToken = new WindowToken.Builder(mWm, mock(IBinder.class),
-                TYPE_NAVIGATION_BAR_PANEL).setDisplayContent(mDisplayContent)
-                .setRoundedCornerOverlay(true).build();
+                TYPE_NAVIGATION_BAR_PANEL).setRoundedCornerOverlay(true).build();
+        mDisplayContent.addWindowToken(decorToken);
         final WindowState screenDecor = newWindowBuilder("screenDecor",
                 decorToken.windowType).setWindowToken(decorToken).build();
         final WindowState[] windows = {statusBar, navBar, ime, screenDecor};

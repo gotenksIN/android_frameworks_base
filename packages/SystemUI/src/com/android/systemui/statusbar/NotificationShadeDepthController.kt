@@ -37,7 +37,6 @@ import com.android.app.tracing.coroutines.TrackTracer
 import com.android.systemui.Dumpable
 import com.android.systemui.Flags
 import com.android.systemui.Flags.checkDesktopModeForSpacialModelAppPushback
-import com.android.systemui.Flags.spatialModelAppPushback
 import com.android.systemui.animation.ShadeInterpolation
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
@@ -377,9 +376,7 @@ constructor(
     private fun onZoomOutChanged(zoomOutFromShadeRadius: Float) {
         TrackTracer.instantForGroup("shade", "zoom_out", zoomOutFromShadeRadius)
         Log.v(TAG, "onZoomOutChanged $zoomOutFromShadeRadius")
-        if (spatialModelAppPushback()) {
-            keyguardInteractor.setZoomOut(zoomOutFromShadeRadius)
-        }
+        keyguardInteractor.setZoomOut(zoomOutFromShadeRadius)
     }
 
     private val applyZoomOutForFrame =
@@ -601,7 +598,7 @@ constructor(
     }
 
     fun onTransitionAnimationProgress(progress: Float) {
-        if (!Flags.notificationShadeBlur() || !Flags.moveTransitionAnimationLayer()) return
+        if (!Flags.notificationShadeBlur()) return
         // Because the Shade takes a few frames to actually trigger the unblur after a transition
         // has ended, we need to disable it manually, or the opening window itself will be blurred
         // for a few frames due to relative ordering. We do this towards the end, so that the
@@ -612,7 +609,7 @@ constructor(
     }
 
     fun onTransitionAnimationEnd() {
-        if (!Flags.notificationShadeBlur() || !Flags.moveTransitionAnimationLayer()) return
+        if (!Flags.notificationShadeBlur()) return
         blursDisabledForAppLaunch = false
     }
 

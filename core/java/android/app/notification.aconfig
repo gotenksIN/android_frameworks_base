@@ -5,12 +5,6 @@ container: "system"
 # when appropriate, as it's not currently part of the namespace so it may not be obvious what the
 # flag relates to.
 
-flag {
-  name: "notifications_redesign_app_icons"
-  namespace: "systemui"
-  description: "Notifications Redesign: Use app icons in notification rows"
-  bug: "371174789"
-}
 
 flag {
   name: "notifications_redesign_themed_app_icons"
@@ -90,13 +84,6 @@ flag {
   namespace: "systemui"
   description: "Experiment to restore the pre-S behavior where standard notifications are not expandable unless they have actions."
   bug: "339523906"
-}
-
-flag {
-  name: "notification_no_custom_view_conversations"
-  namespace: "systemui"
-  description: "Ensures that conversations are not allowed to use Custom Views."
-  bug: "368817201"
 }
 
 flag {
@@ -311,6 +298,13 @@ flag {
   namespace: "systemui"
   description: "[RONs] Guards new promotion logic and UI, including AOD notification and Colorization"
   bug: "367705002"
+}
+
+flag {
+  name: "rich_ongoing_improvements"
+  namespace: "systemui"
+  description: "[RONs] Visual Improvements for Live Updates, for glanceability"
+  bug: "440125908"
 }
 
 flag {

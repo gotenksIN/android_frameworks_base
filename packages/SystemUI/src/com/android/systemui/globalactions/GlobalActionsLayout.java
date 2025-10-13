@@ -43,11 +43,21 @@ import java.util.Locale;
  * Grid-based implementation of the button layout created by the global actions dialog.
  */
 public abstract class GlobalActionsLayout extends MultiListLayout {
-
     boolean mBackgroundsSet;
+
+    private Boolean mIsBlurSupported = null;
 
     public GlobalActionsLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
+    }
+
+    public void setIsBlurSupported(boolean isBlurSupported) {
+        if (mIsBlurSupported != null && isBlurSupported == mIsBlurSupported) {
+            return;
+        }
+
+        mIsBlurSupported = isBlurSupported;
+        updateIsBlurSupported();
     }
 
     private void setBackgrounds() {
@@ -64,7 +74,6 @@ public abstract class GlobalActionsLayout extends MultiListLayout {
             blurDrawable.setBlurRadius(getResources().getDimensionPixelSize(
                     R.dimen.global_actions_blur_radius));
             GradientDrawable surfaceEffect = new GradientDrawable();
-            surfaceEffect.setColor(SurfaceEffectColors.surfaceEffect0(mContext));
             surfaceEffect.setCornerRadius(dialogCornerRadius);
             listBackground = new LayerDrawable(new Drawable[]{blurDrawable, surfaceEffect});
         } else {
@@ -89,6 +98,16 @@ public abstract class GlobalActionsLayout extends MultiListLayout {
         }
     }
 
+    private void updateIsBlurSupported() {
+        if (blurOnMoreSurfaces() && mBackgroundsSet && mIsBlurSupported != null) {
+            LayerDrawable layerDrawable = (LayerDrawable) getListView().getBackground();
+            layerDrawable.getDrawable(0).setVisible(mIsBlurSupported, false);
+            ((GradientDrawable) layerDrawable.getDrawable(1)).setColor(
+                    mContext.getColor(mIsBlurSupported ? R.color.global_actions_grid_background_blur
+                            : R.color.global_actions_grid_background_blur_fallback));
+        }
+    }
+
     protected HardwareBgDrawable getBackgroundDrawable(int backgroundColor) {
         HardwareBgDrawable background = new HardwareBgDrawable(true, true, getContext());
         background.setTint(backgroundColor);
@@ -103,6 +122,7 @@ public abstract class GlobalActionsLayout extends MultiListLayout {
         if (getListView() != null && !mBackgroundsSet) {
             setBackgrounds();
             mBackgroundsSet = true;
+            updateIsBlurSupported();
         }
     }
 

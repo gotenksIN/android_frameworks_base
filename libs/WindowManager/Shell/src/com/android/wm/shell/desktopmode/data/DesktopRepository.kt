@@ -119,6 +119,10 @@ class DesktopRepository(
             }
     }
 
+    /** Returns true if the task has previous bounds. */
+    fun hasBoundsBeforeSnapOrMaximize(taskInfo: ActivityManager.RunningTaskInfo): Boolean =
+        taskInfo.taskId in boundsBeforeSnapOrMaximizeByTaskId
+
     /** Updates tasks changes on all the active task listeners for given display id. */
     private fun updateActiveTasksListeners(displayId: Int) {
         activeTasksListeners.onEach { it.onActiveTasksChanged(displayId) }
@@ -842,6 +846,9 @@ class DesktopRepository(
             desk.visibleTasks.remove(taskId)
         }
         taskBounds?.let { desk.boundsByTaskId[taskId] = it }
+        boundsBeforeSnapOrMaximizeByTaskId.get(taskId)?.let {
+            desk.boundsBeforeSnapOrMaximizeByTaskId[taskId] = it
+        }
         if (desk.transientDesk) return
         val newCount = getVisibleTaskCountInDesk(deskId)
         if (prevCount != newCount) {
@@ -1091,6 +1098,7 @@ class DesktopRepository(
         val desk = desktopData.getDesk(deskId) ?: return
         if (desk.freeformTasksInZOrder.remove(taskId)) {
             desk.boundsByTaskId.remove(taskId)
+            desk.boundsBeforeSnapOrMaximizeByTaskId.remove(taskId)
             logD(
                 "Remaining freeform tasks in desk: %d, tasks: %s",
                 desk.deskId,
@@ -1187,9 +1195,17 @@ class DesktopRepository(
     fun removeBoundsBeforeSnapOrMaximize(taskId: Int): Rect? =
         boundsBeforeSnapOrMaximizeByTaskId.removeReturnOld(taskId)
 
-    /** Saves the bounds of the given task before snapping or maximizing. */
-    fun saveBoundsBeforeSnapOrMaximize(taskId: Int, bounds: Rect) =
-        boundsBeforeSnapOrMaximizeByTaskId.set(taskId, Rect(bounds))
+    /**
+     * Saves the bounds of the given task before snapping or maximizing
+     * if there is no existence for the given taskId.
+     *
+     * This prevents unwanted overwrites.
+     */
+    fun saveBoundsBeforeSnapOrMaximize(taskId: Int, bounds: Rect) {
+        if (taskId !in boundsBeforeSnapOrMaximizeByTaskId) {
+            boundsBeforeSnapOrMaximizeByTaskId.set(taskId, Rect(bounds))
+        }
+    }
 
     /** Removes and returns the bounds saved before minimizing the given task. */
     fun removeBoundsBeforeMinimize(taskId: Int): Rect? =

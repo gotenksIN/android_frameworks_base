@@ -8,6 +8,8 @@ package com.android.server.am;
 import static android.os.Process.THREAD_PRIORITY_TOP_APP_BOOST;
 import static com.android.server.cpu.CpuAvailabilityMonitoringConfig.CPUSET_ALL;
 import static com.android.server.cpu.CpuAvailabilityMonitoringConfig.CPUSET_BACKGROUND;
+import static com.android.server.am.psc.Constants.FOREGROUND_APP_ADJ;
+import static com.android.server.am.psc.Constants.PERCEPTIBLE_APP_ADJ;
 
 import com.android.server.am.ProcessRecord;
 import com.android.server.am.ProcessList;
@@ -40,7 +42,7 @@ public class ProcessFreezerManager {
     private static final long DEFAULT_LAUNCH_TIMEOUT = 2000;
     private static final long DEFAULT_DELAY_UNFREEZER_TIMEOUT = 1000;
     private static final int DEFAULT_CPU_USAGE_THRESHOLD = 60;
-    private static final int DEFAULT_FREEZE_ADJ_THRESHOLD = ProcessList.PERCEPTIBLE_APP_ADJ + 1;
+    private static final int DEFAULT_FREEZE_ADJ_THRESHOLD = PERCEPTIBLE_APP_ADJ + 1;
     private static final int REPORT_UNFREEZE_SERVICE_MSG = 0;
     private static final int FROZEN_AND_UPDATE_PROCESS_MSG = 1;
     private static final int REPORT_UNFREEZE_PROCESS_MSG = 2;
@@ -437,7 +439,7 @@ public class ProcessFreezerManager {
             for (int i = 0; i < mPidsSelfLocked.size(); i++) {
                 final ProcessRecord app = mPidsSelfLocked.valueAt(i);
                 final ProcessRecordInternal state = app;
-                if (state.getCurAdj() >= ProcessList.FOREGROUND_APP_ADJ) {
+                if (state.getCurAdj() >= FOREGROUND_APP_ADJ) {
                     String appPackageName = app.info.packageName;
                     if (processName.equals(appPackageName)) {
                         continue;
@@ -773,7 +775,7 @@ public class ProcessFreezerManager {
             return false;
         }
 
-        if (state.getCurAdj() <= ProcessList.PERCEPTIBLE_APP_ADJ) {
+        if (state.getCurAdj() <= PERCEPTIBLE_APP_ADJ) {
             boolean hasBoundClient = isBoundClient(app, app.processName, false);
             if (hasBoundClient) {
                 if (mUseDebug) {

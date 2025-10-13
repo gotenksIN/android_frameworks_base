@@ -16,8 +16,6 @@
 
 package com.android.systemui.statusbar.phone;
 
-import static com.android.systemui.Flags.moveTransitionAnimationLayer;
-
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.BroadcastReceiver;
@@ -280,14 +278,6 @@ public class SystemUIDialog extends AlertDialog implements ViewRootImpl.ConfigCh
                 /* backAnimationSpec= */mDelegate.getBackAnimationSpec(
                         () -> targetView.getResources().getDisplayMetrics())
         );
-
-        if (moveTransitionAnimationLayer()) {
-            // Elevation doesn't seem to be useful anymore (there are no more shadows below
-            // dialogs), and it creates a weird flickering behavior due to some obscure Window
-            // Manager treatment. See b/404508609#comment3 for more details.
-            // Note: can be moved to styles.xml once the flag is fully rolled out.
-            getWindow().setElevation(0);
-        }
     }
 
     private void updateWindowSize() {
@@ -475,6 +465,15 @@ public class SystemUIDialog extends AlertDialog implements ViewRootImpl.ConfigCh
     public void dismissWithoutAnimation() {
         mDialogTransitionAnimator.disableAllCurrentDialogsExitAnimations();
         dismiss();
+    }
+
+    /**
+     * Set a dialog's elevation to 0. This is needed for dialogs that are not
+     * {@link SystemUIDialog}, as launching an activity from them will result in a weird flicker if
+     * they have an elevation, due to some legacy inner Window Manager behaviors.
+     */
+    public static void resetElevation(Dialog dialog) {
+        dialog.getWindow().setElevation(0);
     }
 
     public static void setShowForAllUsers(Dialog dialog, boolean show) {

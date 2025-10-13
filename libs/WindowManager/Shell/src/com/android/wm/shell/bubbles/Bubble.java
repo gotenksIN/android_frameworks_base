@@ -402,6 +402,18 @@ public class Bubble implements BubbleViewProvider {
         return b;
     }
 
+    /** Creates an app bubble with a pending intent that can be controlled by a client. */
+    public static Bubble createClientControlledAppBubble(PendingIntent pendingIntent,
+            UserHandle user, @Nullable Icon icon, IBinder clientToken,
+            @ShellMainThread Executor mainExecutor, @ShellBackgroundThread Executor bgExecutor) {
+        Bubble b = new Bubble(pendingIntent, user,
+                getAppBubbleKeyForApp(ComponentUtils.getPackageName(pendingIntent), user),
+                mainExecutor, bgExecutor);
+        b.mIcon = icon;
+        b.mClientToken = clientToken;
+        return b;
+    }
+
     /** Creates a task bubble. */
     public static Bubble createTaskBubble(TaskInfo info, UserHandle user, @Nullable Icon icon,
             @ShellMainThread Executor mainExecutor, @ShellBackgroundThread Executor bgExecutor) {
@@ -798,9 +810,9 @@ public class Bubble implements BubbleViewProvider {
         if (!isInflated()) {
             mIconView = info.imageView;
             mExpandedView = info.expandedView;
-            BubbleLog.d("Bubble.setViewInfo() key=%s setting expanded view info to %s",
-                    mKey, info.bubbleBarExpandedView);
             mBubbleBarExpandedView = info.bubbleBarExpandedView;
+            BubbleLog.d("Bubble.setViewInfo() key=%s setting expanded view info to %s",
+                    mKey, mExpandedView != null ? mExpandedView : mBubbleBarExpandedView);
         }
 
         mShortcutInfo = info.shortcutInfo;

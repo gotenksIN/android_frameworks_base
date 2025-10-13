@@ -37,6 +37,7 @@ import static android.Manifest.permission.MANAGE_DEVICE_POLICY_LOCK_CREDENTIALS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_LOCK_TASK;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_MTE;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_PACKAGE_STATE;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_PROFILE_INTERACTION;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_QUERY_SYSTEM_UPDATES;
@@ -311,6 +312,7 @@ import android.app.admin.DevicePolicyManager.DevicePolicyOperation;
 import android.app.admin.DevicePolicyManager.OperationSafetyReason;
 import android.app.admin.DevicePolicyManager.PasswordComplexity;
 import android.app.admin.DevicePolicyManager.PersonalAppsSuspensionReason;
+import android.app.admin.DevicePolicyManager.PolicyScope;
 import android.app.admin.DevicePolicyManager.ProvisioningPrecondition;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.app.admin.DevicePolicyManagerLiteInternal;
@@ -884,15 +886,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             DevicePolicyManagerService dpms
     ){
         List<PolicyHandler<?>> handlers = new ArrayList<PolicyHandler<?>>();
-
-        handlers.add(
-                new PolicyHandler<Integer>(PolicyIdentifier.SCREEN_CAPTURE) {
-                    @Override
-                    protected void storePolicyValue(
-                            CallerIdentity caller, int scope, Integer value) {
-                        dpms.setScreenCaptureUnchecked(caller, scope, value);
-                    }
-                });
 
         // NEW HANDLERS SHOULD GO IN {@link PolicyHandler.HANDLERS}, NOT HERE!
         //
@@ -2974,14 +2967,46 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         });
     }
 
+    ActiveAdmin getActiveAdminUncheckedLocked(CallerIdentity caller) {
+        return getActiveAdminUncheckedLocked(
+                caller.getComponentName(), caller.getUserId(), caller.getPackageName());
+    }
+
     ActiveAdmin getActiveAdminUncheckedLocked(ComponentName who, int userHandle) {
+        return getActiveAdminUncheckedLocked(who, userHandle, /* packageName= */ null);
+    }
+
+    ActiveAdmin getActiveAdminUncheckedLocked(
+            ComponentName who, int userHandle, String packageName) {
         ensureLocked();
-        ActiveAdmin admin = getUserData(userHandle).mAdminMap.get(who);
-        if (admin != null
-                && who.getPackageName().equals(admin.info.getActivityInfo().packageName)
-                && who.getClassName().equals(admin.info.getActivityInfo().name)) {
-            return admin;
+        final DevicePolicyData policy = getUserData(userHandle);
+
+        // Find ActiveAdmin by component name.
+        ActiveAdmin componentAdmin = (who != null) ? policy.mAdminMap.get(who) : null;
+        if (componentAdmin != null) {
+            ActivityInfo activityInfo = componentAdmin.info.getActivityInfo();
+            if (who.getPackageName().equals(activityInfo.packageName)
+                    && who.getClassName().equals(activityInfo.name)) {
+                return componentAdmin;
+            }
         }
+
+        // Find ActiveAdmin by package name. There must be only one.
+        if (packageName != null) {
+            List<ActiveAdmin> packageAdmins = new ArrayList<>();
+            for (ActiveAdmin admin : policy.mAdminList) {
+                if (admin.info.getPackageName().equals(packageName)) {
+                    packageAdmins.add(admin);
+                }
+            }
+            Preconditions.checkState(
+                    packageAdmins.size() == 1,
+                    String.format(
+                            "There must be exactly one ActiveAdmin for specified package %s",
+                            packageName));
+            return packageAdmins.get(0);
+        }
+
         return null;
     }
 
@@ -16008,9 +16033,12 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         int userId = caller.getUserId();
         synchronized (getLockObject()) {
             if (!isSetStatusBarDisabledCoexistenceEnabled()) {
-                Preconditions.checkCallAuthorization(isUserAffiliatedWithDeviceLocked(userId),
-                        "Admin " + callerPackage
-                                + " is neither the device owner or affiliated user's profile owner.");
+                Preconditions.checkCallAuthorization(
+                        isUserAffiliatedWithDeviceLocked(userId),
+                        "Admin "
+                                + callerPackage
+                                + " is neither the device owner or affiliated user's profile"
+                                + " owner.");
                 if (isManagedProfile(userId)) {
                     throw new SecurityException("Managed profile cannot disable status bar");
                 }
@@ -18407,15 +18435,32 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (!mHasFeature) {
             return;
         }
-        CallerIdentity caller = getCallerIdentity(who);
 
-        Objects.requireNonNull(who, "ComponentName is null");
-        Preconditions.checkCallAuthorization(isDeviceOwner(caller) || isProfileOwner(caller));
+        CallerIdentity caller = null;
+        if (Flags.multiUserManagementDeviceProvisioning()) {
+            caller = getCallerIdentity(who, callerPackageName);
+            Preconditions.checkCallAuthorization(
+                    mPermissions.hasPermission(MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY, caller),
+                    "Permission MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY is required to set the "
+                            + "Organization ID.");
+            Preconditions.checkState(
+                    isDeviceManagedUnchecked() || hasProfileOwner(caller.getUserId()),
+                    "Organization ID can only be set on managed device or profile.");
+        } else {
+            Objects.requireNonNull(who, "ComponentName is null");
+            caller = getCallerIdentity(who);
+            Preconditions.checkCallAuthorization(isDeviceOwner(caller) || isProfileOwner(caller));
+        }
 
         text = PolicySizeVerifier.truncateIfLonger(text, MAX_ORG_NAME_LENGTH);
 
         synchronized (getLockObject()) {
-            ActiveAdmin admin = getProfileOwnerOrDeviceOwnerLocked(caller.getUserId());
+            ActiveAdmin admin = null;
+            if (Flags.multiUserManagementDeviceProvisioning()) {
+                admin = getActiveAdminUncheckedLocked(caller);
+            } else {
+                admin = getProfileOwnerOrDeviceOwnerLocked(caller.getUserId());
+            }
             if (!TextUtils.equals(admin.organizationName, text)) {
                 admin.organizationName = (text == null || text.length() == 0)
                         ? null : text.toString();
@@ -22115,14 +22160,25 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         Objects.requireNonNull(callerPackage);
 
         final CallerIdentity caller = getCallerIdentity(callerPackage);
-        // Only the DPC can set this ID.
-        Preconditions.checkCallAuthorization(isDefaultDeviceOwner(caller) || isProfileOwner(caller),
-                "Only a Device Owner or Profile Owner may set the Enterprise ID.");
+        if (Flags.multiUserManagementDeviceProvisioning()) {
+            Preconditions.checkCallAuthorization(
+                    mPermissions.hasPermission(MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY, caller),
+                    "Permission MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY is required to set the "
+                            + "Organization ID.");
+            Preconditions.checkState(
+                    isDeviceManagedUnchecked() || hasProfileOwner(userId),
+                    "Organization ID can only be set on managed device or profile.");
+        } else {
+            // Only the DPC can set this ID.
+            Preconditions.checkCallAuthorization(
+                    isDefaultDeviceOwner(caller) || isProfileOwner(caller),
+                    "Only a Device Owner or Profile Owner may set the Organization ID.");
+        }
         // Empty enterprise ID must not be provided in calls to this method.
         Preconditions.checkArgument(!TextUtils.isEmpty(organizationId),
-                "Enterprise ID may not be empty.");
+                "Organization ID may not be empty.");
 
-        Slogf.i(LOG_TAG, "Setting Enterprise ID to %s for user %d", organizationId, userId);
+        Slogf.i(LOG_TAG, "Setting Organization ID to %s for user %d", organizationId, userId);
 
         synchronized (mESIDInitilizationLock) {
             if (mEsidCalculator == null) {
@@ -22134,13 +22190,18 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
 
         final String ownerPackage;
         synchronized (getLockObject()) {
-            final ActiveAdmin owner = getDeviceOrProfileOwnerAdminLocked(userId);
+            ActiveAdmin owner = null;
+            if (Flags.multiUserManagementDeviceProvisioning()) {
+                owner = getActiveAdminUncheckedLocked(caller);
+            } else {
+                owner = getDeviceOrProfileOwnerAdminLocked(userId);
+            }
             // As the caller is the system, it must specify the component name of the profile owner
             // as a safety check.
             Preconditions.checkCallAuthorization(
                     owner != null && owner.getUserHandle().getIdentifier() == userId,
-                    String.format("The Profile Owner or Device Owner may only set the Enterprise ID"
-                            + " on its own user, called on user %d but owner user is %d", userId,
+                    String.format("The Profile Owner or Device Owner may only set the Organization"
+                            + " ID on its own user, called on user %d but owner user is %d", userId,
                             owner.getUserHandle().getIdentifier()));
             ownerPackage = owner.info.getPackageName();
             Preconditions.checkState(
@@ -23964,7 +24025,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             return EnforcingAdmin.createDeviceAdminEnforcingAdmin(
                     admin.info.getComponent(), userId);
         }
-        return EnforcingAdmin.createEnforcingAdmin(caller.getPackageName(), userId);
+        return EnforcingAdmin.createRoleEnforcingAdmin(caller.getPackageName(), userId);
     }
 
     private EnforcingAdmin getEnforcingAdminForPackage(@Nullable ComponentName who,
@@ -23986,7 +24047,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 }
             }
         }
-        return EnforcingAdmin.createEnforcingAdmin(packageName, userId);
+        return EnforcingAdmin.createRoleEnforcingAdmin(packageName, userId);
     }
 
     private int getAffectedUser(boolean calledOnParent) {
@@ -25225,41 +25286,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                         acceptedScopes));
     }
 
-    private void setScreenCaptureUnchecked(CallerIdentity caller, int scope, Integer value) {
-        requirePolicyScopeIsOneOf(scope, POLICY_SCOPE_DEVICE, POLICY_SCOPE_USER);
-
-        EnforcingAdmin admin = getEnforcingAdmin(caller);
-        boolean disabled = (value == null || value == PolicyIdentifier.SCREEN_CAPTURE_DISALLOWED);
-
-        switch (scope) {
-            case POLICY_SCOPE_DEVICE:
-                if (disabled) {
-                    mDevicePolicyEngine.setGlobalPolicy(PolicyDefinition.SCREEN_CAPTURE_DISABLED,
-                            admin,
-                            new BooleanPolicyValue(disabled));
-                } else {
-                    mDevicePolicyEngine.removeGlobalPolicy(PolicyDefinition.SCREEN_CAPTURE_DISABLED,
-                            admin);
-                }
-                break;
-            case POLICY_SCOPE_USER:
-                int userId = caller.getUserId();
-                if (disabled) {
-                    mDevicePolicyEngine.setLocalPolicy(PolicyDefinition.SCREEN_CAPTURE_DISABLED,
-                            admin,
-                            new BooleanPolicyValue(disabled), userId);
-                } else {
-                    mDevicePolicyEngine.removeLocalPolicy(PolicyDefinition.SCREEN_CAPTURE_DISABLED,
-                            admin, userId);
-                }
-                break;
-            default:
-                throw new IllegalArgumentException(
-                        "SCREEN_CAPTURE_DISABLED only supports POLICY_SCOPE_DEVICE and "
-                                + "POLICY_SCOPE_USER");
-        }
-    }
-
     class PolicyHandlerDelegate implements PolicyHandler.Delegate {
         @Override
         public @DpcType int getDpcType(@NonNull CallerIdentity caller) {
@@ -25271,11 +25297,60 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         public PermissionChecker getPermissionChecker() {
             return DevicePolicyManagerService.this.mPermissions;
         }
+
+        @Override
+        public <T> void storePolicy(
+                @NonNull CallerIdentity caller,
+                @NonNull PolicyDefinition<T> key,
+                @PolicyScope int scope,
+                @NonNull PolicyValue<T> value) {
+            EnforcingAdmin admin = getEnforcingAdmin(caller);
+
+            Slogf.d(LOG_TAG, "Storing policy %s with scope %d in policy engine", key, scope);
+            switch (scope) {
+                case POLICY_SCOPE_DEVICE:
+                    mDevicePolicyEngine.setGlobalPolicy(key, admin, value);
+                    break;
+                case POLICY_SCOPE_USER:
+                    mDevicePolicyEngine.setLocalPolicy(key, admin, value, caller.getUserId());
+                    break;
+                case POLICY_SCOPE_PARENT_USER:
+                    mDevicePolicyEngine.setLocalPolicy(
+                            key, admin, value, getProfileParentId(caller.getUserId()));
+                    break;
+                default:
+                    throw new IllegalArgumentException("Invalid scope " + scope);
+            }
+        }
+
+        @Override
+        public <T> void clearPolicy(
+                @NonNull CallerIdentity caller,
+                @NonNull PolicyDefinition<T> key,
+                @PolicyScope int scope) {
+            EnforcingAdmin admin = getEnforcingAdmin(caller);
+
+            Slogf.d(LOG_TAG, "Removing policy %s with scope %d from policy engine", key, scope);
+            switch (scope) {
+                case POLICY_SCOPE_DEVICE:
+                    mDevicePolicyEngine.removeGlobalPolicy(key, admin);
+                    break;
+                case POLICY_SCOPE_USER:
+                    mDevicePolicyEngine.removeLocalPolicy(key, admin, caller.getUserId());
+                    break;
+                case POLICY_SCOPE_PARENT_USER:
+                    mDevicePolicyEngine.removeLocalPolicy(
+                            key, admin, getProfileParentId(caller.getUserId()));
+                    break;
+                default:
+                    throw new IllegalArgumentException("Invalid scope " + scope);
+            }
+        }
     }
 
     @Override
-    public void setPolicy(String callerPackageName, String id, int scope,
-            PolicyValueTransport value) {
+    public void setPolicy(
+            String callerPackageName, String id, int scope, PolicyValueTransport value) {
         if (!mHasFeature) {
             return;
         }

@@ -129,7 +129,10 @@ import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_SERVICE;
 import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_SERVICE_EXECUTING;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NAME;
-import static com.android.server.am.ProcessList.UNKNOWN_ADJ;
+import static com.android.server.am.psc.Constants.INVALID_ADJ;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_BACKGROUND;
+import static com.android.server.am.psc.Constants.UNKNOWN_ADJ;
+import static com.android.server.am.psc.Constants.VISIBLE_APP_ADJ;
 
 import android.Manifest;
 import android.annotation.IntDef;
@@ -1055,7 +1058,7 @@ public final class ActiveServices {
                         + " (pid=" + callingPid
                         + ") when starting service " + service);
             }
-            callerFg = callerApp.getSetSchedGroup() != ProcessList.SCHED_GROUP_BACKGROUND;
+            callerFg = callerApp.getSetSchedGroup() != SCHED_GROUP_BACKGROUND;
         } else {
             callerFg = true;
         }
@@ -4353,7 +4356,7 @@ public final class ActiveServices {
                     + ") set BIND_SIMULATE_ALLOW_FREEZE when binding service " + service);
         }
 
-        final boolean callerFg = callerApp.getSetSchedGroup() != ProcessList.SCHED_GROUP_BACKGROUND;
+        final boolean callerFg = callerApp.getSetSchedGroup() != SCHED_GROUP_BACKGROUND;
         final boolean isBindExternal =
                 (flags & Integer.toUnsignedLong(Context.BIND_EXTERNAL_SERVICE)) != 0
                 || (flags & Context.BIND_EXTERNAL_SERVICE_LONG) != 0;
@@ -4999,7 +5002,7 @@ public final class ActiveServices {
                         for (int i=b.apps.size()-1; i>=0; i--) {
                             ProcessRecord client = b.apps.valueAt(i).client;
                             if (client != null && client.getSetSchedGroup()
-                                    != ProcessList.SCHED_GROUP_BACKGROUND) {
+                                    != SCHED_GROUP_BACKGROUND) {
                                 inFg = true;
                                 break;
                             }
@@ -6059,7 +6062,7 @@ public final class ActiveServices {
                 boolean isPersistent
                         = !((r.serviceInfo.applicationInfo.flags&ApplicationInfo.FLAG_PERSISTENT) == 0);
                 if (pRec != null)
-                    isVisible = ((pRec.mProfile.getCurRawAdj()) ==  ProcessList.VISIBLE_APP_ADJ);
+                    isVisible = ((pRec.mProfile.getCurRawAdj()) ==  VISIBLE_APP_ADJ);
                 if(top_rc != null) {
                     if(top_rc.launching && !r.shortInstanceName.contains(top_rc.packageName)
                         && !isPersistent && !r.isForeground() && !isVisible) {
@@ -7585,7 +7588,7 @@ public final class ActiveServices {
     boolean bringDownDisabledPackageServicesLocked(String packageName, Set<String> filterByClasses,
             int userId, boolean evenPersistent, boolean fullStop, boolean doit) {
         return bringDownDisabledPackageServicesLocked(packageName, filterByClasses, userId,
-                evenPersistent, fullStop, doit, ProcessList.INVALID_ADJ);
+                evenPersistent, fullStop, doit, INVALID_ADJ);
     }
 
     boolean bringDownDisabledPackageServicesLocked(String packageName, Set<String> filterByClasses,

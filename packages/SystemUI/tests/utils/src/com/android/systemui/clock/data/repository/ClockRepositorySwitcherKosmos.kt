@@ -16,8 +16,16 @@
 
 package com.android.systemui.clock.data.repository
 
+import com.android.systemui.demomode.domain.interactor.demoModeInteractor
 import com.android.systemui.kosmos.Kosmos
-import com.android.systemui.statusbar.policy.nextAlarmController
+import com.android.systemui.kosmos.backgroundScope
 
-var Kosmos.clockRepository: ClockRepository by
-    Kosmos.Fixture { ClockRepository(nextAlarmController) }
+var Kosmos.clockRepositorySwitcher: ClockRepositorySwitcher by
+    Kosmos.Fixture {
+        ClockRepositorySwitcher(
+            scope = backgroundScope,
+            clockRepositoryImpl = clockRepositoryImpl,
+            demoClockRepository = demoClockRepository,
+            demoModeInteractor = demoModeInteractor,
+        )
+    }

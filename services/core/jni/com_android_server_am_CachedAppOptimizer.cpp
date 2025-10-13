@@ -547,6 +547,32 @@ static void com_android_server_am_CachedAppOptimizer_compactSystemWithMemcg(JNIE
     inSystemCompaction = false;
 }
 
+static void com_android_server_am_CachedAppOptimizer_vendorCompactAll(JNIEnv *, jobject) {
+    std::unique_ptr<DIR, decltype(&closedir)> proc(opendir("/proc"), closedir);
+    struct dirent* current;
+
+    inSystemCompaction = true;
+
+    while ((current = readdir(proc.get()))) {
+        if (current->d_type != DT_DIR) {
+            continue;
+        }
+
+        // don't compact system_server, rely on persistent compaction during screen off
+        // in order to avoid mmap_sem-related stalls
+        if (atoi(current->d_name) == getpid()) {
+            continue;
+        }
+
+        int pid = atoi(current->d_name);
+
+        if (pid > 0) {
+            compactProcess(pid, COMPACT_ACTION_ANON_FLAG | COMPACT_ACTION_FILE_FLAG);
+        }
+    }
+    inSystemCompaction = false;
+}
+
 static void com_android_server_am_CachedAppOptimizer_cancelCompaction(JNIEnv*, jobject) {
     cancelRunningCompaction.store(true);
     ATRACE_INSTANT_FOR_TRACK(ATRACE_COMPACTION_TRACK, "Cancel compaction");
@@ -724,6 +750,8 @@ static const JNINativeMethod sMethods[] = {
         {"compactSystem", "()V", (void*)com_android_server_am_CachedAppOptimizer_compactSystem},
         {"compactSystemWithMemcg", "()V",
          (void*)com_android_server_am_CachedAppOptimizer_compactSystemWithMemcg},
+        {"vendorCompactAll", "()V",
+         (void*)com_android_server_am_CachedAppOptimizer_vendorCompactAll},
         {"compactProcess", "(II)V",
          (void*)com_android_server_am_CachedAppOptimizer_compactNativeProcess},
         {"performNativeMemcgCompaction", "(III)V",

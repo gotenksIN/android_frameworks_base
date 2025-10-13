@@ -47,10 +47,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-import java.util.HashMap;
-import java.util.Map;
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
 
 /**
  * <p>WiredAccessoryManager monitors for a wired headset on the main board or dock using
@@ -76,34 +72,8 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
     private static final String NAME_H2W = "h2w";
     private static final String NAME_USB_AUDIO = "usb_audio";
     private static final String NAME_HDMI_AUDIO = "hdmi_audio";
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-    private static final String NAME_DP_AUDIO = "soc:qcom,msm-ext-disp";
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-    // within a device, a single stream supports DP
-    private static final String[] DP_AUDIO_CONNS = {
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-                                                     NAME_DP_AUDIO + "/3/1",
-                                                     NAME_DP_AUDIO + "/2/1",
-                                                     NAME_DP_AUDIO + "/1/1",
-                                                     NAME_DP_AUDIO + "/0/1",
-// QTI_END: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-// QTI_BEGIN: 2021-06-17: Core: WiredAccessoryManager: Update display port device index
-                                                     NAME_DP_AUDIO + "/3/0",
-                                                     NAME_DP_AUDIO + "/2/0",
-// QTI_END: 2021-06-17: Core: WiredAccessoryManager: Update display port device index
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                                                     NAME_DP_AUDIO + "/1/0",
-                                                     NAME_DP_AUDIO + "/0/0"
-                                                   };
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-
-// QTI_BEGIN: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
     private static final String NAME_HDMI = "hdmi";
-    private static final String INTF_DP = "DP";
-    private static final String INTF_HDMI = "HDMI";
-// QTI_END: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
+
     private static final int MSG_NEW_DEVICE_STATE = 1;
     private static final int MSG_SYSTEM_READY = 2;
 
@@ -113,12 +83,7 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
     private final AudioManager mAudioManager;
 
     private int mHeadsetState;
-// QTI_BEGIN: 2019-08-06: Core: WiredAccessoryManager: support for multiple display ports
-    private int mDpCount;
-// QTI_END: 2019-08-06: Core: WiredAccessoryManager: support for multiple display ports
-// QTI_BEGIN: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-    private String mDetectedIntf = INTF_DP;
-// QTI_END: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
+
     private int mSwitchValues;
 
     private final WiredAccessoryObserver mObserver;
@@ -127,12 +92,19 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
     private final boolean mUseDevInputEventForAudioJack;
 
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
     private static final int MAX_DP_COUNT = 2;
-    private boolean []streamsInUse = new boolean[MAX_DP_COUNT];
-    private Map<String, Integer > streamIndexMap = new HashMap();
+    private static final String INTF_DP = "DP";
+    private static final String INTF_HDMI = "HDMI";
+    private int mDpCount;
+    private String mDetectedIntf = INTF_DP;
+    private static final String NAME_DP_AUDIO = "soc:qcom,msm-ext-disp";
+    private static final String[] DP_AUDIO_CONNS = {
+                                                     NAME_DP_AUDIO + "/3/0",
+                                                     NAME_DP_AUDIO + "/2/0",
+                                                     NAME_DP_AUDIO + "/1/0",
+                                                     NAME_DP_AUDIO + "/0/0"
+                                                   };
 
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
     public WiredAccessoryManager(Context context, InputManagerService inputManager) {
         PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WiredAccessoryManager");
@@ -593,22 +565,18 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                 }
             }
 
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
+
+            int streamIndex = MAX_DP_COUNT - 1;
             for (String conn : DP_AUDIO_CONNS) {
                 // Monitor DisplayPort
                 uei = new UEventInfo(conn, BIT_HDMI_AUDIO, 0, 0);
                 if (uei.checkSwitchExists()) {
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
+                    uei.setStreamIndex(streamIndex);
+                    streamIndex--;
                     Slog.i(TAG, "Adding " + conn + " with " + uei.toString() + " to monitor list");
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
                     retVal.add(uei);
                 }
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
             }
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
             return retVal;
         }
 
@@ -712,62 +680,19 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             }
         }
 
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-        private int getStreamIndex(String devPath) {
-            // find first valid stream index
-            for (int i =0; i < MAX_DP_COUNT; i++) {
-                if (!streamsInUse[i]) {
-                    streamsInUse[i] = true;
-                    Slog.v(TAG, "getStreamIndex for " + devPath + " got " + i);
-                    streamIndexMap.put(devPath, i);
-                    return i;
-                }
-            }
-            return 0;
-        }
-
-        private void removeDevice(String devPath) {
-            if (streamIndexMap.containsKey(devPath)) {
-                int index = streamIndexMap.get(devPath);
-                streamsInUse[index] = false;
-                streamIndexMap.remove(devPath);
-                Slog.v(TAG, "removeDevice for " + devPath + " for stream " + index);
-            }
-        }
-
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
         private void updateStateLocked(String devPath, String name, int state) {
             for (int i = 0; i < mUEventInfo.size(); ++i) {
                 UEventInfo uei = mUEventInfo.get(i);
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                Slog.v(TAG, "uei.getDevPath=" + uei.getDevPath() + " uei=" + uei.toString());
-                Slog.v(TAG, "uevent.devPath=" + devPath + ";name=" + name + ";state=" + state);
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-
                 if (devPath.equals(uei.getDevPath())) {
-// QTI_BEGIN: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
+                    Slog.v(TAG, "uei.getDevPath=" + uei.getDevPath() + " uei=" + uei.toString());
                     if (state == 1) {
-// QTI_END: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                        int stream = getStreamIndex(devPath);
-                        Slog.v(TAG, "devPath" + devPath + ";stream=" + stream);
-                        uei.setStreamIndex(stream);
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-                        int newControllerIdx = (mDetectedIntf.equals(INTF_DP)) ? 0 : 1;
-                        uei.setCableIndex(newControllerIdx);
+                        int controller = mDetectedIntf.equals(INTF_DP) ? 0 : 1;
+                        uei.setController(controller);
                     }
-// QTI_END: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
                     updateLocked(name,
                                  uei.getDevAddress(),
                                  uei.computeNewHeadsetState(mHeadsetState, state),
                                  false /*isSynchronous*/);
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-
-                    if (state == 0) {
-                        removeDevice(devPath);
-                    }
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
                     return;
                 }
             }
@@ -775,32 +700,29 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
         private final class UEventInfo {
             private final String mDevName;
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-            private String mDevAddress;
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
             private final int mState1Bits;
             private final int mState2Bits;
             private final int mStateNbits;
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
+
+            private String mDevAddress;
             private int mDevIndex;
             private int mCableIndex;
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
+            private int mStream;
+            private int mController;
 
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
             public UEventInfo(String devName, int state1Bits,
                               int state2Bits, int stateNbits) {
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
+
                 mDevName = devName;
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                mDevAddress = "controller=0;stream=0";
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
                 mState1Bits = state1Bits;
                 mState2Bits = state2Bits;
                 mStateNbits = stateNbits;
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
+
+                mDevAddress = "controller=0;stream=0";
                 mDevIndex = -1;
                 mCableIndex = -1;
-
+                mStream = 0;
+                mController = 0;
                 if (mDevName.startsWith(NAME_DP_AUDIO)) {
                     int idx = mDevName.indexOf("/");
                     if (idx != -1) {
@@ -810,259 +732,37 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                         int cable = Integer.parseInt(mDevName.substring(idx2+1));
                         checkDevIndex(dev);
                         checkCableIndex(cable);
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                        if (LOG) {
-                            Slog.v(TAG, "UEventInfo name" + mDevName + "mDevAddress=" + mDevAddress
-                                        + "mDevIndex="+ mDevIndex + "mCableIndex="+mCableIndex);
-                        }
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                    }
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                }
-            }
-
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-            private void checkDevIndex(int dev_index) {
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                int index = 0;
-                char[] buffer = new char[1024];
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                while (true) {
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                    String devPath = String.format(Locale.US,
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-04-26: Core: WiredAccessoryManager: update extcon file paths
-                          "/sys/devices/platform/soc/%s/extcon/extcon%d/name",
-// QTI_END: 2018-04-26: Core: WiredAccessoryManager: update extcon file paths
-// QTI_BEGIN: 2021-07-20: Core: WiredAccessoryManager: use dev index from UEventInfo to form devPath
-                                                   NAME_DP_AUDIO, dev_index);
-// QTI_END: 2021-07-20: Core: WiredAccessoryManager: use dev index from UEventInfo to form devPath
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                    if (LOG) {
-                        Slog.v(TAG, "checkDevIndex " + devPath);
-                    }
-                    File f = new File(devPath);
-                    if (!f.exists()) {
-                        Slog.e(TAG, "file " + devPath + " not found");
-                        break;
-                    }
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                    try {
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                        FileReader file = new FileReader(f);
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                        int len = file.read(buffer, 0, 1024);
-                        file.close();
-
-                        String devName = (new String(buffer, 0, len)).trim();
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                        if (devName.startsWith(NAME_DP_AUDIO) && index == dev_index) {
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                            Slog.e(TAG, "set dev_index " + dev_index + " devPath " + devPath);
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                            mDevIndex = dev_index;
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                            break;
-                        } else {
-                            index++;
-                        }
-                    } catch (Exception e) {
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                        Slog.e(TAG, "checkDevIndex exception " , e);
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                        break;
                     }
                 }
             }
 
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-            private void checkCableIndex(int cable_index) {
-                if (mDevIndex == -1) {
-                    return;
-                }
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                int index = 0;
-                char[] buffer = new char[1024];
-                while (true)
-                {
-                    String cablePath = String.format(Locale.US,
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-04-26: Core: WiredAccessoryManager: update extcon file paths
-                        "/sys/devices/platform/soc/%s/extcon/extcon%d/cable.%d/name",
-// QTI_END: 2018-04-26: Core: WiredAccessoryManager: update extcon file paths
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                                                     NAME_DP_AUDIO, mDevIndex, index);
-                    if (LOG) {
-                        Slog.v(TAG, "checkCableIndex " + cablePath);
-                    }
-                    File f = new File(cablePath);
-                    if (!f.exists()) {
-                        Slog.e(TAG, "file " + cablePath + " not found");
-                        break;
-                    }
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                    try {
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                        FileReader file = new FileReader(f);
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                        int len = file.read(buffer, 0, 1024);
-                        file.close();
-
-                        String cableName = (new String(buffer, 0, len)).trim();
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-                        if (cableName.equals("HDMI") && index == cable_index) {
-                            mCableIndex = index;
-// QTI_END: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                            Slog.i(TAG, "checkCableIndex set cable for HDMI " + cable_index +
-                                        " cable " + cablePath);
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-                            break;
-                        } else if (cableName.equals("DP") && index == cable_index) {
-// QTI_END: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                            mCableIndex = index;
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                            Slog.i(TAG, "checkCableIndex set cable for DP " + cable_index +
-                                        " cable " + cablePath);
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                            break;
-                        } else {
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                            Slog.i(TAG, "checkCableIndex no name match, skip for cable " +
-                                        cablePath);
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                            index++;
-                        }
-                    } catch (Exception e) {
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-                        Slog.e(TAG, "checkCableIndex exception", e);
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-                        break;
-                    }
-                }
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-            }
-
-// QTI_BEGIN: 2021-08-04: Core: WiredAccessoryManager: Update stream index assignment
-            public void setStreamIndex(int streamIndex) {
-// QTI_END: 2021-08-04: Core: WiredAccessoryManager: Update stream index assignment
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                String devAddress = mDevAddress;
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2021-08-04: Core: WiredAccessoryManager: Update stream index assignment
-                int index1 = mDevAddress.indexOf("=");
-                int index2 = mDevAddress.indexOf("=", index1 + 1);
-
-                String allExceptStreamIdx = mDevAddress.substring(0, index2 + 1);
-                mDevAddress = allExceptStreamIdx + String.valueOf(streamIndex);
-// QTI_END: 2021-08-04: Core: WiredAccessoryManager: Update stream index assignment
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                Slog.i(TAG, "setStreamIndex streamIndex" + streamIndex + " devAddress " +
-                            devAddress + " updated to " + mDevAddress);
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2021-08-04: Core: WiredAccessoryManager: Update stream index assignment
-            }
-
-// QTI_END: 2021-08-04: Core: WiredAccessoryManager: Update stream index assignment
-// QTI_BEGIN: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-            public void setCableIndex(int cableIndex) {
-                int index = mDevAddress.indexOf("=");
-// QTI_END: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                String devAddress = mDevAddress;
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-                String changeControllerIdx = mDevAddress.substring(0, index + 1) + cableIndex
-                                              + mDevAddress.substring(index + 2);
-                mDevAddress = changeControllerIdx;
-// QTI_END: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-                Slog.i(TAG, "setCableIndex cableIndex" + cableIndex + " devAddress " +
-                            devAddress + " updated to " + mDevAddress);
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
-// QTI_BEGIN: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
-            }
-
-// QTI_END: 2023-06-16: Core: WiredAccessoryManager: support for DP/HDMI display on soc:qcom,msm-ext-disp.
             public String getDevName() {
                 return mDevName;
             }
 
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-            public String getDevAddress() { return mDevAddress; }
-
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
             public String getDevPath() {
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
                 if (mDevName.startsWith(NAME_DP_AUDIO)) {
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
                     return String.format(Locale.US,
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
                                          "/devices/platform/soc/%s/extcon/extcon%d",
                                          NAME_DP_AUDIO,
                                          mDevIndex);
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
                 } else {
                     return String.format(Locale.US,
                                      "/devices/virtual/switch/%s",
                                      mDevName);
                 }
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
             }
 
             public String getSwitchStatePath() {
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
                 if (mDevName.startsWith(NAME_DP_AUDIO)) {
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
                     return String.format(Locale.US,
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
-// QTI_BEGIN: 2018-04-26: Core: WiredAccessoryManager: update extcon file paths
                            "/sys/devices/platform/soc/%s/extcon/extcon%d/cable.%d/state",
-// QTI_END: 2018-04-26: Core: WiredAccessoryManager: update extcon file paths
-// QTI_BEGIN: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
                            NAME_DP_AUDIO, mDevIndex, mCableIndex);
-// QTI_END: 2018-06-18: Core: WiredAccessoryManager: Support for multiple extconn devices
-// QTI_BEGIN: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
                 } else {
                     return String.format(Locale.US,
                                     "/sys/class/switch/%s/state",
                                     mDevName);
                 }
-// QTI_END: 2018-03-22: Core: WiredAccessoryManager: Add support for DisplayPort Audio
             }
 
             public boolean checkSwitchExists() {
@@ -1078,16 +778,90 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
                 return ((headsetState & preserveMask) | setBits);
             }
-// QTI_BEGIN: 2024-05-27: Core: base: Fix stream value for Multi DP connections
 
-            public String toString() {
-                return "UEventInfo " +
-                       " name=" + mDevName +
-                       " mDevAddress=" + mDevAddress +
-                       " mDevIndex=" + mDevIndex +
-                       " mCableIndex=" + mCableIndex;
+
+    public String getDevAddress() { return mDevAddress; }
+
+    private void checkDevIndex(int index) {
+        char[] buffer = new char[1024];
+        String devPath = String.format(Locale.US,
+            "/sys/devices/platform/soc/%s/extcon/extcon%d/name",
+            NAME_DP_AUDIO, index);
+
+
+        File f = new File(devPath);
+        if (!f.exists()) {
+            Slog.e(TAG, "file " + devPath + " not found");
+            return;
+        }
+
+        try (FileReader file = new FileReader(f)) {
+            int len = file.read(buffer, 0, 1024);
+            String devName = (new String(buffer, 0, len)).trim();
+
+            if (devName.startsWith(NAME_DP_AUDIO)) {
+                Slog.e(TAG, "set mDevIndex " + index + " devPath " + devPath);
+                mDevIndex = index;
             }
-// QTI_END: 2024-05-27: Core: base: Fix stream value for Multi DP connections
+        } catch (Exception e) {
+            Slog.e(TAG, "checkDevIndex exception ", e);
+        }
+    }
+
+    private void checkCableIndex(int cable_index) {
+        if (mDevIndex == -1) {
+            return;
+        }
+
+        char[] buffer = new char[1024];
+        String cablePath = String.format(Locale.US,
+            "/sys/devices/platform/soc/%s/extcon/extcon%d/cable.%d/name",
+            NAME_DP_AUDIO, mDevIndex, cable_index);
+
+        if (LOG) {
+            Slog.v(TAG, "checkCableIndex " + cablePath);
+        }
+
+        File f = new File(cablePath);
+        if (!f.exists()) {
+            Slog.e(TAG, "file " + cablePath + " not found");
+            return;
+        }
+
+        try (FileReader file = new FileReader(f)) {
+            int len = file.read(buffer, 0, 1024);
+            String cableName = (new String(buffer, 0, len)).trim();
+
+            if ("HDMI".equals(cableName) || "DP".equals(cableName)) {
+                mCableIndex = cable_index;
+                Slog.i(TAG, "checkCableIndex set cable for " + cableName + " " + cable_index +
+                            " cable " + cablePath);
+            } else {
+                Slog.i(TAG, "checkCableIndex no name match, skip for cable " + cablePath);
+            }
+        } catch (Exception e) {
+            Slog.e(TAG, "checkCableIndex exception", e);
+        }
+    }
+
+
+    public void setStreamIndex(int streamIndex) {
+        mStream = streamIndex;
+        mDevAddress = String.format("controller=%d;stream=%d", mController, mStream);
+    }
+
+
+    public void setController(int controller) {
+        mController = controller;
+        mDevAddress = String.format("controller=%d;stream=%d", mController, mStream);
+    }
+
+    public String toString() {
+        return "UEventInfo " +
+                " name=" + mDevName +
+                " mDevAddress=" + mDevAddress;
+        }
+
         }
     }
 

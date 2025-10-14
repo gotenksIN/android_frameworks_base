@@ -23,7 +23,6 @@ import static android.Manifest.permission.READ_HANDOFF_SETTINGS;
 
 import android.annotation.EnforcePermission;
 import android.annotation.NonNull;
-import android.companion.AssociationInfo;
 import android.companion.datatransfer.continuity.IHandoffRequestCallback;
 import android.companion.datatransfer.continuity.ITaskContinuityManager;
 import android.companion.datatransfer.continuity.IRemoteTaskListener;
@@ -34,17 +33,8 @@ import android.os.Binder;
 import android.util.Slog;
 
 import com.android.server.companion.datatransfer.continuity.connectivity.TaskContinuityMessenger;
-import com.android.server.companion.datatransfer.continuity.handoff.InboundHandoffRequestController;
-import com.android.server.companion.datatransfer.continuity.handoff.OutboundHandoffRequestController;
-import com.android.server.companion.datatransfer.continuity.messages.ContinuityDeviceConnected;
-import com.android.server.companion.datatransfer.continuity.messages.HandoffRequestMessage;
-import com.android.server.companion.datatransfer.continuity.messages.HandoffRequestResultMessage;
-import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskAddedMessage;
-import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskRemovedMessage;
-import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskUpdatedMessage;
-import com.android.server.companion.datatransfer.continuity.messages.TaskContinuityMessage;
-import com.android.server.companion.datatransfer.continuity.tasks.RemoteTaskStore;
-import com.android.server.companion.datatransfer.continuity.tasks.TaskBroadcaster;
+import com.android.server.companion.datatransfer.continuity.tasks.TaskSyncController;
+import com.android.server.companion.datatransfer.continuity.handoff.HandoffController;
 
 import com.android.server.SystemService;
 
@@ -56,35 +46,29 @@ import java.util.Objects;
  *
  * @hide
  */
-public final class TaskContinuityManagerService extends SystemService
-        implements TaskContinuityMessenger.Listener {
+public final class TaskContinuityManagerService extends SystemService {
 
     private static final String TAG = "TaskContinuityManagerService";
 
-    private InboundHandoffRequestController mInboundHandoffRequestController;
-    private OutboundHandoffRequestController mOutboundHandoffRequestController;
+    private TaskSyncController mTaskSyncController;
+    private HandoffController mHandoffController;
     private TaskContinuityManagerServiceImpl mTaskContinuityManagerService;
-    private TaskBroadcaster mTaskBroadcaster;
     private TaskContinuityMessenger mTaskContinuityMessenger;
-    private RemoteTaskStore mRemoteTaskStore;
 
     public TaskContinuityManagerService(Context context) {
         super(context);
 
         mTaskContinuityMessenger = new TaskContinuityMessenger(context);
-        mTaskBroadcaster = new TaskBroadcaster(context, mTaskContinuityMessenger);
-        mRemoteTaskStore = new RemoteTaskStore();
-        mOutboundHandoffRequestController =
-                new OutboundHandoffRequestController(
-                        context, mTaskContinuityMessenger, mRemoteTaskStore);
-        mInboundHandoffRequestController =
-                new InboundHandoffRequestController(mTaskContinuityMessenger);
+        mTaskSyncController = new TaskSyncController(context, mTaskContinuityMessenger);
+        mHandoffController =
+                new HandoffController(context, mTaskContinuityMessenger, mTaskSyncController);
     }
 
     @Override
     public void onStart() {
         mTaskContinuityManagerService = new TaskContinuityManagerServiceImpl();
-        mTaskContinuityMessenger.addListener(this);
+        mTaskSyncController.enable();
+        mHandoffController.enable();
         publishBinderService(Context.TASK_CONTINUITY_SERVICE, mTaskContinuityManagerService);
     }
 
@@ -93,16 +77,14 @@ public final class TaskContinuityManagerService extends SystemService
         @EnforcePermission(READ_REMOTE_TASKS)
         public void registerRemoteTaskListener(@NonNull IRemoteTaskListener listener) {
             registerRemoteTaskListener_enforcePermission();
-            Objects.requireNonNull(listener);
-            mRemoteTaskStore.addListener(listener);
+            mTaskSyncController.registerTaskListener(Objects.requireNonNull(listener));
         }
 
         @Override
         @EnforcePermission(READ_REMOTE_TASKS)
         public void unregisterRemoteTaskListener(@NonNull IRemoteTaskListener listener) {
             unregisterRemoteTaskListener_enforcePermission();
-            Objects.requireNonNull(listener);
-            mRemoteTaskStore.removeListener(listener);
+            mTaskSyncController.unregisterTaskListener(Objects.requireNonNull(listener));
         }
 
         @Override
@@ -115,8 +97,7 @@ public final class TaskContinuityManagerService extends SystemService
 
             final long ident = Binder.clearCallingIdentity();
             try {
-                mOutboundHandoffRequestController.requestHandoff(
-                        associationId, remoteTaskId, callback);
+                mHandoffController.requestHandoff(associationId, remoteTaskId, callback);
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
@@ -146,60 +127,6 @@ public final class TaskContinuityManagerService extends SystemService
             unregisterHandoffFeatureStateListener_enforcePermission();
 
             // TODO: Implement this method.
-        }
-    }
-
-    @Override
-    public void onAssociationConnected(@NonNull AssociationInfo associationInfo) {
-        Objects.requireNonNull(associationInfo);
-
-        mRemoteTaskStore.addDevice(
-                associationInfo.getId(), associationInfo.getDisplayName().toString());
-
-        mTaskBroadcaster.onDeviceConnected(associationInfo.getId());
-    }
-
-    @Override
-    public void onAssociationDisconnected(
-            int associationId, @NonNull Collection<AssociationInfo> connectedAssociations) {
-
-        Objects.requireNonNull(connectedAssociations);
-
-        mRemoteTaskStore.removeDevice(associationId);
-        if (connectedAssociations.isEmpty()) {
-            mTaskBroadcaster.onAllDevicesDisconnected();
-        }
-    }
-
-    @Override
-    public void onMessageReceived(
-            int associationId, @NonNull TaskContinuityMessage taskContinuityMessage) {
-
-        Slog.v(TAG, "Received message from association id: " + associationId);
-        switch (Objects.requireNonNull(taskContinuityMessage)) {
-            case ContinuityDeviceConnected continuityDeviceConnected:
-                mRemoteTaskStore.setTasks(associationId, continuityDeviceConnected.remoteTasks());
-                break;
-            case RemoteTaskAddedMessage remoteTaskAddedMessage:
-                mRemoteTaskStore.addTask(associationId, remoteTaskAddedMessage.task());
-                break;
-            case RemoteTaskRemovedMessage remoteTaskRemovedMessage:
-                mRemoteTaskStore.removeTask(associationId, remoteTaskRemovedMessage.taskId());
-                break;
-            case RemoteTaskUpdatedMessage remoteTaskUpdatedMessage:
-                mRemoteTaskStore.updateTask(associationId, remoteTaskUpdatedMessage.task());
-                break;
-            case HandoffRequestResultMessage handoffRequestResultMessage:
-                mOutboundHandoffRequestController.onHandoffRequestResultMessageReceived(
-                        associationId, handoffRequestResultMessage);
-                break;
-            case HandoffRequestMessage handoffRequestMessage:
-                mInboundHandoffRequestController.onHandoffRequestMessageReceived(
-                        associationId, handoffRequestMessage);
-                break;
-            default:
-                Slog.w(TAG, "Received unknown message from device: " + associationId);
-                break;
         }
     }
 }

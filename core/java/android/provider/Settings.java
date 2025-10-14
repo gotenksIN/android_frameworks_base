@@ -13972,6 +13972,13 @@ public final class Settings {
         public static final String AIRPLANE_MODE_ON = "airplane_mode_on";
 
         /**
+         * Whether Airplane Mode should be synced across devices.
+         * (0 disabled, 1 - enabled)
+         * @hide
+         */
+        public static final String AIRPLANE_MODE_SYNC = "airplane_mode_sync";
+
+        /**
          * Whether Theater Mode is on.
          * @hide
          */
@@ -17583,6 +17590,16 @@ public final class Settings {
         public static final String ANGLE_DEBUG_PACKAGE = "angle_debug_package";
 
         /**
+         * List of package names that should not use ANGLE unless explicitly opted in by users.
+         * This is not a list of installed packages on the device, but a dynamic list of denied
+         * names set through adb commands or server config push.
+         *
+         * @hide
+         */
+        @Readable
+        public static final String ANGLE_DYNAMIC_DENYLIST = "angle_dynamic_denylist";
+
+        /**
          * Force all PKGs to use ANGLE, regardless of any other settings
          * The value is a boolean (1 or 0).
          * @hide
@@ -19155,17 +19172,6 @@ public final class Settings {
                 "hearing_device_local_notification";
 
         /**
-         * This defines the order in which the 3-button navigation bar's buttons are displayed.
-         * 0 = left-to-right (back, home, recent)
-         * 1 = right-to-left (recent, home, back)
-         * @hide
-         * @deprecated Use
-         * {@link Secure#NAVIGATIONBAR_KEY_ORDER} instead.
-         */
-        @Deprecated
-        public static final String NAVIGATIONBAR_KEY_ORDER = "navigationbar_key_order";
-
-        /**
          * Global settings that shouldn't be persisted.
          *
          * @hide
@@ -19213,7 +19219,6 @@ public final class Settings {
             MOVED_TO_SECURE.add(Global.BUGREPORT_IN_POWER_MENU);
             MOVED_TO_SECURE.add(Global.CUSTOM_BUGREPORT_HANDLER_APP);
             MOVED_TO_SECURE.add(Global.CUSTOM_BUGREPORT_HANDLER_USER);
-            MOVED_TO_SECURE.add(Global.NAVIGATIONBAR_KEY_ORDER);
         }
 
         // Certain settings have been moved from global to the per-user system namespace

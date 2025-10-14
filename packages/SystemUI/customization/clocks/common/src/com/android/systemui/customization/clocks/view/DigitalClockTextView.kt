@@ -33,6 +33,7 @@ import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.animation.Interpolator
 import android.view.animation.PathInterpolator
 import android.widget.TextView
+import androidx.core.graphics.withSave
 import com.android.app.animation.Interpolators
 import com.android.internal.annotations.VisibleForTesting
 import com.android.systemui.Flags.clockFidgetAnimation
@@ -48,7 +49,6 @@ import com.android.systemui.customization.clocks.FontTextStyle
 import com.android.systemui.customization.clocks.FontTextStyleImpl
 import com.android.systemui.customization.clocks.TextStyle
 import com.android.systemui.customization.clocks.utils.CanvasUtils.translate
-import com.android.systemui.customization.clocks.utils.CanvasUtils.use
 import com.android.systemui.customization.clocks.utils.PaintUtils.getTextBounds
 import com.android.systemui.customization.clocks.utils.ViewUtils.measuredSize
 import com.android.systemui.plugins.keyguard.VPoint
@@ -57,7 +57,7 @@ import com.android.systemui.plugins.keyguard.VPointF.Companion.max
 import com.android.systemui.plugins.keyguard.VRectF
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockAxisStyle
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockViewIds
-import java.lang.Thread
+import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -164,7 +164,7 @@ abstract class DigitalClockTextView(private val clockCtx: ClockContext) :
     var horizontalAlignment: HorizontalAlignment = HorizontalAlignment.CENTER
 
     private val xAlignment: XAlignment
-        get() = horizontalAlignment.resolveXAlignment(this)
+        get() = horizontalAlignment.resolveXAlignment((parent as? View) ?: this)
 
     val isAnimationEnabled: Boolean
         get() = clockCtx.isAnimationEnabled
@@ -184,6 +184,7 @@ abstract class DigitalClockTextView(private val clockCtx: ClockContext) :
         private set
 
     init {
+        maxLines = 1
         layoutParams = ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT)
     }
 
@@ -317,15 +318,25 @@ abstract class DigitalClockTextView(private val clockCtx: ClockContext) :
             } ?: setInterpolatedLocation(measureSize)
         }
 
-        canvas.use {
-            digitTranslateAnimator?.apply { canvas.translate(currentTranslation) }
-            if (isVertical) {
-                canvas.translate(0f, measuredHeight.toFloat())
-                canvas.rotate(-90f)
+        canvas.withSave {
+            if (layout != null) {
+                val layoutRect = layout.computeDrawingBoundingBox()
+                // TODO(b/450350391): This correction is about right, but very weird
+                if (layoutRect.left > 10000f) {
+                    val offset = if (isVertical) interpBounds.top else interpBounds.left
+                    translate(layoutRect.left - offset, 0f)
+                }
             }
+
+            digitTranslateAnimator?.apply { translate(currentTranslation) }
+            if (isVertical) {
+                translate(0f, measuredHeight.toFloat())
+                rotate(-90f)
+            }
+
             val drawTranslation = getDrawTranslation(interpBounds)
-            canvas.translate(drawTranslation)
-            drawAnimators(canvas, drawTranslation)
+            translate(drawTranslation)
+            drawAnimators(this, drawTranslation)
         }
     }
 
@@ -491,15 +502,16 @@ abstract class DigitalClockTextView(private val clockCtx: ClockContext) :
             )
 
         return VPointF(
-            when {
-                mode.x == EXACTLY -> MeasureSpec.getSize(widthMeasureSpec).toFloat()
-                else -> interpBounds.width + 2 * lockscreenPaint.strokeWidth
-            },
-            when {
-                mode.y == EXACTLY -> MeasureSpec.getSize(heightMeasureSpec).toFloat()
-                else -> interpBounds.height + 2 * lockscreenPaint.strokeWidth
-            },
-        )
+                when {
+                    mode.x == EXACTLY -> MeasureSpec.getSize(widthMeasureSpec).toFloat()
+                    else -> interpBounds.width + 2 * lockscreenPaint.strokeWidth
+                },
+                when {
+                    mode.y == EXACTLY -> MeasureSpec.getSize(heightMeasureSpec).toFloat()
+                    else -> interpBounds.height + 2 * lockscreenPaint.strokeWidth
+                },
+            )
+            .let { result -> if (isVertical) result.swap() else result }
     }
 
     /** Set the measured size of the view to match the interpolated text bounds */
@@ -508,26 +520,21 @@ abstract class DigitalClockTextView(private val clockCtx: ClockContext) :
         widthMeasureSpec: Int = measuredWidthAndState,
         heightMeasureSpec: Int = measuredHeightAndState,
     ) {
-        var mode =
-            VPoint(
-                x = MeasureSpec.getMode(widthMeasureSpec),
-                y = MeasureSpec.getMode(heightMeasureSpec),
-            )
-
-        val size = if (isVertical) measureBounds.swap() else measureBounds
-        if (isVertical) mode = mode.swap()
+        val mode =
+            VPoint(MeasureSpec.getMode(widthMeasureSpec), MeasureSpec.getMode(heightMeasureSpec))
+                .let { mode -> if (isVertical) mode.swap() else mode }
 
         setMeasuredDimension(
-            MeasureSpec.makeMeasureSpec(size.x.roundToInt(), mode.x),
-            MeasureSpec.makeMeasureSpec(size.y.roundToInt(), mode.y),
+            MeasureSpec.makeMeasureSpec(ceil(measureBounds.x).toInt(), mode.x),
+            MeasureSpec.makeMeasureSpec(ceil(measureBounds.y).toInt(), mode.y),
         )
 
         logger.d({
-            val size = VPointF.fromLong(long1)
-            val mode = VPoint.fromLong(long2)
-            "setInterpolatedSize(size=$size, mode=$mode)"
+            val unpackedSize = VPointF.fromLong(long1)
+            val unpackedMode = VPoint.fromLong(long2)
+            "setInterpolatedSize(size=$unpackedSize, mode=$unpackedMode)"
         }) {
-            long1 = size.toLong()
+            long1 = measureBounds.toLong()
             long2 = mode.toLong()
         }
     }
@@ -564,7 +571,7 @@ abstract class DigitalClockTextView(private val clockCtx: ClockContext) :
     }
 
     fun getDrawTranslation(interpBounds: VRectF): VPointF {
-        val measuredSize = if (isVertical) this.measuredSize.swap() else this.measuredSize
+        val measuredSize = if (isVertical) measuredSize.swap() else measuredSize
         val sizeDiff = measuredSize - interpBounds.size
         val alignment =
             VPointF(

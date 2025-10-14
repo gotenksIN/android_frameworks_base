@@ -23,11 +23,11 @@ import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
 import static com.android.server.am.OomAdjuster.CPU_TIME_REASON_NONE;
 import static com.android.server.am.OomAdjuster.IMPLICIT_CPU_TIME_REASON_NONE;
 import static com.android.server.am.OomAdjusterImpl.ProcessRecordNode.NUM_NODE_TYPE;
-import static com.android.server.am.ProcessList.CACHED_APP_MIN_ADJ;
-import static com.android.server.am.ProcessList.INVALID_ADJ;
-import static com.android.server.am.ProcessList.SCHED_GROUP_BACKGROUND;
-import static com.android.server.am.ProcessList.SERVICE_B_ADJ;
-import static com.android.server.am.ProcessList.UNKNOWN_ADJ;
+import static com.android.server.am.psc.Constants.CACHED_APP_MIN_ADJ;
+import static com.android.server.am.psc.Constants.INVALID_ADJ;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_BACKGROUND;
+import static com.android.server.am.psc.Constants.SERVICE_B_ADJ;
+import static com.android.server.am.psc.Constants.UNKNOWN_ADJ;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_VISIBLE;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER;
 
@@ -142,13 +142,6 @@ public abstract class ProcessRecordInternal {
         void onHasStartedServicesChanged(boolean hasStartedServices);
 
         /**
-         * Called when the broadcast-receiving state changes.
-         *
-         * @param isReceivingBroadcast The new isReceivingBroadcast value.
-         */
-        void onIsReceivingBroadcastChanged(boolean isReceivingBroadcast);
-
-        /**
          * Called when the activity-hosting state changes.
          *
          * @param hasActivities The new hasActivities value.
@@ -196,15 +189,6 @@ public abstract class ProcessRecordInternal {
 
     /** Retrieves the last reported RSS (Resident Set Size) for this process. */
     public abstract long getLastRss();
-
-    /**
-     * Checks if the process is currently receiving a broadcast.
-     *
-     * @param outSchedGroup An output array of size 1 where the scheduling group associated
-     *                      with the broadcast will be placed if one is active.
-     * @return {@code true} if the process is receiving a broadcast.
-     */
-    public abstract boolean isReceivingBroadcast(int[] outSchedGroup);
 
     /**
      * Checks if a specific compatibility change is enabled for the process.
@@ -584,7 +568,7 @@ public abstract class ProcessRecordInternal {
      * Is this process currently showing a non-activity UI that the user
      * is interacting with? E.g. The status bar when it is expanded, but
      * not when it is minimized. When true the
-     * process will be set to use the ProcessList#SCHED_GROUP_TOP_APP
+     * process will be set to use the {@link Constants#SCHED_GROUP_TOP_APP}
      * scheduling group to boost performance.
      */
     @GuardedBy("mServiceLock")
@@ -595,7 +579,7 @@ public abstract class ProcessRecordInternal {
      * overlays on-top of activity UIs on screen. E.g. display a window
      * of type android.view.WindowManager.LayoutParams#TYPE_APPLICATION_OVERLAY
      * When true the process will oom adj score will be set to
-     * ProcessList#PERCEPTIBLE_APP_ADJ at minimum to reduce the chance
+     * {@link Constants#PERCEPTIBLE_APP_ADJ} at minimum to reduce the chance
      * of the process getting killed.
      */
     @GuardedBy("mServiceLock")
@@ -604,9 +588,9 @@ public abstract class ProcessRecordInternal {
     /**
      * Is the process currently running a remote animation? When true
      * the process will be set to use the
-     * ProcessList#SCHED_GROUP_TOP_APP scheduling group to boost
+     * {@link Constants#SCHED_GROUP_TOP_APP} scheduling group to boost
      * performance, as well as oom adj score will be set to
-     * ProcessList#VISIBLE_APP_ADJ at minimum to reduce the chance
+     * {@link Constants#VISIBLE_APP_ADJ} at minimum to reduce the chance
      * of the process getting killed.
      */
     @GuardedBy("mServiceLock")
@@ -805,8 +789,6 @@ public abstract class ProcessRecordInternal {
     private int mCachedIsPreviousProcess = VALUE_INVALID;
     @GuardedBy("mServiceLock")
     private int mCachedHasRecentTasks = VALUE_INVALID;
-    @GuardedBy("mServiceLock")
-    private int mCachedIsReceivingBroadcast = VALUE_INVALID;
 
     /**
      * Cache the return value of PlatformCompat.isChangeEnabled().
@@ -1492,7 +1474,6 @@ public abstract class ProcessRecordInternal {
         mCachedIsHomeProcess = VALUE_INVALID;
         mCachedIsPreviousProcess = VALUE_INVALID;
         mCachedHasRecentTasks = VALUE_INVALID;
-        mCachedIsReceivingBroadcast = VALUE_INVALID;
         mCachedAdj = INVALID_ADJ;
         mCachedForegroundActivities = false;
         mCachedProcState = ActivityManager.PROCESS_STATE_CACHED_EMPTY;
@@ -1614,28 +1595,6 @@ public abstract class ProcessRecordInternal {
         } else {
             return getCachedHasRecentTasks();
         }
-    }
-
-    /**
-     * Returns whether the process is currently receiving a broadcast, using a cached value or
-     * pulling it. The scheduling group associated with the broadcast will be placed in
-     * {@code outSchedGroup} if active.
-     *
-     * @param outSchedGroup An output array of size 1 where the scheduling group associated
-     *                      with the broadcast will be placed if one is active.
-     * @return True if the process is receiving a broadcast, false otherwise.
-     */
-    @GuardedBy("mServiceLock")
-    public boolean getCachedIsReceivingBroadcast(int[] outSchedGroup) {
-        if (mCachedIsReceivingBroadcast == VALUE_INVALID) {
-            final boolean isReceivingBroadcast = isReceivingBroadcast(outSchedGroup);
-            mCachedIsReceivingBroadcast = isReceivingBroadcast ? VALUE_TRUE : VALUE_FALSE;
-            if (isReceivingBroadcast) {
-                mCachedSchedGroup = outSchedGroup[0];
-            }
-            mStartedServiceObserver.onIsReceivingBroadcastChanged(isReceivingBroadcast);
-        }
-        return mCachedIsReceivingBroadcast == VALUE_TRUE;
     }
 
     /**

@@ -3084,14 +3084,14 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             new ActivityTransitionAnimator.Listener() {
                 @Override
                 public void onTransitionAnimationStart() {
-                    if (!Flags.notificationShadeBlur() || !Flags.moveTransitionAnimationLayer()) {
+                    if (!Flags.notificationShadeBlur()) {
                         mKeyguardViewMediator.setBlursDisabledForAppLaunch(true);
                     }
                 }
 
                 @Override
                 public void onTransitionAnimationProgress(float linearProgress) {
-                    if (Flags.notificationShadeBlur() && Flags.moveTransitionAnimationLayer()) {
+                    if (Flags.notificationShadeBlur()) {
                         mNotificationShadeDepthControllerLazy.get()
                                 .onTransitionAnimationProgress(linearProgress);
                     }
@@ -3099,7 +3099,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
                 @Override
                 public void onTransitionAnimationEnd() {
-                    if (Flags.notificationShadeBlur() && Flags.moveTransitionAnimationLayer()) {
+                    if (Flags.notificationShadeBlur()) {
                         mNotificationShadeDepthControllerLazy.get()
                                 .onTransitionAnimationEnd();
                     } else {

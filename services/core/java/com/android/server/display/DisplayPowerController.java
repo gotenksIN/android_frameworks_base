@@ -86,7 +86,7 @@ import com.android.server.display.brightness.BrightnessReason;
 import com.android.server.display.brightness.BrightnessUtils;
 import com.android.server.display.brightness.DisplayBrightnessController;
 import com.android.server.display.brightness.clamper.BrightnessClamperController;
-import com.android.server.display.brightness.strategy.AutomaticBrightnessStrategy2;
+import com.android.server.display.brightness.strategy.AutomaticBrightnessStrategy;
 import com.android.server.display.brightness.strategy.DisplayBrightnessStrategy;
 import com.android.server.display.brightness.strategy.DisplayBrightnessStrategyConstants;
 import com.android.server.display.color.ColorDisplayService.ColorDisplayServiceInternal;
@@ -426,7 +426,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     private final boolean mSkipScreenOnBrightnessRamp;
 
     // Display white balance components.
-    // Critical methods must be called on DPC2 handler thread.
+    // Critical methods must be called on DPC handler thread.
     @Nullable
     private final DisplayWhiteBalanceSettings mDisplayWhiteBalanceSettings;
     @Nullable
@@ -466,8 +466,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
 
 
     // Responsible for evaluating and tracking the automatic brightness relevant states.
-    // Todo: This is a temporary workaround. Ideally DPC2 should never talk to the strategies
-    private final AutomaticBrightnessStrategy2 mAutomaticBrightnessStrategy;
+    // Todo: This is a temporary workaround. Ideally DPC should never talk to the strategies
+    private final AutomaticBrightnessStrategy mAutomaticBrightnessStrategy;
 
     // A record of state for skipping brightness ramps.
     private int mSkipRampState = RAMP_STATE_SKIP_NONE;
@@ -1698,8 +1698,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                     ? BrightnessEvent.FLAG_USER_SET : 0));
             Slog.i(mTag, newEvent.toString(/* includeTime= */ false));
 
-            if (userSetBrightnessChanged
-                    || newEvent.getReason().getReason() != BrightnessReason.REASON_TEMPORARY) {
+            if (newEvent.getReason().getReason() != BrightnessReason.REASON_TEMPORARY) {
                 logBrightnessEvent(newEvent, unthrottledBrightnessState, clampedState);
             }
             if (mBrightnessEventRingBuffer != null) {
@@ -2907,6 +2906,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         boolean brightnessIsMax = unmodifiedBrightness == event.getHbmMax();
         float brightnessInNits =
                 mDisplayBrightnessController.convertToAdjustedNits(event.getBrightness());
+        boolean isScreenOff = event.getReason().getReason() == BrightnessReason.REASON_SCREEN_OFF;
         float initialBrightnessInNits =
                 mDisplayBrightnessController.convertToAdjustedNits(event.getInitialBrightness());
         float appliedLowPowerMode = event.isLowPowerModeSet() ? event.getPowerFactor() : -1f;
@@ -2924,7 +2924,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 initialBrightnessInNits
                 );
         if (mIsDisplayInternal) {
-            FrameworkStatsLog.write(FrameworkStatsLog.DISPLAY_BRIGHTNESS_CHANGED,
+            FrameworkStatsLog.write(
+                    FrameworkStatsLog.DISPLAY_BRIGHTNESS_CHANGED,
                     initialBrightnessInNits,
                     brightnessInNits,
                     event.getLux(),
@@ -2937,7 +2938,12 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                     event.isAutomaticBrightnessEnabled(),
                     FrameworkStatsLog.DISPLAY_BRIGHTNESS_CHANGED__REASON__REASON_MANUAL,
                     convertBrightnessReasonToStatsEnum(event.getReason().getReason()),
-                    nitsToRangeIndex(brightnessInNits),
+                    // Use the special range 0-min for screen off brightness, otherwise use the
+                    // range based on nits.
+                    isScreenOff
+                            ? FrameworkStatsLog
+                                    .DISPLAY_BRIGHTNESS_CHANGED__BUCKET_INDEX__RANGE_0_MIN
+                            : nitsToRangeIndex(brightnessInNits),
                     brightnessIsMax,
                     event.getHbmMode() == BrightnessInfo.HIGH_BRIGHTNESS_MODE_SUNLIGHT,
                     event.getHbmMode() == BrightnessInfo.HIGH_BRIGHTNESS_MODE_HDR,

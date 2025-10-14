@@ -484,9 +484,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     void setCompanionTaskFragment(@Nullable TaskFragment companionTaskFragment,
             @Nullable IBinder toBeFinishedActivity) {
         mCompanionTaskFragment = companionTaskFragment;
-        if (Flags.taskFragmentCompanionActivity()) {
-            mCompanionToBeFinishedActivity = toBeFinishedActivity;
-        }
+        mCompanionToBeFinishedActivity = toBeFinishedActivity;
     }
 
     @Nullable
@@ -809,34 +807,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     @Override
     boolean isEmbedded() {
         return mIsEmbedded;
-    }
-
-
-    /**
-     * Returns true if this container fills its parent by policy or bounds. Similar to
-     * {@link ActivityRecord}, this returns {@code true} if it has override bounds which equals
-     * to its parent bounds
-     */
-    @Override
-    boolean fillsParentBounds() {
-        if (com.android.window.flags.Flags.rootTaskForBubble()) {
-            final int windowingMode = getWindowingMode();
-            if (windowingMode == WINDOWING_MODE_PINNED) {
-                return false;
-            }
-            if (windowingMode == WINDOWING_MODE_FULLSCREEN) {
-                return true;
-            }
-
-            final Rect overrideBounds = getResolvedOverrideBounds();
-            if (overrideBounds.isEmpty()) {
-                return true;
-            }
-            final WindowContainer parent = getParent();
-            return parent == null || parent.getBounds().equals(overrideBounds);
-        }
-
-        return super.fillsParentBounds();
     }
 
     @EmbeddingCheckResult
@@ -1333,9 +1303,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      * @param source an activity in this TaskFragment that launches another activity.
      */
     boolean shouldAbortActivityLaunchOnFinishingTf(@NonNull ActivityRecord source) {
-        if (!Flags.activityEmbeddingAbortCrossUidLaunchInFinishingTaskFragment()) {
-            return false;
-        }
         // If the source activity is a cross-uid embedded activity, the newly launched activity is
         // always expected to be in the same TaskFragment. If this TaskFragment is being removed, we
         // should not allow a new activity to be launched by the source, because it may be placed

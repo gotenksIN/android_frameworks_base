@@ -5297,7 +5297,7 @@ public final class Parcel {
      * enclosing class of the runtime type of its CREATOR field (that is,
      * {@link Class#getEnclosingClass()} has to return the parcelable implementing class),
      * otherwise this method might throw an exception. If the Parcelable class does not enclose the
-     * CREATOR, use the deprecated {@link #readParcelableCreator(ClassLoader) instead.
+     * CREATOR, use the deprecated {@link #readParcelableCreator(ClassLoader)} instead.
      *
      * @throws BadParcelableException Throws BadParcelableException if the item to be deserialized
      * is not an instance of that class or any of its children classes or there there was an error
@@ -5527,16 +5527,6 @@ public final class Parcel {
                             + cl.getName() + " is not a subclass of required class "
                             + clazz.getName() + " provided in the parameter");
                 }
-            }
-            if (Build.IS_DEBUGGABLE && UserHandle.getAppId(Process.myUid())
-                    < Process.FIRST_APPLICATION_UID) {
-                Slog.wtfStack(TAG, "System process called readSerializableInternal"
-                        + "; uid=" + Process.myUid()
-                        + "; processName=" + Process.myProcessName()
-                        + "; clazz=" + (clazz == null ? "null" : clazz.getName())
-                        + "; name=" + name
-                        + "; callingUid=" + Binder.getCallingUid()
-                );
             }
             byte[] serializedData = createByteArray();
             ByteArrayInputStream bais = new ByteArrayInputStream(serializedData);

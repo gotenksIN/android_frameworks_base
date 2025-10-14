@@ -1875,8 +1875,8 @@ public final class ActivityRecord extends WindowToken {
             boolean _rootVoiceInteraction, ActivityTaskSupervisor supervisor,
             ActivityOptions options, ActivityRecord sourceRecord, PersistableBundle persistentState,
             TaskDescription _taskDescription, long _createTime) {
-        super(_service.mWindowManager, new Token(), TYPE_APPLICATION, true,
-                null /* displayContent */, false /* ownerCanManageAppTokens */);
+        super(_service.mWindowManager, new Token(), TYPE_APPLICATION, true /* persistOnEmpty */,
+                false /* ownerCanManageAppTokens */);
 
         mAtmService = _service;
         ((Token) token).mActivityRef = new WeakReference<>(this);
@@ -3679,7 +3679,7 @@ public final class ActivityRecord extends WindowToken {
                 chain.getTransition().collectClose(trigger);
             }
 
-            if (Flags.polishCloseWallpaperIncludesOpenChange() && endTask) {
+            if (endTask) {
                 final TaskDisplayArea displayArea = getDisplayArea();
                 if (displayArea != null && rootTask == displayArea.mPreferredTopFocusableRootTask) {
                     displayArea.clearPreferredTopFocusableRootTask();
@@ -6417,10 +6417,8 @@ public final class ActivityRecord extends WindowToken {
                 mAtmService.deferWindowLayout();
                 try {
                     taskFragment.completePause(true /* resumeNext */, null /* resumingActivity */);
-                    if (com.android.window.flags.Flags.fixRapidTopResumedSwitch()) {
-                        mTaskSupervisor.handleTopResumedStateReleasedIfNeeded(this,
-                                false /* timeout */);
-                    }
+                    mTaskSupervisor.handleTopResumedStateReleasedIfNeeded(this,
+                            false /* timeout */);
                 } finally {
                     mAtmService.continueWindowLayout();
                 }

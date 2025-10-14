@@ -15,10 +15,19 @@
  */
 package com.android.server.pm;
 
+import static android.content.ComponentName.unflattenFromString;
+
+import static com.android.server.pm.HsuAllowlistsMediator.DEBUG;
+
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
+
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.res.Resources;
 import android.util.Log;
@@ -36,9 +45,32 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 
 public final class HsuAllowlistsMediatorTest extends ExpectableTestCase {
     private static final String TAG = HsuAllowlistsMediatorTest.class.getSimpleName();
+
+    private static final String PERM_NAME_1 = "perm/one.is.the.loniest.number";
+    private static final String PERM_NAME_2 = "perm/two.to.tango";
+    private static final String PERM_NAME_3 = "perm/three.is.a.charm";
+
+    private static final String TEMP_NAME_1 = "temp/one.is.the.loniest.number";
+    private static final String TEMP_NAME_2 = "temp/two.to.tango";
+    private static final String TEMP_NAME_3 = "temp/three.is.a.charm";
+
+    private static final ComponentName PERM_ACTIVITY_1 = unflattenFromString(PERM_NAME_1);
+    private static final ComponentName PERM_ACTIVITY_2 = unflattenFromString(PERM_NAME_2);
+    private static final ComponentName PERM_ACTIVITY_3 = unflattenFromString(PERM_NAME_3);
+
+    private static final ComponentName TEMP_ACTIVITY_1 = unflattenFromString(TEMP_NAME_1);
+    private static final ComponentName TEMP_ACTIVITY_2 = unflattenFromString(TEMP_NAME_2);
+    private static final ComponentName TEMP_ACTIVITY_3 = unflattenFromString(TEMP_NAME_3);
+
+
+    private static final ComponentName NOT_ALLOWLISTED_ACTIVITY =
+            unflattenFromString("allowlisted/I.am...NOT");
+    private static final String INVALID_NAME = "invalid.I.am"; // missing package
 
     @Rule
     public final MockitoRule mocks = MockitoJUnit.rule();
@@ -59,30 +91,140 @@ public final class HsuAllowlistsMediatorTest extends ExpectableTestCase {
     }
 
     @Test
-    public void testIsActivityAllowed_emptyConfig() throws Exception {
+    public void testIsActivityAllowed_null() throws Exception {
         var ham = createHam();
 
-        expectWithMessage("ActivityStarterTests(null)").that(ham.isActivityAllowed(null))
-                .isTrue();
-
-        expectWithMessage("ActivityStarterTests(whatever)").that(ham.isActivityAllowed("whatever"))
-                .isTrue();
+        assertThrows(NullPointerException.class, () -> ham.isActivityAllowed(null));
     }
 
     @Test
-    public void testIsActivityAllowed_nonEmptyConfig() throws Exception {
-        var allowlisted = "allowlisted/I.am";
-        var notAllowlisted = "allowlisted/I.am...NOT";
-        var ham = createHam(allowlisted);
+    public void testIsActivityAllowed_emptyConfig() throws Exception {
+        var ham = createHam();
 
-        expectWithMessage("ActivityStarterTests(null)").that(ham.isActivityAllowed(null))
-                .isFalse();
-        expectWithMessage("isActivitivyAllowed(%s)", allowlisted)
-                .that(ham.isActivityAllowed(allowlisted))
-                .isTrue();
-        expectWithMessage("isActivitivyAllowed(%s)", notAllowlisted)
-                .that(ham.isActivityAllowed(notAllowlisted))
-                .isFalse();
+        expectAllowed(ham, PERM_ACTIVITY_1);
+    }
+
+    @Test
+    public void testIsActivityAllowed_configWithOne() throws Exception {
+        var ham = createHam(PERM_NAME_1);
+
+        expectNotAllowed(ham, NOT_ALLOWLISTED_ACTIVITY);
+        expectAllowed(ham, PERM_ACTIVITY_1);
+    }
+
+    @Test
+    public void testIsActivityAllowed_configWithTwo() throws Exception {
+        var ham = createHam(PERM_NAME_1, PERM_NAME_2);
+
+        expectNotAllowed(ham, NOT_ALLOWLISTED_ACTIVITY);
+        expectAllowed(ham, PERM_ACTIVITY_1, PERM_ACTIVITY_2);
+    }
+
+    @Test
+    public void testIsActivityAllowed_configWithMultiple() throws Exception {
+        var allowlistedShortened = new ComponentName("allowlisted", ".I.am");
+        var allowlistedNotShortened = new ComponentName("allowlisted", "allowlisted.me.too");
+        var ham = createHam(PERM_NAME_1, PERM_NAME_2, PERM_NAME_3,
+                "allowlisted/.I.am", "allowlisted/allowlisted.me.too", INVALID_NAME);
+
+        expectNotAllowed(ham, NOT_ALLOWLISTED_ACTIVITY);
+        expectAllowed(ham, PERM_ACTIVITY_1, PERM_ACTIVITY_2, PERM_ACTIVITY_3,
+                allowlistedShortened, allowlistedNotShortened);
+    }
+
+    @Test
+    public void testSetTemporaryActivitiesAllowlist_fromEmptyConfig() throws Exception {
+        var ham = createHam();
+
+        testSetAndResetTemporaryList(ham, () -> expectAllowed(ham, NOT_ALLOWLISTED_ACTIVITY));
+    }
+
+    @Test
+    public void testSetTemporaryActivitiesAllowlist_fromConfigWithOne() throws Exception {
+        var ham = createHam(PERM_NAME_1);
+
+        testSetAndResetTemporaryList(ham, () -> {
+            expectNotAllowed(ham, NOT_ALLOWLISTED_ACTIVITY);
+            expectAllowed(ham, PERM_ACTIVITY_1);
+        });
+    }
+
+    @Test
+    public void testSetTemporaryActivitiesAllowlist_fromConfigWithTwo() throws Exception {
+        var ham = createHam(PERM_NAME_1, PERM_NAME_2);
+
+        testSetAndResetTemporaryList(ham, () -> {
+            expectNotAllowed(ham, NOT_ALLOWLISTED_ACTIVITY);
+            expectAllowed(ham, PERM_ACTIVITY_1, PERM_ACTIVITY_2);
+        });
+    }
+
+    @Test
+    public void testSetTemporaryActivitiesAllowlist_fromConfigWithMultiple() throws Exception {
+        var ham = createHam(PERM_NAME_1, PERM_NAME_2, PERM_NAME_3);
+
+        testSetAndResetTemporaryList(ham, () -> {
+            expectNotAllowed(ham, NOT_ALLOWLISTED_ACTIVITY);
+            expectAllowed(ham, PERM_ACTIVITY_1, PERM_ACTIVITY_2, PERM_ACTIVITY_3);
+        });
+    }
+
+    private void testSetAndResetTemporaryList(HsuAllowlistsMediator ham,
+            Runnable permanentAllowListStateChecker) {
+        // Check permanent state before
+        permanentAllowListStateChecker.run();
+
+
+        // Set as empty - everything should be allowed
+        List<ComponentName> emptyList = emptyList();
+
+        ham.setTemporaryActivitiesAllowlist(emptyList);
+
+        expectAllowedAfterSettingTemporaryList(ham, emptyList,
+                NOT_ALLOWLISTED_ACTIVITY,
+                TEMP_ACTIVITY_1, TEMP_ACTIVITY_2, TEMP_ACTIVITY_3,
+                PERM_ACTIVITY_1, PERM_ACTIVITY_2, PERM_ACTIVITY_3
+        );
+
+        // One temporary activity
+        List<ComponentName> listWithOne = asList(TEMP_ACTIVITY_1);
+
+        ham.setTemporaryActivitiesAllowlist(listWithOne);
+
+        expectAllowedAfterSettingTemporaryList(ham, listWithOne,
+                TEMP_ACTIVITY_1);
+        expectNotAllowedAfterSettingTemporaryList(ham, listWithOne,
+                NOT_ALLOWLISTED_ACTIVITY, TEMP_ACTIVITY_2, TEMP_ACTIVITY_3);
+        expectDefaultPermanentActivitiesNotAllowed(ham);
+
+
+        // Two temporary activities
+        List<ComponentName> listWithOneAndTwo = asList(TEMP_ACTIVITY_1, TEMP_ACTIVITY_2);
+
+        ham.setTemporaryActivitiesAllowlist(listWithOneAndTwo);
+
+        expectAllowedAfterSettingTemporaryList(ham, listWithOneAndTwo,
+                TEMP_ACTIVITY_1, TEMP_ACTIVITY_2);
+        expectNotAllowedAfterSettingTemporaryList(ham, listWithOneAndTwo,
+                NOT_ALLOWLISTED_ACTIVITY, TEMP_ACTIVITY_3);
+        expectDefaultPermanentActivitiesNotAllowed(ham);
+
+
+        // Three temporary activities
+        List<ComponentName> listWithThree =
+                asList(TEMP_ACTIVITY_1, TEMP_ACTIVITY_2, TEMP_ACTIVITY_3);
+
+        ham.setTemporaryActivitiesAllowlist(listWithThree);
+
+        expectAllowedAfterSettingTemporaryList(ham, listWithThree,
+                TEMP_ACTIVITY_1, TEMP_ACTIVITY_2, TEMP_ACTIVITY_3);
+        expectNotAllowedAfterSettingTemporaryList(ham, listWithThree, NOT_ALLOWLISTED_ACTIVITY);
+        expectDefaultPermanentActivitiesNotAllowed(ham);
+
+        // Reset the list
+        ham.setTemporaryActivitiesAllowlist(null);
+
+        permanentAllowListStateChecker.run();
     }
 
     @Test
@@ -92,10 +234,13 @@ public final class HsuAllowlistsMediatorTest extends ExpectableTestCase {
         String dump = dump(ham);
 
         expectWithMessage("dump()").that(dump)
-                .isEqualTo("""
+                .isEqualTo(String.format("""
                       HsuAllowlistsMediator (HAM)
-                        0 permanently allowlisted activities
-                           """);
+                        DEBUG: %b
+                        activities allowlist status: allowlisting disabled
+                        permanent activities allowlist is empty.
+                        temporary activities allowlist is not set.
+                           """, DEBUG));
     }
 
     @Test
@@ -105,11 +250,14 @@ public final class HsuAllowlistsMediatorTest extends ExpectableTestCase {
         String dump = dump(ham);
 
         expectWithMessage("dump()").that(dump)
-                .isEqualTo("""
+                .isEqualTo(String.format("""
                       HsuAllowlistsMediator (HAM)
-                        1 permanently allowlisted activities:
+                        DEBUG: %b
+                        activities allowlist status: using permanent allowlist
+                        permanent activities allowlist has 1 activity:
                           allowlisted/I.am
-                          """);
+                        temporary activities allowlist is not set.
+                           """, DEBUG));
     }
 
     @Test
@@ -119,13 +267,126 @@ public final class HsuAllowlistsMediatorTest extends ExpectableTestCase {
         String dump = dump(ham);
 
         expectWithMessage("dump()").that(dump)
-                .isEqualTo("""
+                .isEqualTo(String.format("""
                       HsuAllowlistsMediator (HAM)
-                        2 permanently allowlisted activities:
+                        DEBUG: %b
+                        activities allowlist status: using permanent allowlist
+                        permanent activities allowlist has 2 activities:
                           allowlisted/I.am
                           so/am.I
-                          """);
+                        temporary activities allowlist is not set.
+                          """, DEBUG));
+    }
 
+    @Test
+    public void testDump_configWithOneInvalidActivity() throws Exception {
+        var ham = createHam(INVALID_NAME);
+
+        String dump = dump(ham);
+
+        expectWithMessage("dump()").that(dump)
+                .isEqualTo(String.format("""
+                        HsuAllowlistsMediator (HAM)
+                          DEBUG: %b
+                          activities allowlist status: allowlisting disabled
+                          permanent activities allowlist is empty.
+                          temporary activities allowlist is not set.
+                             """, DEBUG));
+    }
+
+    @Test
+    public void testDump_configWithValidAndInvalidActivities() throws Exception {
+        var ham = createHam("allowlisted/I.am", "so/am.I", INVALID_NAME);
+
+        String dump = dump(ham);
+
+        expectWithMessage("dump()").that(dump)
+                .isEqualTo(String.format("""
+                      HsuAllowlistsMediator (HAM)
+                        DEBUG: %b
+                        activities allowlist status: using permanent allowlist
+                        permanent activities allowlist has 2 activities:
+                          allowlisted/I.am
+                          so/am.I
+                        temporary activities allowlist is not set.
+                          """, DEBUG));
+    }
+
+    @Test
+    public void testDump_temporaryAllowlistEmpty_emptyConfig() throws Exception {
+        var ham = createHam();
+        ham.setTemporaryActivitiesAllowlist(emptyList());
+
+        String dump = dump(ham);
+
+        expectWithMessage("dump()").that(dump)
+                .isEqualTo(String.format("""
+                      HsuAllowlistsMediator (HAM)
+                        DEBUG: %b
+                        activities allowlist status: allowlisting disabled
+                        permanent activities allowlist is empty.
+                        temporary activities allowlist is empty.
+                           """, DEBUG));
+    }
+
+    @Test
+    public void testDump_temporaryAllowlistEmpty_nonEmptyConfig() throws Exception {
+        var ham = createHam("allowlisted/I.am", "so/am.I");
+        ham.setTemporaryActivitiesAllowlist(emptyList());
+
+        String dump = dump(ham);
+
+        expectWithMessage("dump()").that(dump)
+                .isEqualTo(String.format("""
+                      HsuAllowlistsMediator (HAM)
+                        DEBUG: %b
+                        activities allowlist status: allowlisting disabled
+                        permanent activities allowlist has 2 activities:
+                          allowlisted/I.am
+                          so/am.I
+                        temporary activities allowlist is empty.
+                           """, DEBUG));
+    }
+
+    @Test
+    public void testDump_temporaryAllowlistWithOne_emptyConfig() throws Exception {
+        var ham = createHam();
+        ham.setTemporaryActivitiesAllowlist(asList(unflattenFromString("and/me.too")));
+
+        String dump = dump(ham);
+
+        expectWithMessage("dump()").that(dump)
+                .isEqualTo(String.format("""
+                      HsuAllowlistsMediator (HAM)
+                        DEBUG: %b
+                        activities allowlist status: using temporary allowlist
+                        permanent activities allowlist is empty.
+                        temporary activities allowlist has 1 activity:
+                          and/me.too
+                           """, DEBUG));
+    }
+
+    @Test
+    public void testDump_temporaryAllowlistWithMultiple_nonEmptyConfig() throws Exception {
+        var ham = createHam("allowlisted/I.am", "so/am.I");
+        ham.setTemporaryActivitiesAllowlist(asList(
+                unflattenFromString("and/me.too"),
+                unflattenFromString("dont/forget.about.me")));
+
+        String dump = dump(ham);
+
+        expectWithMessage("dump()").that(dump)
+                .isEqualTo(String.format("""
+                      HsuAllowlistsMediator (HAM)
+                        DEBUG: %b
+                        activities allowlist status: using temporary allowlist
+                        permanent activities allowlist has 2 activities:
+                          allowlisted/I.am
+                          so/am.I
+                        temporary activities allowlist has 2 activities:
+                          and/me.too
+                          dont/forget.about.me
+                           """, DEBUG));
     }
 
     private HsuAllowlistsMediator createHam(String... configAllowlist) {
@@ -138,6 +399,42 @@ public final class HsuAllowlistsMediatorTest extends ExpectableTestCase {
         when(mMockResources
                 .getStringArray(com.android.internal.R.array.config_hsu_allowlist_activitivies))
                         .thenReturn(componentNames);
+    }
+
+    private void expectNotAllowed(HsuAllowlistsMediator ham, ComponentName... activities) {
+        for (var activity : activities) {
+            expectWithMessage("isActivityAllowed(%s)", activity)
+                    .that(ham.isActivityAllowed(activity))
+                    .isFalse();
+        }
+    }
+
+    private void expectAllowed(HsuAllowlistsMediator ham, ComponentName... activities) {
+        for (var activity : activities) {
+            expectWithMessage("isActivityAllowed(%s)", activity)
+                    .that(ham.isActivityAllowed(activity))
+                    .isTrue();
+        }
+    }
+
+    private void expectNotAllowedAfterSettingTemporaryList(HsuAllowlistsMediator ham,
+            Collection<ComponentName> temporaryAllowList, ComponentName...activities) {
+        for (var activity: activities) {
+            expectWithMessage("isActivityAllowed(%s) after SetTemporaryActivitiesAllowlist(%s)",
+                    activity, temporaryAllowList).that(ham.isActivityAllowed(activity)).isFalse();
+        }
+    }
+
+    private void expectAllowedAfterSettingTemporaryList(HsuAllowlistsMediator ham,
+            Collection<ComponentName> temporaryAllowList, ComponentName...activities) {
+        for (var activity: activities) {
+            expectWithMessage("isActivityAllowed(%s) after SetTemporaryActivitiesAllowlist(%s)",
+                    activity, temporaryAllowList).that(ham.isActivityAllowed(activity)).isTrue();
+        }
+    }
+
+    private void expectDefaultPermanentActivitiesNotAllowed(HsuAllowlistsMediator ham) {
+        expectNotAllowed(ham, PERM_ACTIVITY_1, PERM_ACTIVITY_2, PERM_ACTIVITY_3);
     }
 
     private static String dump(HsuAllowlistsMediator ham) throws IOException {

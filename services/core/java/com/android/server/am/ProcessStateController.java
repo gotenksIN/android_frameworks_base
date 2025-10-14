@@ -22,6 +22,7 @@ import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UI_VISIBILITY;
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER;
 
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_OOM_ADJ;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_UNDEFINED;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -36,11 +37,13 @@ import android.os.Looper;
 import android.os.PowerManagerInternal;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.util.SparseBooleanArray;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
 import com.android.server.am.psc.AsyncBatchSession;
+import com.android.server.am.psc.ProcessListInternal;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.am.psc.ServiceRecordInternal;
 import com.android.server.am.psc.SyncBatchSession;
@@ -80,7 +83,7 @@ public class ProcessStateController {
      */
     private final ConcurrentLinkedQueue<Runnable> mStagingQueue = new ConcurrentLinkedQueue<>();
 
-    private ProcessStateController(ActivityManagerService ams, ProcessList processList,
+    private ProcessStateController(ActivityManagerService ams, ProcessListInternal processList,
             ActiveUids activeUids, ServiceThread handlerThread,
             Object lock, Object procLock, Consumer<ProcessRecord> topChangeCallback,
             ProcessLruUpdater lruUpdater, OomAdjuster.Injector oomAdjInjector,
@@ -130,6 +133,10 @@ public class ProcessStateController {
 
     public void setCurTrimEmptyProcesses(int value) {
         mOomConstants.mCurTrimEmptyProcesses = value;
+    }
+
+    public void setProcStateDebugUids(SparseBooleanArray value) {
+        mOomConstants.mProcStateDebugUids = value;
     }
 
     /**
@@ -927,7 +934,7 @@ public class ProcessStateController {
     @GuardedBy("mLock")
     public void noteBroadcastDeliveryEnded(@NonNull ProcessRecord proc) {
         proc.getReceivers().setIsReceivingBroadcast(false);
-        proc.getReceivers().setBroadcastReceiverSchedGroup(ProcessList.SCHED_GROUP_UNDEFINED);
+        proc.getReceivers().setBroadcastReceiverSchedGroup(SCHED_GROUP_UNDEFINED);
 
         proc.mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
     }
@@ -1139,7 +1146,7 @@ public class ProcessStateController {
      */
     public static class Builder {
         private final ActivityManagerService mAms;
-        private final ProcessList mProcessList;
+        private final ProcessListInternal mProcessList;
         private final ActiveUids mActiveUids;
         private final OomAdjuster.Constants mOomConstants;
         private final OomAdjuster.Callback mOomAdjCallback;
@@ -1150,8 +1157,9 @@ public class ProcessStateController {
         private ProcessLruUpdater mProcessLruUpdater = null;
         private OomAdjuster.Injector mOomAdjInjector = null;
 
-        public Builder(ActivityManagerService ams, ProcessList processList, ActiveUids activeUids,
-                OomAdjuster.Constants oomConstants, OomAdjuster.Callback oomAdjCallback) {
+        public Builder(ActivityManagerService ams, ProcessListInternal processList,
+                ActiveUids activeUids, OomAdjuster.Constants oomConstants,
+                OomAdjuster.Callback oomAdjCallback) {
             mAms = ams;
             mProcessList = processList;
             mActiveUids = activeUids;

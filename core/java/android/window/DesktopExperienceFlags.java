@@ -80,6 +80,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_APP_HANDLE_POSITION_REPORTING),
     ENABLE_APP_TO_WEB_EDUCATION_ANIMATION(Flags::enableAppToWebEducationAnimation, false,
             Flags.FLAG_ENABLE_APP_TO_WEB_EDUCATION_ANIMATION),
+    ENABLE_AUTO_RECOVERY_FROM_SELF_KILL(Flags::enableAutoRecoveryFromSelfKill, false,
+            Flags.FLAG_ENABLE_AUTO_RECOVERY_FROM_SELF_KILL),
     ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE(Flags::enableAutoRestartOnDisplayMove, false,
             Flags.FLAG_ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE),
     ENABLE_AUTO_ROTATE_ON_SLATE_STATE(Flags::enableAutoRotateOnSlateState, false,
@@ -291,9 +293,6 @@ public enum DesktopExperienceFlags {
     ENABLE_REQUEST_FULLSCREEN_REFACTOR(
             Flags::enableRequestFullscreenRefactor, false,
             Flags.FLAG_ENABLE_REQUEST_FULLSCREEN_REFACTOR),
-    ENABLE_REQUEST_FULLSCREEN_RESTORE_FREEFORM_BUGFIX(
-            Flags::enableRequestFullscreenRestoreFreeformBugfix, false,
-            Flags.FLAG_ENABLE_REQUEST_FULLSCREEN_RESTORE_FREEFORM_BUGFIX),
     ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS(Flags::enableRestartMenuForConnectedDisplays, true,
             Flags.FLAG_ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS),
     ENABLE_RESTRICT_FREEFORM_HIDDEN_SYSTEM_BARS_TO_FILLING_TASKS(

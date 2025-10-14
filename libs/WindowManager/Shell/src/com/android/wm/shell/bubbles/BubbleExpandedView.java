@@ -141,8 +141,6 @@ public class BubbleExpandedView extends LinearLayout {
     private TaskView mTaskView;
     private BubbleOverflowContainerView mOverflowView;
 
-    private int mTaskId = INVALID_TASK_ID;
-
     private boolean mImeVisible;
     private boolean mNeedsNewHeight;
 
@@ -326,21 +324,14 @@ public class BubbleExpandedView extends LinearLayout {
             mManageButton.setVisibility(GONE);
         } else {
             mTaskView = bubbleTaskView.getTaskView();
-            // reset the insets that might left after TaskView is shown in BubbleBarExpandedView
+            // reset properties that may be left if TaskView is reused from BubbleBarExpandedView
             mTaskView.setCaptionInsets(null);
+            mTaskView.setVisibility(VISIBLE);
             mTaskViewListener = new BubbleTaskViewListener(mContext, bubbleTaskView,
                     /* viewParent= */ this, expandedViewManager,
                     new BubbleTaskViewListener.Callback() {
                         @Override
                         public void onTaskCreated() {
-                            // The taskId is saved to use for removeTask,
-                            // preventing appearance in recent tasks.
-                            BubbleTaskViewListener listener = mTaskViewListener != null
-                                    ? mTaskViewListener
-                                    : null;
-                            mTaskId = listener != null
-                                    ? listener.getTaskId()
-                                    : bubbleTaskView.getTaskId();
                             setContentVisibility(true);
                         }
 
@@ -352,11 +343,6 @@ public class BubbleExpandedView extends LinearLayout {
                         @Override
                         public void onBackPressed() {
                             mStackView.onBackPressed();
-                        }
-
-                        @Override
-                        public void onTaskRemovalStarted() {
-                            // nothing to do / handled in listener.
                         }
 
                         @Override
@@ -809,7 +795,7 @@ public class BubbleExpandedView extends LinearLayout {
     }
 
     int getTaskId() {
-        return mTaskId;
+        return mTaskViewListener != null ? mTaskViewListener.getTaskId() : INVALID_TASK_ID;
     }
 
     /**
@@ -847,7 +833,6 @@ public class BubbleExpandedView extends LinearLayout {
                 if ((mPendingIntent != null || mBubble.hasMetadataShortcutId())
                         && mTaskView != null) {
                     setContentVisibility(false);
-                    mTaskView.setVisibility(VISIBLE);
                 }
             }
             applyThemeAttrs();
@@ -1039,7 +1024,7 @@ public class BubbleExpandedView extends LinearLayout {
      */
     public void dump(@NonNull PrintWriter pw, @NonNull String prefix) {
         pw.print(prefix); pw.println("BubbleExpandedView:");
-        pw.print(prefix); pw.print("  taskId: "); pw.println(mTaskId);
+        pw.print(prefix); pw.print("  taskId: "); pw.println(getTaskId());
         pw.print(prefix); pw.print("  stackView: "); pw.println(mStackView);
         pw.print(prefix); pw.print("  contentVisibility: "); pw.println(mIsContentVisible);
         pw.print(prefix); pw.print("  isAnimating: "); pw.println(mIsAnimating);
@@ -1050,7 +1035,7 @@ public class BubbleExpandedView extends LinearLayout {
         pw.print(prefix); pw.print("  v-alpha: "); pw.println(getAlpha());
         pw.print(prefix); pw.print("  v-viewVis: "); pw.println(getVisibility());
         pw.print(prefix); pw.print("  isClipping: "); pw.println(mIsClipping);
-        pw.print(prefix); pw.print("  clipRect: "); pw.println(
-                new Rect(mLeftClip, mTopClip, mRightClip, mBottomClip));
+        pw.print(prefix); pw.println(String.format("  clip: left=%d, top=%d, right=%d, bottom=%d",
+                mLeftClip, mTopClip, mRightClip, mBottomClip));
     }
 }

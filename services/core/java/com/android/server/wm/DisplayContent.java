@@ -1448,7 +1448,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         return mTokenMap.get(binder);
     }
 
-    void addWindowToken(IBinder binder, WindowToken token) {
+    void addWindowToken(WindowToken token) {
         final DisplayContent dc = mWmService.mRoot.getWindowTokenDisplay(token);
         if (dc != null) {
             // We currently don't support adding a window token to the display if the display
@@ -1458,17 +1458,20 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             throw new IllegalArgumentException("Can't map token=" + token + " to display="
                     + getName() + " already mapped to display=" + dc + " tokens=" + dc.mTokenMap);
         }
-        if (binder == null) {
+        if (token == null) {
+            throw new IllegalArgumentException("Can't map null token to display=" + getName());
+        }
+        if (token.token == null) {
             throw new IllegalArgumentException("Can't map token=" + token + " to display="
                     + getName() + " binder is null");
         }
-        if (token == null) {
-            throw new IllegalArgumentException("Can't map null token to display="
-                    + getName() + " binder=" + binder);
+
+        mTokenMap.put(token.token, token);
+
+        final var wallpaperToken = token.asWallpaperToken();
+        if (wallpaperToken != null) {
+            mWallpaperController.addWallpaperToken(wallpaperToken);
         }
-
-        mTokenMap.put(binder, token);
-
         if (token.asActivityRecord() == null) {
             // Setting the mDisplayContent to the token is not needed: it is done by da.addChild
             // below, that also calls onDisplayChanged once moved.
@@ -1484,6 +1487,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             // the parent container managing them (e.g. Tasks).
             final DisplayArea.Tokens da = findAreaForToken(token).asTokens();
             da.addChild(token);
+            setLayoutNeeded();
+            mWmService.requestTraversal();
         }
     }
 
@@ -1558,7 +1563,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             }
         }
 
-        addWindowToken(token.token, token);
+        addWindowToken(token);
 
         if (mWmService.mAccessibilityController.hasCallbacks()) {
             final int prevDisplayId = prevDc != null ? prevDc.getDisplayId() : INVALID_DISPLAY;
@@ -4911,7 +4916,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     @VisibleForTesting
     @Nullable
     WindowContainer computeImeParent() {
-        if (!canComputeImeParent(mImeLayeringTarget, mImeInputTarget)) {
+        if (!canComputeImeParent(mInputMethodWindow, mImeLayeringTarget, mImeInputTarget)) {
             return null;
         }
         // Attach it to app if the IME layering target is part of an app that is covering the entire
@@ -4925,15 +4930,20 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
     /**
-     * Called from {@link #computeImeParent()} to check if we can compute the new IME parent
-     * based on the given IME layering and IME input target.
+     * Called from {@link #computeImeParent()} to check if we can compute a new IME parent.
      *
+     * @param imeWindow         The window of the IME.
      * @param imeLayeringTarget The window the IME is on top of.
      * @param imeInputTarget    The target which receives input from the IME.
      * @return {@code true} to keep computing the IME parent, {@code false} to defer this operation.
      */
-    private static boolean canComputeImeParent(@Nullable WindowState imeLayeringTarget,
-            @Nullable InputTarget imeInputTarget) {
+    private static boolean canComputeImeParent(@Nullable WindowState imeWindow,
+            @Nullable WindowState imeLayeringTarget, @Nullable InputTarget imeInputTarget) {
+        if (android.view.inputmethod.Flags.computeImeParentNullImeWindow() && imeWindow == null) {
+            // If we have no IME window, allow reparenting the surface of the IME Container to its
+            // parent window. Otherwise, it may remain parented to a destroyed surface.
+            return true;
+        }
         if (imeLayeringTarget == null) {
             return false;
         }

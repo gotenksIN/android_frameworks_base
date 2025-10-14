@@ -16,14 +16,17 @@
 
 package com.android.systemui.shade.display
 
+import android.content.res.Resources
 import android.util.Log
 import android.view.Display
-import android.view.MotionEvent
+import android.view.View
 import com.android.app.tracing.coroutines.launchTraced
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.display.data.repository.DisplayRepository
 import com.android.systemui.display.data.repository.FocusedDisplayRepository
+import com.android.systemui.res.R
+import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.domain.interactor.NotificationShadeElement
 import com.android.systemui.shade.domain.interactor.QSShadeElement
 import com.android.systemui.shade.domain.interactor.ShadeExpandedStateInteractor.ShadeElement
@@ -51,6 +54,7 @@ import kotlinx.coroutines.flow.map
 class StatusBarTouchShadeDisplayPolicy
 @Inject
 constructor(
+    @ShadeDisplayAware private val resources: Resources,
     displayRepository: DisplayRepository,
     private val focusedDisplayRepository: FocusedDisplayRepository,
     @Background private val backgroundScope: CoroutineScope,
@@ -69,25 +73,39 @@ constructor(
 
     private var removalListener: Job? = null
 
-    /** Called when the status bar or launcher homescreen on the given display is touched. */
-    fun onStatusBarOrLauncherTouched(event: MotionEvent, statusBarWidth: Int) {
-        ShadeWindowGoesAround.isUnexpectedlyInLegacyMode()
-        updateShadeDisplayIfNeeded(event.displayId)
-        val element = classifyStatusBarEvent(event, statusBarWidth)
-        updateExpansionIntent(element)
+    private val shadeInvocationSplitRatio: Float =
+        resources.getFloat(R.dimen.config_invocationGestureSplitRatio)
+
+    /** Called when the status bar on the given display is touched/clicked. */
+    fun setExpansionIntentFromStatusBarEvent(eventX: Float, displayId: Int, statusBarWidth: Int) {
+        val element = classifyStatusBarEvent(eventX, statusBarWidth)
+        setExpansionIntentForElement(element, displayId)
     }
 
-    private fun onKeyboardShortcut(element: ShadeElement) {
+    /**
+     * Called when we need to move the notification shade to a specific display. For e.g. when
+     * launcher homescreen on the given display is touched/clicked.
+     */
+    fun setExpansionIntentForNotificationElement(displayId: Int) {
+        setExpansionIntentForElement(notificationElement.get(), displayId)
+    }
+
+    private fun setExpansionIntentForElement(
+        element: ShadeElement,
+        displayId: Int = focusedDisplayRepository.focusedDisplayId.value,
+    ) {
         ShadeWindowGoesAround.isUnexpectedlyInLegacyMode()
-        updateShadeDisplayIfNeeded(focusedDisplayRepository.focusedDisplayId.value)
+
+        updateShadeDisplayIfNeeded(displayId)
         updateExpansionIntent(element)
     }
 
     /** Called when notification panel keyboard shortcut is pressed. */
-    fun onNotificationPanelKeyboardShortcut() = onKeyboardShortcut(notificationElement.get())
+    fun onNotificationPanelKeyboardShortcut() =
+        setExpansionIntentForElement(notificationElement.get())
 
     /** Called when quick settings panel keyboard shortcut is pressed. */
-    fun onQSPanelKeyboardShortcut() = onKeyboardShortcut(qsShadeElement.get())
+    fun onQSPanelKeyboardShortcut() = setExpansionIntentForElement(qsShadeElement.get())
 
     override fun consumeExpansionIntent(): ShadeElement? {
         return latestIntent.getAndSet(null)
@@ -117,12 +135,20 @@ constructor(
         }
     }
 
-    private fun classifyStatusBarEvent(
-        motionEvent: MotionEvent,
-        statusbarWidth: Int,
-    ): ShadeElement {
-        val xPercentage = motionEvent.x / statusbarWidth
-        return if (xPercentage < 0.5f) notificationElement.get() else qsShadeElement.get()
+    private fun classifyStatusBarEvent(eventX: Float, statusBarWidth: Int): ShadeElement {
+        val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        val xPercentage = eventX / statusBarWidth
+
+        // Normalize the percentage to be from the "start" edge of the status bar.
+        // For LTR, this is the left edge (xPercentage).
+        // For RTL, this is the right edge (1 - xPercentage).
+        val percentageFromStart = if (isRtl) 1 - xPercentage else xPercentage
+
+        return if (percentageFromStart < shadeInvocationSplitRatio) {
+            notificationElement.get()
+        } else {
+            qsShadeElement.get()
+        }
     }
 
     private fun monitorDisplayRemovals(): Job {

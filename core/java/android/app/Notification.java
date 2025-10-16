@@ -2182,6 +2182,13 @@ public class Notification implements Parcelable
         @Retention(RetentionPolicy.SOURCE)
         public @interface Style {}
 
+
+        /**
+         * {@link #extras} key to a String defining this action's content description.
+         * @hide
+         */
+        public static final String EXTRA_CONTENT_DESCRIPTION = "android.extra.CONTENT_DESCRIPTION";
+
         private final Bundle mExtras;
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
         private Icon mIcon;
@@ -6386,7 +6393,8 @@ public class Notification implements Parcelable
                     || resId == getCollapsedMediaLayoutResource()
                     || resId == getCollapsedConversationLayoutResource()
                     || (apiMetricStyle() && (resId == getCollapsedMetricLayoutResource()
-                    || resId == getCompactHeadsUpMetricLayoutResource()))
+                    || resId == getCompactHeadsUpMetricLayoutResource()
+                    || resId == getHeadsUpMetricLayoutResource()))
                     || (notificationsRedesignTemplates()
                     && resId == getCollapsedCallLayoutResource()));
             RemoteViews contentView = new BuilderRemoteViews(mContext.getApplicationInfo(), resId);
@@ -8306,8 +8314,13 @@ public class Notification implements Parcelable
         private int getCompactHeadsUpMetricLayoutResource() {
             return R.layout.notification_2025_template_compact_heads_up_metric;
         }
+
         private int getCollapsedMetricLayoutResource() {
             return R.layout.notification_2025_template_collapsed_metric;
+        }
+
+        private int getHeadsUpMetricLayoutResource() {
+            return R.layout.notification_2025_template_heads_up_metric;
         }
 
         private int getExpandedMetricLayoutResource() {
@@ -12108,18 +12121,22 @@ public class Notification implements Parcelable
         /** @hide */
         @Override
         public RemoteViews makeHeadsUpContentView() {
-            return makeLargeMetricContentView(StandardTemplateParams.VIEW_TYPE_HEADS_UP);
+            final StandardTemplateParams p = mBuilder.mParams.reset()
+                    .viewType(StandardTemplateParams.VIEW_TYPE_HEADS_UP)
+                    .fillTextsFrom(mBuilder).text(null)
+                    .hideProgress(true)
+                    .hideRightIcon(true);
+            final TemplateBindResult result = new TemplateBindResult();
+            final RemoteViews contentView = getStandardView(
+                    mBuilder.getHeadsUpMetricLayoutResource(), p, result);
+            return bindMetricStyleMetrics(contentView, p, mMetrics, /* isExpandedView = */false);
         }
 
         /** @hide */
         @Override
         public RemoteViews makeExpandedContentView() {
-            return makeLargeMetricContentView(StandardTemplateParams.VIEW_TYPE_EXPANDED);
-        }
-
-        private RemoteViews makeLargeMetricContentView(int viewType){
             final StandardTemplateParams p = mBuilder.mParams.reset()
-                    .viewType(viewType)
+                    .viewType(StandardTemplateParams.VIEW_TYPE_EXPANDED)
                     .hideProgress(true)
                     .fillTextsFrom(mBuilder)
                     .text(null)

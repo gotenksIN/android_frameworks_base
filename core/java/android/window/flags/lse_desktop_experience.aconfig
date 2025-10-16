@@ -72,17 +72,6 @@ flag {
 }
 
 flag {
-    name: "disable_desktop_launch_params_outside_desktop_bug_fix"
-    namespace: "lse_desktop_experience"
-    description: "Prevents DesktopModeLaunchParamsModifier from modifying launch params for non /n"
-                 "desktop launches."
-    bug: "396108436"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "disable_non_resizable_app_snap_resizing"
     namespace: "lse_desktop_experience"
     description: "Stops non-resizable app desktop windows from being snap resized"
@@ -313,13 +302,6 @@ flag {
 }
 
 flag {
-    name: "enable_compat_ui_visibility_status"
-    namespace: "lse_desktop_experience"
-    description: "Enables the tracking of the status for compat ui elements."
-    bug: "350953004"
-}
-
-flag {
     name: "enable_connected_displays_dnd"
     namespace: "lse_desktop_experience"
     description: "Enable drag-and-drop between connected displays."
@@ -345,16 +327,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enable window drag between connected displays."
     bug: "381172172"
-}
-
-flag {
-    name: "enable_crash_logging_for_desktop"
-    namespace: "lse_desktop_experience"
-    description: "Enables crash reporting indicating activity was in desktop."
-    bug: "331162483"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -493,6 +465,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Fix windowing mode handling for the existing fullscreen tasks on desktop-first."
     bug: "421801240"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_desktop_first_launch_adjacent_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fix a task launch with FLAG_ACTIVITY_LAUNCH_ADJACENT on desktop-first displays."
+    bug: "440254150"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -952,16 +934,6 @@ flag {
 }
 
 flag {
-    name: "enable_drag_end_stable_bounds_reset"
-    namespace: "lse_desktop_experience"
-    description: "Enables bugfix handling stale stable bounds when drag ends."
-    bug: "421180735"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_drag_resize_set_up_in_bg_thread"
     namespace: "lse_desktop_experience"
     description: "Enables setting up the drag-resize input listener in a bg thread"
@@ -1291,16 +1263,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-  name: "enable_opaque_background_for_transparent_windows"
-  namespace: "lse_desktop_experience"
-  description: "Whether an opaque background should be forcefully set for windows with only transparent background."
-  bug: "397219542"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -1767,17 +1729,6 @@ flag {
 }
 
 flag {
-    name: "handle_incompatible_tasks_in_desktop_launch_params"
-    namespace: "lse_desktop_experience"
-    description: "Forces incompatible tasks opening in desktop to be fullscreen via the desktop /n"
-                 "mode launch params modifier."
-    bug: "423860499"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "ignore_current_params_in_desktop_launch_params"
     namespace: "lse_desktop_experience"
     description: "Ignore the current params when resolving desktop specific launch params in the /n"
@@ -1826,16 +1777,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enable switching the active desk with keyboard shortcuts"
     bug: "389957556"
-}
-
-flag {
-    name: "limit_system_fullscreen_override_to_default_display"
-    namespace: "lse_desktop_experience"
-    description: "Limit system full-screen override to apps first launched on default display"
-    bug: "423802240"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1949,16 +1890,6 @@ flag {
 }
 
 flag {
-    name: "respect_orientation_change_for_unresizeable"
-    namespace: "lse_desktop_experience"
-    description: "Whether to resize task to respect requested orientation change of unresizeable activity"
-    bug: "353338503"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "restrict_freeform_hidden_system_bars_to_filling_tasks"
     namespace: "lse_desktop_experience"
     description: "Only allow filling freeform tasks to hide the system bars"
@@ -1997,16 +1928,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables the home to be shown behind the desktop."
     bug: "375644149"
-}
-
-flag {
-    name: "skip_compat_ui_education_in_desktop_mode"
-    namespace: "lse_desktop_experience"
-    description: "Ignore Compat UI educations when in Desktop Mode."
-    bug: "357062954"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

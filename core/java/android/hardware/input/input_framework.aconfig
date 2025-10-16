@@ -210,8 +210,6 @@ flag {
     bug: "416054433"
 }
 
-
-
 flag {
     name: "mouse_to_touch_per_app_compat"
     namespace: "lse_desktop_experience"
@@ -249,6 +247,13 @@ flag {
 }
 
 flag {
+    name: "relative_capture_mode_by_default"
+    namespace: "input"
+    description: "Use the RELATIVE pointer capture mode by default, in which touchpad gestures are recognized and converted into mouse-like events. Requires pointer_capture_modes to be enabled"
+    bug: "403531245"
+}
+
+flag {
     name: "enable_partial_screenshot_keyboard_shortcut"
     namespace: "input"
     description: "Enables keyboard shortcut for taking partial screenshots via large screen capture UI"
@@ -256,10 +261,10 @@ flag {
 }
 
 flag {
-  name: "keyboard_backlight_shortcuts"
-  namespace: "desktop_input"
-  description: "Enables new keyboard shortcuts to adjust keyboard backlight"
-  bug: "401626732"
+    name: "keyboard_backlight_shortcuts"
+    namespace: "desktop_input"
+    description: "Enables new keyboard shortcuts to adjust keyboard backlight"
+    bug: "401626732"
 }
 
 flag {
@@ -277,4 +282,11 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "controller_remapping"
+    namespace: "input"
+    description: "Enables game controller remapping"
+    bug: "435503326"
 }

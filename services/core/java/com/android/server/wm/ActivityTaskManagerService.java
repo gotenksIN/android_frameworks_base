@@ -246,6 +246,9 @@ import android.sysprop.DisplayProperties;
 import android.telecom.TelecomManager;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+import android.util.BoostFramework;
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 import android.util.IntArray;
 import android.util.Log;
 import android.util.Pair;
@@ -403,6 +406,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     final ActivityTaskManagerInternal mInternal;
     private PowerManagerInternal mPowerManagerInternal;
     private UsageStatsManagerInternal mUsageStatsInternal;
+
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+    private BoostFramework mPerf = new BoostFramework();
+    private int mLegacyUiPerfHandler = -1;
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 
     GrammaticalInflectionManagerInternal mGrammaticalManagerInternal;
     PendingIntentController mPendingIntentController;
@@ -5927,6 +5935,36 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
         final boolean clearPrevious = mTopApp == mPreviousProcess;
         if (clearPrevious) mPreviousProcess = null;
+
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+        if (mPerf != null) {
+            if (mTopApp != null && mTopApp.mInfo != null) {
+                mPerf.updateUiPerfState(mContext, mTopApp.mInfo.packageName,
+                                            mTopApp.getPid());
+                if (mLegacyUiPerfHandler == -1) {
+                    int hint = mPerf.getLegacyUiPerfHint(mContext,
+                                                         mTopApp.mInfo.packageName);
+                    if (hint != -1) {
+                        mLegacyUiPerfHandler = mPerf.perfHint(hint, "android",
+                                                            Integer.MAX_VALUE, -1);
+                    }
+                } else {
+                    int hint = mPerf.getLegacyUiPerfHint(mContext,
+                                                         mTopApp.mInfo.packageName);
+                    if (hint == -1) {
+                        mPerf.perfLockReleaseHandler(mLegacyUiPerfHandler);
+                        mLegacyUiPerfHandler = -1;
+                    }
+                }
+            } else {
+                mPerf.updateUiPerfState(mContext, "", 0);
+                if (mLegacyUiPerfHandler != -1) {
+                    mPerf.perfLockReleaseHandler(mLegacyUiPerfHandler);
+                    mLegacyUiPerfHandler = -1;
+                }
+            }
+        }
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 
         final int demoteReasons = mDemoteTopAppReasons;
         final boolean cancelExpandedShade;

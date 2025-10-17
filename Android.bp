@@ -404,7 +404,6 @@ java_defaults {
         "aconfig_storage_reader_java",
         "android.hardware.common.fmq-V1-java",
         "bouncycastle-repackaged-unbundled",
-        "com.android.sysprop.foldlockbehavior",
         "com.android.sysprop.view",
         "framework-internal-utils",
         "dropboxmanager_aidl-java",
@@ -656,6 +655,13 @@ filegroup {
     name: "framework-android-os-unit-testable-src",
     srcs: [
         "core/java/android/os/DdmSyncState.java",
+    ],
+}
+
+filegroup {
+    name: "framework-telecom-shared-srcs",
+    srcs: [
+        "core/java/android/util/IndentingPrintWriter.java",
     ],
 }
 

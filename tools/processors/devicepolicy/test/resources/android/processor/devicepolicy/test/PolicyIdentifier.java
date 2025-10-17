@@ -41,6 +41,7 @@ public final class PolicyIdentifier<T> {
 
     /**
      * Test policy 1
+     * Second line
      */
     @BooleanPolicyDefinition(
             base = @PolicyDefinition(
@@ -149,7 +150,8 @@ public final class PolicyIdentifier<T> {
                             affectedResource = 1 // RESOURCE_DEVICE_WIDE
                             // requiredPermission and requiredCrossUserPermission using the
                             // default values.
-                    )
+                    ),
+                    emptyStringAllowed = true
             )
     )
     public static final PolicyIdentifier<List<String>> SIMPLE_STRING_LIST_POLICY =

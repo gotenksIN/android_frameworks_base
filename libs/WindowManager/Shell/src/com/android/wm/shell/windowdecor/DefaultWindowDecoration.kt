@@ -46,7 +46,6 @@ import android.window.DesktopModeFlags
 import android.window.WindowContainerTransaction
 import com.android.app.tracing.traceSection
 import com.android.internal.policy.DesktopModeCompatPolicy
-import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
@@ -256,10 +255,7 @@ constructor(
      * To be called when exclusion region is changed to allow [relayout] to be called if necessary.
      */
     override fun onExclusionRegionChanged(exclusionRegion: Region) {
-        if (
-            Flags.appHandleNoRelayoutOnExclusionChange() &&
-                captionType == CaptionController.CaptionType.APP_HANDLE
-        ) {
+        if (captionType == CaptionController.CaptionType.APP_HANDLE) {
             // Avoid unnecessary relayouts for app handle. See b/383672263
             return
         }
@@ -943,11 +939,11 @@ constructor(
                         checkNotNull(decorationContainerSurface) {
                             "Expected non-null decoration container surface"
                         },
+                    taskOrganizer = taskOrganizer,
                     mainHandler = handler,
                     mainExecutor = mainExecutor,
                     mainDispatcher = mainDispatcher,
                     mainScope = mainScope,
-                    bgExecutor = bgExecutor,
                     syncQueue = syncQueue,
                     rootTaskDisplayAreaOrganizer = rootTaskDisplayAreaOrganizer,
                     windowManagerWrapper = windowManagerWrapper,
@@ -1008,6 +1004,8 @@ constructor(
                     onTouchListener = onTouchListener,
                     onGenericMotionEventListener = onGenericMotionListener,
                     windowDecorationActions,
+                    taskOrganizer,
+                    mainScope,
                 )
             }
 

@@ -594,6 +594,16 @@ flag {
 }
 
 flag {
+    name: "activity_starter_display_aware"
+    namespace: "systemui"
+    description: "Fix non display aware calls in ActivityStarter"
+    bug: "432402434"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "restore_show_taps_setting"
     namespace: "systemui"
     description: "Restore show taps setting even if screen recording session is interrupted"
@@ -683,6 +693,16 @@ flag {
     namespace: "systemui"
     description: "Log card swipe events in smartspace"
     bug: "374150422"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+    name: "heads_up_style_provider_display_aware"
+    namespace: "systemui"
+    description: "Make HeadsUpStyleProvider display aware"
+    bug: "432401846"
     metadata {
         purpose: PURPOSE_BUGFIX
    }
@@ -1028,16 +1048,6 @@ flag {
   namespace: "systemui"
   description: "Flags some minor bug fixes for opening the shade on the hub"
   bug: "409682586"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "lockscreen_shade_to_dream_transition_fix"
-  namespace: "systemui"
-  description: "Flags a minor transition fix for starting the dream from lockscreen with shade open"
-  bug: "409720192"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -1694,16 +1704,6 @@ flag {
    bug: "433400058"
    metadata {
         purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
-   name: "qs_compose_fragment_early_expansion"
-   namespace: "systemui"
-   description: "Start expansion from QQS into QS early when touching the shade."
-   bug: "414856236"
-   metadata {
-     purpose: PURPOSE_BUGFIX
    }
 }
 

@@ -235,9 +235,6 @@
   <java-symbol type="id" name="metric_chronometer_0" />
   <java-symbol type="id" name="metric_chronometer_1" />
   <java-symbol type="id" name="metric_chronometer_2" />
-  <java-symbol type="id" name="metric_unit_0" />
-  <java-symbol type="id" name="metric_unit_1" />
-  <java-symbol type="id" name="metric_unit_2" />
   <java-symbol type="id" name="alt_title" />
   <java-symbol type="id" name="app_name_text_divider" />
   <java-symbol type="id" name="status_bar_latest_event_content" />
@@ -2515,6 +2512,7 @@
   <java-symbol type="layout" name="notification_material_action_tombstone" />
   <java-symbol type="layout" name="notification_2025_template_collapsed_base" />
   <java-symbol type="layout" name="notification_2025_template_collapsed_metric" />
+  <java-symbol type="layout" name="notification_2025_template_heads_up_metric" />
   <java-symbol type="layout" name="notification_2025_template_compact_heads_up_metric" />
   <java-symbol type="layout" name="notification_2025_template_expanded_metric" />
   <java-symbol type="layout" name="notification_2025_template_expanded_single_metric" />

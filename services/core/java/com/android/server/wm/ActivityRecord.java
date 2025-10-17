@@ -4320,6 +4320,10 @@ public final class ActivityRecord extends WindowToken {
             // process dies, the SDKs are unloaded and can not handle the activity, so sandbox
             // activity records should be removed.
             remove = true;
+        } else if (mAppCompatController.getDisplayCompatModePolicy()
+                .shouldRecoverFromSelfKillOnDisplayMove()) {
+            // Relaunch it as it's likely to be unintentionally killing itself on display move.
+            remove = false;
         } else if ((mRelaunchReason == RELAUNCH_REASON_WINDOWING_MODE_RESIZE
                 || mRelaunchReason == RELAUNCH_REASON_FREE_RESIZE)
                 && launchCount < 3 && !finishing) {

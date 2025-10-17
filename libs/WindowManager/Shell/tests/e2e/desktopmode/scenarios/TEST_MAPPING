@@ -322,7 +322,7 @@
       ]
     },
     {
-      "name": "FunctionalTestsDesktopMode-fundamentals-QuickSwitchBetweenDesktopAndFullscreenTest",
+      "name": "FunctionalTestsDesktopMode-fundamentals-SwitchBetweenDesktopAndFullscreenTest",
       "keywords": [
         "device",
         "desktop"
@@ -568,6 +568,13 @@
     },
     {
       "name": "FunctionalTestsDesktopMode-overview-ClearOpenAppsFromOverviewTest",
+      "keywords": [
+        "device",
+        "desktop"
+      ]
+    },
+    {
+      "name": "FunctionalTestsDesktopMode-overview-SwitchBetweenDesktopAndSplitScreenTest",
       "keywords": [
         "device",
         "desktop"

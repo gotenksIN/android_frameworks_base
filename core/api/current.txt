@@ -4560,7 +4560,6 @@ package android.app {
     method public boolean isDestroyed();
     method public boolean isFinishing();
     method @FlaggedApi("android.companion.enable_task_continuity") public final boolean isHandoffEnabled();
-    method @FlaggedApi("android.companion.enable_task_continuity") public final boolean isHandoffFullTaskRecreationAllowed();
     method public boolean isImmersive();
     method public boolean isInMultiWindowMode();
     method public boolean isInPictureInPictureMode();
@@ -4706,7 +4705,7 @@ package android.app {
     method public final void setFeatureDrawableResource(int, @DrawableRes int);
     method public final void setFeatureDrawableUri(int, android.net.Uri);
     method public void setFinishOnTouchOutside(boolean);
-    method @FlaggedApi("android.companion.enable_task_continuity") public final void setHandoffEnabled(boolean, boolean);
+    method @FlaggedApi("android.companion.enable_task_continuity") public final void setHandoffEnabled(boolean);
     method public void setImmersive(boolean);
     method public void setInheritShowWhenLocked(boolean);
     method public void setIntent(android.content.Intent);
@@ -43089,6 +43088,40 @@ package android.service.personalcontext.hint {
     method @Nullable public final android.service.personalcontext.RenderToken getRenderToken();
     field public static final int HINT_TYPE_BUNDLE = 1; // 0x1
     field public static final int HINT_TYPE_ERROR = -1; // 0xffffffff
+    field public static final int HINT_TYPE_NOTIFICATION = 2; // 0x2
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class NotificationEvent {
+    method public abstract int getEventType();
+    field public static final int EVENT_TYPE_ENQUEUED = 1; // 0x1
+    field public static final int EVENT_TYPE_REMOVED = 2; // 0x2
+    field public static final int EVENT_TYPE_UNKNOWN = -1; // 0xffffffff
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class NotificationEvent.NotificationEnqueuedEvent extends android.service.personalcontext.hint.NotificationEvent {
+    ctor public NotificationEvent.NotificationEnqueuedEvent(@NonNull android.service.notification.StatusBarNotification, @NonNull android.app.NotificationChannel, @NonNull android.service.notification.NotificationListenerService.RankingMap);
+    method public int getEventType();
+    method @NonNull public android.app.NotificationChannel getNotificationChannel();
+    method @NonNull public android.service.notification.NotificationListenerService.RankingMap getRankingMap();
+    method @NonNull public android.service.notification.StatusBarNotification getStatusBarNotification();
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class NotificationEvent.NotificationRemovedEvent extends android.service.personalcontext.hint.NotificationEvent {
+    ctor public NotificationEvent.NotificationRemovedEvent(@NonNull android.service.notification.StatusBarNotification, @NonNull android.service.notification.NotificationListenerService.RankingMap, int);
+    method public int getEventType();
+    method @NonNull public android.service.notification.NotificationListenerService.RankingMap getRankingMap();
+    method public int getReason();
+    method @NonNull public android.service.notification.StatusBarNotification getStatusBarNotification();
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class NotificationHint extends android.service.personalcontext.hint.ContextHint {
+    method public int getHintType();
+    method @NonNull public android.service.personalcontext.hint.NotificationEvent getNotificationEvent();
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class NotificationHint.NotificationHintBuilder {
+    ctor public NotificationHint.NotificationHintBuilder(@NonNull android.service.personalcontext.hint.NotificationEvent);
+    method @NonNull public android.service.personalcontext.hint.NotificationHint build();
   }
 
 }
@@ -44778,7 +44811,6 @@ package android.telephony {
     field public static final String KEY_WFC_EMERGENCY_ADDRESS_CARRIER_APP_STRING = "wfc_emergency_address_carrier_app_string";
     field public static final String KEY_WORLD_MODE_ENABLED_BOOL = "world_mode_enabled_bool";
     field public static final String KEY_WORLD_PHONE_BOOL = "world_phone_bool";
-    field @FlaggedApi("com.android.internal.telephony.flags.support_low_battery_alert") public static final int LOW_BATTERY_ALERT_DISABLED = -1; // 0xffffffff
     field @FlaggedApi("com.android.internal.telephony.flags.expose_oppt_auto_data_switch_policies") public static final int OPP_AUTO_DATA_SWITCH_POLICY_DISABLED = 0; // 0x0
     field @FlaggedApi("com.android.internal.telephony.flags.expose_oppt_auto_data_switch_policies") public static final int OPP_AUTO_DATA_SWITCH_POLICY_FOLLOW_SYSTEM = 2147483647; // 0x7fffffff
     field @FlaggedApi("com.android.internal.telephony.flags.expose_oppt_auto_data_switch_policies") public static final int OPP_AUTO_DATA_SWITCH_POLICY_FOR_AVAILABILITY = 1; // 0x1

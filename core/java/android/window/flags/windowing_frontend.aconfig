@@ -136,16 +136,6 @@ flag {
 }
 
 flag {
-  name: "app_handle_no_relayout_on_exclusion_change"
-  namespace: "windowing_frontend"
-  description: "Remove unnecessary relayouts for app handle when exclusion regions change"
-  bug: "383672263"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "update_dims_when_window_shown"
   namespace: "windowing_frontend"
   description: "Check if we need to update dim layers when a new window draws the first frame"
@@ -174,16 +164,6 @@ flag {
   is_fixed_read_only: true
   metadata {
       purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "keyguard_remove_default_display_usage"
-  namespace: "windowing_frontend"
-  description: "Execute transitions on affected DisplayContent(s) instead of Default DisplayContent"
-  bug: "430227391"
-  metadata {
-    purpose: PURPOSE_BUGFIX
   }
 }
 
@@ -231,6 +211,16 @@ flag {
     is_fixed_read_only: true
     bug: "362938401"
     is_exported: true
+}
+
+flag {
+    name: "handle_repeated_display_switches"
+    namespace: "windowing_frontend"
+    description: "Ensures that we wait for the last transition when doing repeated fold/unfolds"
+    bug: "416255987"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

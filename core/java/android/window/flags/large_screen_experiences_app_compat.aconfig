@@ -151,16 +151,6 @@ flag {
 }
 
 flag {
-  name: "enable_transition_on_activity_set_requested_orientation"
-  namespace: "large_screen_experiences_app_compat"
-  description: "Whether a Transition should be created after setRequestedOrientation"
-  bug: "409043134"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "letterbox_background_wallpaper"
   namespace: "large_screen_experiences_app_compat"
   description: "Whether the blurred letterbox wallpaper background is enabled by default"
@@ -201,14 +191,6 @@ flag {
   description: "Whether the API for forcing apps to be universal resizable on virtual display is available"
   bug: "372848702"
   is_exported: true
-}
-
-flag {
-  name: "backup_and_restore_for_user_aspect_ratio_settings"
-  namespace: "large_screen_experiences_app_compat"
-  description: "Whether B&R for user aspect ratio settings is enabled"
-  bug: "396650383"
-  is_fixed_read_only: true
 }
 
 flag {

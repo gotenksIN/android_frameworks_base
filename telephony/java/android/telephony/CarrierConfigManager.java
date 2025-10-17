@@ -42,6 +42,7 @@ import android.os.Handler;
 import android.os.PersistableBundle;
 import android.os.RemoteException;
 import android.service.carrier.CarrierService;
+import android.telecom.PhoneAccount;
 import android.telecom.TelecomManager;
 import android.telephony.AccessNetworkConstants.AccessNetworkType;
 import android.telephony.data.ApnSetting;
@@ -7602,7 +7603,7 @@ public class CarrierConfigManager {
          * {@link SmsManager#SMS_RP_CAUSE_MESSAGE_INCOMPATIBLE_WITH_PROTOCOL_STATE}
          * {@link SmsManager#SMS_RP_CAUSE_INFORMATION_ELEMENT_NON_EXISTENT}
          * {@link SmsManager#SMS_RP_CAUSE_PROTOCOL_ERROR}
-         * {@link SmsManager#SMS_RP_CAUSE_INTERWORKING_UNSPECIFIED
+         * {@link SmsManager#SMS_RP_CAUSE_INTERWORKING_UNSPECIFIED}
          */
         public static final String KEY_SMS_RP_CAUSE_VALUES_TO_RETRY_OVER_IMS_INT_ARRAY =
                 KEY_PREFIX + "sms_rp_cause_values_to_retry_over_ims_int_array";
@@ -11223,12 +11224,6 @@ public class CarrierConfigManager {
             "opp_auto_data_switch_policy_int";
 
     /**
-     * Default value indicating that the low battery alert feature is disabled.
-     */
-    @FlaggedApi(Flags.FLAG_SUPPORT_LOW_BATTERY_ALERT)
-    public static final int LOW_BATTERY_ALERT_DISABLED = -1;
-
-    /**
      * Battery level threshold (in percentage) to trigger an audio alert.
      * <p>
      * This flag defines the minimum battery percentage at which an audio alert will be played.
@@ -11237,9 +11232,9 @@ public class CarrierConfigManager {
      * </p>
      * <p>Type: Integer</p>
      * <p>Valid values: 0–100</p>
-     * <p>Default value: {@link #LOW_BATTERY_ALERT_DISABLED} (feature disabled)</p>
-     * <p>If the value is set to {@link #LOW_BATTERY_ALERT_DISABLED}, the audio alert for low
-     * battery is not enabled.</p>
+     * <p>Default value: {@link PhoneAccount.LOW_BATTERY_ALERT_DISABLED} (feature disabled)</p>
+     * <p>If the value is set to {@link PhoneAccount.LOW_BATTERY_ALERT_DISABLED},
+     * the audio alert for low battery is not enabled.</p>
      *
      */
     @FlaggedApi(Flags.FLAG_SUPPORT_LOW_BATTERY_ALERT)
@@ -11255,8 +11250,9 @@ public class CarrierConfigManager {
      * </p>
      * <p>Type: Integer</p>
      * <p>Valid values: 0 or greater</p>
-     * <p>Default value: {@link #LOW_BATTERY_ALERT_DISABLED} (feature disabled)</p>
-     * <p>If set to {@link #LOW_BATTERY_ALERT_DISABLED}, the alert tone is disabled entirely.</p>
+     * <p>Default value: {@link PhoneAccount.LOW_BATTERY_ALERT_DISABLED} (feature disabled)</p>
+     * <p>If set to {@link PhoneAccount.LOW_BATTERY_ALERT_DISABLED},
+     * the alert tone is disabled entirely.</p>
      *
      */
     @FlaggedApi(Flags.FLAG_SUPPORT_LOW_BATTERY_ALERT)
@@ -12156,9 +12152,10 @@ public class CarrierConfigManager {
         sDefaults.putInt(KEY_OPP_AUTO_DATA_SWITCH_POLICY_INT, 0);
 
         // Default value for low battery alert.
-        sDefaults.putInt(KEY_LOW_BATTERY_ALERT_THRESHOLD_INT, LOW_BATTERY_ALERT_DISABLED);
+        sDefaults.putInt(KEY_LOW_BATTERY_ALERT_THRESHOLD_INT,
+                PhoneAccount.LOW_BATTERY_ALERT_DISABLED);
         sDefaults.putInt(KEY_LOW_BATTERY_ALERT_INTERVAL_INT,
-                LOW_BATTERY_ALERT_DISABLED);
+                PhoneAccount.LOW_BATTERY_ALERT_DISABLED);
     }
 
     /**

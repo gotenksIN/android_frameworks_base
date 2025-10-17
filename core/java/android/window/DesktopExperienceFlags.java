@@ -193,8 +193,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING),
     ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS(Flags::enableDraggingPipAcrossDisplays, false,
             Flags.FLAG_ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS),
-    ENABLE_DRAG_END_STABLE_BOUNDS_RESET(Flags::enableDragEndStableBoundsReset, false,
-            Flags.FLAG_ENABLE_DRAG_END_STABLE_BOUNDS_RESET),
     ENABLE_DRAG_TO_MAXIMIZE(Flags::enableDragToMaximize, true, Flags.FLAG_ENABLE_DRAG_TO_MAXIMIZE),
     ENABLE_DRAWING_APP_HANDLE(Flags::enableDrawingAppHandle, false,
             Flags.FLAG_ENABLE_DRAWING_APP_HANDLE),
@@ -344,18 +342,12 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_FORCE_CLOSE_TOP_TRANSPARENT_FULLSCREEN_TASK),
     FORM_FACTOR_BASED_DESKTOP_FIRST_SWITCH(Flags::formFactorBasedDesktopFirstSwitch, true,
             Flags.FLAG_FORM_FACTOR_BASED_DESKTOP_FIRST_SWITCH),
-    HANDLE_INCOMPATIBLE_TASKS_IN_DESKTOP_LAUNCH_PARAMS(
-            Flags::handleIncompatibleTasksInDesktopLaunchParams, false,
-            Flags.FLAG_HANDLE_INCOMPATIBLE_TASKS_IN_DESKTOP_LAUNCH_PARAMS),
     IGNORE_CURRENT_PARAMS_IN_DESKTOP_LAUNCH_PARAMS(
             Flags::ignoreCurrentParamsInDesktopLaunchParams, false,
             Flags.FLAG_IGNORE_CURRENT_PARAMS_IN_DESKTOP_LAUNCH_PARAMS),
     IGNORE_OVERRIDE_TASK_BOUNDS_IF_INCOMPATIBLE_WITH_DISPLAY(
             Flags::ignoreOverrideTaskBoundsIfIncompatibleWithDisplay, false,
             Flags.FLAG_IGNORE_OVERRIDE_TASK_BOUNDS_IF_INCOMPATIBLE_WITH_DISPLAY),
-    LIMIT_SYSTEM_FULLSCREEN_OVERRIDE_TO_DEFAULT_DISPLAY(
-            Flags::limitSystemFullscreenOverrideToDefaultDisplay, false,
-            Flags.FLAG_LIMIT_SYSTEM_FULLSCREEN_OVERRIDE_TO_DEFAULT_DISPLAY),
     MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE(
             Flags::moveToNextDisplayShortcutWithProjectedMode, true,
             Flags.FLAG_MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE),

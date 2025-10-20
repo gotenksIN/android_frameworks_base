@@ -2660,9 +2660,7 @@ public class AudioDeviceBroker {
             // what has been communicated to audio policy manager. The device
             // returned by requestedCommunicationDevice() can be a placeholder SCO device if legacy
             // APIs are used to start SCO audio.
-// QTI_BEGIN: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-            AudioDeviceAttributes device = mBtHelper.getHeadsetAudioDummyDevice();
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
+            AudioDeviceAttributes device = mBtHelper.getHeadsetAudioDevice();
             if (device != null) {
                 return device;
             }

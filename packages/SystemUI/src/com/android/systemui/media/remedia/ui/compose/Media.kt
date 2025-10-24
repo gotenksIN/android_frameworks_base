@@ -66,6 +66,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -109,6 +110,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.node.Ref
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -120,6 +122,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.util.fastRoundToInt
@@ -138,13 +141,14 @@ import com.android.compose.gesture.effect.rememberOffsetOverscrollEffect
 import com.android.compose.gesture.overscrollToDismiss
 import com.android.compose.modifiers.thenIf
 import com.android.compose.ui.graphics.painter.rememberDrawablePainter
-import com.android.mechanics.spec.builder.rememberMotionBuilderContext
 import com.android.systemui.animation.Expandable
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.shared.model.asImageBitmap
 import com.android.systemui.common.ui.compose.Icon
 import com.android.systemui.common.ui.compose.PagerDots
+import com.android.systemui.common.ui.compose.byLayoutId
 import com.android.systemui.common.ui.compose.load
+import com.android.systemui.common.ui.compose.singleton
 import com.android.systemui.communal.ui.compose.extensions.detectLongPressGesture
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.lifecycle.rememberViewModel
@@ -292,7 +296,6 @@ private fun CardCarouselContent(
             Box(
                 modifier =
                     Modifier.overscrollToDismiss(
-                        rememberMotionBuilderContext(),
                         orientation = Orientation.Horizontal,
                         enabled = isSwipingEnabled,
                         onDismissed = onDismissed,
@@ -458,7 +461,7 @@ private fun ContentScope.CardForeground(
                 fillHeight = fillHeight,
                 colorScheme = colorScheme,
                 modifier =
-                    Modifier.graphicsLayer {
+                    Modifier.layoutId(Media.LayoutId.CardForeground).graphicsLayer {
                         compositingStrategy = CompositingStrategy.ModulateAlpha
                         alpha = 1f - gutsAlphaAnimatable.value
                     },
@@ -468,7 +471,7 @@ private fun ContentScope.CardForeground(
                 viewModel = viewModel.guts,
                 colorScheme = colorScheme,
                 modifier =
-                    Modifier.graphicsLayer {
+                    Modifier.layoutId(Media.LayoutId.CardGuts).graphicsLayer {
                         compositingStrategy = CompositingStrategy.ModulateAlpha
                         alpha = gutsAlphaAnimatable.value
                     },
@@ -476,12 +479,13 @@ private fun ContentScope.CardForeground(
         },
         modifier = modifier,
     ) { measurables, constraints ->
-        check(measurables.size == 2)
-        val contentPlaceable = measurables[0].measure(constraints)
+        val measurableByLayoutId = measurables.byLayoutId<Media.LayoutId>()
+        val contentPlaceable =
+            measurableByLayoutId[Media.LayoutId.CardForeground]!!.measure(constraints)
         // Guts should always have the exact dimensions as the content, even if we don't show the
         // content.
         val gutsPlaceable =
-            measurables[1].measure(
+            measurableByLayoutId[Media.LayoutId.CardGuts]!!.measure(
                 Constraints.fixed(contentPlaceable.width, contentPlaceable.height)
             )
 
@@ -533,12 +537,10 @@ private fun ContentScope.CardForegroundContent(
                 modifier =
                     Modifier.align(Alignment.TopEnd)
                         // Output switcher chip must be limited to at most 40% of the maximum
-                        // width
-                        // of the card.
+                        // width of the card.
                         //
                         // This saves the maximum possible width of the card so it can be
-                        // referred
-                        // to by child custom layout code below.
+                        // referred to by child custom layout code below.
                         //
                         // The assumption is that the row can be as wide as the entire card.
                         .layout { measurable, constraints ->
@@ -608,7 +610,7 @@ private fun ContentScope.CardForegroundContent(
             // Second row.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp),
             ) {
                 Metadata(
                     title = viewModel.title,
@@ -617,19 +619,17 @@ private fun ContentScope.CardForegroundContent(
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
 
-                val playPauseSize = DpSize(width = 48.dp, height = 48.dp)
                 if (viewModel.actionButtonLayout == MediaCardActionButtonLayout.WithPlayPause) {
                     AnimatedVisibility(visible = viewModel.playPauseAction != null) {
                         PlayPauseAction(
-                            viewModel = checkNotNull(viewModel.playPauseAction),
-                            buttonSize = playPauseSize,
+                            viewModel = viewModel.playPauseAction,
                             buttonColor = colorScheme.primary,
                             iconColor = colorScheme.onPrimary,
                             buttonCornerRadius = { isPlaying -> if (isPlaying) 16.dp else 48.dp },
                         )
                     }
                 } else {
-                    Spacer(Modifier.size(playPauseSize))
+                    Spacer(Modifier.size(width = 0.dp, height = 48.dp))
                 }
             }
 
@@ -638,8 +638,7 @@ private fun ContentScope.CardForegroundContent(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier =
-                        Modifier.padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 16.dp),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                 ) {
                     Navigation(
                         viewModel = viewModel.navigation,
@@ -665,7 +664,7 @@ private fun ContentScope.CardForegroundContent(
             // Bottom row.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 16.dp, top = 36.dp, end = 16.dp, bottom = 16.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             ) {
                 Metadata(
                     title = viewModel.title,
@@ -699,19 +698,17 @@ private fun ContentScope.CardForegroundContent(
                     }
                 }
 
-                val playPauseSize = DpSize(width = 48.dp, height = 48.dp)
                 if (viewModel.actionButtonLayout == MediaCardActionButtonLayout.WithPlayPause) {
                     AnimatedVisibility(visible = viewModel.playPauseAction != null) {
                         PlayPauseAction(
-                            viewModel = checkNotNull(viewModel.playPauseAction),
-                            buttonSize = playPauseSize,
+                            viewModel = viewModel.playPauseAction,
                             buttonColor = colorScheme.primary,
                             iconColor = colorScheme.onPrimary,
                             buttonCornerRadius = { isPlaying -> if (isPlaying) 16.dp else 48.dp },
                         )
                     }
                 } else {
-                    Spacer(Modifier.size(playPauseSize))
+                    Spacer(Modifier.size(width = 0.dp, height = 48.dp))
                 }
             }
         }
@@ -772,8 +769,7 @@ private fun ContentScope.CompactCardForeground(
 
         AnimatedVisibility(visible = viewModel.playPauseAction != null) {
             PlayPauseAction(
-                viewModel = checkNotNull(viewModel.playPauseAction),
-                buttonSize = DpSize(width = 72.dp, height = 48.dp),
+                viewModel = viewModel.playPauseAction,
                 buttonColor = MaterialTheme.colorScheme.primaryContainer,
                 iconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 buttonCornerRadius = { isPlaying -> if (isPlaying) 16.dp else 24.dp },
@@ -1103,6 +1099,7 @@ private fun CardGuts(
                 Modifier.align(Alignment.TopEnd).padding(top = 16.dp, end = 16.dp).clickable {
                     viewModel.settingsButton.onClick()
                 },
+            tint = Color.White,
         )
 
         //  Content.
@@ -1110,11 +1107,16 @@ private fun CardGuts(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier =
-                Modifier.align(Alignment.BottomCenter)
+                Modifier.align(Alignment.Center)
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 32.dp, bottom = 40.dp),
+                    .padding(start = 16.dp, end = 32.dp, top = 16.dp),
         ) {
-            Text(text = viewModel.text, color = Color.White)
+            Text(
+                text = viewModel.text,
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                fontSize = 14.sp,
+            )
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1123,20 +1125,27 @@ private fun CardGuts(
                 PlatformButton(
                     onClick = viewModel.primaryAction.onClick,
                     modifier = Modifier.sysuiResTag(MediaRes.HIDE_BTN),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = colorScheme.primary),
                 ) {
                     Text(
                         text = checkNotNull(viewModel.primaryAction.text),
                         color = colorScheme.onPrimary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontSize = 14.sp,
                     )
                 }
 
                 viewModel.secondaryAction?.let { button ->
                     PlatformOutlinedButton(
                         onClick = button.onClick,
-                        border = BorderStroke(width = 1.dp, color = Color.White),
+                        border = BorderStroke(width = 1.dp, color = colorScheme.primary),
                     ) {
-                        Text(text = checkNotNull(button.text), color = Color.White)
+                        Text(
+                            text = checkNotNull(button.text),
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontSize = 14.sp,
+                        )
                     }
                 }
             }
@@ -1145,6 +1154,7 @@ private fun CardGuts(
 }
 
 /** Renders the metadata labels of a track. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ContentScope.Metadata(
     title: String,
@@ -1161,7 +1171,7 @@ private fun ContentScope.Metadata(
                 Text(
                     text = title,
                     modifier = Modifier.sysuiResTag(MediaRes.TITLE),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMediumEmphasized,
                     color = color,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1203,7 +1213,7 @@ private fun DeviceChip(
                 color = Color.Transparent,
                 shape = RoundedCornerShape(12.dp),
             ),
-        modifier = modifier.padding(top = 16.dp, bottom = 8.dp),
+        modifier = modifier.padding(top = 16.dp, bottom = 0.dp),
         useModifierBasedImplementation = true,
     ) {
         Box(
@@ -1247,7 +1257,7 @@ private fun DeviceChip(
                     rememberLastNonNull(viewModel.text)?.let {
                         Text(
                             text = it,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.labelMedium,
                             color = style.contentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -1263,13 +1273,15 @@ private fun DeviceChip(
 /** Renders the primary action of media controls: the play/pause button. */
 @Composable
 private fun ContentScope.PlayPauseAction(
-    viewModel: MediaPlayPauseActionViewModel,
-    buttonSize: DpSize,
+    viewModel: MediaPlayPauseActionViewModel?,
     buttonColor: Color,
     iconColor: Color,
     buttonCornerRadius: (isPlaying: Boolean) -> Dp,
     modifier: Modifier = Modifier,
 ) {
+    if (viewModel == null) return
+
+    val buttonSize = DpSize(width = 72.dp, height = 48.dp)
     val cornerRadius: Dp by
         animateDpAsState(
             targetValue = buttonCornerRadius(viewModel.state != MediaSessionState.Paused),
@@ -1295,7 +1307,7 @@ private fun ContentScope.PlayPauseAction(
                                 rememberAnimatedVectorPainter(
                                     animatedImageVector =
                                         AnimatedImageVector.animatedVectorResource(
-                                            id = viewModel.icon.res
+                                            id = viewModel.icon.resId
                                         ),
                                     atEnd = viewModel.state == MediaSessionState.Playing,
                                 )
@@ -1365,7 +1377,7 @@ private fun SecondaryActionContent(
                         modifier = sharedModifier.sysuiResTag(resId),
                         enabled = viewModel.onClick != null,
                         colors = IconButtonDefaults.iconButtonColors(contentColor = iconColor),
-                        iconResource = viewModel.icon.res,
+                        iconResource = viewModel.icon.resId,
                         contentDescription = viewModel.icon.contentDescription?.load(),
                     )
 
@@ -1410,7 +1422,8 @@ private fun RevealedContent(
             Icon(
                 icon = viewModel.icon,
                 modifier =
-                    Modifier.size(48.dp)
+                    Modifier.layoutId(Media.LayoutId.CardRevealedContent)
+                        .size(48.dp)
                         .padding(12.dp)
                         .graphicsLayer {
                             alpha = abs(revealAmount()).fastCoerceIn(0f, 1f)
@@ -1421,8 +1434,9 @@ private fun RevealedContent(
         },
         modifier = modifier,
     ) { measurables, constraints ->
-        check(measurables.size == 1)
-        val placeable = measurables[0].measure(constraints)
+        val placeable =
+            measurables.singleton(Media.LayoutId.CardRevealedContent).measure(constraints)
+
         val totalWidth =
             min(horizontalPadding.roundToPx() * 2 + placeable.measuredWidth, constraints.maxWidth)
 
@@ -1544,6 +1558,12 @@ object Media {
             val name = "additional_action_$index"
             return ElementKey(debugName = name, identity = name)
         }
+    }
+
+    enum class LayoutId {
+        CardForeground,
+        CardGuts,
+        CardRevealedContent,
     }
 }
 

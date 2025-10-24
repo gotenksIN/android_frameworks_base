@@ -128,6 +128,7 @@ import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
 import static android.internal.perfetto.protos.Inputmethodeditor.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
 import static android.internal.perfetto.protos.Inputmethodeditor.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
 import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION;
+import static android.window.DesktopExperienceFlags.DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW;
 
 import static com.android.graphics.surfaceflinger.flags.Flags.setClientDrawnCornerRadii;
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
@@ -135,6 +136,7 @@ import static com.android.text.flags.Flags.disableHandwritingInitiatorForIme;
 import static com.android.window.flags.Flags.alwaysSeqIdLayout;
 import static com.android.window.flags.Flags.alwaysSeqIdLayoutWear;
 import static com.android.window.flags.Flags.enableWindowContextResourcesUpdateOnConfigChange;
+import static com.android.window.flags.Flags.predictiveBackStopKeycodeBackForwarding;
 import static com.android.window.flags.Flags.reduceChangedExclusionRectsMsgs;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
 
@@ -276,8 +278,8 @@ import android.window.ActivityWindowInfo;
 import android.window.BackEvent;
 import android.window.ClientWindowFrames;
 import android.window.CompatOnBackInvokedCallback;
+import android.window.ImeBackCallbackProxy;
 import android.window.InputTransferToken;
-import android.window.OnBackAnimationCallback;
 import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 import android.window.ScreenCaptureInternal;
@@ -330,7 +332,7 @@ import java.util.function.Predicate;
  * and the WindowManager.  This is for the most part an internal implementation
  * detail of {@link WindowManagerGlobal}.
  *
- * {@hide}
+ * @hide
  */
 @SuppressWarnings({"EmptyCatchBlock", "PointlessBooleanExpression"})
 public final class ViewRootImpl implements ViewParent,
@@ -779,6 +781,16 @@ public final class ViewRootImpl implements ViewParent,
     int mSyncSeqId = 0;
     int mLastSyncSeqId = 0;
 
+    /**
+     * Specific optimization where a sync relayout (WM) has determined that the results of a
+     * relayout are likely-valid despite this client providing parameters based on an out-dated
+     * configuration. In this case, relayout will provide a (later) seqId (this one) which it
+     * believes doesn't require another sync relayout and then will NOT cancel. This allows the
+     * VRI to assume the frames are already correct, layout/draw immediately, and then skip the
+     * next sync relayout.
+     */
+    int mNonSyncEarlySeqId = 0;
+
     /** @hide */
     public static final class NoPreloadHolder {
         public static final boolean sAlwaysSeqId;
@@ -875,12 +887,9 @@ public final class ViewRootImpl implements ViewParent,
     private final Rect mLastLayoutFrame;
     Rect mOverrideInsetsFrame;
 
-    final Rect mPendingBackDropFrame = new Rect();
-
     private int mRelayoutSeq;
     private final Rect mWinFrameInScreen = new Rect();
     private final InsetsState mTempInsets = new InsetsState();
-    private final InsetsSourceControl.Array mTempControls = new InsetsSourceControl.Array();
     private final WindowConfiguration mTempWinConfig = new WindowConfiguration();
     private float mInvCompatScale = 1f;
     final ViewTreeObserver.InternalInsetsInfo mLastGivenInsets
@@ -1185,7 +1194,7 @@ public final class ViewRootImpl implements ViewParent,
      * integer back over relayout.
      */
     private final WindowRelayoutResult mRelayoutResult = new WindowRelayoutResult(
-            mTmpFrames, mPendingMergedConfiguration, mTempInsets, mTempControls);
+            mTmpFrames, mPendingMergedConfiguration, mTempInsets, new InsetsSourceControl.Array());
 
     private static volatile boolean sAnrReported = false;
     static BLASTBufferQueue.TransactionHangCallback sTransactionHangCallback =
@@ -1219,6 +1228,9 @@ public final class ViewRootImpl implements ViewParent,
             new BLASTBufferQueue.CornerRadiiCallback() {
                 @Override
                 public void onCornerRadiiChanged(float[] cornerRadii) {
+                    if (!setClientDrawnCornerRadii()) {
+                        return;
+                    }
                     if (cornerRadii != null && cornerRadii.length == 4) {
                         CornerRadii newCornerRadii = new CornerRadii();
                         newCornerRadii.topLeft = cornerRadii[0];
@@ -1619,6 +1631,9 @@ public final class ViewRootImpl implements ViewParent,
                     mWindowAttributes.privateFlags |= PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY;
                 }
 
+                final WindowRelayoutResult addResult = new WindowRelayoutResult(
+                        new ClientWindowFrames(), new MergedConfiguration(), mTempInsets,
+                        new InsetsSourceControl.Array());
                 try {
                     mOrigWindowType = mWindowAttributes.type;
                     mAttachInfo.mRecomputeGlobalAttributes = true;
@@ -1628,9 +1643,6 @@ public final class ViewRootImpl implements ViewParent,
                             mInsetsController.isBehaviorControlled());
                     controlInsetsForCompatibility(mWindowAttributes);
 
-                    final WindowRelayoutResult addResult = new WindowRelayoutResult(
-                            new ClientWindowFrames(), new MergedConfiguration(), mTempInsets,
-                            mTempControls);
                     res = mWindowSession.addToDisplayAsUser(mWindow, mWindowAttributes,
                             getHostVisibility(), mDisplay.getDisplayId(), userId,
                             mInsetsController.getRequestedVisibleTypes(), inputChannel, addResult);
@@ -1658,7 +1670,7 @@ public final class ViewRootImpl implements ViewParent,
                     }
                 }
 
-                handleInsetsControlChanged(mTempInsets, mTempControls);
+                handleInsetsControlChanged(mTempInsets, addResult.activeControls);
                 final InsetsState state = mInsetsController.getState();
                 final Rect displayCutoutSafe = mTempRect;
                 state.getDisplayCutoutSafe(displayCutoutSafe);
@@ -2322,7 +2334,7 @@ public final class ViewRootImpl implements ViewParent,
 
         onClientWindowFramesChanged(frames);
 
-        CompatibilityInfo.applyOverrideIfNeeded(mergedConfiguration);
+        CompatibilityInfo.applyOverrideIfNeeded(mergedConfiguration, displayId);
         final Rect frame = frames.frame;
         final Rect displayFrame = frames.displayFrame;
         final Rect attachedFrame = frames.attachedFrame;
@@ -2381,14 +2393,6 @@ public final class ViewRootImpl implements ViewParent,
         mTmpFrames.displayFrame.set(displayFrame);
         if (mTmpFrames.attachedFrame != null && attachedFrame != null) {
             mTmpFrames.attachedFrame.set(attachedFrame);
-        }
-
-        if (mDragResizing && mUseMTRenderer) {
-            boolean fullscreen = frame.equals(mPendingBackDropFrame);
-            for (int i = mWindowCallbacks.size() - 1; i >= 0; i--) {
-                mWindowCallbacks.get(i).onWindowSizeIsChanging(mPendingBackDropFrame, fullscreen,
-                        mAttachInfo.mVisibleInsets, mAttachInfo.mStableInsets);
-            }
         }
 
         mForceNextWindowRelayout |= forceLayout;
@@ -4089,12 +4093,7 @@ public final class ViewRootImpl implements ViewParent,
 
                 if (mDragResizing != dragResizing) {
                     if (dragResizing) {
-                        final boolean backdropSizeMatchesFrame =
-                                mWinFrame.width() == mPendingBackDropFrame.width()
-                                        && mWinFrame.height() == mPendingBackDropFrame.height();
-                        // TODO: Need cutout?
-                        startDragResizing(mPendingBackDropFrame, !backdropSizeMatchesFrame,
-                                mAttachInfo.mContentInsets, mAttachInfo.mStableInsets);
+                        startDragResizing();
                     } else {
                         // We shouldn't come here, but if we come we should end the resize.
                         endDragResizing();
@@ -4916,7 +4915,7 @@ public final class ViewRootImpl implements ViewParent,
      * get focus before drawing the content of the app. This will be used so that apps do not get
      * blacked out when they are resumed and do not have focus yet.
      *
-     * {@hide}
+     * @hide
      */
     // TODO(b/263094829): Investigate dispatching this for onPause as well
     public void dispatchCompatFakeFocus() {
@@ -7437,9 +7436,16 @@ public final class ViewRootImpl implements ViewParent,
                 }
             }
 
-            // find the best view to give focus to in this brave new non-touch-mode
-            // world
-            return mView.restoreDefaultFocus();
+            if (DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW.isTrue()) {
+                // If the window has focus, then we should restore the default view focus.
+                if (mAttachInfo.mHasWindowFocus) {
+                    return mView.restoreDefaultFocus();
+                }
+            } else {
+                // find the best view to give focus to in this brave new non-touch-mode
+                // world
+                return mView.restoreDefaultFocus();
+            }
         }
         return false;
     }
@@ -7547,6 +7553,11 @@ public final class ViewRootImpl implements ViewParent,
         protected void onWindowFocusChanged(boolean hasWindowFocus) {
             if (mNext != null) {
                 mNext.onWindowFocusChanged(hasWindowFocus);
+            }
+            if (DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW.isTrue()) {
+                if (hasWindowFocus && !isInTouchMode() && mView != null && !mView.hasFocus()) {
+                    mView.restoreDefaultFocus();
+                }
             }
         }
 
@@ -7803,7 +7814,12 @@ public final class ViewRootImpl implements ViewParent,
                             return FORWARD;
                         }
                     } else if (mContext != null
-                            && mOnBackInvokedDispatcher.isOnBackInvokedCallbackEnabled()) {
+                            && (mOnBackInvokedDispatcher.isOnBackInvokedCallbackEnabled()
+                            || mOnBackInvokedDispatcher.getTopCallback()
+                            instanceof ImeBackAnimationController
+                            || mOnBackInvokedDispatcher.getTopCallback()
+                            instanceof ImeBackCallbackProxy.ImeOnBackInvokedCallback)
+                    ) {
                         return doOnBackKeyEvent(keyEvent);
                     }
                 }
@@ -7822,10 +7838,7 @@ public final class ViewRootImpl implements ViewParent,
             if (dispatcher.isBackGestureInProgress()) {
                 return FINISH_NOT_HANDLED;
             }
-            if (topCallback instanceof OnBackAnimationCallback
-                    && !(topCallback instanceof ImeBackAnimationController)) {
-                final OnBackAnimationCallback animationCallback =
-                        (OnBackAnimationCallback) topCallback;
+            if (topCallback != null) {
                 switch (keyEvent.getAction()) {
                     case KeyEvent.ACTION_DOWN:
                         // ACTION_DOWN is emitted twice: once when the user presses the button,
@@ -7834,35 +7847,37 @@ public final class ViewRootImpl implements ViewParent,
                         // - 0 means the button was pressed.
                         // - 1 means the button continues to be pressed (long press).
                         if (keyEvent.getRepeatCount() == 0) {
-                            animationCallback.onBackStarted(
-                                    new BackEvent(0, 0, 0f, BackEvent.EDGE_NONE));
+                            dispatcher.onBackStarted(topCallback,
+                                    new BackEvent(0, 0, 0f, BackEvent.EDGE_NONE), /* observerOnly */
+                                    topCallback instanceof ImeBackAnimationController);
                         }
                         break;
                     case KeyEvent.ACTION_UP:
                         if (keyEvent.isCanceled()) {
-                            animationCallback.onBackCancelled();
+                            dispatcher.onBackCancelled(topCallback);
                         } else {
-                            dispatcher.tryInvokeSystemNavigationObserverCallbacks();
-                            topCallback.onBackInvoked();
+                            dispatcher.onBackInvoked(topCallback);
+                            if (predictiveBackStopKeycodeBackForwarding()) {
+                                return FINISH_HANDLED;
+                            }
                         }
                         break;
                 }
-            } else if (topCallback != null) {
-                if (keyEvent.getAction() == KeyEvent.ACTION_UP) {
-                    if (!keyEvent.isCanceled()) {
-                        dispatcher.tryInvokeSystemNavigationObserverCallbacks();
-                        topCallback.onBackInvoked();
-                    } else {
-                        Log.d(mTag, "Skip onBackInvoked(), reason: keyEvent.isCanceled=true");
-                    }
+            } else {
+                if (predictiveBackStopKeycodeBackForwarding()) {
+                    return FORWARD;
                 }
             }
-            // Do not cancel the keyEvent if no callback can handle the back event.
-            if (topCallback != null && keyEvent.getAction() == KeyEvent.ACTION_UP) {
-                // forward a cancelled event so that following stages cancel their back logic
-                keyEvent.cancel();
+            if (predictiveBackStopKeycodeBackForwarding()) {
+                return FINISH_NOT_HANDLED;
+            } else {
+                // Do not cancel the keyEvent if no callback can handle the back event.
+                if (topCallback != null && keyEvent.getAction() == KeyEvent.ACTION_UP) {
+                    // forward a cancelled event so that following stages cancel their back logic
+                    keyEvent.cancel();
+                }
+                return FORWARD;
             }
-            return FORWARD;
         }
 
         @Override
@@ -9627,7 +9642,9 @@ public final class ViewRootImpl implements ViewParent,
         if ((mViewFrameInfo.flags & FrameInfo.FLAG_WINDOW_VISIBILITY_CHANGED) == 0
                 && mWindowAttributes.type != TYPE_APPLICATION_STARTING
                 && mSyncSeqId <= mLastSyncSeqId
-                && (mSeqId <= mLastSeqId || !NoPreloadHolder.sAlwaysSeqId)
+                && (!NoPreloadHolder.sAlwaysSeqId
+                    || mSeqId <= mLastSeqId
+                    || mSeqId <= mNonSyncEarlySeqId)
                 && winConfigFromAm.diff(winConfigFromWm, false /* compareUndefined */) == 0) {
             final InsetsState state = mInsetsController.getState();
             final Rect displayCutoutSafe = mTempRect;
@@ -9718,9 +9735,13 @@ public final class ViewRootImpl implements ViewParent,
                     mPendingActivityWindowInfo.set(outInfo);
                 }
             }
-            final int maybeSyncSeqId = mRelayoutResult.syncSeqId;
-            if (maybeSyncSeqId > (NoPreloadHolder.sAlwaysSeqId ? mSyncSeqId : 0)) {
-                mSyncSeqId = maybeSyncSeqId;
+            if (NoPreloadHolder.sAlwaysSeqId) {
+                // mRelayoutResult.syncSeqId is a legacy name. In practice, with sAlwaysSeqId, it
+                // has been repurposed to be "the highest (non-sync) seqId that this relayout
+                // result is valid for". See docstring on mNonSyncEarlySeqId for more info.
+                mNonSyncEarlySeqId = Math.max(mRelayoutResult.syncSeqId, mNonSyncEarlySeqId);
+            } else if (mRelayoutResult.syncSeqId > 0) {
+                mSyncSeqId = mRelayoutResult.syncSeqId;
             }
 
             mWinFrameInScreen.set(mTmpFrames.frame);
@@ -9730,8 +9751,8 @@ public final class ViewRootImpl implements ViewParent,
                 mTranslator.translateRectInScreenToAppWindow(mTmpFrames.attachedFrame);
             }
             mInvCompatScale = 1f / mTmpFrames.compatScale;
-            CompatibilityInfo.applyOverrideIfNeeded(mPendingMergedConfiguration);
-            handleInsetsControlChanged(mTempInsets, mTempControls);
+            CompatibilityInfo.applyOverrideIfNeeded(mPendingMergedConfiguration, getDisplayId());
+            handleInsetsControlChanged(mTempInsets, mRelayoutResult.activeControls);
         }
 
         final int transformHint = SurfaceControl.rotationToBufferTransform(
@@ -9846,15 +9867,6 @@ public final class ViewRootImpl implements ViewParent,
         if (withinRelayout) {
             mLastLayoutFrame.set(frame);
         }
-
-        final WindowConfiguration winConfig = getCompatWindowConfiguration();
-        mPendingBackDropFrame.set(mPendingDragResizing && !winConfig.useWindowFrameForBackdrop()
-                ? winConfig.getMaxBounds()
-                : frame);
-        // Surface position is now inherited from parent, and BackdropFrameRenderer uses backdrop
-        // frame to position content. Thus, we just keep the size of backdrop frame, and remove the
-        // offset to avoid double offset from display origin.
-        mPendingBackDropFrame.offsetTo(0, 0);
 
         mInsetsController.onFrameChanged(mOverrideInsetsFrame != null ?
                 mOverrideInsetsFrame : frame);
@@ -12145,14 +12157,12 @@ public final class ViewRootImpl implements ViewParent,
     /**
      * Start a drag resizing which will inform all listeners that a window resize is taking place.
      */
-    private void startDragResizing(Rect initialBounds, boolean fullscreen, Rect systemInsets,
-            Rect stableInsets) {
+    private void startDragResizing() {
         if (!mDragResizing) {
             mDragResizing = true;
             if (mUseMTRenderer) {
                 for (int i = mWindowCallbacks.size() - 1; i >= 0; i--) {
-                    mWindowCallbacks.get(i).onWindowDragResizeStart(
-                            initialBounds, fullscreen, systemInsets, stableInsets);
+                    mWindowCallbacks.get(i).onWindowDragResizeStart();
                 }
             }
             mFullRedrawNeeded = true;
@@ -12983,7 +12993,7 @@ public final class ViewRootImpl implements ViewParent,
         mCompatOnBackInvokedCallback = () -> {
             injectBackKeyEvents(/* preImeOnly */ false);
         };
-        if (mOnBackInvokedDispatcher.hasImeOnBackInvokedDispatcher()) {
+        if (mOnBackInvokedDispatcher.hasImeBackCallbackSender()) {
             Log.d(TAG, "Skip registering CompatOnBackInvokedCallback on IME dispatcher");
             return;
         }

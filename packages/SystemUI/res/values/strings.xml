@@ -30,11 +30,11 @@
     <!-- When the battery is low, this is displayed to the user in a dialog.  The title of the low battery alert.  [CHAR LIMIT=NONE]-->
     <string name="battery_low_title">Turn on Battery Saver?</string>
 
-    <!-- When the battery is low, this is displayed to the user in a dialog.  The description of the low battery alert.  [CHAR LIMIT=NONE]-->
-    <string name="battery_low_description">You have <xliff:g id="percentage" example="20%">%s</xliff:g> battery left. Battery Saver turns on Dark theme, restricts background activity, and delays notifications.</string>
+    <!-- When the battery is low, this is displayed to the user in a dialog.  The description of the low battery alert.  [CHAR LIMIT=NONE] [BACKUP_MESSAGE_ID: 3282977755476423966]-->
+    <string name="battery_low_description">You have <xliff:g id="percentage" example="20%">%s</xliff:g> battery left. Battery Saver turns on dark theme, restricts background activity, and delays notifications.</string>
 
-    <!-- When the battery is low at first time, this is displayed to the user in a dialog.  The description of the low battery alert.  [CHAR LIMIT=NONE]-->
-    <string name="battery_low_intro">Battery Saver turns on Dark theme, restricts background activity, and delays notifications.</string>
+    <!-- When the battery is low at first time, this is displayed to the user in a dialog.  The description of the low battery alert.  [CHAR LIMIT=NONE] [BACKUP_MESSAGE_ID: 5148725009653088790] -->
+    <string name="battery_low_intro">Battery Saver turns on dark theme, restricts background activity, and delays notifications.</string>
 
     <!-- A message that appears when the battery level is getting low in a dialog.  This is
         appended to the subtitle of the low battery alert.  "percentage" is the percentage of battery
@@ -355,22 +355,40 @@
     <!-- Button to stop a screen recording [CHAR LIMIT=35] -->
     <string name="screenrecord_stop_dialog_button">Stop recording</string>
 
+    <!-- Screen recording should record entire screen [CHAR LIMIT=35] -->
+    <string name="screen_record_entire_screen">Entire screen</string>
+    <!-- Screen recording should record a single app [CHAR LIMIT=35] -->
+    <string name="screen_record_single_app">Single app</string>
+    <!-- Screen recording hint shown on a button leading to choosing an app to record [CHAR LIMIT=35] -->
+    <string name="screen_record_single_app_hint">App to record</string>
+    <!-- Screen recording should record a single app but there are no apps open [CHAR LIMIT=35] -->
+    <string name="screen_record_single_app_no_recents">Single app (Open an app to choose)</string>
     <!-- Screen recording should record device audio setting [CHAR LIMIT=35] -->
     <string name="screen_record_record_device_audio_label">Record device audio</string>
     <!-- Screen recording should record microphone setting [CHAR LIMIT=35] -->
     <string name="screen_record_record_microphone_label">Record microphone</string>
+    <!-- Screen recording should show selfie camera [CHAR LIMIT=35] -->
+    <string name="screen_record_should_show_camera_label">Show selfie camera</string>
     <!-- Screen recording should show touches setting [CHAR LIMIT=35] -->
     <string name="screen_record_should_show_touches_label">Show touches</string>
     <!-- Header for the carousel to choose an app for screen recording. [CHAR LIMIT=50] -->
     <string name="screen_record_capture_target_choose_app">Choose an app to record</string>
     <!-- Snackbar shows after the screen recording is saved [CHAR LIMIT=20] -->
     <string name="screen_record_video_saved">Video saved</string>
+    <!-- Snackbar shows after the screen recording is deleted [CHAR LIMIT=20] -->
+    <string name="screen_record_video_deleted">Video deleted</string>
+    <!-- Snackbar shows after the screen recording is deleted. Undo action label [CHAR LIMIT=20] -->
+    <string name="screen_record_undo">Undo</string>
     <!-- Button to retake a screen recording [CHAR LIMIT=20] -->
     <string name="screen_record_retake">Retake</string>
     <!-- Button to edit a screen recording [CHAR LIMIT=20] -->
     <string name="screen_record_edit">Edit</string>
     <!-- Button to delete a screen recording [CHAR LIMIT=20] -->
     <string name="screen_record_delete">Delete</string>
+    <!-- Recording deletion confirmation dialog title [CHAR LIMIT=50] -->
+    <string name="screen_record_delete_dialog_title">Delete this recording?</string>
+    <!-- Recording deletion confirmation dialog content [CHAR LIMIT=50] -->
+    <string name="screen_record_delete_dialog_content">Deleting this recording will permanently delete the video file from your device.</string>
     <!-- Button to play record preview video [CHAR LIMIT=20] -->
     <string name="screen_record_play">Play</string>
     <!-- Button to pause record preview video [CHAR LIMIT=20] -->
@@ -395,6 +413,10 @@
     <string name="screen_capture_toolbar_record_button">Record</string>
     <!-- Button text for screen sharing [CHAR LIMIT=35] -->
     <string name="screen_share_toolbar_share_button">Share</string>
+    <!-- Text for app screen sharing thumbnail when no app is selected. [CHAR LIMIT=35] -->
+    <string name="screen_share_no_select_app_thumbnail">Select an app to share</string>
+    <!-- Text for share app audio. [CHAR LIMIT=35] -->
+    <string name="screen_share_app_audio_sharing">Share window audio</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "screenshot". [CHAR LIMIT=NONE] -->
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y">Take screenshot of window</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "record". [CHAR LIMIT=NONE] -->
@@ -410,8 +432,20 @@
     <!-- Content description for the settings button in the toolbar. [CHAR LIMIT=NONE] -->
     <string name="screen_capture_toolbar_settings_button_a11y">Screen capture settings</string>
 
+    <!-- Screen capture setting to show clicks and keys when recording [CHAR LIMIT=35] -->
+    <string name="screen_capture_show_clicks_and_keys">Show clicks and keys</string>
+    <!-- Screen capture setting to capture device audio when recording [CHAR LIMIT=35] -->
+    <string name="screen_capture_device_audio">Device audio</string>
+    <!-- Screen capture setting to capture microphone audio when recording [CHAR LIMIT=35] -->
+    <string name="screen_capture_microphone_audio">Microphone</string>
+    <!-- Screen capture setting to include the front camera when recording [CHAR LIMIT=35] -->
+    <string name="screen_capture_front_camera">Front camera</string>
+
     <!-- Text shown beneath partial screenshot region displaying the dimensions (width and height) of the area to be captured. [CHAR LIMIT=NONE] [SCREENSHOT=screen/7ytguTQdu3cEn4f] -->
     <string name="screen_capture_region_dimensions"><xliff:g example="210" id="width">%1$d</xliff:g> x <xliff:g example="129" id="height">%2$d</xliff:g></string>
+
+    <!-- Text of the button popup on the share screen privacy indicator to stop screen sharing. -->
+    <string name="screen_share_privacy_indicator_stop_sharing">Stop sharing</string>
 
     <!-- Content description for the status bar chip shown to the user when they're sharing their screen to another app on the device [CHAR LIMIT=NONE] -->
     <string name="share_to_app_chip_accessibility_label">Sharing screen</string>
@@ -996,6 +1030,8 @@
     <string name="quick_settings_cast_no_network">No Wi\u2011Fi or Ethernet connection</string>
     <!-- QuickSettings: Cast details, text on the disconnect button, click to disconnect a device [CHAR LIMIT=NONE] -->
     <string name="quick_settings_cast_disconnect">Disconnect</string>
+    <!-- QuickSettings: Audio details, text on the input device indicating what the current input device is [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_audio_current_input">Current mic is</string>
     <!-- QuickSettings: Brightness dialog title [CHAR LIMIT=NONE] -->
     <string name="quick_settings_brightness_dialog_title">Brightness</string>
     <!-- QuickSettings: Label for the toggle that controls whether display inversion is enabled. [CHAR LIMIT=NONE] -->
@@ -1149,6 +1185,10 @@
     <string name="hearing_devices_presets_error">Couldn\'t update preset</string>
     <!-- QuickSettings: Title for hearing aids presets. Preset is a set of hearing aid settings. User can apply different settings in different environments (e.g. Outdoor, Restaurant, Home) [CHAR LIMIT=40]-->
     <string name="hearing_devices_preset_label">Preset</string>
+    <!-- QuickSettings: Title for hearing aids presets of left side device. Preset is a set of hearing aid settings. User can apply different settings in different environments (e.g. Outdoor, Restaurant, Home) [CHAR LIMIT=40]-->
+    <string name="hearing_devices_preset_label_left">Left Preset</string>
+    <!-- QuickSettings: Title for hearing aids presets of right side device. Preset is a set of hearing aid settings. User can apply different settings in different environments (e.g. Outdoor, Restaurant, Home) [CHAR LIMIT=40]-->
+    <string name="hearing_devices_preset_label_right">Right Preset</string>
     <!-- QuickSettings: Title for hearing aids input routing control in hearing device dialog. [CHAR LIMIT=40]-->
     <string name="hearing_devices_input_routing_label">Default microphone for calls</string>
     <!-- QuickSettings: Option for hearing aids input routing control in hearing device dialog. It will alter input routing for calls for hearing aid. [CHAR LIMIT=40]-->
@@ -1156,8 +1196,6 @@
         <item>Hearing aid microphone</item>
         <item>This phone\'s microphone</item>
     </string-array>
-    <!-- QuickSettings: Content description for the icon that indicates the item is selected [CHAR LIMIT=NONE]-->
-    <string name="hearing_devices_spinner_item_selected">Selected</string>
     <!-- QuickSettings: Title for ambient controls. [CHAR LIMIT=40]-->
     <string name="hearing_devices_ambient_label">Surroundings</string>
     <!-- QuickSettings: The text to show the control is for left side device. [CHAR LIMIT=30] -->
@@ -1339,7 +1377,7 @@
     </string>
 
     <!-- Modes: title for when multiple modes are active; number is >= 2 [CHAR LIMIT=20] -->
-    <string name="zen_modes_multiple_on_title"><xliff:g id="number" example="3">%s</xliff:g> Modes</string>
+    <string name="zen_modes_multiple_on_title"><xliff:g id="number" example="3">%d</xliff:g> Modes</string>
 
     <!-- Modes: subtitle for when multiple modes are active. Plural. [CHAR LIMIT=20] -->
     <string name="zen_modes_multiple_on_status">On</string>
@@ -1716,9 +1754,6 @@
     <!-- Content description for accessibility: Tapping this button will open notifications settings [CHAR LIMIT=NONE] -->
     <string name="accessibility_notification_section_header_open_settings">Open notifications settings</string>
 
-    <!-- The text to show in the notifications shade when dnd is suppressing notifications. [CHAR LIMIT=100] -->
-    <string name="dnd_suppressing_shade_text">Notifications paused by Do Not Disturb</string>
-
     <!-- The text to show in the notifications shade when a mode is suppressing notifications. [CHAR LIMIT=100] -->
     <string name="modes_suppressing_shade_text">
         {count, plural, offset:1
@@ -1728,6 +1763,9 @@
             other {Notifications paused by {mode} and # other modes}
         }
     </string>
+
+    <!-- The text to show in the notifications shade when there are no notifications [CHAR LIMIT=100] -->
+    <string name="caught_up_shade_text">You\'re all caught up</string>
 
     <!-- Media projection permission dialog action text. [CHAR LIMIT=60] -->
     <string name="media_projection_action_text">Start now</string>
@@ -2249,7 +2287,7 @@
     <string name="notification_guts_recs_summary">Newsletters, recommended media, and more</string>
 
     <!-- Notification summaries onboarding affordance turn on button [CHAR LIMIT=40]-->
-    <string name="notification_onboarding_summaries_turn_on">Turn on</string>
+    <string name="notification_onboarding_summaries_turn_on">Turn on in Settings</string>
 
     <!--  Notification summaries onboarding affordance message [CHAR LIMIT=NONE]-->
     <string name="notification_onboarding_summaries_message">Your longer conversations can now be summarized to give you quick recaps</string>
@@ -2550,6 +2588,8 @@
     <string name="group_system_access_quick_settings_panel">View quick settings</string>
     <!-- User visible title for the keyboard shortcut that takes a full screenshot. [CHAR LIMIT=70] -->
     <string name="group_system_full_screenshot">Take screenshot</string>
+    <!-- User visible title for the keyboard shortcut that begins a partial screenshot. [CHAR LIMIT=70] -->
+    <string name="group_system_partial_screenshot">Take partial screenshot</string>
     <!-- User visible title for the keyboard shortcut that access list of system / apps shortcuts. [CHAR LIMIT=70] -->
     <string name="group_system_access_system_app_shortcuts">Show shortcuts</string>
     <!-- User visible title for the keyboard shortcut that goes back to previous state. [CHAR LIMIT=70] -->
@@ -2572,8 +2612,6 @@
     <string name="group_system_lock_screen">Lock screen</string>
     <!-- User visible title for the keyboard shortcut that pulls up Notes app for quick memo. [CHAR LIMIT=70] -->
     <string name="group_system_quick_memo">Take a note</string>
-    <!-- User visible title for the keyboard shortcut that closes a focused task [CHAR LIMIT=70] -->
-    <string name="group_system_close_window">Close current window</string>
 
     <!-- User visible title for the multitasking keyboard shortcuts list. [CHAR LIMIT=70] -->
     <string name="keyboard_shortcut_group_system_multitasking">Multitasking</string>
@@ -2601,6 +2639,9 @@
     <string name="system_desktop_mode_toggle_maximize_window">Maximize window</string>
     <!-- User visible title for the keyboard shortcut that minimizes a task in desktop mode [CHAR LIMIT=70] -->
     <string name="system_desktop_mode_minimize_window">Minimize window</string>
+    <!-- User visible title for the keyboard shortcut that closes a focused task
+         [CHAR LIMIT=70 BACKUP_MESSAGE_ID=1506354809787837043] -->
+    <string name="system_desktop_mode_close_window">Close current window</string>
     <!-- User visible title for the keyboard shortcut that switches between desktops in multiple desktop mode [CHAR LIMIT=70] -->
     <string name="system_multiple_desktop_mode_switch_between_desks">Move between desktops</string>
 
@@ -2928,22 +2969,30 @@
     <!-- Text for the dialog title. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_dialog_title">Turn on <xliff:g name="feature_name" example="Magnification">%1$s</xliff:g>?</string>
     <!-- Text for showing inside the dialog. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_key_gesture_dialog_content">Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="M">^2</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="Voice Access">^3</xliff:g>. <xliff:g name="feature_intro" example="Voice Access intro">^4</xliff:g></string>
+    <string name="accessibility_key_gesture_dialog_content">Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="M">^2</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="TalkBack">^3</xliff:g>. <xliff:g name="feature_intro" example="TalkBack intro">^4</xliff:g></string>
     <!-- The text for the TalkBack introduction. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_dialog_talkback_intro"><xliff:g name="feature_name" example="TalkBack">%1$s</xliff:g> is a screen reader that allows you to hear items spoken aloud. It can be helpful for people who have difficulty seeing the screen.</string>
-    <!-- The text for the Voice Access introduction. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_key_gesture_dialog_va_intro"><xliff:g name="feature_name" example="Voice Access">%1$s</xliff:g> lets you control your device hands-free.</string>
     <!-- Positive button text for the dialog. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_dialog_positive_button_text">Turn on</string>
 
-    <!-- Text for the Magnification dialog title. [CHAR LIMIT=NONE] -->
+    <!-- Text for the dialog title when keyboard shortcut has not yet been enabled. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title">Turn on <xliff:g name="feature_name" example="Voice Access">%1$s</xliff:g> keyboard shortcut?</string>
+    <!-- Negative button text for dialog when the keyboard shortcut has not yet enabled. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text">Don\'t turn on</string>
+    <!-- Positive button text for dialog when the keyboard shortcut has not yet enabled. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text">Turn on shortcut</string>
+
+    <!-- Text for the Magnification dialog title when the keyboard shortcut is enabled and Magnification has been toggled on. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_magnification_dialog_title"><xliff:g name="feature_name" example="Magnification">%1$s</xliff:g> keyboard shortcut turned on</string>
     <!-- Text for showing inside the Magnification dialog. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_key_gesture_magnification_dialog_content">Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="M">^2</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="Magnification">^3</xliff:g>. This allows you to quickly zoom in on the screen to make content larger. Press Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> and \"+\" or \"-\" to adjust zoom.</string>
-    <!-- Negative button text for the Magnification dialog. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_key_gesture_magnification_dialog_content">Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="M">^2</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="Magnification">^3</xliff:g>, an accessibility feature. This allows you to quickly zoom in on the screen to make content larger. Once magnification is on, press Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> and \"+\" or \"-\" to adjust zoom.</string>
+    <!-- Negative button text for the Magnification dialog when the keyboard shortcut is enabled. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text">Turn off shortcut</string>
-    <!-- Positive button text for the Magnification dialog. [CHAR LIMIT=NONE] -->
+    <!-- Positive button text for the Magnification dialog when the keyboard shortcut is enabled. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text">Keep on</string>
+
+    <!-- Text for showing inside the Voice Access dialog. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_key_gesture_voice_access_dialog_content">Pressing Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="M">^2</xliff:g> turns on <xliff:g name="feature_name" example="Voice Access">^3</xliff:g>, an accessibility feature. This lets you control your device hands-free.</string>
 
     <!-- Plugin control section of the tuner. Non-translatable since it should
          not appear on production builds ever. -->
@@ -4264,6 +4313,10 @@
          any key  yet. The helper is a component that shows the user which keyboard shortcuts
          they can use. [CHAR LIMIT=NONE] -->
     <string name="shortcut_helper_add_shortcut_dialog_placeholder">Press key</string>
+    <!-- Action key, used in keyboard shortcut helper to combine keys for shortcut. E.g. Action + 1
+         The helper is a component that shows the user which keyboard shortcuts they can use.
+         [CHAR LIMIT=NONE] -->
+    <string name="shortcut_helper_customizer_action_key_text">Action</string>
     <!-- Error message displayed when the user select a key combination that is already in use while
          assigning a new custom key combination to a shortcut in shortcut helper. The helper is a
          component that shows the user which keyboard shortcuts they can use. [CHAR LIMIT=NONE] -->

@@ -19,8 +19,10 @@ package com.android.wm.shell.desktopmode.data.persistence
 import android.content.Context
 import android.platform.test.annotations.EnableFlags
 import android.testing.AndroidTestingRunner
+import android.util.ArrayMap
 import android.util.ArraySet
 import android.view.Display.DEFAULT_DISPLAY
+import android.view.Display.INVALID_DISPLAY
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.dataStoreFile
@@ -29,8 +31,10 @@ import androidx.test.filters.SmallTest
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PERSISTENCE
+import com.android.window.flags.Flags.FLAG_ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.desktopmode.data.Desk
+import com.android.wm.shell.desktopmode.data.DesktopDisplay
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -320,6 +324,8 @@ class DesktopPersistentRepositoryTest : ShellTestCase() {
             datastoreRepository.addOrUpdateRepository(
                 userId = DEFAULT_USER_ID,
                 desks = listOf(desk),
+                activeDeskId = DEFAULT_DESKTOP_ID,
+                preservedDisplays = ArrayMap(),
             )
 
             val actualDesktop = datastoreRepository.readDesktop(DEFAULT_USER_ID, DEFAULT_DESKTOP_ID)
@@ -353,6 +359,8 @@ class DesktopPersistentRepositoryTest : ShellTestCase() {
             datastoreRepository.addOrUpdateRepository(
                 userId = DEFAULT_USER_ID,
                 desks = listOf(desk),
+                activeDeskId = DEFAULT_DESKTOP_ID,
+                preservedDisplays = ArrayMap(),
             )
 
             var actualDesktop = datastoreRepository.readDesktop(DEFAULT_USER_ID, DEFAULT_DESKTOP_ID)
@@ -369,6 +377,8 @@ class DesktopPersistentRepositoryTest : ShellTestCase() {
             datastoreRepository.addOrUpdateRepository(
                 userId = DEFAULT_USER_ID,
                 desks = listOf(desk),
+                activeDeskId = DEFAULT_DESKTOP_ID,
+                preservedDisplays = ArrayMap(),
             )
 
             actualDesktop = datastoreRepository.readDesktop(DEFAULT_USER_ID, DEFAULT_DESKTOP_ID)
@@ -403,6 +413,8 @@ class DesktopPersistentRepositoryTest : ShellTestCase() {
             datastoreRepository.addOrUpdateRepository(
                 userId = DEFAULT_USER_ID,
                 desks = listOf(desk),
+                activeDeskId = DEFAULT_DESKTOP_ID,
+                preservedDisplays = ArrayMap(),
             )
 
             val actualDesktop = datastoreRepository.readDesktop(DEFAULT_USER_ID, DEFAULT_DESKTOP_ID)
@@ -429,6 +441,7 @@ class DesktopPersistentRepositoryTest : ShellTestCase() {
                     visibleTasks = visibleTasks,
                     minimizedTasks = minimizedTasks,
                     freeformTasksInZOrder = freeformTasksInZOrder,
+                    uniqueDisplayId = UNIQUE_DISPLAY_ID,
                 )
             val desk2 =
                 Desk(
@@ -437,6 +450,7 @@ class DesktopPersistentRepositoryTest : ShellTestCase() {
                     visibleTasks = visibleTasks,
                     minimizedTasks = minimizedTasks,
                     freeformTasksInZOrder = freeformTasksInZOrder,
+                    uniqueDisplayId = UNIQUE_DISPLAY_ID,
                 )
             val desk3 =
                 Desk(
@@ -445,10 +459,13 @@ class DesktopPersistentRepositoryTest : ShellTestCase() {
                     visibleTasks = visibleTasks,
                     minimizedTasks = minimizedTasks,
                     freeformTasksInZOrder = freeformTasksInZOrder,
+                    uniqueDisplayId = UNIQUE_DISPLAY_ID,
                 )
             datastoreRepository.addOrUpdateRepository(
                 userId = DEFAULT_USER_ID,
                 desks = listOf(desk1, desk2, desk3),
+                activeDeskId = DEFAULT_DESKTOP_ID,
+                preservedDisplays = ArrayMap(),
             )
 
             // Back to back removals
@@ -456,18 +473,24 @@ class DesktopPersistentRepositoryTest : ShellTestCase() {
                 datastoreRepository.addOrUpdateRepository(
                     userId = DEFAULT_USER_ID,
                     desks = listOf(desk1, desk3),
+                    activeDeskId = DEFAULT_DESKTOP_ID,
+                    preservedDisplays = ArrayMap(),
                 )
             }
             launch {
                 datastoreRepository.addOrUpdateRepository(
                     userId = DEFAULT_USER_ID,
                     desks = listOf(desk3),
+                    activeDeskId = DEFAULT_DESKTOP_ID + 3,
+                    preservedDisplays = ArrayMap(),
                 )
             }
             launch {
                 datastoreRepository.addOrUpdateRepository(
                     userId = DEFAULT_USER_ID,
                     desks = listOf(),
+                    activeDeskId = null,
+                    preservedDisplays = ArrayMap(),
                 )
             }
             advanceUntilIdle()
@@ -475,6 +498,82 @@ class DesktopPersistentRepositoryTest : ShellTestCase() {
             val actualDesktop = datastoreRepository.readDesktop(DEFAULT_USER_ID, DEFAULT_DESKTOP_ID)
             assertThat(actualDesktop?.tasksByTaskIdMap?.get(task.taskId)?.desktopTaskState)
                 .isEqualTo(DesktopTaskState.MINIMIZED)
+        }
+    }
+
+    @Test
+    fun addOrUpdateRepository_addsNewActiveDesk() {
+        runTest(StandardTestDispatcher()) {
+            // Create a basic repository state
+            val task = createDesktopTask(1)
+            val desktopPersistentRepositories = createRepositoryWithOneDesk(ArrayList(listOf(task)))
+            testDatastore.updateData { desktopPersistentRepositories }
+            // Create a new state to be initialized
+            val visibleTasks = ArraySet(listOf(1, 2))
+            val minimizedTasks = ArraySet<Int>()
+            val freeformTasksInZOrder = ArrayList(listOf(2, 1))
+            val desk =
+                Desk(
+                    deskId = DEFAULT_DESKTOP_ID,
+                    displayId = DEFAULT_DISPLAY,
+                    visibleTasks = visibleTasks,
+                    minimizedTasks = minimizedTasks,
+                    freeformTasksInZOrder = freeformTasksInZOrder,
+                    uniqueDisplayId = UNIQUE_DISPLAY_ID,
+                )
+
+            // Update with new state
+            datastoreRepository.addOrUpdateRepository(
+                userId = DEFAULT_USER_ID,
+                desks = listOf(desk),
+                activeDeskId = DEFAULT_DESKTOP_ID,
+                preservedDisplays = ArrayMap(),
+            )
+
+            val desktopState = datastoreRepository.getDesktopRepositoryState(DEFAULT_USER_ID)
+            assertThat(desktopState?.activeDeskByUniqueDisplayIdMap?.values)
+                .containsExactly(DEFAULT_DESKTOP_ID)
+        }
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX)
+    fun addOrUpdateRepository_addsNewPreservedDisplay() {
+        runTest(StandardTestDispatcher()) {
+            // Create a basic repository state
+            val task = createDesktopTask(1)
+            val desktopPersistentRepositories = createRepositoryWithOneDesk(ArrayList(listOf(task)))
+            testDatastore.updateData { desktopPersistentRepositories }
+
+            val displayToPreserve = DesktopDisplay(INVALID_DISPLAY)
+            val deskToPreserve =
+                Desk(
+                    deskId = 2,
+                    displayId = 2,
+                    visibleTasks = ArraySet(listOf(3, 4, 5)),
+                    minimizedTasks = ArraySet<Int>(),
+                    freeformTasksInZOrder = ArrayList(listOf(3, 4, 5)),
+                    uniqueDisplayId = UNIQUE_DISPLAY_ID,
+                )
+            deskToPreserve.activeTasks.addAll(listOf(3, 4, 5))
+            displayToPreserve.orderedDesks.add(deskToPreserve)
+            displayToPreserve.activeDeskId = 2
+            val preservedDisplays = ArrayMap<String, DesktopDisplay>()
+            preservedDisplays[UNIQUE_DISPLAY_ID] = displayToPreserve
+
+            // Update with new state
+            datastoreRepository.addOrUpdateRepository(
+                userId = DEFAULT_USER_ID,
+                desks = listOf(),
+                activeDeskId = DEFAULT_DESKTOP_ID,
+                preservedDisplays = preservedDisplays,
+            )
+
+            val desktopState = datastoreRepository.getDesktopRepositoryState(DEFAULT_USER_ID)
+            val preservedDisplayFound = desktopState?.preservedDisplayByUniqueIdMap?.values?.first()
+            assertThat(preservedDisplayFound?.activeDeskId).isEqualTo(2)
+            val preservedDesktop = preservedDisplayFound?.preservedDesktopMap?.values?.first()
+            assertThat(preservedDesktop?.tasksByTaskIdMap?.keys).containsExactly(3, 4, 5)
         }
     }
 

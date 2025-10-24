@@ -1080,6 +1080,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         if (consumedControlCount != mTmpControlArray.size()) {
             for (int i = mTmpControlArray.size() - 1; i >= 0; i--) {
                 final InsetsSourceControl control = mTmpControlArray.valueAt(i);
+                controllableTypes |= control.getType();
                 getSourceConsumer(control.getId(), control.getType())
                         .setControl(control, showTypes, hideTypes, cancelTypes, transientTypes);
             }
@@ -1218,6 +1219,14 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
                 continue;
             }
             if (isIme) {
+                if (requestedVisible && (mReportedRequestedVisibleTypes & ime()) != 0) {
+                    // If the IME is requested, but has been reported to the server already, the
+                    // request would not go through. Call into IMM to check whether the session was
+                    // reset and in that case, request focus again.
+                    if (mHost.getInputMethodManager() != null) {
+                        mHost.getInputMethodManager().requestFocusAfterSessionReset();
+                    }
+                }
                 ImeTracker.forLogging().onProgress(
                         statsToken, ImeTracker.PHASE_CLIENT_APPLY_ANIMATION);
             }
@@ -1375,7 +1384,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         if (!fromPredictiveBack && !visible && (types & ime()) != 0
                 && (mRequestedVisibleTypes & ime()) != 0) {
             // Clear IME back callbacks if a IME hide animation is requested
-            mHost.getInputMethodManager().getImeOnBackInvokedDispatcher().preliminaryClear();
+            mHost.getInputMethodManager().getImeBackCallbackProxy().preliminaryClear();
         }
         // Basically, we accept the requested visibilities from the upstream callers...
         setRequestedVisibleTypes(visible ? types : 0, types);
@@ -1834,7 +1843,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
                 // In case the IME back callbacks have been preliminarily cleared before, let's
                 // reregister them. This can happen if an IME hide animation was interrupted and the
                 // IME is requested to be shown again.
-                getHost().getInputMethodManager().getImeOnBackInvokedDispatcher()
+                getHost().getInputMethodManager().getImeBackCallbackProxy()
                         .undoPreliminaryClear();
             }
             ProtoLog.d(IME_INSETS_CONTROLLER, "Setting requestedVisibleTypes to %d (was %d)",
@@ -1911,7 +1920,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
             @Nullable ImeTracker.Token statsToken) {
         // TODO(b/166736352): We should only skip the animation of specific types, not all types.
         boolean skipsAnim = false;
-        if ((types & ime()) != 0) {
+        if (!Flags.unifySkipAnimationOnceWithInitiallyVisible() && (types & ime()) != 0) {
             final InsetsSourceControl imeControl = mImeSourceConsumer.getControl();
             // Skip showing animation once that made by system for some reason.
             // (e.g. starting window with hasImeSurface)

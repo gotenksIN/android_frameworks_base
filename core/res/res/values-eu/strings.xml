@@ -87,7 +87,7 @@
     <string name="CLIRPermanent" msgid="166443681876381118">"Ezin duzu aldatu deitzailearen identitatearen ezarpena."</string>
     <string name="auto_data_switch_title" msgid="3286350716870518297">"<xliff:g id="CARRIERDISPLAY">%s</xliff:g> operadorearen datu-konexiora aldatu zara"</string>
     <string name="auto_data_switch_content" msgid="803557715007110959">"Ezarpenak atalean alda dezakezu aukera hori"</string>
-    <string name="RestrictedOnDataTitle" msgid="1500576417268169774">"Ez dago mugikorretarako datu-zerbitzurik"</string>
+    <string name="RestrictedOnDataTitle" msgid="1500576417268169774">"Ez dago datu-konexioaren zerbitzurik"</string>
     <string name="RestrictedOnEmergencyTitle" msgid="2852916906106191866">"Ezin da egin larrialdi-deirik"</string>
     <string name="RestrictedOnNormalTitle" msgid="7009474589746551737">"Ez dago ahots-deien zerbitzurik"</string>
     <string name="RestrictedOnAllVoiceTitle" msgid="3982069078579103087">"Ez dago ahozko zerbitzurik eta ezin da egin larrialdi-deirik"</string>
@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Aldatu laneko profilera"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Aldatu <xliff:g id="APP_NAME">%1$s</xliff:g> aplikazioko profil pertsonalera"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Aldatu <xliff:g id="APP_NAME">%1$s</xliff:g> aplikazioko laneko profilera"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Kontaktuak"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"atzitu kontaktuak"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Kontaktuak eta kontuak"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"zure kontaktuak erabiltzeko baimena izan eta gailuan kontaktuak gorde ditzaketen kontuen zerrenda ikusi"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Kokapena"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"atzitu gailuaren kokapena"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Calendar"</string>
@@ -370,8 +370,10 @@
     <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"begi-mugimenduen jarraipen zehatza egin"</string>
     <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Mugimenduen eta inguruaren datuak"</string>
     <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"begien, aurpegiaren eta gorputzaren jarraipena egin eta ingurua aztertu"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Buru-mugimendu zehatzen eta inguruaren datuak"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"buruaren jarraipen zehatza egin eta ingurua aztertu"</string>
+    <!-- no translation found for permgrouplab_xr_tracking_sensitive (6574264227123545314) -->
+    <skip />
+    <!-- no translation found for permgroupdesc_xr_tracking_sensitive (2480835734248509848) -->
+    <skip />
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Leihoko edukia eskuratu."</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Arakatu irekita daukazun leihoko edukia."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"\"Arakatu ukituta\" aktibatu."</string>
@@ -639,6 +641,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Banda ultrazabala darabilten inguruko gailuen arteko distantzia erlatiboa zehazteko baimena ematen dio aplikazioari"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"inguruko wifi-gailuekin interakzioan jardun"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Inguruko wifi-gailuetan iragartzeko, haiekin konektatzeko eta haien kokapena zehazteko baimena ematen dio aplikazioari"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"sare lokaleko gailuak atzitu"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Sare lokaleko gailuak atzitzeko baimena ematen dio aplikazioari"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"zehaztu inguruko gailuen arteko distantzia erlatiboa"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Inguruko gailuen arteko distantzia erlatiboa zehazteko baimena ematen dio aplikazioari"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"NFC bidezko ordainketa-zerbitzu lehenetsiari buruzko informazioa"</string>
@@ -683,7 +687,8 @@
     <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Zure ingurunea aztertzeko baimena ematen dio aplikazioari."</string>
     <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"ingurua zehaztasunez aztertu"</string>
     <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Zure ingurunea zehaztasunez aztertzeko baimena ematen dio aplikazioari."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"atzeko planoan EHko datuen jarraipena egin"</string>
+    <!-- no translation found for permlab_xr_tracking_in_background (1714941204255185460) -->
+    <skip />
     <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Atzeko planoan EHko datuak erabiltzeko baimena ematen dio aplikazioari."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"kapturatu gakoak"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Sistemak sistemaren lasterbideak eta ekintzak prozesatu ahal izan baino lehen gakoak kapturatzeko baimena ematen dio aplikazioari."</string>
@@ -1984,8 +1989,10 @@
     <string name="package_updated_device_owner" msgid="7770195449213776218">"Administratzaileak eguneratu du.\nEmandako baimenak ikusteko, joan ezarpenetara."</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Administratzaileak ezabatu du"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"Ados"</string>
-    <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"Bateria-aurreztaileak gai iluna aktibatzen du, eta atzeko planoko jarduerak, zenbait efektu bisual, eta eginbide jakin eta sareko konexio batzuk mugatzen edo desaktibatzen ditu."</string>
-    <string name="battery_saver_description" msgid="8518809702138617167">"Bateria-aurreztaileak gai iluna aktibatzen du, eta atzeko planoko jarduerak, zenbait efektu bisual, eta eginbide jakin eta sareko konexio batzuk mugatzen edo desaktibatzen ditu."</string>
+    <!-- no translation found for battery_saver_description_with_learn_more (8969945879044849461) -->
+    <skip />
+    <!-- no translation found for battery_saver_description (2820475140307374570) -->
+    <skip />
     <string name="data_saver_description" msgid="4995164271550590517">"Datu-erabilera murrizteko, atzeko planoan datuak bidaltzea eta jasotzea galarazten die datu-aurreztaileak aplikazio batzuei. Erabiltzen ari zaren aplikazioek datuak atzitu ahalko dituzte, baina baliteke maiztasun txikiagoarekin atzitzea. Ondorioz, adibidez, baliteke irudiak ez erakustea haiek sakatu arte."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"Datu-aurreztailea aktibatu nahi duzu?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"Aktibatu"</string>
@@ -2047,12 +2054,9 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"Maximizatu"</string>
     <string name="close_button_text" msgid="10603510034455258">"Itxi"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
-    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
-    <skip />
+    <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
+    <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
+    <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Erantzun"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Bideoa"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Baztertu"</string>
@@ -2580,33 +2584,22 @@
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"Aplikazioak"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"Zure hatz-markak ez dira ezagutzen jada. Konfiguratu berriro hatz-marka bidez desblokeatzeko eginbidea."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Segurtasuna eta pribatutasuna"</string>
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
-    <skip />
-    <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Desaktibatu audioa"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"Desblokeatu pantaila eta konektatu USBa berriro"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"Desblokeatu pantaila USB bidez konektatzeko"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"USB bidezko konexioa abiarazteko, pantaila desblokeatuta egotea behar du Babes aurreratua programak"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"USB bidezko konexioa abiarazteko, pantaila desblokeatuta egotea behar du Babes aurreratua programak"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"Bizkorrago kargatzeko, pantaila desblokeatuta egotea behar du Babes aurreratua programak"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"Bizkorrago kargatzeko edo USB bidezko konexioa abiarazteko, pantaila desblokeatuta egotea behar du Babes aurreratua programak"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Desaktibatu jakinarazpenak"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Jakinarazpenak desaktibatuta"</string>
-    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
-    <skip />
+    <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Ez duzu jasoko Babes aurreratua programaren USB konexioei buruzko jakinarazpenik gailua berrabiarazi arte"</string>
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"USB bidezko jarduera susmagarriak"</string>
-    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
-    <skip />
+    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="5772698072220844779">"USB bidezko datu-seinalea desgaitu egin da"</string>
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Arazoak dituzu hatz-marka bidez desblokeatzeko eginbidearekin?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Sakatu hau desblokeatzeko aukera hobetzeko aholkuak berrikusteko"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Ez egin keinurik"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Sakatu etengailua luze telebista itzaltzeko"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Sistemaren baliabideei buruzko alertak"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Baliabideen gehiegizko erabilera"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"<xliff:g id="APP_NAME">%1$s</xliff:g> aplikazioa baliabide gehiegi erabiltzen ari da."</string>
 </resources>

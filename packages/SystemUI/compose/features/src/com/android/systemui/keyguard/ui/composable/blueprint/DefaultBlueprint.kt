@@ -31,6 +31,7 @@ import com.android.systemui.keyguard.ui.composable.elements.LockIconElementProvi
 import com.android.systemui.keyguard.ui.composable.elements.LockscreenElementFactoryImpl
 import com.android.systemui.keyguard.ui.composable.elements.LockscreenElementFactoryImpl.Companion.createRemembered
 import com.android.systemui.keyguard.ui.composable.elements.LockscreenLowerRegionElementProvider
+import com.android.systemui.keyguard.ui.composable.elements.LockscreenScopeImpl
 import com.android.systemui.keyguard.ui.composable.elements.LockscreenUpperRegionElementProvider
 import com.android.systemui.keyguard.ui.composable.elements.MediaElementProvider
 import com.android.systemui.keyguard.ui.composable.elements.NotificationStackElementProvider
@@ -45,7 +46,11 @@ import com.android.systemui.keyguard.ui.viewmodel.AodBurnInViewModel
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardClockViewModel
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenContentViewModel
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementContext
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.Clock
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.MediaCarousel
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.SettingsMenu
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.Shortcuts
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.Smartspace
 import javax.inject.Inject
 
 /** Renders the lockscreen scene when showing a standard phone or tablet layout */
@@ -97,14 +102,12 @@ constructor(
             )
 
         val burnIn = rememberBurnIn(keyguardClockViewModel)
-
         LockscreenTouchHandling(
             viewModelFactory = viewModel.touchHandlingFactory,
             modifier = modifier,
         ) { onSettingsMenuPlaced ->
             val elementContext =
                 LockscreenElementContext(
-                    scope = this@Content,
                     burnInModifier =
                         Modifier.burnInAware(
                             viewModel = aodBurnInViewModel,
@@ -112,35 +115,25 @@ constructor(
                         ),
                     onElementPositioned = { key, rect ->
                         when (key) {
-                            LockscreenElementKeys.Clock.Small -> {
+                            Clock.Small -> {
                                 burnIn.onSmallClockTopChanged(rect.top)
                                 viewModel.setSmallClockBottom(rect.bottom)
                             }
-                            LockscreenElementKeys.Smartspace.Cards -> {
+                            Smartspace.Cards -> {
                                 burnIn.onSmartspaceTopChanged(rect.top)
                                 viewModel.setSmartspaceCardBottom(rect.bottom)
                             }
-                            LockscreenElementKeys.MediaCarousel -> {
-                                viewModel.setMediaPlayerBottom(rect.bottom)
-                            }
-                            LockscreenElementKeys.Shortcuts.Start -> {
-                                viewModel.setShortcutTop(rect.top)
-                            }
-                            LockscreenElementKeys.Shortcuts.End -> {
-                                viewModel.setShortcutTop(rect.top)
-                            }
-                            LockscreenElementKeys.SettingsMenu -> {
-                                onSettingsMenuPlaced(rect)
-                            }
+                            MediaCarousel -> viewModel.setMediaPlayerBottom(rect.bottom)
+                            Shortcuts.Start -> viewModel.setShortcutTop(rect.top)
+                            Shortcuts.End -> viewModel.setShortcutTop(rect.top)
+                            SettingsMenu -> onSettingsMenuPlaced(rect)
+                            else -> {}
                         }
                     },
                 )
 
-            LockscreenSceneLayout(
-                viewModel = viewModel,
-                factory = elementFactory,
-                context = elementContext,
-            )
+            LockscreenScopeImpl(this@Content, elementFactory, elementContext)
+                .LockscreenSceneLayout(viewModel)
         }
     }
 }

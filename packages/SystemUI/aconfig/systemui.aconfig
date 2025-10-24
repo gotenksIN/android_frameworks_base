@@ -60,6 +60,13 @@ flag {
 }
 
 flag {
+  name: "show_icon_in_empty_shade"
+  namespace: "systemui"
+  description: "Show a representative icon when there are no notifications in the shade."
+  bug: "388472403"
+}
+
+flag {
    name: "notification_row_is_removed_fix"
    namespace: "systemui"
    description: "Fix incorrect isRemoved value in ExpandableNotificationRow"
@@ -105,13 +112,6 @@ flag {
 }
 
 flag {
-    name: "notification_async_hybrid_view_inflation"
-    namespace: "systemui"
-    description: "Inflates hybrid (single-line) notification views from the background thread."
-    bug: "217799515"
-}
-
-flag {
     name: "notification_color_update_logger"
     namespace: "systemui"
     description: "Enabled debug logging and dumping of notification color updates."
@@ -134,16 +134,6 @@ flag {
 }
 
 flag {
-    name: "notification_content_alpha_optimization"
-    namespace: "systemui"
-    description: "Only reset alpha values of needed content views"
-    bug: "292024656"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
    name: "notification_transparent_header_fix"
    namespace: "systemui"
    description: "fix the transparent group header issue for async header inflation."
@@ -151,16 +141,6 @@ flag {
    metadata {
         purpose: PURPOSE_BUGFIX
    }
-}
-
-flag {
-    name: "notifications_hun_accessibility_refactor"
-    namespace: "systemui"
-    description: "Refactors where notification HUN accessibility events happen"
-    bug: "397507681"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -208,6 +188,16 @@ flag {
     namespace: "systemui"
     description: "Do not notify HeadsUpManager for silent updates."
     bug: "401068530"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "notification_fix_hun_shadows"
+    namespace: "systemui"
+    description: "Fix HUN shadows when the shade is collapsed."
+    bug: "440572084"
     metadata {
        purpose: PURPOSE_BUGFIX
     }
@@ -447,21 +437,21 @@ flag {
 }
 
 flag {
-    name: "status_bar_app_handle_tracking"
+    name: "status_bar_always_schedule_auto_hide"
     namespace: "systemui"
-    description: "Have status bar track the location of app handles so that tappable status bar "
-        "content doesn't overlap"
-    bug: "397506207"
+    description: "Schedule the status bar auto-hide functionality more often for fullscreen mode"
+    bug: "428659575"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
 }
 
 flag {
-    name: "status_bar_inflate_carrier_merged"
+    name: "status_bar_app_handle_tracking"
     namespace: "systemui"
-    description: "Allow the status bar to inflate the levels of the carrier merged connection"
-    bug: "423686800"
+    description: "Have status bar track the location of app handles so that tappable status bar "
+        "content doesn't overlap"
+    bug: "397506207"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -510,17 +500,6 @@ flag {
     description: "Build time flag for 2025 icon refresh"
     bug: "391605373"
     is_fixed_read_only: true
-}
-
-flag {
-    name: "global_actions_icon_refresh_2025"
-    namespace: "systemui"
-    description: "Build time flag for 2025 power menu icon refresh"
-    bug: "427755140"
-    is_fixed_read_only: true
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -605,16 +584,6 @@ flag {
 }
 
 flag {
-   name: "activity_transition_use_largest_window"
-   namespace: "systemui"
-   description: "Target largest opening window during activity transitions."
-   bug: "323294573"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "enable_layout_tracing"
   namespace: "systemui"
   description: "Enables detailed traversal slices during measure and layout in perfetto traces"
@@ -692,16 +661,6 @@ flag {
 }
 
 flag {
-    name: "clipboard_announce_live_region"
-    namespace: "systemui"
-    description: "Use live region for clipboard status announcement"
-    bug: "378856296"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "screen_reactions"
     namespace: "systemui"
     description: "Enables the new screen recording UX"
@@ -713,6 +672,16 @@ flag {
     namespace: "systemui"
     description: "Fix screen recording on hsum enabled devices"
     bug: "368579013"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "restore_show_taps_setting"
+    namespace: "systemui"
+    description: "Restore show taps setting even if screen recording session is interrupted"
+    bug: "431753924"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -763,23 +732,6 @@ flag {
     namespace: "systemui"
     description: "Force screenshot sound when camera sound is forced and camera is open"
     bug: "411503333"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "screenshot_action_dismiss_system_windows"
-    namespace: "systemui"
-    description: "Dismiss existing system windows when starting action from screenshot UI"
-    bug: "309933761"
-}
-
-flag {
-    name: "fix_screenshot_action_dismiss_system_windows"
-    namespace: "systemui"
-    description: "Dismiss existing system windows when starting action from screenshot UI"
-    bug: "309933761"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -920,16 +872,6 @@ flag {
 }
 
 flag {
-   name: "register_new_wallet_card_in_background"
-   namespace: "systemui"
-   description: "Decide whether the call to registerNewWalletCards method should be issued on background thread."
-   bug: "322506838"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
     name: "update_user_switcher_background"
     namespace: "systemui"
     description: "Decide whether to update user switcher in background thread."
@@ -1002,10 +944,13 @@ flag {
 }
 
 flag {
-    name: "qs_edit_mode_tabs"
+    name: "qs_edit_mode_v2"
     namespace: "systemui"
-    description: "Splits the Quick Settings edit mode in tabs. This feature is for the compose version of Quick Settings."
-    bug: "416236871"
+    description: "Updates the removal process of tiles and improves tiles selection."
+    bug: "438943936"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1219,15 +1164,7 @@ flag {
   }
 }
 
-flag {
-  name: "dream_transition_fixes"
-  namespace: "systemui"
-  description: "Flags some minor transition fixes for opening the dream"
-  bug: "409720192"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
+
 
 flag {
   name: "dream_bouncer_transition_fix"
@@ -1289,13 +1226,6 @@ flag {
 }
 
 flag {
-  name: "media_controls_ui_update"
-  namespace: "systemui"
-  description: "Enables media visuals update"
-  bug: "379044958"
-}
-
-flag {
   name: "media_controls_in_compose"
   namespace: "systemui"
   description: "Runs media controls in compose"
@@ -1319,6 +1249,26 @@ flag {
     bug: "417204970"
     metadata {
       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name:"media_controls_translation_fix"
+    namespace: "systemui"
+    description: "Removes media controls y-translation update"
+    bug: "415755300"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "shade_app_launch_animation_skip_in_desktop"
+    namespace: "systemui"
+    description: "Fixes the animation for notification shade entry points in Desktop Mode"
+    bug: "383061244"
+    metadata {
+        purpose: PURPOSE_BUGFIX
     }
 }
 
@@ -1561,14 +1511,6 @@ flag {
 }
 
 flag {
-  name: "shade_header_font_update"
-  namespace: "systemui"
-  description: "Updates the fonts of the shade header"
-  bug: "393609960"
-  is_fixed_read_only: true
-}
-
-flag {
   name: "shade_header_blur_font_color"
   namespace: "systemui"
   description: "Updates the font colors of the shade header for blur"
@@ -1782,24 +1724,6 @@ flag {
 }
 
 flag {
-    name: "lockscreen_font"
-    namespace: "systemui"
-    description: "Read-only flag for lockscreen font"
-    bug: "393610165"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "always_compose_qs_ui_fragment"
-    namespace: "systemui"
-    description: "Have QQS and QS scenes in the Compose fragment always composed, not just when it should be visible."
-    bug: "389985793"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "move_transition_animation_layer"
     namespace: "systemui"
     description: "Enables moving the launching window on top of the origin window in the Animation library."
@@ -1845,13 +1769,6 @@ flag {
     namespace: "ailabs"
     description: "Enable the underlay additional layer"
     bug: "403422950"
-}
-
-flag {
-    name: "tv_global_actions_focus"
-    namespace: "systemui"
-    description: "Enables global actions focus on TV."
-    bug: "402759931"
 }
 
 flag {
@@ -1958,6 +1875,13 @@ flag {
 }
 
 flag {
+    name: "large_screen_screenshot_save_location"
+    namespace: "systemui"
+    description: "Enables ability to specify a custom save location for screenshots within settings menu on large screen devices."
+    bug: "439894467"
+}
+
+flag {
     name: "large_screen_recording"
     namespace: "systemui"
     description: "Enables screen recording UI for large screen devices."
@@ -1983,6 +1907,16 @@ flag {
    namespace: "systemui"
    description: "Adds new dozing keyguard states for more robust animations to/from dozing."
    bug: "415704030"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+   name: "allow_doze_touches_for_lock_icon"
+   namespace: "systemui"
+   description: "Allow touches for device entry lock icon during aod deferment."
+   bug: "433400058"
    metadata {
         purpose: PURPOSE_BUGFIX
    }
@@ -2098,16 +2032,6 @@ flag {
 }
 
 flag {
-    name: "paginated_qs_pager_dots_arrows"
-    namespace: "systemui"
-    description: "Show arrows in the pager dots in paginated QS"
-    bug: "397156072"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "blur_settings_toggle"
     namespace: "systemui"
     description: "Add a settings toggle to enable/disable blur."
@@ -2185,6 +2109,16 @@ flag {
 }
 
 flag {
+    name: "no_shade_blur_on_dream_start"
+    namespace: "systemui"
+    description: "Suppress shade blur when starting dream"
+    bug: "422835977"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
 
     name: "qs_split_internet_tile"
     namespace: "systemui"
@@ -2210,5 +2144,76 @@ flag {
     bug: "406740115"
     metadata {
         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "ambient_cue_plugin"
+    namespace: "ailabs"
+    description: "Enable plugin for ambient cue project"
+    bug: "439907833"
+}
+
+flag {
+   name: "update_keyguard_on_wake_and_unlock_earlier"
+   namespace: "systemui"
+   description: "Call updateIsKeyguard earlier than on the dozing callback."
+   bug: "441261701"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+    name: "check_desktop_mode_for_spacial_model_app_pushback"
+    namespace: "systemui"
+    description: "Checks desktop mode for disabling spacial model as opposed to just checking if the screen is large"
+    bug: "409529581"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+    name: "sysui_intrinsic_lock_dispatcher"
+    namespace: "systemui"
+    description: "Custom dispatcher for background tasks, which uses intrinsic locks instead of ReentrantLock"
+    bug: "419472502"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "blur_on_more_surfaces"
+    namespace: "systemui"
+    description: "Enable blur on more systemui surfaces"
+    bug: "444141641"
+}
+
+flag {
+    name: "enable_cue_bar_animated_icon"
+    namespace: "ailabs"
+    description: "Enable the animated icon in cue bar"
+    bug: "443197064"
+}
+
+flag {
+    name: "wakefulness_for_animations"
+    namespace: "systemui"
+    description: "Changes the signal used for animation wakefulness on keyguard"
+    bug: "445366741"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "expandable_force_modifier_implementation"
+    namespace: "systemui"
+    description: "Always use the Compose Expandable modifier implementation everywhere, independently of useModifierBasedImplementation"
+    bug: "428899288"
+    metadata {
+      purpose: PURPOSE_BUGFIX
     }
 }

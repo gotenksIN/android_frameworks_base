@@ -112,6 +112,8 @@ import com.android.systemui.statusbar.notification.PhysicsPropertyAnimator;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.render.GroupExpansionManager;
 import com.android.systemui.statusbar.notification.collection.render.GroupMembershipManager;
+import com.android.systemui.statusbar.notification.emptyshade.ui.shared.flag.ShowIconInEmptyShade;
+import com.android.systemui.statusbar.notification.emptyshade.ui.view.EmptyShadeIconView;
 import com.android.systemui.statusbar.notification.emptyshade.ui.view.EmptyShadeView;
 import com.android.systemui.statusbar.notification.footer.ui.view.FooterView;
 import com.android.systemui.statusbar.notification.headsup.HeadsUpAnimationEvent;
@@ -124,7 +126,6 @@ import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
 import com.android.systemui.statusbar.notification.row.ExpandableView;
 import com.android.systemui.statusbar.notification.row.StackScrollerDecorView;
 import com.android.systemui.statusbar.notification.shared.NotificationBundleUi;
-import com.android.systemui.statusbar.notification.shared.NotificationContentAlphaOptimization;
 import com.android.systemui.statusbar.notification.shared.NotificationHeadsUpCycling;
 import com.android.systemui.statusbar.notification.shared.NotificationMinimalism;
 import com.android.systemui.statusbar.notification.shared.NotificationThrottleHun;
@@ -303,7 +304,7 @@ public class NotificationStackScrollLayout
     private boolean mShouldShowShelfOnly;
     protected boolean mScrollingEnabled;
     protected FooterView mFooterView;
-    protected EmptyShadeView mEmptyShadeView;
+    protected StackScrollerDecorView mEmptyShadeView;
     private boolean mClearAllInProgress;
     private boolean mFlingAfterUpEvent;
     /**
@@ -1366,7 +1367,7 @@ public class NotificationStackScrollLayout
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
         // The received drawBounds are relative to the Window, but NSSL  expects a rect relative to
         // its own position, so we need to offset it in case the NSSL has some horizontal margins.
-        drawBounds.offset(-getX(), 0f);
+        drawBounds.offset(-getX(), -getY());
         if (mAmbientState.getDrawBounds() != drawBounds) {
             mAmbientState.setDrawBounds(drawBounds);
             updateStackEndHeightAndStackHeight(mAmbientState.getExpansionFraction());
@@ -4779,7 +4780,7 @@ public class NotificationStackScrollLayout
         for (int i = 0; i < getChildCount(); i++) {
             ExpandableView child = getChildAtIndex(i);
             if (child instanceof ExpandableNotificationRow row) {
-                row.setUserLocked(false);
+                row.setUserSwipingToExpandRow(false);
             }
         }
     }
@@ -4870,9 +4871,7 @@ public class NotificationStackScrollLayout
                 if (SceneContainerFlag.isEnabled()) {
                     setHeadsUpAnimatingAway(false);
                 }
-                if (NotificationContentAlphaOptimization.isEnabled()) {
-                    resetChildAlpha();
-                }
+                resetChildAlpha();
             } else {
                 mGroupExpansionManager.collapseGroups();
                 mExpandHelper.cancelImmediately();
@@ -4949,7 +4948,7 @@ public class NotificationStackScrollLayout
     private void updateScrollPositionOnExpandInBottom(ExpandableView view) {
         if (view instanceof ExpandableNotificationRow row && !onKeyguard()) {
             // TODO: once we're recycling this will need to check the adapter position of the child
-            if (row.isUserLocked() && row != getFirstChildNotGoneInternal()) {
+            if (row.isUserSwipingToExpandRow() && row != getFirstChildNotGoneInternal()) {
                 if (row.isSummaryWithChildren()) {
                     return;
                 }
@@ -5155,7 +5154,11 @@ public class NotificationStackScrollLayout
         }
 
         if (mEmptyShadeView != null) {
-            mEmptyShadeView.setTextColors(onSurface, onSurfaceVariant);
+            if (ShowIconInEmptyShade.isEnabled()) {
+                ((EmptyShadeIconView) mEmptyShadeView).setContentColor(onSurface);
+            } else {
+                ((EmptyShadeView) mEmptyShadeView).setTextColors(onSurface, onSurfaceVariant);
+            }
         }
     }
 
@@ -5281,7 +5284,8 @@ public class NotificationStackScrollLayout
         addView(mFooterView, index);
     }
 
-    public void setEmptyShadeView(EmptyShadeView emptyShadeView) {
+    /** Bind the {@link EmptyShadeView} to the NSSL. */
+    public void setEmptyShadeView(StackScrollerDecorView emptyShadeView) {
         int index = -1;
         if (mEmptyShadeView != null) {
             index = indexOfChild(mEmptyShadeView);
@@ -7326,7 +7330,7 @@ public class NotificationStackScrollLayout
                     // We also need to un-user lock it here, since otherwise the content height
                     // calculated might be wrong. We also can't invert the two calls since
                     // un-userlocking it will trigger a layout switch in the content view.
-                    row.setUserLocked(false);
+                    row.setUserSwipingToExpandRow(false);
                     updateContentHeight();
                     notifyHeightChangeListener(row);
                     return;
@@ -7344,9 +7348,9 @@ public class NotificationStackScrollLayout
         }
 
         @Override
-        public void setUserLockedChild(View v, boolean userLocked) {
+        public void setUserSwipingToExpand(View v, boolean isUserSwiping) {
             if (v instanceof ExpandableNotificationRow) {
-                ((ExpandableNotificationRow) v).setUserLocked(userLocked);
+                ((ExpandableNotificationRow) v).setUserSwipingToExpandRow(isUserSwiping);
             }
             cancelLongPress();
             requestDisallowInterceptTouchEvent(true);

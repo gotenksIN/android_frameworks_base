@@ -364,6 +364,12 @@ public class WindowProcessControllerTests extends WindowTestsBase {
         activity.setState(STOPPED, "test");
         flags = mWpc.getActivityStateFlags() & exclusiveFlags;
         assertEquals(0, flags);
+
+        activity.setVisibleRequested(true);
+        activity.setState(RESUMED, "test");
+        activity.makeInvisible();
+        flags = mWpc.getActivityStateFlags() & exclusiveFlags;
+        assertEquals(WindowProcessController.ACTIVITY_STATE_FLAG_IS_PAUSING_OR_PAUSED, flags);
     }
 
     @Test
@@ -476,8 +482,6 @@ public class WindowProcessControllerTests extends WindowTestsBase {
         decorInsetsInfo.mConfigInsets.set(emptyRect);
         decorInsetsInfo.mOverrideConfigInsets.set(new Rect(0, 100, 0, 200));
         decorInsetsInfo.mOverrideNonDecorInsets.set(new Rect(0, 0, 0, 200));
-        decorInsetsInfo.mNonDecorFrame.set(new Rect(0, 0, 1000, 1500));
-        decorInsetsInfo.mConfigFrame.set(new Rect(0, 0, 1000, 1500));
         decorInsetsInfo.mOverrideConfigFrame.set(new Rect(0, 100, 1000, 1300));
         decorInsetsInfo.mOverrideNonDecorFrame.set(new Rect(0, 0, 1000, 1300));
         doReturn(decorInsetsInfo).when(displayPolicy)

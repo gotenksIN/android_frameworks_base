@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Жумуш профилине которулуу"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Жеке <xliff:g id="APP_NAME">%1$s</xliff:g> колдонмосуна которулуу"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Жумушка тиешелүү <xliff:g id="APP_NAME">%1$s</xliff:g> колдонмосуна которулуу"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Байланыштар"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"байланыштарыңызды көрүүгө"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Байланыштар жана аккаунттар"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"байланыштарыңызга кирип, бул түзмөктө байланыштарды сактай ала турган аккаунттардын тизмесин көрүңүз"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Жайгашкан жер"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"түзмөктүн жайгашкан жерин аныктоого"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Жылнаама"</string>
@@ -370,8 +370,10 @@
     <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"көз карашка так көз салуу"</string>
     <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Кыймылдар жана айлана боюнча маалымат"</string>
     <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"көз карашка, жүзгө, денеге көз салуу жана айлананы скандоо"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Баштын кыймылы жана айлана боюнча так маалымат"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"баштын кыймылына так көз салуу жана айлананы скандоо"</string>
+    <!-- no translation found for permgrouplab_xr_tracking_sensitive (6574264227123545314) -->
+    <skip />
+    <!-- no translation found for permgroupdesc_xr_tracking_sensitive (2480835734248509848) -->
+    <skip />
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Терезедеги нерселерди алып туруу"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Учурда ачылып турган терезедеги маалыматты талдайт."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"\"Сыйпалап изилдөө\" мүмкүнчүлүгүн иштетет"</string>
@@ -639,6 +641,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Колдонмо кең тилкелүү тармак аркылуу туташа турган жакын жердеги түзмөктөрдү аныктай алат"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"Жакын жердеги Wi‑Fi түзмөктөрүнө байланышуу"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Колдонмо жакын жердеги Wi-Fi түзмөктөргө туташып, алардын жайгашкан жерин аныктап, ар кандай нерселерди өткөрө алат."</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"жергиликтүү тармактагы түзмөктөрдү көрүү"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Колдонмого жергиликтүү тармактагы түзмөктөрдү көрүүгө уруксат берүү"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"жакын жердеги түзмөктөр арасындагы салыштырмалуу абалды аныктоо"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Колдонмого жакын жердеги түзмөктөр ортосундагы салыштырмалуу абалды аныктоого уруксат берүү"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Тандалган NFC төлөм кызматы жөнүндө маалымат"</string>
@@ -683,7 +687,8 @@
     <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Колдонмо айланаңыздагы нерселерди скандай алат."</string>
     <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"айланаңызды так скандоо"</string>
     <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Колдонмо айланаңыздагы нерселерди так скандай алат."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"фондо кеңейтилген чындык боюнча маалыматка көз салуу"</string>
+    <!-- no translation found for permlab_xr_tracking_in_background (1714941204255185460) -->
+    <skip />
     <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Колдонмо фондо кеңейтилген чындык дайындарына кире алат."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"баскычтардын басылышын аныктоо"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Бул колдонмого тутумдун ыкчам баскычтарын жана аракеттерин иштетүүдөн мурун баскычтардын басылышын аныктоого уруксат берет."</string>
@@ -1984,8 +1989,10 @@
     <string name="package_updated_device_owner" msgid="7770195449213776218">"Администраторуңуз орнотту.\nБерилген уруксаттарды көрүү үчүн параметрлерге өтүңүз"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Администраторуңуз жок кылып салган"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"ЖАРАЙТ"</string>
-    <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"Батареяны үнөмдөөчү режимде Караңгы тема күйгүзүлүп, фондогу аракеттер, айрым визуалдык эффекттер, белгилүү бир функциялар жана айрым тармакка туташуулар чектелип же өчүрүлөт."</string>
-    <string name="battery_saver_description" msgid="8518809702138617167">"Батареяны үнөмдөөчү режимде Караңгы тема күйгүзүлүп, фондогу аракеттер, айрым визуалдык эффекттер, белгилүү бир функциялар жана айрым тармакка туташуулар чектелип же өчүрүлөт."</string>
+    <!-- no translation found for battery_saver_description_with_learn_more (8969945879044849461) -->
+    <skip />
+    <!-- no translation found for battery_saver_description (2820475140307374570) -->
+    <skip />
     <string name="data_saver_description" msgid="4995164271550590517">"Трафикти үнөмдөө режиминде айрым колдонмолор маалыматтарды фондо өткөрө алышпайт. Учурда сиз пайдаланып жаткан колдонмо маалыматтарды жөнөтүп/ала алат, бирок адаттагыдан азыраак өткөргөндүктөн, анын айрым функциялары талаптагыдай иштебей коюшу мүмкүн. Мисалы, сүрөттөр басылмайынча жүктөлбөйт."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"Трафикти үнөмдөө режимин иштетесизби?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"Күйгүзүү"</string>
@@ -2047,12 +2054,9 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"Чоңойтуу"</string>
     <string name="close_button_text" msgid="10603510034455258">"Жабуу"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
-    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
-    <skip />
+    <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
+    <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
+    <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Жооп берүү"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Видео"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Четке кагуу"</string>
@@ -2580,33 +2584,22 @@
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"Колдонмолор"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"Манжаңыздын изи мындан ары таанылбайт. Манжа изи менен ачуу функциясын кайрадан тууралаңыз."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Коопсуздук жана купуялык"</string>
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
-    <skip />
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"Экрандын кулпусун ачып, USB\'ни кайра туташтырыңыз"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"USB\'ни туташтыруу үчүн экрандын кулпусун ачыңыз"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"Күчөтүлгөн коргоо USB туташуусун баштоо үчүн экраныңыздын кулпусун ачууну талап кылат"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"Күчөтүлгөн коргоо USB туташуусун баштоо үчүн экраныңыздын кулпусун ачууну талап кылат"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"Күчөтүлгөн коргоо тез кубаттоо үчүн экраныңыздын кулпусун ачууну талап кылат"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"Тез кубаттоо же USB туташуусун баштоо үчүн Күчөтүлгөн коргоо экраныңыздын кулпусун ачууну талап кылат"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Үнүн өчүрүү"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Билдирменин үнү өчүрүлдү"</string>
-    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
-    <skip />
+    <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Түзмөгүңүздү өчүрүп күйгүзмөйүнчө Күчөтүлгөн коргоо USB билдирмелерин албайсыз"</string>
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"USB\'ге байланыштуу шектүү аракет"</string>
-    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
-    <skip />
+    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="5772698072220844779">"USB сигналы өчүрүлдү"</string>
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Манжа изи менен ачылбай жатабы?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Кулпуну ачуу боюнча кеңештерди көрүү үчүн таптап коюңуз"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Бүлбүлдөбөсүн"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Сыналгыны өчүрүү үчүн Кубат баскычын кое бербей басып туруңуз"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Системанын ресурстары тууралуу эскертүүлөр"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Ресурстарды ашыкча колдонуу"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"<xliff:g id="APP_NAME">%1$s</xliff:g> колдонмосу өтө көп ресурстарды колдонуп жатат."</string>
 </resources>

@@ -595,6 +595,37 @@ public class RootWindowContainerTests extends WindowTestsBase {
         assertEquals(taskFragmentBounds, pinnedRootTask.getBounds());
     }
 
+    @Test
+    public void testMoveActivityToPinnedRootTask_singleActivity_recordsSnapshot() {
+        // Create a task with a single activity.
+        final Task task = new TaskBuilder(mSupervisor).setCreateActivity(true).build();
+        final ActivityRecord activity = task.getTopMostActivity();
+        spyOn(mWm.mTaskSnapshotController);
+
+        // Move the activity to the pinned root task.
+        mRootWindowContainer.moveActivityToPinnedRootTaskForTest(activity, "test");
+
+        // Verify that a snapshot of the task was recorded.
+        verify(mWm.mTaskSnapshotController).recordSnapshot(eq(task));
+    }
+
+    @Test
+    public void testMoveActivityToPinnedRootTask_multiActivity_recordsSnapshot() {
+        // Create a task with two activities.
+        final Task originalTask = new TaskBuilder(mSupervisor).setCreateActivity(true).build();
+        new ActivityBuilder(mAtm).setTask(originalTask).build();
+        final ActivityRecord topActivity = originalTask.getTopMostActivity();
+        spyOn(mWm.mTaskSnapshotController);
+
+        // Move the top activity to the pinned root task.
+        mRootWindowContainer.moveActivityToPinnedRootTaskForTest(topActivity, "test");
+
+        // Verify that a snapshot of the original task was recorded.
+        // In the multi-activity case, a new task is created for the PiP activity, but the snapshot
+        // should be taken of the original task before the activity is reparented.
+        verify(mWm.mTaskSnapshotController).recordSnapshot(eq(originalTask));
+    }
+
     private static void ensureTaskPlacement(Task task, ActivityRecord... activities) {
         final ArrayList<ActivityRecord> taskActivities = new ArrayList<>();
 
@@ -1085,6 +1116,23 @@ public class RootWindowContainerTests extends WindowTestsBase {
     }
 
     /**
+     * Tests that secondary home activity should not be resolved if display cannot host tasks.
+     */
+    @Test
+    public void testStartSecondaryHomeOnDisplayCannotHostTasks() {
+        // Create secondary displays.
+        final TestDisplayContent secondDisplay =
+                new TestDisplayContent.Builder(mAtm, 1000, 1500).build();
+        spyOn(secondDisplay.mDisplay);
+        doReturn(false).when(secondDisplay.mDisplay).canHostTasks();
+
+        mRootWindowContainer.startHomeOnDisplay(0 /* userId */, "testStartSecondaryHome",
+                secondDisplay.mDisplayId, true /* allowInstrumenting */, true /* fromHomeKey */);
+
+        verify(mRootWindowContainer, never()).resolveSecondaryHomeActivity(anyInt(), any());
+    }
+
+    /**
      * Tests that when starting {@link ResolverActivity} for home, it should use the standard
      * activity type (in a new root task) so the order of back stack won't be broken.
      */
@@ -1287,6 +1335,30 @@ public class RootWindowContainerTests extends WindowTestsBase {
                 activity, null /* options */, task, null /* sourceTask */, null /* launchParams */,
                 0 /* launchFlags */, ACTIVITY_TYPE_STANDARD, true /* onTop */);
         assertEquals(task, rootTask);
+    }
+
+    @Test
+    public void testGetOrCreateRootTask_withPreferredRootTask_returnsPreferredRootTask() {
+        // Arrange: Create a preferred root task and set it in the launch parameters.
+        final Task preferredRootTask = new TaskBuilder(mSupervisor).build();
+        final ActivityRecord activity = new ActivityBuilder(mAtm).build();
+
+        final LaunchParamsController.LaunchParams launchParams =
+                new LaunchParamsController.LaunchParams();
+        launchParams.mPreferredRootTask = preferredRootTask;
+
+        // Act: Call the method under test.
+        final Task resultTask = mRootWindowContainer.getOrCreateRootTask(
+                activity,
+                null /* options */,
+                null /* candidateTask */,
+                null /* sourceTask */,
+                true /* onTop */,
+                launchParams,
+                0 /* launchFlags */);
+
+        // Assert: Verify that the returned task is the preferred one.
+        assertEquals(preferredRootTask, resultTask);
     }
 
     @Test
@@ -1555,4 +1627,3 @@ public class RootWindowContainerTests extends WindowTestsBase {
         return  aInfo;
     }
 }
-

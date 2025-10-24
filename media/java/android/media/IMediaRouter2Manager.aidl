@@ -25,11 +25,11 @@ import android.media.SuggestedDeviceInfo;
 import android.media.AppId;
 
 /**
- * {@hide}
+ * @hide
  */
 oneway interface IMediaRouter2Manager {
     void notifySessionCreated(int requestId, in RoutingSessionInfo session);
-    void notifySessionUpdated(in RoutingSessionInfo session);
+    void notifySessionUpdated(in RoutingSessionInfo session, in boolean shouldShowVolumeUi);
     void notifySessionReleased(in RoutingSessionInfo session);
     void notifyDiscoveryPreferenceChanged(String packageName,
             in RouteDiscoveryPreference discoveryPreference);

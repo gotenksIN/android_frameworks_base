@@ -336,9 +336,9 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"ਕਾਰਜ ਪ੍ਰੋਫਾਈਲ ਵਰਤੋ"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"<xliff:g id="APP_NAME">%1$s</xliff:g> ਦੇ ਨਿੱਜੀ ਪ੍ਰੋਫਾਈਲ \'ਤੇ ਜਾਓ"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"<xliff:g id="APP_NAME">%1$s</xliff:g> ਦੇ ਕਾਰਜ ਪ੍ਰੋਫਾਈਲ \'ਤੇ ਜਾਓ"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"ਸੰਪਰਕ"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"ਆਪਣੇ ਸੰਪਰਕਾਂ ਤੱਕ ਪਹੁੰਚ ਕਰਨ"</string>
-    <string name="permgrouplab_location" msgid="1858277002233964394">"ਟਿਕਾਣੇ ਦੀ ਜਾਣਕਾਰੀ"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"ਸੰਪਰਕ ਅਤੇ ਖਾਤੇ"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"ਆਪਣੇ ਸੰਪਰਕਾਂ ਤੱਕ ਪਹੁੰਚ ਕਰੋ ਅਤੇ ਆਪਣੇ ਉਨ੍ਹਾਂ ਖਾਤਿਆਂ ਦੀ ਸੂਚੀ ਦੇਖੋ ਜੋ ਸੰਪਰਕਾਂ ਨੂੰ ਇਸ ਡੀਵਾਈਸ \'ਤੇ ਰੱਖਿਅਤ ਕਰ ਸਕਦੇ ਹਨ"</string>
+    <string name="permgrouplab_location" msgid="1858277002233964394">"ਟਿਕਾਣਾ"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"ਇਸ ਡੀਵਾਈਸ ਦੇ ਨਿਰਧਾਰਤ ਟਿਕਾਣੇ ਤੱਕ ਪਹੁੰਚੋ"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"ਕੈਲੰਡਰ"</string>
     <string name="permgroupdesc_calendar" msgid="6762751063361489379">"ਤੁਹਾਡੇ ਕੈਲੰਡਰ ਤੱਕ ਪਹੁੰਚ ਕਰਨ"</string>
@@ -370,8 +370,8 @@
     <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"ਅੱਖ ਦੀ ਹਲਚਲ ਨੂੰ ਸਟੀਕਤਾ ਨਾਲ ਟਰੈਕ ਕਰੋ"</string>
     <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"ਹਲਚਲ ਅਤੇ ਖੇਤਰ ਸੰਬੰਧੀ ਡਾਟਾ"</string>
     <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"ਅੱਖਾਂ, ਚਿਹਰੇ, ਸਰੀਰ ਨੂੰ ਟਰੈਕ ਕਰੋ ਅਤੇ ਖੇਤਰ ਨੂੰ ਸਕੈਨ ਕਰੋ"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"ਸਿਰ ਦੀ ਹਲਚਲ ਅਤੇ ਖੇਤਰ ਸੰਬੰਧੀ ਸਟੀਕ ਡਾਟਾ"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"ਸਿਰ ਨੂੰ ਸਟੀਕਤਾ ਨਾਲ ਟਰੈਕ ਕਰੋ ਅਤੇ ਖੇਤਰ ਨੂੰ ਸਕੈਨ ਕਰੋ"</string>
+    <string name="permgrouplab_xr_tracking_sensitive" msgid="6574264227123545314">"ਹਲਚਲ ਅਤੇ ਖੇਤਰ ਸੰਬੰਧੀ ਸਟੀਕ ਡਾਟਾ"</string>
+    <string name="permgroupdesc_xr_tracking_sensitive" msgid="2480835734248509848">"ਖੇਤਰ ਨੂੰ ਸਟੀਕਤਾ ਨਾਲ ਸਕੈਨ ਕਰੋ ਅਤੇ ਸਿਰ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"ਵਿੰਡੋ ਸਮੱਗਰੀ ਮੁੜ-ਪ੍ਰਾਪਤ ਕਰਨਾ"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"ਉਸ ਵਿੰਡੋ ਸਮੱਗਰੀ ਦੀ ਜਾਂਚ ਕਰੋ, ਜਿਸ ਨਾਲ ਤੁਸੀਂ ਅੰਤਰਕਿਰਿਆ ਕਰ ਰਹੇ ਹੋ"</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"\'ਸਪੱਰਸ਼ ਰਾਹੀਂ ਪੜਚੋਲ ਕਰੋ\' ਚਾਲੂ ਕਰਨਾ"</string>
@@ -639,6 +639,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"ਐਪ ਨੂੰ ਨਜ਼ਦੀਕੀ ਅਲਟ੍ਰਾ-ਵਾਈਡਬੈਂਡ ਡੀਵਾਈਸਾਂ ਦੇ ਵਿਚਾਲੇ ਸੰਬੰਧਿਤ ਸਥਿਤੀ ਨੂੰ ਨਿਰਧਾਰਿਤ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"ਨਜ਼ਦੀਕੀ ਵਾਈ-ਫਾਈ ਡੀਵਾਈਸਾਂ ਨਾਲ ਅੰਤਰਕਿਰਿਆ ਕਰੋ"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"ਐਪ ਨੂੰ ਨਜ਼ਦੀਕੀ ਵਾਈ-ਫਾਈ ਡੀਵਾਈਸਾਂ \'ਤੇ ਵਿਗਿਆਪਨ ਦੇਣ, ਕਨੈਕਟ ਕਰਨ ਅਤੇ ਉਨ੍ਹਾਂ ਦੀ ਸੰਬੰਧਿਤ ਸਥਿਤੀ ਨੂੰ ਨਿਰਧਾਰਿਤ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿੱਤੀ ਜਾਂਦੀ ਹੈ"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"ਸਥਾਨਕ ਨੈੱਟਵਰਕ ਡੀਵਾਈਸਾਂ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿਓ"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"ਐਪ ਨੂੰ ਸਥਾਨਕ ਨੈੱਟਵਰਕ ਡੀਵਾਈਸਾਂ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"ਨਜ਼ਦੀਕੀ ਡੀਵਾਈਸਾਂ ਵਿਚਾਲੇ ਸੰਬੰਧਿਤ ਸਥਿਤੀ ਨਿਰਧਾਰਿਤ ਕਰੋ"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"ਐਪ ਨੂੰ ਨਜ਼ਦੀਕੀ ਡੀਵਾਈਸਾਂ ਦੇ ਵਿਚਾਲੇ ਸੰਬੰਧਿਤ ਸਥਿਤੀ ਨੂੰ ਨਿਰਧਾਰਿਤ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿਓ"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ਤਰਜੀਹੀ NFC ਭੁਗਤਾਨਸ਼ੁਦਾ ਸੇਵਾ ਜਾਣਕਾਰੀ"</string>
@@ -683,7 +685,7 @@
     <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ ਨੂੰ ਸਕੈਨ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
     <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ ਦੇ ਖੇਤਰ ਨੂੰ ਸਟੀਕਤਾ ਨਾਲ ਸਕੈਨ ਕਰੋ"</string>
     <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਤੁਹਾਡੇ ਆਲੇ-ਦੁਆਲੇ ਨੂੰ ਸਟੀਕਤਾ ਨਾਲ ਸਕੈਨ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
-    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ XR ਡਾਟਾ ਨੂੰ ਟਰੈਕ ਕਰੋ"</string>
+    <string name="permlab_xr_tracking_in_background" msgid="1714941204255185460">"ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ XR ਟਰੈਕਿੰਗ ਤੱਕ ਪਹੁੰਚ ਕਰੋ"</string>
     <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ XR ਡਾਟਾ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ।"</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"ਕੁੰਜੀਆਂ ਕੈਪਚਰ ਕਰੋ"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"ਸਿਸਟਮ ਵੱਲੋਂ ਸਿਸਟਮ ਸ਼ਾਰਟਕੱਟਾਂ ਅਤੇ ਕਾਰਵਾਈਆਂ \'ਤੇ ਪ੍ਰਕਿਰਿਆ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਐਪ ਨੂੰ ਕੁੰਜੀਆਂ ਕੈਪਚਰ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿੰਦੀ ਹੈ।"</string>
@@ -1984,8 +1986,10 @@
     <string name="package_updated_device_owner" msgid="7770195449213776218">"ਤੁਹਾਡੇ ਪ੍ਰਸ਼ਾਸਕ ਵੱਲੋਂ ਅੱਪਡੇਟ ਕੀਤਾ ਗਿਆ।\nਦਿੱਤੀਆਂ ਗਈਆਂ ਇਜਾਜ਼ਤਾਂ ਨੂੰ ਦੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ \'ਤੇ ਜਾਓ"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"ਤੁਹਾਡੇ ਪ੍ਰਸ਼ਾਸਕ ਵੱਲੋਂ ਮਿਟਾਇਆ ਗਿਆ"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"ਠੀਕ ਹੈ"</string>
-    <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"ਬੈਟਰੀ ਸੇਵਰ ਗੂੜ੍ਹੇ ਥੀਮ ਨੂੰ ਚਾਲੂ ਕਰਦਾ ਹੈ ਅਤੇ ਬੈਕਗ੍ਰਾਊਂਡ ਸਰਗਰਮੀ, ਕੁਝ ਦ੍ਰਿਸ਼ਟੀਗਤ ਪ੍ਰਭਾਵਾਂ, ਕੁਝ ਖਾਸ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਅਤੇ ਕੁਝ ਨੈੱਟਵਰਕ ਕਨੈਕਸ਼ਨਾਂ ਨੂੰ ਸੀਮਤ ਜਾਂ ਬੰਦ ਕਰਦਾ ਹੈ।"</string>
-    <string name="battery_saver_description" msgid="8518809702138617167">"ਬੈਟਰੀ ਸੇਵਰ ਗੂੜ੍ਹੇ ਥੀਮ ਨੂੰ ਚਾਲੂ ਕਰਦਾ ਹੈ ਅਤੇ ਬੈਕਗ੍ਰਾਊਂਡ ਸਰਗਰਮੀ, ਕੁਝ ਦ੍ਰਿਸ਼ਟੀਗਤ ਪ੍ਰਭਾਵਾਂ, ਕੁਝ ਖਾਸ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਅਤੇ ਕੁਝ ਨੈੱਟਵਰਕ ਕਨੈਕਸ਼ਨਾਂ ਨੂੰ ਸੀਮਤ ਜਾਂ ਬੰਦ ਕਰਦਾ ਹੈ।"</string>
+    <!-- no translation found for battery_saver_description_with_learn_more (8969945879044849461) -->
+    <skip />
+    <!-- no translation found for battery_saver_description (2820475140307374570) -->
+    <skip />
     <string name="data_saver_description" msgid="4995164271550590517">"ਡਾਟਾ ਵਰਤੋਂ ਘਟਾਉਣ ਵਿੱਚ ਮਦਦ ਕਰਨ ਲਈ, ਡਾਟਾ ਸੇਵਰ ਵਿਸ਼ੇਸ਼ਤਾ ਕੁਝ ਐਪਾਂ ਨੂੰ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ ਡਾਟਾ ਭੇਜਣ ਜਾਂ ਪ੍ਰਾਪਤ ਕਰਨ ਤੋਂ ਰੋਕਦੀ ਹੈ। ਤੁਹਾਡੇ ਵੱਲੋਂ ਮੌਜੂਦਾ ਤੌਰ \'ਤੇ ਵਰਤੀ ਜਾ ਰਹੀ ਐਪ ਡਾਟਾ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੀ ਹੈ, ਪਰ ਉਹ ਇੰਝ ਕਦੇ-ਕਦਾਈਂ ਕਰ ਸਕਦੀ ਹੈ। ਉਦਾਹਰਨ ਲਈ, ਇਸ ਦਾ ਮਤਲਬ ਇਹ ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਚਿੱਤਰ ਉਦੋਂ ਤੱਕ ਨਹੀਂ ਦਿਖਾਏ ਜਾਂਦੇ, ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਉਨ੍ਹਾਂ \'ਤੇ ਟੈਪ ਨਹੀਂ ਕਰਦੇ।"</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"ਕੀ ਡਾਟਾ ਸੇਵਰ ਚਾਲੂ ਕਰਨਾ ਹੈ?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"ਚਾਲੂ ਕਰੋ"</string>
@@ -2047,12 +2051,9 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"ਵੱਡਾ ਕਰੋ"</string>
     <string name="close_button_text" msgid="10603510034455258">"ਬੰਦ ਕਰੋ"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
-    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
-    <skip />
+    <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
+    <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
+    <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"ਜਵਾਬ ਦਿਓ"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"ਵੀਡੀਓ"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"ਅਸਵੀਕਾਰ ਕਰੋ"</string>
@@ -2580,33 +2581,22 @@
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"ਐਪਲੀਕੇਸ਼ਨਾਂ"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"ਤੁਹਾਡੇ ਫਿੰਗਰਪ੍ਰਿੰਟਾਂ ਦੀ ਹੁਣ ਪਛਾਣ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ। ਫਿੰਗਰਪ੍ਰਿੰਟ ਅਣਲਾਕ ਦਾ ਦੁਬਾਰਾ ਸੈੱਟਅੱਪ ਕਰੋ।"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"ਸੁਰੱਖਿਆ ਅਤੇ ਪਰਦੇਦਾਰੀ"</string>
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
-    <skip />
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"ਸਕ੍ਰੀਨ ਨੂੰ ਅਣਲਾਕ ਕਰੋ ਅਤੇ USB ਨੂੰ ਮੁੜ-ਕਨੈਕਟ ਕਰੋ"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"USB ਨਾਲ ਕਨੈਕਟ ਕਰਨ ਲਈ ਸਕ੍ਰੀਨ ਨੂੰ ਅਣਲਾਕ ਕਰੋ"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵੇਲੇ, USB ਕਨੈਕਟੀਵਿਟੀ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਤੁਹਾਡੀ ਸਕ੍ਰੀਨ ਨੂੰ ਅਣਲਾਕ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵੇਲੇ, USB ਕਨੈਕਟੀਵਿਟੀ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਤੁਹਾਡੀ ਸਕ੍ਰੀਨ ਨੂੰ ਅਣਲਾਕ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵੇਲੇ, ਤੇਜ਼ ਚਾਰਜਿੰਗ ਲਈ ਤੁਹਾਡੀ ਸਕ੍ਰੀਨ ਨੂੰ ਅਣਲਾਕ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ ਦੀ ਵਰਤੋਂ ਕਰਨ ਵੇਲੇ, ਤੇਜ਼ ਚਾਰਜਿੰਗ ਜਾਂ USB ਕਨੈਕਟੀਵਿਟੀ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਤੁਹਾਡੀ ਸਕ੍ਰੀਨ ਨੂੰ ਅਣਲਾਕ ਕਰਨ ਦੀ ਲੋੜ ਹੁੰਦੀ ਹੈ"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"ਖਮੋਸ਼ੀ"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"ਸੂਚਨਾਵਾਂ ਨੂੰ ਖਮੋਸ਼ ਕੀਤਾ ਗਿਆ"</string>
-    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
-    <skip />
+    <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਆਪਣਾ ਡੀਵਾਈਸ ਮੁੜ-ਸ਼ੁਰੂ ਨਹੀਂ ਕਰਦੇ, ਉਦੋਂ ਤੱਕ ਤੁਹਾਨੂੰ ਅਡਵਾਂਸ ਸੁਰੱਖਿਆ USB ਸੂਚਨਾਵਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਹੋਣਗੀਆਂ"</string>
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"ਸ਼ੱਕੀ USB ਸਰਗਰਮੀ"</string>
-    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
-    <skip />
+    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="5772698072220844779">"USB ਡਾਟਾ ਸਿਗਨਲ ਬੰਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ"</string>
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"ਕੀ ਫਿੰਗਰਪ੍ਰਿੰਟ ਅਣਲਾਕ ਸੰਬੰਧੀ ਕੋਈ ਸਮੱਸਿਆ ਆ ਰਹੀ ਹੈ?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"ਆਪਣੇ ਅਣਲਾਕ ਕਰਨ ਸੰਬੰਧੀ ਅਨੁਭਵ ਨੂੰ ਬਿਹਤਰ ਬਣਾਉਣ ਵਾਸਤੇ ਸੁਝਾਵਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"ਪਲਕਾਂ ਨਾ ਝਪਕੋ"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"ਟੀਵੀ ਬੰਦ ਕਰਨ ਲਈ ਪਾਵਰ ਬਟਨ ਨੂੰ ਦਬਾਈ ਰੱਖੋ"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"ਸਿਸਟਮ ਸਰੋਤ ਸੰਬੰਧੀ ਅਲਰਟ"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"ਸਰੋਤ ਦੀ ਜ਼ਿਆਦਾ ਵਰਤੋਂ"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"ਐਪ ‘<xliff:g id="APP_NAME">%1$s</xliff:g> ਬਹੁਤ ਸਾਰੇ ਸਰੋਤਾਂ ਦੀ ਵਰਤੋਂ ਕਰ ਰਹੀ ਹੈ।\""</string>
 </resources>

@@ -219,6 +219,7 @@ public class ActivityTaskSupervisorTests extends WindowTestsBase {
     @Test
     public void testRemoveTask() {
         final ActivityRecord activity1 = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        activity1.setVisibleRequested(false);
         activity1.setVisible(false);
         activity1.finishing = true;
         activity1.setState(ActivityRecord.State.STOPPING, "test");
@@ -235,6 +236,7 @@ public class ActivityTaskSupervisorTests extends WindowTestsBase {
         assertEquals(ActivityRecord.State.DESTROYING, activity2.getState());
         assertEquals(ActivityRecord.State.STOPPING, activity1.getState());
         assertTrue(mSupervisor.mStoppingActivities.contains(activity1));
+        waitHandlerIdle(mAtm.mH);
         // Assume that it is called by scheduleIdle from addToStopping. And because
         // mStoppingActivities remembers the finishing activity, it can continue to destroy.
         mSupervisor.processStoppingAndFinishingActivities(null /* launchedActivity */,
@@ -650,6 +652,25 @@ public class ActivityTaskSupervisorTests extends WindowTestsBase {
         nonLeafTask.addChild(directChildFragment, 0);
 
         assertThat(mSupervisor.mOpaqueContainerHelper.isOpaque(nonLeafTask)).isFalse();
+    }
+
+    @Test
+    public void testOpaque_leafTaskUpdated() {
+        final Task rootTask = new TaskBuilder(mSupervisor).setCreatedByOrganizer(true).build();
+        final TaskFragment opaqueTask = createChildTaskFragment(rootTask,
+                WINDOWING_MODE_FREEFORM, /* opaque */ true, /* filling */ true);
+        final Task childTask = new TaskBuilder(mSupervisor).setParentTask(rootTask).build();
+        final ActivityRecord directChildActivity = new ActivityBuilder(mAtm).setTask(childTask)
+                .build();
+
+        directChildActivity.setOccludesParent(false);
+
+        assertThat(mSupervisor.mOpaqueContainerHelper.isOpaque(childTask)).isFalse();
+        assertThat(mSupervisor.mOpaqueContainerHelper.isOpaque(opaqueTask)).isTrue();
+
+        directChildActivity.setOccludesParent(true);
+
+        assertThat(mSupervisor.mOpaqueContainerHelper.isOpaque(childTask)).isTrue();
     }
 
     @NonNull

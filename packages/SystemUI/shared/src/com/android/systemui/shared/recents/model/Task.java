@@ -107,6 +107,9 @@ public class Task {
         private int mHashCode;
 
         public TaskKey(TaskInfo t) {
+            this(t, t.displayId);
+        }
+        public TaskKey(TaskInfo t, int displayIdOverride) {
             ComponentName sourceComponent = t.origActivity != null
                     // Activity alias if there is one
                     ? t.origActivity
@@ -118,7 +121,7 @@ public class Task {
             this.sourceComponent = sourceComponent;
             this.userId = t.userId;
             this.lastActiveTime = t.lastActiveTime;
-            this.displayId = t.displayId;
+            this.displayId = displayIdOverride;
             this.baseActivity = t.baseActivity;
             this.numActivities = t.numActivities;
             this.isTopActivityNoDisplay = t.isTopActivityNoDisplay;
@@ -322,10 +325,12 @@ public class Task {
                         CONTROLLED_WINDOWING_MODES_WHEN_ACTIVE, taskInfo.getWindowingMode())
                 && (taskInfo.getActivityType() == ACTIVITY_TYPE_UNDEFINED
                 || ArrayUtils.contains(CONTROLLED_ACTIVITY_TYPES, taskInfo.getActivityType()));
-        return new Task(taskKey,
+        Task result = new Task(taskKey,
                 td != null ? td.getPrimaryColor() : 0,
                 td != null ? td.getBackgroundColor() : 0, isDockable , isLocked, td,
                 taskInfo.topActivity);
+        result.appBounds = taskInfo.configuration.windowConfiguration.getAppBounds();
+        return result;
     }
 
     /**

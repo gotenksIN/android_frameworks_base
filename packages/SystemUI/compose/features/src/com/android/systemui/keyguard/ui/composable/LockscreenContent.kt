@@ -17,9 +17,18 @@
 package com.android.systemui.keyguard.ui.composable
 
 import android.view.View
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
 import com.android.compose.animation.scene.ContentScope
 import com.android.internal.jank.Cuj
@@ -33,10 +42,10 @@ import com.android.systemui.keyguard.ui.composable.blueprint.ComposableLockscree
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenBehindScrimViewModel
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenContentViewModel
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenFrontScrimViewModel
+import com.android.systemui.keyguard.ui.viewmodel.ViewStateAccessor
 import com.android.systemui.lifecycle.rememberViewModel
-import com.android.systemui.notifications.ui.composable.NotificationLockscreenScrim
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
-import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationLockscreenScrimViewModel
+import kotlin.math.min
 
 /**
  * Renders the content of the lockscreen.
@@ -46,7 +55,6 @@ import com.android.systemui.statusbar.notification.stack.ui.viewmodel.Notificati
  */
 class LockscreenContent(
     private val viewModelFactory: LockscreenContentViewModel.Factory,
-    private val notificationScrimViewModelFactory: NotificationLockscreenScrimViewModel.Factory,
     private val lockscreenFrontScrimViewModelFactory: LockscreenFrontScrimViewModel.Factory,
     private val lockscreenBehindScrimViewModelFactory: LockscreenBehindScrimViewModel.Factory,
     private val blueprints: Set<@JvmSuppressWildcards ComposableLockscreenSceneBlueprint>,
@@ -60,17 +68,17 @@ class LockscreenContent(
     @Composable
     fun ContentScope.Content(modifier: Modifier = Modifier) {
         val view = LocalView.current
+        var lockscreenAlpha by remember { mutableFloatStateOf(0f) }
         val viewModel =
             rememberViewModel("LockscreenContent-viewModel") {
                 viewModelFactory.create(
                     keyguardTransitionAnimationCallback =
-                        KeyguardTransitionAnimationCallbackImpl(view, interactionJankMonitor)
+                        KeyguardTransitionAnimationCallbackImpl(view, interactionJankMonitor),
+                    viewState = ViewStateAccessor(alpha = { lockscreenAlpha }),
                 )
             }
-        val notificationLockscreenScrimViewModel =
-            rememberViewModel("LockscreenContent-notificationScrimViewModel") {
-                notificationScrimViewModelFactory.create()
-            }
+
+        LaunchedEffect(viewModel.alpha) { lockscreenAlpha = viewModel.alpha }
         val lockscreenFrontScrimViewModel =
             rememberViewModel("LockscreenContent-frontScrimViewModel") {
                 lockscreenFrontScrimViewModelFactory.create()
@@ -79,6 +87,60 @@ class LockscreenContent(
             rememberViewModel("LockscreenContent-behindScrimViewModel") {
                 lockscreenBehindScrimViewModelFactory.create()
             }
+
+        /**
+         * Important: Make sure that [LockscreenContentViewModel.shouldContentFadeIn] is checked the
+         * first time the Lockscreen scene is composed.
+         */
+        val useFadeInOnComposition = remember {
+            layoutState.currentTransition?.let { currentTransition ->
+                viewModel.shouldContentFadeIn(currentTransition)
+            } ?: false
+        }
+
+        // Alpha for the animation when transitioning from Shade scene to Lockscreen Scene and
+        // ending user input, at which point the content fades in, visually completing the
+        // transition.
+        val contentAlphaAnimatable = remember { Animatable(0f) }
+        LaunchedEffect(contentAlphaAnimatable) {
+            snapshotFlow { contentAlphaAnimatable.value }
+                .collect {
+                    // Pipe the content alpha animation progress to the view model, so NSSL can
+                    // fade-in the stack in tandem.
+                    viewModel.setContentAlphaForLockscreenFadeIn(it)
+                }
+        }
+
+        LaunchedEffect(
+            contentAlphaAnimatable,
+            layoutState.currentTransition,
+            useFadeInOnComposition,
+        ) {
+            val currentTransition = layoutState.currentTransition
+            when {
+                useFadeInOnComposition &&
+                    currentTransition != null &&
+                    viewModel.shouldContentFadeIn(currentTransition) &&
+                    currentTransition.isUserInputOngoing -> {
+
+                    // Keep the content invisible until user lifts their finger.
+                    contentAlphaAnimatable.snapTo(0f)
+                }
+
+                useFadeInOnComposition &&
+                    (currentTransition == null ||
+                        (viewModel.shouldContentFadeIn(currentTransition) &&
+                            !currentTransition.isUserInputOngoing)) -> {
+                    // Animate the content fade in.
+                    contentAlphaAnimatable.animateTo(1f, tween())
+                }
+
+                else -> {
+                    // Disable the content fade in logic.
+                    contentAlphaAnimatable.snapTo(1f)
+                }
+            }
+        }
 
         // Ensure clock events are connected. This is a no-op if they are already registered.
         clockInteractor.clockEventController.registerListeners()
@@ -96,9 +158,11 @@ class LockscreenContent(
             )
             Content(
                 viewModel,
-                modifier.sysuiResTag("keyguard_root_view").element(LockscreenElementKeys.Root),
+                modifier
+                    .sysuiResTag("keyguard_root_view")
+                    .element(LockscreenElementKeys.Root)
+                    .graphicsLayer { alpha = min(viewModel.alpha, contentAlphaAnimatable.value) },
             )
-            NotificationLockscreenScrim(notificationLockscreenScrimViewModel)
             LockscreenFrontScrim(lockscreenFrontScrimViewModel)
         }
     }

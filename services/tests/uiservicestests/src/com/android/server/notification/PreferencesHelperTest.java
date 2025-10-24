@@ -253,8 +253,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     @Parameters(name = "{0}")
     public static List<FlagsParameterization> getParams() {
         return FlagsParameterization.allCombinationsOf(
-                android.app.Flags.FLAG_UI_RICH_ONGOING,
-                FLAG_NOTIFICATION_CLASSIFICATION_UI,
                 android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS);
     }
 
@@ -5493,6 +5491,11 @@ public class PreferencesHelperTest extends UiServiceTestCase {
         List<ConversationChannelWrapper> convos =
                 mHelper.getConversations(IntArray.wrap(new int[] {mUserId}), true);
 
+        assertEquals(1, convos.size());
+        assertTrue(conversationWrapperContainsChannel(convos, channel));
+
+        // Also test the getConversations(pkg, uid) API
+        List<ConversationChannelWrapper> convosByPkgUid = mHelper.getConversations(PKG_O, UID_O);
         assertEquals(1, convos.size());
         assertTrue(conversationWrapperContainsChannel(convos, channel));
     }

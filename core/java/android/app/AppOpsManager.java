@@ -1733,9 +1733,27 @@ public class AppOpsManager {
      */
     public static final int OP_READ_CELL_INFO = AppOpEnums.APP_OP_READ_CELL_INFO;
 
+    /**
+     * Allow the app to create sessions for automated control of other applications.
+     *
+     * @hide
+     */
+    public static final int OP_COMPUTER_CONTROL = AppOpEnums.APP_OP_COMPUTER_CONTROL;
+
+    /**
+     * Allow the app to read SMS messages that contain One Time Passwords (OTPs). This app op does
+     * not remove the need for the READ_SMS app op to be granted.
+     *
+     * @hide
+     */
+    public static final int OP_READ_OTP_SMS = AppOpEnums.APP_OP_READ_OTP_SMS;
+
+    /** @hide Access local network devices. */
+    public static final int OP_ACCESS_LOCAL_NETWORK = AppOpEnums.APP_OP_ACCESS_LOCAL_NETWORK;
+
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
-    public static final int _NUM_OP = 167;
+    public static final int _NUM_OP = 170;
 
     /**
      * All app ops represented as strings.
@@ -1905,7 +1923,10 @@ public class AppOpsManager {
             OPSTR_POST_PROMOTED_NOTIFICATIONS,
             OPSTR_SYSTEM_APPLICATION_OVERLAY,
             OPSTR_READ_CELL_IDENTITY,
-            OPSTR_READ_CELL_INFO
+            OPSTR_READ_CELL_INFO,
+            OPSTR_COMPUTER_CONTROL,
+            OPSTR_READ_OTP_SMS,
+            OPSTR_ACCESS_LOCAL_NETWORK,
     })
     public @interface AppOpString {}
 
@@ -1923,7 +1944,10 @@ public class AppOpsManager {
     /** Access to {@link android.app.usage.UsageStatsManager}. */
     public static final String OPSTR_GET_USAGE_STATS
             = "android:get_usage_stats";
-    /** Activate a VPN connection without user intervention. @hide */
+    /**
+     * Activate a VPN connection without user intervention.
+     * @hide
+     */
     @SystemApi
     public static final String OPSTR_ACTIVATE_VPN
             = "android:activate_vpn";
@@ -2715,6 +2739,15 @@ public class AppOpsManager {
     /** @hide Read telephony cell information. */
     public static final String OPSTR_READ_CELL_INFO = "android:read_cell_info";
 
+    /** @hide Control other applications. */
+    public static final String OPSTR_COMPUTER_CONTROL = "android:computer_control";
+
+    /** @hide Read OTP SMS messages */
+    public static final String OPSTR_READ_OTP_SMS = "android:read_otp_sms";
+
+    /** @hide */
+    public static final String OPSTR_ACCESS_LOCAL_NETWORK = "android:access_local_network";
+
     /** {@link #sAppOpsToNote} not initialized yet for this op */
     private static final byte SHOULD_COLLECT_NOTE_OP_NOT_INITIALIZED = 0;
     /** Should not collect noting of this app-op in {@link #sAppOpsToNote} */
@@ -2787,6 +2820,7 @@ public class AppOpsManager {
             OP_UWB_RANGING,
             OP_NEARBY_WIFI_DEVICES,
             Flags.rangingPermissionEnabled() ? OP_RANGING : OP_NONE,
+            Flags.accessLocalNetworkPermissionEnabled() ? OP_ACCESS_LOCAL_NETWORK : OP_NONE,
             // Notifications
             OP_POST_NOTIFICATION,
             // Health
@@ -3388,6 +3422,20 @@ public class AppOpsManager {
                 "READ_CELL_INFO")
                 .setDefaultMode(AppOpsManager.MODE_ALLOWED)
                 .build(),
+        // OP_COMPUTER_CONTROL is related to the ACCESS_COMPUTER_CONTROL permission but with
+        // slightly different semantics - the permission must be held in order to request a
+        // computer control session at all, while the op mode determines whether explicit user
+        // consent is required when requesting a computer control session.
+        new AppOpInfo.Builder(OP_COMPUTER_CONTROL, OPSTR_COMPUTER_CONTROL, "COMPUTER_CONTROL")
+                .setDefaultMode(AppOpsManager.MODE_IGNORED)
+                .build(),
+        new AppOpInfo.Builder(OP_READ_OTP_SMS, OPSTR_READ_OTP_SMS, "READ_OTP_SMS")
+                .build(),
+        new AppOpInfo.Builder(OP_ACCESS_LOCAL_NETWORK, OPSTR_ACCESS_LOCAL_NETWORK,
+                "ACCESS_LOCAL_NETWORK")
+                .setPermission(Flags.accessLocalNetworkPermissionEnabled()
+                        ? Manifest.permission.ACCESS_LOCAL_NETWORK : null)
+                .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
     };
 
     // The number of longs needed to form a full bitmask of app ops
@@ -9022,7 +9070,7 @@ public class AppOpsManager {
         }
     }
 
-    /** {@hide} */
+    /** @hide */
     @Deprecated
     public void startWatchingActive(@NonNull int[] ops,
             @NonNull OnOpActiveChangedListener callback) {
@@ -9384,7 +9432,7 @@ public class AppOpsManager {
     }
 
     /**
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     @TestApi
@@ -10773,6 +10821,27 @@ public class AppOpsManager {
     public void resetPackageOpsNoHistory(@NonNull String packageName) {
         try {
             mService.resetPackageOpsNoHistory(packageName);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Gets a list of packages that have a particular app op set to a particular mode, if that mode
+     * is not the default mode for the op.
+     *
+     * @param op The op to check state for.
+     * @param mode The mode the op must have for a package to be included. This mode must not be
+     *             the default mode of the op, or the method will throw an IllegalArgumenException.
+     * @return A list of all packages whose app op mode matches the given mode for the given app op.
+     *
+     * @throws IllegalArgumentException if the specified mode is the default mode for the op
+     * @hide
+     */
+    @RequiresPermission(Manifest.permission.QUERY_ALL_PACKAGES)
+    public @NonNull List<String> getPackagesWithNonDefaultUidMode(int op, int mode) {
+        try {
+            return mService.getPackagesWithNonDefaultUidMode(op, mode, mContext.getUserId());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

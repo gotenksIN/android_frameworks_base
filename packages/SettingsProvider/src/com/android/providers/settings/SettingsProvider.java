@@ -2112,7 +2112,7 @@ public class SettingsProvider extends ContentProvider {
 
         File cacheFile = getCacheFile(name, callingUserId);
         if (cacheFile != null) {
-            if (!isValidMediaUri(name, value)) {
+            if (!isValidMediaUri(name, value, callingUserId)) {
                 return false;
             }
         }
@@ -2174,7 +2174,7 @@ public class SettingsProvider extends ContentProvider {
         return true;
     }
 
-    private boolean isValidMediaUri(String name, String uri) {
+    private boolean isValidMediaUri(String name, String uri, int callingUserId) {
         if (uri != null) {
             Uri audioUri = Uri.parse(uri);
             if (Settings.AUTHORITY.equals(
@@ -2206,6 +2206,16 @@ public class SettingsProvider extends ContentProvider {
                     Binder.restoreCallingIdentity(identity);
                 }
             } else {
+                // Check if the URI has a userId and if it matches the callingUserId
+                final int uriUserId = ContentProvider.getUserIdFromUri(
+                        audioUri, /* defaultUserId= */ callingUserId);
+                if (callingUserId != uriUserId) {
+                    Slog.e(LOG_TAG,
+                            "mutateSystemSetting for setting: " + name + " URI: " + audioUri
+                                    + " ignored: URI userId (" + uriUserId
+                                    + ") does not match calling userId (" + callingUserId + ")");
+                    return false;
+                }
                 mimeType = getContext().getContentResolver().getType(audioUri);
             }
             if (DEBUG) {
@@ -3206,8 +3216,8 @@ public class SettingsProvider extends ContentProvider {
 
     private int getDeviceId() {
         int deviceId = android.companion.virtualdevice.flags.Flags.deviceAwareSettingsOverride()
-                && canUidAccessDeviceAwareSettings(Binder.getCallingUid())
-                ? getCallingDeviceId() : Context.DEVICE_ID_DEFAULT;
+                && canAccessDeviceAwareSettings(Binder.getCallingUid(),
+                getCallingPackageUnchecked()) ? getCallingDeviceId() : Context.DEVICE_ID_DEFAULT;
         if (deviceId != Context.DEVICE_ID_DEFAULT) {
             // We have received a call for a non-default device id, so now would be a good time
             // to initialize a virtual device listener.
@@ -3268,10 +3278,13 @@ public class SettingsProvider extends ContentProvider {
                 ? getContext().getSystemService(VirtualDeviceManager.class) : null;
     }
 
-    private static boolean canUidAccessDeviceAwareSettings(int uid) {
-        // Allow root, system and shell (for testing) to access device-aware settings (i.e.,
-        // settings for virtual devices).
-        return uid == ROOT_UID || uid == SYSTEM_UID || uid == SHELL_UID;
+    private static boolean canAccessDeviceAwareSettings(int uid, String packageName) {
+        // Allow system_server to access device-aware settings (i.e., settings for virtual devices).
+        if (uid == SYSTEM_UID && "android".equals(packageName)) {
+            return true;
+        }
+        // Otherwise, allow root and shell (for testing purposes).
+        return uid == ROOT_UID || uid == SHELL_UID;
     }
 
     final class SettingsRegistry {
@@ -6772,7 +6785,8 @@ public class SettingsProvider extends ContentProvider {
                 }
 
                 if (currentVersion == 230) {
-                    if (Flags.allowDefaultValueForTextShowPassword()) {
+                    if (com.android.internal.widget.flags.Flags
+                            .enableDefaultVisibilityForSensitiveInputs()) {
                         if (systemSettings
                                 .getSettingLocked(Settings.System.TEXT_SHOW_PASSWORD)
                                 .isNull()) {

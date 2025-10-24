@@ -7,15 +7,13 @@
     { "name": "hoststubgen-test-tiny-test" },
     { "name": "hoststubgen-invoke-test" },
 
-    // This test fails with mysterious errors on the server side. Commenting out for now.
-    // TODO(b/438195035) Un-comment it
-    // { "name": "ravenwood-scripts-sh-golden-test" },
+    { "name": "ravenwood-scripts-sh-golden-test" },
 
     // Device side tests for the bivalent tests.
     { "name": "RavenwoodMockitoTest_device" },
     { "name": "RavenwoodBivalentTest_device" },
     { "name": "RavenwoodBivalentTest_device_ravenizer" },
-    { "name": "RavenwoodBivalentInstTest_nonself_inst" },
+    { "name": "RavenwoodBivalentInstTest_nonself_inst_device" },
     { "name": "RavenwoodBivalentInstTest_self_inst_device" },
     { "name": "RavenwoodUiTest_device" },
 
@@ -178,10 +176,6 @@
     },
     {
       "name": "FrameworksUtilTestsRavenwood",
-      "host": true
-    },
-    {
-      "name": "InternalArrayUtilsTest",
       "host": true
     },
     {

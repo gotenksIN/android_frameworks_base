@@ -107,17 +107,6 @@ flag {
 
 flag {
     namespace: "windowing_sdk"
-    name: "fix_task_compatible_modes"
-    description: "Make most of the windowing modes compatible"
-    bug: "427336494"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    namespace: "windowing_sdk"
     name: "task_fragment_companion_activity"
     description: "Track the activity to be finished with tf in core"
     bug: "433459536"
@@ -168,10 +157,9 @@ flag {
 
 flag {
     namespace: "windowing_sdk"
-    name: "dispose_task_fragment_synchronously"
-    description: "Handle TaskFragment disposal synchronously when handling app died."
-    bug: "429336735"
-    is_fixed_read_only: true
+    name: "refactor_match_parent_bounds"
+    description: "Consolidate fillsParentBounds with matchParentBounds."
+    bug: "409417223"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -182,6 +170,16 @@ flag {
     name: "fix_bal_reparent_existing_task"
     description: "Avoid reparent existing task when the background launch is not allowed."
     bug: "434047695"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "fix_rapid_top_resumed_switch"
+    description: "Prevent top-resumed-activity rapidly switched in multi-window mode."
+    bug: "417956804"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

@@ -184,7 +184,7 @@
     <string name="scNullCipherIssueActionGotIt" msgid="8747796640866585787">"Важи"</string>
     <string name="fcComplete" msgid="1080909484660507044">"Кôд функције је извршен."</string>
     <string name="fcError" msgid="5325116502080221346">"Проблеми са везом или неважећи кôд функције."</string>
-    <string name="httpErrorOk" msgid="6206751415788256357">"Потврди"</string>
+    <string name="httpErrorOk" msgid="6206751415788256357">"Важи"</string>
     <string name="httpError" msgid="3406003584150566720">"Дошло је до грешке на мрежи."</string>
     <string name="httpErrorLookup" msgid="3099834738227549349">"Није могуће пронаћи URL адресу"</string>
     <string name="httpErrorUnsupportedAuthScheme" msgid="3976195595501606787">"Шема потврда аутентичности сајта није подржана."</string>
@@ -337,8 +337,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Пређи на пословни профил"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Пређи на лични профил апликације <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Пређи на пословни профил апликације <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Контакти"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"приступи контактима"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Контакти и налози"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"приступа контактима и види листу налога који могу да чувају контакте на овом уређају"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Локација"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"приступи локацији овог уређаја"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Календар"</string>
@@ -371,8 +371,10 @@
     <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"прецизно праћење покрета очију"</string>
     <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Подаци о кретању и области"</string>
     <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"праћење очију, лица, тела и области за скенирање"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Прецизни подаци: покрети главе и област"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"прецизно праћење главе и области за скенирање"</string>
+    <!-- no translation found for permgrouplab_xr_tracking_sensitive (6574264227123545314) -->
+    <skip />
+    <!-- no translation found for permgroupdesc_xr_tracking_sensitive (2480835734248509848) -->
+    <skip />
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"да преузима садржај прозора"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Проверава садржај прозора са којим остварујете интеракцију."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"да укључи Истраживања додиром"</string>
@@ -640,6 +642,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Дозвољава апликацији да одређује релативну раздаљину између уређаја ултра-широког појаса у близини"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"интеракција са WiFi уређајима у близини"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Дозвољава апликацији да се оглашава, повезује и утврђује релативну позицију WiFi уређаја у близини"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"приступ уређајима на локалној мрежи"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Дозвољава апликацији да приступа уређајима на локалној мрежи"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"одређивање раздаљине између уређаја у близини"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Дозволите апликацији да одређује релативну раздаљину између уређаја у близини"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Информације о жељеној NFC услузи за плаћање"</string>
@@ -684,7 +688,8 @@
     <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Дозвољава апликацији да скенира окружење."</string>
     <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"прецизно скенирање окружења"</string>
     <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Дозвољава апликацији да прецизно скенира окружење."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"праћење података проширене стварности у позадини"</string>
+    <!-- no translation found for permlab_xr_tracking_in_background (1714941204255185460) -->
+    <skip />
     <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Дозвољава апликацији да приступа подацима проширене стварности у позадини."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"евидентирање тастера"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Дозвољава апликацији да евидентира тастере пре него што систем може да обради системске пречице и радње."</string>
@@ -1218,7 +1223,7 @@
     <string name="VideoView_error_title" msgid="5750686717225068016">"Проблем са видео снимком"</string>
     <string name="VideoView_error_text_invalid_progressive_playback" msgid="3782449246085134720">"Овај видео не може да се стримује на овом уређају."</string>
     <string name="VideoView_error_text_unknown" msgid="7658683339707607138">"Не можете да пустите овај видео."</string>
-    <string name="VideoView_error_button" msgid="5138809446603764272">"Потврди"</string>
+    <string name="VideoView_error_button" msgid="5138809446603764272">"Важи"</string>
     <string name="relative_time" msgid="8572030016028033243">"<xliff:g id="DATE">%1$s</xliff:g>, <xliff:g id="TIME">%2$s</xliff:g>"</string>
     <string name="noon" msgid="8365974533050605886">"подне"</string>
     <string name="Noon" msgid="6902418443846838189">"Подне"</string>
@@ -1255,7 +1260,7 @@
     <string name="low_internal_storage_view_text_no_boot" msgid="7368968163411251788">"Нема довољно меморијског простора за систем. Уверите се да имате 250 MB слободног простора и поново покрените."</string>
     <string name="app_running_notification_title" msgid="8985999749231486569">"Апликација <xliff:g id="APP_NAME">%1$s</xliff:g> је покренута"</string>
     <string name="app_running_notification_text" msgid="5120815883400228566">"Додирните за више информација или заустављање апликације."</string>
-    <string name="ok" msgid="2646370155170753815">"Потврди"</string>
+    <string name="ok" msgid="2646370155170753815">"Важи"</string>
     <string name="cancel" msgid="6908697720451760115">"Откажи"</string>
     <string name="yes" msgid="9069828999585032361">"У реду"</string>
     <string name="no" msgid="5122037903299899715">"Откажи"</string>
@@ -1316,7 +1321,7 @@
     <string name="anr_activity_process" msgid="3477362583767128667">"<xliff:g id="ACTIVITY">%1$s</xliff:g> не реагује"</string>
     <string name="anr_application_process" msgid="4978772139461676184">"<xliff:g id="APPLICATION">%1$s</xliff:g> не реагује"</string>
     <string name="anr_process" msgid="1664277165911816067">"Процес <xliff:g id="PROCESS">%1$s</xliff:g> не реагује"</string>
-    <string name="force_close" msgid="9035203496368973803">"Потврди"</string>
+    <string name="force_close" msgid="9035203496368973803">"Важи"</string>
     <string name="report" msgid="2149194372340349521">"Пријави"</string>
     <string name="wait" msgid="7765985809494033348">"Сачекај"</string>
     <string name="webpage_unresponsive" msgid="7850879412195273433">"Страница је престала да се одазива.\n\n Да ли желите да је затворите?"</string>
@@ -1448,7 +1453,7 @@
     <string name="perms_description_app" msgid="2747752389870161996">"Омогућава <xliff:g id="APP_NAME">%1$s</xliff:g>."</string>
     <string name="no_permissions" msgid="5729199278862516390">"Није потребна ниједна дозвола"</string>
     <string name="perm_costs_money" msgid="749054595022779685">"ово ће вам можда бити наплаћено"</string>
-    <string name="dlg_ok" msgid="5103447663504839312">"Потврди"</string>
+    <string name="dlg_ok" msgid="5103447663504839312">"Важи"</string>
     <string name="usb_charging_notification_title" msgid="1674124518282666955">"Овај уређај се пуни преко USB-а"</string>
     <string name="usb_supplying_notification_title" msgid="5378546632408101811">"Повезани уређај се пуни преко USB-а"</string>
     <string name="usb_mtp_notification_title" msgid="1065989144124499810">"USB пренос датотека је укључен"</string>
@@ -1984,9 +1989,11 @@
     <string name="package_installed_device_owner" msgid="8684974629306529138">"Инсталирао је администратор.\nИдите у подешавања да бисте видели одобрене дозволе"</string>
     <string name="package_updated_device_owner" msgid="7770195449213776218">"Ажурирао је администратор.\nИдите у подешавања да бисте видели одобрене дозволе"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Избрисао је администратор"</string>
-    <string name="confirm_battery_saver" msgid="5247976246208245754">"Потврди"</string>
-    <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"Уштеда батерије укључује тамну тему и ограничава или искључује активности у позадини, неке визуелне ефекте, одређене функције и неке мрежне везе."</string>
-    <string name="battery_saver_description" msgid="8518809702138617167">"Уштеда батерије укључује тамну тему и ограничава или искључује активности у позадини, неке визуелне ефекте, одређене функције и неке мрежне везе."</string>
+    <string name="confirm_battery_saver" msgid="5247976246208245754">"Важи"</string>
+    <!-- no translation found for battery_saver_description_with_learn_more (8969945879044849461) -->
+    <skip />
+    <!-- no translation found for battery_saver_description (2820475140307374570) -->
+    <skip />
     <string name="data_saver_description" msgid="4995164271550590517">"Да би се смањила потрошња података, Уштеда података спречава неке апликације да шаљу или примају податке у позадини. Апликација коју тренутно користите може да приступа подацима, али ће то чинити ређе. На пример, слике се неће приказивати док их не додирнете."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"Желите да укључите Уштеду података?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"Укључи"</string>
@@ -2227,7 +2234,7 @@
     <string name="notification_feedback_indicator_demoted" msgid="8880309924296450875">"Ово обавештење је рангирано ниже. Додирните да бисте навели повратне информације."</string>
     <string name="nas_upgrade_notification_title" msgid="8436359459300146555">"Побољшана обавештења"</string>
     <string name="nas_upgrade_notification_content" msgid="5157550369837103337">"Предложене радње и одговоре сада добијате помоћу побољшаних обавештења. Прилагодљива обавештења за Android више нису подржана."</string>
-    <string name="nas_upgrade_notification_enable_action" msgid="3046406808378726874">"Потврди"</string>
+    <string name="nas_upgrade_notification_enable_action" msgid="3046406808378726874">"Важи"</string>
     <string name="nas_upgrade_notification_disable_action" msgid="3794833210043497982">"Искључи"</string>
     <string name="nas_upgrade_notification_learn_more_action" msgid="7011130656195423947">"Сазнајте више"</string>
     <string name="nas_upgrade_notification_learn_more_content" msgid="3735480566983530650">"Побољшана обавештења су заменила Android прилагодљива обавештења у Android-у 12. Ова функција показује предложене радње и одговоре, и организује обавештења.\n\nПобољшана обавештења могу да приступају садржају обавештења, укључујући личне податке попут имена контаката и порука. Ова функција може и да одбацује обавештења или да одговара на њих, на пример, да се јавља на телефонске позиве и контролише режим Не узнемиравај."</string>
@@ -2580,10 +2587,10 @@
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Безбедност и приватност"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"Откључајте екран и поново повежите USB"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"Откључајте екран да бисте повезали USB"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"Напредна заштита захтева да екран буде откључан да би се покренула USB веза"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"Напредна заштита захтева да екран буде откључан да би се покренула USB веза"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"Напредна заштита захтева да екран буде откључан да би се покренуло USB повезивање"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"Напредна заштита захтева да екран буде откључан да би се покренуло USB повезивање"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"Напредна заштита захтева да екран буде откључан ради бржег пуњења"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"Ради бржег пуњења или покретања USB везе, Напредна заштита захтева да екран буде откључан"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"За брже пуњење или покретање USB повезивања, Напредна заштита захтева да екран буде откључан"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Искључи звук"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Искључен је звук обавештења"</string>
     <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Нећете добијати обавештења о Напредној заштити за USB док не рестартујете уређај"</string>
@@ -2593,10 +2600,7 @@
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Додирните да бисте видели савете за побољшање доживљаја откључавања"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Без трептања"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Дуго притисните дугме за укључивање и искључите ТВ"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Упозорења о ресурсима система"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Прекомерно коришћење ресурса"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Апликација <xliff:g id="APP_NAME">%1$s</xliff:g> користи превише ресурса."</string>
 </resources>

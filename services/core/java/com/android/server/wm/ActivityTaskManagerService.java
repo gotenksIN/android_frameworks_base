@@ -260,6 +260,7 @@ import android.window.IWindowOrganizerController;
 import android.window.SplashScreenView.SplashScreenViewParcelable;
 import android.window.TaskSnapshot;
 import android.window.TaskSnapshotManager;
+import android.window.WindowContainerTransaction;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -285,7 +286,6 @@ import com.android.server.UiThread;
 import com.android.server.Watchdog;
 import com.android.server.am.ActivityManagerService;
 import com.android.server.am.ActivityManagerServiceDumpProcessesProto;
-import com.android.server.wm.ActivityTaskManagerInternal.HandoffEnablementListener;
 import com.android.server.am.AppTimeTracker;
 import com.android.server.am.AssistDataRequester;
 import com.android.server.am.BaseErrorDialog;
@@ -795,10 +795,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     @Nullable
     private ActivityRecord mTracedResumedActivity;
 
-// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
     boolean toastWindow = false;
 
-// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
     /** If non-null, we are tracking the time the user spends in the currently focused app. */
     AppTimeTracker mCurAppTimeTracker;
 
@@ -5410,6 +5408,12 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         // ClientTransactions is queued during #deferWindowLayout() for performance.
         // Notify to continue.
         mLifecycleManager.onLayoutContinued();
+
+        if (com.android.window.flags.Flags.rankTaskLayerWithWindowLayout()
+                && mRootWindowContainer.mTaskLayersChanged
+                && !mWindowManager.mWindowPlacerLocked.isLayoutDeferred()) {
+            mRootWindowContainer.rankTaskLayers();
+        }
     }
 
     /**
@@ -5965,7 +5969,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         return mCompatModePackages.compatibilityInfoForPackageLocked(ai);
     }
 
-// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
     void setToastWindow() {
         toastWindow = true;
     }
@@ -5978,7 +5981,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         return toastWindow;
     }
 
-// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
     /**
      * Returns the PackageManager. Used by classes hosted by {@link ActivityTaskManagerService}. The
      * PackageManager could be unavailable at construction time and therefore needs to be accessed
@@ -6500,6 +6502,35 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             }
 
             mHandoffEnablementListeners.remove(listener);
+        }
+
+        @Override
+        public void moveAllTasks(int fromDisplayId, int toDisplayId) {
+            enforceTaskPermission("moveAllTasks()");
+            synchronized (mGlobalLock) {
+                final DisplayContent fromDc = mRootWindowContainer.getDisplayContent(fromDisplayId);
+                final DisplayContent toDc = mRootWindowContainer.getDisplayContent(toDisplayId);
+
+                if (fromDc == null) {
+                    Slog.w(TAG, "moveAllTasks: invalid fromDisplayId=" + fromDisplayId);
+                    return;
+                }
+                if (toDc == null) {
+                    Slog.w(TAG, "moveAllTasks: invalid toDisplayId=" + toDisplayId);
+                    return;
+                }
+                if (fromDc == toDc) {
+                    Slog.w(TAG, "moveAllTasks: fromDisplayId=" + fromDisplayId
+                            + " and toDisplayId=" + toDisplayId + " are the same");
+                    return;
+                }
+
+                WindowContainerTransaction wct = new WindowContainerTransaction().reparentTasks(
+                        fromDc.getDefaultTaskDisplayArea().mRemoteToken.toWindowContainerToken(),
+                        toDc.getDefaultTaskDisplayArea().mRemoteToken.toWindowContainerToken(),
+                        /* windowingModes= */ null, /* activityTypes= */ null, /* onTop= */ true);
+                mWindowOrganizerController.startNewTransition(TRANSIT_TO_FRONT, wct);
+            }
         }
 
         @Override

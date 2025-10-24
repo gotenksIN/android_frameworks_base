@@ -238,6 +238,8 @@
   <java-symbol type="id" name="metric_unit_0" />
   <java-symbol type="id" name="metric_unit_1" />
   <java-symbol type="id" name="metric_unit_2" />
+  <java-symbol type="id" name="alt_title" />
+  <java-symbol type="id" name="app_name_text_divider" />
   <java-symbol type="id" name="status_bar_latest_event_content" />
   <java-symbol type="id" name="notification_main_column" />
   <java-symbol type="id" name="notification_headerless_view_column" />
@@ -783,6 +785,10 @@
   <java-symbol type="string" name="gpsNotifTitle" />
   <java-symbol type="string" name="gpsVerifNo" />
   <java-symbol type="string" name="gpsVerifYes" />
+  <java-symbol type="string" name="emergency_location_notification_title" />
+  <java-symbol type="string" name="emergency_location_notification_message" />
+  <java-symbol type="string" name="emergency_location_notification_learn_more" />
+  <java-symbol type="string" name="emergency_location_notification_learn_more_url" />
   <java-symbol type="string" name="gsm_alphabet_default_charset" />
   <java-symbol type="string" name="httpError" />
   <java-symbol type="string" name="httpErrorAuth" />
@@ -1443,7 +1449,6 @@
   <java-symbol type="drawable" name="ic_lock_open" />
   <java-symbol type="drawable" name="ic_lock_bugreport" />
   <java-symbol type="drawable" name="ic_lock_bugreport_round" />
-  <java-symbol type="drawable" name="ic_lock_lockdown" />
   <java-symbol type="drawable" name="ic_lock_lockdown_round" />
   <java-symbol type="drawable" name="ic_lock_power_off" />
   <java-symbol type="drawable" name="ic_lock_power_off_round" />
@@ -2244,6 +2249,8 @@
   <java-symbol type="dimen" name="config_keyboardHapticFeedbackFixedAmplitude" />
   <java-symbol type="bool" name="config_keyboardVibrationSettingsSupported" />
   <java-symbol type="bool" name="config_ringtoneVibrationSettingsSupported" />
+  <java-symbol type="array" name="config_ringtoneVibrationPatternToMetricIdMapping" />
+  <java-symbol type="array" name="config_notificationVibrationPatternToMetricIdMapping" />
   <java-symbol type="integer" name="config_vibrationWaveformRampStepDuration" />
   <java-symbol type="bool" name="config_ignoreVibrationsOnWirelessCharger" />
   <java-symbol type="integer" name="config_vibrationWaveformRampDownDuration" />
@@ -2505,6 +2512,7 @@
   <java-symbol type="layout" name="notification_2025_template_collapsed_base" />
   <java-symbol type="layout" name="notification_2025_template_collapsed_metric" />
   <java-symbol type="layout" name="notification_2025_template_expanded_metric" />
+  <java-symbol type="layout" name="notification_2025_template_expanded_single_metric" />
   <java-symbol type="layout" name="notification_2025_template_expanded_base" />
   <java-symbol type="layout" name="notification_2025_template_heads_up_base" />
   <java-symbol type="layout" name="notification_2025_template_compact_heads_up_base" />
@@ -4233,6 +4241,10 @@
   <java-symbol type="bool" name="config_lockPinEnhancedPrivacyDefault" />
   <java-symbol type="bool" name="config_lockPatternVisibleDefault" />
 
+  <java-symbol type="bool" name="config_enableFailedAuthLock" />
+  <java-symbol type="integer" name="config_maxAllowedFailedAuthAttempts" />
+  <java-symbol type="bool" name="config_enableFailedAuthLockToggle" />
+
   <!-- ETWS primary messages -->
   <java-symbol type="string" name="etws_primary_default_message_earthquake" />
   <java-symbol type="string" name="etws_primary_default_message_tsunami" />
@@ -4274,6 +4286,9 @@
   <java-symbol type="integer" name="config_autoGroupAtCount" />
   <java-symbol type="bool" name="config_dozeAlwaysOnDisplayAvailable" />
   <java-symbol type="bool" name="config_dozePickupGestureEnabled" />
+  <java-symbol type="bool" name="config_dozeEnabled" />
+  <java-symbol type="bool" name="config_dozeTapGestureEnabled" />
+  <java-symbol type="bool" name="config_dozeDoubleTapGestureEnabled" />
   <java-symbol type="bool" name="config_dozeAlwaysOnEnabled" />
   <java-symbol type="bool" name="config_dozeSupportsAodWallpaper" />
   <java-symbol type="bool" name="config_displayBlanksAfterDoze" />
@@ -4482,7 +4497,6 @@
   <java-symbol type="attr" name="opticalInsetRight" />
   <java-symbol type="attr" name="opticalInsetBottom" />
 
-  <java-symbol type="drawable" name="ic_lock_lockdown" />
   <java-symbol type="drawable" name="ic_arrow_forward" />
   <java-symbol type="drawable" name="ic_permission" />
 
@@ -4711,6 +4725,7 @@
   <java-symbol type="string" name="config_factoryResetPackage" />
   <java-symbol type="array" name="config_highRefreshRateBlacklist" />
   <java-symbol type="array" name="config_angleAllowList" />
+  <java-symbol type="array" name="config_angleDenyList" />
   <java-symbol type="array" name="config_forceSlowJpegModeList" />
   <java-symbol type="array" name="pause_wallpaper_render_when_state_change" />
   <java-symbol type="bool" name="config_pauseWallpaperRenderWhenStateChangeEnabled" />
@@ -6116,6 +6131,8 @@
 
   <java-symbol type="string" name="unarchival_session_app_label" />
 
+  <java-symbol type="bool" name="config_appResolutionSwitchVoteDisabled" />
+
   <!-- Whether WM DisplayContent supports high performance transitions -->
   <java-symbol type="bool" name="config_deviceSupportsHighPerfTransitions" />
 
@@ -6370,6 +6387,7 @@
 
   <!-- For App Functions -->
   <java-symbol type="array" name="config_appFunctionDeviceSettingsPackages" />
+  <java-symbol type="array" name="config_defaultAppFunctionAgentAllowlist" />
 
   <!-- Action for opening trusted location settings page -->
   <java-symbol type="string" name="trusted_location_settings_action" />

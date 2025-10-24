@@ -72,6 +72,7 @@ import android.graphics.Rect;
 import android.hardware.display.DisplayManagerGlobal;
 import android.os.Binder;
 import android.os.VibrationAttributes;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.annotations.RequiresFlagsEnabled;
@@ -401,6 +402,139 @@ public class ViewRootImplTest {
     }
 
     @Test
+    public void enteringTouchMode_whenWindowIsFocused_nothingFocused_noChange() throws Throwable {
+        sInstrumentation.setInTouchMode(false);
+        setUpViewAndApplyFocusStates(/* windowFocused = */ true, /* viewFocused= */ false);
+
+        assertThat(mView.hasFocus()).isFalse();
+
+        sInstrumentation.setInTouchMode(true);
+        sInstrumentation.waitForIdleSync();
+        waitForFrameRateCategoryToSettle(mView);
+
+        assertThat(mView.hasFocus()).isFalse();
+    }
+
+    @Test
+    public void enteringTouchMode_whenWindowIsFocused_withFocusedItem_noChange() throws Throwable {
+        sInstrumentation.setInTouchMode(false);
+        setUpViewAndApplyFocusStates(/* windowFocused= */ true, /* viewFocused= */ true);
+
+        assertThat(mView.hasFocus()).isTrue();
+
+        sInstrumentation.setInTouchMode(true);
+        sInstrumentation.waitForIdleSync();
+        waitForFrameRateCategoryToSettle(mView);
+
+        assertThat(mView.hasFocus()).isTrue();
+    }
+
+    @Test
+    public void enteringTouchMode_whenWindowIsNotFocused_nothingFocused_noChange()
+            throws Throwable {
+        sInstrumentation.setInTouchMode(false);
+        setUpViewAndApplyFocusStates(/* windowFocused= */ false, /* viewFocused= */ false);
+
+        assertThat(mView.hasFocus()).isFalse();
+
+        sInstrumentation.setInTouchMode(true);
+        sInstrumentation.waitForIdleSync();
+        waitForFrameRateCategoryToSettle(mView);
+
+        assertThat(mView.hasFocus()).isFalse();
+    }
+
+    @Test
+    public void enteringTouchMode_whenWindowIsNotFocused_withFocusedItem_noChange()
+            throws Throwable {
+        sInstrumentation.setInTouchMode(false);
+        setUpViewAndApplyFocusStates(/* windowFocused= */ false, /* viewFocused= */ true);
+
+        assertThat(mView.hasFocus()).isTrue();
+
+        sInstrumentation.setInTouchMode(true);
+        sInstrumentation.waitForIdleSync();
+        waitForFrameRateCategoryToSettle(mView);
+
+        assertThat(mView.hasFocus()).isTrue();
+    }
+
+    @Test
+    public void leavingTouchMode_whenWindowIsFocused_nothingFocused_assignsDefaultFocus()
+            throws Throwable {
+        sInstrumentation.setInTouchMode(true);
+        setUpViewAndApplyFocusStates(/* windowFocused= */ true, /* viewFocused= */ false);
+
+        assertThat(mView.hasFocus()).isFalse();
+
+        sInstrumentation.setInTouchMode(false);
+        sInstrumentation.waitForIdleSync();
+        waitForFrameRateCategoryToSettle(mView);
+
+        assertThat(mView.hasFocus()).isTrue();
+    }
+
+    @Test
+    public void leavingTouchMode_whenWindowIsFocused_withFocusedItem_noChange() throws Throwable {
+        sInstrumentation.setInTouchMode(true);
+        setUpViewAndApplyFocusStates(/* windowFocused= */ true, /* viewFocused= */ true);
+
+        assertThat(mView.hasFocus()).isTrue();
+
+        sInstrumentation.setInTouchMode(false);
+        sInstrumentation.waitForIdleSync();
+        waitForFrameRateCategoryToSettle(mView);
+
+        assertThat(mView.hasFocus()).isTrue();
+    }
+
+    @Test
+    public void leavingTouchMode_whenWindowIsNotFocused_withFocusedItem_noChange()
+            throws Throwable {
+        sInstrumentation.setInTouchMode(true);
+        setUpViewAndApplyFocusStates(/* windowFocused= */ false, /* viewFocused= */ true);
+
+        assertThat(mView.hasFocus()).isTrue();
+
+        sInstrumentation.setInTouchMode(false);
+        sInstrumentation.waitForIdleSync();
+        waitForFrameRateCategoryToSettle(mView);
+
+        assertThat(mView.hasFocus()).isTrue();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW)
+    public void leavingTouchMode_whenWindowIsNotFocused_nothingFocused_noChange() throws Throwable {
+        sInstrumentation.setInTouchMode(true);
+        setUpViewAndApplyFocusStates(/* windowFocused= */ false, /* viewFocused= */ false);
+
+        assertThat(mView.hasFocus()).isFalse();
+
+        sInstrumentation.setInTouchMode(false);
+        sInstrumentation.waitForIdleSync();
+        waitForFrameRateCategoryToSettle(mView);
+
+        assertThat(mView.hasFocus()).isFalse();
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW)
+    public void leavingTouchMode_whenWindowIsNotFocused_nothingFocused_assignsDefaultFocus() throws
+            Throwable {
+        sInstrumentation.setInTouchMode(true);
+        setUpViewAndApplyFocusStates(/* windowFocused= */ false, /* viewFocused= */ false);
+
+        assertThat(mView.hasFocus()).isFalse();
+
+        sInstrumentation.setInTouchMode(false);
+        sInstrumentation.waitForIdleSync();
+        waitForFrameRateCategoryToSettle(mView);
+
+        assertThat(mView.hasFocus()).isTrue();
+    }
+
+    @Test
     public void whenDispatchFakeFocus_focusDoesNotPersist() throws Exception {
         mView = new View(sContext);
         attachViewToWindow(mView);
@@ -415,7 +549,6 @@ public class ViewRootImplTest {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_SURFACE_CONTROL_INPUT_RECEIVER)
     public void whenViewIsAttachedToWindow_getHostToken() {
         mView = new View(sContext);
         attachViewToWindow(mView);
@@ -1414,7 +1547,7 @@ public class ViewRootImplTest {
 
         waitForFrameRateCategoryToSettle(mView);
 
-         // reset the frame rate category counts
+        // reset the frame rate category counts
         for (int i = 0; i < 5; i++) {
             Thread.sleep(delay);
             sInstrumentation.runOnMainSync(() -> {
@@ -1827,6 +1960,41 @@ public class ViewRootImplTest {
         } finally {
             threadRunning.set(0);
         }
+    }
+
+    private void setUpViewAndApplyFocusStates(boolean windowFocused, boolean viewFocused)
+            throws Throwable {
+        mView = new View(sContext);
+        mView.setFocusableInTouchMode(true);
+        mView.setFocusable(true);
+        attachViewToWindow(mView);
+        sInstrumentation.runOnMainSync(() -> {
+            mView.setVisibility(View.VISIBLE);
+            mView.layout(0, 0, 100, 100);
+            mView.invalidate();
+            runAfterDraw(() -> {
+            });
+        });
+        waitForAfterDraw();
+        mViewRootImpl = mView.getViewRootImpl();
+        waitForFrameRateCategoryToSettle(mView);
+
+        sInstrumentation.runOnMainSync(() -> {
+            mViewRootImpl.windowFocusChanged(windowFocused);
+        });
+        sInstrumentation.waitForIdleSync();
+        waitForFrameRateCategoryToSettle(mView);
+        assertThat(mView.hasWindowFocus()).isEqualTo(windowFocused);
+
+        sInstrumentation.runOnMainSync(() -> {
+            if (viewFocused) {
+                mView.requestFocus();
+            } else {
+                mView.clearFocusInternal(null, true, false);
+            }
+        });
+        waitForAfterDraw();
+        waitForFrameRateCategoryToSettle(mView);
     }
 
     static class InputView extends View {

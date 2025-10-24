@@ -643,7 +643,7 @@ public class TelephonyManager {
      *   <li>Returns UNKNOWN for others.</li>
      * </ul>
      */
-    /** {@hide} */
+    /** @hide */
     @UnsupportedAppUsage
     public MultiSimVariants getMultiSimConfiguration() {
         String mSimConfig =
@@ -659,7 +659,6 @@ public class TelephonyManager {
         }
     }
 
-// QTI_BEGIN: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
     /**
      * The allowed values for multi sim voice capability
      *
@@ -676,16 +675,10 @@ public class TelephonyManager {
         static final int PSEUDO_DSDA = 2;
         /** Concurrent calls on both subscriptions are possible */
         static final int DSDA = 3;
-// QTI_END: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
-// QTI_BEGIN: 2025-01-22: Telephony: Introduce new MultiSimVoiceCapability value
         /** MultiSimVoiceCapability is unsupported/deprecated */
         static final int UNSUPPORTED = 4;
-// QTI_END: 2025-01-22: Telephony: Introduce new MultiSimVoiceCapability value
-// QTI_BEGIN: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
     }
 
-// QTI_END: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
-// QTI_BEGIN: 2023-03-16: Telephony: DSDA: Add APIs to support DSDA -> DSDS transition use cases
     /**
      * Returns true if on multisim devices, DSDA features are supported in non-DSDA modes
      * Returns false otherwise
@@ -695,7 +688,6 @@ public class TelephonyManager {
         return TelephonyProperties.dsds_transition_supported().orElse(false);
     }
 
-// QTI_END: 2023-03-16: Telephony: DSDA: Add APIs to support DSDA -> DSDS transition use cases
 
     /**
      * Returns the number of phones available.
@@ -775,7 +767,7 @@ public class TelephonyManager {
         return 1;
     }
 
-    /** {@hide} */
+    /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public static TelephonyManager from(Context context) {
         return (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
@@ -807,7 +799,7 @@ public class TelephonyManager {
         return new TelephonyManager(mContext, subId);
     }
 
-    /** {@hide} */
+    /** @hide */
     @UnsupportedAppUsage
     public boolean isMultiSimEnabled() {
         return getPhoneCount() > 1;
@@ -2399,9 +2391,7 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public String getDeviceId(int slotIndex) {
         // FIXME this assumes phoneId == slotIndex
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(8, ""+slotIndex);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -2702,9 +2692,7 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public CellLocation getCellLocation() {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(49);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null) {
@@ -2743,9 +2731,7 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public List<NeighboringCellInfo> getNeighboringCellInfo() {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(50);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null)
@@ -2796,7 +2782,7 @@ public class TelephonyManager {
      * @see #PHONE_TYPE_CDMA
      * @see #PHONE_TYPE_SIP
      *
-     * {@hide}
+     * @hide
      */
     @SystemApi
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY)
@@ -3116,7 +3102,10 @@ public class TelephonyManager {
             TelephonyProtoEnums.NETWORK_TYPE_TD_SCDMA; // = 17.
     /** Current network is IWLAN */
     public static final int NETWORK_TYPE_IWLAN = TelephonyProtoEnums.NETWORK_TYPE_IWLAN; // = 18.
-    /** Current network is LTE_CA {@hide} */
+    /**
+     * Current network is LTE_CA
+     * @hide
+     */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public static final int NETWORK_TYPE_LTE_CA = TelephonyProtoEnums.NETWORK_TYPE_LTE_CA; // = 19.
     /**
@@ -3366,7 +3355,7 @@ public class TelephonyManager {
      * @return the name of the radio technology
      *
      */
-    /** {@hide} */
+    /** @hide */
     @UnsupportedAppUsage
     public static String getNetworkTypeName(@NetworkType int type) {
         switch (type) {
@@ -3421,7 +3410,7 @@ public class TelephonyManager {
      * Returns the bitmask for a given technology (network type)
      * @param networkType for which bitmask is returned
      * @return the network type bitmask
-     * {@hide}
+     * @hide
      */
     public static @NetworkTypeBitMask long getBitMaskForNetworkType(@NetworkType int networkType) {
         switch(networkType) {
@@ -3678,7 +3667,7 @@ public class TelephonyManager {
      *
      * @param slotIndex for which icc card presence is checked
      */
-    /** {@hide} */
+    /** @hide */
     // FIXME Input argument slotIndex should be of type int
     @UnsupportedAppUsage
     public boolean hasIccCard(int slotIndex) {
@@ -4245,9 +4234,7 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @UnsupportedAppUsage
     public String getSimSerialNumber(int subId) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(388, ""+subId);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -4695,9 +4682,7 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public String getSubscriberId(int subId) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(389, ""+subId);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -5282,7 +5267,6 @@ public class TelephonyManager {
      *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_GET_GROUP_ID_LEVEL2)
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION)
     @SystemApi
@@ -5359,9 +5343,7 @@ public class TelephonyManager {
     })
     @UnsupportedAppUsage
     public String getLine1Number(int subId) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(9, ""+subId);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         String number = null;
         try {
             ITelephony telephony = getITelephony();
@@ -8444,7 +8426,7 @@ public class TelephonyManager {
      * with the default subId.
      * If SIM is not inserted, return default SIM slot index.
      *
-     * {@hide}
+     * @hide
      */
     @VisibleForTesting
     @UnsupportedAppUsage
@@ -11805,7 +11787,7 @@ public class TelephonyManager {
      * TODO: The legacy design only supports single sim design. Ideally, this should support
      * multi-sim design in current world.
      *
-     * {@hide}
+     * @hide
      */
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public @Nullable String getMobileProvisioningUrl() {
@@ -12584,7 +12566,7 @@ public class TelephonyManager {
      *
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
-     * {@hide}
+     * @hide
      **/
     @SystemApi
     @Deprecated
@@ -12613,7 +12595,7 @@ public class TelephonyManager {
      *
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
-     * {@hide}
+     * @hide
      **/
     @SystemApi
     @Deprecated
@@ -12653,7 +12635,7 @@ public class TelephonyManager {
      *
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
-     * {@hide}
+     * @hide
      **/
     @SystemApi
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
@@ -12685,7 +12667,7 @@ public class TelephonyManager {
      *
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
-     * {@hide}
+     * @hide
      **/
     @SystemApi
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
@@ -16491,7 +16473,7 @@ public class TelephonyManager {
      *
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
-     * {@hide}
+     * @hide
      */
     @SystemApi
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)

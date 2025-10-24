@@ -338,8 +338,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Przełącz na profil służbowy"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Przełącz na osobistą aplikację <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Przełącz na służbową aplikację <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Kontakty"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"dostęp do kontaktów"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Kontakty i konta"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"uzyskiwanie dostępu do kontaktów i wyświetlanie listy kont, na których można zapisywać kontakty na tym urządzeniu"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Lokalizacja"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"dostęp do informacji o lokalizacji tego urządzenia"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Kalendarz"</string>
@@ -372,8 +372,10 @@
     <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"dokładne śledzenie ruchów gałek ocznych"</string>
     <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Dane o ruchu i obszarze"</string>
     <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"śledzenie oczu, twarzy i ciała oraz skanowanie obszaru"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Dokładne dane o ruchach głowy i obszarze"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"dokładne śledzenie ruchów głowy i skanowanie obszaru"</string>
+    <!-- no translation found for permgrouplab_xr_tracking_sensitive (6574264227123545314) -->
+    <skip />
+    <!-- no translation found for permgroupdesc_xr_tracking_sensitive (2480835734248509848) -->
+    <skip />
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Pobieranie zawartości okna"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Sprawdzanie zawartości okna, z którego korzystasz."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"Włączenie czytania dotykiem"</string>
@@ -641,6 +643,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Zezwól na określanie przez aplikację względnego położenia urządzeń ultraszerokopasmowych w pobliżu"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"interakcje z urządzeniami Wi-Fi w pobliżu"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Zezwala aplikacji na przesyłanie informacji o sobie, łączenie się z urządzeniami Wi‑Fi w pobliżu i określanie ich względnego położenia"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"dostęp do urządzeń w sieci lokalnej"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Zezwala aplikacji na dostęp do urządzeń w sieci lokalnej"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"określanie względnego położenia urządzeń w pobliżu"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Zezwól na określanie przez aplikację względnego położenia urządzeń w pobliżu"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informacje o preferowanych usługach płatniczych NFC"</string>
@@ -685,7 +689,8 @@
     <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Zezwala aplikacji na skanowanie otoczenia."</string>
     <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"dokładne skanowanie otoczenia"</string>
     <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Zezwala aplikacji na dokładne skanowanie otoczenia."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"śledzenie danych XR w tle"</string>
+    <!-- no translation found for permlab_xr_tracking_in_background (1714941204255185460) -->
+    <skip />
     <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Zezwala aplikacji na dostęp do danych XR w tle."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"przechwytywanie klawiszy"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Zezwala aplikacji na przechwytywanie klawiszy, zanim system będzie mógł przetworzyć skróty i działania systemowe."</string>
@@ -1986,8 +1991,10 @@
     <string name="package_updated_device_owner" msgid="7770195449213776218">"Zaktualizowany przez administratora.\nAby zobaczyć przyznane uprawnienia, przejdź do ustawień"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Usunięty przez administratora"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"OK"</string>
-    <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"Oszczędzanie baterii uruchamia ciemny motyw oraz wyłącza lub ogranicza aktywność w tle, niektóre efekty wizualne, pewne funkcje oraz wybrane połączenia sieciowe."</string>
-    <string name="battery_saver_description" msgid="8518809702138617167">"Oszczędzanie baterii uruchamia ciemny motyw oraz wyłącza lub ogranicza aktywność w tle, niektóre efekty wizualne, pewne funkcje oraz wybrane połączenia sieciowe."</string>
+    <!-- no translation found for battery_saver_description_with_learn_more (8969945879044849461) -->
+    <skip />
+    <!-- no translation found for battery_saver_description (2820475140307374570) -->
+    <skip />
     <string name="data_saver_description" msgid="4995164271550590517">"Oszczędzanie danych uniemożliwia niektórym aplikacjom wysyłanie i odbieranie danych w tle, zmniejszając w ten sposób ich użycie. Aplikacja, z której w tej chwili korzystasz, może uzyskiwać dostęp do danych, ale rzadziej. Może to powodować, że obrazy będą się wyświetlać dopiero po kliknięciu."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"Włączyć oszczędzanie danych?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"Włącz"</string>
@@ -2049,12 +2056,9 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"Maksymalizuj"</string>
     <string name="close_button_text" msgid="10603510034455258">"Zamknij"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
-    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
-    <skip />
+    <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
+    <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
+    <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Odbierz"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Wideo"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Odrzuć"</string>
@@ -2582,33 +2586,22 @@
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"Aplikacje"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"Nie można już rozpoznać Twoich odcisków palców. Skonfiguruj ponownie odblokowywanie odciskiem palca."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Bezpieczeństwo i prywatność"</string>
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
-    <skip />
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"Odblokuj ekran i ponownie nawiąż połączenie przez USB"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"Aby nawiązać połączenie przez USB, odblokuj ekran"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"Zaawansowana ochrona wymaga odblokowania ekranu, aby umożliwić nawiązanie połączenia przez USB"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"Zaawansowana ochrona wymaga odblokowania ekranu, aby umożliwić nawiązanie połączenia przez USB"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"Zaawansowana ochrona wymaga odblokowania ekranu, aby umożliwić szybsze ładowanie"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"Aby umożliwić szybsze ładowanie lub nawiązanie połączenia przez USB, zaawansowana ochrona wymaga odblokowania ekranu"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Wycisz"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Powiadomienia wyciszone"</string>
-    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
-    <skip />
+    <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Nie będziesz otrzymywać powiadomień o zaawansowanej ochronie USB, dopóki nie uruchomisz ponownie urządzenia"</string>
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"Podejrzana aktywność przez USB"</string>
-    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
-    <skip />
+    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="5772698072220844779">"Sygnał danych z urządzenia USB został wyłączony"</string>
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Masz problem z odblokowywaniem odciskiem palca?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Kliknij, aby poznać wskazówki, które ułatwią odblokowywanie"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Brak migania"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Aby wyłączyć telewizor, przytrzymaj przycisk zasilania"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Alerty dotyczące zasobów systemowych"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Nadmierne zużycie zasobów"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Aplikacja „<xliff:g id="APP_NAME">%1$s</xliff:g>” używa zbyt wielu zasobów."</string>
 </resources>

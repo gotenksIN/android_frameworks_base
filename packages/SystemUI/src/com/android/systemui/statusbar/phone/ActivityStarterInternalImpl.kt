@@ -18,7 +18,7 @@ package com.android.systemui.statusbar.phone
 
 import android.app.ActivityManager
 import android.app.ActivityOptions
-import android.app.ActivityTaskManager
+import android.app.IActivityTaskManager
 import android.app.PendingIntent
 import android.app.TaskStackBuilder
 import android.content.Context
@@ -33,8 +33,10 @@ import android.view.RemoteAnimationAdapter
 import android.view.View
 import android.view.WindowManager
 import android.window.RemoteTransition
+import com.android.app.displaylib.PerDisplayRepository
 import com.android.systemui.ActivityIntentHelper
 import com.android.systemui.Flags
+import com.android.systemui.Flags.shadeAppLaunchAnimationSkipInDesktop
 import com.android.systemui.animation.ActivityTransitionAnimator
 import com.android.systemui.animation.DelegateTransitionAnimatorController
 import com.android.systemui.assist.AssistManager
@@ -44,11 +46,13 @@ import com.android.systemui.communal.shared.model.CommunalScenes
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.desktop.DesktopFirstRepository
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.keyguard.KeyguardViewMediator
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
+import com.android.systemui.model.SysUiState
 import com.android.systemui.plugins.ActivityStartOptions
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.res.R
@@ -56,6 +60,7 @@ import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.shade.ShadeController
 import com.android.systemui.shade.domain.interactor.ShadeAnimationInteractor
 import com.android.systemui.shade.domain.interactor.ShadeDialogContextInteractor
+import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_FREEFORM_ACTIVE_IN_DESKTOP_MODE
 import com.android.systemui.statusbar.CommandQueue
 import com.android.systemui.statusbar.NotificationLockscreenUserManager
 import com.android.systemui.statusbar.NotificationShadeWindowController
@@ -91,6 +96,7 @@ constructor(
     private val activityIntentHelper: ActivityIntentHelper,
     private val keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val assistManagerLazy: Lazy<AssistManager>,
+    private val activityTaskManager: IActivityTaskManager,
     @Main private val mainExecutor: DelayableExecutor,
     @Application private val applicationScope: CoroutineScope,
     private val shadeControllerLazy: Lazy<ShadeController>,
@@ -101,15 +107,30 @@ constructor(
     private val notifShadeWindowControllerLazy: Lazy<NotificationShadeWindowController>,
     private val commandQueue: CommandQueue,
     private val lockScreenUserManager: NotificationLockscreenUserManager,
+    private val perDisplaySysUiStateRepository: PerDisplayRepository<SysUiState>,
+    private val desktopFirstRepository: DesktopFirstRepository,
 ) : ActivityStarterInternal {
     private val centralSurfaces: CentralSurfaces?
         get() = centralSurfacesOptLazy.get().getOrNull()
 
-    private val context: Context
+    private val currentShadeContext: Context
         get() = contextInteractor.context
 
-    private val displayId: Int
-        get() = context.displayId
+    private val currentShadeDisplayId: Int
+        get() = currentShadeContext.displayId
+
+    private val shadeSysUiState: Long
+        get() {
+            val sysUiState = perDisplaySysUiStateRepository[currentShadeDisplayId]
+            if (sysUiState == null) {
+                Log.w(TAG, "SysUiState is null for display $currentShadeDisplayId")
+                return 0L
+            }
+            return sysUiState.flags
+        }
+
+    private val isInDesktopModeOnCurrentShadeDisplay: Boolean
+        get() = (shadeSysUiState and SYSUI_STATE_FREEFORM_ACTIVE_IN_DESKTOP_MODE) != 0L
 
     override fun registerTransition(
         cookie: ActivityTransitionAnimator.TransitionCookie,
@@ -217,7 +238,7 @@ constructor(
                 )
 
                 intent.sendAndReturnResult(
-                    context,
+                    currentShadeContext,
                     0,
                     fillInIntent,
                     null,
@@ -242,7 +263,7 @@ constructor(
                                 ): Int {
                                     return startIntent(
                                         createActivityOptions(
-                                            displayId,
+                                            currentShadeDisplayId,
                                             transition,
                                             controllerWithCookie?.transitionCookie,
                                         )
@@ -261,7 +282,10 @@ constructor(
                                 animationAdapter: RemoteAnimationAdapter?
                             ): Int {
                                 return startIntent(
-                                    CentralSurfaces.getActivityOptions(displayId, animationAdapter)
+                                    CentralSurfaces.getActivityOptions(
+                                        currentShadeDisplayId,
+                                        animationAdapter,
+                                    )
                                 )
                             }
                         },
@@ -408,21 +432,20 @@ constructor(
                 intent.collectExtraIntentKeys()
                 try {
                     result[0] =
-                        ActivityTaskManager.getService()
-                            .startActivityAsUser(
-                                null,
-                                context.basePackageName,
-                                context.attributionTag,
-                                intent,
-                                intent.resolveTypeIfNeeded(context.contentResolver),
-                                null,
-                                null,
-                                0,
-                                Intent.FLAG_ACTIVITY_NEW_TASK,
-                                null,
-                                activityOptions.toBundle(),
-                                userHandle.identifier,
-                            )
+                        activityTaskManager.startActivityAsUser(
+                            null,
+                            currentShadeContext.basePackageName,
+                            currentShadeContext.attributionTag,
+                            intent,
+                            intent.resolveTypeIfNeeded(currentShadeContext.contentResolver),
+                            null,
+                            null,
+                            0,
+                            Intent.FLAG_ACTIVITY_NEW_TASK,
+                            null,
+                            activityOptions.toBundle(),
+                            userHandle.identifier,
+                        )
                 } catch (e: RemoteException) {
                     Log.w(TAG, "Unable to start activity", e)
                 }
@@ -438,7 +461,7 @@ constructor(
                 ) { transition: RemoteTransition? ->
                     startIntent(
                         createActivityOptions(
-                            displayId,
+                            currentShadeDisplayId,
                             transition,
                             controllerWithCookie?.transitionCookie,
                         )
@@ -450,7 +473,7 @@ constructor(
                     animate,
                     intent.getPackage(),
                 ) { adapter: RemoteAnimationAdapter? ->
-                    startIntent(CentralSurfaces.getActivityOptions(displayId, adapter))
+                    startIntent(CentralSurfaces.getActivityOptions(currentShadeDisplayId, adapter))
                 }
             }
 
@@ -535,11 +558,11 @@ constructor(
                 animate = animate,
                 showOverLockscreen = showOverLockscreenWhenLocked,
             ) { transition: RemoteTransition? ->
-                TaskStackBuilder.create(context)
+                TaskStackBuilder.create(currentShadeContext)
                     .addNextIntent(intent)
                     .startActivities(
                         createActivityOptions(
-                            displayId,
+                            currentShadeDisplayId,
                             transition,
                             controllerWithCookie?.transitionCookie,
                         ),
@@ -553,10 +576,10 @@ constructor(
                 intent.getPackage(),
                 showOverLockscreenWhenLocked,
             ) { adapter: RemoteAnimationAdapter? ->
-                TaskStackBuilder.create(context)
+                TaskStackBuilder.create(currentShadeContext)
                     .addNextIntent(intent)
                     .startActivities(
-                        CentralSurfaces.getActivityOptions(displayId, adapter),
+                        CentralSurfaces.getActivityOptions(currentShadeDisplayId, adapter),
                         userHandle,
                     )
             }
@@ -646,6 +669,14 @@ constructor(
             return false
         }
 
+        if (
+            shadeAppLaunchAnimationSkipInDesktop() &&
+                (isInDesktopModeOnCurrentShadeDisplay ||
+                    desktopFirstRepository.isDisplayDesktopFirst(currentShadeDisplayId))
+        ) {
+            return false
+        }
+
         // Always animate if we are not showing the keyguard or if we animate over the lockscreen
         // (without unlocking it).
         if (showOverLockscreen || !isKeyguardShowing()) {
@@ -718,7 +749,7 @@ constructor(
                     shadeControllerLazy.get(),
                     notifShadeWindowControllerLazy.get(),
                     commandQueue,
-                    displayId,
+                    currentShadeDisplayId,
                     isLaunchForActivity,
                 )
             }

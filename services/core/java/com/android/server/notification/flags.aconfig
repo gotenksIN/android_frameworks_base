@@ -194,41 +194,13 @@ flag {
   }
 }
 
-flag {
-  name: "log_visually_changed_updates"
-  namespace: "systemui"
-  description: "Logs a notification update if it is visually changed"
-  bug: "420989666"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
 
-flag {
-  name: "skip_policy_access_nls_check"
-  namespace: "systemui"
-  description: "When querying whether a caller has Notification Policy Access, don't explicitly look in the NLSes list. All NLSes are also ConditionProviders so this is unnecessary."
-  bug: "390441924"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
 
 flag {
   name: "random_conversation_ids"
   namespace: "systemui"
   description: "Use random ids for new conversation channels, instead of concatenating parent id and conversation id"
   bug: "432250872"
-}
-
-flag {
-  name: "preferences_throws_on_invalid_uid"
-  namespace: "systemui"
-  description: "Throw IAE when calling getOrCreatePackagePreferences() with INVALID_UID."
-  bug: "430250142"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -239,4 +211,24 @@ flag {
   metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+  name: "use_on_binding_died"
+  namespace: "notifications"
+  description: "Prefer onBindingDied for package updates to avoid duplicate service bindings"
+  bug: "434679743"
+  metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+  name: "limit_managed_services_count"
+  namespace: "systemui"
+  description: "Enforce a maximum number of allowed components in ManagedServices"
+  bug: "428701593"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }

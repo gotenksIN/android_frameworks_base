@@ -845,7 +845,7 @@ public class DisplayRotation {
                 // setUserRotationSetting may be called.
                 mService.mRoot.mDeviceStateAutoRotateSettingController
                         .requestAccelerometerRotationSettingChange(accelerometerRotation == 1,
-                                userRotation);
+                                userRotation, caller);
             } else {
                 Settings.System.putIntForUser(res, Settings.System.ACCELEROMETER_ROTATION,
                         accelerometerRotation, UserHandle.USER_CURRENT);
@@ -2005,39 +2005,29 @@ public class DisplayRotation {
                 mDeviceStateEnum = newState;
                 return;
             }
-
-            final DeviceStateController.DeviceStateEnum oldState = mDeviceStateEnum;
-            mDeviceStateEnum = newState;
-
-            handleDeviceStateChangeForHalfFoldOverride(oldState, newState);
-
+            if (newState == DeviceStateController.DeviceStateEnum.HALF_FOLDED
+                    && mDeviceStateEnum != DeviceStateController.DeviceStateEnum.HALF_FOLDED) {
+                // The device has transitioned to HALF_FOLDED state: save the current rotation and
+                // update the device rotation.
+                mDisplayContent.getRotationReversionController().beforeOverrideApplied(
+                        REVERSION_TYPE_HALF_FOLD);
+                mHalfFoldSavedRotation = mRotation;
+                mDeviceStateEnum = newState;
+                // Now mFoldState is set to HALF_FOLDED, the overrideFrozenRotation function will
+                // return true, so rotation is unlocked.
+                mService.updateRotation(false /* alwaysSendConfiguration */,
+                        false /* forceRelayout */);
+            } else {
+                mInHalfFoldTransition = true;
+                mDeviceStateEnum = newState;
+                // Tell the device to update its orientation.
+                mService.updateRotation(false /* alwaysSendConfiguration */,
+                        false /* forceRelayout */);
+            }
             // Alert the activity of possible new bounds.
             UiThread.getHandler().removeCallbacks(mActivityBoundsUpdateCallback);
             UiThread.getHandler().postDelayed(mActivityBoundsUpdateCallback,
                     FOLDING_RECOMPUTE_CONFIG_DELAY_MS);
-        }
-
-        private void handleDeviceStateChangeForHalfFoldOverride(
-                DeviceStateController.DeviceStateEnum oldState,
-                DeviceStateController.DeviceStateEnum newState) {
-            if (!mAllowHalfFoldAutoRotationOverride) return;
-
-            final boolean switchingToHalfFolded =
-                    newState == DeviceStateController.DeviceStateEnum.HALF_FOLDED
-                    && mDeviceStateEnum != DeviceStateController.DeviceStateEnum.HALF_FOLDED;
-            if (switchingToHalfFolded) {
-                // The device has transitioned to HALF_FOLDED state: save the current rotation
-                // and update the device rotation.
-                mDisplayContent.getRotationReversionController().beforeOverrideApplied(
-                        REVERSION_TYPE_HALF_FOLD);
-                mHalfFoldSavedRotation = mRotation;
-            } else {
-                mInHalfFoldTransition = true;
-            }
-
-            // Tell the device to update its orientation.
-            mService.updateRotation(false /* alwaysSendConfiguration */,
-                    false /* forceRelayout */);
         }
 
         boolean shouldIgnoreSensorRotation() {

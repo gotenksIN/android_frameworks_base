@@ -61,6 +61,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -77,15 +78,13 @@ import com.android.compose.animation.Expandable
 import com.android.compose.animation.bounceable
 import com.android.compose.animation.rememberExpandableController
 import com.android.compose.animation.scene.ContentScope
-import com.android.compose.animation.scene.ElementKey
 import com.android.compose.modifiers.thenIf
 import com.android.compose.theme.LocalAndroidColorScheme
 import com.android.mechanics.compose.modifier.verticalFadeContentReveal
-import com.android.mechanics.spec.builder.rememberMotionBuilderContext
+import com.android.mechanics.compose.modifier.verticalTactileSurfaceReveal
 import com.android.systemui.Flags
 import com.android.systemui.animation.Expandable
 import com.android.systemui.common.shared.model.Icon
-import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.haptics.msdl.qs.TileHapticsViewModel
 import com.android.systemui.haptics.msdl.qs.TileHapticsViewModelFactoryProvider
 import com.android.systemui.lifecycle.rememberViewModel
@@ -105,12 +104,10 @@ import com.android.systemui.qs.panels.ui.viewmodel.toIconProvider
 import com.android.systemui.qs.panels.ui.viewmodel.toUiState
 import com.android.systemui.qs.pipeline.shared.TileSpec
 import com.android.systemui.qs.tileimpl.QSTileImpl
+import com.android.systemui.qs.ui.composable.QuickSettingsShade
 import com.android.systemui.qs.ui.compose.borderOnFocus
 import com.android.systemui.res.R
 import kotlinx.coroutines.CoroutineScope
-
-private const val TEST_TAG_SMALL = "qs_tile_small"
-private const val TEST_TAG_LARGE = "qs_tile_large"
 
 @Composable
 fun TileLazyGrid(
@@ -156,8 +153,7 @@ private val TileViewModel.traceName
  *   tile is clicked, used to request the feedback text.
  * @param detailsViewModel An optional [DetailsViewModel] used to handle navigation to a detailed
  *   view when a tile is clicked, if applicable.
- * @param revealEffectContainer An optional [ElementKey] identifying a container for a reveal effect
- *   animation. If provided, the tile will animate its appearance.
+ * @param enableRevealEffect If `true`, the tiles will animate using the reveal animation.
  */
 @Composable
 fun ContentScope.Tile(
@@ -172,7 +168,7 @@ fun ContentScope.Tile(
     isVisible: () -> Boolean = { true },
     requestToggleTextFeedback: (TileSpec) -> Unit = {},
     detailsViewModel: DetailsViewModel?,
-    revealEffectContainer: ElementKey? = null,
+    enableRevealEffect: Boolean = false,
 ) {
     trace(tile.traceName) {
         val currentBounceableInfo by rememberUpdatedState(bounceableInfo)
@@ -205,6 +201,20 @@ fun ContentScope.Tile(
         val animatedColor by animateColorAsState(colors.background, label = "QSTileBackgroundColor")
         val isDualTarget = uiState.handlesSecondaryClick
 
+        val surfaceRevealModifier: Modifier
+        val contentRevealModifier: Modifier
+        if (enableRevealEffect) {
+            val marginBottom =
+                with(LocalDensity.current) { QuickSettingsShade.Dimensions.Padding.toPx() }
+            surfaceRevealModifier =
+                Modifier.verticalTactileSurfaceReveal(deltaY = marginBottom, label = tile.traceName)
+            contentRevealModifier =
+                Modifier.verticalFadeContentReveal(deltaY = marginBottom, label = tile.traceName)
+        } else {
+            surfaceRevealModifier = Modifier
+            contentRevealModifier = Modifier
+        }
+
         TileExpandable(
             color = { animatedColor },
             shape = tileShape,
@@ -212,6 +222,7 @@ fun ContentScope.Tile(
             hapticsViewModel = hapticsViewModel,
             modifier =
                 modifier
+                    .then(surfaceRevealModifier)
                     .borderOnFocus(color = MaterialTheme.colorScheme.secondary, tileShape.topEnd)
                     .fillMaxWidth()
                     .thenIf(currentBounceableInfo != null) {
@@ -291,16 +302,7 @@ fun ContentScope.Tile(
                 accessibilityUiState = uiState.accessibilityUiState,
                 iconOnly = iconOnly,
                 isDualTarget = isDualTarget,
-                modifier =
-                    if (revealEffectContainer != null) {
-                        Modifier.verticalFadeContentReveal(
-                            contentScope = this,
-                            motionBuilderContext = rememberMotionBuilderContext(),
-                            container = revealEffectContainer,
-                        )
-                    } else {
-                        Modifier
-                    },
+                modifier = contentRevealModifier,
             ) {
                 val iconProvider: Context.() -> Icon = { getTileIcon(icon = icon) }
                 if (iconOnly) {
@@ -386,7 +388,7 @@ fun TileContainer(
                     isDualTarget = isDualTarget,
                     interactionSource = interactionSource,
                 )
-                .sysuiResTag(if (iconOnly) TEST_TAG_SMALL else TEST_TAG_LARGE),
+                .tileTestTag(iconOnly),
         content = content,
     )
 }

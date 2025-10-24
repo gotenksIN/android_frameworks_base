@@ -186,16 +186,14 @@
     </style>
 
     <style name="TextAppearance.QS.Status">
-        <item name="android:fontFamily" android:featureFlag="!com.android.systemui.shade_header_font_update">@*android:string/config_headlineFontFamily</item>
-        <item name="android:fontFamily" android:featureFlag="com.android.systemui.shade_header_font_update">variable-body-medium-emphasized</item>
+        <item name="android:fontFamily">variable-body-medium-emphasized</item>
         <item name="android:textColor">@color/shade_header_text_color</item>
         <item name="android:textSize">@dimen/status_bar_shade_header_text_size_sp</item>
         <item name="android:letterSpacing">0.01</item>
     </style>
 
     <style name="TextAppearance.QS.Status.Clock">
-        <item name="android:fontFamily" android:featureFlag="!com.android.systemui.shade_header_font_update">@*android:string/config_headlineFontFamily</item>
-        <item name="android:fontFamily" android:featureFlag="com.android.systemui.shade_header_font_update">variable-display-small-emphasized</item>
+        <item name="android:fontFamily">variable-display-small-emphasized</item>
     </style>
 
     <style name="TextAppearance.QS.Status.Build">
@@ -282,14 +280,14 @@
 
     <style name="TextAppearance.AuthNonBioCredential.Subtitle">
         <item name="android:fontFamily">@*android:string/config_headlineFontFamily</item>
-        <item name="android:layout_marginTop">20dp</item>
+        <item name="android:layout_marginTop">16dp</item>
         <item name="android:textSize">18sp</item>
         <item name="android:textColor">@androidprv:color/materialColorOnSurface</item>
     </style>
 
     <style name="TextAppearance.AuthNonBioCredential.Description">
         <item name="android:fontFamily">@*android:string/config_headlineFontFamily</item>
-        <item name="android:layout_marginTop">20dp</item>
+        <item name="android:layout_marginTop">16dp</item>
         <item name="android:textSize">18sp</item>
         <item name="android:textColor">@androidprv:color/materialColorOnSurface</item>
     </style>
@@ -317,9 +315,17 @@
         <item name="android:background">@drawable/edit_text_filled</item>
     </style>
 
+    <style name="AuthCredentialPasswordOutlineText">
+        <item name="android:textColor">@androidprv:color/materialColorOnSurfaceVariant</item>
+    </style>
+
+    <style name="Widget.AuthCredential.Password" parent="AuthCredentialPasswordOutlineText">
+        <item name="android:background">@drawable/edit_text_outline</item>
+    </style>
+
     <style name="AuthNonBioCredentialHeaderStyle">
-        <item name="android:paddingStart">48dp</item>
-        <item name="android:paddingEnd">48dp</item>
+        <item name="android:paddingStart">24dp</item>
+        <item name="android:paddingEnd">24dp</item>
         <item name="android:paddingTop">48dp</item>
         <item name="android:paddingBottom">10dp</item>
         <item name="android:layout_gravity">top</item>
@@ -363,7 +369,7 @@
         <item name="android:background">@drawable/auth_credential_fallback_button_background</item>
         <item name="android:textColor">@androidprv:color/materialColorOnSecondaryContainer</item>
         <item name="android:outlineProvider">none</item>
-        <item name="android:layout_marginTop">16dp</item>
+        <item name="android:layout_marginTop">32dp</item>
         <item name="android:paddingTop">10dp</item>
         <item name="android:paddingBottom">10dp</item>
         <item name="android:paddingLeft">16dp</item>
@@ -409,6 +415,14 @@
         <item name="android:fontFamily">@*android:string/config_bodyFontFamilyMedium</item>
         <item name="android:background">@color/transparent</item>
         <item name="android:textColor">@androidprv:color/materialColorPrimary</item>
+    </style>
+
+    <style name="AuthCredentialBackButton">
+        <item name="android:layout_width">@dimen/biometric_auth_back_button_size</item>
+        <item name="android:layout_height">@dimen/biometric_auth_back_button_size</item>
+        <item name="android:background">@drawable/auth_credential_back_button_background</item>
+        <item name="android:tint">@androidprv:color/materialColorOnSurface</item>
+        <item name="android:padding">4dp</item>
     </style>
 
     <style name="DeviceManagementDialogTitle">
@@ -1046,6 +1060,15 @@
         <item name="android:windowCloseOnTouchOutside">false</item>
     </style>
 
+    <style name="ScreenCapture.PostRecord.SnackbarDialog" parent="@style/Theme.SystemUI.Dialog">
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:showWhenLocked">true</item>
+        <item name="android:windowBackground">@color/transparent</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
     <style name="TextAppearance.ScreenRecord" />
 
     <style name="TextAppearance.ScreenRecord.SwitchLabel">
@@ -1566,6 +1589,29 @@
         <item name="android:background">@drawable/audio_sharing_btn_background</item>
         <item name="android:textColor">@color/audio_sharing_btn_text_color</item>
         <item name="android:drawableTint">@color/audio_sharing_btn_text_color</item>
+    </style>
+
+    <!-- Hearing Device Dialog -->
+    <style name="TextAppearance.HearingDeviceDialog.Title" parent="TextAppearance.Dialog.Title">
+        <item name="android:textColor">@androidprv:color/materialColorSecondary</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textDirection">locale</item>
+        <item name="android:fontFamily">@*android:string/config_headlineFontFamilyMedium</item>
+    </style>
+
+    <style name="HearingDeviceDialog" />
+    <style name="HearingDeviceDialog.Title">
+        <item name="android:paddingStart">@dimen/hearing_devices_small_title_padding_horizontal</item>
+        <item name="android:gravity">start|center_vertical</item>
+    </style>
+    <style name="HearingDeviceDialog.Spinner">
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:longClickable">false</item>
+        <item name="android:background">@drawable/hearing_devices_spinner_background</item>
+        <item name="android:popupBackground">@drawable/hearing_devices_spinner_popup_background</item>
+        <item name="android:dropDownWidth">match_parent</item>
+        <item name="android:dropDownVerticalOffset">0.5dp</item>
     </style>
 
     <!-- Dream Overlay Complication UI styles -->

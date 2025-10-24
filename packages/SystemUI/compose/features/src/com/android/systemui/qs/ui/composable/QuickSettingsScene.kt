@@ -38,14 +38,15 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
@@ -56,6 +57,7 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.window.core.layout.WindowSizeClass
 import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.SceneTransitionLayoutState
@@ -64,6 +66,7 @@ import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.animateContentFloatAsState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.transitions
+import com.android.compose.gesture.gesturesDisabled
 import com.android.compose.lifecycle.DisposableEffectWithLifecycle
 import com.android.compose.lifecycle.LaunchedEffectWithLifecycle
 import com.android.compose.modifiers.thenIf
@@ -160,7 +163,10 @@ constructor(
             viewModel = viewModel,
             headerViewModel = viewModel.qsContainerViewModel.shadeHeaderViewModel,
             notificationsPlaceholderViewModel = notificationsPlaceholderViewModel,
-            modifier = modifier.graphicsLayer { alpha = contentAlpha },
+            modifier =
+                modifier
+                    .graphicsLayer { alpha = contentAlpha }
+                    .thenIf(brightnessMirrorShowing) { Modifier.gesturesDisabled() },
             shadeSession = shadeSession,
             jankMonitor = jankMonitor,
         )
@@ -194,7 +200,13 @@ private fun ContentScope.QuickSettingsScene(
     shadeSession: SaveableSession,
     jankMonitor: InteractionJankMonitor,
 ) {
-    Box(modifier.fillMaxSize()) {
+    val targetBlur by
+        remember(layoutState) {
+            derivedStateOf { viewModel.calculateBlur(layoutState.transitionState) }
+        }
+    val animatedBlurRadiusPx: Float by
+        animateFloatAsState(targetValue = targetBlur, label = "QS-blurRadius")
+    Box(modifier.blur(with(LocalDensity.current) { animatedBlurRadiusPx.toDp() }).fillMaxSize()) {
         // This is the background for the whole scene, as the elements don't necessarily provide
         // a background that extends to the edges.
         ShadePanelScrim(viewModel.isTransparencyEnabled)
@@ -340,14 +352,19 @@ private fun ContentScope.QuickSettingsContent(
                             .align(Alignment.TopCenter)
                             .sysuiResTag("expanded_qs_scroll_view")
                 ) {
-                    when (LocalWindowSizeClass.current.widthSizeClass) {
-                        WindowWidthSizeClass.Compact ->
-                            ExpandedShadeHeader(
-                                viewModel = headerViewModel,
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                            )
-                        else ->
-                            CollapsedShadeHeader(viewModel = headerViewModel, isSplitShade = false)
+                    with(LocalWindowSizeClass.current) {
+                        when {
+                            isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) ->
+                                CollapsedShadeHeader(
+                                    viewModel = headerViewModel,
+                                    isSplitShade = false,
+                                )
+                            else ->
+                                ExpandedShadeHeader(
+                                    viewModel = headerViewModel,
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                )
+                        }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     QuickSettingsContent(viewModel.qsContainerViewModel, mediaInRow)
@@ -358,7 +375,6 @@ private fun ContentScope.QuickSettingsContent(
                 viewModel = footerActionsViewModel,
                 isCustomizing = false,
                 customizingAnimationDuration = 0,
-                lifecycleOwner = lifecycleOwner,
                 modifier =
                     Modifier.align(Alignment.CenterHorizontally)
                         .sysuiResTag("qs_footer_actions")
@@ -375,6 +391,7 @@ private fun ContentScope.QuickSettingsContent(
                     .padding(horizontal = shadeHorizontalPadding),
         )
 
+        // TODO(b/436646848): remove NotificationScrollingStack from QuickSettings
         // The minimum possible value for the top of the notification stack. In other words: how
         // high is the notification stack allowed to get when the scene is at rest. It may still be
         // translated farther upwards by a transition animation but, at rest, the top edge of its
@@ -394,7 +411,7 @@ private fun ContentScope.QuickSettingsContent(
             stackTopPadding = notificationStackPadding,
             stackBottomPadding = navBarBottomHeight,
             shouldIncludeHeadsUpSpace = false,
-            supportNestedScrolling = true,
+            supportNestedScrolling = false,
             modifier =
                 Modifier.fillMaxWidth()
                     // Match the screen height with the scrim, so it covers the whole screen,

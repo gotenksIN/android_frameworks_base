@@ -19,7 +19,6 @@ package com.android.systemui.keyboard.shortcut.data.source
 import android.content.res.Resources
 import android.hardware.input.InputManager
 import android.hardware.input.KeyGlyphMap
-import android.view.KeyEvent.KEYCODE_A
 import android.view.KeyEvent.KEYCODE_BACK
 import android.view.KeyEvent.KEYCODE_DPAD_LEFT
 import android.view.KeyEvent.KEYCODE_ESCAPE
@@ -32,15 +31,15 @@ import android.view.KeyEvent.KEYCODE_Q
 import android.view.KeyEvent.KEYCODE_RECENT_APPS
 import android.view.KeyEvent.KEYCODE_S
 import android.view.KeyEvent.KEYCODE_SLASH
+import android.view.KeyEvent.KEYCODE_SPACE
 import android.view.KeyEvent.KEYCODE_TAB
-import android.view.KeyEvent.KEYCODE_W
 import android.view.KeyEvent.META_ALT_ON
 import android.view.KeyEvent.META_CTRL_ON
 import android.view.KeyEvent.META_META_ON
 import android.view.KeyEvent.META_SHIFT_ON
 import android.view.KeyboardShortcutGroup
 import android.view.KeyboardShortcutInfo
-import android.window.DesktopExperienceFlags
+import com.android.hardware.input.Flags.enablePartialScreenshotKeyboardShortcut
 import com.android.hardware.input.Flags.enableQuickSettingsPanelShortcut
 import com.android.systemui.Flags.shortcutHelperKeyGlyph
 import com.android.systemui.dagger.qualifiers.Main
@@ -178,6 +177,17 @@ constructor(@Main private val resources: Resources, private val inputManager: In
                 command(META_META_ON, KEYCODE_S)
             }
         )
+        // TODO(b/420714826) Determine if this shortcut should be displayed only for large screen
+        // devices.
+        // Take a partial screenshot:
+        //  - Meta + Ctrl + S
+        if (enablePartialScreenshotKeyboardShortcut()) {
+            add(
+                shortcutInfo(resources.getString(R.string.group_system_partial_screenshot)) {
+                    command(META_META_ON or META_CTRL_ON, KEYCODE_S)
+                }
+            )
+        }
         // Access list of system / apps shortcuts:
         //  - Meta + /
         add(
@@ -210,15 +220,6 @@ constructor(@Main private val resources: Resources, private val inputManager: In
                 command(META_META_ON, KEYCODE_L)
             }
         )
-        if (DesktopExperienceFlags.CLOSE_TASK_KEYBOARD_SHORTCUT.isTrue()) {
-            // Close focused task:
-            //  - Meta + Ctrl + W
-            add(
-                shortcutInfo(resources.getString(R.string.group_system_close_window)) {
-                    command(META_META_ON or META_CTRL_ON, KEYCODE_W)
-                }
-            )
-        }
     }
 
     private fun systemAppsShortcuts() =
@@ -229,9 +230,9 @@ constructor(@Main private val resources: Resources, private val inputManager: In
                 command(META_META_ON, KEYCODE_I)
             },
             // Access Assistant:
-            //  - Meta + A
+            //  - Meta + Space
             shortcutInfo(resources.getString(R.string.group_system_access_google_assistant)) {
-                command(META_META_ON, KEYCODE_A)
+                command(META_META_ON, KEYCODE_SPACE)
             },
         )
 }

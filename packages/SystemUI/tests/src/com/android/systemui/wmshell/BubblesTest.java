@@ -156,6 +156,7 @@ import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.SensitiveNotificationProtectionController;
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.statusbar.policy.data.repository.FakeDeviceProvisioningRepository;
+import com.android.systemui.statusbar.policy.domain.interactor.DeviceProvisioningInteractor;
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 import com.android.systemui.util.FakeEventLog;
 import com.android.systemui.util.settings.FakeGlobalSettings;
@@ -169,7 +170,6 @@ import com.android.wm.shell.bubbles.BubbleData;
 import com.android.wm.shell.bubbles.BubbleDataRepository;
 import com.android.wm.shell.bubbles.BubbleEducationController;
 import com.android.wm.shell.bubbles.BubbleEntry;
-import com.android.wm.shell.bubbles.BubbleLogger;
 import com.android.wm.shell.bubbles.BubbleOverflow;
 import com.android.wm.shell.bubbles.BubbleResizabilityChecker;
 import com.android.wm.shell.bubbles.BubbleStackView;
@@ -181,6 +181,8 @@ import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.bubbles.StackEducationView;
 import com.android.wm.shell.bubbles.appinfo.PackageManagerBubbleAppInfoProvider;
 import com.android.wm.shell.bubbles.bar.BubbleBarLayerView;
+import com.android.wm.shell.bubbles.logging.BubbleLogger;
+import com.android.wm.shell.bubbles.logging.BubbleSessionTracker;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayImeController;
 import com.android.wm.shell.common.DisplayInsetsController;
@@ -329,6 +331,8 @@ public class BubblesTest extends SysuiTestCase {
     private DisplayImeController mDisplayImeController;
     @Mock
     private BubbleLogger mBubbleLogger;
+    @Mock
+    private BubbleSessionTracker mSessionTracker;
     @Mock
     private BubbleEducationController mEducationController;
     @Mock
@@ -496,7 +500,8 @@ public class BubblesTest extends SysuiTestCase {
                         Optional.of(mock(Bubbles.class)),
                         mContext,
                         mock(NotificationManager.class),
-                        mock(NotificationSettingsInteractor.class)
+                        mock(NotificationSettingsInteractor.class),
+                        mock(DeviceProvisioningInteractor.class)
                 );
         interruptionDecisionProvider.start();
 
@@ -542,7 +547,8 @@ public class BubblesTest extends SysuiTestCase {
                 new BubbleResizabilityChecker(),
                 mHomeIntentProvider,
                 mAppInfoProvider,
-                Optional.empty());
+                Optional.empty(),
+                mSessionTracker);
         mBubbleController.setExpandListener(mBubbleExpandListener);
         spyOn(mBubbleController);
 

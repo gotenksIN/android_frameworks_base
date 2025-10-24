@@ -42,7 +42,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementContentScope
 import com.android.compose.modifiers.height
 import com.android.compose.modifiers.padding
 import com.android.compose.theme.PlatformTheme
@@ -51,10 +51,9 @@ import com.android.systemui.common.shared.model.Icon as IconModel
 import com.android.systemui.common.ui.compose.Icon
 import com.android.systemui.common.ui.compose.windowinsets.LocalDisplayCutout
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementContext
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementProvider
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenScope
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.shade.NotificationPanelView
@@ -75,21 +74,17 @@ constructor(
     private val notificationPanelView: Lazy<NotificationPanelView>,
     private val viewModel: KeyguardStatusBarViewModel,
 ) : LockscreenElementProvider {
-    override val elements: List<LockscreenElement> by lazy { listOf(statusBarElement) }
+    override val elements: List<LockscreenElement> by lazy { listOf(StatusBarElement()) }
 
-    private val statusBarElement =
-        object : LockscreenElement {
-            override val key = LockscreenElementKeys.StatusBar
-            override val context = this@StatusBarElementProvider.context
+    private inner class StatusBarElement : LockscreenElement {
+        override val key = LockscreenElementKeys.StatusBar
+        override val context = this@StatusBarElementProvider.context
 
-            @Composable
-            override fun ContentScope.LockscreenElement(
-                factory: LockscreenElementFactory,
-                context: LockscreenElementContext,
-            ) {
-                StatusBar(modifier = Modifier.fillMaxWidth())
-            }
+        @Composable
+        override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
+            StatusBar(modifier = Modifier.fillMaxWidth())
         }
+    }
 
     @Composable
     fun StatusBar(modifier: Modifier = Modifier) {

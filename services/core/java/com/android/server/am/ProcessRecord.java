@@ -57,9 +57,7 @@ import android.util.EventLog;
 import android.util.Slog;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
 import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
@@ -239,12 +237,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     private boolean mUnlocked;
 
     /**
-     * TID for RenderThread.
-     */
-    @GuardedBy("mProcLock")
-    private int mRenderThreadTid;
-
-    /**
      * Last used compatibility mode.
      */
     @GuardedBy("mService")
@@ -287,12 +279,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     private long mKillTime;
 
     /**
-     * Process is waiting to be killed when in the bg, and reason.
-     */
-    @GuardedBy("mService")
-    private String mWaitingToKill;
-
-    /**
      * Whether this process should be killed and removed from process list.
      * It is set when the package is force-stopped or the process has crashed too many times.
      */
@@ -311,22 +297,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     private boolean mWaitedForDebugger;
 
     /**
-     * For managing the LRU list.
-     */
-    @CompositeRWLock({"mService", "mProcLock"})
-    private long mLastActivityTime;
-
-    /**
      * Set to true when process was launched with a wrapper attached.
      */
     @GuardedBy("mService")
     private boolean mUsingWrapper;
-
-    /**
-     * Class to run on start if this is a special isolated process.
-     */
-    @GuardedBy("mService")
-    private String mIsolatedEntryPoint;
 
     /**
      * Arguments to pass to isolatedEntryPoint's main().
@@ -500,7 +474,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         pw.print(prefix); pw.print("thread="); pw.println(mThread);
         pw.print(prefix); pw.print("pid="); pw.println(mPid);
         pw.print(prefix); pw.print("lastActivityTime=");
-        TimeUtils.formatDuration(mLastActivityTime, nowUptime, pw);
+        TimeUtils.formatDuration(getLastActivityTime(), nowUptime, pw);
         pw.print(prefix); pw.print("startUpTime=");
         TimeUtils.formatDuration(mStartUptime, nowUptime, pw);
         pw.print(prefix); pw.print("startElapsedTime=");
@@ -519,13 +493,13 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         pw.print(prefix); pw.print("startSeq="); pw.println(mStartSeq);
         pw.print(prefix); pw.print("mountMode="); pw.println(
                 DebugUtils.valueToString(Zygote.class, "MOUNT_EXTERNAL_", mMountMode));
-        if (isKilled() || isKilledByAm() || mWaitingToKill != null) {
+        if (isKilled() || isKilledByAm() || getWaitingToKill() != null) {
             pw.print(prefix); pw.print("killed="); pw.print(isKilled());
             pw.print(" killedByAm="); pw.print(isKilledByAm());
-            pw.print(" waitingToKill="); pw.println(mWaitingToKill);
+            pw.print(" waitingToKill="); pw.println(getWaitingToKill());
         }
-        if (mIsolatedEntryPoint != null || mIsolatedEntryPointArgs != null) {
-            pw.print(prefix); pw.print("isolatedEntryPoint="); pw.println(mIsolatedEntryPoint);
+        if (getIsolatedEntryPoint() != null || mIsolatedEntryPointArgs != null) {
+            pw.print(prefix); pw.print("isolatedEntryPoint="); pw.println(getIsolatedEntryPoint());
             pw.print(prefix); pw.print("isolatedEntryPointArgs=");
             pw.println(Arrays.toString(mIsolatedEntryPointArgs));
         }
@@ -720,13 +694,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     public void makeActive(ApplicationThreadDeferred thread, ProcessStatsService tracker) {
         // TODO(b/180501180): Add back this logging message.
         /*
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         String seempStr = "app_uid=" + uid
                             + ",app_pid=" + pid + ",oom_adj=" + curAdj
                             + ",setAdj=" + setAdj + ",hasShownUi=" + (hasShownUi ? 1 : 0)
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             + ",cached=" + (mCached ? 1 : 0)
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             + ",fA=" + (mHasForegroundActivities ? 1 : 0)
                             + ",fS=" + (mHasForegroundServices ? 1 : 0)
                             + ",systemNoUi=" + (systemNoUi ? 1 : 0)
@@ -735,7 +706,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                             + ",killed=" + (killed ? 1 : 0) + ",killedByAm=" + (killedByAm ? 1 : 0)
                             + ",isDebugging=" + (isDebugging() ? 1 : 0);
         android.util.SeempLog.record_str(386, seempStr);
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         */
         mProfile.onProcessActive(thread, tracker);
         mThread = thread;
@@ -754,13 +724,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     public void makeInactive(ProcessStatsService tracker) {
         // TODO(b/180501180): Add back this logging message.
         /*
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         String seempStr = "app_uid=" + uid
                             + ",app_pid=" + pid + ",oom_adj=" + curAdj
                             + ",setAdj=" + setAdj + ",hasShownUi=" + (hasShownUi ? 1 : 0)
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             + ",cached=" + (mCached ? 1 : 0)
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             + ",fA=" + (mHasForegroundActivities ? 1 : 0)
                             + ",fS=" + (mHasForegroundServices ? 1 : 0)
                             + ",systemNoUi=" + (systemNoUi ? 1 : 0)
@@ -769,7 +736,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                             + ",killed=" + (killed ? 1 : 0) + ",killedByAm=" + (killedByAm ? 1 : 0)
                             + ",isDebugging=" + (isDebugging() ? 1 : 0);
         android.util.SeempLog.record_str(387, seempStr);
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         */
         mThread = null;
         mOnewayThread = null;
@@ -945,17 +911,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         mUnlocked = unlocked;
     }
 
-    @GuardedBy("mProcLock")
-    @Override
-    public int getRenderThreadTid() {
-        return mRenderThreadTid;
-    }
-
-    @GuardedBy("mProcLock")
-    void setRenderThreadTid(int renderThreadTid) {
-        mRenderThreadTid = renderThreadTid;
-    }
-
     @GuardedBy("mService")
     CompatibilityInfo getCompat() {
         return mCompat;
@@ -1045,16 +1000,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         mKillTime = killTime;
     }
 
-    @GuardedBy("mService")
-    String getWaitingToKill() {
-        return mWaitingToKill;
-    }
-
-    @GuardedBy("mService")
-    void setWaitingToKill(String waitingToKill) {
-        mWaitingToKill = waitingToKill;
-    }
-
     @Override
     public boolean isRemoved() {
         return mRemoved;
@@ -1108,16 +1053,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         mWaitedForDebugger = waitedForDebugger;
     }
 
-    @GuardedBy(anyOf = {"mService", "mProcLock"})
-    long getLastActivityTime() {
-        return mLastActivityTime;
-    }
-
-    @GuardedBy({"mService", "mProcLock"})
-    void setLastActivityTime(long lastActivityTime) {
-        mLastActivityTime = lastActivityTime;
-    }
-
     @GuardedBy("mService")
     boolean isUsingWrapper() {
         return mUsingWrapper;
@@ -1127,16 +1062,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     void setUsingWrapper(boolean usingWrapper) {
         mUsingWrapper = usingWrapper;
         mWindowProcessController.setUsingWrapper(usingWrapper);
-    }
-
-    @GuardedBy("mService")
-    String getIsolatedEntryPoint() {
-        return mIsolatedEntryPoint;
-    }
-
-    @GuardedBy("mService")
-    void setIsolatedEntryPoint(String isolatedEntryPoint) {
-        mIsolatedEntryPoint = isolatedEntryPoint;
     }
 
     @GuardedBy("mService")
@@ -1242,11 +1167,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     }
 
     @Override
-    public boolean isFreezeExempt() {
-        return mOptRecord.isFreezeExempt();
-    }
-
-    @Override
     public boolean shouldNotFreeze() {
         return mOptRecord.shouldNotFreeze();
     }
@@ -1270,6 +1190,16 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     @Override
     public int getApplicationUid() {
         return info.uid;
+    }
+
+    @Override
+    public String getPackageName() {
+        return info.packageName;
+    }
+
+    @Override
+    public boolean isInstantApp() {
+        return info.isInstantApp();
     }
 
     @Override
@@ -1363,31 +1293,9 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         return (rss != null && rss.length > 0) ? rss[0] : 0;
     }
 
+    @Override
     @GuardedBy("mService")
-    void killLocked(String reason, @Reason int reasonCode, boolean noisy) {
-        killLocked(reason, reasonCode, ApplicationExitInfo.SUBREASON_UNKNOWN, noisy, true);
-    }
-
-    @GuardedBy("mService")
-    void killLocked(String reason, @Reason int reasonCode, @SubReason int subReason,
-            boolean noisy) {
-        killLocked(reason, reason, reasonCode, subReason, noisy, true);
-    }
-
-    @GuardedBy("mService")
-    void killLocked(String reason, String description, @Reason int reasonCode,
-            @SubReason int subReason, boolean noisy) {
-        killLocked(reason, description, reasonCode, subReason, noisy, true);
-    }
-
-    @GuardedBy("mService")
-    void killLocked(String reason, @Reason int reasonCode, @SubReason int subReason,
-            boolean noisy, boolean asyncKPG) {
-        killLocked(reason, reason, reasonCode, subReason, noisy, asyncKPG);
-    }
-
-    @GuardedBy("mService")
-    void killLocked(String reason, String description, @Reason int reasonCode,
+    public void killLocked(String reason, String description, @Reason int reasonCode,
             @SubReason int subReason, boolean noisy, boolean asyncKPG) {
         if (!isKilledByAm()) {
             if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
@@ -1404,8 +1312,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                         + "): " + reason, info.uid);
             }
             // Since the process is getting killed, reset the freezable related state.
-            mOptRecord.setPendingFreeze(false);
-            mOptRecord.setFrozen(false);
+            synchronized (mProcLock) {
+                mOptRecord.setPendingFreeze(false);
+                mOptRecord.setFrozen(false);
+            }
             if (mPid > 0) {
                 mService.mProcessList.noteAppKill(this, reasonCode, subReason, description);
                 EventLog.writeEvent(EventLogTags.AM_KILL,
@@ -1431,13 +1341,9 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                 }
                 mService.mUxPerf.perfEvent(
                     BoostFramework.VENDOR_HINT_KILL,this.processName, 2, 0,getPid());
-// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
             } else {
                 mService.mForceStopKill = false;
-// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             if (mService.mUxPerf != null && processName.equals(info.packageName)) {
                 mService.mUxPerf.perfHint(
                     BoostFramework.VENDOR_HINT_UNPIN_FILE, info.packageName, 0, 0);
@@ -1523,6 +1429,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         return sb.toString();
     }
 
+    @Override
     public String toShortString() {
         final String shortStringName = mShortStringName;
         if (shortStringName != null) {
@@ -1677,8 +1584,20 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         }
     }
 
-    String[] getPackageList() {
-        return mPkgList.getPackageList();
+    @Override
+    public String[] getProcessPackageNames() {
+        return mPkgList.getPackageNames();
+    }
+
+    @Override
+    public boolean shouldKeepWarm() {
+        final ArraySet<ComponentName> warmServices = mService.mConstants.KEEP_WARMING_SERVICES;
+        for (int i = warmServices.size() - 1; i >= 0; i--) {
+            if (mPkgList.containsKey(warmServices.valueAt(i).getPackageName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     List<VersionedPackage> getPackageListWithVersionCode() {
@@ -1763,6 +1682,16 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     }
 
     @Override
+    public long getNextPssTime() {
+        return mProfile.getNextPssTime();
+    }
+
+    @Override
+    public void setLastCpuTime(long time) {
+        mProfile.mLastCpuTime.set(time);
+    }
+
+    @Override
     public void setPendingUiClean(boolean pendingUiClean) {
         synchronized (mProcLock) {
             mProfile.setPendingUiClean(pendingUiClean);
@@ -1814,7 +1743,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     public void onStartActivity(int topProcessState, boolean setProfileProc, String packageName,
             long versionCode) {
         synchronized (mService) {
-            mWaitingToKill = null;
+            setWaitingToKill(null);
             if (setProfileProc) {
                 synchronized (mService.mAppProfiler.mProfilerLock) {
                     mService.mAppProfiler.setProfileProcLPf(this);

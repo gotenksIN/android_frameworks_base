@@ -18,6 +18,8 @@
 package com.android.systemui.shade.ui.composable
 
 import android.view.ContextThemeWrapper
+import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.ColorInt
 import androidx.compose.animation.core.Animatable
@@ -38,6 +40,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -344,14 +347,6 @@ fun ContentScope.OverlayShadeHeader(
     showClock: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val localContext = LocalContext.current
-    val themedContext =
-        ContextThemeWrapper(localContext, R.style.Theme_SystemUI_QuickSettings_Header)
-    val primaryColor =
-        Utils.getColorAttrDefaultColor(themedContext, android.R.attr.textColorPrimary)
-    val inverseColor =
-        Utils.getColorAttrDefaultColor(themedContext, android.R.attr.textColorPrimaryInverse)
-
     val horizontalPadding =
         max(LocalScreenCornerRadius.current / 2f, Shade.Dimensions.HorizontalPadding)
 
@@ -418,8 +413,8 @@ fun ContentScope.OverlayShadeHeader(
                         viewModel = viewModel,
                         useExpandedFormat = false,
                         modifier = Modifier.padding(end = paddingEnd).weight(1f, fill = false),
-                        foregroundColor = if (isHighlighted) primaryColor else inverseColor,
-                        backgroundColor = if (isHighlighted) inverseColor else primaryColor,
+                        foregroundColor = quickSettingsHighlight.foregroundColor.toArgb(),
+                        backgroundColor = quickSettingsHighlight.backgroundColor.toArgb(),
                     )
                     BatteryInfo(
                         viewModel = viewModel,
@@ -484,9 +479,8 @@ private fun CutoutAwareShadeHeader(
         check(measurables[1].size == 1)
 
         val screenWidth = constraints.maxWidth
-        val cutoutWidthPx = cutoutWidth
         val height = max(cutoutHeight + (cutoutTop * 2), statusBarHeight.roundToPx())
-        val childConstraints = Constraints.fixed((screenWidth - cutoutWidthPx) / 2, height)
+        val childConstraints = Constraints.fixed((screenWidth - cutoutWidth) / 2, height)
 
         val startMeasurable = measurables[0][0]
         val endMeasurable = measurables[1][0]
@@ -503,11 +497,11 @@ private fun CutoutAwareShadeHeader(
                 }
                 CutoutLocation.CENTER -> {
                     startPlaceable.placeRelative(x = 0, y = 0)
-                    endPlaceable.placeRelative(x = startPlaceable.width + cutoutWidthPx, y = 0)
+                    endPlaceable.placeRelative(x = startPlaceable.width + cutoutWidth, y = 0)
                 }
                 CutoutLocation.LEFT -> {
-                    startPlaceable.placeRelative(x = cutoutWidthPx, y = 0)
-                    endPlaceable.placeRelative(x = startPlaceable.width + cutoutWidthPx, y = 0)
+                    startPlaceable.placeRelative(x = cutoutWidth, y = 0)
+                    endPlaceable.placeRelative(x = startPlaceable.width + cutoutWidth, y = 0)
                 }
             }
         }
@@ -530,13 +524,22 @@ private fun ContentScope.Clock(
             AndroidView(
                 factory = { context ->
                     Clock(
-                        ContextThemeWrapper(context, R.style.Theme_SystemUI_QuickSettings_Header),
-                        null,
-                    )
+                            ContextThemeWrapper(
+                                context,
+                                R.style.Theme_SystemUI_QuickSettings_Header,
+                            ),
+                            null,
+                        )
+                        .apply {
+                            isSingleLine = true
+                            textDirection = View.TEXT_DIRECTION_LOCALE
+                            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                        }
                 },
                 update = { view -> textColor?.let { view.setTextColor(it.toArgb()) } },
                 modifier =
                     modifier
+                        .wrapContentWidth(unbounded = true)
                         // use graphicsLayer instead of Modifier.scale to anchor transform to the
                         // (start, top) corner
                         .graphicsLayer {

@@ -34,15 +34,15 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementContentScope
 import com.android.compose.modifiers.padding
 import com.android.systemui.common.ui.ConfigurationState
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardRootViewModel
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementContext
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementProvider
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenScope
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.AlwaysOnDisplayNotificationIconViewStore
@@ -70,28 +70,20 @@ constructor(
     private val nicAodIconViewStore: AlwaysOnDisplayNotificationIconViewStore,
     @ShadeDisplayAware private val systemBarUtilsState: SystemBarUtilsState,
 ) : LockscreenElementProvider {
-    override val elements: List<LockscreenElement> by lazy { listOf(aodNotificationElement) }
+    override val elements: List<LockscreenElement> by lazy { listOf(AodNotificationElement()) }
 
-    private val aodNotificationElement =
-        object : LockscreenElement {
-            override val key = LockscreenElementKeys.Notifications.AOD.IconShelf
-            override val context = this@AodNotificationIconsElementProvider.context
+    private inner class AodNotificationElement : LockscreenElement {
+        override val key = LockscreenElementKeys.Notifications.AOD.IconShelf
+        override val context = this@AodNotificationIconsElementProvider.context
 
-            @Composable
-            override fun ContentScope.LockscreenElement(
-                factory: LockscreenElementFactory,
-                context: LockscreenElementContext,
-            ) {
-                AodNotificationIcons(factory, context)
-            }
+        @Composable
+        override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
+            AodNotificationIcons()
         }
+    }
 
     @Composable
-    private fun ContentScope.AodNotificationIcons(
-        factory: LockscreenElementFactory,
-        context: LockscreenElementContext,
-        modifier: Modifier = Modifier,
-    ) {
+    private fun LockscreenScope<ContentScope>.AodNotificationIcons(modifier: Modifier = Modifier) {
         val isVisible by
             keyguardRootViewModel.isNotifIconContainerVisible.collectAsStateWithLifecycle()
         val transitionState = remember { MutableTransitionState(isVisible.value) }

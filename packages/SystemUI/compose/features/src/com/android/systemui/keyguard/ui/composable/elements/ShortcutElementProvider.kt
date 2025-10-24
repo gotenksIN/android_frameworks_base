@@ -30,7 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.res.ResourcesCompat
-import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementContentScope
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.modifiers.padding
 import com.android.systemui.animation.view.LaunchableImageView
@@ -38,10 +38,9 @@ import com.android.systemui.keyguard.ui.binder.KeyguardQuickAffordanceViewBinder
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardQuickAffordanceViewModel
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardQuickAffordancesCombinedViewModel
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementContext
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.Shortcuts
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementProvider
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenScope
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.statusbar.KeyguardIndicationController
@@ -71,10 +70,7 @@ constructor(
         override val context = this@ShortcutElementProvider.context
 
         @Composable
-        override fun ContentScope.LockscreenElement(
-            factory: LockscreenElementFactory,
-            context: LockscreenElementContext,
-        ) {
+        override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
             Shortcut(isStart, applyPadding = false)
         }
     }
@@ -87,7 +83,7 @@ constructor(
      *   shortcut is placed along the edges of the display.
      */
     @Composable
-    private fun ContentScope.Shortcut(
+    private fun Shortcut(
         isStart: Boolean,
         applyPadding: Boolean,
         onTopChanged: ((Float) -> Unit)? = null,

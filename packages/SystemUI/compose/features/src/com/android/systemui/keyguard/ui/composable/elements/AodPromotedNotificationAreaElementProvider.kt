@@ -31,14 +31,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementContentScope
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardRootViewModel
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementContext
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementProvider
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenScope
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.statusbar.notification.promoted.AODPromotedNotification
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi
@@ -57,29 +57,23 @@ constructor(
     private val keyguardRootViewModel: KeyguardRootViewModel,
     private val aodPromotedNotificationViewModelFactory: AODPromotedNotificationViewModel.Factory,
 ) : LockscreenElementProvider {
-    override val elements: List<LockscreenElement> by lazy { listOf(promotedNotificationElement) }
+    override val elements: List<LockscreenElement> by lazy { listOf(PromotedNotificationElement()) }
 
-    private val promotedNotificationElement =
-        object : LockscreenElement {
-            override val key = LockscreenElementKeys.Notifications.AOD.Promoted
-            override val context = this@AodPromotedNotificationAreaElementProvider.context
+    private inner class PromotedNotificationElement : LockscreenElement {
+        override val key = LockscreenElementKeys.Notifications.AOD.Promoted
+        override val context = this@AodPromotedNotificationAreaElementProvider.context
 
-            @Composable
-            override fun ContentScope.LockscreenElement(
-                factory: LockscreenElementFactory,
-                context: LockscreenElementContext,
-            ) {
-                if (PromotedNotificationUi.isEnabled) {
-                    AodPromotedNotificationArea(factory, context)
-                }
+        @Composable
+        override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
+            if (PromotedNotificationUi.isEnabled) {
+                AodPromotedNotificationArea()
             }
         }
+    }
 
     @Composable
-    private fun ContentScope.AodPromotedNotificationArea(
-        factory: LockscreenElementFactory,
-        context: LockscreenElementContext,
-        modifier: Modifier = Modifier,
+    private fun LockscreenScope<ContentScope>.AodPromotedNotificationArea(
+        modifier: Modifier = Modifier
     ) {
         val isVisible by
             keyguardRootViewModel.isAodPromotedNotifVisible.collectAsStateWithLifecycle()

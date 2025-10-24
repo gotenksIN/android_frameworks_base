@@ -66,7 +66,6 @@ import static com.android.server.am.ActivityManagerService.TAG_UID_OBSERVERS;
 import static com.android.server.wm.WindowProcessController.STOPPED_STATE_FIRST_LAUNCH;
 import static com.android.server.wm.WindowProcessController.STOPPED_STATE_FORCE_STOPPED;
 
-import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SpecialUsers.CanBeALL;
@@ -150,6 +149,7 @@ import com.android.server.SystemConfig;
 import com.android.server.Watchdog;
 import com.android.server.am.ActivityManagerService.ProcessChangeItem;
 import com.android.server.am.psc.PlatformCompatCache;
+import com.android.server.am.psc.ProcessListInternal;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.am.psc.UidRecordInternal;
 import com.android.server.compat.PlatformCompat;
@@ -183,7 +183,8 @@ import java.util.function.Function;
 /**
  * Activity manager code dealing with processes.
  */
-public final class ProcessList implements ProcessStateController.ProcessLruUpdater {
+public final class ProcessList implements ProcessListInternal,
+        ProcessStateController.ProcessLruUpdater {
     static final String TAG = TAG_WITH_CLASS_NAME ? "ProcessList" : TAG_AM;
 
     static final String TAG_PROCESS_OBSERVERS = TAG + POSTFIX_PROCESS_OBSERVERS;
@@ -573,12 +574,10 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
 
     ActivityManagerGlobalLock mProcLock;
 
-// QTI_BEGIN: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
     /**
      * BoostFramework Object
      */
     public static BoostFramework mPerfServiceStartHint = new BoostFramework();
-// QTI_END: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
 
     private static final String PROPERTY_APPLY_SDK_SANDBOX_AUDIT_RESTRICTIONS =
             "apply_sdk_sandbox_audit_restrictions";
@@ -1581,7 +1580,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
      * @param uid The uid of the app
      * @param amt Adjustment value -- lmkd allows -1000 to +1000
      *
-     * {@hide}
+     * @hide
      */
     public static void setOomAdj(int pid, int uid, int amt) {
         // This indicates that the process is not started yet and so no need to proceed further.
@@ -1605,7 +1604,6 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
         }
     }
 
-// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
     /**
      * Set the out-of-memory badness adjustment for a process.
      * If {@code pid <= 0}, this method will be a no-op.
@@ -1642,7 +1640,6 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
         }
     }
 
-// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
 
     // The max size for PROCS_PRIO cmd in LMKD
     private static final int MAX_PROCS_PRIO_PACKET_SIZE = 3;
@@ -1655,9 +1652,9 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
      *
      * @param apps App list to adjust their respective oom score.
      *
-     * {@hide}
+     * @hide
      */
-    public static void batchSetOomAdj(ArrayList<ProcessRecord> apps) {
+    public static void batchSetOomAdj(ArrayList<ProcessRecordInternal> apps) {
         final int totalApps = apps.size();
         if (totalApps == 0) {
             return;
@@ -1682,7 +1679,6 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
             buf.putInt(uid);
             buf.putInt(amt);
             buf.putInt(0);  // Default proc type to PROC_TYPE_APP
-// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             total_procs_in_buf++;
         }
         writeLmkd(buf, null);
@@ -1695,7 +1691,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
      *
      * {@hide}
      */
-    public static void batchSetOomAdjExt(ArrayList<ProcessRecord> apps) {
+    public static void batchSetOomAdjExt(ArrayList<ProcessRecordInternal> apps) {
         final int totalApps = apps.size();
         if (totalApps == 0) {
             return;
@@ -1706,11 +1702,10 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
         int total_procs_in_buf = 0;
         buf.putInt(LMK_PROCS_PRIO);
         for (int i = 0; i < totalApps; i++) {
-            final int pid = apps.get(i).getPid();
-// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            final int amt = apps.get(i).getCurAdj();
-// QTI_BEGIN: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            final int uid = apps.get(i).uid;
+            final ProcessRecord app = (ProcessRecord) apps.get(i);
+            final int pid = app.getPid();
+            final int amt = app.getCurAdj();
+            final int uid = app.uid;
             if (pid <= 0 || amt == UNKNOWN_ADJ) continue;
             if (total_procs_in_buf >= MAX_PROCS_PRIO_PACKET_SIZE) {
                 writeLmkd(buf, null);
@@ -1719,14 +1714,14 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
                 buf.allocate(MAX_OOM_ADJ_BATCH_LENGTH);
                 buf.putInt(LMK_PROCS_PRIO);
             }
-            String packageName = apps.get(i).info.packageName;
-            String processName = apps.get(i).processName;
+            String packageName = app.info.packageName;
+            String processName = app.processName;
             int isMainProc = 0;
             int isSystemApp = 0;
             if (packageName.equals(processName)) {
                 isMainProc = 1;
             }
-            if (apps.get(i).info.isSystemApp()) {
+            if (app.info.isSystemApp()) {
                 isSystemApp = 1;
             }
             buf.putInt(pid);
@@ -1735,14 +1730,13 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
             buf.putInt(isSystemApp);
             buf.putInt(isMainProc);
             buf.putInt(0);  // Default proc type to PROC_TYPE_APP
-// QTI_END: 2025-07-03: Core: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             total_procs_in_buf++;
         }
         writeLmkd(buf, null);
     }
 
     /*
-     * {@hide}
+     * @hide
      */
     public static final void remove(int pid) {
         // This indicates that the process is not started yet and so no need to proceed further.
@@ -1756,7 +1750,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
     }
 
     /*
-     * {@hide}
+     * @hide
      */
     public static final Integer getLmkdKillCount(int min_oom_adj, int max_oom_adj) {
         ByteBuffer buf = ByteBuffer.allocate(4 * 3);
@@ -1807,7 +1801,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
     }
 
     /**
-     * {@hide}
+     * @hide
      */
     public static void startPsiMonitoringAfterBoot() {
         ByteBuffer buf = ByteBuffer.allocate(4);
@@ -2026,13 +2020,6 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
                             app.info.packageName);
                     externalStorageAccess = storageManagerInternal.hasExternalStorageAccess(uid,
                             app.info.packageName);
-                    if (mService.isAppFreezerExemptInstPkg()
-                            && pm.checkPermission(Manifest.permission.INSTALL_PACKAGES,
-                            app.info.packageName, userId)
-                            == PackageManager.PERMISSION_GRANTED) {
-                        Slog.i(TAG, app.info.packageName + " is exempt from freezer");
-                        app.mOptRecord.setFreezeExempt(true);
-                    }
                 } catch (RemoteException e) {
                     throw e.rethrowAsRuntimeException();
                 }
@@ -2652,14 +2639,16 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
             }
 
             boolean bindOverrideSysprops = false;
-            String[] syspropOverridePkgNames = DeviceConfig.getString(
-                    DeviceConfig.NAMESPACE_APP_COMPAT,
-                            "appcompat_sysprop_override_pkgs", "").split(",");
-            String[] pkgs = app.getPackageList();
-            for (int i = 0; i < pkgs.length; i++) {
-                if (ArrayUtils.contains(syspropOverridePkgNames, pkgs[i])) {
-                    bindOverrideSysprops = true;
-                    break;
+            if (Build.IS_USERDEBUG || Build.IS_ENG) {
+                final String[] syspropOverridePkgNames = DeviceConfig.getString(
+                        DeviceConfig.NAMESPACE_APP_COMPAT,
+                                "appcompat_sysprop_override_pkgs", "").split(",");
+                final String[] pkgs = app.getProcessPackageNames();
+                for (int i = 0; i < pkgs.length; i++) {
+                    if (ArrayUtils.contains(syspropOverridePkgNames, pkgs[i])) {
+                        bindOverrideSysprops = true;
+                        break;
+                    }
                 }
             }
 
@@ -2685,7 +2674,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
                         app.processName, uid, uid, gids, runtimeFlags, mountExternal,
                         app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
                         app.info.dataDir, null, app.info.packageName,
-                        app.getDisabledCompatChanges(),
+                        app.getDisabledCompatChanges(), app.getStartSeq(),
                         new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
             } else if (hostingRecord.usesAppZygote()) {
                 final AppZygote appZygote = createAppZygoteForProcessIfNeeded(app);
@@ -2696,7 +2685,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
                         app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
                         app.info.dataDir, app.info.packageName, isTopApp,
                         app.getDisabledCompatChanges(), pkgDataInfoMap,
-                        allowlistedAppDataInfoMap,
+                        allowlistedAppDataInfoMap, app.getStartSeq(),
                         new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
             } else {
                 regularZygote = true;
@@ -2707,6 +2696,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
                         isTopApp, app.getDisabledCompatChanges(), pkgDataInfoMap,
                         allowlistedAppDataInfoMap, bindMountAppsData, bindMountAppStorageDirs,
                         bindOverrideSysprops,
+                        app.getStartSeq(),
                         new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
                 // By now the process group should have been created by zygote.
                 app.mProcessGroupCreated = true;
@@ -2744,24 +2734,16 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
                 storageManagerInternal.prepareStorageDirs(userId, pkgDataInfoMap.keySet(),
                         app.processName);
             }
-// QTI_BEGIN: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
             if (mPerfServiceStartHint != null) {
-// QTI_END: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
-// QTI_BEGIN: 2021-01-29: Core: Boostframework: Call perfHint with new hostingType when application starts.
                 if ((hostingRecord.getType() != null)
-// QTI_END: 2021-01-29: Core: Boostframework: Call perfHint with new hostingType when application starts.
                        && (hostingRecord.getType().equals(HostingRecord.HOSTING_TYPE_NEXT_ACTIVITY)
                                || hostingRecord.getType().equals(HostingRecord.HOSTING_TYPE_NEXT_TOP_ACTIVITY))) {
-// QTI_BEGIN: 2021-01-29: Core: Boostframework: Call perfHint with new hostingType when application starts.
                                    //TODO: not acting on pre-activity
-// QTI_END: 2021-01-29: Core: Boostframework: Call perfHint with new hostingType when application starts.
-// QTI_BEGIN: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
                     if (startResult != null) {
                         mPerfServiceStartHint.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName, startResult.pid, BoostFramework.Launch.TYPE_START_PROC);
                     }
                 }
             }
-// QTI_END: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
             checkSlow(startTime, "startProcess: returned from zygote!");
             return startResult;
         } finally {
@@ -3512,9 +3494,10 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
      *
      * @param uid UID to return sansdbox processes for
      */
+    @Override
     @Nullable
     @GuardedBy("mService")
-    List<ProcessRecord> getSdkSandboxProcessesForAppLocked(int uid) {
+    public List<ProcessRecord> getSdkSandboxProcessesForAppLocked(int uid) {
         return mSdkSandboxes.get(uid);
     }
 
@@ -3678,7 +3661,14 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
         return old;
     }
 
-    /** Call setCoreSettings on all LRU processes, with the new settings. */
+    /**
+     * Updates the core settings for all running processes.
+     * <p>This method is used when the {@code core_settings_multi_user} feature flag is
+     * <strong>disabled</strong>. It sends a single bundle of settings to every process,
+     * regardless of the user.
+     *
+     * @param settings A {@link Bundle} containing the core settings to be applied.
+     */
     @GuardedBy(anyOf = {"mService", "mProcLock"})
     void updateCoreSettingsLOSP(Bundle settings) {
         for (int i = mLruProcesses.size() - 1; i >= 0; i--) {
@@ -3687,6 +3677,36 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
             try {
                 if (thread != null) {
                     thread.setCoreSettings(settings);
+                }
+            } catch (RemoteException re) {
+                /* ignore */
+            }
+        }
+    }
+
+    /**
+     * Updates the core settings for all running processes on a per-user basis.
+     * <p>This method is used when the {@code core_settings_multi_user} feature flag is
+     * <strong>enabled</strong>. It dispatches user-specific settings to each process based on its
+     * user ID.
+     *
+     * @param settingsPerUser A {@link SparseArray} mapping user IDs to their corresponding
+     *                        core settings {@link Bundle}.
+     */
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
+    void updateCoreSettingsLOSP(SparseArray<Bundle> settingsPerUser) {
+        for (int i = mLruProcesses.size() - 1; i >= 0; i--) {
+            ProcessRecord processRecord = mLruProcesses.get(i);
+            final Bundle userSettings = settingsPerUser.get(processRecord.userId);
+            final IApplicationThread thread = processRecord.getThread();
+            try {
+                // It's possible for userSettings to be null here if a process has already started
+                // for a new user after CoreSettingsObserverMultiUser retrieves the list of running
+                // users. In that situation, CoreSettingsObserverMultiUser will receive another
+                // onUserStarted() call for that user and call onCoreSettingsChange() again, so we
+                // can skip setCoreSettings() if userSettings is null.
+                if (thread != null && userSettings != null) {
+                    thread.setCoreSettings(userSettings);
                 }
             } catch (RemoteException re) {
                 /* ignore */
@@ -4390,7 +4410,7 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
                 // Generate process state info for running application
                 ActivityManager.RunningAppProcessInfo currApp =
                         new ActivityManager.RunningAppProcessInfo(app.processName,
-                                app.getPid(), app.getPackageList());
+                                app.getPid(), app.getProcessPackageNames());
                 if (app.getPkgDeps() != null) {
                     final int size = app.getPkgDeps().size();
                     currApp.pkgDeps = app.getPkgDeps().toArray(new String[size]);
@@ -4431,8 +4451,9 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
     /**
      * Return the reference to the LRU list, call this function for read-only access
      */
+    @Override
     @GuardedBy(anyOf = {"mService", "mProcLock"})
-    ArrayList<ProcessRecord> getLruProcessesLOSP() {
+    public ArrayList<ProcessRecord> getLruProcessesLOSP() {
         return mLruProcesses;
     }
 
@@ -4442,20 +4463,6 @@ public final class ProcessList implements ProcessStateController.ProcessLruUpdat
     @GuardedBy({"mService", "mProcLock"})
     ArrayList<ProcessRecord> getLruProcessesLSP() {
         return mLruProcesses;
-    }
-
-    /**
-     * For test only
-     */
-    @VisibleForTesting
-    @GuardedBy({"mService", "mProcLock"})
-    void setLruProcessServiceStartLSP(int pos) {
-        mLruProcessServiceStart = pos;
-    }
-
-    @GuardedBy(anyOf = {"mService", "mProcLock"})
-    int getLruProcessServiceStartLOSP() {
-        return mLruProcessServiceStart;
     }
 
     /**

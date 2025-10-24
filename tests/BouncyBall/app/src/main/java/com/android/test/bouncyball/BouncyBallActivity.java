@@ -16,7 +16,9 @@
 
 package com.android.test.bouncyball;
 
+import android.app.Activity;
 import android.hardware.display.DisplayManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Trace;
 import android.util.Log;
@@ -25,11 +27,9 @@ import android.view.Display;
 import android.view.Window;
 import android.view.WindowManager;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import java.util.concurrent.Executors;
 
-public class BouncyBallActivity extends AppCompatActivity {
+public class BouncyBallActivity extends Activity {
     // Since logging (to logcat) takes system resources, we chose not to log
     // data every frame by default.
     private static final boolean LOG_EVERY_FRAME = false;
@@ -46,10 +46,11 @@ public class BouncyBallActivity extends AppCompatActivity {
 
     private static final String LOG_TAG = "BouncyBall";
 
-    // The app needs to run at at least this frame rate to be a valid test.
-    // If the system defaults us to a higher frame rate, we'll test with that,
-    // but we need to at least meet this rate.
-    private static final float MINIMUM_FRAME_RATE = 60.0f;
+    // This is the bare minimum the app needs to run at for us to consider
+    // this a valid test.  We'll generally use the maximum of
+    // getSuggestedFrameRate() and the rate the system launches us at.  But
+    // if that maximum is less than this minimum, we'll use this minimum.
+    private static final float MINIMUM_TEST_FRAME_RATE = 60.0f;
 
     // This test measures sustained frame rate, so it's safe to ignore
     // frame drops around the start time.
@@ -103,7 +104,14 @@ public class BouncyBallActivity extends AppCompatActivity {
                     if (displayId != mDisplayId) {
                         return;
                     }
-                    setFrameRate(getDisplay().getMode().getRefreshRate());
+                    float frameRate = getDisplay().getMode().getRefreshRate();
+                    if (frameRate == mFrameRate) {
+                        // On devices with API level < 36, we might get this
+                        // called for other reasons (like brightness changing).
+                        // We ignore anything but frame rate changes.
+                        return;
+                    }
+                    setFrameRate(frameRate);
                     Log.i(LOG_TAG, "Using frame rate " + mFrameRate + "Hz");
                 }
             };
@@ -171,9 +179,17 @@ public class BouncyBallActivity extends AppCompatActivity {
         setContentView(R.layout.activity_bouncy_ball);
 
         DisplayManager manager = getSystemService(DisplayManager.class);
-        manager.registerDisplayListener(Executors.newSingleThreadExecutor(),
-                                        DisplayManager.EVENT_TYPE_DISPLAY_REFRESH_RATE,
-                                        mDisplayListener);
+        if (Build.VERSION.SDK_INT >= 36) {
+            // We prefer this newer API, introduced at API level 36.
+            manager.registerDisplayListener(Executors.newSingleThreadExecutor(),
+                                            DisplayManager.EVENT_TYPE_DISPLAY_REFRESH_RATE,
+                                            mDisplayListener);
+        } else {
+            // We don't need a separate Handler because our listener logic is
+            // cheap, and for valid tests only gets invoked before we're looking
+            // for dropped frames.
+            manager.registerDisplayListener(mDisplayListener, null);
+        }
 
         initFrameRate();
         mChoreographer = Choreographer.getInstance();
@@ -197,17 +213,32 @@ public class BouncyBallActivity extends AppCompatActivity {
         Display display = getDisplay();
         Display.Mode currentMode = display.getMode();
         mDisplayId = display.getDisplayId();
+        float minimumFrameRate = MINIMUM_TEST_FRAME_RATE;
+        if (Build.VERSION.SDK_INT >= 36) {
+            // This API wasn't introduced until API level 36, so for testing
+            // on older devices, we'll just stick with our MINIMUM.
+            // TODO(b/442635053): Allow switching between NORMAL and HIGH here,
+            //     so we can also test against the HIGH rate.
+            minimumFrameRate =
+                display.getSuggestedFrameRate(Display.FRAME_RATE_CATEGORY_NORMAL);
+        }
+        if (minimumFrameRate < MINIMUM_TEST_FRAME_RATE) {
+            Log.w(LOG_TAG, "getSuggestedFrameRate (" + minimumFrameRate
+                    + "Hz) is below our testing minimum (" + MINIMUM_TEST_FRAME_RATE
+                    + "Hz); using the latter for our minimum.");
+            minimumFrameRate = MINIMUM_TEST_FRAME_RATE;
+        }
         setFrameRate(currentMode.getRefreshRate());
-        if (mFrameRate >= MINIMUM_FRAME_RATE) {
+        if (mFrameRate >= minimumFrameRate) {
             // The default frame rate is sufficient for our testing.
             return;
         }
 
-        String minRateStr = MINIMUM_FRAME_RATE + "Hz";
+        String minRateStr = minimumFrameRate + "Hz";
         // Using a Warning here, because this seems unexpected that a device
-        // defaults to running at below 60Hz.
-        Log.w(LOG_TAG, "Default frame rate (" + mFrameRate
-                  + "Hz) is below the acceptable minimum (" + minRateStr + ")");
+        // defaults to running at below this rate.
+        Log.w(LOG_TAG, "App launched with frame rate (" + mFrameRate
+                  + "Hz), below the acceptable/expected minimum (" + minRateStr + ")");
 
         // If available at our current resolution, use 60Hz.  If not, use the
         // lowest refresh rate above 60Hz which is available.  Otherwise, throw
@@ -221,13 +252,13 @@ public class BouncyBallActivity extends AppCompatActivity {
                 continue;
             }
             float rate = mode.getRefreshRate();
-            if (rate == MINIMUM_FRAME_RATE) {
+            if (rate == minimumFrameRate) {
                 // This is exactly what we were hoping for, so we can stop
                 // looking.
                 preferredRate = rate;
                 break;
             }
-            if ((rate > MINIMUM_FRAME_RATE) && (rate < preferredRate)) {
+            if ((rate > minimumFrameRate) && (rate < preferredRate)) {
                 // This is the best rate we've seen so far in terms of being
                 // closest to our desired rate without being under it.
                 preferredRate = rate;

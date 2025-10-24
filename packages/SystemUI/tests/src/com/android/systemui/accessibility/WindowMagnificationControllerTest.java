@@ -417,7 +417,6 @@ public class WindowMagnificationControllerTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_UPDATE_WINDOW_MAGNIFIER_BOTTOM_BOUNDARY_WITH_MOUSE)
     public void enableWindowMagnificationAtTheBottom_withKeyboard_overlapFlagIsTrue() {
         when(mMockInputManager.getInputDeviceIds()).thenReturn(new int[]{1});
         when(mMockInputManager.getInputDevice(1)).thenReturn(
@@ -436,7 +435,6 @@ public class WindowMagnificationControllerTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_UPDATE_WINDOW_MAGNIFIER_BOTTOM_BOUNDARY_WITH_MOUSE)
     public void deleteWindowMagnification_withMouse_enableAtTheBottom_overlapFlagIsFalse() {
         when(mMockInputManager.getInputDeviceIds()).thenReturn(new int[]{1, 2});
         when(mMockInputManager.getInputDevice(1)).thenReturn(
@@ -757,7 +755,8 @@ public class WindowMagnificationControllerTest extends SysuiTestCase {
         verify(mResources, atLeastOnce()).getDimensionPixelSize(anyInt());
         verify(mSurfaceControlViewHosts.get(0)).release();
         verify(mMirrorWindowControl).destroyControl();
-        verify(mSurfaceControlViewHosts.get(1)).setView(any(), any());
+        verify(mSurfaceControlViewHosts.get(1)).setView(any(),
+                any(WindowManager.LayoutParams.class));
         verify(mMirrorWindowControl).showControl();
     }
 
@@ -1239,7 +1238,6 @@ public class WindowMagnificationControllerTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_UPDATE_WINDOW_MAGNIFIER_BOTTOM_BOUNDARY_WITH_MOUSE)
     public void
             moveWindowMagnificationToTheBottom_withMouse_enabledWithGestureInset_overlapFlagIsTrue(
     ) {
@@ -1262,7 +1260,6 @@ public class WindowMagnificationControllerTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_UPDATE_WINDOW_MAGNIFIER_BOTTOM_BOUNDARY_WITH_MOUSE)
     public void moveWindowMagnificationToTheBottom_withoutMouse_stopsAtSystemGestureTop() {
         // Makes sure any non-mouse device allows magnification overlaps with system gesture.
         when(mMockInputManager.getInputDeviceIds()).thenReturn(new int[]{1, 2, 3, 4, 5});
@@ -1319,7 +1316,6 @@ public class WindowMagnificationControllerTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_UPDATE_WINDOW_MAGNIFIER_BOTTOM_BOUNDARY_WITH_MOUSE)
     public void moveWindowMagnificationToTheBottom_onMouseAdded_movesToBottom() {
         when(mMockInputManager.getInputDeviceIds()).thenReturn(new int[]{});
 
@@ -1353,7 +1349,6 @@ public class WindowMagnificationControllerTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_UPDATE_WINDOW_MAGNIFIER_BOTTOM_BOUNDARY_WITH_MOUSE)
     public void moveWindowMagnificationToTheBottom_onMouseRemoved_stopsMoveAtBottomGesture() {
         when(mMockInputManager.getInputDeviceIds()).thenReturn(new int[]{2});
         when(mMockInputManager.getInputDevice(2)).thenReturn(
@@ -1587,7 +1582,7 @@ public class WindowMagnificationControllerTest extends SysuiTestCase {
         mInstrumentation.runOnMainSync(
                 () -> {
                     mWindowMagnificationController
-                            .onDrag(getInternalView(R.id.bottom_right_corner), 2f, 1f);
+                            .onDrag(getInternalView(R.id.bottom_right_corner), 2, 1);
                     actualWindowHeight.set(
                             mSurfaceControlViewHost.getView().getLayoutParams().height);
                     actualWindowWidth.set(
@@ -1617,7 +1612,7 @@ public class WindowMagnificationControllerTest extends SysuiTestCase {
                     mWindowMagnificationController.setWindowSize(startingSize, startingSize);
                     mWindowMagnificationController.setEditMagnifierSizeMode(true);
                     mWindowMagnificationController
-                            .onDrag(getInternalView(R.id.bottom_handle), 2f, 1f);
+                            .onDrag(getInternalView(R.id.bottom_handle), 2, 1);
                     actualWindowHeight.set(
                             mSurfaceControlViewHost.getView().getLayoutParams().height);
                     actualWindowWidth.set(
@@ -1669,7 +1664,8 @@ public class WindowMagnificationControllerTest extends SysuiTestCase {
         dragButton.dispatchTouchEvent(
                 obtainMotionEvent(downTime, downTime, ACTION_UP, 100, 100));
 
-        verify(mSurfaceControlViewHost).setView(any(View.class), any());
+        verify(mSurfaceControlViewHost).setView(any(View.class),
+                any(WindowManager.LayoutParams.class));
     }
 
     private <T extends View> T getInternalView(@IdRes int idRes) {

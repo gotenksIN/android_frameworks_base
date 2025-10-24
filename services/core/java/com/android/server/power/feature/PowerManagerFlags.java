@@ -37,11 +37,6 @@ public class PowerManagerFlags {
             Flags.FLAG_ENABLE_EARLY_SCREEN_TIMEOUT_DETECTOR,
             Flags::enableEarlyScreenTimeoutDetector);
 
-    private final FlagState mEnableScreenTimeoutPolicyListenerApi = new FlagState(
-            Flags.FLAG_ENABLE_SCREEN_TIMEOUT_POLICY_LISTENER_API,
-            Flags::enableScreenTimeoutPolicyListenerApi
-    );
-
     private final FlagState mImproveWakelockLatency = new FlagState(
             Flags.FLAG_IMPROVE_WAKELOCK_LATENCY,
             Flags::improveWakelockLatency
@@ -89,14 +84,14 @@ public class PowerManagerFlags {
             Flags::separateTimeoutsFlicker
     );
 
+    private final FlagState mWakeAdjacentDisplaysOnWakeupCall = new FlagState(
+            Flags.FLAG_WAKE_ADJACENT_DISPLAYS_ON_WAKEUP_CALL,
+            Flags::wakeAdjacentDisplaysOnWakeupCall
+    );
+
     /** Returns whether early-screen-timeout-detector is enabled on not. */
     public boolean isEarlyScreenTimeoutDetectorEnabled() {
         return mEarlyScreenTimeoutDetectorFlagState.isEnabled();
-    }
-
-    /** Returns whether screen timeout policy listener APIs are enabled on not. */
-    public boolean isScreenTimeoutPolicyListenerApiEnabled() {
-        return mEnableScreenTimeoutPolicyListenerApi.isEnabled();
     }
 
     /**
@@ -179,6 +174,13 @@ public class PowerManagerFlags {
     }
 
     /**
+     * @return Whether the system should wakeup the adjacent displays too on a wakeup call
+     */
+    public boolean isWakeAdjacentDisplaysOnWakeupCallEnabled() {
+        return mWakeAdjacentDisplaysOnWakeupCall.isEnabled();
+    }
+
+    /**
      * dumps all flagstates
      * @param pw printWriter
      */
@@ -195,6 +197,7 @@ public class PowerManagerFlags {
         pw.println(" " + mEnableAppWakelockDataSource);
         pw.println(" " + mPartialSleepWakelocks);
         pw.println(" " + mSeparateTimeoutsFlicker);
+        pw.println(" " + mWakeAdjacentDisplaysOnWakeupCall);
     }
 
     private static class FlagState {

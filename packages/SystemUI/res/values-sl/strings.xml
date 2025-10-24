@@ -21,8 +21,10 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="app_label" msgid="4811759950673118541">"Sistemski uporabniški vmesnik"</string>
     <string name="battery_low_title" msgid="5319680173344341779">"Želite vklopiti varčevanje z energijo baterije?"</string>
-    <string name="battery_low_description" msgid="3282977755476423966">"Preostala napolnjenost baterije: <xliff:g id="PERCENTAGE">%s</xliff:g>. Funkcija varčevanja z energijo baterije vklopi temno temo, omeji dejavnost v ozadju in prikazuje obvestila z zakasnitvijo."</string>
-    <string name="battery_low_intro" msgid="5148725009653088790">"Funkcija varčevanja z energijo baterije vklopi temno temo, omeji dejavnost v ozadju in prikazuje obvestila z zakasnitvijo."</string>
+    <!-- no translation found for battery_low_description (7848989602036547056) -->
+    <skip />
+    <!-- no translation found for battery_low_intro (8033783734931200690) -->
+    <skip />
     <string name="battery_low_percent_format" msgid="4276661262843170964">"Še <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
     <string name="invalid_charger_title" msgid="938685362320735167">"Ni mogoče polniti prek USB-ja"</string>
     <string name="invalid_charger_text" msgid="2339310107232691577">"Uporabite polnilnik, ki je bil priložen napravi"</string>
@@ -138,29 +140,57 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"Trenutno snemate celotni zaslon"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"Trenutno snemate aplikacijo <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"Ustavi snemanje"</string>
+    <string name="screen_record_entire_screen" msgid="66944996337928170">"Celoten zaslon"</string>
+    <string name="screen_record_single_app" msgid="7355880948574569290">"Ena aplikacija"</string>
+    <string name="screen_record_single_app_hint" msgid="8404332826093639170">"Aplikacija za snemanje"</string>
+    <string name="screen_record_single_app_no_recents" msgid="1023249803854209330">"Ena aplik. (odprite ap. za izbiro)"</string>
     <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"Snemaj zvok v napravi"</string>
     <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"Snemaj mikrofon"</string>
+    <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"Prikaz fotoaparata za selfije"</string>
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"Pokaži dotike"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"Izberite aplikacijo za snemanje"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"Video je shranjen"</string>
+    <!-- no translation found for screen_record_video_deleted (30786214839944540) -->
+    <skip />
+    <string name="screen_record_undo" msgid="7942716736019800870">"Razveljavi"</string>
     <string name="screen_record_retake" msgid="3846643688365398450">"Nov posnetek"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"Uredi"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"Izbriši"</string>
-    <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"Ustvari posnetek celotnega zaslona"</string>
-    <string name="screen_capture_region_selection_button" msgid="515608875142444130">"Ustvari posnetek izbranega območja zaslona"</string>
-    <!-- no translation found for screen_capture_record_region_selection_button (3699353194755563053) -->
+    <!-- no translation found for screen_record_delete_dialog_title (5868561491974057044) -->
     <skip />
+    <!-- no translation found for screen_record_delete_dialog_content (2610040845214024496) -->
+    <skip />
+    <string name="screen_record_play" msgid="4732544724679889445">"Predvajaj"</string>
+    <string name="screen_record_pause" msgid="1715012292444967776">"Začasno zaustavi"</string>
+    <string name="screen_record_mute" msgid="8111682249858638168">"Izklopi zvok"</string>
+    <string name="screen_record_unmute" msgid="2207912659365156472">"Vklopi zvok"</string>
+    <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"Ustvari posnetek celotnega zaslona"</string>
+    <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"Snemanje celotnega zaslona"</string>
+    <string name="screen_capture_region_selection_button" msgid="515608875142444130">"Ustvari posnetek izbranega območja zaslona"</string>
+    <string name="screen_capture_record_region_selection_button" msgid="3699353194755563053">"Snemanje izbranega območja"</string>
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"Posnetek zaslona"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Snemaj"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Deli"</string>
+    <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Izberite aplikacijo, ki jo želite deliti"</string>
+    <string name="screen_share_app_audio_sharing" msgid="7201172218924898712">"Deljenje zvoka okna"</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Ustvarjanje posnetka zaslona okna"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Okno za snemanje"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Ustvarjanje posnetka izbranega območja zaslona"</string>
     <string name="screen_capture_toolbar_region_button_record_a11y" msgid="6829009792885846867">"Snemanje izbranega območja"</string>
     <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"Ustvarjanje posnetka celotnega zaslona"</string>
     <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"Snemanje celotnega zaslona"</string>
-    <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"Nastavitve Zaslonskega posnetka"</string>
+    <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"Nastavitve zajema zaslonske slike"</string>
+    <!-- no translation found for screen_capture_show_clicks_and_keys (2151690554364148717) -->
+    <skip />
+    <!-- no translation found for screen_capture_device_audio (1537290197773737349) -->
+    <skip />
+    <!-- no translation found for screen_capture_microphone_audio (1698835678818747741) -->
+    <skip />
+    <!-- no translation found for screen_capture_front_camera (1214647538302639358) -->
+    <skip />
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> × <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
+    <!-- no translation found for screen_share_privacy_indicator_stop_sharing (2297045039651417274) -->
+    <skip />
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"Deljenje zaslona"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"Deljenje vsebine"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"Želite ustaviti deljenje zaslona?"</string>
@@ -474,12 +504,13 @@
     <string name="accessibility_hearing_device_pair_new_device" msgid="8440082580186130090">"Kliknite za seznanitev nove naprave"</string>
     <string name="hearing_devices_presets_error" msgid="350363093458408536">"Prednastavljenih vrednosti ni bilo mogoče posodobiti"</string>
     <string name="hearing_devices_preset_label" msgid="7878267405046232358">"Prednastavljeno"</string>
+    <string name="hearing_devices_preset_label_left" msgid="7427947566560179945">"Prednastavitev levo"</string>
+    <string name="hearing_devices_preset_label_right" msgid="1847206329436268522">"Prednastavitev desno"</string>
     <string name="hearing_devices_input_routing_label" msgid="730396728151232306">"Privzeti mikrofon za klice"</string>
   <string-array name="hearing_device_input_routing_options">
     <item msgid="4582190415045337003">"Mikrofon slušnega aparata"</item>
     <item msgid="8501466270452446450">"Mikrofon tega telefona"</item>
   </string-array>
-    <string name="hearing_devices_spinner_item_selected" msgid="3137083889662762383">"Izbrano"</string>
     <string name="hearing_devices_ambient_label" msgid="629440938614895797">"Okolica"</string>
     <string name="hearing_devices_ambient_control_left" msgid="3586965448230412600">"Levo"</string>
     <string name="hearing_devices_ambient_control_right" msgid="6192137602448918383">"Desno"</string>
@@ -533,7 +564,7 @@
     <string name="zen_mode_set_up" msgid="8231201163894922821">"Ni nastavljeno"</string>
     <string name="zen_mode_no_manual_invocation" msgid="1769975741344633672">"Upravljanje v nastavitvah"</string>
     <string name="zen_mode_active_modes" msgid="1625850411578488856">"{count,plural, =0{Ni aktivnih načinov}=1{Način {mode} je aktiven}one{# način je aktiven}two{# načina sta aktivna}few{# načini so aktivni}other{# načinov je aktivnih}}"</string>
-    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"Št. načinov: <xliff:g id="NUMBER">%s</xliff:g>"</string>
+    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"Št. načinov: <xliff:g id="NUMBER">%d</xliff:g>"</string>
     <string name="zen_modes_multiple_on_status" msgid="8120633422509269588">"Vklopljeno"</string>
     <string name="zen_priority_introduction" msgid="3159291973383796646">"Ne bodo vas motili zvoki ali vibriranje, razen v primeru alarmov, opomnikov, dogodkov in klicateljev, ki jih določite. Še vedno pa boste slišali vse, kar se boste odločili predvajati, vključno z glasbo, videoposnetki in igrami."</string>
     <string name="zen_alarms_introduction" msgid="3987266042682300470">"Ne bodo vas motili zvoki ali vibriranje, razen v primeru alarmov. Še vedno pa boste slišali vse, kar se boste odločili predvajati, vključno z glasbo, videoposnetki in igrami."</string>
@@ -680,8 +711,8 @@
     <string name="notification_section_header_conversations" msgid="821834744538345661">"Pogovori"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"Brisanje vseh tihih obvestil"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"Odpiranje nastavitev obvestil"</string>
-    <string name="dnd_suppressing_shade_text" msgid="5588252250634464042">"Prikazovanje obvestil je začasno zaustavljeno z načinom »ne moti«"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{Ni obvestil}=1{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode}}=2{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode} in še enim drugim načinom}one{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode} in še # drugim načinom}two{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode} in še # drugima načinoma}few{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode} in še # drugimi načini}other{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode} in še # drugimi načini}}"</string>
+    <string name="caught_up_shade_text" msgid="8166221989384139659">"Na tekočem ste"</string>
     <string name="media_projection_action_text" msgid="3634906766918186440">"Začni zdaj"</string>
     <string name="empty_shade_text" msgid="8935967157319717412">"Ni obvestil"</string>
     <string name="no_unseen_notif_text" msgid="395512586119868682">"Ni novih obvestil"</string>
@@ -832,7 +863,7 @@
     <string name="wallet_secondary_label_device_locked" msgid="5175862019125370506">"Odklenite za uporabo"</string>
     <string name="wallet_error_generic" msgid="257704570182963611">"Pri pridobivanju kartic je prišlo do težave. Poskusite znova pozneje."</string>
     <string name="wallet_lockscreen_settings_label" msgid="3539105300870383570">"Nastavitve zaklepanja zaslona"</string>
-    <string name="qr_code_scanner_title" msgid="1938155688725760702">"Optični bralnik kod QR"</string>
+    <string name="qr_code_scanner_title" msgid="1938155688725760702">"Bralnik kod QR"</string>
     <string name="qr_code_scanner_updating_secondary_label" msgid="8344598017007876352">"Posodabljanje"</string>
     <string name="status_bar_work" msgid="5238641949837091056">"Profil za Android Work"</string>
     <string name="status_bar_airplane" msgid="4848702508684541009">"Način za letalo"</string>
@@ -875,7 +906,8 @@
     <string name="notification_guts_news_summary" msgid="638697931043407835">"Najpomembnejše novice, uvodniki in drugo"</string>
     <string name="notification_guts_social_summary" msgid="3749147631983977040">"Všečki, objave in drugo"</string>
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"Glasila, priporočena predstavnost in drugo"</string>
-    <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"Vklopi"</string>
+    <!-- no translation found for notification_onboarding_summaries_turn_on (3831339570984683297) -->
+    <skip />
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"Daljše pogovore lahko zdaj povzamete in si ogledate hitre povzetke"</string>
     <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"Organizator obvestil združuje in utiša manj pomembna obvestila. Dodajte več kategorij v nastavitvah."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# obvestilo}one{# obvestilo}two{# obvestili}few{# obvestila}other{# obvestil}}"</string>
@@ -981,6 +1013,7 @@
     <string name="group_system_access_notification_shade" msgid="1619028907006553677">"Ogled obvestil"</string>
     <string name="group_system_access_quick_settings_panel" msgid="1844771096582064926">"Ogled hitrih nastavitev"</string>
     <string name="group_system_full_screenshot" msgid="5742204844232667785">"Ustvarjanje posnetka zaslona"</string>
+    <string name="group_system_partial_screenshot" msgid="2114314797127648010">"Ustvarjanje delnega posnetka zaslona"</string>
     <string name="group_system_access_system_app_shortcuts" msgid="8562482996626694026">"Prikaz bližnjic"</string>
     <string name="group_system_go_back" msgid="2730322046244918816">"Nazaj"</string>
     <string name="group_system_access_home_screen" msgid="4130366993484706483">"Pomik na začetni zaslon"</string>
@@ -992,7 +1025,6 @@
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"Odpiranje digitalnega pomočnika"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"Zaklepanje zaslona"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"Ustvarjanje zapiska"</string>
-    <string name="group_system_close_window" msgid="1506354809787837043">"Zapiranje trenutnega okna"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"Večopravilnost"</string>
     <string name="system_multitasking_rhs" msgid="8779289852395243004">"Uporaba razdeljenega zaslona z aplikacijo na desni"</string>
     <string name="system_multitasking_lhs" msgid="7348595296208696452">"Uporaba razdeljenega zaslona z aplikacijo na levi"</string>
@@ -1006,6 +1038,7 @@
     <string name="system_desktop_mode_snap_right_window" msgid="2162560187639411929">"Premik okna na desno"</string>
     <string name="system_desktop_mode_toggle_maximize_window" msgid="4084100093691768239">"Povečanje okna"</string>
     <string name="system_desktop_mode_minimize_window" msgid="1248714536732927092">"Pomanjšanje okna"</string>
+    <string name="system_desktop_mode_close_window" msgid="3072490692608682536">"Zapiranje trenutnega okna"</string>
     <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"Premikanje med namizji"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"Vnos"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"Preklop na naslednji jezik"</string>
@@ -1127,12 +1160,15 @@
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"Želite vklopiti funkcijo <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"Dejanje "<annotation id="action_key_icon">"Ikona"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> je bližnjična tipka za uporabo funkcije <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_talkback_intro" msgid="1617808784388544741">"<xliff:g id="ID_1">%1$s</xliff:g> je bralnik zaslona, ki vam omogoča, da so elementi na zaslonu izgovorjeni. To je lahko uporabno za osebe s težavami pri razločevanju vsebine zaslona."</string>
-    <string name="accessibility_key_gesture_dialog_va_intro" msgid="4709198503441288289">"<xliff:g id="ID_1">%1$s</xliff:g> vam omogoča prostoročno upravljanje naprave."</string>
     <string name="accessibility_key_gesture_dialog_positive_button_text" msgid="3670746017523589293">"Vklopi"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"Želite vklopiti bližnjične tipke za funkcijo <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"Ne vklopi"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Vklopi bližnjico"</string>
     <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"Bližnjična tipka za funkcijo <xliff:g id="ID_1">%1$s</xliff:g> je vklopljena"</string>
-    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="7575802369763469379"><annotation id="action_key_icon">"Ikona"</annotation>" dejanja + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> je bližnjična tipka za uporabo funkcije <xliff:g id="ID_3">^3</xliff:g>. Tako lahko hitro povečate zaslon za povečavo vsebine. Pritisnite "<annotation id="action_key_icon">"ikono"</annotation>" dejanja + <xliff:g id="ID_4">^1</xliff:g> in »+« ali »–«, če želite prilagoditi povečavo."</string>
+    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572">"Dejanje "<annotation id="action_key_icon">"ikona"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> so bližnjične tipke za uporabo funkcije dostopnosti <xliff:g id="ID_3">^3</xliff:g>. Tako lahko hitro povečate zaslon za povečavo vsebine. Ko je povečava vklopljena, pritisnite Dejanje "<annotation id="action_key_icon">"ikona"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> in »+« ali »–«, če želite prilagoditi povečavo."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Izklopi bližnjico"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Pusti vklopljeno"</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"Če pritisnete "<annotation id="action_key_icon">"ikono"</annotation>" za dejanje + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g>, vklopite funkcijo dostopnosti <xliff:g id="ID_3">^3</xliff:g>. Tako lahko prostoročno upravljate napravo."</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Zaklenjen zaslon"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Zaustavljanje …"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Oglejte si navodila za ukrepanje"</string>
@@ -1463,7 +1499,6 @@
     <string name="clipboard_edit_text_done" msgid="4551887727694022409">"Končano"</string>
     <string name="clipboard_overlay_text_copied" msgid="1872624400464891363">"Kopirano"</string>
     <string name="clipboard_edit_source" msgid="9156488177277788029">"Iz aplikacije <xliff:g id="APPNAME">%1$s</xliff:g>"</string>
-    <string name="clipboard_dismiss_description" msgid="3335990369850165486">"Opusti kopirano besedilo"</string>
     <string name="clipboard_edit_text_description" msgid="805254383912962103">"Uredi kopirano besedilo"</string>
     <string name="clipboard_edit_image_description" msgid="8904857948976041306">"Uredi kopirano sliko"</string>
     <string name="clipboard_send_nearby_description" msgid="4629769637846717650">"Pošlji v napravo v bližini"</string>
@@ -1603,6 +1638,7 @@
     <string name="shortcut_helper_customize_dialog_reset_button_label" msgid="7645535254306312685">"Da"</string>
     <string name="shortcut_helper_customize_dialog_cancel_button_label" msgid="5595546460431741178">"Prekliči"</string>
     <string name="shortcut_helper_add_shortcut_dialog_placeholder" msgid="9154297849458741995">"Pritisnite tipko"</string>
+    <string name="shortcut_helper_customizer_action_key_text" msgid="3979063901857046887">"Dejanje"</string>
     <string name="shortcut_customizer_key_combination_in_use_error_message" msgid="3325858369539848162">"Kombinacija tipk je že v uporabi. Poskusite drugo kombinacijo."</string>
     <string name="shortcut_customizer_generic_error_message" msgid="3128454624049722741">"Bližnjice ni mogoče nastaviti."</string>
     <string name="shortcut_helper_plus_symbol" msgid="4534843157353732011">"+"</string>

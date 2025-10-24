@@ -791,7 +791,6 @@ final class WifiDisplayController implements DumpUtils.Dump {
             }
         };
 
-// QTI_BEGIN: 2019-05-30: WLAN: WifiDisplayController: Changes to allow R2 session from hybrid
         int WFDR2Info = SystemProperties.getInt("persist.vendor.setWFDInfo.R2",0);
         Slog.i(TAG, "WFDR2info is: " + WFDR2Info);
        /*R1 source - R1 sink ->0
@@ -799,11 +798,9 @@ final class WifiDisplayController implements DumpUtils.Dump {
         *R2 source - R1 sink ->2
         *R2 source - R2 sink ->3*/
         if(WFDR2Info==2 || WFDR2Info==3){
-// QTI_END: 2019-05-30: WLAN: WifiDisplayController: Changes to allow R2 session from hybrid
             WifiP2pWfdInfo wfdInfo = mThisDevice.getWfdInfo();
             wfdInfo.setR2DeviceType(WifiP2pWfdInfo.DEVICE_TYPE_WFD_SOURCE);
             mWifiP2pManager.setWfdInfo(mWifiP2pChannel, wfdInfo, new ActionListener() {
-// QTI_BEGIN: 2019-05-30: WLAN: WifiDisplayController: Changes to allow R2 session from hybrid
                     @Override
                     public void onSuccess() {
                         if (DEBUG) {
@@ -819,7 +816,6 @@ final class WifiDisplayController implements DumpUtils.Dump {
                     }
                 });
         }
-// QTI_END: 2019-05-30: WLAN: WifiDisplayController: Changes to allow R2 session from hybrid
         // Step 5. Try to connect.
         if (mConnectedDevice == null && mConnectingDevice == null) {
             Slog.i(TAG, "Connecting to Wifi display: " + mDesiredDevice.deviceName);
@@ -840,11 +836,9 @@ final class WifiDisplayController implements DumpUtils.Dump {
             config.wps = wps;
             config.deviceAddress = mConnectingDevice.deviceAddress;
             // Helps with STA & P2P concurrency
-// QTI_BEGIN: 2022-10-07: WLAN: Merge "WifiDisplayController: Introduce system property to set GO Intent" into t-keystone-qcom-dev
             int WFDGoIntent = SystemProperties.getInt("persist.vendor.sys.debug.wfd.gointent", WifiP2pConfig.GROUP_OWNER_INTENT_MIN);
             config.groupOwnerIntent = WFDGoIntent;
             Slog.i(TAG, "WFD P2P GO Intent value: " + config.groupOwnerIntent);
-// QTI_END: 2022-10-07: WLAN: Merge "WifiDisplayController: Introduce system property to set GO Intent" into t-keystone-qcom-dev
 
             WifiDisplay display = createWifiDisplay(mConnectingDevice);
             advertiseDisplay(display, null, 0, 0, 0);

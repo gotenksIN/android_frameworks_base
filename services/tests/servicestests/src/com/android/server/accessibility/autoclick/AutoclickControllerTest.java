@@ -1235,6 +1235,13 @@ public class AutoclickControllerTest {
         assertThat(mMotionEventCaptor.upEvent).isNotNull();
         assertThat(mMotionEventCaptor.upEvent.getDownTime()).isEqualTo(
                 mMotionEventCaptor.downEvent.getDownTime());
+
+        // Verify the button release & up event have the correct click parameters.
+        assertThat(mMotionEventCaptor.buttonReleaseEvent.getActionButton()).isEqualTo(
+                MotionEvent.BUTTON_PRIMARY);
+        assertThat(mMotionEventCaptor.buttonReleaseEvent.getButtonState()).isEqualTo(0);
+        assertThat(mMotionEventCaptor.upEvent.getActionButton()).isEqualTo(0);
+        assertThat(mMotionEventCaptor.upEvent.getButtonState()).isEqualTo(0);
     }
 
 
@@ -1660,10 +1667,6 @@ public class AutoclickControllerTest {
                 .registerInputDeviceListener(listenerCaptor.capture(), any());
         InputManager.InputDeviceListener listener = listenerCaptor.getValue();
 
-        // Manually trigger once to establish initial connected state.
-        listener.onInputDeviceChanged(1);
-        mTestableLooper.processAllMessages();
-
         // Mock panels to verify interactions.
         AutoclickTypePanel mockTypePanel = mock(AutoclickTypePanel.class);
         AutoclickScrollPanel mockScrollPanel = mock(AutoclickScrollPanel.class);
@@ -1772,10 +1775,6 @@ public class AutoclickControllerTest {
         verify(mMockInputManagerWrapper)
                 .registerInputDeviceListener(listenerCaptor.capture(), any());
         InputManager.InputDeviceListener listener = listenerCaptor.getValue();
-
-        // Manually trigger once to establish initial connected state.
-        listener.onInputDeviceChanged(1);
-        mTestableLooper.processAllMessages();
 
         // Mock panels to verify interactions.
         AutoclickTypePanel mockTypePanel = mock(AutoclickTypePanel.class);

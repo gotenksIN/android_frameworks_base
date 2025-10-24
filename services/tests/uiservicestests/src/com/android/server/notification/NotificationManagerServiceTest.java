@@ -32,6 +32,7 @@ import static android.app.Flags.FLAG_UI_RICH_ONGOING;
 import static android.app.Notification.EXTRA_ALLOW_DURING_SETUP;
 import static android.app.Notification.EXTRA_PICTURE;
 import static android.app.Notification.EXTRA_PICTURE_ICON;
+import static android.app.Notification.EXTRA_PREFER_SMALL_ICON;
 import static android.app.Notification.EXTRA_TEXT;
 import static android.app.Notification.FLAG_AUTO_CANCEL;
 import static android.app.Notification.FLAG_BUBBLE;
@@ -152,7 +153,6 @@ import static com.android.server.am.PendingIntentRecord.FLAG_BROADCAST_SENDER;
 import static com.android.server.am.PendingIntentRecord.FLAG_SERVICE_SENDER;
 import static com.android.server.notification.Flags.FLAG_LOG_CACHED_POSTS;
 import static com.android.server.notification.Flags.FLAG_MANAGED_SERVICES_CONCURRENT_MULTIUSER;
-import static com.android.server.notification.Flags.FLAG_SKIP_POLICY_ACCESS_NLS_CHECK;
 import static com.android.server.notification.GroupHelper.AUTOGROUP_KEY;
 import static com.android.server.notification.NotificationManagerService.BITMAP_DURATION;
 import static com.android.server.notification.NotificationManagerService.DEFAULT_MAX_NOTIFICATION_ENQUEUE_RATE;
@@ -369,12 +369,12 @@ import com.android.server.utils.quota.MultiRateLimiter;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
-import libcore.junit.util.compat.CoreCompatChangeRule.DisableCompatChanges;
-import libcore.junit.util.compat.CoreCompatChangeRule.EnableCompatChanges;
-
 import com.google.android.collect.Lists;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+
+import libcore.junit.util.compat.CoreCompatChangeRule.DisableCompatChanges;
+import libcore.junit.util.compat.CoreCompatChangeRule.EnableCompatChanges;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -392,6 +392,9 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4;
+import platform.test.runner.parameterized.Parameters;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
@@ -406,9 +409,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
-
-import platform.test.runner.parameterized.ParameterizedAndroidJunit4;
-import platform.test.runner.parameterized.Parameters;
 
 @SmallTest
 @RunWith(ParameterizedAndroidJunit4.class)
@@ -521,6 +521,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     NotificationChannel mSilentChannel = new NotificationChannel("low", "low", IMPORTANCE_LOW);
 
     NotificationChannel mMinChannel = new NotificationChannel("min", "min", IMPORTANCE_MIN);
+
+    NotificationChannel mNewsChannel = new NotificationChannel(NEWS_ID, "News", IMPORTANCE_LOW);
 
     private static final int NOTIFICATION_LOCATION_UNKNOWN = 0;
 
@@ -740,6 +742,18 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mPolicyFile.finishWrite(fos);
 
         // Setup managed services
+        when(mListeners.setPackageOrComponentEnabled(any(), anyInt(), anyBoolean(), anyBoolean()))
+                .thenReturn(true);
+        when(mListeners.setPackageOrComponentEnabled(any(), anyInt(), anyBoolean(), anyBoolean(),
+                anyBoolean())).thenReturn(true);
+        when(mAssistants.setPackageOrComponentEnabled(any(), anyInt(), anyBoolean(), anyBoolean()))
+                .thenReturn(true);
+        when(mAssistants.setPackageOrComponentEnabled(any(), anyInt(), anyBoolean(), anyBoolean(),
+                anyBoolean())).thenReturn(true);
+        when(mConditionProviders.setPackageOrComponentEnabled(any(), anyInt(), anyBoolean(),
+                anyBoolean())).thenReturn(true);
+        when(mConditionProviders.setPackageOrComponentEnabled(any(), anyInt(), anyBoolean(),
+                anyBoolean(), anyBoolean())).thenReturn(true);
         when(mNlf.isTypeAllowed(anyInt())).thenReturn(true);
         when(mNlf.isPackageAllowed(any())).thenReturn(true);
         when(mNlf.isPackageAllowed(null)).thenReturn(true);
@@ -5759,7 +5773,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_PREFERENCES_THROWS_ON_INVALID_UID)
     public void updateNotificationChannelFromPrivilegedListener_invalidPackage_throws()
             throws Exception {
         when(mListeners.checkServiceTokenLocked(any())).thenReturn(mListener);
@@ -6369,6 +6382,22 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_LIMIT_MANAGED_SERVICES_COUNT)
+    public void testSetListenerAccessForUser_tooManyListeners_skipsFollowups() throws Exception {
+        UserHandle user = UserHandle.of(mContext.getUserId() + 10);
+        ComponentName c = ComponentName.unflattenFromString("package/Component");
+        when(mListeners.setPackageOrComponentEnabled(any(), anyInt(), anyBoolean(), anyBoolean(),
+                anyBoolean())).thenReturn(false);
+
+        mBinderService.setNotificationListenerAccessGrantedForUser(
+                c, user.getIdentifier(), /* enabled= */ true, true);
+
+        verify(mConditionProviders, never()).setPackageOrComponentEnabled(any(), anyInt(),
+                anyBoolean(), anyBoolean(), anyBoolean());
+        verify(mContext, never()).sendBroadcastAsUser(any(), any(), any());
+    }
+
+    @Test
     public void testSetAssistantAccessForUser() throws Exception {
         UserInfo ui = new UserInfo();
         ui.id = mContext.getUserId() + 10;
@@ -6877,7 +6906,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    public void testNoNotificationDuringSetupPermission() throws Exception {
+    public void testHasNotificationDuringSetupPermission() throws Exception {
         mContext.getTestablePermissions().setPermission(
                 android.Manifest.permission.NOTIFICATION_DURING_SETUP, PERMISSION_GRANTED);
         Bundle extras = new Bundle();
@@ -6888,7 +6917,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .addExtras(extras)
                 .setSmallIcon(android.R.drawable.sym_def_app_icon);
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
-                "testNoNotificationDuringSetupPermission", mUid, 0,
+                "testHasNotificationDuringSetupPermission", mUid, 0,
                 nb.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
         NotificationRecord nr = new NotificationRecord(mContext, sbn, mTestNotificationChannel);
 
@@ -6900,6 +6929,32 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mPkg, nr.getSbn().getTag(), nr.getSbn().getId(), nr.getSbn().getUserId());
 
         assertTrue(posted.getNotification().extras.containsKey(EXTRA_ALLOW_DURING_SETUP));
+    }
+
+    @Test
+    public void testNoPreferSmallIconPermission() throws Exception {
+        mContext.getTestablePermissions().setPermission(
+                Manifest.permission.PACKAGE_VERIFICATION_AGENT, PERMISSION_DENIED);
+        Bundle extras = new Bundle();
+        extras.putBoolean(EXTRA_PREFER_SMALL_ICON, true);
+        Notification.Builder nb = new Notification.Builder(mContext,
+                mTestNotificationChannel.getId())
+                .setContentTitle("foo")
+                .addExtras(extras)
+                .setSmallIcon(android.R.drawable.sym_def_app_icon);
+        StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 1,
+                "testNoPreferSmallIconPermission", mUid, 0,
+                nb.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
+        NotificationRecord nr = new NotificationRecord(mContext, sbn, mTestNotificationChannel);
+
+        mBinderService.enqueueNotificationWithTag(mPkg, mPkg, sbn.getTag(),
+                nr.getSbn().getId(), nr.getSbn().getNotification(), nr.getSbn().getUserId());
+        waitForIdle();
+
+        NotificationRecord posted = mService.findNotificationLocked(
+                mPkg, nr.getSbn().getTag(), nr.getSbn().getId(), nr.getSbn().getUserId());
+
+        assertFalse(posted.getNotification().extras.containsKey(EXTRA_PREFER_SMALL_ICON));
     }
 
     @Test
@@ -15500,38 +15555,48 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertFalse(n.hasColorizedPermission());
     }
 
-    @Test
-    @EnableFlags({FLAG_API_RICH_ONGOING, FLAG_API_RICH_ONGOING_PERMISSION})
-    public void testPromotion_permissionDenied() throws Exception {
+    private void testPromotion(int postPromotedNotificationsPermissionState,
+            NotificationChannel channel, boolean expectPromoted) {
         when(mPermissionManager.checkPermissionForDataDelivery(
-                eq(Manifest.permission.POST_PROMOTED_NOTIFICATIONS), any(), any()))
-                .thenReturn(PermissionManager.PERMISSION_SOFT_DENIED);
+                        eq(Manifest.permission.POST_PROMOTED_NOTIFICATIONS), any(), any()))
+                .thenReturn(postPromotedNotificationsPermissionState);
 
-        Notification n = createPromotableNotification();
-        NotificationChannel channel = new NotificationChannel(
-                "ChannelId", "TestChannel", NotificationManager.IMPORTANCE_HIGH);
+        Notification n = createPromotableNotification(channel);
 
         mService.fixNotificationWithChannel(n, channel, mUid, mPkg);
 
-        final int promotedOngoing = n.flags & FLAG_PROMOTED_ONGOING;
-        assertEquals(0, promotedOngoing);
+        final boolean isPromoted = (n.flags & FLAG_PROMOTED_ONGOING) != 0;
+        assertEquals(expectPromoted, isPromoted);
     }
 
     @Test
-    @EnableFlags({FLAG_API_RICH_ONGOING, FLAG_API_RICH_ONGOING_PERMISSION})
+    @EnableFlags({FLAG_API_RICH_ONGOING, FLAG_UI_RICH_ONGOING})
     public void testPromotion_permissionAllowed() throws Exception {
-        when(mPermissionManager.checkPermissionForDataDelivery(
-                eq(Manifest.permission.POST_PROMOTED_NOTIFICATIONS), any(), any()))
-                .thenReturn(PermissionManager.PERMISSION_GRANTED);
+        testPromotion(PermissionManager.PERMISSION_GRANTED, mTestNotificationChannel, true);
+    }
 
-        Notification n = createPromotableNotification();
-        NotificationChannel channel = new NotificationChannel(
-                "ChannelId", "TestChannel", NotificationManager.IMPORTANCE_HIGH);
+    @Test
+    @EnableFlags({FLAG_API_RICH_ONGOING, FLAG_UI_RICH_ONGOING})
+    public void testPromotion_permissionDenied() throws Exception {
+        testPromotion(PermissionManager.PERMISSION_SOFT_DENIED, mTestNotificationChannel, false);
+    }
 
-        mService.fixNotificationWithChannel(n, channel, mUid, mPkg);
+    @Test
+    @EnableFlags({FLAG_API_RICH_ONGOING, FLAG_UI_RICH_ONGOING})
+    public void testPromotion_bundledNotification() throws Exception {
+        testPromotion(PermissionManager.PERMISSION_GRANTED, mNewsChannel, false);
+    }
 
-        final int promotedOngoing = n.flags & FLAG_PROMOTED_ONGOING;
-        assertNotEquals(0, promotedOngoing);
+    @Test
+    @EnableFlags({FLAG_API_RICH_ONGOING, FLAG_UI_RICH_ONGOING})
+    public void testPromotion_silentChannel() throws Exception {
+        testPromotion(PermissionManager.PERMISSION_GRANTED, mSilentChannel, true);
+    }
+
+    @Test
+    @EnableFlags({FLAG_API_RICH_ONGOING, FLAG_UI_RICH_ONGOING})
+    public void testPromotion_minimizedChannel() throws Exception {
+        testPromotion(PermissionManager.PERMISSION_GRANTED, mMinChannel, false);
     }
 
     @Test
@@ -17361,46 +17426,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    @DisableFlags({FLAG_MANAGED_SERVICES_CONCURRENT_MULTIUSER, FLAG_SKIP_POLICY_ACCESS_NLS_CHECK})
-    public void isNotificationPolicyAccessGranted_isNls() throws Exception {
-        final String packageName = "target";
-        final int uid = 123;
-        final var checker = mService.permissionChecker;
-
-        when(mPackageManagerClient.getPackageUidAsUser(eq(packageName), anyInt())).thenReturn(uid);
-        when(mListeners.isComponentEnabledForPackage(packageName)).thenReturn(true);
-
-        assertThat(mBinderService.isNotificationPolicyAccessGranted(packageName)).isTrue();
-        verify(mPackageManagerClient).getPackageUidAsUser(eq(packageName), eq(mUserId));
-        verify(checker).check(android.Manifest.permission.MANAGE_NOTIFICATIONS, uid, -1, true);
-        verify(mConditionProviders).isPackageOrComponentAllowed(eq(packageName), eq(mUserId));
-        verify(mListeners, Flags.skipPolicyAccessNlsCheck() ? never() : times(1))
-                .isComponentEnabledForPackage(packageName);
-        verify(mDevicePolicyManager, never()).isActiveDeviceOwner(anyInt());
-    }
-
-    @Test
-    @EnableFlags(FLAG_MANAGED_SERVICES_CONCURRENT_MULTIUSER)
-    @DisableFlags(FLAG_SKIP_POLICY_ACCESS_NLS_CHECK)
-    public void isNotificationPolicyAccessGranted_isNls_concurrent_multiUser()
-                throws Exception {
-        final String packageName = "target";
-        final int uid = 123;
-        final var checker = mService.permissionChecker;
-
-        when(mPackageManagerClient.getPackageUidAsUser(eq(packageName), anyInt())).thenReturn(uid);
-        when(mListeners.isComponentEnabledForPackage(packageName, mUserId)).thenReturn(true);
-
-        assertThat(mBinderService.isNotificationPolicyAccessGranted(packageName)).isTrue();
-        verify(mPackageManagerClient).getPackageUidAsUser(eq(packageName), eq(mUserId));
-        verify(checker).check(android.Manifest.permission.MANAGE_NOTIFICATIONS, uid, -1, true);
-        verify(mConditionProviders).isPackageOrComponentAllowed(eq(packageName), eq(mUserId));
-        verify(mListeners, Flags.skipPolicyAccessNlsCheck() ? never() : times(1))
-                .isComponentEnabledForPackage(packageName, mUserId);
-        verify(mDevicePolicyManager, never()).isActiveDeviceOwner(anyInt());
-    }
-
-    @Test
     @DisableFlags(FLAG_MANAGED_SERVICES_CONCURRENT_MULTIUSER)
     public void isNotificationPolicyAccessGranted_isDeviceOwner() throws Exception {
         final String packageName = "target";
@@ -17414,8 +17439,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(mPackageManagerClient).getPackageUidAsUser(eq(packageName), eq(mUserId));
         verify(checker).check(android.Manifest.permission.MANAGE_NOTIFICATIONS, uid, -1, true);
         verify(mConditionProviders).isPackageOrComponentAllowed(eq(packageName), eq(mUserId));
-        verify(mListeners, Flags.skipPolicyAccessNlsCheck() ? never() : times(1))
-                .isComponentEnabledForPackage(packageName);
+        verify(mListeners, never()).isComponentEnabledForPackage(packageName);
         verify(mDevicePolicyManager).isActiveDeviceOwner(uid);
     }
 
@@ -17434,8 +17458,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(mPackageManagerClient).getPackageUidAsUser(eq(packageName), eq(mUserId));
         verify(checker).check(android.Manifest.permission.MANAGE_NOTIFICATIONS, uid, -1, true);
         verify(mConditionProviders).isPackageOrComponentAllowed(eq(packageName), eq(mUserId));
-        verify(mListeners, Flags.skipPolicyAccessNlsCheck() ? never() : times(1))
-                .isComponentEnabledForPackage(packageName, mUserId);
+        verify(mListeners, never()).isComponentEnabledForPackage(packageName, mUserId);
         verify(mDevicePolicyManager).isActiveDeviceOwner(uid);
     }
 
@@ -17457,8 +17480,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(mPackageManagerClient).getPackageUidAsUser(eq(packageName), eq(mUserId));
         verify(checker).check(android.Manifest.permission.MANAGE_NOTIFICATIONS, uid, -1, true);
         verify(mConditionProviders).isPackageOrComponentAllowed(eq(packageName), eq(mUserId));
-        verify(mListeners, Flags.skipPolicyAccessNlsCheck() ? never() : times(1))
-                .isComponentEnabledForPackage(packageName);
+        verify(mListeners, never()).isComponentEnabledForPackage(packageName);
         verify(mDevicePolicyManager).isActiveDeviceOwner(uid);
         verify(mDevicePolicyManager, never()).isActiveDeviceOwner(callingUid);
     }
@@ -17482,15 +17504,13 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(mPackageManagerClient).getPackageUidAsUser(eq(packageName), eq(mUserId));
         verify(checker).check(android.Manifest.permission.MANAGE_NOTIFICATIONS, uid, -1, true);
         verify(mConditionProviders).isPackageOrComponentAllowed(eq(packageName), eq(mUserId));
-        verify(mListeners, Flags.skipPolicyAccessNlsCheck() ? never() : times(1))
-                .isComponentEnabledForPackage(packageName, mUserId);
+        verify(mListeners, never()).isComponentEnabledForPackage(packageName, mUserId);
         verify(mDevicePolicyManager).isActiveDeviceOwner(uid);
         verify(mDevicePolicyManager, never()).isActiveDeviceOwner(callingUid);
     }
 
     @Test
     @DisableFlags(FLAG_MANAGED_SERVICES_CONCURRENT_MULTIUSER)
-    @EnableFlags(FLAG_SKIP_POLICY_ACCESS_NLS_CHECK)
     public void isNotificationPolicyAccessGranted_notGranted() throws Exception {
         final String packageName = "target";
         final int uid = 123;
@@ -17508,7 +17528,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags({FLAG_MANAGED_SERVICES_CONCURRENT_MULTIUSER, FLAG_SKIP_POLICY_ACCESS_NLS_CHECK})
+    @EnableFlags({FLAG_MANAGED_SERVICES_CONCURRENT_MULTIUSER})
     public void isNotificationPolicyAccessGranted_notGranted_concurrent_multiUser()
                 throws Exception {
         final String packageName = "target";
@@ -17523,42 +17543,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(mConditionProviders).isPackageOrComponentAllowed(eq(packageName), eq(mUserId));
         verify(mListeners, never()).isComponentEnabledForPackage(any());
         verify(mListeners, never()).isComponentEnabledForPackage(any(), anyInt());
-        verify(mDevicePolicyManager).isActiveDeviceOwner(uid);
-    }
-
-    @Test
-    @DisableFlags({FLAG_MANAGED_SERVICES_CONCURRENT_MULTIUSER, FLAG_SKIP_POLICY_ACCESS_NLS_CHECK})
-    public void isNotificationPolicyAccessGranted_notGranted_badNlsCheck() throws Exception {
-        final String packageName = "target";
-        final int uid = 123;
-        final var checker = mService.permissionChecker;
-
-        when(mPackageManagerClient.getPackageUidAsUser(eq(packageName), anyInt())).thenReturn(uid);
-
-        assertThat(mBinderService.isNotificationPolicyAccessGranted(packageName)).isFalse();
-        verify(mPackageManagerClient).getPackageUidAsUser(eq(packageName), eq(mUserId));
-        verify(checker).check(android.Manifest.permission.MANAGE_NOTIFICATIONS, uid, -1, true);
-        verify(mConditionProviders).isPackageOrComponentAllowed(eq(packageName), eq(mUserId));
-        verify(mListeners).isComponentEnabledForPackage(packageName);
-        verify(mDevicePolicyManager).isActiveDeviceOwner(uid);
-    }
-
-    @Test
-    @EnableFlags(FLAG_MANAGED_SERVICES_CONCURRENT_MULTIUSER)
-    @DisableFlags(FLAG_SKIP_POLICY_ACCESS_NLS_CHECK)
-    public void isNotificationPolicyAccessGranted_notGranted_concurrent_multiUser_badNlsCheck()
-            throws Exception {
-        final String packageName = "target";
-        final int uid = 123;
-        final var checker = mService.permissionChecker;
-
-        when(mPackageManagerClient.getPackageUidAsUser(eq(packageName), anyInt())).thenReturn(uid);
-
-        assertThat(mBinderService.isNotificationPolicyAccessGranted(packageName)).isFalse();
-        verify(mPackageManagerClient).getPackageUidAsUser(eq(packageName), eq(mUserId));
-        verify(checker).check(android.Manifest.permission.MANAGE_NOTIFICATIONS, uid, -1, true);
-        verify(mConditionProviders).isPackageOrComponentAllowed(eq(packageName), eq(mUserId));
-        verify(mListeners).isComponentEnabledForPackage(packageName, mUserId);
         verify(mDevicePolicyManager).isActiveDeviceOwner(uid);
     }
 
@@ -19108,7 +19092,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @EnableFlags({FLAG_API_RICH_ONGOING})
     public void testPostPromotableNotification_unimportantNotification() throws Exception {
         mBinderService.setCanBePromoted(mPkg, mUid, true, true);
-        Notification n = createPromotableNotification(/* addFlagManually= */ false, mMinChannel);
+        Notification n = createPromotableNotification(mMinChannel);
 
         StatusBarNotification sbn = new StatusBarNotification(mPkg, mPkg, 9, null, mUid, 0,
                 n, UserHandle.getUserHandleForUid(mUid), null, 0);
@@ -19130,8 +19114,12 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         return createPromotableNotification(/* addFlagManually= */ false, mTestNotificationChannel);
     }
 
-  private Notification createPromotableNotification(boolean addFlagManually) {
+    private Notification createPromotableNotification(boolean addFlagManually) {
         return createPromotableNotification(addFlagManually, mTestNotificationChannel);
+    }
+
+    private Notification createPromotableNotification(NotificationChannel channel) {
+        return createPromotableNotification(/* addFlagManually= */ false, channel);
     }
 
     private Notification createPromotableNotification(
@@ -20620,9 +20608,11 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Test
     @EnableFlags(FLAG_NOTIFICATION_FORCE_GROUPING)
-    public void clearAll_fromUser_willSendDeleteIntentForCachedSummaries() throws Exception {
+    public void clearAll_fromUser_sendsDeleteIntentForCachedSummaries() throws Exception {
+        PendingIntent deleteIntent = mock(PendingIntent.class);
         NotificationRecord n = generateNotificationRecord(
                 mTestNotificationChannel, 1, "group", true);
+        n.getNotification().deleteIntent = deleteIntent;
         mBinderService.enqueueNotificationWithTag(mPkg, mPkg, "tag",
                 n.getSbn().getId(), n.getSbn().getNotification(), n.getSbn().getUserId());
         waitForIdle();
@@ -20631,14 +20621,16 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mService.mNotificationDelegate.onClearAll(mUid, Binder.getCallingPid(), n.getUserId());
         waitForIdle();
 
-        verify(mGroupHelper).onNotificationRemoved(eq(n), any(), eq(true));
+        verify(deleteIntent).send();
     }
 
     @Test
     @EnableFlags(FLAG_NOTIFICATION_FORCE_GROUPING)
-    public void cancel_fromApp_willNotSendDeleteIntentForCachedSummaries() throws Exception {
+    public void cancel_fromApp_doesNotSendDeleteIntentForCachedSummaries() throws Exception {
+        PendingIntent deleteIntent = mock(PendingIntent.class);
         NotificationRecord n = generateNotificationRecord(
                 mTestNotificationChannel, 1, "group", true);
+        n.getNotification().deleteIntent = deleteIntent;
         mBinderService.enqueueNotificationWithTag(mPkg, mPkg, "tag",
                 n.getSbn().getId(), n.getSbn().getNotification(), n.getSbn().getUserId());
         waitForIdle();
@@ -20647,7 +20639,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mBinderService.cancelAllNotifications(mPkg, mUserId);
         waitForIdle();
 
-        verify(mGroupHelper).onNotificationRemoved(eq(n), any(), eq(false));
+        verify(deleteIntent, never()).send();
     }
 
     @Test

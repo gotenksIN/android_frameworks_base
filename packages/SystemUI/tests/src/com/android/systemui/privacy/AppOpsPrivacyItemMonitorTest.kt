@@ -34,6 +34,8 @@ import com.android.systemui.settings.UserTracker
 import com.android.systemui.util.concurrency.FakeExecutor
 import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth
+import java.io.PrintWriter
+import java.io.StringWriter
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
 import org.hamcrest.Matchers.nullValue
@@ -66,6 +68,7 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
         val CURRENT_USER_ID = 1
         val TEST_UID = CURRENT_USER_ID * UserHandle.PER_USER_RANGE
         const val TEST_PACKAGE_NAME = "test"
+        private const val MAPS_PACKAGE_NAME = "com.google.android.apps.maps"
 
         fun <T> capture(argumentCaptor: ArgumentCaptor<T>): T = argumentCaptor.capture()
 
@@ -93,7 +96,9 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
 
     private lateinit var appOpsPrivacyItemMonitor: AppOpsPrivacyItemMonitor
     private lateinit var executor: FakeExecutor
+    private lateinit var clock: FakeSystemClock
     private lateinit var uiEventLogger: UiEventLoggerFake
+    private lateinit var locationAccumulatedLogger: LocationAccumulatedLogger
 
     fun createAppOpsPrivacyItemMonitor(): AppOpsPrivacyItemMonitor {
         return AppOpsPrivacyItemMonitor(
@@ -106,14 +111,17 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
             activityManager,
             mContext,
             uiEventLogger,
+            locationAccumulatedLogger,
         )
     }
 
     @Before
     fun setup() {
+        clock = FakeSystemClock()
         MockitoAnnotations.initMocks(this)
-        executor = FakeExecutor(FakeSystemClock())
+        executor = FakeExecutor(clock)
         uiEventLogger = UiEventLoggerFake()
+        locationAccumulatedLogger = LocationAccumulatedLogger(clock)
 
         // Listen to everything by default
         `when`(privacyConfig.micCameraAvailable).thenReturn(true)
@@ -291,14 +299,7 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
 
     @Test
     fun testLocationOpForeground() {
-        // Set to non system
-        doReturn(512)
-            .`when`(packageManager)
-            .getPermissionFlags(
-                "android.permission.ACCESS_FINE_LOCATION",
-                "com.google.android.apps.maps",
-                UserHandle.getUserHandleForUid(TEST_UID),
-            )
+        setMapsToNonSystem()
         // Default is foreground
         val process = ActivityManager.RunningAppProcessInfo()
         process.uid = TEST_UID
@@ -307,12 +308,7 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
         doReturn(
                 listOf(
                     // Regular item which should not be filtered
-                    AppOpItem(
-                        AppOpsManager.OP_FINE_LOCATION,
-                        TEST_UID,
-                        "com.google.android.apps.maps",
-                        0,
-                    )
+                    AppOpItem(AppOpsManager.OP_FINE_LOCATION, TEST_UID, MAPS_PACKAGE_NAME, 0)
                 )
             )
             .`when`(appOpsController)
@@ -320,8 +316,10 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
 
         var result = appOpsPrivacyItemMonitor.getActivePrivacyItems()
         assertEquals(result.size, 1)
-        assertEquals(result[0].application.packageName, "com.google.android.apps.maps")
+        assertEquals(result[0].application.packageName, MAPS_PACKAGE_NAME)
 
+        // Expect logs for NON_SYSTEM_APP, SYSTEM_APP, BACKGROUND_APP, and ALL_APP when location
+        // is first used.
         assertEquals(uiEventLogger.numLogs(), 4)
         Truth.assertThat(
                 uiEventLogger.logs.any { log ->
@@ -363,7 +361,7 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
         // indicator is already showing.
         result = appOpsPrivacyItemMonitor.getActivePrivacyItems()
         assertEquals(result.size, 1)
-        assertEquals(result[0].application.packageName, "com.google.android.apps.maps")
+        assertEquals(result[0].application.packageName, MAPS_PACKAGE_NAME)
         // Assert no additional logging events
         assertEquals(uiEventLogger.numLogs(), 4)
 
@@ -371,29 +369,24 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
         doReturn(listOf<AppOpItem>()).`when`(appOpsController).getActiveAppOps(anyBoolean())
         result = appOpsPrivacyItemMonitor.getActivePrivacyItems()
         assertEquals(result.size, 0)
-        // Assert no additional logging events
-        assertEquals(uiEventLogger.numLogs(), 4)
+        // Assert OFF events are logged
+        assertEquals(uiEventLogger.numLogs(), 8)
 
         // Simulate a round of appOps where the location indicator appears again and the logging
         // count increases.
         doReturn(
                 listOf(
                     // Regular item which should not be filtered
-                    AppOpItem(
-                        AppOpsManager.OP_FINE_LOCATION,
-                        TEST_UID,
-                        "com.google.android.apps.maps",
-                        0,
-                    )
+                    AppOpItem(AppOpsManager.OP_FINE_LOCATION, TEST_UID, MAPS_PACKAGE_NAME, 0)
                 )
             )
             .`when`(appOpsController)
             .getActiveAppOps(anyBoolean())
         result = appOpsPrivacyItemMonitor.getActivePrivacyItems()
         assertEquals(result.size, 1)
-        assertEquals(result[0].application.packageName, "com.google.android.apps.maps")
+        assertEquals(result[0].application.packageName, MAPS_PACKAGE_NAME)
         // Assert there are additional logging events
-        assertEquals(uiEventLogger.numLogs(), 8)
+        assertEquals(uiEventLogger.numLogs(), 12)
         Truth.assertThat(
                 uiEventLogger.logs.count { log ->
                     log.eventId ==
@@ -403,6 +396,169 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
                 }
             )
             .isEqualTo(2)
+    }
+
+    @Test
+    fun testLocationOpForegroundOff() {
+        setMapsToNonSystem()
+        // Default is foreground
+        val process = ActivityManager.RunningAppProcessInfo()
+        process.uid = TEST_UID
+        doReturn(listOf(process)).`when`(activityManager).runningAppProcesses
+
+        // First, location is used by a foreground app
+        doReturn(
+                listOf(
+                    // Regular item which should not be filtered
+                    AppOpItem(AppOpsManager.OP_FINE_LOCATION, TEST_UID, MAPS_PACKAGE_NAME, 0)
+                )
+            )
+            .`when`(appOpsController)
+            .getActiveAppOps(anyBoolean())
+
+        var result = appOpsPrivacyItemMonitor.getActivePrivacyItems()
+        assertEquals(result.size, 1)
+        // Expect logs for NON_SYSTEM_APP, SYSTEM_APP, BACKGROUND_APP, and ALL_APP when location
+        // is first used.
+        assertEquals(uiEventLogger.numLogs(), 4)
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_NON_SYSTEM_APP
+                            .id
+                }
+            )
+            .isTrue()
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_SYSTEM_APP
+                            .id
+                }
+            )
+            .isTrue()
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_BACKGROUND_APP
+                            .id
+                }
+            )
+            .isTrue()
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent.LOCATION_INDICATOR_ALL_APP
+                            .id
+                }
+            )
+            .isTrue()
+
+        // Then, location is not used anymore
+        doReturn(emptyList<AppOpItem>()).`when`(appOpsController).getActiveAppOps(anyBoolean())
+        result = appOpsPrivacyItemMonitor.getActivePrivacyItems()
+        assertEquals(result.size, 0)
+
+        // Then we log the OFF events
+        assertEquals(uiEventLogger.numLogs(), 8)
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_NON_SYSTEM_APP_OFF
+                            .id
+                }
+            )
+            .isTrue()
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_SYSTEM_APP_OFF
+                            .id
+                }
+            )
+            .isTrue()
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_BACKGROUND_APP_OFF
+                            .id
+                }
+            )
+            .isTrue()
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_ALL_APP_OFF
+                            .id
+                }
+            )
+            .isTrue()
+    }
+
+    @Test
+    fun testLocationOpSystemOff() {
+        // First, location is used by a system app
+        doReturn(
+                listOf(
+                    // Regular item which should not be filtered
+                    AppOpItem(AppOpsManager.OP_FINE_LOCATION, TEST_UID, "com.google.android.gms", 0)
+                )
+            )
+            .`when`(appOpsController)
+            .getActiveAppOps(anyBoolean())
+
+        assertEquals(appOpsPrivacyItemMonitor.getActivePrivacyItems().size, 0)
+        // Expect logs for SYSTEM_APP and ALL_APP when location is first used by a system app.
+        assertEquals(uiEventLogger.numLogs(), 2)
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_SYSTEM_APP
+                            .id
+                }
+            )
+            .isTrue()
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent.LOCATION_INDICATOR_ALL_APP
+                            .id
+                }
+            )
+            .isTrue()
+
+        // Then, location is not used anymore
+        doReturn(emptyList<AppOpItem>()).`when`(appOpsController).getActiveAppOps(anyBoolean())
+        assertEquals(appOpsPrivacyItemMonitor.getActivePrivacyItems().size, 0)
+
+        // Then we log the OFF events
+        assertEquals(uiEventLogger.numLogs(), 4)
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_SYSTEM_APP_OFF
+                            .id
+                }
+            )
+            .isTrue()
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_ALL_APP_OFF
+                            .id
+                }
+            )
+            .isTrue()
     }
 
     @Test
@@ -417,6 +573,7 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
             .getActiveAppOps(anyBoolean())
 
         assertEquals(appOpsPrivacyItemMonitor.getActivePrivacyItems().size, 0)
+        // Expect logs for SYSTEM_APP and ALL_APP.
         assertEquals(uiEventLogger.numLogs(), 2)
         Truth.assertThat(
                 uiEventLogger.logs.any { log ->
@@ -438,37 +595,25 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
     }
 
     @Test
-    fun testLocationOpBackground() {
-        // Set to non system
-        doReturn(512)
-            .`when`(packageManager)
-            .getPermissionFlags(
-                "android.permission.ACCESS_FINE_LOCATION",
-                "com.google.android.apps.maps",
-                UserHandle.getUserHandleForUid(TEST_UID),
-            )
+    fun testLocationOpBackgroundOff() {
+        setMapsToNonSystem()
 
         // Set to background
-        val process = ActivityManager.RunningAppProcessInfo()
-        process.uid = TEST_UID
-        process.importance = IMPORTANCE_CACHED
-        doReturn(listOf(process)).`when`(activityManager).runningAppProcesses
+        doReturn(IMPORTANCE_CACHED).`when`(activityManager).getUidImportance(eq(TEST_UID))
 
+        // First, location is used by a background app
         doReturn(
                 listOf(
                     // Regular item which should not be filtered
-                    AppOpItem(
-                        AppOpsManager.OP_FINE_LOCATION,
-                        TEST_UID,
-                        "com.google.android.apps.maps",
-                        0,
-                    )
+                    AppOpItem(AppOpsManager.OP_FINE_LOCATION, TEST_UID, MAPS_PACKAGE_NAME, 0)
                 )
             )
             .`when`(appOpsController)
             .getActiveAppOps(anyBoolean())
 
         assertEquals(appOpsPrivacyItemMonitor.getActivePrivacyItems().size, 0)
+        // Expect logs for BACKGROUND_APP and ALL_APP when location is first used by a background
+        // app.
         assertEquals(uiEventLogger.numLogs(), 2)
         Truth.assertThat(
                 uiEventLogger.logs.any { log ->
@@ -483,6 +628,115 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
                 uiEventLogger.logs.any { log ->
                     log.eventId ==
                         AppOpsPrivacyItemMonitor.LocationIndicatorEvent.LOCATION_INDICATOR_ALL_APP
+                            .id
+                }
+            )
+            .isTrue()
+
+        // Then, location is not used anymore
+        doReturn(emptyList<AppOpItem>()).`when`(appOpsController).getActiveAppOps(anyBoolean())
+        assertEquals(appOpsPrivacyItemMonitor.getActivePrivacyItems().size, 0)
+
+        // Then we log the OFF events
+        assertEquals(uiEventLogger.numLogs(), 4)
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_BACKGROUND_APP_OFF
+                            .id
+                }
+            )
+            .isTrue()
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_ALL_APP_OFF
+                            .id
+                }
+            )
+            .isTrue()
+    }
+
+    @Test
+    fun testLocationOpBackground() {
+        setMapsToNonSystem()
+
+        // Set to background
+        doReturn(IMPORTANCE_CACHED).`when`(activityManager).getUidImportance(eq(TEST_UID))
+
+        doReturn(
+                listOf(
+                    // Regular item which should not be filtered
+                    AppOpItem(AppOpsManager.OP_FINE_LOCATION, TEST_UID, MAPS_PACKAGE_NAME, 0)
+                )
+            )
+            .`when`(appOpsController)
+            .getActiveAppOps(anyBoolean())
+
+        assertEquals(appOpsPrivacyItemMonitor.getActivePrivacyItems().size, 0)
+        // Expect logs for BACKGROUND_APP and ALL_APP.
+        assertEquals(uiEventLogger.numLogs(), 2)
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_BACKGROUND_APP
+                            .id
+                }
+            )
+            .isTrue()
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent.LOCATION_INDICATOR_ALL_APP
+                            .id
+                }
+            )
+            .isTrue()
+    }
+
+    @Test
+    fun testLocationOpHighPowerOff() {
+        // First, high power location is used
+        doReturn(
+                listOf(
+                    AppOpItem(
+                        AppOpsManager.OP_MONITOR_HIGH_POWER_LOCATION,
+                        TEST_UID,
+                        TEST_PACKAGE_NAME,
+                        0,
+                    )
+                )
+            )
+            .`when`(appOpsController)
+            .getActiveAppOps(anyBoolean())
+
+        // Expect a log for LOCATION_INDICATOR_MONITOR_HIGH_POWER when high power location is used.
+        appOpsPrivacyItemMonitor.getActivePrivacyItems()
+        assertEquals(uiEventLogger.numLogs(), 1)
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_MONITOR_HIGH_POWER
+                            .id
+                }
+            )
+            .isTrue()
+
+        // Then, it is not used anymore
+        doReturn(emptyList<AppOpItem>()).`when`(appOpsController).getActiveAppOps(anyBoolean())
+        appOpsPrivacyItemMonitor.getActivePrivacyItems()
+
+        // Then we log the OFF event
+        assertEquals(uiEventLogger.numLogs(), 2)
+        Truth.assertThat(
+                uiEventLogger.logs.any { log ->
+                    log.eventId ==
+                        AppOpsPrivacyItemMonitor.LocationIndicatorEvent
+                            .LOCATION_INDICATOR_MONITOR_HIGH_POWER_OFF
                             .id
                 }
             )
@@ -628,6 +882,102 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
         assertFalse(privacyItems[0].paused)
     }
 
+    @Test
+    fun testDumpLogsLocationIndicatorDetails() {
+        val stringWriter = StringWriter()
+        val printWriter = PrintWriter(stringWriter)
+
+        // Start listening to populate logging start time
+        appOpsPrivacyItemMonitor.startListening(callback)
+        executor.runAllReady()
+
+        // Given a non-system, foreground app is using location
+        setMapsToNonSystem()
+        // Default is foreground
+        val process = ActivityManager.RunningAppProcessInfo()
+        process.uid = TEST_UID
+        doReturn(listOf(process)).`when`(activityManager).runningAppProcesses
+
+        doReturn(listOf(AppOpItem(AppOpsManager.OP_FINE_LOCATION, TEST_UID, MAPS_PACKAGE_NAME, 0)))
+            .`when`(appOpsController)
+            .getActiveAppOps(anyBoolean())
+
+        // When location is used
+        appOpsPrivacyItemMonitor.getActivePrivacyItems()
+        executor.runAllReady()
+
+        clock.advanceTime(123456L)
+
+        // ...and then not used
+        doReturn(emptyList<AppOpItem>()).`when`(appOpsController).getActiveAppOps(anyBoolean())
+        appOpsPrivacyItemMonitor.getActivePrivacyItems()
+        executor.runAllReady()
+
+        // Check the dump
+        appOpsPrivacyItemMonitor.dump(printWriter, emptyArray())
+
+        val output = stringWriter.toString()
+        Truth.assertThat(output).contains("NON_SYSTEM_FG: blinks=1, onDuration=2m")
+        Truth.assertThat(output).contains("SYSTEM: blinks=1, onDuration=2m")
+        Truth.assertThat(output).contains("BACKGROUND: blinks=1, onDuration=2m")
+        Truth.assertThat(output).contains("ALL: blinks=1, onDuration=2m")
+    }
+
+    @Test
+    fun testDumpLogsLocationIndicatorDetails_multipleBlinks() {
+        val stringWriter = StringWriter()
+        val printWriter = PrintWriter(stringWriter)
+
+        // Start listening to populate logging start time
+        appOpsPrivacyItemMonitor.startListening(callback)
+        executor.runAllReady()
+
+        // Given a non-system, foreground app is using location
+        setMapsToNonSystem()
+        // Default is foreground
+        val process = ActivityManager.RunningAppProcessInfo()
+        process.uid = TEST_UID
+        doReturn(listOf(process)).`when`(activityManager).runningAppProcesses
+
+        val locationAppOp =
+            AppOpItem(AppOpsManager.OP_FINE_LOCATION, TEST_UID, MAPS_PACKAGE_NAME, 0)
+
+        // Blink 1 on
+        doReturn(listOf(locationAppOp)).`when`(appOpsController).getActiveAppOps(anyBoolean())
+        appOpsPrivacyItemMonitor.getActivePrivacyItems()
+        executor.runAllReady()
+
+        clock.advanceTime(60_000L) // 1 minute
+
+        // Blink 1 off
+        doReturn(emptyList<AppOpItem>()).`when`(appOpsController).getActiveAppOps(anyBoolean())
+        appOpsPrivacyItemMonitor.getActivePrivacyItems()
+        executor.runAllReady()
+
+        clock.advanceTime(10_000L) // 10 seconds off
+
+        // Blink 2 on
+        doReturn(listOf(locationAppOp)).`when`(appOpsController).getActiveAppOps(anyBoolean())
+        appOpsPrivacyItemMonitor.getActivePrivacyItems()
+        executor.runAllReady()
+
+        clock.advanceTime(120_000L) // 2 minutes
+
+        // Blink 2 off
+        doReturn(emptyList<AppOpItem>()).`when`(appOpsController).getActiveAppOps(anyBoolean())
+        appOpsPrivacyItemMonitor.getActivePrivacyItems()
+        executor.runAllReady()
+
+        // Check the dump
+        appOpsPrivacyItemMonitor.dump(printWriter, emptyArray())
+
+        val output = stringWriter.toString()
+        Truth.assertThat(output).contains("NON_SYSTEM_FG: blinks=2, onDuration=3m")
+        Truth.assertThat(output).contains("SYSTEM: blinks=2, onDuration=3m")
+        Truth.assertThat(output).contains("BACKGROUND: blinks=2, onDuration=3m")
+        Truth.assertThat(output).contains("ALL: blinks=2, onDuration=3m")
+    }
+
     private fun changeMicCamera(value: Boolean) {
         `when`(privacyConfig.micCameraAvailable).thenReturn(value)
         argCaptorConfigCallback.value.onFlagMicCameraChanged(value)
@@ -636,5 +986,17 @@ class AppOpsPrivacyItemMonitorTest : SysuiTestCase() {
     private fun changeLocation(value: Boolean) {
         `when`(privacyConfig.locationAvailable).thenReturn(value)
         argCaptorConfigCallback.value.onFlagLocationChanged(value)
+    }
+
+    /** Sets Maps to non-system. */
+    private fun setMapsToNonSystem() {
+        // Set to non system
+        doReturn(512)
+            .`when`(packageManager)
+            .getPermissionFlags(
+                "android.permission.ACCESS_FINE_LOCATION",
+                MAPS_PACKAGE_NAME,
+                UserHandle.getUserHandleForUid(TEST_UID),
+            )
     }
 }

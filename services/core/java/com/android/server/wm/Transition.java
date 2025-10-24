@@ -108,9 +108,7 @@ import android.os.SystemClock;
 import android.os.Trace;
 import android.util.ArrayMap;
 import android.util.ArraySet;
-// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 import android.util.BoostFramework;
-// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 import android.util.Slog;
 import android.util.SparseArray;
 import android.view.Display;
@@ -213,12 +211,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     private SurfaceControl.Transaction mStartTransaction = null;
     private SurfaceControl.Transaction mFinishTransaction = null;
 
-// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
     /** Perf **/
     private BoostFramework mPerf = null;
     private boolean mIsAnimationPerfLockAcquired = false;
 
-// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
     /** Used for failsafe clean-up to prevent leaks due to misbehaving player impls. */
     private SurfaceControl.Transaction mCleanupTransaction = null;
 
@@ -401,12 +397,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
        if (!mController.useFullReadyTracking()) {
             mReadyTracker.add(mReadyTrackerOld);
         }
-// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 
         if (mPerf == null) {
             mPerf = new BoostFramework();
         }
-// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
     }
 
     @Nullable
@@ -662,7 +656,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         final WindowState top = dc.getDisplayPolicy().getTopFullscreenOpaqueWindow();
         if (top != null) {
             mIsSeamlessRotation = true;
-            top.mSyncMethodOverride = BLASTSyncEngine.METHOD_BLAST;
+            top.useBlastForNextSync();
             ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, "Override sync-method for %s "
                     + "because seamless rotating", top.getName());
         }
@@ -802,15 +796,11 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
         mState = STATE_STARTED;
 
-// QTI_BEGIN: 2023-07-03: Core: perf: Add Transition Type check.
         if (mPerf != null && mType == TRANSIT_CHANGE) {
-// QTI_END: 2023-07-03: Core: perf: Add Transition Type check.
-// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
             mPerf.perfHint(BoostFramework.VENDOR_HINT_ROTATION_ANIM_BOOST, null);
             mIsAnimationPerfLockAcquired = true;
         }
 
-// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, "Starting Transition %d",
                 mSyncId);
         applyReady();
@@ -908,12 +898,16 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         recordDisplay(from.getDisplayContent());
     }
 
-    /** Adds the top non-alwaysOnTop tasks within `task` to `out`. */
+    /** Adds the top visible non-alwaysOnTop tasks within `task` to `out`. */
     private static void addOnTopTasks(Task task, ArrayList<Task> out) {
         for (int i = task.getChildCount() - 1; i >= 0; --i) {
             final Task child = task.getChildAt(i).asTask();
             if (child == null) return;
-            if (child.getWindowConfiguration().isAlwaysOnTop()) continue;
+            if (child.getWindowConfiguration().isAlwaysOnTop()
+                    || (com.android.window.flags.Flags.polishCloseWallpaperIncludesOpenChange()
+                        && !child.isVisibleRequested())) {
+                continue;
+            }
             out.add(child);
             addOnTopTasks(child, out);
             break;
@@ -1715,12 +1709,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         validateKeyguardOcclusion();
 
         mState = STATE_FINISHED;
-// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         if (mPerf != null && mIsAnimationPerfLockAcquired) {
             mPerf.perfLockRelease();
             mIsAnimationPerfLockAcquired = false;
         }
-// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         // Rotation change may be deferred while there is a display change transition, so check
         // again in case there is a new pending change.
         if (hasParticipatedDisplay && !mController.useShellTransitionsRotation()) {
@@ -1778,9 +1770,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             } else {
                 // If there is an existing sync group for the commit-at-end activity,
                 // enforce BLAST sync method for its windows, before resuming config dispatch.
-                target.forAllWindows(windowState -> {
-                    windowState.mSyncMethodOverride = BLASTSyncEngine.METHOD_BLAST;
-                }, true /* traverseTopToBottom */);
+                target.forAllWindows(WindowState::useBlastForNextSync,
+                        true /* traverseTopToBottom */);
             }
             // Reset surface state here (since it was skipped in buildFinishTransaction). Since
             // we are resuming config to the "current" state, we have to calculate the matching

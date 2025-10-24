@@ -16,7 +16,7 @@
 
 package com.android.server;
 
-import static android.app.userrecovery.flags.Flags.enableUserRecoveryManager;
+import static android.app.lskfreset.flags.Flags.enableLskfResetManager;
 import static android.media.tv.flags.Flags.mediaQualityFw;
 import static android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
@@ -72,9 +72,7 @@ import android.os.FileUtils;
 import android.os.IBinder;
 import android.os.IBinderCallback;
 import android.os.IIncidentManager;
-// QTI_BEGIN: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 import android.os.IBinder;
-// QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 import android.os.Looper;
 import android.os.Message;
 import android.os.Parcel;
@@ -157,6 +155,7 @@ import com.android.server.camera.CameraServiceProxy;
 import com.android.server.clipboard.ClipboardService;
 import com.android.server.companion.CompanionDeviceManagerService;
 import com.android.server.companion.datatransfer.continuity.TaskContinuityManagerService;
+import com.android.server.companion.datatransfer.continuity.UniversalClipboardService;
 import com.android.server.companion.virtual.VirtualDeviceManagerService;
 import com.android.server.compat.PlatformCompat;
 import com.android.server.compat.PlatformCompatNative;
@@ -196,6 +195,7 @@ import com.android.server.location.altitude.AltitudeService;
 import com.android.server.locksettings.LockSettingsInternal;
 import com.android.server.locksettings.LockSettingsService;
 import com.android.server.logcat.LogcatManagerService;
+import com.android.server.lskfreset.LskfResetManagerService;
 import com.android.server.media.MediaResourceMonitorService;
 import com.android.server.media.MediaRouterService;
 import com.android.server.media.MediaSessionService;
@@ -270,7 +270,6 @@ import com.android.server.selinux.SelinuxAuditLogsService;
 import com.android.server.sensorprivacy.SensorPrivacyService;
 import com.android.server.sensors.SensorService;
 import com.android.server.serial.SerialManagerService;
-import com.android.server.signalcollector.SignalCollectorService;
 import com.android.server.signedconfig.SignedConfigService;
 import com.android.server.slice.SliceManagerService;
 import com.android.server.smartspace.SmartspaceManagerService;
@@ -306,7 +305,6 @@ import com.android.server.uri.UriGrantsManagerService;
 import com.android.server.usage.StorageStatsService;
 import com.android.server.usage.UsageStatsService;
 import com.android.server.usb.UsbService;
-import com.android.server.userrecovery.UserRecoveryManagerService;
 import com.android.server.utils.TimingsTraceAndSlog;
 import com.android.server.vcn.VcnLocation;
 import com.android.server.vibrator.VibratorManagerService;
@@ -319,18 +317,19 @@ import com.android.server.wm.ActivityTaskManagerService;
 import com.android.server.wm.WindowManagerGlobalLock;
 import com.android.server.wm.WindowManagerService;
 
+import dalvik.system.VMDebug;
 import dalvik.system.VMRuntime;
-// QTI_BEGIN: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 import dalvik.system.PathClassLoader;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-// QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedList;
@@ -385,6 +384,8 @@ public final class SystemServer implements Dumpable {
             "com.android.clockwork.settings.WearSettingsService";
     private static final String WEAR_GESTURE_SERVICE_CLASS =
             "com.android.clockwork.gesture.WearGestureService";
+    private static final String WEAR_INPUT_SERVICE_CLASS =
+            "com.android.clockwork.input.WearInputService";
     private static final String WRIST_ORIENTATION_SERVICE_CLASS =
             "com.android.clockwork.wristorientation.WristOrientationService";
     private static final String IOT_SERVICE_CLASS =
@@ -473,6 +474,12 @@ public final class SystemServer implements Dumpable {
             "/apex/com.android.profiling/javalib/service-profiling.jar";
     private static final String ANOMALY_DETECTOR_SERVICE_CLASS =
             "com.android.os.profiling.anomaly.AnomalyDetectorService";
+    private static final String SIGNAL_COLLECTOR_SERVICE_CLASS =
+            "com.android.server.signalcollector";
+    private static final String UPROBESTATS_SERVICE_JAR_PATH =
+            "/apex/com.android.uprobestats/javalib/service-uprobestats.jar";
+    private static final String UPROBESTATS_SERVICE_CLASS =
+            "com.android.os.uprobestats.UprobeStatsService";
 
     private static final String RANGING_APEX_SERVICE_JAR_PATH =
             "/apex/com.android.uwb/javalib/service-ranging.jar";
@@ -736,8 +743,6 @@ public final class SystemServer implements Dumpable {
         TimeUtils.formatDuration(mRuntimeStartUptime, pw); pw.println();
         pw.print("Runtime start-elapsed time: ");
         TimeUtils.formatDuration(mRuntimeStartElapsedTime, pw); pw.println();
-
-        HsumBootUserInitializer.dump(pw, mSystemContext);
     }
 
     /**
@@ -758,7 +763,7 @@ public final class SystemServer implements Dumpable {
     private final class SystemServerDumper extends Binder {
 
         @GuardedBy("mDumpables")
-        private final ArrayMap<String, Dumpable> mDumpables = new ArrayMap<>(4);
+        private final ArrayMap<String, WeakReference<Dumpable>> mDumpables = new ArrayMap<>(4);
 
         @Override
         protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
@@ -779,13 +784,17 @@ public final class SystemServer implements Dumpable {
                         return;
                     }
                     final String name = args[1];
-                    final Dumpable dumpable = mDumpables.get(name);
-                    if (dumpable == null) {
+                    final var ref = mDumpables.get(name);
+                    if (ref == null) {
                         pw.printf("No dumpable named %s\n", name);
                         return;
                     }
-
                     try (IndentingPrintWriter ipw = new IndentingPrintWriter(pw, "  ")) {
+                        final var dumpable = ref.get();
+                        if (dumpable == null) {
+                            ipw.printf("%s has been garbage collected\n", name);
+                            return;
+                        }
                         // Strip --name DUMPABLE from args
                         final String[] actualArgs = Arrays.copyOfRange(args, 2, args.length);
                         dumpable.dump(ipw, actualArgs);
@@ -794,27 +803,47 @@ public final class SystemServer implements Dumpable {
                 }
 
                 final int dumpablesSize = mDumpables.size();
+                List<String> garbageCollected = null;
                 try (IndentingPrintWriter ipw = new IndentingPrintWriter(pw, "  ")) {
                     for (int i = 0; i < dumpablesSize; i++) {
-                        final Dumpable dumpable = mDumpables.valueAt(i);
+                        final var ref = mDumpables.valueAt(i);
+                        final var dumpable = ref.get();
+                        if (dumpable == null) {
+                            if (garbageCollected == null) {
+                                garbageCollected = new ArrayList<>(dumpablesSize);
+                            }
+                            garbageCollected.add(mDumpables.keyAt(i));
+                            continue;
+                        }
                         ipw.printf("%s:\n", dumpable.getDumpableName());
                         ipw.increaseIndent();
                         dumpable.dump(ipw, args);
                         ipw.decreaseIndent();
                         ipw.println();
                     }
+                    if (garbageCollected != null) {
+                        ipw.printf("%d dumpable(s) has been garbage collected: %s\n",
+                                garbageCollected.size(), garbageCollected);
+                    }
                 }
+
             }
         }
 
-        private void addDumpable(@NonNull Dumpable dumpable) {
+        private void addDumpable(Dumpable dumpable) {
             synchronized (mDumpables) {
-                mDumpables.put(dumpable.getDumpableName(), dumpable);
+                mDumpables.put(dumpable.getDumpableName(), new WeakReference<>(dumpable));
             }
         }
     }
 
     private void run() {
+        if (VMDebug.isDebuggingEnabled()
+                && SystemProperties.getBoolean("debug.system_server.jdwp_wait", false)) {
+            Slog.i(TAG, "System server is waiting for debugger before starting...");
+            Debug.waitForDebugger();
+        }
+
         TimingsTraceAndSlog t = new TimingsTraceAndSlog();
         try {
             // Explicitly initialize a 4 MB shmem buffer for Perfetto producers (b/382369925)
@@ -909,7 +938,6 @@ public final class SystemServer implements Dumpable {
             // Prepare the main looper thread (this thread).
             android.os.Process.setThreadPriority(
                     android.os.Process.THREAD_PRIORITY_FOREGROUND);
-            android.os.Process.setCanSelfBackground(false);
             Looper.prepareMainLooper();
             Looper.getMainLooper().setSlowLogThresholdMs(
                     SLOW_DISPATCH_THRESHOLD_MS, SLOW_DELIVERY_THRESHOLD_MS);
@@ -917,8 +945,8 @@ public final class SystemServer implements Dumpable {
             SystemServiceRegistry.sEnableServiceNotFoundWtf = true;
 
             // Prepare the thread pool for init tasks that can be parallelized
-            SystemServerInitThreadPool tp = SystemServerInitThreadPool.start();
-            mDumper.addDumpable(tp);
+            SystemServerInitThreadPool.start();
+            mDumper.addDumpable(SystemServerInitThreadPool.getInstance());
 
             // SystemConfig init is expensive, so enqueue the work as early as possible to allow
             // concurrent execution before it's needed (typically by ActivityManagerService).
@@ -1172,12 +1200,10 @@ public final class SystemServer implements Dumpable {
         t.traceEnd();
 
         // Orchestrates some ProtoLogging functionality.
-        if (android.tracing.Flags.clientSideProtoLogging()) {
-            t.traceBegin("StartProtoLogConfigurationService");
-            ServiceManager.addService(
-                    Context.PROTOLOG_CONFIGURATION_SERVICE, new ProtoLogConfigurationServiceImpl());
-            t.traceEnd();
-        }
+        t.traceBegin("StartProtoLogConfigurationService");
+        ServiceManager.addService(
+                Context.PROTOLOG_CONFIGURATION_SERVICE, new ProtoLogConfigurationServiceImpl());
+        t.traceEnd();
 
         t.traceBegin("InitializeProtoLog");
         ProtoLog.init(WmProtoLogGroups.values());
@@ -1543,10 +1569,8 @@ public final class SystemServer implements Dumpable {
         MmsServiceBroker mmsService = null;
         HardwarePropertiesManagerService hardwarePropertiesService = null;
         PacProxyService pacProxyService = null;
-// QTI_BEGIN: 2018-02-17: Wigig: frameworks/base: Add WiGig support
         Object wigigP2pService = null;
         Object wigigService = null;
-// QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 
         boolean disableSystemTextClassifier = SystemProperties.getBoolean(
                 "config.disable_systemtextclassifier", false);
@@ -1556,9 +1580,7 @@ public final class SystemServer implements Dumpable {
         boolean disableCameraService = SystemProperties.getBoolean("config.disable_cameraservice",
                 false);
 
-// QTI_BEGIN: 2018-02-17: Wigig: frameworks/base: Add WiGig support
         boolean enableWigig = SystemProperties.getBoolean("persist.vendor.wigig.enable", false);
-// QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 
         boolean isWatch = RoSystemFeatures.hasFeatureWatch(context);
 
@@ -1785,10 +1807,8 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(PinnerService.class);
             t.traceEnd();
 
-// QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
             mSystemServiceManager.startService(ActivityTriggerService.class);
 
-// QTI_END: 2019-11-13: Core: Add mechanism to improve consistancy of notification
             if (Build.IS_DEBUGGABLE && ProfcollectForwardingService.enabled()) {
                 t.traceBegin("ProfcollectForwardingService");
                 mSystemServiceManager.startService(ProfcollectForwardingService.class);
@@ -1822,9 +1842,9 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (enableUserRecoveryManager()) {
-                t.traceBegin("StartUserRecoveryManager");
-                mSystemServiceManager.startService(UserRecoveryManagerService.class);
+            if (enableLskfResetManager()) {
+                t.traceBegin("StartLskfResetManager");
+                mSystemServiceManager.startService(LskfResetManagerService.class);
                 t.traceEnd();
             }
 
@@ -2452,9 +2472,11 @@ public final class SystemServer implements Dumpable {
                 Slog.i(TAG, "Wallpaper service disabled by config");
             }
 
-            t.traceBegin("StartThemeService");
-            mSystemServiceManager.startService(ThemeManagerService.class);
-            t.traceEnd();
+            if (android.server.Flags.enableThemeService()) {
+                t.traceBegin("StartThemeService");
+                mSystemServiceManager.startService(ThemeManagerService.class);
+                t.traceEnd();
+            }
 
             // WallpaperEffectsGeneration manager service
             if (deviceHasConfigString(context,
@@ -2707,6 +2729,12 @@ public final class SystemServer implements Dumpable {
             if (android.companion.Flags.enableTaskContinuity()) {
                 t.traceBegin("StartTaskContinuityService");
                 mSystemServiceManager.startService(TaskContinuityManagerService.class);
+                t.traceEnd();
+            }
+
+            if (android.companion.Flags.enableUniversalClipboard()) {
+                t.traceBegin("StartUniversalClipboardService");
+                mSystemServiceManager.startService(UniversalClipboardService.class);
                 t.traceEnd();
             }
 
@@ -2982,6 +3010,15 @@ public final class SystemServer implements Dumpable {
                 mSystemServiceManager.startService(WEAR_GESTURE_SERVICE_CLASS);
                 t.traceEnd();
             }
+
+            if (com.android.server.policy.Flags.wearKeyGestureHandling()) {
+                t.traceBegin("StartWearKeyGestureService");
+                try {
+                    mSystemServiceManager.startService(WEAR_INPUT_SERVICE_CLASS);
+                } finally {
+                    t.traceEnd();
+                }
+            }
         }
 
         if (!mPackageManager.hasSystemFeature(PackageManager.FEATURE_SLICES_DISABLED)) {
@@ -3060,6 +3097,31 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("StartAnomalyDetectorService");
             mSystemServiceManager.startService(ANOMALY_DETECTOR_SERVICE_CLASS);
             t.traceEnd();
+
+            t.traceBegin("StartSignalCollectorService");
+            try {
+                mSystemServiceManager.startService(SIGNAL_COLLECTOR_SERVICE_CLASS);
+            } catch (Throwable e) {
+                reportWtf("starting SignalCollectorService", e);
+            }
+            t.traceEnd();
+        }
+
+        // UprobeStats
+        if (android.security.Flags.serviceUprobestats()) {
+            t.traceBegin("StartUprobeStatsService");
+            // The service class is defined in a mainline module, and is not providing any
+            // core, user facing functionality. It is only used for collecting telemetry
+            // and anti-abuse. Thus, catch any startup exceptions and report them as WTFs.
+            try {
+                mSystemServiceManager.startServiceFromJar(
+                        UPROBESTATS_SERVICE_CLASS, UPROBESTATS_SERVICE_JAR_PATH);
+            } catch (Throwable e) {
+                reportWtf("StartUprobeStatsService", e);
+            }
+            t.traceEnd();
+        } else if (Build.IS_DEBUGGABLE) {
+            Slog.d(TAG, "UprobeStatsService disabled by flag");
         }
 
         if (safeMode) {
@@ -3155,6 +3217,13 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("HsumBootUserInitializer.init");
             hsumBootUserInitializer.init(t);
             t.traceEnd();
+            var dumpable = HsumBootUserInitializer.getDumpable();
+            if (dumpable != null) {
+                mDumper.addDumpable(dumpable);
+            } else {
+                // It shouldn't happen, but if does, better log...
+                Slog.e(TAG, "HsumBootUserInitializer doesn't have a dumpable");
+            }
         }
 
         CommunalProfileInitializer communalProfileInitializer = null;
@@ -3174,7 +3243,6 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startBootPhase(t, SystemService.PHASE_SYSTEM_SERVICES_READY);
         t.traceEnd();
 
-// QTI_BEGIN: 2018-02-17: Wigig: frameworks/base: Add WiGig support
         // Wigig services are not registered as system services because of class loader
         // limitations, send boot phase notification separately
         if (enableWigig) {
@@ -3194,7 +3262,6 @@ public final class SystemServer implements Dumpable {
             }
         }
 
-// QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
         t.traceBegin("MakeWindowManagerServiceReady");
         try {
             wm.systemReady();
@@ -3639,19 +3706,6 @@ public final class SystemServer implements Dumpable {
             reportWtf("starting System UI", e);
         }
         t.traceEnd();
-
-        // TODO(b/421229308): The collector service should only be running if
-        // the anomaly detection service APIs are enabled.
-        // Replace this flag with the exported API flag after it's ready.
-        if (com.android.server.signalcollector.Flags.enableBinderCallSignalCollector()) {
-            t.traceBegin("StartSignalCollectorService");
-            try {
-                mSystemServiceManager.startService(SignalCollectorService.class);
-            } catch (Throwable e) {
-                reportWtf("starting SignalCollectorService", e);
-            }
-            t.traceEnd();
-        }
 
         t.traceEnd(); // startOtherServices
     }

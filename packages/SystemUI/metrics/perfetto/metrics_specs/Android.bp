@@ -22,12 +22,36 @@ filegroup {
     name: "sysui_metrics_artifacts",
     srcs: [
         "android_bitmap_metric.textproto",
+        "android_sf_critical_work_main_thread.textproto",
+        "android_dmabuf_per_process_metric.textproto",
+        "android_sf_critical_work_region_sampling.textproto",
+        "android_gralloc_buffers_per_process_metric.textproto",
     ],
 }
 
 prebuilt_etc {
     name: "android_bitmap_metric.textproto",
     src: "android_bitmap_metric.textproto",
+}
+
+prebuilt_etc {
+    name: "android_sf_critical_work_main_thread.textproto",
+    src: "android_sf_critical_work_main_thread.textproto",
+}
+
+prebuilt_etc {
+    name: "android_dmabuf_per_process_metric.textproto",
+    src: "android_dmabuf_per_process_metric.textproto",
+}
+
+prebuilt_etc {
+    name: "android_sf_critical_work_region_sampling.textproto",
+    src: "android_sf_critical_work_region_sampling.textproto",
+}
+
+prebuilt_etc {
+    name: "android_gralloc_buffers_per_process_metric.textproto",
+    src: "android_gralloc_buffers_per_process_metric.textproto",
 }
 
 python_library_host {
@@ -47,17 +71,12 @@ python_test_host {
     ],
     data: [
         ":trace_processor_shell_prebuilt",
-        "android_bitmap_metric.textproto",
-        "tests/data/android_bitmap_metric_output.txt",
+        "*.textproto",
+        "tests/data/*.txt",
     ],
     test_options: {
         unit_test: true,
     },
-    version: {
-        py3: {
-            enabled: true,
-            // The test needs to use the host python interpreter to be able import the perfetto modules.
-            embedded_launcher: false,
-        },
-    },
+    // The test needs to use the host python interpreter to be able import the perfetto modules.
+    embedded_launcher: false,
 }

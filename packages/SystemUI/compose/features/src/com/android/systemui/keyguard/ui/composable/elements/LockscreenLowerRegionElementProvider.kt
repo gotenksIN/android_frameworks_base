@@ -22,25 +22,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.dimensionResource
-import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementContentScope
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenLowerRegionViewModel
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.core.Logger
 import com.android.systemui.log.dagger.KeyguardBlueprintLog
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementContext
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory.Companion.lockscreenElement
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.IndicationArea
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.Shortcuts
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementProvider
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenScope
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenScope.Companion.LockscreenElement
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
 import javax.inject.Inject
@@ -62,12 +62,8 @@ constructor(
         override val context = this@LockscreenLowerRegionElementProvider.context
 
         @Composable
-        override fun ContentScope.LockscreenElement(
-            factory: LockscreenElementFactory,
-            context: LockscreenElementContext,
-        ) {
+        override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
             val viewModel = rememberViewModel("LockscreenLowerRegion") { viewModelFactory.create() }
-
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier =
@@ -78,14 +74,20 @@ constructor(
                                 dimensionResource(R.dimen.keyguard_affordance_horizontal_offset)
                         ),
             ) {
-                Box(Modifier.graphicsLayer { translationX = viewModel.unfoldTranslations.start }) {
-                    factory.lockscreenElement(Shortcuts.Start, context)
+                Box(
+                    Modifier.graphicsLayer { translationX = viewModel.unfoldTranslations.start }
+                        .wrapContentHeight(Alignment.Bottom, unbounded = true)
+                ) {
+                    LockscreenElement(Shortcuts.Start)
                 }
 
-                Box(Modifier.weight(1f)) { factory.lockscreenElement(IndicationArea, context) }
+                Box(Modifier.weight(1f)) { LockscreenElement(IndicationArea) }
 
-                Box(Modifier.graphicsLayer { translationX = viewModel.unfoldTranslations.end }) {
-                    factory.lockscreenElement(Shortcuts.End, context)
+                Box(
+                    Modifier.graphicsLayer { translationX = viewModel.unfoldTranslations.end }
+                        .wrapContentHeight(Alignment.Bottom, unbounded = true)
+                ) {
+                    LockscreenElement(Shortcuts.End)
                 }
             }
         }

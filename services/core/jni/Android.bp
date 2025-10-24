@@ -14,6 +14,7 @@ cc_library_static {
     cflags: [
         "-Wall",
         "-Werror",
+        "-Werror=reorder-init-list",
         "-Wno-unused-parameter",
         "-Wthread-safety",
 
@@ -73,9 +74,7 @@ cc_library_static {
         "com_android_server_sensor_SensorService.cpp",
         "com_android_server_utils_LongMethodTracer.cpp",
         "com_android_server_wm_TaskFpsCallbackController.cpp",
-// QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
         "com_android_server_activityTriggerService.cpp",
-// QTI_END: 2019-11-13: Core: Add mechanism to improve consistancy of notification
         "onload.cpp",
         ":lib_cachedAppOptimizer_native",
         ":lib_freezer_native",
@@ -112,6 +111,7 @@ cc_defaults {
         "libandroid_runtime",
         "libandroidfw",
         "libaudioclient",
+        "libasyncio",
         "libbase",
         "libappfuse",
         "libbinder_ndk",
@@ -141,6 +141,7 @@ cc_defaults {
         "libinput",
         "libinputflinger",
         "libinputservice",
+        "libselinux",
         "libservices.core-gnss",
         "libstatshidl",
         "libstatspull",
@@ -194,7 +195,6 @@ cc_defaults {
         "android.hardware.tv.input@1.0",
         "android.hardware.tv.input-V3-ndk",
         "android.hardware.vibrator-V3-ndk",
-        "android.hardware.vr@1.0",
         "android.hidl.token@1.0-utils",
         "android.frameworks.sensorservice@1.0",
         "android.frameworks.sensorservice-V1-ndk",

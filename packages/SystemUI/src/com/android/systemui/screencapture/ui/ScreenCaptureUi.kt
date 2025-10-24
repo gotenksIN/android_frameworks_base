@@ -19,10 +19,8 @@ package com.android.systemui.screencapture.ui
 import android.annotation.SuppressLint
 import android.content.Context
 import android.view.Display
-import android.view.KeyEvent
-import android.view.View
-import android.view.View.OnKeyListener
 import android.view.Window
+import android.view.WindowManager
 import android.window.OnBackInvokedCallback
 import android.window.WindowOnBackInvokedDispatcher
 import androidx.compose.animation.AnimatedVisibility
@@ -31,6 +29,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
@@ -44,12 +43,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.ComposeView
 import com.android.compose.theme.PlatformTheme
 import com.android.systemui.compose.ComposeInitializer
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.lifecycle.rememberViewModel
-import com.android.systemui.screencapture.common.ScreenCaptureComponent
+import com.android.systemui.screencapture.common.ScreenCaptureUiComponent
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiState
@@ -78,9 +87,9 @@ constructor(
             @JvmSuppressWildcards
             ScreenCaptureType,
             @JvmSuppressWildcards
-            ScreenCaptureComponent.Builder,
+            ScreenCaptureUiComponent.Builder,
         >,
-    private val defaultBuilder: Lazy<ScreenCaptureComponent.Builder>,
+    private val defaultBuilder: Lazy<ScreenCaptureUiComponent.Builder>,
 ) :
     ScreenshotWindow(
         display = display,
@@ -89,6 +98,18 @@ constructor(
     ) {
 
     private var composeRoot: ComposeView? = null
+
+    init {
+        with(window) {
+            addFlags(
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+            )
+            addPrivateFlags(WindowManager.LayoutParams.PRIVATE_FLAG_TRUSTED_OVERLAY)
+        }
+    }
 
     override fun onAttach() {
         require(composeRoot == null) { "The ui is already attached" }
@@ -113,12 +134,10 @@ constructor(
                     // Wait until parameters are passed down to Compose
                     val parameters = parametersState ?: return@setContent
 
-                    LaunchedEffect(viewModel) {
-                        window.decorView.observeKeyUpEvents { keyCode: Int, event: KeyEvent ->
-                            onKeyUp(viewModel = viewModel, keyCode = keyCode, event = event)
-                        }
-                    }
                     LaunchedEffect(viewModel) { window.observeBack { viewModel.dismiss() } }
+
+                    // Focus the view on initial render so it can receive key events.
+                    LaunchedEffect(Unit) { window.decorView.requestFocus() }
 
                     PlatformTheme {
                         val visibleState = remember { MutableTransitionState(false) }
@@ -135,18 +154,25 @@ constructor(
                                 scaleOut(transformOrigin = scaleTransformOrigin) +
                                     slideOutVertically(),
                         ) {
-                            val builder: ScreenCaptureComponent.Builder =
+                            val builder: ScreenCaptureUiComponent.Builder =
                                 componentBuilders[parameters.screenCaptureType]
                                     ?: defaultBuilder.get()
                             val coroutineScope = rememberCoroutineScope()
                             val component =
                                 remember(parameters, coroutineScope) {
                                     builder
-                                        .setParameters(parameters)
                                         .setScope(coroutineScope)
+                                        .setDisplay(display)
+                                        .setWindow(window)
                                         .build()
                                 }
-                            Box(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
+
+                            Box(
+                                modifier =
+                                    Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
+                                        .focusable()
+                                        .onKeyEvent { event -> handleKeyEvent(event, viewModel) }
+                            ) {
                                 component.screenCaptureContent.Content()
                             }
                         }
@@ -162,18 +188,19 @@ constructor(
         composeRoot = null
     }
 
-    private fun onKeyUp(
-        viewModel: ScreenCaptureUiViewModel,
-        keyCode: Int,
-        event: KeyEvent,
-    ): Boolean {
+    private fun handleKeyEvent(event: KeyEvent, viewModel: ScreenCaptureUiViewModel): Boolean {
+        if (event.type != KeyEventType.KeyUp) {
+            return false
+        }
+
         val noModifierKeys =
             !event.isShiftPressed &&
                 !event.isCtrlPressed &&
                 !event.isAltPressed &&
                 !event.isMetaPressed
+
         return when {
-            (keyCode == KeyEvent.KEYCODE_ESCAPE && noModifierKeys) -> {
+            (event.key == Key.Escape && noModifierKeys) -> {
                 viewModel.dismiss()
                 true
             }
@@ -197,23 +224,5 @@ private suspend fun Window.observeBack(onBack: OnBackInvokedCallback) {
         awaitCancellation()
     } finally {
         onBackInvokedDispatcher.unregisterOnBackInvokedCallback(onBack)
-    }
-}
-
-private suspend fun View.observeKeyUpEvents(onKeyUp: (keyCode: Int, event: KeyEvent) -> Boolean) {
-    val listener =
-        object : OnKeyListener {
-            override fun onKey(v: View?, keyCode: Int, event: KeyEvent?): Boolean {
-                if (event?.action == KeyEvent.ACTION_UP) {
-                    return onKeyUp(keyCode, event)
-                }
-                return false
-            }
-        }
-    setOnKeyListener(listener)
-    try {
-        awaitCancellation()
-    } finally {
-        setOnKeyListener(null)
     }
 }

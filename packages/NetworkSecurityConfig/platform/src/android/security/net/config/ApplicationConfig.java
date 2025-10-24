@@ -16,7 +16,10 @@
 
 package android.security.net.config;
 
-import static android.security.Flags.certificateTransparencyConfiguration;
+import static libcore.net.NetworkSecurityPolicy.CERTIFICATE_TRANSPARENCY_REASON_APP_OPT_IN;
+import static libcore.net.NetworkSecurityPolicy.CERTIFICATE_TRANSPARENCY_REASON_DOMAIN_OPT_IN;
+import static libcore.net.NetworkSecurityPolicy.CERTIFICATE_TRANSPARENCY_REASON_SDK_TARGET_DEFAULT_ENABLED;
+import static libcore.net.NetworkSecurityPolicy.CERTIFICATE_TRANSPARENCY_REASON_UNKNOWN;
 
 import android.annotation.NonNull;
 import android.util.Pair;
@@ -172,9 +175,20 @@ public final class ApplicationConfig {
      *     otherwise
      */
     public boolean isCertificateTransparencyVerificationRequired(@NonNull String hostname) {
-        return certificateTransparencyConfiguration()
-                ? getConfigForHostname(hostname).isCertificateTransparencyVerificationRequired()
-                : NetworkSecurityConfig.certificateTransparencyVerificationRequiredDefault();
+        return getConfigForHostname(hostname).isCertificateTransparencyVerificationRequired();
+    }
+
+    int getCertificateTransparencyVerificationReason(@NonNull String hostname) {
+        if (NetworkSecurityConfig.certificateTransparencyVerificationRequiredDefault()) {
+            return CERTIFICATE_TRANSPARENCY_REASON_SDK_TARGET_DEFAULT_ENABLED;
+        }
+        if (getConfigForHostname(null).isCertificateTransparencyVerificationRequired()) {
+            return CERTIFICATE_TRANSPARENCY_REASON_APP_OPT_IN;
+        }
+        if (getConfigForHostname(hostname).isCertificateTransparencyVerificationRequired()) {
+            return CERTIFICATE_TRANSPARENCY_REASON_DOMAIN_OPT_IN;
+        }
+        return CERTIFICATE_TRANSPARENCY_REASON_UNKNOWN;
     }
 
     public void handleTrustStorageUpdate() {

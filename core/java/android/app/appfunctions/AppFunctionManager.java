@@ -39,6 +39,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.SignedPackage;
 import android.content.pm.SignedPackageParcel;
+import android.net.Uri;
 import android.os.CancellationSignal;
 import android.os.ICancellationSignal;
 import android.os.OutcomeReceiver;
@@ -106,7 +107,6 @@ import java.util.concurrent.Executor;
 @SystemService(Context.APP_FUNCTION_SERVICE)
 public final class AppFunctionManager {
 
-    // TODO(b/427993624): Expose Uri once ContentProvider is added
     /**
      * The contract between the AppFunction access history provider and applications with read
      * permission. Contains definitions for the supported URIs and columns.
@@ -122,6 +122,10 @@ public final class AppFunctionManager {
     @SystemApi
     public static final class AccessHistory implements BaseColumns {
         private AccessHistory() {}
+
+        @NonNull
+        private static final Uri TARGET_USER_URI =
+                Uri.parse("content://com.android.appfunction.accesshistory/user");
 
         /**
          * The package name of the agent app.
@@ -491,7 +495,8 @@ public final class AppFunctionManager {
                         request,
                         mContext.getUser(),
                         mContext.getPackageName(),
-                        /* requestTime= */ SystemClock.elapsedRealtime());
+                        /* requestTime= */ SystemClock.elapsedRealtime(),
+                        /* requestWallTime= */ System.currentTimeMillis());
 
         try {
             ICancellationSignal cancellationTransport =
@@ -827,6 +832,24 @@ public final class AppFunctionManager {
     }
 
     /**
+     * Creates an intent which can be used to request App Function access for the given target app.
+     * This intent MUST be used with {@link android.app.Activity#startActivityForResult}.The result
+     * code of the activity will be {@link android.app.Activity#RESULT_OK} if the request was
+     * granted, {@link android.app.Activity#RESULT_CANCELED} if not.
+     *
+     * @param targetPackageName The app access is being requested for.
+     * @return The created intent.
+     */
+    @FlaggedApi(FLAG_APP_FUNCTION_ACCESS_UI_ENABLED)
+    public @NonNull Intent createRequestAccessIntent(@NonNull String targetPackageName) {
+        try {
+            return mService.createRequestAccessIntent(targetPackageName);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Gets the configured list of package names that should be grouped as Device Settings.
      *
      * <p>The list here is a configuration, the returned packages are not necessarily installed. The
@@ -846,6 +869,7 @@ public final class AppFunctionManager {
 
     /**
      * Gets the current agent allowlist
+     *
      * @hide
      */
     @TestApi
@@ -866,35 +890,51 @@ public final class AppFunctionManager {
     }
 
     /**
-     * Gets whether or not the agent allowlist is enabled
-     * TODO b/413093397: Remove once list is ready for permanent enable
+     * Clear the access history data.
+     *
      * @hide
      */
     @TestApi
     @RequiresPermission(MANAGE_APP_FUNCTION_ACCESS)
     @FlaggedApi(Flags.FLAG_APP_FUNCTION_ACCESS_API_ENABLED)
-    public boolean isAgentAllowlistEnabled() {
+    @UserHandleAware
+    public void clearAccessHistory() {
         try {
-            return mService.isAgentAllowlistEnabled();
+            mService.clearAccessHistory(mContext.getUserId());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     /**
-     * Gets whether or not the agent allowlist is enabled
-     * TODO b/413093397: Remove once list is ready for permanent enable
+     * Gets the {@code content://} style URI for the AppFunction access history table for the
+     * user from the context used to obtain the instance of this class.
+     *
+     * <p>To query the content provider using the returned URI, the calling application must hold
+     * the {@link android.Manifest.permission#MANAGE_APP_FUNCTION_ACCESS} permission.
+     *
+     * <p>To query for a user other than the current one, the caller must also hold the {@link
+     * android.Manifest.permission#INTERACT_ACROSS_USERS_FULL} permission.
+     *
+     * <p>Attempting to query the content provider with the returned URI without holding the
+     * necessary permissions will result in a {@link java.lang.SecurityException}.
+     *
+     * @return The {@link Uri} for the AppFunction access history table.
      * @hide
      */
-    @TestApi
-    @RequiresPermission(MANAGE_APP_FUNCTION_ACCESS)
+    @SuppressLint("RequiresPermission") // Permission enforced in AppFunctionAccessHistoryProvider
+    @SystemApi
     @FlaggedApi(Flags.FLAG_APP_FUNCTION_ACCESS_API_ENABLED)
-    public void setAgentAllowlistEnabled(boolean enabled) {
-        try {
-            mService.setAgentAllowlistEnabled(enabled);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+    @UserHandleAware
+    @NonNull
+    public Uri getAccessHistoryContentUri() {
+        // The verification of whether the user has access to the target user's URI is enforced
+        // in the provide.
+        final int userId = mContext.getUserId();
+        return AccessHistory.TARGET_USER_URI
+                .buildUpon()
+                .appendPath(Integer.toString(userId))
+                .build();
     }
 
     private static class CallbackWrapper extends IAppFunctionEnabledCallback.Stub {

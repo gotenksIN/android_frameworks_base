@@ -547,10 +547,8 @@ public class PreferencesHelper implements RankingConfig {
     @NonNull
     private PackagePreferences getOrCreatePackagePreferencesLocked(String pkg, int uid) {
         Objects.requireNonNull(pkg);
-        if (Flags.preferencesThrowsOnInvalidUid()) {
-            Preconditions.checkArgument(uid != INVALID_UID,
-                    "Valid uid required to get settings of %s", pkg);
-        }
+        Preconditions.checkArgument(uid != INVALID_UID,
+                "Valid uid required to get settings of %s", pkg);
 
         // TODO (b/194833441): use permissionhelper instead of DEFAULT_IMPORTANCE
         return getOrCreatePackagePreferencesSupportingInvalidUidLocked(pkg,
@@ -1927,8 +1925,10 @@ public class PreferencesHelper implements RankingConfig {
                     conversation.setPkg(r.pkg);
                     conversation.setUid(r.uid);
                     conversation.setNotificationChannel(nc);
-                    conversation.setParentChannelLabel(
-                            r.channels.get(nc.getParentChannelId()).getName());
+                    NotificationChannel parent = r.channels.get(nc.getParentChannelId());
+                    conversation.setParentChannelLabel(parent == null
+                            ? null
+                            : parent.getName());
                     boolean blockedByGroup = false;
                     if (nc.getGroup() != null) {
                         NotificationChannelGroup group = r.groups.get(nc.getGroup());

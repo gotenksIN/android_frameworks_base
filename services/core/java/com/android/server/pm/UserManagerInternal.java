@@ -20,6 +20,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SpecialUsers.CanBeNULL;
 import android.annotation.UserIdInt;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.LauncherUserInfo;
 import android.content.pm.UserInfo;
@@ -620,6 +621,22 @@ public abstract class UserManagerInternal {
      * there is no such user.
      */
     public abstract @CanBeNULL @UserIdInt int getSupervisingProfileId();
+
+    /** Optimized version of {@link UserManager#isHeadlessSystemUserMode()} */
+    public abstract boolean isHeadlessSystemUserMode();
+
+    // TODO(b/414326600): for now it's only logging launched activities, but once the allowlist
+    // mechanism is implemented, it should pass some sort of @HsuUiActionResult int result
+    /** Logs an activity launched in the headless system user */
+    public abstract void logLaunchedHsuActivity(ComponentName activity);
+
+    /**
+     * Sets the id of the {@code DeviceOwner}, if any.
+     *
+     * <p>{@code DeviceOwner} is a {@code DPM} (Device Policy Management) concept and hence should
+     * only be called by the {@code DPM} infra.
+     */
+    public abstract void setDeviceOwnerUserId(@CanBeNULL @UserIdInt int userId);
 
     /**
      * Checks whether to show a notification for sounds (e.g., alarms, timers, etc.) from background

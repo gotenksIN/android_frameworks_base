@@ -15,6 +15,7 @@
  */
 package com.android.internal.widget.remotecompose.player.state;
 
+
 import android.annotation.NonNull;
 import android.graphics.Bitmap;
 

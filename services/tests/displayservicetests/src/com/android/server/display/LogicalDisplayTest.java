@@ -35,6 +35,9 @@ import android.app.PropertyInvalidatedCache;
 import android.content.Context;
 import android.graphics.Point;
 import android.os.IBinder;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.util.SparseArray;
 import android.view.Display;
 import android.view.DisplayInfo;
@@ -43,10 +46,12 @@ import android.view.SurfaceControl;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.server.display.feature.flags.Flags;
 import com.android.server.display.layout.Layout;
 import com.android.server.display.mode.SyntheticModeManager;
 
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.AdditionalAnswers;
 
@@ -61,6 +66,9 @@ public class LogicalDisplayTest {
     private static final int DISPLAY_HEIGHT = 200;
     private static final int MODE_ID = 1;
     private static final int OTHER_MODE_ID = 2;
+
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     private LogicalDisplay mLogicalDisplay;
     private DisplayDevice mDisplayDevice;
@@ -155,11 +163,11 @@ public class LogicalDisplayTest {
 
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ANISOTROPY_CORRECTED_MODES)
     public void testNoLetterbox_noAnisotropyCorrectionForInternalDisplay() {
         mDisplayDeviceInfo.type = Display.TYPE_INTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isSyncedResolutionSwitchEnabled=*/ true);
-        mLogicalDisplay.setAnisotropyCorrectionEnabled(true);
+                /*isSyncedResolutionSwitchEnabled=*/ true, true, false);
 
         // In case of Anisotropy of pixels, then the content should be rescaled so it would adjust
         // to using the whole screen. This is because display will rescale it back to fill the
@@ -184,11 +192,11 @@ public class LogicalDisplayTest {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ANISOTROPY_CORRECTED_MODES)
     public void testNoLetterbox_anisotropyCorrection() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isSyncedResolutionSwitchEnabled=*/ true);
-        mLogicalDisplay.setAnisotropyCorrectionEnabled(true);
+                /*isSyncedResolutionSwitchEnabled=*/ true, true, false);
 
         // In case of Anisotropy of pixels, then the content should be rescaled so it would adjust
         // to using the whole screen. This is because display will rescale it back to fill the
@@ -213,11 +221,11 @@ public class LogicalDisplayTest {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ANISOTROPY_CORRECTED_MODES)
     public void testLetterbox_anisotropyCorrectionYDpi() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isSyncedResolutionSwitchEnabled=*/ true);
-        mLogicalDisplay.setAnisotropyCorrectionEnabled(true);
+                /*isSyncedResolutionSwitchEnabled=*/ true, true, false);
 
         DisplayInfo displayInfo = new DisplayInfo();
         displayInfo.logicalWidth = DISPLAY_WIDTH;
@@ -231,6 +239,31 @@ public class LogicalDisplayTest {
         mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false);
 
         assertEquals(new Point(0, 75), mLogicalDisplay.getDisplayPosition());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_ANISOTROPY_CORRECTED_MODES)
+    public void testNoLetterbox_noAnisotropyCorrectionIfAnisotropicModesEnabled() {
+        mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
+                /*isSyncedResolutionSwitchEnabled=*/ true, true, false);
+
+        // In case of Anisotropy of pixels, then the content should be rescaled so it would adjust
+        // to using the whole screen. This is because display will rescale it back to fill the
+        // screen (in case the display menu setting is set to stretch the pixels across the display)
+        mDisplayDeviceInfo.xDpi = 0.5f;
+        mDisplayDeviceInfo.yDpi = 1.0f;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        var originalDisplayInfo = mLogicalDisplay.getDisplayInfoLocked();
+        // Content width not scaled
+        assertEquals(DISPLAY_WIDTH, originalDisplayInfo.logicalWidth);
+        assertEquals(DISPLAY_HEIGHT, originalDisplayInfo.logicalHeight);
+
+        SurfaceControl.Transaction t = mock(SurfaceControl.Transaction.class);
+        mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false);
+
+        assertEquals(new Point(0, 0), mLogicalDisplay.getDisplayPosition());
     }
 
     @Test
@@ -271,11 +304,11 @@ public class LogicalDisplayTest {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ANISOTROPY_CORRECTED_MODES)
     public void testPillarbox_anisotropyCorrection() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isSyncedResolutionSwitchEnabled=*/ true);
-        mLogicalDisplay.setAnisotropyCorrectionEnabled(true);
+                /*isSyncedResolutionSwitchEnabled=*/ true, true, false);
 
         DisplayInfo displayInfo = new DisplayInfo();
         displayInfo.logicalWidth = DISPLAY_WIDTH;
@@ -300,11 +333,11 @@ public class LogicalDisplayTest {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ANISOTROPY_CORRECTED_MODES)
     public void testNoPillarbox_anisotropyCorrectionYDpi() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isSyncedResolutionSwitchEnabled=*/ true);
-        mLogicalDisplay.setAnisotropyCorrectionEnabled(true);
+                /*isSyncedResolutionSwitchEnabled=*/ true, true, false);
 
         // In case of Anisotropy of pixels, then the content should be rescaled so it would adjust
         // to using the whole screen. This is because display will rescale it back to fill the
@@ -387,7 +420,7 @@ public class LogicalDisplayTest {
     @Test
     public void testSetDisplaySizeIsCalledDuringConfigureDisplayLocked() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isSyncedResolutionSwitchEnabled=*/ true);
+                /*isSyncedResolutionSwitchEnabled=*/ true, true, false);
         mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
         SurfaceControl.Transaction t = mock(SurfaceControl.Transaction.class);
         mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false);
@@ -572,7 +605,8 @@ public class LogicalDisplayTest {
 
     @Test
     public void testGetsAppSupportedModesFromSyntheticModeManager() {
-        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice);
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
+                false, false);
         Display.Mode[] appSupportedModes = new Display.Mode[] {new Display.Mode(OTHER_MODE_ID,
                 DISPLAY_WIDTH, DISPLAY_HEIGHT, /* refreshRate= */ 45)};
         when(mSyntheticModeManager.createAppSupportedModes(
@@ -582,6 +616,15 @@ public class LogicalDisplayTest {
         mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
         DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
         assertArrayEquals(appSupportedModes, info.appsSupportedModes);
+    }
+
+    @Test
+    public void testGetsAppSupportedModesFromSupportedModes() {
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice);
+
+        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
+        assertArrayEquals(mDisplayDeviceInfo.supportedModes, info.appsSupportedModes);
     }
 
     @Test
@@ -737,5 +780,47 @@ public class LogicalDisplayTest {
         DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
 
         assertEquals(125, info.logicalDensityDpi);
+    }
+
+    @Test
+    public void testUserPreferredModeWithSizeOverride_updatesResolution() {
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
+                false, true);
+        Display.Mode mode = new Display.Mode(OTHER_MODE_ID, -1, Display.Mode.FLAG_SIZE_OVERRIDE,
+                1000, 1000, 60f, 60f, new float[]{}, new int[]{});
+        mDisplayDeviceInfo.supportedModes = new Display.Mode[] {mode};
+        mDisplayDeviceInfo.width = 500;
+        mDisplayDeviceInfo.height = 500;
+        mDisplayDeviceInfo.xDpi = 100;
+        mDisplayDeviceInfo.yDpi = 100;
+        mDisplayDeviceInfo.userPreferredModeId = OTHER_MODE_ID;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+
+        assertThat(mLogicalDisplay.getDisplayInfoLocked().logicalWidth).isEqualTo(1000);
+        assertThat(mLogicalDisplay.getDisplayInfoLocked().logicalHeight).isEqualTo(1000);
+        assertThat(mLogicalDisplay.getDisplayInfoLocked().physicalXDpi).isEqualTo(200);
+        assertThat(mLogicalDisplay.getDisplayInfoLocked().physicalYDpi).isEqualTo(200);
+    }
+
+    @Test
+    public void testUserPreferredModeWithoutSizeOverride_doesNotUpdateResolution() {
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
+                false, true);
+        Display.Mode mode = new Display.Mode(OTHER_MODE_ID, -1, 0,
+                1000, 1000, 60f, 60f, new float[]{}, new int[]{});
+        mDisplayDeviceInfo.supportedModes = new Display.Mode[] {mode};
+        mDisplayDeviceInfo.width = 500;
+        mDisplayDeviceInfo.height = 500;
+        mDisplayDeviceInfo.xDpi = 100;
+        mDisplayDeviceInfo.yDpi = 100;
+        mDisplayDeviceInfo.userPreferredModeId = OTHER_MODE_ID;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+
+        assertThat(mLogicalDisplay.getDisplayInfoLocked().logicalWidth).isEqualTo(500);
+        assertThat(mLogicalDisplay.getDisplayInfoLocked().logicalHeight).isEqualTo(500);
+        assertThat(mLogicalDisplay.getDisplayInfoLocked().physicalXDpi).isEqualTo(100);
+        assertThat(mLogicalDisplay.getDisplayInfoLocked().physicalYDpi).isEqualTo(100);
     }
 }

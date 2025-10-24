@@ -32,7 +32,7 @@ aconfig_declarations_group {
         "android.app.jank.flags-aconfig-java",
         "android.app.ondeviceintelligence-aconfig-java",
         "android.app.privatecompute.flags-aconfig-java",
-        "android.app.userrecovery.flags-aconfig-java",
+        "android.app.lskfreset.flags-aconfig-java",
         "android.app.smartspace.flags-aconfig-java",
         "android.app.supervision.flags-aconfig-java",
         "android.app.usage.flags-aconfig-java",
@@ -96,6 +96,7 @@ aconfig_declarations_group {
         "backstage_power_flags_lib",
         "backup_flags_lib",
         "camera_platform_flags_core_java_lib",
+        "com.android.eyedropper.flags-aconfig-java",
         "com.android.hardware.input-aconfig-java",
         "com.android.input.flags-aconfig-java",
         "com.android.internal.compat.flags-aconfig-java",
@@ -131,6 +132,7 @@ aconfig_declarations_group {
         "libcore_exported_aconfig_flags_lib",
         "libcore_readonly_aconfig_flags_lib",
         "libgui_flags_java_lib",
+        "mediaprovider_exported_aconfig_flag_lib",
         "networksecurity_exported_aconfig_flags_lib",
         "power_flags_lib",
         "sdk_sandbox_exported_flags_lib",
@@ -239,6 +241,7 @@ java_aconfig_library {
 java_aconfig_library {
     name: "telecom_flags_core_java_lib",
     aconfig_declarations: "telecom_flags",
+    min_sdk_version: "36",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -440,6 +443,7 @@ aconfig_declarations {
     name: "android.nfc.flags-aconfig",
     package: "android.nfc",
     container: "system",
+    exportable: true,
     srcs: ["nfc-non-updatable/flags/*.aconfig"],
 }
 
@@ -460,6 +464,7 @@ java_aconfig_library {
     name: "android.nfc.flags-aconfig-java",
     aconfig_declarations: "android.nfc.flags-aconfig",
     min_sdk_version: "34",
+    mode: "exported",
     apex_available: [
         "//apex_available:platform",
         "com.android.nfcservices",
@@ -664,6 +669,13 @@ aconfig_declarations {
 java_aconfig_library {
     name: "android.view.inputmethod.flags-aconfig-java",
     aconfig_declarations: "android.view.inputmethod.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+java_aconfig_library {
+    name: "android.view.inputmethod.flags-aconfig-java-host",
+    aconfig_declarations: "android.view.inputmethod.flags-aconfig",
+    host_supported: true,
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -970,6 +982,7 @@ java_aconfig_library {
         "com.android.extservices",
         "com.android.nfcservices",
         "com.android.permission",
+        "com.android.tethering",
     ],
 }
 
@@ -1058,6 +1071,18 @@ java_aconfig_library {
     name: "display_flags_lib",
     aconfig_declarations: "display_flags",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+java_aconfig_library {
+    name: "display_flags_lib-export",
+    aconfig_declarations: "display_flags",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    min_sdk_version: "30",
+    mode: "exported",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.nfcservices",
+    ],
 }
 
 cc_aconfig_library {
@@ -1387,16 +1412,16 @@ aconfig_declarations {
 
 // User Recovery
 aconfig_declarations {
-    name: "android.app.userrecovery.flags-aconfig",
+    name: "android.app.lskfreset.flags-aconfig",
     exportable: true,
-    package: "android.app.userrecovery.flags",
+    package: "android.app.lskfreset.flags",
     container: "system",
-    srcs: ["core/java/android/app/userrecovery/flags/flags.aconfig"],
+    srcs: ["core/java/android/app/lskfreset/flags/flags.aconfig"],
 }
 
 java_aconfig_library {
-    name: "android.app.userrecovery.flags-aconfig-java",
-    aconfig_declarations: "android.app.userrecovery.flags-aconfig",
+    name: "android.app.lskfreset.flags-aconfig-java",
+    aconfig_declarations: "android.app.lskfreset.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 

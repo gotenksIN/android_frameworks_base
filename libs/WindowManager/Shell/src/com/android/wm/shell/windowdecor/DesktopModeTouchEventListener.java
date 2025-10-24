@@ -114,9 +114,6 @@ public class DesktopModeTouchEventListener
      * Whether to pilfer the next motion event to send cancellations to the windows below.
      * Useful when the caption window is spy and the gesture should be handled by the system
      * instead of by the app for their custom header content.
-     * Should not have any effect when
-     * {@link DesktopModeFlags#ENABLE_ACCESSIBLE_CUSTOM_HEADERS}, because a spy window is not
-     * used then.
      */
     private boolean mIsCustomHeaderGesture;
     private boolean mIsResizeGesture;
@@ -334,13 +331,9 @@ public class DesktopModeTouchEventListener
                     viewName, mIsCustomHeaderGesture, mIsResizeGesture);
             return false;
         }
-        if (mInputManager != null
-                && !DesktopModeFlags.ENABLE_ACCESSIBLE_CUSTOM_HEADERS.isTrue()) {
-            ViewRootImpl viewRootImpl = v.getViewRootImpl();
-            if (viewRootImpl != null) {
-                // Pilfer so that windows below receive cancellations for this gesture.
-                mInputManager.pilferPointers(viewRootImpl.getInputToken());
-            }
+        if (isDown) {
+            // Pilfer once (on down) so that windows below receive cancellations for this gesture.
+            pilferPointers(v);
         }
         if (isUpOrCancel) {
             // Gesture is finished, reset state.
@@ -352,6 +345,12 @@ public class DesktopModeTouchEventListener
         } else {
             return mHeaderDragDetector.onMotionEvent(v, e);
         }
+    }
+
+    private void pilferPointers(@NonNull View v) {
+        final ViewRootImpl viewRootImpl = v.getViewRootImpl();
+        if (mInputManager == null || viewRootImpl == null) return;
+        mInputManager.pilferPointers(viewRootImpl.getInputToken());
     }
 
     @Override
@@ -669,7 +668,7 @@ public class DesktopModeTouchEventListener
                 // Tasks bounds haven't actually been updated (only its leash), so pass to
                 // DesktopTasksController to allow secondary transformations (i.e. snap resizing
                 // or transforming to fullscreen) before setting new task bounds.
-                final Rect validDragArea = decoration.calculateValidDragArea();
+                final Rect validDragArea = decoration.getValidDragArea();
                 final boolean needDragIndicatorCleanup =
                         mDesktopTasksController.onDragPositioningEnd(
                                 taskInfo, decoration.getTaskSurface(), e.getDisplayId(),

@@ -21,6 +21,7 @@ import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.core.StatusBarForDesktop
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.onConfigChanged
 import javax.inject.Inject
@@ -39,15 +40,31 @@ constructor(
     @Background private val scope: CoroutineScope,
     configurationController: ConfigurationController,
 ) {
-
-    /** Whether the desktop feature set is enabled. */
-    val isDesktopFeatureSetEnabled: StateFlow<Boolean> =
+    /** Whether this is a desktop device for the purposes of falsing. */
+    val isDesktopForFalsingPurposes: StateFlow<Boolean> =
         configurationController.onConfigChanged
-            .map { resources.getBoolean(R.bool.config_enableDesktopFeatureSet) }
-            .onStart { emit(resources.getBoolean(R.bool.config_enableDesktopFeatureSet)) }
+            .map { resources.getBoolean(R.bool.config_isDesktopForFalsingPurposes) }
+            .onStart { emit(resources.getBoolean(R.bool.config_isDesktopForFalsingPurposes)) }
             .stateIn(
                 scope,
                 SharingStarted.WhileSubscribed(),
-                resources.getBoolean(R.bool.config_enableDesktopFeatureSet),
+                resources.getBoolean(R.bool.config_isDesktopForFalsingPurposes),
             )
+
+    // TODO(441100057): This StateFlow should support Connected Displays.
+    /** Whether showing the desktop status bar is enabled. */
+    val useDesktopStatusBar: StateFlow<Boolean> =
+        configurationController.onConfigChanged
+            .map { resources.getBoolean(R.bool.config_useDesktopStatusBar) }
+            .onStart { emit(resources.getBoolean(R.bool.config_useDesktopStatusBar)) }
+            .stateIn(
+                scope,
+                SharingStarted.WhileSubscribed(),
+                resources.getBoolean(R.bool.config_useDesktopStatusBar),
+            )
+
+    // TODO(441100057): This should support Connected Displays.
+    val isNotificationShadeOnTopEnd: Boolean =
+        resources.getBoolean(R.bool.config_notificationShadeOnTopEnd) &&
+            StatusBarForDesktop.isEnabled
 }

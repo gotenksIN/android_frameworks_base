@@ -87,6 +87,8 @@
     <string name="bluetooth_connecting" msgid="5871702668260192755">"מתבצעת התחברות…"</string>
     <string name="bluetooth_connected" msgid="8065345572198502293">"<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g> מחובר"</string>
     <string name="bluetooth_pairing" msgid="4269046942588193600">"ההתאמה מתבצעת..."</string>
+    <string name="bluetooth_pairing_failure" msgid="6914444518793157913">"אי אפשר לבצע את ההתאמה"</string>
+    <string name="bluetooth_connection_failure" msgid="384203214661155324">"אין אפשרות להתחבר"</string>
     <string name="bluetooth_connected_no_headset" msgid="2224101138659967604">"מחובר (ללא טלפון)<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>"</string>
     <string name="bluetooth_connected_no_a2dp" msgid="8566874395813947092">"מחובר (ללא מדיה)<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>"</string>
     <string name="bluetooth_connected_no_headset_no_a2dp" msgid="2893204819854215433">"מחובר (ללא טלפון או מדיה)<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>"</string>
@@ -116,6 +118,9 @@
     <string name="bluetooth_hearing_aid_right_active" msgid="2244728507170385397">"פעיל (ימין בלבד)"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="4294571497939983181">"פעיל (ימין ושמאל)"</string>
     <string name="bluetooth_hearing_device_ambient_error" msgid="6035857289108813878">"לא ניתן לעדכן את עוצמת הרעשים בסביבה"</string>
+    <string name="bluetooth_hearing_aids_presets_error" msgid="4523942574698610976">"אי אפשר לעדכן את ההגדרה הקבועה מראש."</string>
+    <!-- no translation found for hearing_device_spinner_item_selected (3884049360428514878) -->
+    <skip />
     <string name="bluetooth_active_media_only_battery_level" msgid="7772517511061834073">"פעיל (מדיה בלבד). סוללה: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>."</string>
     <string name="bluetooth_active_media_only_battery_level_untethered" msgid="7444753133664620926">"פעיל (מדיה בלבד). סוללה בצד שמאל: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g>, סוללה בצד ימין: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g>."</string>
     <string name="bluetooth_guest_battery_level" msgid="2820003593899467676">"מכשיר אורח. סוללה: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>."</string>
@@ -345,7 +350,7 @@
     <string name="wifi_non_persistent_mac_randomization_summary" msgid="2159794543105053930">"‏כשהמצב הזה מופעל, כתובת ה-MAC של המכשיר הזה יכולה להשתנות בכל פעם שהוא מתחבר לרשת שבה פועלת רנדומיזציה של כתובות MAC."</string>
     <string name="wifi_metered_label" msgid="8737187690304098638">"חיוב לפי שימוש בנתונים"</string>
     <string name="wifi_unmetered_label" msgid="6174142840934095093">"לא נמדדת"</string>
-    <string name="select_logd_size_title" msgid="1604578195914595173">"גודלי מאגר של יומן רישום"</string>
+    <string name="select_logd_size_title" msgid="4393502933789367691">"גודל מאגר הנתונים הזמני של הכלי לרישום ביומן"</string>
     <string name="select_logd_size_dialog_title" msgid="2105401994681013578">"יש לבחור גדלים של יוצר יומן לכל מאגר יומן"</string>
     <string name="dev_logpersist_clear_warning_title" msgid="8631859265777337991">"האם למחוק את אחסון המתעד המתמיד?"</string>
     <string name="dev_logpersist_clear_warning_message" msgid="6447590867594287413">"כשאנחנו כבר לא מבצעים מעקב באמצעות המתעד המתמיד, אנחנו נדרשים למחוק את נתוני המתעד המקומי במכשיר."</string>
@@ -414,7 +419,7 @@
     <string name="simulate_color_space" msgid="1206503300335835151">"יצירת הדמיה של מרחב צבעים"</string>
     <string name="enable_opengl_traces_title" msgid="4638773318659125196">"‏הפעלת מעקבי OpenGL"</string>
     <string name="usb_audio_disable_routing" msgid="3367656923544254975">"‏השבתת ניתוב אודיו ב-USB"</string>
-    <string name="usb_audio_disable_routing_summary" msgid="8768242894849534699">"‏השבתת ניתוב אוטומטי אל התקני אודיו חיצוניים ב-USB"</string>
+    <string name="usb_audio_disable_routing_summary" msgid="8768242894849534699">"‏הניתוב האוטומטי אל התקני אודיו חיצוניים ב-USB יושבת"</string>
     <string name="debug_layout" msgid="1659216803043339741">"הצגת גבולות הפריסה"</string>
     <string name="debug_layout_summary" msgid="8825829038287321978">"הצגת גבולות אזור, שוליים וכדומה"</string>
     <string name="force_rtl_layout_all_locales" msgid="8690762598501599796">"אילוץ כיוון פריסה מימין לשמאל"</string>
@@ -446,7 +451,7 @@
     <string name="immediately_destroy_activities_summary" msgid="6289590341144557614">"השמדת כל פעילות ברגע שהמשתמש עוזב אותה"</string>
     <string name="app_process_limit_title" msgid="8361367869453043007">"מגבלה של תהליכים ברקע"</string>
     <string name="show_all_anrs" msgid="9160563836616468726">"‏הצגת מקרי ANR ברקע"</string>
-    <string name="show_all_anrs_summary" msgid="8562788834431971392">"הצגת תיבת דו-שיח של \'אפליקציה לא מגיבה\' עבור אפליקציות שפועלות ברקע"</string>
+    <string name="show_all_anrs_summary" msgid="8562788834431971392">"תופיע תיבת דו-שיח של \"אפליקציה לא מגיבה\" לגבי אפליקציות שפועלות ברקע"</string>
     <string name="show_notification_channel_warnings" msgid="3448282400127597331">"אזהרות לגבי ערוץ התראות"</string>
     <string name="show_notification_channel_warnings_summary" msgid="68031143745094339">"הצגת אזהרה כשאפליקציה שולחת התראה ללא ערוץ תקין"</string>
     <string name="force_allow_on_external" msgid="9187902444231637880">"אילוץ הרשאת אפליקציות באחסון חיצוני"</string>
@@ -574,7 +579,7 @@
     <string name="use_system_language_to_select_input_method_subtypes" msgid="4865195835541387040">"שימוש בשפות המערכת"</string>
     <string name="failed_to_open_app_settings_toast" msgid="764897252657692092">"פתיחת הגדרות עבור <xliff:g id="SPELL_APPLICATION_NAME">%1$s</xliff:g> נכשלה"</string>
     <string name="ime_security_warning" msgid="6547562217880551450">"ייתכן ששיטת קלט זו תוכל לאסוף את כל הטקסט המוקלד, כולל נתונים אישיים כגון סיסמאות ומספרי כרטיס אשראי. היא מגיעה מהאפליקציה <xliff:g id="IME_APPLICATION_NAME">%1$s</xliff:g>. האם להשתמש בשיטת קלט זו?"</string>
-    <string name="direct_boot_unaware_dialog_message" msgid="7845398276735021548">"לתשומת ליבך: לאחר הפעלה מחדש של המכשיר, ניתן להפעיל את האפליקציה רק לאחר שתבטל את נעילת הטלפון"</string>
+    <string name="direct_boot_unaware_dialog_message" msgid="7845398276735021548">"חשוב לשים לב: אחרי שהמכשיר יופעל מחדש, צריך יהיה קודם לפתוח את נעילת הטלפון ורק אחר כך להפעיל את האפליקציה"</string>
     <string name="ims_reg_title" msgid="8197592958123671062">"‏סטטוס הרשמה ל-IMS"</string>
     <string name="ims_reg_status_registered" msgid="884916398194885457">"רשום"</string>
     <string name="ims_reg_status_not_registered" msgid="2989287366045704694">"לא רשום"</string>

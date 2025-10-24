@@ -84,6 +84,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.android.compose.modifiers.animatedBackground
 import com.android.compose.modifiers.thenIf
 import com.android.compose.ui.graphics.FullScreenComposeViewInOverlay
+import com.android.systemui.Flags.expandableForceModifierImplementation
 import com.android.systemui.Flags.expandableUseModifierImplementation
 import com.android.systemui.animation.ComposableControllerFactory
 import com.android.systemui.animation.Expandable
@@ -219,7 +220,7 @@ fun Expandable(
         }
     }
 
-    if (useModifierBasedImplementation) {
+    if (useModifierBasedImplementation || expandableForceModifierImplementation()) {
         Box(modifier.expandable(controller, onClick, onClickLabel, interactionSource)) {
             WrappedContent(
                 controller.expandable,
@@ -311,7 +312,11 @@ fun Expandable(
                     .then(clickModifier(controller, onClick, onClickLabel, interactionSource))
                     .animatedBackground(color, shape = shape)
                     .border(controller)
-                    .onGloballyPositioned { controller.boundsInComposeViewRoot = it.boundsInRoot() }
+                    .onGloballyPositioned {
+                        if (it.isAttached) {
+                            controller.boundsInComposeViewRoot = it.boundsInRoot()
+                        }
+                    }
             ) {
                 wrappedContent(controller.expandable)
             }

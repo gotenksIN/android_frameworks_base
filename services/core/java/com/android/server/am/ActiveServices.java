@@ -96,6 +96,7 @@ import static android.os.Process.ROOT_UID;
 import static android.os.Process.SHELL_UID;
 import static android.os.Process.SYSTEM_UID;
 import static android.os.Process.ZYGOTE_POLICY_FLAG_EMPTY;
+import static android.os.Process.ZYGOTE_POLICY_FLAG_NATIVE_PROCESS;
 
 import static com.android.internal.messages.nano.SystemMessageProto.SystemMessage.NOTE_FOREGROUND_SERVICE_BG_LAUNCH;
 import static com.android.internal.util.FrameworkStatsLog.FOREGROUND_SERVICE_STATE_CHANGED__FGS_START_API__FGSSTARTAPI_DELEGATE;
@@ -218,9 +219,7 @@ import android.stats.devicepolicy.DevicePolicyEnums;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
-// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
 import android.util.BoostFramework;
-// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 import android.util.EventLog;
 import android.util.Pair;
 import android.util.PrintWriterPrinter;
@@ -252,9 +251,7 @@ import com.android.server.am.ServiceRecord.ShortFgsInfo;
 import com.android.server.am.ServiceRecord.TimeLimitedFgsInfo;
 import com.android.server.pm.KnownPackages;
 import com.android.server.uri.NeededUriGrants;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import com.android.server.wm.ActivityRecord;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import com.android.server.utils.AnrTimer;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 
@@ -274,12 +271,10 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
 import vendor.qti.hardware.servicetracker.V1_0.IServicetracker;
 import vendor.qti.hardware.servicetracker.V1_0.ServiceData;
 import vendor.qti.hardware.servicetracker.V1_0.ClientData;
 
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
 public final class ActiveServices {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ActiveServices" : TAG_AM;
     private static final String TAG_MU = TAG + POSTFIX_MU;
@@ -293,14 +288,10 @@ public final class ActiveServices {
 
     private static final boolean LOG_SERVICE_START_STOP = DEBUG_SERVICE;
 
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     private static final String AIDL_SERVICE =
             "vendor.qti.hardware.servicetrackeraidl.IServicetracker/default";
 
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2024-09-23: Core: Assign mIsAIDLSupported default value to false
     private static boolean mIsAIDLSupported = false;
-// QTI_END: 2024-09-23: Core: Assign mIsAIDLSupported default value to false
     // Foreground service types that always get immediate notification display,
     // expressed in the same bitmask format that ServiceRecord.foregroundServiceType
     // uses.
@@ -425,17 +416,11 @@ public final class ActiveServices {
     // at the same time.
     final int mMaxStartingBackground;
 
-// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
    //mPerf Object
    public static BoostFramework mPerf = new BoostFramework();
 
-// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     // Flag to reschedule the services during app launch. Disable by default.
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
     private static boolean SERVICE_RESCHEDULE = false;
-// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 
     /**
      * Master service bookkeeping, keyed by user number.
@@ -532,16 +517,12 @@ public final class ActiveServices {
     /** Amount of time to allow a last ANR message to exist before freeing the memory. */
     static final int LAST_ANR_LIFETIME_DURATION_MSECS = 2 * 60 * 60 * 1000; // Two hours
 
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     private vendor.qti.hardware.servicetracker.V1_0.IServicetracker mServicetracker;
     private vendor.qti.hardware.servicetrackeraidl.IServicetracker  mServicetracker_aidl;
 
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
     private final boolean isLowRamDevice =
             SystemProperties.getBoolean("ro.config.low_ram", false);
 
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
     String mLastAnrDump;
 
     AppWidgetManagerInternal mAppWidgetManagerInternal;
@@ -826,10 +807,8 @@ public final class ActiveServices {
 
         final IBinder b = ServiceManager.getService(Context.PLATFORM_COMPAT_SERVICE);
 
-// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
         if(mPerf != null)
             SERVICE_RESCHEDULE = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.am.reschedule_service", "false"));
-// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
 
         this.mFGSLogger = new ForegroundServiceTypeLoggerModule();
         this.mActiveServiceAnrTimer = new ProcessAnrTimer(service,
@@ -846,7 +825,6 @@ public final class ActiveServices {
                 new AnrTimer.Args()
                             .extend(true)
                             .longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer()));
-// QTI_BEGIN: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
         try {
             if (ServiceManager.isDeclared(AIDL_SERVICE)){
                 if (DEBUG_SERVICE) Slog.w(TAG, "AIDL is supported");
@@ -856,7 +834,6 @@ public final class ActiveServices {
             if (DEBUG_SERVICE) Slog.w(TAG, "AIDL not Supported");
             mIsAIDLSupported = false;
         }
-// QTI_END: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
     }
 
     void systemServicesReady() {
@@ -887,7 +864,6 @@ public final class ActiveServices {
         }
     }
 
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
     private boolean getServicetrackerInstance() {
         if (mServicetracker == null ) {
             try {
@@ -906,25 +882,15 @@ public final class ActiveServices {
         return true;
     }
 
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     private boolean getAIDLServicetrackerInstance() {
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
 
         if (!mIsAIDLSupported) return false;
 
-// QTI_END: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         if (mServicetracker_aidl == null ) {
             try {
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
                 IBinder mBinder = ServiceManager.getService(AIDL_SERVICE);
                 mServicetracker_aidl =
                     vendor.qti.hardware.servicetrackeraidl.IServicetracker.Stub.asInterface(mBinder);
-// QTI_END: 2023-10-16: Core: Add check if vendor is supporting AIDL or HIDL
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             } catch (java.util.NoSuchElementException e) {
                 // Service doesn't exist or cannot be opened logged below
             } catch (Exception e) {
@@ -939,7 +905,6 @@ public final class ActiveServices {
         return true;
     }
 
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     ServiceRecord getServiceByNameLocked(ComponentName name, int callingUser) {
         // TODO: Deal with global services
         if (DEBUG_MU)
@@ -1479,7 +1444,9 @@ public final class ActiveServices {
                                         if (!mAm.getPackageManagerInternal()
                                                 .isPermissionsReviewRequired(r.packageName,
                                                     r.userId)) {
-                                            try {
+                                            try (var unused = mAm.mProcessStateController
+                                                    .startServiceBatchSession(
+                                                    OOM_ADJ_REASON_START_SERVICE)) {
                                                 bringUpServiceLocked(r,
                                                         service.getFlags(),
                                                         callerFg,
@@ -1491,9 +1458,15 @@ public final class ActiveServices {
                                             } catch (RemoteException e) {
                                                 /* ignore - local call */
                                             } finally {
-                                                /* Will be a no-op if nothing pending */
-                                                mAm.updateOomAdjPendingTargetsLocked(
-                                                        OOM_ADJ_REASON_START_SERVICE);
+                                                if (Flags.pscBatchServiceUpdates()) {
+                                                    // Do nothing. The ProcessStateController
+                                                    // BatchSession close would have triggered
+                                                    // the update.
+                                                } else {
+                                                    /* Will be a no-op if nothing pending */
+                                                    mAm.updateOomAdjPendingTargetsLocked(
+                                                            OOM_ADJ_REASON_START_SERVICE);
+                                                }
                                             }
                                         } else {
                                             unbindServiceLocked(connection);
@@ -1572,7 +1545,8 @@ public final class ActiveServices {
                         return;
                     }
                     if (isBinding) {
-                        try {
+                        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                                OOM_ADJ_REASON_START_SERVICE)) {
                             bringUpServiceLocked(s, serviceIntent.getFlags(), callerFg,
                                     false /* whileRestarting */,
                                     false /* permissionsReviewRequired */,
@@ -1582,8 +1556,13 @@ public final class ActiveServices {
                         } catch (TransactionTooLargeException e) {
                             /* ignore - local call */
                         } finally {
-                            /* Will be a no-op if nothing pending */
-                            mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
+                            if (Flags.pscBatchServiceUpdates()) {
+                                // Do nothing. The ProcessStateController BatchSession close
+                                // would have triggered the update.
+                            } else {
+                                /* Will be a no-op if nothing pending */
+                                mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
+                            }
                         }
                     } else { // Starting a service
                         try {
@@ -1656,16 +1635,25 @@ public final class ActiveServices {
         final boolean wasStopped = hostApp == null ? r.appInfo.isStopped() : false;
         final boolean firstLaunch = hostApp == null ? r.appInfo.isNotLaunched() : false;
 
-        String error = bringUpServiceLocked(r, service.getFlags(), callerFg,
-                false /* whileRestarting */,
-                false /* permissionsReviewRequired */,
-                false /* packageFrozen */,
-                true /* enqueueOomAdj */,
-                SERVICE_BIND_OOMADJ_POLICY_LEGACY);
-        /* Will be a no-op if nothing pending */
-        mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
-        if (error != null) {
-            return new ComponentName("!!", error);
+
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_START_SERVICE)) {
+            String error = bringUpServiceLocked(r, service.getFlags(), callerFg,
+                    false /* whileRestarting */,
+                    false /* permissionsReviewRequired */,
+                    false /* packageFrozen */,
+                    true /* enqueueOomAdj */,
+                    SERVICE_BIND_OOMADJ_POLICY_LEGACY);
+            if (Flags.pscBatchServiceUpdates()) {
+                // Do nothing. The ProcessStateController BatchSession close
+                // would have triggered the update.
+            } else {
+                /* Will be a no-op if nothing pending */
+                mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
+            }
+            if (error != null) {
+                return new ComponentName("!!", error);
+            }
         }
 
         final int packageState = wasStopped
@@ -1849,15 +1837,23 @@ public final class ActiveServices {
                 }
             }
             if (stopping != null) {
-                final int size = stopping.size();
-                for (int i = size - 1; i >= 0; i--) {
-                    ServiceRecord service = stopping.get(i);
-                    service.delayed = false;
-                    services.ensureNotStartingBackgroundLocked(service);
-                    stopServiceLocked(service, true);
-                }
-                if (size > 0) {
-                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_UID_IDLE);
+                try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                        OOM_ADJ_REASON_UID_IDLE)) {
+                    final int size = stopping.size();
+                    for (int i = size - 1; i >= 0; i--) {
+                        ServiceRecord service = stopping.get(i);
+                        service.delayed = false;
+                        services.ensureNotStartingBackgroundLocked(service);
+                        stopServiceLocked(service, true);
+                    }
+                    if (size > 0) {
+                        if (Flags.pscBatchServiceUpdates()) {
+                            // Do nothing. The ProcessStateController BatchSession close
+                            // would have triggered the update.
+                        } else {
+                            mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_UID_IDLE);
+                        }
+                    }
                 }
             }
         }
@@ -4186,21 +4182,16 @@ public final class ActiveServices {
         return false;
     }
 
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     private void getServiceTrackerAidlData(vendor.qti.hardware.servicetrackeraidl.ServiceData sData,
             vendor.qti.hardware.servicetrackeraidl.ClientData cData, ServiceRecord r,
             ConnectionRecord connrec, ProcessRecord callerApp, boolean unbind) {
         if (unbind){
             sData.packageName = connrec.binding.service.packageName;
             sData.processName = connrec.binding.service.shortInstanceName;
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             sData.lastActivity = connrec.binding.service.getLastActivity();
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             if (connrec.binding.service.app != null) {
                 sData.pid = connrec.binding.service.app.getPid();
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                 sData.serviceB = connrec.binding.service.app.isServiceB();
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             } else {
                 sData.pid = -1;
                 sData.serviceB = false;
@@ -4214,14 +4205,10 @@ public final class ActiveServices {
 
         sData.packageName = r.packageName;
         sData.processName = r.shortInstanceName;
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         sData.lastActivity = r.getLastActivity();
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         if (r.app != null) {
             sData.pid = r.app.getPid();
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             sData.serviceB = r.app.isServiceB();
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         } else {
             sData.pid = -1;
             sData.serviceB = false;
@@ -4238,14 +4225,10 @@ public final class ActiveServices {
         if (unbind) {
             sData.packageName = connrec.binding.service.packageName;
             sData.processName = connrec.binding.service.shortInstanceName;
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             sData.lastActivity = connrec.binding.service.getLastActivity();
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             if (connrec.binding.service.app != null) {
                 sData.pid = connrec.binding.service.app.getPid();
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                 sData.serviceB = connrec.binding.service.app.isServiceB();
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             } else {
                 sData.pid = -1;
                 sData.serviceB = false;
@@ -4259,14 +4242,10 @@ public final class ActiveServices {
 
         sData.packageName = r.packageName;
         sData.processName = r.shortInstanceName;
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         sData.lastActivity = r.getLastActivity();
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         if (r.app != null) {
             sData.pid = r.app.getPid();
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             sData.serviceB = r.app.isServiceB();
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
         } else {
             sData.pid = -1;
             sData.serviceB = false;
@@ -4277,7 +4256,6 @@ public final class ActiveServices {
         }
     }
 
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
     int bindServiceLocked(IApplicationThread caller, IBinder token, Intent service,
             String resolvedType, final IServiceConnection connection, long flags,
             String instanceName, boolean isSdkSandboxService, int sdkSandboxClientAppUid,
@@ -4439,7 +4417,8 @@ public final class ActiveServices {
 
         final long origId = mAm.mInjector.clearCallingIdentity();
 
-        try {
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_UID_IDLE)) {
             if (unscheduleServiceRestartLocked(s, callerApp.info.uid, false)) {
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "BIND SERVICE WHILE RESTART PENDING: "
                         + s);
@@ -4518,11 +4497,8 @@ public final class ActiveServices {
             }
             clist.add(c);
 
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
             if (!isLowRamDevice) {
                 try {
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                     if (getAIDLServicetrackerInstance()) {
                         vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
                                 new vendor.qti.hardware.servicetrackeraidl.ServiceData();
@@ -4536,22 +4512,15 @@ public final class ActiveServices {
                         vendor.qti.hardware.servicetracker.V1_0.ClientData cData =
                                 new vendor.qti.hardware.servicetracker.V1_0.ClientData();
                         getServiceTrackerHidlData(sData, cData, s, null, callerApp, false);
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
                         mServicetracker.bindService(sData, cData);
                     }
                 } catch (RemoteException e) {
                     Slog.e(TAG, "Failed to send bind details to servicetracker HAL", e);
                     mServicetracker = null;
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                     mServicetracker_aidl = null;
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
                 }
             }
 
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             final boolean isolated = (s.serviceInfo.flags & ServiceInfo.FLAG_ISOLATED_PROCESS) != 0;
             final ProcessRecord hostApp = isolated
                     ? null
@@ -4584,7 +4553,12 @@ public final class ActiveServices {
                 if (bringUpServiceLocked(s, service.getFlags(), callerFg, false,
                         permissionsReviewRequired, packageFrozen, true, serviceBindingOomAdjPolicy)
                         != null) {
-                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_BIND_SERVICE);
+                    if (Flags.pscBatchServiceUpdates()) {
+                        // Do nothing. The ProcessStateController BatchSession close
+                        // would have triggered the update.
+                    } else {
+                        mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_BIND_SERVICE);
+                    }
                     return 0;
                 }
             }
@@ -4612,7 +4586,12 @@ public final class ActiveServices {
                 }
             }
             if (needOomAdj) {
-                mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_BIND_SERVICE);
+                if (Flags.pscBatchServiceUpdates()) {
+                    // Do nothing. The ProcessStateController BatchSession close
+                    // would have triggered the update.
+                } else {
+                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_BIND_SERVICE);
+                }
             }
 
             final int packageState = wasStopped
@@ -4803,11 +4782,8 @@ public final class ActiveServices {
         boolean needOomAdj = false;
         while (clist.size() > 0) {
             final ConnectionRecord r = clist.get(0);
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
                 if (!isLowRamDevice) {
                     try {
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                       if (getAIDLServicetrackerInstance()) {
                           vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
                                   new vendor.qti.hardware.servicetrackeraidl.ServiceData();
@@ -4821,25 +4797,14 @@ public final class ActiveServices {
                           vendor.qti.hardware.servicetracker.V1_0.ClientData cData =
                                   new vendor.qti.hardware.servicetracker.V1_0.ClientData();
                           getServiceTrackerHidlData(sData, cData, null, r, null, true);
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
                           mServicetracker.unbindService(sData, cData);
                       }
                   } catch (RemoteException e) {
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                       Slog.e(TAG, "Failed to send unbind details to servicetracker AIDL/HAL", e);
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
                       mServicetracker = null;
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                       mServicetracker_aidl = null;
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
                   }
               }
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             final int serviceBindingOomAdjPolicy = removeConnectionLocked(r, null, null, true);
             if (clist.size() > 0 && clist.get(0) == r) {
                 // In case it didn't get removed above, do it now.
@@ -4883,7 +4848,8 @@ public final class ActiveServices {
 
         final int callingPid = mAm.mInjector.getCallingPid();
         final long origId = mAm.mInjector.clearCallingIdentity();
-        try {
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_UNBIND_SERVICE)) {
             if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                 String info;
                 if (clist.size() > 0) {
@@ -4898,9 +4864,13 @@ public final class ActiveServices {
             boolean needOomAdj = unbindServiceConnectionsLocked(binder, clist);
 
             if (needOomAdj) {
-                mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_UNBIND_SERVICE);
+                if (Flags.pscBatchServiceUpdates()) {
+                    // Do nothing. The ProcessStateController BatchSession close
+                    // would have triggered the update.
+                } else {
+                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_BIND_SERVICE);
+                }
             }
-
         } finally {
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
             mAm.mInjector.restoreCallingIdentity(origId);
@@ -4989,7 +4959,8 @@ public final class ActiveServices {
         if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
             Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "updateServiceBindingsLocked()");
         }
-        try {
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_BATCH_UPDATE_REQUEST)) {
             boolean needOomAdj = false;
             for (int i = 0, size = updates.size(); i < size; i++) {
                 if (updateServiceBindingsSingleLocked(updates.get(i))) {
@@ -4998,7 +4969,12 @@ public final class ActiveServices {
             }
 
             if (needOomAdj) {
-                mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_BATCH_UPDATE_REQUEST);
+                if (Flags.pscBatchServiceUpdates()) {
+                    // Do nothing. The ProcessStateController BatchSession close
+                    // would have triggered the update.
+                } else {
+                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_BATCH_UPDATE_REQUEST);
+                }
             }
         } finally {
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
@@ -5568,50 +5544,58 @@ public final class ActiveServices {
         final boolean shouldSkipTimeout = skipTimeoutIfPossible && r.app != null
                 && (r.app.mOptRecord.isPendingFreeze() || r.app.mOptRecord.isFrozen());
 
-        ProcessServiceRecord psr;
-        if (r.executeNesting == 0) {
-            r.executeFg = fg;
-            synchronized (mAm.mProcessStats.mLock) {
-                final ServiceState stracker = r.getTracker();
-                if (stracker != null) {
-                    stracker.setExecuting(true, mAm.mProcessStats.getMemFactorLocked(),
-                            SystemClock.uptimeMillis());
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(oomAdjReason)) {
+            ProcessServiceRecord psr;
+            if (r.executeNesting == 0) {
+                r.executeFg = fg;
+                synchronized (mAm.mProcessStats.mLock) {
+                    final ServiceState stracker = r.getTracker();
+                    if (stracker != null) {
+                        stracker.setExecuting(true, mAm.mProcessStats.getMemFactorLocked(),
+                                SystemClock.uptimeMillis());
+                    }
                 }
-            }
-            if (r.app != null) {
+                if (r.app != null) {
+                    psr = r.app.mServices;
+                    mAm.mProcessStateController.startExecutingService(psr, r);
+                    mAm.mProcessStateController.setExecServicesFg(psr,
+                            psr.isExecServicesFg() || fg);
+                    if (timeoutNeeded && psr.numberOfExecutingServices() == 1) {
+                        if (!shouldSkipTimeout) {
+                            scheduleServiceTimeoutLocked(r.app);
+                        } else {
+                            r.app.mServices.noteScheduleServiceTimeoutPending(true);
+                        }
+                    }
+                }
+            } else if (r.app != null && fg) {
                 psr = r.app.mServices;
-                mAm.mProcessStateController.startExecutingService(psr, r);
-                mAm.mProcessStateController.setExecServicesFg(psr, psr.isExecServicesFg() || fg);
-                if (timeoutNeeded && psr.numberOfExecutingServices() == 1) {
-                    if (!shouldSkipTimeout) {
-                        scheduleServiceTimeoutLocked(r.app);
-                    } else {
-                        r.app.mServices.noteScheduleServiceTimeoutPending(true);
+                if (!psr.isExecServicesFg()) {
+                    mAm.mProcessStateController.setExecServicesFg(psr, true);
+                    if (timeoutNeeded) {
+                        if (!shouldSkipTimeout) {
+                            scheduleServiceTimeoutLocked(r.app);
+                        } else {
+                            r.app.mServices.noteScheduleServiceTimeoutPending(true);
+                        }
                     }
                 }
             }
-        } else if (r.app != null && fg) {
-            psr = r.app.mServices;
-            if (!psr.isExecServicesFg()) {
-                mAm.mProcessStateController.setExecServicesFg(psr, true);
-                if (timeoutNeeded) {
-                    if (!shouldSkipTimeout) {
-                        scheduleServiceTimeoutLocked(r.app);
+            if (r.app != null
+                    && r.app.getCurProcState() > ActivityManager.PROCESS_STATE_SERVICE) {
+                // Enqueue the oom adj target anyway for opportunistic oom adj updates.
+                mAm.enqueueOomAdjTargetLocked(r.app);
+                r.updateOomAdjSeq();
+                if (oomAdjReason != OOM_ADJ_REASON_NONE) {
+                    // Force an immediate oomAdjUpdate, so the client app could be in the correct
+                    // process state before doing any service related transactions
+                    if (Flags.pscBatchServiceUpdates()) {
+                        // Do nothing. The ProcessStateController BatchSession close
+                        // would have triggered the update.
                     } else {
-                        r.app.mServices.noteScheduleServiceTimeoutPending(true);
+                        mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_BATCH_UPDATE_REQUEST);
                     }
                 }
-            }
-        }
-        if (r.app != null
-                && r.app.getCurProcState() > ActivityManager.PROCESS_STATE_SERVICE) {
-            // Enqueue the oom adj target anyway for opportunistic oom adj updates.
-            mAm.enqueueOomAdjTargetLocked(r.app);
-            r.updateOomAdjSeq();
-            if (oomAdjReason != OOM_ADJ_REASON_NONE) {
-                // Force an immediate oomAdjUpdate, so the client app could be in the correct
-                // process state before doing any service related transactions
-                mAm.updateOomAdjPendingTargetsLocked(oomAdjReason);
             }
         }
         r.executeFg |= fg;
@@ -5707,7 +5691,6 @@ public final class ActiveServices {
                         r.pendingStarts.add(0, si);
                         long dur = SystemClock.uptimeMillis() - si.deliveredTime;
                         dur *= 2;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         if (SERVICE_RESCHEDULE && DEBUG_DELAYED_SERVICE) {
                             Slog.w(TAG,"Can add more delay !!!"
                                +" si.deliveredTime "+si.deliveredTime
@@ -5716,7 +5699,6 @@ public final class ActiveServices {
                                +" si.doneExecutingCount "+si.doneExecutingCount
                                +" allowCancel "+allowCancel);
                         }
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         if (minDuration < dur) minDuration = dur;
                         if (resetTime < dur) resetTime = dur;
                     } else {
@@ -5740,7 +5722,6 @@ public final class ActiveServices {
             }
 
             r.totalRestartCount++;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             if (SERVICE_RESCHEDULE && DEBUG_DELAYED_SERVICE) {
                 Slog.w(TAG,"r.name "+r.name+" N "+N+" minDuration "+minDuration
                        +" resetTime "+resetTime+" now "+now
@@ -5748,7 +5729,6 @@ public final class ActiveServices {
                        +" r.restartTime+resetTime "+(r.restartTime+resetTime)
                        +" allowCancel "+allowCancel);
             }
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             if (r.restartDelay == 0) {
                 r.restartCount++;
                 r.restartDelay = minDuration;
@@ -5884,7 +5864,6 @@ public final class ActiveServices {
         r.nextRestartTime = now + r.restartDelay;
         Slog.w(TAG, scheduling + " restart of crashed service "
                 + r.shortInstanceName + " in " + r.restartDelay + "ms for " + reason);
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
         if (SERVICE_RESCHEDULE && DEBUG_DELAYED_SERVICE) {
             for (int i=mRestartingServices.size()-1; i>=0; i--) {
@@ -5894,7 +5873,6 @@ public final class ActiveServices {
             }
         }
 
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         EventLog.writeEvent(EventLogTags.AM_SCHEDULE_SERVICE_RESTART,
                 r.userId, r.shortInstanceName, r.restartDelay);
     }
@@ -6067,41 +6045,27 @@ public final class ActiveServices {
             Slog.wtf(TAG, "Restarting service that is not needed: " + r);
             return;
         }
-        try {
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_START_SERVICE)) {
             if(SERVICE_RESCHEDULE) {
                 boolean shouldDelay = false;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 boolean isVisible = false;
-// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 ActivityRecord top_rc = mAm.mTaskSupervisor.getTopResumedActivity();
-// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 ProcessRecord pRec = mAm.getProcessRecordLocked(r.serviceInfo.applicationInfo.processName,r.serviceInfo.applicationInfo.uid);
-// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
                 boolean isPersistent
                         = !((r.serviceInfo.applicationInfo.flags&ApplicationInfo.FLAG_PERSISTENT) == 0);
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 if (pRec != null)
                     isVisible = ((pRec.mProfile.getCurRawAdj()) ==  ProcessList.VISIBLE_APP_ADJ);
-// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                 if(top_rc != null) {
                     if(top_rc.launching && !r.shortInstanceName.contains(top_rc.packageName)
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         && !isPersistent && !r.isForeground() && !isVisible) {
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         shouldDelay = true;
                     }
                 }
                 if(!shouldDelay) {
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                     bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false,
                             false, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                 } else {
                     if (DEBUG_DELAYED_SERVICE) {
                         Slog.v(TAG, "Reschedule service restart due to app launch"
@@ -6111,15 +6075,19 @@ public final class ActiveServices {
                     scheduleServiceRestartLocked(r, true);
                 }
             } else {
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                 bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false,
                         false, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
             }
         } catch (TransactionTooLargeException e) {
             // Ignore, it's been logged and nothing upstack cares.
         } finally {
-            /* Will be a no-op if nothing pending */
-            mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
+            if (Flags.pscBatchServiceUpdates()) {
+                // Do nothing. The ProcessStateController BatchSession close would have triggered
+                // the update.
+            } else {
+                /* Will be a no-op if nothing pending */
+                mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
+            }
         }
     }
 
@@ -6401,8 +6369,12 @@ public final class ActiveServices {
                         hostingRecord, ZYGOTE_POLICY_FLAG_EMPTY, uid, r.sdkSandboxClientAppPackage);
                 r.isolationHostProc = app;
             } else {
-                app = mAm.startProcessLocked(procName, r.appInfo, true, intentFlags,
-                        hostingRecord, ZYGOTE_POLICY_FLAG_EMPTY, false, isolated);
+                int policy = ZYGOTE_POLICY_FLAG_EMPTY;
+                if (android.os.Flags.nativeFrameworkPrototype() && r.mIsNativeIsolated) {
+                    policy |= ZYGOTE_POLICY_FLAG_NATIVE_PROCESS;
+                }
+                app = mAm.startProcessLocked(procName, r.appInfo, true, intentFlags, hostingRecord,
+                        policy, false, isolated);
             }
             if (app == null) {
                 String msg = "Unable to launch app "
@@ -6535,33 +6507,40 @@ public final class ActiveServices {
         if (DEBUG_MU)
             Slog.v(TAG_MU, "realStartServiceLocked, ServiceRecord.uid = " + r.appInfo.uid
                     + ", ProcessRecord.uid = " + app.uid);
-        r.setProcess(app, thread, pid, uidRecord);
-        final long now = SystemClock.uptimeMillis();
-        r.restartTime = now;
-        mAm.mProcessStateController.setServiceLastActivityTime(r, now);
-        final boolean skipOomAdj = (serviceBindingOomAdjPolicy
-                & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CREATE) != 0;
-        final ProcessServiceRecord psr = app.mServices;
-        final boolean newService = mAm.mProcessStateController.startService(psr, r);
-        bumpServiceExecutingLocked(r, execInFg, "create",
-                OOM_ADJ_REASON_NONE /* use "none" to avoid extra oom adj */,
-                skipOomAdj /* skipTimeoutIfPossible */);
-        mAm.updateLruProcessLocked(app, false, null);
-        updateServiceForegroundLocked(psr, /* oomAdj= */ false);
-        // Skip the oom adj update if it's a self-binding, the Service#onCreate() will be running
-        // at its current adj score.
-        if (!skipOomAdj) {
-            // Force an immediate oomAdjUpdate, so the host app could be in the correct
-            // process state before doing any service related transactions
-            mAm.enqueueOomAdjTargetLocked(app);
-            r.updateOomAdjSeq();
-            mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
-        } else {
-            // Since we skipped the oom adj update, the Service#onCreate() might be running in
-            // the cached state, if the service process drops into the cached state after the call.
-            // But there is still a grace period before freezing it, so we should be fine
-            // in terms of not getting an ANR.
-        }
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_START_SERVICE)) {
+            r.setProcess(app, thread, pid, uidRecord);
+            final long now = SystemClock.uptimeMillis();
+            r.restartTime = now;
+            mAm.mProcessStateController.setServiceLastActivityTime(r, now);
+            final boolean skipOomAdj = (serviceBindingOomAdjPolicy
+                    & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CREATE) != 0;
+            final ProcessServiceRecord psr = app.mServices;
+            final boolean newService = mAm.mProcessStateController.startService(psr, r);
+            bumpServiceExecutingLocked(r, execInFg, "create",
+                    OOM_ADJ_REASON_NONE /* use "none" to avoid extra oom adj */,
+                    skipOomAdj /* skipTimeoutIfPossible */);
+            mAm.updateLruProcessLocked(app, false, null);
+            updateServiceForegroundLocked(psr, /* oomAdj= */ false);
+            // Skip the oom adj update if it's a self-binding, the Service#onCreate() will be
+            // running at its current adj score.
+            if (!skipOomAdj) {
+                // Force an immediate oomAdjUpdate, so the host app could be in the correct
+                // process state before doing any service related transactions
+                mAm.enqueueOomAdjTargetLocked(app);
+                r.updateOomAdjSeq();
+                if (Flags.pscBatchServiceUpdates()) {
+                    // Do nothing. The ProcessStateController BatchSession close
+                    // would have triggered the update.
+                } else {
+                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
+                }
+            } else {
+                // Since we skipped the oom adj update, the Service#onCreate() might be running
+                // in the cached state, if the service process drops into the cached state after
+                // the call. But there is still a grace period before freezing it, so we should
+                // be fine in terms of not getting an ANR.
+            }
 
         boolean created = false;
         try {
@@ -6588,11 +6567,8 @@ public final class ActiveServices {
             r.postNotification(false);
             created = true;
 
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
             if (!isLowRamDevice) {
                 try {
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                     if (getAIDLServicetrackerInstance()) {
                         vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
                                 new vendor.qti.hardware.servicetrackeraidl.ServiceData();
@@ -6602,21 +6578,14 @@ public final class ActiveServices {
                         vendor.qti.hardware.servicetracker.V1_0.ServiceData sData =
                                 new vendor.qti.hardware.servicetracker.V1_0.ServiceData();
                         getServiceTrackerHidlData(sData, null, r, null, null, false);
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
                         mServicetracker.startService(sData);
                     }
                 } catch (RemoteException e) {
                     Slog.e(TAG, "Failed to send start details to servicetracker HAL", e);
                     mServicetracker = null;
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                     mServicetracker_aidl = null;
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
                 }
             }
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
         } catch (DeadObjectException e) {
             Slog.w(TAG, "Application dead when creating service " + r);
             mAm.appDiedLocked(app, "Died when creating service");
@@ -6631,33 +6600,30 @@ public final class ActiveServices {
                 // Cleanup.
                 if (newService) {
                     mAm.mProcessStateController.stopService(psr, r);
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                     r.app = null;
                     if (SERVICE_RESCHEDULE && DEBUG_DELAYED_SERVICE) {
                     Slog.w(TAG, " Failed to create Service !!!! ."
                            +"This will introduce huge delay...  "
                            +r.shortInstanceName + " in " + r.restartDelay + "ms");
                     }
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                 }
-
-                // Retry.
+                    // Retry.
                 if (!inDestroying) {
                     scheduleServiceRestartLocked(r, false);
                 }
             }
         }
+            if (r.allowlistManager) {
+                psr.mAllowlistManager = true;
+            }
 
-        if (r.allowlistManager) {
-            psr.mAllowlistManager = true;
-        }
+            requestServiceBindingsLocked(r, execInFg, serviceBindingOomAdjPolicy);
 
-        requestServiceBindingsLocked(r, execInFg, serviceBindingOomAdjPolicy);
+            updateServiceClientActivitiesLocked(psr, null, true);
 
-        updateServiceClientActivitiesLocked(psr, null, true);
-
-        if (newService && created) {
-            psr.addBoundClientUidsOfNewService(r);
+            if (newService && created) {
+                psr.addBoundClientUidsOfNewService(r);
+            }
         }
 
         // If the service is in the started state, and there are no
@@ -6693,93 +6659,109 @@ public final class ActiveServices {
         if (N == 0) {
             return;
         }
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_START_SERVICE)) {
+            ArrayList<ServiceStartArgs> args = new ArrayList<>();
 
-        ArrayList<ServiceStartArgs> args = new ArrayList<>();
-
-        while (r.pendingStarts.size() > 0) {
-            ServiceRecord.StartItem si = r.pendingStarts.remove(0);
-            if (DEBUG_SERVICE) {
-                Slog.v(TAG_SERVICE, "Sending arguments to: "
-                        + r + " " + r.intent + " args=" + si.intent);
-            }
-            if (si.intent == null && N > 1) {
-                // If somehow we got a dummy null intent in the middle,
-                // then skip it.  DO NOT skip a null intent when it is
-                // the only one in the list -- this is to support the
-                // onStartCommand(null) case.
-                continue;
-            }
-            si.deliveredTime = SystemClock.uptimeMillis();
-            r.deliveredStarts.add(si);
-            si.deliveryCount++;
-            if (si.neededGrants != null) {
-                mAm.mUgmInternal.grantUriPermissionUncheckedFromIntent(si.neededGrants,
-                        si.getUriPermissionsLocked());
-            }
-            mAm.grantImplicitAccess(r.userId, si.intent, si.callingId,
-                    UserHandle.getAppId(r.appInfo.uid)
-            );
-            bumpServiceExecutingLocked(r, execInFg, "start",
-                    OOM_ADJ_REASON_NONE /* use "none" to avoid extra oom adj */,
-                    false /* skipTimeoutIfPossible */);
-            if (r.fgRequired && !r.fgWaiting) {
-                if (!r.isForeground()) {
-                    if (DEBUG_BACKGROUND_CHECK) {
-                        Slog.i(TAG, "Launched service must call startForeground() within timeout: " + r);
+            while (r.pendingStarts.size() > 0) {
+                ServiceRecord.StartItem si = r.pendingStarts.remove(0);
+                if (DEBUG_SERVICE) {
+                    Slog.v(TAG_SERVICE, "Sending arguments to: "
+                            + r + " " + r.intent + " args=" + si.intent);
+                }
+                if (si.intent == null && N > 1) {
+                    // If somehow we got a dummy null intent in the middle,
+                    // then skip it.  DO NOT skip a null intent when it is
+                    // the only one in the list -- this is to support the
+                    // onStartCommand(null) case.
+                    continue;
+                }
+                si.deliveredTime = SystemClock.uptimeMillis();
+                r.deliveredStarts.add(si);
+                si.deliveryCount++;
+                if (si.neededGrants != null) {
+                    mAm.mUgmInternal.grantUriPermissionUncheckedFromIntent(si.neededGrants,
+                            si.getUriPermissionsLocked());
+                }
+                mAm.grantImplicitAccess(r.userId, si.intent, si.callingId,
+                        UserHandle.getAppId(r.appInfo.uid)
+                );
+                bumpServiceExecutingLocked(r, execInFg, "start",
+                        OOM_ADJ_REASON_NONE /* use "none" to avoid extra oom adj */,
+                        false /* skipTimeoutIfPossible */);
+                if (r.fgRequired && !r.fgWaiting) {
+                    if (!r.isForeground()) {
+                        if (DEBUG_BACKGROUND_CHECK) {
+                            Slog.i(TAG,
+                                    "Launched service must call startForeground() within timeout: "
+                                            + r);
+                        }
+                        scheduleServiceForegroundTransitionTimeoutLocked(r);
+                    } else {
+                        if (DEBUG_BACKGROUND_CHECK) {
+                            Slog.i(TAG, "Service already foreground; no new timeout: " + r);
+                        }
+                        r.fgRequired = false;
                     }
-                    scheduleServiceForegroundTransitionTimeoutLocked(r);
+                }
+                int flags = 0;
+                if (si.deliveryCount > 1) {
+                    flags |= Service.START_FLAG_RETRY;
+                }
+                if (si.doneExecutingCount > 0) {
+                    flags |= Service.START_FLAG_REDELIVERY;
+                }
+                args.add(new ServiceStartArgs(si.taskRemoved, si.id, flags, si.intent));
+            }
+
+            if (!oomAdjusted) {
+                mAm.enqueueOomAdjTargetLocked(r.app);
+                if (Flags.pscBatchServiceUpdates()) {
+                    // Do nothing. The ProcessStateController BatchSession close
+                    // would have triggered the update.
                 } else {
-                    if (DEBUG_BACKGROUND_CHECK) {
-                        Slog.i(TAG, "Service already foreground; no new timeout: " + r);
-                    }
-                    r.fgRequired = false;
+                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
                 }
             }
-            int flags = 0;
-            if (si.deliveryCount > 1) {
-                flags |= Service.START_FLAG_RETRY;
+            ParceledListSlice<ServiceStartArgs> slice = new ParceledListSlice<>(args);
+            slice.setInlineCountLimit(4);
+            Exception caughtException = null;
+            try {
+                r.app.getThread().scheduleServiceArgs(r, slice);
+            } catch (TransactionTooLargeException e) {
+                if (DEBUG_SERVICE) {
+                    Slog.v(TAG_SERVICE, "Transaction too large for " + args.size()
+                            + " args, first: " + args.get(0).args);
+                }
+                Slog.w(TAG, "Failed delivering service starts", e);
+                caughtException = e;
+            } catch (RemoteException e) {
+                // Remote process gone...  we'll let the normal cleanup take care of this.
+                if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Crashed while sending args: " + r);
+                Slog.w(TAG, "Failed delivering service starts", e);
+                caughtException = e;
+            } catch (Exception e) {
+                Slog.w(TAG, "Unexpected exception", e);
+                caughtException = e;
             }
-            if (si.doneExecutingCount > 0) {
-                flags |= Service.START_FLAG_REDELIVERY;
-            }
-            args.add(new ServiceStartArgs(si.taskRemoved, si.id, flags, si.intent));
-        }
 
-        if (!oomAdjusted) {
-            mAm.enqueueOomAdjTargetLocked(r.app);
-            mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
-        }
-        ParceledListSlice<ServiceStartArgs> slice = new ParceledListSlice<>(args);
-        slice.setInlineCountLimit(4);
-        Exception caughtException = null;
-        try {
-            r.app.getThread().scheduleServiceArgs(r, slice);
-        } catch (TransactionTooLargeException e) {
-            if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Transaction too large for " + args.size()
-                    + " args, first: " + args.get(0).args);
-            Slog.w(TAG, "Failed delivering service starts", e);
-            caughtException = e;
-        } catch (RemoteException e) {
-            // Remote process gone...  we'll let the normal cleanup take care of this.
-            if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Crashed while sending args: " + r);
-            Slog.w(TAG, "Failed delivering service starts", e);
-            caughtException = e;
-        } catch (Exception e) {
-            Slog.w(TAG, "Unexpected exception", e);
-            caughtException = e;
-        }
-
-        if (caughtException != null) {
-            // Keep nesting count correct
-            final boolean inDestroying = mDestroyingServices.contains(r);
-            for (int i = 0, size = args.size(); i < size; i++) {
-                serviceDoneExecutingLocked(r, inDestroying, inDestroying, true,
-                        OOM_ADJ_REASON_STOP_SERVICE);
-            }
-            /* Will be a no-op if nothing pending */
-            mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_STOP_SERVICE);
-            if (caughtException instanceof TransactionTooLargeException) {
-                throw (TransactionTooLargeException)caughtException;
+            if (caughtException != null) {
+                // Keep nesting count correct
+                final boolean inDestroying = mDestroyingServices.contains(r);
+                for (int i = 0, size = args.size(); i < size; i++) {
+                    serviceDoneExecutingLocked(r, inDestroying, inDestroying, true,
+                            OOM_ADJ_REASON_STOP_SERVICE);
+                }
+                if (Flags.pscBatchServiceUpdates()) {
+                    // Do nothing. The ProcessStateController BatchSession close
+                    // would have triggered the update.
+                } else {
+                    /* Will be a no-op if nothing pending */
+                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_STOP_SERVICE);
+                }
+                if (caughtException instanceof TransactionTooLargeException) {
+                    throw (TransactionTooLargeException) caughtException;
+                }
             }
         }
     }
@@ -6821,13 +6803,11 @@ public final class ActiveServices {
     }
 
     private void bringDownServiceLocked(ServiceRecord r, boolean enqueueOomAdj) {
-        //Slog.i(TAG, "Bring down service:");
-        //r.dump("  ");
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_STOP_SERVICE)) {
+
         if (!isLowRamDevice) {
             try {
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                 if (getAIDLServicetrackerInstance()) {
                     vendor.qti.hardware.servicetrackeraidl.ServiceData sData =
                             new vendor.qti.hardware.servicetrackeraidl.ServiceData();
@@ -6837,21 +6817,15 @@ public final class ActiveServices {
                     vendor.qti.hardware.servicetracker.V1_0.ServiceData sData =
                             new vendor.qti.hardware.servicetracker.V1_0.ServiceData();
                     getServiceTrackerHidlData(sData, null, r, null, null, false);
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
                     mServicetracker.destroyService(sData);
                 }
             } catch (RemoteException e) {
                 Slog.e(TAG, "Failed to send destroy details to servicetracker HAL", e);
                 mServicetracker = null;
-// QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                 mServicetracker_aidl = null;
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             }
         }
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+
         if (r.isShortFgs()) {
             // FGS can be stopped without the app calling stopService() or stopSelf(),
             // due to force-app-standby, or from Task Manager.
@@ -6882,224 +6856,239 @@ public final class ActiveServices {
             }
         }
 
-        boolean oomAdjusted = r.wasOomAdjUpdated();
+            boolean oomAdjusted = r.wasOomAdjUpdated();
 
-        // Tell the service that it has been unbound.
-        if (r.app != null && r.app.isThreadReady()) {
-            for (int i = r.bindings.size() - 1; i >= 0; i--) {
-                IntentBindRecord ibr = r.bindings.valueAt(i);
-                if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Bringing down binding " + ibr
-                        + ": hasBound=" + ibr.hasBound);
-                if (ibr.hasBound) {
-                    try {
-                        bumpServiceExecutingLocked(r, false, "bring down unbind",
-                                oomAdjusted ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE,
-                                oomAdjusted /* skipTimeoutIfPossible */);
-                        oomAdjusted |= r.wasOomAdjUpdated();
-                        ibr.hasBound = false;
-                        ibr.requested = false;
-                        r.app.getThread().scheduleUnbindService(r, ibr,
-                                ibr.intent.getIntent());
-                    } catch (Exception e) {
-                        Slog.w(TAG, "Exception when unbinding service "
-                                + r.shortInstanceName, e);
-                        serviceProcessGoneLocked(r, enqueueOomAdj);
-                        break;
+            // Tell the service that it has been unbound.
+            if (r.app != null && r.app.isThreadReady()) {
+                for (int i = r.bindings.size() - 1; i >= 0; i--) {
+                    IntentBindRecord ibr = r.bindings.valueAt(i);
+                    if (DEBUG_SERVICE) {
+                        Slog.v(TAG_SERVICE,
+                                "Bringing down binding " + ibr + ": hasBound=" + ibr.hasBound);
                     }
-                }
-            }
-        }
-
-        // Check to see if the service had been started as foreground, but being
-        // brought down before actually showing a notification.  That is not allowed.
-        if (r.fgRequired) {
-            Slog.w(TAG_SERVICE, "Bringing down service while still waiting for start foreground: "
-                    + r);
-            r.fgRequired = false;
-            r.fgWaiting = false;
-            synchronized (mAm.mProcessStats.mLock) {
-                ServiceState stracker = r.getTracker();
-                if (stracker != null) {
-                    stracker.setForeground(false, mAm.mProcessStats.getMemFactorLocked(),
-                            SystemClock.uptimeMillis());
-                }
-            }
-            mAm.mAppOpsService.finishOperation(AppOpsManager.getToken(mAm.mAppOpsService),
-                    AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName, null);
-            mServiceFGAnrTimer.cancel(r);
-            if (r.app != null) {
-                Message msg = mAm.mHandler.obtainMessage(
-                        ActivityManagerService.SERVICE_FOREGROUND_CRASH_MSG);
-                SomeArgs args = SomeArgs.obtain();
-                args.arg1 = r.app;
-                args.arg2 = r.toString();
-                args.arg3 = r.getComponentName();
-
-                msg.obj = args;
-                mAm.mHandler.sendMessage(msg);
-            }
-        }
-
-        if (DEBUG_SERVICE) {
-            RuntimeException here = new RuntimeException();
-            Slog.v(TAG_SERVICE, "Bringing down " + r + " " + r.intent, here);
-        }
-        r.destroyTime = SystemClock.uptimeMillis();
-        if (LOG_SERVICE_START_STOP) {
-            EventLogTags.writeAmDestroyService(
-                    r.userId, System.identityHashCode(r), (r.app != null) ? r.app.getPid() : -1);
-        }
-
-        final ServiceMap smap = getServiceMapLocked(r.userId);
-        ServiceRecord found = smap.mServicesByInstanceName.remove(r.instanceName);
-
-        // Note when this method is called by bringUpServiceLocked(), the service is not found
-        // in mServicesByInstanceName and found will be null.
-        if (found != null && found != r) {
-            // This is not actually the service we think is running...  this should not happen,
-            // but if it does, fail hard.
-            smap.mServicesByInstanceName.put(r.instanceName, found);
-            throw new IllegalStateException("Bringing down " + r + " but actually running "
-                    + found);
-        }
-        smap.mServicesByIntent.remove(r.intent);
-        r.totalRestartCount = 0;
-        unscheduleServiceRestartLocked(r, 0, true);
-
-        // Also make sure it is not on the pending list.
-        for (int i=mPendingServices.size()-1; i>=0; i--) {
-            if (mPendingServices.get(i) == r) {
-                mPendingServices.remove(i);
-                if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Removed pending: " + r);
-            }
-        }
-        if (mPendingBringups.remove(r) != null) {
-            if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Removed pending bringup: " + r);
-        }
-
-        cancelForegroundNotificationLocked(r);
-        final boolean exitingFg = r.isForeground();
-        if (exitingFg) {
-            maybeStopShortFgsTimeoutLocked(r);
-            decActiveForegroundAppLocked(smap, r);
-            synchronized (mAm.mProcessStats.mLock) {
-                ServiceState stracker = r.getTracker();
-                if (stracker != null) {
-                    stracker.setForeground(false, mAm.mProcessStats.getMemFactorLocked(),
-                            SystemClock.uptimeMillis());
-                }
-            }
-            mAm.mAppOpsService.finishOperation(
-                    AppOpsManager.getToken(mAm.mAppOpsService),
-                    AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName, null);
-            unregisterAppOpCallbackLocked(r);
-            r.mFgsExitTime = SystemClock.uptimeMillis();
-            logFGSStateChangeLocked(r,
-                    FOREGROUND_SERVICE_STATE_CHANGED__STATE__EXIT,
-                    r.mFgsExitTime > r.mFgsEnterTime
-                            ? (int) (r.mFgsExitTime - r.mFgsEnterTime) : 0,
-                    FGS_STOP_REASON_STOP_SERVICE,
-                    FGS_TYPE_POLICY_CHECK_UNKNOWN,
-                    FOREGROUND_SERVICE_STATE_CHANGED__FGS_START_API__FGSSTARTAPI_NA,
-                    false /* fgsRestrictionRecalculated */
-            );
-            synchronized (mFGSLogger) {
-                mFGSLogger.logForegroundServiceStop(r.appInfo.uid, r);
-            }
-            mAm.updateForegroundServiceUsageStats(r.name, r.userId, false);
-        }
-
-        mAm.mProcessStateController.setIsForegroundService(r, false);
-        r.mFgsNotificationWasDeferred = false;
-        dropFgsNotificationStateLocked(r);
-        r.foregroundId = 0;
-        r.foregroundNoti = null;
-        resetFgsRestrictionLocked(r);
-        // Signal FGS observers *after* changing the isForeground state, and
-        // only if this was an actual state change.
-        if (exitingFg) {
-            signalForegroundServiceObserversLocked(r);
-        }
-
-        // Clear start entries.
-        r.clearDeliveredStartsLocked();
-        r.pendingStarts.clear();
-        smap.mDelayedStartList.remove(r);
-
-        if (r.app != null) {
-            mAm.mBatteryStatsService.noteServiceStopLaunch(r.appInfo.uid, r.name.getPackageName(),
-                    r.name.getClassName());
-            stopServiceAndUpdateAllowlistManagerLocked(r);
-            if (r.app.isThreadReady()) {
-                // Bump the process to the top of LRU list
-                mAm.updateLruProcessLocked(r.app, false, null);
-                updateServiceForegroundLocked(r.app.mServices, false);
-                if (r.mIsFgsDelegate) {
-                    if (r.mFgsDelegation.mConnection != null) {
-                        mAm.mHandler.post(() -> {
-                            r.mFgsDelegation.mConnection.onServiceDisconnected(
-                                    r.mFgsDelegation.mOptions.getComponentName());
-                        });
-                    }
-                    for (int i = mFgsDelegations.size() - 1; i >= 0; i--) {
-                        if (mFgsDelegations.valueAt(i) == r) {
-                            mFgsDelegations.removeAt(i);
+                    if (ibr.hasBound) {
+                        try {
+                            bumpServiceExecutingLocked(r, false, "bring down unbind",
+                                    oomAdjusted ? OOM_ADJ_REASON_NONE
+                                            : OOM_ADJ_REASON_UNBIND_SERVICE,
+                                    oomAdjusted /* skipTimeoutIfPossible */);
+                            oomAdjusted |= r.wasOomAdjUpdated();
+                            ibr.hasBound = false;
+                            ibr.requested = false;
+                            r.app.getThread().scheduleUnbindService(r, ibr,
+                                    ibr.intent.getIntent());
+                        } catch (Exception e) {
+                            Slog.w(TAG, "Exception when unbinding service "
+                                    + r.shortInstanceName, e);
+                            serviceProcessGoneLocked(r, enqueueOomAdj);
                             break;
                         }
                     }
+                }
+            }
+
+            // Check to see if the service had been started as foreground, but being
+            // brought down before actually showing a notification.  That is not allowed.
+            if (r.fgRequired) {
+                Slog.w(TAG_SERVICE,
+                        "Bringing down service while still waiting for start foreground: "
+                                + r);
+                r.fgRequired = false;
+                r.fgWaiting = false;
+                synchronized (mAm.mProcessStats.mLock) {
+                    ServiceState stracker = r.getTracker();
+                    if (stracker != null) {
+                        stracker.setForeground(false, mAm.mProcessStats.getMemFactorLocked(),
+                                SystemClock.uptimeMillis());
+                    }
+                }
+                mAm.mAppOpsService.finishOperation(AppOpsManager.getToken(mAm.mAppOpsService),
+                        AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName, null);
+                mServiceFGAnrTimer.cancel(r);
+                if (r.app != null) {
+                    Message msg = mAm.mHandler.obtainMessage(
+                            ActivityManagerService.SERVICE_FOREGROUND_CRASH_MSG);
+                    SomeArgs args = SomeArgs.obtain();
+                    args.arg1 = r.app;
+                    args.arg2 = r.toString();
+                    args.arg3 = r.getComponentName();
+
+                    msg.obj = args;
+                    mAm.mHandler.sendMessage(msg);
+                }
+            }
+
+            if (DEBUG_SERVICE) {
+                RuntimeException here = new RuntimeException();
+                Slog.v(TAG_SERVICE, "Bringing down " + r + " " + r.intent, here);
+            }
+            r.destroyTime = SystemClock.uptimeMillis();
+            if (LOG_SERVICE_START_STOP) {
+                EventLogTags.writeAmDestroyService(
+                        r.userId, System.identityHashCode(r),
+                        (r.app != null) ? r.app.getPid() : -1);
+            }
+
+            final ServiceMap smap = getServiceMapLocked(r.userId);
+            ServiceRecord found = smap.mServicesByInstanceName.remove(r.instanceName);
+
+            // Note when this method is called by bringUpServiceLocked(), the service is not found
+            // in mServicesByInstanceName and found will be null.
+            if (found != null && found != r) {
+                // This is not actually the service we think is running...  this should not happen,
+                // but if it does, fail hard.
+                smap.mServicesByInstanceName.put(r.instanceName, found);
+                throw new IllegalStateException("Bringing down " + r + " but actually running "
+                        + found);
+            }
+            smap.mServicesByIntent.remove(r.intent);
+            r.totalRestartCount = 0;
+            unscheduleServiceRestartLocked(r, 0, true);
+
+            // Also make sure it is not on the pending list.
+            for (int i = mPendingServices.size() - 1; i >= 0; i--) {
+                if (mPendingServices.get(i) == r) {
+                    mPendingServices.remove(i);
+                    if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Removed pending: " + r);
+                }
+            }
+            if (mPendingBringups.remove(r) != null) {
+                if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Removed pending bringup: " + r);
+            }
+
+            cancelForegroundNotificationLocked(r);
+            final boolean exitingFg = r.isForeground();
+            if (exitingFg) {
+                maybeStopShortFgsTimeoutLocked(r);
+                decActiveForegroundAppLocked(smap, r);
+                synchronized (mAm.mProcessStats.mLock) {
+                    ServiceState stracker = r.getTracker();
+                    if (stracker != null) {
+                        stracker.setForeground(false, mAm.mProcessStats.getMemFactorLocked(),
+                                SystemClock.uptimeMillis());
+                    }
+                }
+                mAm.mAppOpsService.finishOperation(
+                        AppOpsManager.getToken(mAm.mAppOpsService),
+                        AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName, null);
+                unregisterAppOpCallbackLocked(r);
+                r.mFgsExitTime = SystemClock.uptimeMillis();
+                logFGSStateChangeLocked(r,
+                        FOREGROUND_SERVICE_STATE_CHANGED__STATE__EXIT,
+                        r.mFgsExitTime > r.mFgsEnterTime
+                                ? (int) (r.mFgsExitTime - r.mFgsEnterTime) : 0,
+                        FGS_STOP_REASON_STOP_SERVICE,
+                        FGS_TYPE_POLICY_CHECK_UNKNOWN,
+                        FOREGROUND_SERVICE_STATE_CHANGED__FGS_START_API__FGSSTARTAPI_NA,
+                        false /* fgsRestrictionRecalculated */
+                );
+                synchronized (mFGSLogger) {
+                    mFGSLogger.logForegroundServiceStop(r.appInfo.uid, r);
+                }
+                mAm.updateForegroundServiceUsageStats(r.name, r.userId, false);
+            }
+
+            mAm.mProcessStateController.setIsForegroundService(r, false);
+            r.mFgsNotificationWasDeferred = false;
+            dropFgsNotificationStateLocked(r);
+            r.foregroundId = 0;
+            r.foregroundNoti = null;
+            resetFgsRestrictionLocked(r);
+            // Signal FGS observers *after* changing the isForeground state, and
+            // only if this was an actual state change.
+            if (exitingFg) {
+                signalForegroundServiceObserversLocked(r);
+            }
+
+            // Clear start entries.
+            r.clearDeliveredStartsLocked();
+            r.pendingStarts.clear();
+            smap.mDelayedStartList.remove(r);
+
+            if (r.app != null) {
+                mAm.mBatteryStatsService.noteServiceStopLaunch(r.appInfo.uid,
+                        r.name.getPackageName(),
+                        r.name.getClassName());
+                stopServiceAndUpdateAllowlistManagerLocked(r);
+                if (r.app.isThreadReady()) {
+                    // Bump the process to the top of LRU list
+                    mAm.updateLruProcessLocked(r.app, false, null);
+                    updateServiceForegroundLocked(r.app.mServices, false);
+                    if (r.mIsFgsDelegate) {
+                        if (r.mFgsDelegation.mConnection != null) {
+                            mAm.mHandler.post(() -> {
+                                r.mFgsDelegation.mConnection.onServiceDisconnected(
+                                        r.mFgsDelegation.mOptions.getComponentName());
+                            });
+                        }
+                        for (int i = mFgsDelegations.size() - 1; i >= 0; i--) {
+                            if (mFgsDelegations.valueAt(i) == r) {
+                                mFgsDelegations.removeAt(i);
+                                break;
+                            }
+                        }
+                    } else {
+                        try {
+                            bumpServiceExecutingLocked(r, false, "destroy",
+                                    oomAdjusted ? OOM_ADJ_REASON_NONE
+                                            : OOM_ADJ_REASON_UNBIND_SERVICE,
+                                    oomAdjusted /* skipTimeoutIfPossible */);
+                            mDestroyingServices.add(r);
+                            oomAdjusted |= r.wasOomAdjUpdated();
+                            r.destroying = true;
+                            r.app.getThread().scheduleStopService(r);
+                        } catch (Exception e) {
+                            Slog.w(TAG, "Exception when destroying service "
+                                    + r.shortInstanceName, e);
+                            serviceProcessGoneLocked(r, enqueueOomAdj);
+                        }
+                    }
                 } else {
-                    try {
-                        bumpServiceExecutingLocked(r, false, "destroy",
-                                oomAdjusted ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE,
-                                oomAdjusted /* skipTimeoutIfPossible */);
-                        mDestroyingServices.add(r);
-                        oomAdjusted |= r.wasOomAdjUpdated();
-                        r.destroying = true;
-                        r.app.getThread().scheduleStopService(r);
-                    } catch (Exception e) {
-                        Slog.w(TAG, "Exception when destroying service "
-                                + r.shortInstanceName, e);
-                        serviceProcessGoneLocked(r, enqueueOomAdj);
+                    if (DEBUG_SERVICE) {
+                        Slog.v(TAG_SERVICE, "Removed service that has no process: " + r);
                     }
                 }
             } else {
-                if (DEBUG_SERVICE) Slog.v(
-                    TAG_SERVICE, "Removed service that has no process: " + r);
-            }
-        } else {
-            if (DEBUG_SERVICE) Slog.v(
-                TAG_SERVICE, "Removed service that is not running: " + r);
-        }
-
-        if (!oomAdjusted) {
-            mAm.enqueueOomAdjTargetLocked(r.app);
-            if (!enqueueOomAdj) {
-                mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_STOP_SERVICE);
-            }
-        }
-        if (r.bindings.size() > 0) {
-            r.bindings.clear();
-        }
-
-        if (r.restarter instanceof ServiceRestarter) {
-           ((ServiceRestarter)r.restarter).setService(null);
-        }
-
-        synchronized (mAm.mProcessStats.mLock) {
-            final int memFactor = mAm.mProcessStats.getMemFactorLocked();
-            if (r.tracker != null) {
-                final long now = SystemClock.uptimeMillis();
-                r.tracker.setStarted(false, memFactor, now);
-                r.tracker.setBound(false, memFactor, now);
-                if (r.executeNesting == 0) {
-                    r.tracker.clearCurrentOwner(r, false);
-                    r.tracker = null;
+                if (DEBUG_SERVICE) {
+                    Slog.v(TAG_SERVICE, "Removed service that is not running: " + r);
                 }
             }
-        }
 
-        smap.ensureNotStartingBackgroundLocked(r);
-        updateNumForegroundServicesLocked();
+            if (!oomAdjusted) {
+                mAm.enqueueOomAdjTargetLocked(r.app);
+                if (!enqueueOomAdj) {
+                    if (Flags.pscBatchServiceUpdates()) {
+                        // Do nothing. The ProcessStateController BatchSession close
+                        // would have triggered the update.
+                    } else {
+                        mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_STOP_SERVICE);
+                    }
+                }
+            }
+            if (r.bindings.size() > 0) {
+                r.bindings.clear();
+            }
+
+            if (r.restarter instanceof ServiceRestarter) {
+                ((ServiceRestarter) r.restarter).setService(null);
+            }
+
+            synchronized (mAm.mProcessStats.mLock) {
+                final int memFactor = mAm.mProcessStats.getMemFactorLocked();
+                if (r.tracker != null) {
+                    final long now = SystemClock.uptimeMillis();
+                    r.tracker.setStarted(false, memFactor, now);
+                    r.tracker.setBound(false, memFactor, now);
+                    if (r.executeNesting == 0) {
+                        r.tracker.clearCurrentOwner(r, false);
+                        r.tracker = null;
+                    }
+                }
+            }
+
+            smap.ensureNotStartingBackgroundLocked(r);
+            updateNumForegroundServicesLocked();
+        }
     }
 
     private void dropFgsNotificationStateLocked(ServiceRecord r) {
@@ -7442,7 +7431,8 @@ public final class ActiveServices {
         // Collect any services that are waiting for this process to come up.
         if (mPendingServices.size() > 0) {
             ServiceRecord sr = null;
-            try {
+            try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                    OOM_ADJ_REASON_START_SERVICE)) {
                 for (int i=0; i<mPendingServices.size(); i++) {
                     sr = mPendingServices.get(i);
                     if (proc != sr.isolationHostProc && (proc.uid != sr.appInfo.uid
@@ -7475,8 +7465,13 @@ public final class ActiveServices {
                         // is done, so let's drop it.
                         bringDownServiceLocked(sr, true);
                     }
-                    /* Will be a no-op if nothing pending */
-                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
+                    if (Flags.pscBatchServiceUpdates()) {
+                        // Do nothing. The ProcessStateController BatchSession close
+                        // would have triggered the update.
+                    } else {
+                        /* Will be a no-op if nothing pending */
+                        mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
+                    }
                 }
             } catch (RemoteException e) {
                 Slog.w(TAG, "Exception in new application when starting service "
@@ -7520,23 +7515,31 @@ public final class ActiveServices {
     }
 
     void processStartTimedOutLocked(ProcessRecord proc) {
-        boolean needOomAdj = false;
-        for (int i = 0, size = mPendingServices.size(); i < size; i++) {
-            ServiceRecord sr = mPendingServices.get(i);
-            if ((proc.uid == sr.appInfo.uid
-                    && proc.processName.equals(sr.processName))
-                    || sr.isolationHostProc == proc) {
-                Slog.w(TAG, "Forcing bringing down service: " + sr);
-                sr.isolationHostProc = null;
-                mPendingServices.remove(i);
-                size = mPendingServices.size();
-                i--;
-                needOomAdj = true;
-                bringDownServiceLocked(sr, true);
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_PROCESS_END)) {
+            boolean needOomAdj = false;
+            for (int i = 0, size = mPendingServices.size(); i < size; i++) {
+                ServiceRecord sr = mPendingServices.get(i);
+                if ((proc.uid == sr.appInfo.uid
+                        && proc.processName.equals(sr.processName))
+                        || sr.isolationHostProc == proc) {
+                    Slog.w(TAG, "Forcing bringing down service: " + sr);
+                    sr.isolationHostProc = null;
+                    mPendingServices.remove(i);
+                    size = mPendingServices.size();
+                    i--;
+                    needOomAdj = true;
+                    bringDownServiceLocked(sr, true);
+                }
             }
-        }
-        if (needOomAdj) {
-            mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_PROCESS_END);
+            if (needOomAdj) {
+                if (Flags.pscBatchServiceUpdates()) {
+                    // Do nothing. The ProcessStateController BatchSession close
+                    // would have triggered the update.
+                } else {
+                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_PROCESS_END);
+                }
+            }
         }
     }
 
@@ -7615,12 +7618,20 @@ public final class ActiveServices {
         }
 
         if (mTmpCollectionResults != null) {
-            final int size = mTmpCollectionResults.size();
-            for (int i = size - 1; i >= 0; i--) {
-                bringDownServiceLocked(mTmpCollectionResults.get(i), true);
-            }
-            if (size > 0) {
-                mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_COMPONENT_DISABLED);
+            try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                    OOM_ADJ_REASON_COMPONENT_DISABLED)) {
+                final int size = mTmpCollectionResults.size();
+                for (int i = size - 1; i >= 0; i--) {
+                    bringDownServiceLocked(mTmpCollectionResults.get(i), true);
+                }
+                if (size > 0) {
+                    if (Flags.pscBatchServiceUpdates()) {
+                        // Do nothing. The ProcessStateController BatchSession close
+                        // would have triggered the update.
+                    } else {
+                        mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_COMPONENT_DISABLED);
+                    }
+                }
             }
             if (fullStop && !mTmpCollectionResults.isEmpty()) {
                 // if we're tearing down the app's entire service state, account for possible
@@ -7722,33 +7733,41 @@ public final class ActiveServices {
             }
         }
 
-        // Take care of any running services associated with the app.
-        boolean needOomAdj = false;
-        for (int i = services.size() - 1; i >= 0; i--) {
-            ServiceRecord sr = services.get(i);
-            if (sr.isStartRequested()) {
-                if ((sr.serviceInfo.flags&ServiceInfo.FLAG_STOP_WITH_TASK) != 0) {
-                    Slog.i(TAG, "Stopping service " + sr.shortInstanceName + ": remove task");
-                    needOomAdj = true;
-                    stopServiceLocked(sr, true);
-                } else {
-                    sr.pendingStarts.add(new ServiceRecord.StartItem(sr, true,
-                            sr.getLastStartId(), baseIntent, null, 0, null, null,
-                            ActivityManager.PROCESS_STATE_UNKNOWN));
-                    if (sr.app != null && sr.app.isThreadReady()) {
-                        // We always run in the foreground, since this is called as
-                        // part of the "remove task" UI operation.
-                        try {
-                            sendServiceArgsLocked(sr, true, false);
-                        } catch (TransactionTooLargeException e) {
-                            // Ignore, keep going.
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_REMOVE_TASK)) {
+            // Take care of any running services associated with the app.
+            boolean needOomAdj = false;
+            for (int i = services.size() - 1; i >= 0; i--) {
+                ServiceRecord sr = services.get(i);
+                if (sr.isStartRequested()) {
+                    if ((sr.serviceInfo.flags & ServiceInfo.FLAG_STOP_WITH_TASK) != 0) {
+                        Slog.i(TAG, "Stopping service " + sr.shortInstanceName + ": remove task");
+                        needOomAdj = true;
+                        stopServiceLocked(sr, true);
+                    } else {
+                        sr.pendingStarts.add(new ServiceRecord.StartItem(sr, true,
+                                sr.getLastStartId(), baseIntent, null, 0, null, null,
+                                ActivityManager.PROCESS_STATE_UNKNOWN));
+                        if (sr.app != null && sr.app.isThreadReady()) {
+                            // We always run in the foreground, since this is called as
+                            // part of the "remove task" UI operation.
+                            try {
+                                sendServiceArgsLocked(sr, true, false);
+                            } catch (TransactionTooLargeException e) {
+                                // Ignore, keep going.
+                            }
                         }
                     }
                 }
             }
-        }
-        if (needOomAdj) {
-            mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_REMOVE_TASK);
+            if (needOomAdj) {
+                if (Flags.pscBatchServiceUpdates()) {
+                    // Do nothing. The ProcessStateController BatchSession close
+                    // would have triggered the update.
+                } else {
+                    mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_REMOVE_TASK);
+                }
+            }
         }
     }
 
@@ -7781,96 +7800,89 @@ public final class ActiveServices {
             }
         }
 
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+        try (var unused = mAm.mProcessStateController.startBatchSession(
+                OOM_ADJ_REASON_STOP_SERVICE)) {
+
         try {
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             if (!isLowRamDevice && getAIDLServicetrackerInstance()) {
                 mServicetracker_aidl.killProcess(app.getPid());
             } else if (!isLowRamDevice && getServicetrackerInstance()) {
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
                 mServicetracker.killProcess(app.getPid());
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             }
         } catch (RemoteException e) {
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             Slog.e(TAG, "Failed to send kill process details to servicetracker AIDL/HAL", e);
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
             mServicetracker = null;
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-// QTI_BEGIN: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
             mServicetracker_aidl = null;
-// QTI_END: 2023-04-06: Core: Add servicetracker AIDl support for service lifecycle event
-// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
         }
 
-// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
-        // Clean up any connections this application has to other services.
-        for (int i = psr.numberOfConnections() - 1; i >= 0; i--) {
-            ConnectionRecord r = psr.getConnectionAt(i);
-            removeConnectionLocked(r, app, null, true);
-        }
-        updateServiceConnectionActivitiesLocked(psr);
-        mAm.mProcessStateController.removeAllConnections(psr);
 
-        psr.mAllowlistManager = false;
+            // Clean up any connections this application has to other services.
+            for (int i = psr.numberOfConnections() - 1; i >= 0; i--) {
+                ConnectionRecord r = psr.getConnectionAt(i);
+                removeConnectionLocked(r, app, null, true);
+            }
+            updateServiceConnectionActivitiesLocked(psr);
+            mAm.mProcessStateController.removeAllConnections(psr);
 
-        // Clear app state from services.
-        for (int i = psr.numberOfRunningServices() - 1; i >= 0; i--) {
-            ServiceRecord sr = psr.getRunningServiceAt(i);
-            mAm.mBatteryStatsService.noteServiceStopLaunch(sr.appInfo.uid, sr.name.getPackageName(),
-                    sr.name.getClassName());
-            if (sr.app != app && sr.app != null && !sr.app.isPersistent()) {
-                mAm.mProcessStateController.stopService(sr.app.mServices, sr);
-                sr.app.mServices.updateBoundClientUids();
-            }
-            sr.setProcess(null, null, 0, null);
-            sr.isolationHostProc = null;
-            sr.executeNesting = 0;
-            synchronized (mAm.mProcessStats.mLock) {
-                sr.forceClearTracker();
-            }
-            if (mDestroyingServices.remove(sr)) {
-                if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "killServices remove destroying " + sr);
-            }
+            psr.mAllowlistManager = false;
 
-            final int numClients = sr.bindings.size();
-            for (int bindingi=numClients-1; bindingi>=0; bindingi--) {
-                IntentBindRecord b = sr.bindings.valueAt(bindingi);
-                if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Killing binding " + b
-                        + ": shouldUnbind=" + b.hasBound);
-                b.binder = null;
-                b.requested = b.received = b.hasBound = false;
-                // If this binding is coming from a cached process and is asking to keep
-                // the service created, then we'll kill the cached process as well -- we
-                // don't want to be thrashing around restarting processes that are only
-                // there to be cached.
-                for (int appi=b.apps.size()-1; appi>=0; appi--) {
-                    final ProcessRecord proc = b.apps.keyAt(appi);
-                    // If the process is already gone, skip it.
-                    if (proc.isKilledByAm() || proc.getThread() == null) {
-                        continue;
+            // Clear app state from services.
+            for (int i = psr.numberOfRunningServices() - 1; i >= 0; i--) {
+                ServiceRecord sr = psr.getRunningServiceAt(i);
+                mAm.mBatteryStatsService.noteServiceStopLaunch(sr.appInfo.uid,
+                        sr.name.getPackageName(),
+                        sr.name.getClassName());
+                if (sr.app != app && sr.app != null && !sr.app.isPersistent()) {
+                    mAm.mProcessStateController.stopService(sr.app.mServices, sr);
+                    sr.app.mServices.updateBoundClientUids();
+                }
+                sr.setProcess(null, null, 0, null);
+                sr.isolationHostProc = null;
+                sr.executeNesting = 0;
+                synchronized (mAm.mProcessStats.mLock) {
+                    sr.forceClearTracker();
+                }
+                if (mDestroyingServices.remove(sr)) {
+                    if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "killServices remove destroying " + sr);
+                }
+
+                final int numClients = sr.bindings.size();
+                for (int bindingi = numClients - 1; bindingi >= 0; bindingi--) {
+                    IntentBindRecord b = sr.bindings.valueAt(bindingi);
+                    if (DEBUG_SERVICE) {
+                        Slog.v(TAG_SERVICE,
+                                "Killing binding " + b + ": shouldUnbind=" + b.hasBound);
                     }
-                    // Only do this for processes that have an auto-create binding;
-                    // otherwise the binding can be left, because it won't cause the
-                    // service to restart.
-                    final AppBindRecord abind = b.apps.valueAt(appi);
-                    boolean hasCreate = false;
-                    for (int conni = abind.connections.size() - 1; conni >= 0; conni--) {
-                        ConnectionRecord conn = abind.connections.valueAt(conni);
-                        if (conn.hasFlag(Context.BIND_AUTO_CREATE)
-                                && conn.notHasFlag(Context.BIND_ALLOW_OOM_MANAGEMENT
-                                |Context.BIND_WAIVE_PRIORITY)) {
-                            hasCreate = true;
-                            break;
+                    b.binder = null;
+                    b.requested = b.received = b.hasBound = false;
+                    // If this binding is coming from a cached process and is asking to keep
+                    // the service created, then we'll kill the cached process as well -- we
+                    // don't want to be thrashing around restarting processes that are only
+                    // there to be cached.
+                    for (int appi = b.apps.size() - 1; appi >= 0; appi--) {
+                        final ProcessRecord proc = b.apps.keyAt(appi);
+                        // If the process is already gone, skip it.
+                        if (proc.isKilledByAm() || proc.getThread() == null) {
+                            continue;
                         }
-                    }
-                    if (!hasCreate) {
-                        continue;
-                    }
-                    // XXX turned off for now until we have more time to get a better policy.
+                        // Only do this for processes that have an auto-create binding;
+                        // otherwise the binding can be left, because it won't cause the
+                        // service to restart.
+                        final AppBindRecord abind = b.apps.valueAt(appi);
+                        boolean hasCreate = false;
+                        for (int conni = abind.connections.size() - 1; conni >= 0; conni--) {
+                            ConnectionRecord conn = abind.connections.valueAt(conni);
+                            if (conn.hasFlag(Context.BIND_AUTO_CREATE)
+                                    && conn.notHasFlag(Context.BIND_ALLOW_OOM_MANAGEMENT
+                                    | Context.BIND_WAIVE_PRIORITY)) {
+                                hasCreate = true;
+                                break;
+                            }
+                        }
+                        if (!hasCreate) {
+                            continue;
+                        }
+                        // XXX turned off for now until we have more time to get a better policy.
                     /*
                     if (false && proc != null && !proc.isPersistent() && proc.getThread() != null
                             && proc.getPid() != 0 && proc.getPid() != ActivityManagerService.MY_PID
@@ -7880,118 +7892,125 @@ public final class ActiveServices {
                                 ApplicationExitInfo.REASON_OTHER, true);
                     }
                     */
+                    }
                 }
             }
-        }
 
-        ServiceMap smap = getServiceMapLocked(app.userId);
+            ServiceMap smap = getServiceMapLocked(app.userId);
 
-        // Now do remaining service cleanup.
-        for (int i = psr.numberOfRunningServices() - 1; i >= 0; i--) {
-            ServiceRecord sr = psr.getRunningServiceAt(i);
+            // Now do remaining service cleanup.
+            for (int i = psr.numberOfRunningServices() - 1; i >= 0; i--) {
+                ServiceRecord sr = psr.getRunningServiceAt(i);
 
-            // Unless the process is persistent, this process record is going away,
-            // so make sure the service is cleaned out of it.
-            if (!app.isPersistent()) {
-                mAm.mProcessStateController.stopService(psr, sr);
-                psr.updateBoundClientUids();
-            }
-
-            // Check: if the service listed for the app is not one
-            // we actually are maintaining, just let it drop.
-            final ServiceRecord curRec = smap.mServicesByInstanceName.get(sr.instanceName);
-            if (curRec != sr) {
-                if (curRec != null) {
-                    Slog.wtf(TAG, "Service " + sr + " in process " + app
-                            + " not same as in map: " + curRec);
+                // Unless the process is persistent, this process record is going away,
+                // so make sure the service is cleaned out of it.
+                if (!app.isPersistent()) {
+                    mAm.mProcessStateController.stopService(psr, sr);
+                    psr.updateBoundClientUids();
                 }
-                continue;
-            }
 
-            // Any services running in the application may need to be placed
-            // back in the pending list.
-            if (allowRestart && sr.crashCount >= mAm.mConstants.BOUND_SERVICE_MAX_CRASH_RETRY
-                    && (sr.serviceInfo.applicationInfo.flags
-                        &ApplicationInfo.FLAG_PERSISTENT) == 0) {
-                Slog.w(TAG, "Service crashed " + sr.crashCount
-                        + " times, stopping: " + sr);
-                EventLog.writeEvent(EventLogTags.AM_SERVICE_CRASHED_TOO_MUCH,
-                        sr.userId, sr.crashCount, sr.shortInstanceName,
-                        sr.app != null ? sr.app.getPid() : -1);
-                bringDownServiceLocked(sr, true);
-            } else if (!allowRestart
-                    || !mAm.mUserController.isUserRunning(sr.userId, 0)) {
-                bringDownServiceLocked(sr, true);
-            } else {
-                final boolean scheduled = scheduleServiceRestartLocked(sr, true /* allowCancel */);
+                // Check: if the service listed for the app is not one
+                // we actually are maintaining, just let it drop.
+                final ServiceRecord curRec = smap.mServicesByInstanceName.get(sr.instanceName);
+                if (curRec != sr) {
+                    if (curRec != null) {
+                        Slog.wtf(TAG, "Service " + sr + " in process " + app
+                                + " not same as in map: " + curRec);
+                    }
+                    continue;
+                }
 
-                // Should the service remain running?  Note that in the
-                // extreme case of so many attempts to deliver a command
-                // that it failed we also will stop it here.
-                if (!scheduled) {
+                // Any services running in the application may need to be placed
+                // back in the pending list.
+                if (allowRestart && sr.crashCount >= mAm.mConstants.BOUND_SERVICE_MAX_CRASH_RETRY
+                        && (sr.serviceInfo.applicationInfo.flags
+                        & ApplicationInfo.FLAG_PERSISTENT) == 0) {
+                    Slog.w(TAG, "Service crashed " + sr.crashCount
+                            + " times, stopping: " + sr);
+                    EventLog.writeEvent(EventLogTags.AM_SERVICE_CRASHED_TOO_MUCH,
+                            sr.userId, sr.crashCount, sr.shortInstanceName,
+                            sr.app != null ? sr.app.getPid() : -1);
                     bringDownServiceLocked(sr, true);
-                } else if (sr.canStopIfKilled(false /* isStartCanceled */)) {
-                    // Update to stopped state because the explicit start is gone. The service is
-                    // scheduled to restart for other reason (e.g. connections) so we don't bring
-                    // down it.
-                    mAm.mProcessStateController.setStartRequested(sr, false);
-                    if (sr.tracker != null) {
-                        synchronized (mAm.mProcessStats.mLock) {
-                            sr.tracker.setStarted(false, mAm.mProcessStats.getMemFactorLocked(),
-                                    SystemClock.uptimeMillis());
+                } else if (!allowRestart
+                        || !mAm.mUserController.isUserRunning(sr.userId, 0)) {
+                    bringDownServiceLocked(sr, true);
+                } else {
+                    final boolean scheduled = scheduleServiceRestartLocked(sr,
+                            true /* allowCancel */);
+
+                    // Should the service remain running?  Note that in the
+                    // extreme case of so many attempts to deliver a command
+                    // that it failed we also will stop it here.
+                    if (!scheduled) {
+                        bringDownServiceLocked(sr, true);
+                    } else if (sr.canStopIfKilled(false /* isStartCanceled */)) {
+                        // Update to stopped state because the explicit start is gone. The
+                        // service is scheduled to restart for other reason (e.g. connections) so
+                        // we don't bring down it.
+                        mAm.mProcessStateController.setStartRequested(sr, false);
+                        if (sr.tracker != null) {
+                            synchronized (mAm.mProcessStats.mLock) {
+                                sr.tracker.setStarted(false, mAm.mProcessStats.getMemFactorLocked(),
+                                        SystemClock.uptimeMillis());
+                            }
                         }
                     }
                 }
             }
+
+            if (Flags.pscBatchServiceUpdates()) {
+                // Do nothing. The ProcessStateController BatchSession close
+                // would have triggered the update.
+            } else {
+                mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_STOP_SERVICE);
+            }
+
+            if (!allowRestart) {
+                mAm.mProcessStateController.stopAllServices(psr);
+                psr.clearBoundClientUids();
+
+                // Make sure there are no more restarting services for this process.
+                for (int i = mRestartingServices.size() - 1; i >= 0; i--) {
+                    ServiceRecord r = mRestartingServices.get(i);
+                    if (r.processName.equals(app.processName)
+                            && r.serviceInfo.applicationInfo.uid == app.info.uid) {
+                        mRestartingServices.remove(i);
+                        clearRestartingIfNeededLocked(r);
+                    }
+                }
+                for (int i = mPendingServices.size() - 1; i >= 0; i--) {
+                    ServiceRecord r = mPendingServices.get(i);
+                    if (r.processName.equals(app.processName)
+                            && r.serviceInfo.applicationInfo.uid == app.info.uid) {
+                        mPendingServices.remove(i);
+                    }
+                }
+                for (int i = mPendingBringups.size() - 1; i >= 0; i--) {
+                    ServiceRecord r = mPendingBringups.keyAt(i);
+                    if (r.processName.equals(app.processName)
+                            && r.serviceInfo.applicationInfo.uid == app.info.uid) {
+                        mPendingBringups.removeAt(i);
+                    }
+                }
+            }
+
+            // Make sure we have no more records on the stopping list.
+            int i = mDestroyingServices.size();
+            while (i > 0) {
+                i--;
+                ServiceRecord sr = mDestroyingServices.get(i);
+                if (sr.app == app) {
+                    synchronized (mAm.mProcessStats.mLock) {
+                        sr.forceClearTracker();
+                    }
+                    mDestroyingServices.remove(i);
+                    if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "killServices remove destroying " + sr);
+                }
+            }
+
+            mAm.mProcessStateController.stopAllExecutingServices(psr);
+            psr.noteScheduleServiceTimeoutPending(false);
         }
-
-        mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_STOP_SERVICE);
-
-        if (!allowRestart) {
-            mAm.mProcessStateController.stopAllServices(psr);
-            psr.clearBoundClientUids();
-
-            // Make sure there are no more restarting services for this process.
-            for (int i=mRestartingServices.size()-1; i>=0; i--) {
-                ServiceRecord r = mRestartingServices.get(i);
-                if (r.processName.equals(app.processName) &&
-                        r.serviceInfo.applicationInfo.uid == app.info.uid) {
-                    mRestartingServices.remove(i);
-                    clearRestartingIfNeededLocked(r);
-                }
-            }
-            for (int i=mPendingServices.size()-1; i>=0; i--) {
-                ServiceRecord r = mPendingServices.get(i);
-                if (r.processName.equals(app.processName) &&
-                        r.serviceInfo.applicationInfo.uid == app.info.uid) {
-                    mPendingServices.remove(i);
-                }
-            }
-            for (int i = mPendingBringups.size() - 1; i >= 0; i--) {
-                ServiceRecord r = mPendingBringups.keyAt(i);
-                if (r.processName.equals(app.processName)
-                        && r.serviceInfo.applicationInfo.uid == app.info.uid) {
-                    mPendingBringups.removeAt(i);
-                }
-            }
-        }
-
-        // Make sure we have no more records on the stopping list.
-        int i = mDestroyingServices.size();
-        while (i > 0) {
-            i--;
-            ServiceRecord sr = mDestroyingServices.get(i);
-            if (sr.app == app) {
-                synchronized (mAm.mProcessStats.mLock) {
-                    sr.forceClearTracker();
-                }
-                mDestroyingServices.remove(i);
-                if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "killServices remove destroying " + sr);
-            }
-        }
-
-        mAm.mProcessStateController.stopAllExecutingServices(psr);
-        psr.noteScheduleServiceTimeoutPending(false);
     }
 
     ActivityManager.RunningServiceInfo makeRunningServiceInfoLocked(ServiceRecord r) {
@@ -8810,7 +8829,7 @@ public final class ActiveServices {
     protected boolean dumpService(FileDescriptor fd, PrintWriter pw, String name, int[] users,
             String[] args, int opti, boolean dumpAll) {
         try {
-            mAm.mOomAdjuster.mCachedAppOptimizer.enableFreezer(false);
+            mAm.getCachedAppOptimizer().enableFreezer(false);
             final ArrayList<ServiceRecord> services = new ArrayList<>();
 
             final Predicate<ServiceRecord> filter = DumpUtils.filterRecord(name);
@@ -8853,7 +8872,7 @@ public final class ActiveServices {
             }
             return true;
         } finally {
-            mAm.mOomAdjuster.mCachedAppOptimizer.enableFreezer(true);
+            mAm.getCachedAppOptimizer().enableFreezer(true);
         }
     }
 

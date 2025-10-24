@@ -38,6 +38,7 @@ import android.view.View.OnLongClickListener
 import android.view.View.OnTouchListener
 import android.view.ViewConfiguration
 import android.view.WindowManager
+import android.view.WindowManager.LayoutParams.INPUT_FEATURE_SPY
 import android.view.WindowManager.TRANSIT_CHANGE
 import android.view.WindowManagerGlobal
 import android.window.DesktopExperienceFlags
@@ -49,9 +50,7 @@ import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
-import com.android.wm.shell.apptoweb.AppToWebGenericLinksParser
 import com.android.wm.shell.apptoweb.AppToWebRepository
-import com.android.wm.shell.apptoweb.AssistContentRequester
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.LockTaskChangeListener
 import com.android.wm.shell.common.MultiInstanceHelper
@@ -98,8 +97,6 @@ class DefaultWindowDecoration
 constructor(
     taskInfo: RunningTaskInfo,
     taskSurface: SurfaceControl,
-    genericLinksParser: AppToWebGenericLinksParser,
-    assistContentRequester: AssistContentRequester,
     val context: Context,
     private val userContext: Context,
     private val displayController: DisplayController,
@@ -125,6 +122,7 @@ constructor(
     private val desktopState: DesktopState,
     private val desktopConfig: DesktopConfig,
     private val windowDecorationActions: WindowDecorationActions,
+    private val appToWebRepository: AppToWebRepository,
     private val windowManagerWrapper: WindowManagerWrapper =
         WindowManagerWrapper(context.getSystemService(WindowManager::class.java)),
     private val surfaceControlBuilderSupplier: () -> SurfaceControl.Builder = {
@@ -150,9 +148,6 @@ constructor(
         mainScope,
         transitions,
     ) {
-    private var appToWebRepository =
-        AppToWebRepository(userContext, taskInfo.taskId, assistContentRequester, genericLinksParser)
-
     private lateinit var onClickListener: OnClickListener
     private lateinit var onTouchListener: OnTouchListener
     private lateinit var onLongClickListener: OnLongClickListener
@@ -331,7 +326,11 @@ constructor(
         traceSection("DefaultWindowDecoration#relayout") {
             if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB.isTrue) {
                 taskInfo.capturedLink?.let {
-                    appToWebRepository.setCapturedLink(it, taskInfo.capturedLinkTimestamp)
+                    appToWebRepository.setCapturedLink(
+                        taskInfo.taskId,
+                        it,
+                        taskInfo.capturedLinkTimestamp,
+                    )
                 }
             }
 
@@ -360,6 +359,7 @@ constructor(
                 )
 
             val wct = windowContainerTransactionSupplier.invoke()
+            val oldDecorationSurface = decorationContainerSurface
             relayout(relayoutParams, startT, finishT, wct, taskSurface)
 
             // After this line, [WindowDecoration2.taskInfo] is up-to-date and should be
@@ -389,7 +389,9 @@ constructor(
                 Trace.endSection()
             }
 
-            decorationContainerSurface?.let { updateDragResizeListenerIfNeeded(it) }
+            decorationContainerSurface?.let {
+                updateDragResizeListenerIfNeeded(oldDecorationSurface)
+            }
         }
 
     private fun getRelayoutParams(
@@ -428,12 +430,25 @@ constructor(
         var insetSourceFlags = 0
         var shouldSetAppBounds = false
         if (isAppHeader) {
-            if (
-                taskInfo.isTransparentCaptionBarAppearance &&
-                    !DesktopModeFlags.ENABLE_ACCESSIBLE_CUSTOM_HEADERS.isTrue
-            ) {
-                // Allow input to fall through to the windows below so that the app can respond
-                // to input events on their custom content.
+            if (taskInfo.isTransparentCaptionBarAppearance) {
+                // The app is requesting to customize the caption bar, which means input on
+                // customizable/exclusion regions must go to the app instead of to the system.
+                // Custom touchable regions OR spy windows are usually sufficient to satisfy this
+                // requirement for the general case, but some edge cases make it so we actually
+                // need both:
+                // 1) Spy window by itself does not let a11y services "see" through the window and
+                // focus the custom content. The touchable region carveout helps here. Note that
+                // this is set by |CaptionController#calculateLimitedTouchableRegion|.
+                // 2) When the app has a modal window on top of the window that reports exclusion
+                // regions, the modal window actually blocks the exclusion region from being
+                // reported to SystemUI, which prevents the window decoration from correctly
+                // setting the touchable region (of the caption) and thus touching the
+                // custom region has the input consumed by the caption and makes it impossible for
+                // the modal to be closed in this region, see b/414521306.
+                // So by setting the spy feature the input can fall through to the windows below,
+                // but more precisely it allows the first motion event over a modal window to fall
+                // through and dismiss the modal, even when the caption touchable region is not
+                // being limited.
                 inputFeatures = inputFeatures or WindowManager.LayoutParams.INPUT_FEATURE_SPY
             } else if (DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION.isTrue) {
                 if (shouldExcludeCaptionFromAppBounds) {
@@ -453,6 +468,14 @@ constructor(
                     insetSourceFlags = insetSourceFlags or FLAG_FORCE_CONSUMING_OPAQUE_CAPTION_BAR
                 }
             }
+            inputFeatures =
+                inputFeatures or WindowManager.LayoutParams.INPUT_FEATURE_DISPLAY_TOPOLOGY_AWARE
+        } else if (
+            isAppHandle && DesktopExperienceFlags.ENABLE_REMOVE_STATUS_BAR_INPUT_LAYER.isTrue
+        ) {
+            // Add input feature spy flag if caption is an app handle so that input is not stolen
+            // when motion event exits caption view.
+            inputFeatures = inputFeatures or INPUT_FEATURE_SPY
         }
 
         // The configuration used to layout the window decoration. A copy is made instead of using
@@ -653,7 +676,7 @@ constructor(
         return showCaption
     }
 
-    private fun updateDragResizeListenerIfNeeded(containerSurface: SurfaceControl) {
+    private fun updateDragResizeListenerIfNeeded(containerSurface: SurfaceControl?) {
         val taskPositionChanged = !taskInfo.positionInParent.equals(taskPositionInParent)
         if (!taskInfo.isDragResizable(inFullImmersive)) {
             if (taskPositionChanged) {
@@ -671,7 +694,7 @@ constructor(
     }
 
     private fun updateDragResizeListener(
-        containerSurface: SurfaceControl,
+        containerSurface: SurfaceControl?,
         onUpdateFinished: (Boolean) -> Unit,
     ) {
         val containerSurfaceChanged = containerSurface != decorationContainerSurface
@@ -693,7 +716,7 @@ constructor(
                     handler,
                     choreographer,
                     checkNotNull(display?.displayId) { "expected non-null display" },
-                    decorationContainerSurface,
+                    checkNotNull(decorationContainerSurface),
                     dragPositioningCallback,
                     surfaceControlBuilderSupplier,
                     surfaceControlTransactionSupplier,
@@ -853,7 +876,7 @@ constructor(
 
     /** Checks if touch event occurred in caption's customizable region. */
     fun checkTouchEventInCustomizableRegion(e: MotionEvent): Boolean =
-        (captionController as? AppHandleController)?.checkTouchEventInCustomizableRegion(e) ?: false
+        captionController?.checkTouchEventInCustomizableRegion(e) ?: false
 
     /** Adds inset for caption if one exists. */
     fun addCaptionInset(wct: WindowContainerTransaction) {

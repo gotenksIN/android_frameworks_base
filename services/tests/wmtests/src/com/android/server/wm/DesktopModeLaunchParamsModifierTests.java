@@ -149,7 +149,16 @@ public class DesktopModeLaunchParamsModifierTests extends
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testReturnsSkipIfDesktopWindowingIsEnabledOnUnsupportedDevice() {
         setupDesktopModeLaunchParamsModifier(/*isDesktopModeSupported=*/ false,
-                /*enforceDeviceRestrictions=*/ true);
+                /*enforceDeviceRestrictions=*/ true, /*doesDisplaySupportDesktop*/ true);
+
+        assertEquals(RESULT_SKIP, new CalculateRequestBuilder().setTask(null).calculate());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
+    public void testReturnsSkipIfDesktopWindowingIsNotSupportedOnTargetDisplay() {
+        setupDesktopModeLaunchParamsModifier(/*isDesktopModeSupported=*/ true,
+                /*enforceDeviceRestrictions=*/ true, /*doesDisplaySupportDesktop*/ false);
 
         assertEquals(RESULT_SKIP, new CalculateRequestBuilder().setTask(null).calculate());
     }
@@ -158,7 +167,7 @@ public class DesktopModeLaunchParamsModifierTests extends
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testReturnsContinueIfDesktopWindowingIsEnabledAndUnsupportedDeviceOverridden() {
         setupDesktopModeLaunchParamsModifier(/*isDesktopModeSupported=*/ true,
-                /*enforceDeviceRestrictions=*/ false);
+                /*enforceDeviceRestrictions=*/ false, /*doesDisplaySupportDesktop*/ true);
 
         final Task task = new TaskBuilder(mSupervisor).build();
         assertEquals(RESULT_CONTINUE, new CalculateRequestBuilder().setTask(task).calculate());
@@ -526,6 +535,69 @@ public class DesktopModeLaunchParamsModifierTests extends
                 DesktopModeCompatUtils.computeConfigOrientation(mResult.mBounds));
         assertEquals(expectedAspectRatio,
                 AppCompatUtils.computeAspectRatio(mResult.mAppBounds), /* delta */ 0.05);
+    }
+
+    @Test
+    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
+            Flags.FLAG_INHERIT_TASK_BOUNDS_FOR_TRAMPOLINE_TASK_LAUNCHES})
+    public void testInheritSourceTaskBoundsFromExistingInstanceIfClosing() {
+        setupDesktopModeLaunchParamsModifier();
+
+        final String packageName = "com.same.package";
+        // Setup existing task.
+        final DisplayContent dc = spy(createNewDisplay());
+        final Task sourceTask = new TaskBuilder(mSupervisor).setCreateActivity(true)
+                .setWindowingMode(WINDOWING_MODE_FREEFORM).setPackage(packageName).build();
+        sourceTask.topRunningActivity().launchMode = LAUNCH_SINGLE_INSTANCE;
+        sourceTask.setBounds(
+                /* left */ 0,
+                /* top */ 0,
+                /* right */ 500,
+                /* bottom */ 500);
+        // Set up new instance of already existing task. By default multi instance is not supported
+        // so first instance will close.
+        final Task launchingTask = new TaskBuilder(mSupervisor).setPackage(packageName)
+                .setCreateActivity(true).build();
+        launchingTask.topRunningActivity().launchMode = LAUNCH_SINGLE_INSTANCE;
+        launchingTask.onDisplayChanged(dc);
+
+        // New instance should inherit task bounds of old instance.
+        assertEquals(RESULT_DONE,
+                new CalculateRequestBuilder().setTask(launchingTask)
+                        .setActivity(launchingTask.getRootActivity())
+                        .setSource(sourceTask.getTopMostActivity()).calculate());
+        assertEquals(sourceTask.getBounds(), mResult.mBounds);
+    }
+
+    @Test
+    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
+            Flags.FLAG_INHERIT_TASK_BOUNDS_FOR_TRAMPOLINE_TASK_LAUNCHES})
+    public void testInheritSourceTaskBoundsFromExistingInstanceIfNoLongerVisible() {
+        setupDesktopModeLaunchParamsModifier();
+
+        final String packageName = "com.same.package";
+        // Setup existing task.
+        final Task sourceTask = spy(new TaskBuilder(mSupervisor).setCreateActivity(true)
+                .setWindowingMode(WINDOWING_MODE_FREEFORM).setPackage(packageName).build());
+        sourceTask.setBounds(
+                /* left */ 0,
+                /* top */ 0,
+                /* right */ 500,
+                /* bottom */ 500);
+        // Set source task activity as invisible.
+        final ActivityRecord sourceTaskActivity = spy(sourceTask.getTopMostActivity());
+        sourceTask.topRunningActivity().launchMode = LAUNCH_SINGLE_INSTANCE;
+        doReturn(false).when(sourceTaskActivity).isVisible();
+        // Set up new instance of already existing task.
+        final Task launchingTask = new TaskBuilder(mSupervisor).setPackage(packageName)
+                .setCreateActivity(true).build();
+
+        // New instance should inherit task bounds of old instance.
+        assertEquals(RESULT_DONE,
+                new CalculateRequestBuilder().setTask(launchingTask)
+                        .setActivity(launchingTask.getRootActivity())
+                        .setSource(sourceTaskActivity).calculate());
+        assertEquals(sourceTask.getBounds(), mResult.mBounds);
     }
 
     @Test
@@ -2298,15 +2370,17 @@ public class DesktopModeLaunchParamsModifierTests extends
 
     private void setupDesktopModeLaunchParamsModifier() {
         setupDesktopModeLaunchParamsModifier(/*isDesktopModeSupported=*/ true,
-                /*enforceDeviceRestrictions=*/ true);
+                /*enforceDeviceRestrictions=*/ true, /*doesDisplaySupportDesktop*/ true);
     }
 
     private void setupDesktopModeLaunchParamsModifier(boolean isDesktopModeSupported,
-            boolean enforceDeviceRestrictions) {
+            boolean enforceDeviceRestrictions, boolean doesDisplaySupportDesktop) {
         doReturn(isDesktopModeSupported)
                 .when(() -> DesktopModeHelper.canEnterDesktopMode(any()));
         doReturn(enforceDeviceRestrictions)
                 .when(DesktopModeHelper::shouldEnforceDeviceRestrictions);
+        doReturn(doesDisplaySupportDesktop)
+                .when(mTarget).isDesktopModeSupportedOnDisplay(any());
     }
 
     private void allowOverlayPermissionForAllUsers(String[] permissions)

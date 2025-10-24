@@ -21,8 +21,10 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="app_label" msgid="4811759950673118541">"UI Sistem"</string>
     <string name="battery_low_title" msgid="5319680173344341779">"Hidupkan Penjimat Bateri?"</string>
-    <string name="battery_low_description" msgid="3282977755476423966">"Paras bateri anda ialah <xliff:g id="PERCENTAGE">%s</xliff:g>. Penjimat Bateri menghidupkan Tema gelap, mengehadkan aktiviti latar dan menangguhkan pemberitahuan."</string>
-    <string name="battery_low_intro" msgid="5148725009653088790">"Penjimat Bateri menghidupkan Tema gelap, mengehadkan aktiviti latar dan menangguhkan pemberitahuan."</string>
+    <!-- no translation found for battery_low_description (7848989602036547056) -->
+    <skip />
+    <!-- no translation found for battery_low_intro (8033783734931200690) -->
+    <skip />
     <string name="battery_low_percent_format" msgid="4276661262843170964">"<xliff:g id="PERCENTAGE">%s</xliff:g> yang tinggal"</string>
     <string name="invalid_charger_title" msgid="938685362320735167">"Tidak dapat mengecas melalui USB"</string>
     <string name="invalid_charger_text" msgid="2339310107232691577">"Gunakan pengecas yang disertakan dengan peranti anda"</string>
@@ -138,21 +140,36 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"Anda sedang merakam seluruh skrin anda"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"Anda sedang merakam <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"Hentikan rakaman"</string>
+    <string name="screen_record_entire_screen" msgid="66944996337928170">"Seluruh skrin"</string>
+    <string name="screen_record_single_app" msgid="7355880948574569290">"Apl tunggal"</string>
+    <string name="screen_record_single_app_hint" msgid="8404332826093639170">"Apl untuk merakam"</string>
+    <string name="screen_record_single_app_no_recents" msgid="1023249803854209330">"Apl tunggal (Buka apl utk dipilih)"</string>
     <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"Rakam audio peranti"</string>
     <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"Rakam mikrofon"</string>
+    <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"Tunjukkan kamera swafoto"</string>
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"Tunjukkan sentuhan"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"Pilih apl untuk dirakam"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"Video disimpan"</string>
+    <string name="screen_record_video_deleted" msgid="30786214839944540">"Video dipadamkan"</string>
+    <string name="screen_record_undo" msgid="7942716736019800870">"Buat asal"</string>
     <string name="screen_record_retake" msgid="3846643688365398450">"Ambil semula"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"Edit"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"Padam"</string>
+    <string name="screen_record_delete_dialog_title" msgid="5868561491974057044">"Padamkan rakaman ini?"</string>
+    <string name="screen_record_delete_dialog_content" msgid="2610040845214024496">"Fail video dipadamkan secara kekal daripada peranti jika rakaman ini dipadamkan."</string>
+    <string name="screen_record_play" msgid="4732544724679889445">"Main"</string>
+    <string name="screen_record_pause" msgid="1715012292444967776">"Jeda"</string>
+    <string name="screen_record_mute" msgid="8111682249858638168">"Redam"</string>
+    <string name="screen_record_unmute" msgid="2207912659365156472">"Nyahredam"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"Ambil tangkapan skrin seluruh skrin"</string>
+    <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"Rakam seluruh skrin"</string>
     <string name="screen_capture_region_selection_button" msgid="515608875142444130">"Ambil tangkapan skrin kawasan yang dipilih"</string>
-    <!-- no translation found for screen_capture_record_region_selection_button (3699353194755563053) -->
-    <skip />
+    <string name="screen_capture_record_region_selection_button" msgid="3699353194755563053">"Rekodkan kawasan yang dipilih"</string>
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"Tangkapan skrin"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Rakam"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Kongsi"</string>
+    <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Pilih apl untuk dikongsi"</string>
+    <string name="screen_share_app_audio_sharing" msgid="7201172218924898712">"Kongsi audio tetingkap"</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Ambil tangkapan skrin tetingkap"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Rakam tetingkap"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Ambil tangkapan skrin kawasan yang dipilih"</string>
@@ -160,7 +177,13 @@
     <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"Ambil tangkapan skrin seluruh skrin"</string>
     <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"Rakam seluruh skrin"</string>
     <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"Tetapan tangkapan skrin"</string>
+    <string name="screen_capture_show_clicks_and_keys" msgid="2151690554364148717">"Tunjukkan klik dan kekunci"</string>
+    <string name="screen_capture_device_audio" msgid="1537290197773737349">"Audio peranti"</string>
+    <string name="screen_capture_microphone_audio" msgid="1698835678818747741">"Mikrofon"</string>
+    <string name="screen_capture_front_camera" msgid="1214647538302639358">"Kamera depan"</string>
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> x <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
+    <!-- no translation found for screen_share_privacy_indicator_stop_sharing (2297045039651417274) -->
+    <skip />
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"Berkongsi skrin"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"Berkongsi kandungan"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"Hentikan perkongsian skrin?"</string>
@@ -474,12 +497,13 @@
     <string name="accessibility_hearing_device_pair_new_device" msgid="8440082580186130090">"Klik untuk menggandingkan peranti baharu"</string>
     <string name="hearing_devices_presets_error" msgid="350363093458408536">"Tidak dapat mengemaskinikan pratetapan"</string>
     <string name="hearing_devices_preset_label" msgid="7878267405046232358">"Pratetapan"</string>
+    <string name="hearing_devices_preset_label_left" msgid="7427947566560179945">"Pratetapan Kiri"</string>
+    <string name="hearing_devices_preset_label_right" msgid="1847206329436268522">"Pratetapan Kanan"</string>
     <string name="hearing_devices_input_routing_label" msgid="730396728151232306">"Mikrofon lalai untuk panggilan"</string>
   <string-array name="hearing_device_input_routing_options">
     <item msgid="4582190415045337003">"Mikrofon alat bantu pendengaran"</item>
     <item msgid="8501466270452446450">"Mikrofon telefon ini"</item>
   </string-array>
-    <string name="hearing_devices_spinner_item_selected" msgid="3137083889662762383">"Dipilih"</string>
     <string name="hearing_devices_ambient_label" msgid="629440938614895797">"Persekitaran"</string>
     <string name="hearing_devices_ambient_control_left" msgid="3586965448230412600">"Kiri"</string>
     <string name="hearing_devices_ambient_control_right" msgid="6192137602448918383">"Kanan"</string>
@@ -533,7 +557,7 @@
     <string name="zen_mode_set_up" msgid="8231201163894922821">"Tidak ditetapkan"</string>
     <string name="zen_mode_no_manual_invocation" msgid="1769975741344633672">"Urus dalam tetapan"</string>
     <string name="zen_mode_active_modes" msgid="1625850411578488856">"{count,plural, =0{Tiada mod yang aktif}=1{{mode} aktif}other{# mod aktif}}"</string>
-    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"<xliff:g id="NUMBER">%s</xliff:g> Mod"</string>
+    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"<xliff:g id="NUMBER">%d</xliff:g> Mod"</string>
     <string name="zen_modes_multiple_on_status" msgid="8120633422509269588">"Hidup"</string>
     <string name="zen_priority_introduction" msgid="3159291973383796646">"Anda tidak akan diganggu oleh bunyi dan getaran, kecuali daripada penggera, peringatan, acara dan pemanggil yang anda tetapkan. Anda masih mendengar item lain yang anda pilih untuk dimainkan termasuk muzik, video dan permainan."</string>
     <string name="zen_alarms_introduction" msgid="3987266042682300470">"Anda tidak akan diganggu oleh bunyi dan getaran, kecuali daripada penggera. Anda masih mendengar item lain yang anda pilih untuk dimainkan termasuk muzik, video dan permainan."</string>
@@ -680,8 +704,8 @@
     <string name="notification_section_header_conversations" msgid="821834744538345661">"Perbualan"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"Kosongkan semua pemberitahuan senyap"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"Buka tetapan pemberitahuan"</string>
-    <string name="dnd_suppressing_shade_text" msgid="5588252250634464042">"Pemberitahuan dijeda oleh Jangan Ganggu"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{Tiada pemberitahuan}=1{Pemberitahuan dijeda oleh {mode}}=2{Pemberitahuan dijeda oleh {mode} dan satu lagi mod yang lain}other{Pemberitahuan dijeda oleh {mode} dan # mod yang lain}}"</string>
+    <string name="caught_up_shade_text" msgid="8166221989384139659">"Anda sudah membaca kesemuanya"</string>
     <string name="media_projection_action_text" msgid="3634906766918186440">"Mulakan sekarang"</string>
     <string name="empty_shade_text" msgid="8935967157319717412">"Tiada pemberitahuan"</string>
     <string name="no_unseen_notif_text" msgid="395512586119868682">"Tiada pemberitahuan baharu"</string>
@@ -815,7 +839,7 @@
     <string name="volume_panel_hint_vibrate" msgid="4136223145435914132">"getar"</string>
     <string name="media_output_label_title" msgid="872824698593182505">"Memainkan <xliff:g id="LABEL">%s</xliff:g> pada"</string>
     <string name="media_output_title_without_playing" msgid="3825663683169305013">"Audio dimainkan pada"</string>
-    <string name="media_output_title_ongoing_call" msgid="208426888064112006">"Membuat panggilan"</string>
+    <string name="media_output_title_ongoing_call" msgid="208426888064112006">"Panggilan pada"</string>
     <string name="system_ui_tuner" msgid="1471348823289954729">"Penala UI Sistem"</string>
     <string name="status_bar" msgid="4357390266055077437">"Bar status"</string>
     <string name="demo_mode" msgid="263484519766901593">"Mod tunjuk cara UI sistem"</string>
@@ -875,7 +899,7 @@
     <string name="notification_guts_news_summary" msgid="638697931043407835">"Cerita popular, editorial dan pelbagai lagi"</string>
     <string name="notification_guts_social_summary" msgid="3749147631983977040">"Suka, siaran dan pelbagai lagi"</string>
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"Surat berita, media yang disyorkan dan pelbagai lagi"</string>
-    <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"Hidupkan"</string>
+    <string name="notification_onboarding_summaries_turn_on" msgid="3831339570984683297">"Hidupkan dalam Tetapan"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"Kini perbualan anda yang lebih panjang boleh diringkaskan untuk memberi anda ringkasan pantas"</string>
     <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"Pengelola pemberitahuan menghimpunkan dan menyenyapkan pemberitahuan keutamaan yang lebih rendah. Tambahkan lebih banyak kategori dalam Tetapan."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# pemberitahuan}other{# pemberitahuan}}"</string>
@@ -981,6 +1005,7 @@
     <string name="group_system_access_notification_shade" msgid="1619028907006553677">"Lihat pemberitahuan"</string>
     <string name="group_system_access_quick_settings_panel" msgid="1844771096582064926">"Lihat tetapan pantas"</string>
     <string name="group_system_full_screenshot" msgid="5742204844232667785">"Ambil tangkapan skrin"</string>
+    <string name="group_system_partial_screenshot" msgid="2114314797127648010">"Ambil tangkapan skrin separa"</string>
     <string name="group_system_access_system_app_shortcuts" msgid="8562482996626694026">"Tunjukkan pintasan"</string>
     <string name="group_system_go_back" msgid="2730322046244918816">"Kembali"</string>
     <string name="group_system_access_home_screen" msgid="4130366993484706483">"Akses skrin utama"</string>
@@ -992,7 +1017,6 @@
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"Buka pembantu digital"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"Kunci skrin"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"Catat nota"</string>
-    <string name="group_system_close_window" msgid="1506354809787837043">"Tutup tetingkap semasa"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"Berbilang tugas"</string>
     <string name="system_multitasking_rhs" msgid="8779289852395243004">"Gunakan skrin pisah dengan apl di sebelah kanan"</string>
     <string name="system_multitasking_lhs" msgid="7348595296208696452">"Gunakan skrin pisah dengan apl di sebelah kiri"</string>
@@ -1006,6 +1030,7 @@
     <string name="system_desktop_mode_snap_right_window" msgid="2162560187639411929">"Alihkan tetingkap ke sebelah kanan"</string>
     <string name="system_desktop_mode_toggle_maximize_window" msgid="4084100093691768239">"Maksimumkan tetingkap"</string>
     <string name="system_desktop_mode_minimize_window" msgid="1248714536732927092">"Minimumkan tetingkap"</string>
+    <string name="system_desktop_mode_close_window" msgid="3072490692608682536">"Tutup tetingkap semasa"</string>
     <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"Beralih antara desktop"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"Input"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"Beralih kepada bahasa seterusnya"</string>
@@ -1127,12 +1152,15 @@
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"Hidupkan <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794"><annotation id="action_key_icon">"Ikon"</annotation>" tindakan + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> ialah pintasan papan kekunci untuk menggunakan <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_talkback_intro" msgid="1617808784388544741">"<xliff:g id="ID_1">%1$s</xliff:g> ialah pembaca skrin yang membolehkan anda mendengar item dituturkan dengan kuat. Ciri ini dapat membantu orang yang mengalami kesukaran melihat skrin."</string>
-    <string name="accessibility_key_gesture_dialog_va_intro" msgid="4709198503441288289">"<xliff:g id="ID_1">%1$s</xliff:g> membolehkan anda mengawal peranti anda secara bebas tangan."</string>
     <string name="accessibility_key_gesture_dialog_positive_button_text" msgid="3670746017523589293">"Hidupkan"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"Hidupkan pintasan papan kekunci <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"Jangan hidupkan"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Hidupkan pintasan"</string>
     <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"Pintasan papan kekunci <xliff:g id="ID_1">%1$s</xliff:g> dihidupkan"</string>
-    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="7575802369763469379"><annotation id="action_key_icon">"Ikon"</annotation>" tindakan + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> ialah pintasan papan kekunci untuk menggunakan <xliff:g id="ID_3">^3</xliff:g>. Ciri ini membolehkan anda mengezum masuk dengan pantas pada skrin untuk menjadikan kandungan lebih besar. Tekan "<annotation id="action_key_icon">"ikon"</annotation>" Tindakan + <xliff:g id="ID_4">^1</xliff:g> dan \"+\" atau \"-\" untuk melaraskan zum."</string>
+    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572"><annotation id="action_key_icon">"Ikon"</annotation>" Tindakan + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> ialah pintasan papan kekunci untuk menggunakan <xliff:g id="ID_3">^3</xliff:g>, yang merupakan ciri kebolehaksesan. Ciri ini membolehkan anda mengezum masuk dengan pantas pada skrin untuk menjadikan kandungan lebih besar. Setelah pembesaran dihidupkan, tekan "<annotation id="action_key_icon">"ikon"</annotation>" Tindakan + <xliff:g id="ID_4">^1</xliff:g> dan \"+\" atau \"-\" untuk melaraskan zum."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Matikan pintasan"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Sentiasa hidupkan"</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"Tindakan menekan "<annotation id="action_key_icon">"ikon"</annotation>" Tindakan + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> menghidupkan <xliff:g id="ID_3">^3</xliff:g>, ciri kebolehaksesan. Tindakan ini membolehkan anda mengawal peranti anda secara bebas tangan."</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Kunci skrin"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Mematikan…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Lihat langkah penjagaan"</string>
@@ -1463,7 +1491,6 @@
     <string name="clipboard_edit_text_done" msgid="4551887727694022409">"Selesai"</string>
     <string name="clipboard_overlay_text_copied" msgid="1872624400464891363">"Disalin"</string>
     <string name="clipboard_edit_source" msgid="9156488177277788029">"Daripada <xliff:g id="APPNAME">%1$s</xliff:g>"</string>
-    <string name="clipboard_dismiss_description" msgid="3335990369850165486">"Ketepikan teks yang disalin"</string>
     <string name="clipboard_edit_text_description" msgid="805254383912962103">"Edit teks yang disalin"</string>
     <string name="clipboard_edit_image_description" msgid="8904857948976041306">"Edit imej yang disalin"</string>
     <string name="clipboard_send_nearby_description" msgid="4629769637846717650">"Hantar ke peranti berdekatan"</string>
@@ -1603,6 +1630,7 @@
     <string name="shortcut_helper_customize_dialog_reset_button_label" msgid="7645535254306312685">"Ya, tetapkan semula"</string>
     <string name="shortcut_helper_customize_dialog_cancel_button_label" msgid="5595546460431741178">"Batal"</string>
     <string name="shortcut_helper_add_shortcut_dialog_placeholder" msgid="9154297849458741995">"Tekan kekunci"</string>
+    <string name="shortcut_helper_customizer_action_key_text" msgid="3979063901857046887">"Tindakan"</string>
     <string name="shortcut_customizer_key_combination_in_use_error_message" msgid="3325858369539848162">"Gabungan kekunci sudah digunakan. Cuba kombinasi lain."</string>
     <string name="shortcut_customizer_generic_error_message" msgid="3128454624049722741">"Pintasan tidak boleh ditetapkan."</string>
     <string name="shortcut_helper_plus_symbol" msgid="4534843157353732011">"+"</string>

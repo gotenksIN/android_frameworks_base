@@ -54,6 +54,7 @@ import static android.provider.Settings.Secure.VOLUME_HUSH_OFF;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.Display.STATE_OFF;
+import static android.view.Display.TYPE_EXTERNAL;
 import static android.view.KeyEvent.KEYCODE_BACK;
 import static android.view.KeyEvent.KEYCODE_HOME;
 import static android.view.KeyEvent.KEYCODE_POWER;
@@ -90,6 +91,7 @@ import static android.view.WindowManagerGlobal.ADD_OKAY;
 import static android.view.WindowManagerGlobal.ADD_PERMISSION_DENIED;
 import static android.view.contentprotection.flags.Flags.createAccessibilityOverlayAppOpEnabled;
 
+import static com.android.hardware.input.Flags.bluetoothWakeupStateCheck;
 import static com.android.hardware.input.Flags.enableNew25q2Keycodes;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN;
@@ -200,6 +202,7 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.proto.ProtoOutputStream;
 import android.view.Display;
+import android.view.DisplayInfo;
 import android.view.HapticFeedbackConstants;
 import android.view.IDisplayFoldListener;
 import android.view.InputDevice;
@@ -216,6 +219,7 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.autofill.AutofillManagerInternal;
 import android.widget.Toast;
+import android.window.DesktopExperienceFlags;
 
 import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
@@ -488,9 +492,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     // Assigned on main thread, accessed on UI thread
     volatile VrManagerInternal mVrManagerInternal;
-
-    /** If true, can use a keyboard shortcut to trigger a bugreport. */
-    boolean mEnableBugReportKeyboardShortcut = false;
 
     private TalkbackShortcutController mTalkbackShortcutController;
 
@@ -837,7 +838,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
-// QTI_BEGIN: 2021-04-28: Core: HDMI/DP pluggin notification changes
     private UEventObserver mHDMISwitchObserver = new UEventObserver() {
         @Override
         public void onUEvent(UEventObserver.UEvent event) {
@@ -845,8 +845,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
-// QTI_END: 2021-04-28: Core: HDMI/DP pluggin notification changes
-// QTI_BEGIN: 2019-06-24: Core: frameworks/base: Add HDMI hotplug handling
     private UEventObserver mExtEventObserver = new UEventObserver() {
         @Override
         public void onUEvent(UEventObserver.UEvent event) {
@@ -856,7 +854,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
-// QTI_END: 2019-06-24: Core: frameworks/base: Add HDMI hotplug handling
     class SettingsObserver extends ContentObserver {
         SettingsObserver(Handler handler) {
             super(handler);
@@ -2377,7 +2374,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 "PhoneWindowManager.mBroadcastWakeLock");
         mPowerKeyWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                 "PhoneWindowManager.mPowerKeyWakeLock");
-        mEnableBugReportKeyboardShortcut = "1".equals(SystemProperties.get("ro.debuggable"));
         mLidKeyboardAccessibility = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_lidKeyboardAccessibility);
         mLidNavigationAccessibility = mContext.getResources().getInteger(
@@ -3493,8 +3489,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_DO_NOT_DISTURB,
                 KeyGestureEvent.KEY_GESTURE_TYPE_RINGER_TOGGLE_CHORD,
                 KeyGestureEvent.KEY_GESTURE_TYPE_GLOBAL_ACTIONS,
-                KeyGestureEvent.KEY_GESTURE_TYPE_TV_TRIGGER_BUG_REPORT,
-                KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK
+                KeyGestureEvent.KEY_GESTURE_TYPE_TV_TRIGGER_BUG_REPORT
         ));
         if (!com.android.window.flags.Flags.grantManageKeyGesturesToRecents()) {
             // When grantManageKeyGesturesToRecents is enabled, the event is handled in the
@@ -3576,11 +3571,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
                 break;
             case KeyGestureEvent.KEY_GESTURE_TYPE_TRIGGER_BUG_REPORT:
-                if (complete && mEnableBugReportKeyboardShortcut) {
+                if (complete) {
                     try {
-                        if (!mActivityManagerService.launchBugReportHandlerApp()) {
+                        if (mActivityManagerService.launchBugReportHandlerApp()) {
+                            return;
+                        }
+                        // Take bug report only for debuggable builds as a fallback when there is
+                        // no bug handler or feedback app on the system image.
+                        if ("1".equals(SystemProperties.get("ro.debuggable"))) {
                             mActivityManagerService.requestInteractiveBugReport();
                         }
+                        return;
                     } catch (RemoteException e) {
                         Slog.d(TAG, "Error taking bugreport", e);
                     }
@@ -3698,25 +3699,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             "Key gesture DND", true);
                 }
                 break;
-            case KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK:
-                if (complete) {
-                    try {
-                        RootTaskInfo currentRootTask =
-                                mActivityManagerService.getFocusedRootTaskInfo();
-                        if (currentRootTask == null) {
-                            Slog.e(TAG,
-                                    "onKeyGesture: KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK the current"
-                                            + " root task is null" );
-                            return;
-                        }
-                        mActivityManagerService.removeTask(currentRootTask.taskId);
-                    } catch (RemoteException e) {
-                        Slog.e(TAG,
-                                "onKeyGesture: KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK failed to close"
-                                        + " the current root task",
-                                e);
-                    }
-                }
             default:
                 Log.w(TAG, "Received a key gesture " + event
                         + " that was not registered by this handler");
@@ -4371,13 +4353,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     void initializeHdmiStateInternal() {
         boolean plugged = false;
-// QTI_BEGIN: 2019-06-24: Core: frameworks/base: Add HDMI hotplug handling
         mExtEventObserver.startObserving("mdss_mdp/drm/card");
-// QTI_END: 2019-06-24: Core: frameworks/base: Add HDMI hotplug handling
         // watch for HDMI plug messages if the hdmi switch exists
-// QTI_BEGIN: 2021-04-28: Core: HDMI/DP pluggin notification changes
         mHDMISwitchObserver.startObserving("change@/devices/virtual/graphics/fb2");
-// QTI_END: 2021-04-28: Core: HDMI/DP pluggin notification changes
         if (new File("/sys/devices/virtual/switch/hdmi/state").exists()) {
             mHDMIObserver.startObserving("DEVPATH=/devices/virtual/switch/hdmi");
 
@@ -5303,10 +5281,24 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     BroadcastReceiver mBluetoothHidReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            if (bluetoothWakeupStateCheck() && !SystemProperties.getBoolean(
+                    "bluetooth.power.suspend.hid_wake_up.enabled", false)) {
+                Slog.d(TAG, "Bluetooth HID wake up disabled.");
+                return;
+            }
             if (ACTION_CONNECTION_STATE_CHANGED.equals(intent.getAction())) {
-                Integer state = (Integer) intent.getExtra(BluetoothProfile.EXTRA_STATE);
+                Integer newState = (Integer) intent.getExtra(BluetoothProfile.EXTRA_STATE);
+                Integer prevState = (Integer) intent.getExtra(
+                        BluetoothProfile.EXTRA_PREVIOUS_STATE);
                 final boolean interactive = mDefaultDisplayPolicy.isAwake();
-                if (state != null && !interactive && state == STATE_CONNECTED) {
+                if (bluetoothWakeupStateCheck()
+                        && (newState == null || prevState == null || prevState.equals(newState))) {
+                    if (DEBUG_WAKEUP) {
+                        Slog.w(TAG, "Bluetooth connection state does not change: " + intent);
+                    }
+                    return;
+                }
+                if (newState != null && !interactive && newState.equals(STATE_CONNECTED)) {
                     mWindowWakeUpPolicy.wakeUpFromBluetooth();
                 }
             }
@@ -6344,10 +6336,25 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             Log.d(TAG, "startDockOrHome: startReason= " + startReason);
         }
 
-        int userId = mUserManagerInternal.getUserAssignedToDisplay(displayId);
-        // Start home.
-        mActivityTaskManagerInternal.startHomeOnDisplay(userId, startReason,
-                displayId, true /* allowInstrumenting */, fromHomeKey);
+        DisplayInfo displayInfo = mDisplayManagerInternal.getDisplayInfo(displayId);
+        boolean isDisplayExternal = displayInfo != null && displayInfo.type == TYPE_EXTERNAL;
+        if (DesktopExperienceFlags.ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT.isTrue()
+                && isDisplayExternal) {
+            // TODO(b/441952247): Clean up using home gesture handling in WM Core
+            mInputManagerInternal.handleKeyGestureInKeyGestureController(
+                    new KeyGestureEvent.Builder()
+                            .setKeyGestureType(
+                                 KeyGestureEvent.KEY_GESTURE_TYPE_REJECT_HOME_ON_EXTERNAL_DISPLAY)
+                            .setKeycodes(new int[]{KEYCODE_HOME})
+                            .setDisplayId(displayId)
+                            .setAction(ACTION_COMPLETE)
+                            .build());
+        } else {
+            int userId = mUserManagerInternal.getUserAssignedToDisplay(displayId);
+            // Start home.
+            mActivityTaskManagerInternal.startHomeOnDisplay(userId, startReason,
+                    displayId, true /* allowInstrumenting */, fromHomeKey);
+        }
     }
 
     void startDockOrHome(int displayId, boolean fromHomeKey, boolean awakenFromDreams) {

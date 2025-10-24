@@ -923,6 +923,75 @@ public class PowerManagerServiceTest {
         mService.getBinderServiceInstance().releaseWakeLock(token, /* flags= */ 0);
     }
 
+    @RequiresFlagsEnabled({com.android.server.display.feature.flags.Flags.FLAG_SEPARATE_TIMEOUTS,
+            Flags.FLAG_WAKE_ADJACENT_DISPLAYS_ON_WAKEUP_CALL})
+    @Test
+    public void testWakeup_multiplePowerGroups_wakesupAdjacentGroups() {
+        // setup
+        final int nonDefaultAdjacentPowerGroup = Display.DEFAULT_DISPLAY_GROUP + 1;
+        final int nonDefaultNonAdjacentPowerGroup = Display.DEFAULT_DISPLAY_GROUP + 2;
+
+        final AtomicReference<DisplayManagerInternal.DisplayGroupListener> listener =
+                new AtomicReference<>();
+        long eventTime1 = 10;
+        final DisplayInfo info = new DisplayInfo();
+        info.displayGroupId = Display.DEFAULT_DISPLAY_GROUP;
+        when(mDisplayManagerInternalMock.getDisplayInfo(Display.DEFAULT_DISPLAY)).thenReturn(info);
+        doAnswer((Answer<Void>) invocation -> {
+            listener.set(invocation.getArgument(0));
+            return null;
+        }).when(mDisplayManagerInternalMock).registerDisplayGroupListener(any());
+        when(mDisplayManagerInternalMock.getDisplayGroupFlags(nonDefaultAdjacentPowerGroup))
+                .thenReturn(DisplayGroup.FLAG_DEFAULT_GROUP_ADJACENT);
+        createService();
+        startSystem();
+        listener.get().onDisplayGroupAdded(nonDefaultAdjacentPowerGroup);
+        listener.get().onDisplayGroupAdded(nonDefaultNonAdjacentPowerGroup);
+
+
+        // Verify all displays are awake.
+        assertThat(mService.getGlobalWakefulnessLocked())
+                .isEqualTo(WAKEFULNESS_AWAKE);
+        assertThat(mService.getWakefulnessLocked(Display.DEFAULT_DISPLAY_GROUP))
+                .isEqualTo(WAKEFULNESS_AWAKE);
+        assertThat(mService.getWakefulnessLocked(nonDefaultAdjacentPowerGroup))
+                .isEqualTo(WAKEFULNESS_AWAKE);
+        assertThat(mService.getWakefulnessLocked(nonDefaultNonAdjacentPowerGroup))
+                .isEqualTo(WAKEFULNESS_AWAKE);
+
+        // Transition all the groups to sleep, and verify the global wakefulness
+        mService.setWakefulnessLocked(Display.DEFAULT_DISPLAY_GROUP, WAKEFULNESS_ASLEEP, eventTime1,
+                0, PowerManager.GO_TO_SLEEP_REASON_INATTENTIVE, 0, null, null);
+        mService.setWakefulnessLocked(nonDefaultAdjacentPowerGroup, WAKEFULNESS_ASLEEP, eventTime1,
+                0, PowerManager.GO_TO_SLEEP_REASON_INATTENTIVE, 0, null, null);
+        mService.setWakefulnessLocked(nonDefaultNonAdjacentPowerGroup, WAKEFULNESS_ASLEEP,
+                eventTime1, 0, PowerManager.GO_TO_SLEEP_REASON_INATTENTIVE, 0, null, null);
+
+        advanceTime(1000);
+
+        // assert that default group is asleep
+        assertWithMessage("Global wakefulness is not awake")
+                .that(mService.getGlobalWakefulnessLocked())
+                .isEqualTo(WAKEFULNESS_ASLEEP);
+
+        // Wake default and default adjacent
+        mService.getBinderServiceInstance().wakeUp(mClock.now(),
+                PowerManager.WAKE_REASON_WAKE_KEY, "", "");
+
+        advanceTime(1000);
+
+        // verify default group is still asleep + secondary display is awake
+        assertWithMessage("Default group is not asleep")
+                .that(mService.getWakefulnessLocked(Display.DEFAULT_DISPLAY_GROUP))
+                .isEqualTo(WAKEFULNESS_AWAKE);
+        assertWithMessage("Secondary group is not awake")
+                .that(mService.getWakefulnessLocked(nonDefaultAdjacentPowerGroup))
+                .isEqualTo(WAKEFULNESS_AWAKE);
+        assertWithMessage("Secondary group is not awake")
+                .that(mService.getWakefulnessLocked(nonDefaultNonAdjacentPowerGroup))
+                .isEqualTo(WAKEFULNESS_ASLEEP);
+    }
+
     @RequiresFlagsEnabled(Flags.FLAG_PARTIAL_SLEEP_WAKELOCKS)
     @Test
     public void testPartialSleepWakelock_multiplePowerGroups_sleepNonDefault() {
@@ -3322,6 +3391,20 @@ public class PowerManagerServiceTest {
         assertThat(mService.getLocalServiceInstance().getLastWakeup()).isEqualTo(initialWakeData);
     }
 
+    @EnableFlags(android.service.dreams.Flags.FLAG_NAP_WHEN_DREAM_ENABLED)
+    @Test
+    public void testCanDreamLocked_dreamsDisabled() {
+        createService();
+        startSystem();
+        // Dreams are disabled.
+        Settings.Secure.putIntForUser(mContextSpy.getContentResolver(),
+                Settings.Secure.SCREENSAVER_ENABLED, 0, UserHandle.USER_CURRENT);
+        mUserSwitchedReceiver.onReceive(mContextSpy, new Intent(Intent.ACTION_USER_SWITCHED));
+
+        forceSleep();
+        assertThat(mService.getGlobalWakefulnessLocked()).isNotEqualTo(WAKEFULNESS_DREAMING);
+    }
+
     @Test
     public void testMultiDisplay_onlyOneDisplaySleeps_onWakefulnessChangedEventsFire() {
         createService();
@@ -4382,25 +4465,6 @@ public class PowerManagerServiceTest {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_ENABLE_SCREEN_TIMEOUT_POLICY_LISTENER_API)
-    public void testAcquireWakelock_screenTimeoutListenersDisabled_noCrashes() {
-        IntArray displayGroupIds = IntArray.wrap(new int[]{Display.DEFAULT_DISPLAY_GROUP});
-        when(mDisplayManagerInternalMock.getDisplayGroupIds()).thenReturn(displayGroupIds);
-
-        final DisplayInfo displayInfo = new DisplayInfo();
-        displayInfo.displayGroupId = Display.DEFAULT_DISPLAY_GROUP;
-        when(mDisplayManagerInternalMock.getDisplayInfo(Display.DEFAULT_DISPLAY))
-                .thenReturn(displayInfo);
-
-        createService();
-        startSystem();
-
-        acquireWakeLock("screenBright", PowerManager.SCREEN_BRIGHT_WAKE_LOCK,
-                    Display.DEFAULT_DISPLAY);
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SCREEN_TIMEOUT_POLICY_LISTENER_API)
     public void testAddWakeLockKeepingScreenOn_addsToNotifierAndReportsTimeoutPolicyChange() {
         IntArray displayGroupIds = IntArray.wrap(new int[]{Display.DEFAULT_DISPLAY_GROUP});
         when(mDisplayManagerInternalMock.getDisplayGroupIds()).thenReturn(displayGroupIds);
@@ -4428,7 +4492,6 @@ public class PowerManagerServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SCREEN_TIMEOUT_POLICY_LISTENER_API)
     public void test_addAndRemoveScreenTimeoutListener_propagatesToNotifier()
             throws Exception {
         IntArray displayGroupIds = IntArray.wrap(new int[]{Display.DEFAULT_DISPLAY_GROUP});
@@ -4455,7 +4518,6 @@ public class PowerManagerServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SCREEN_TIMEOUT_POLICY_LISTENER_API)
     public void test_displayIsRemoved_clearsScreenTimeoutListeners()
             throws Exception {
         IntArray displayGroupIds = IntArray.wrap(new int[]{Display.DEFAULT_DISPLAY_GROUP});
@@ -4478,7 +4540,6 @@ public class PowerManagerServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_SCREEN_TIMEOUT_POLICY_LISTENER_API)
     public void testScreenTimeoutListener_screenHasWakelocks_addsWithHeldTimeoutPolicyToNotifier()
             throws Exception {
         IntArray displayGroupIds = IntArray.wrap(new int[]{Display.DEFAULT_DISPLAY_GROUP});

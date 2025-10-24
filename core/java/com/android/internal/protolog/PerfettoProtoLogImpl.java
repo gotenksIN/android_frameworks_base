@@ -98,6 +98,8 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
         TracingInstanceStartCallback, TracingInstanceStopCallback, TracingFlushCallback {
     private static final String LOG_TAG = "ProtoLog";
     public static final String NULL_STRING = "null";
+    @VisibleForTesting
+    public static int MAX_INTERNED_STRINGS_SIZE_BYTES_BEFORE_RESET = 4 * 1024 * 1024; // 4MB
     private final AtomicInteger mTracingInstances = new AtomicInteger();
 
     @NonNull
@@ -178,7 +180,7 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
     public void enable() {
         Producer.init(InitArguments.DEFAULTS);
 
-        if (android.tracing.Flags.clientSideProtoLogging() && mConfigurationService != null) {
+        if (mConfigurationService != null) {
             synchronized (mLogGroupsLock) {
                 // Get the values on the main thread instead of the background worker thread because
                 // if we register more groups in the future this might happen before the task
@@ -208,24 +210,21 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
 
     @Nullable
     private static IProtoLogConfigurationService getConfigurationService() {
-        if (android.tracing.Flags.clientSideProtoLogging()) {
-            var service = ServiceManager.getService(PROTOLOG_CONFIGURATION_SERVICE);
+        var service = ServiceManager.getService(PROTOLOG_CONFIGURATION_SERVICE);
+        if (service != null) {
+            return IProtoLogConfigurationService.Stub.asInterface(service);
+        } else {
+            Log.e(LOG_TAG, "Failed to get the ProtoLog Configuration Service! "
+                    + "Protologging client will not be synced properly and will not be "
+                    + "available for running configuration of which groups to log to logcat. "
+                    + "We might also be missing viewer configs in the trace for decoding the "
+                    + "messages.");
 
-            if (service != null) {
-                return IProtoLogConfigurationService.Stub.asInterface(service);
-            } else {
-                Log.e(LOG_TAG, "Failed to get the ProtoLog Configuration Service! "
-                        + "Protologging client will not be synced properly and will not be "
-                        + "available for running configuration of which groups to log to logcat. "
-                        + "We might also be missing viewer configs in the trace for decoding the "
-                        + "messages.");
-            }
+            // Will be null either because we are calling this before the service is ready and
+            // registered with the service manager or because we are calling this from a service
+            // that does not have access to the configuration service.
+            return null;
         }
-
-        // Will be null either because we are calling this before the service is ready and
-        // registered with the service manager or because we are calling this from a service
-        // that does not have access to the configuration service.
-        return null;
     }
 
     private void connectToConfigurationServiceAsync(@NonNull IProtoLogGroup... groups) {
@@ -282,7 +281,7 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
         mDataSource.unregisterOnFlushCallback(this);
         mDataSource.unregisterOnStopCallback(this);
 
-        if (android.tracing.Flags.clientSideProtoLogging() && mConfigurationService != null) {
+        if (mConfigurationService != null) {
             disconnectFromConfigurationServiceAsync();
         }
 
@@ -452,39 +451,8 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
     @Deprecated
     public int onShellCommand(@NonNull ShellCommand shell) {
         PrintWriter pw = shell.getOutPrintWriter();
-
-        if (android.tracing.Flags.clientSideProtoLogging()) {
-            pw.println("Command deprecated. Please use 'cmd protolog_configuration' instead.");
-            return -1;
-        }
-
-        String cmd = shell.getNextArg();
-        if (cmd == null) {
-            return unknownCommand(pw);
-        }
-        ArrayList<String> args = new ArrayList<>();
-        String arg;
-        while ((arg = shell.getNextArg()) != null) {
-            args.add(arg);
-        }
-        final ILogger logger = (msg) -> logAndPrintln(pw, msg);
-        String[] groups = args.toArray(new String[0]);
-        switch (cmd) {
-            case "start", "stop" -> {
-                pw.println("Command not supported. "
-                        + "Please start and stop ProtoLog tracing with Perfetto.");
-                return -1;
-            }
-            case "enable-text" -> {
-                return startLoggingToLogcat(groups, logger);
-            }
-            case "disable-text" -> {
-                return stopLoggingToLogcat(groups, logger);
-            }
-            default -> {
-                return unknownCommand(pw);
-            }
-        }
+        pw.println("Command deprecated. Please use 'cmd protolog_configuration' instead.");
+        return -1;
     }
 
     private void log(@NonNull LogLevel logLevel, @NonNull IProtoLogGroup group,
@@ -551,10 +519,6 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
     public void onTracingFlush() {
         Log.d(LOG_TAG, "Executing onTracingFlush");
         waitForExistingBackgroundTasksToComplete();
-
-        if (!android.tracing.Flags.clientSideProtoLogging()) {
-            dumpViewerConfig();
-        }
 
         Log.d(LOG_TAG, "Finished onTracingFlush");
     }
@@ -726,6 +690,18 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
             @NonNull IProtoLogGroup logGroup, @NonNull String message) {
         final ProtoLogDataSource.IncrementalState incrementalState = ctx.getIncrementalState();
 
+        final Long messageHash = hash(level, logGroup.name(), message);
+
+        if (android.tracing.Flags.protologAutoClearIncrementalState()
+                && !incrementalState.protologMessageInterningSet.contains(messageHash)) {
+            final boolean sizeThresholdReached =
+                    incrementalState.internedStringsSizeBytes + message.length()
+                            >= MAX_INTERNED_STRINGS_SIZE_BYTES_BEFORE_RESET;
+            if (sizeThresholdReached) {
+                incrementalState.reset();
+            }
+        }
+
         if (!incrementalState.clearReported) {
             final ProtoOutputStream os = ctx.newTracePacket(8);
             os.write(SEQUENCE_FLAGS, SEQ_INCREMENTAL_STATE_CLEARED);
@@ -748,9 +724,9 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
             os.end(protologViewerConfigToken);
         }
 
-        final Long messageHash = hash(level, logGroup.name(), message);
         if (!incrementalState.protologMessageInterningSet.contains(messageHash)) {
             incrementalState.protologMessageInterningSet.add(messageHash);
+            incrementalState.internedStringsSizeBytes += message.length();
 
             final ProtoOutputStream os = ctx.newTracePacket(128);
 
@@ -825,6 +801,16 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
     ) {
         final ProtoLogDataSource.IncrementalState incrementalState = ctx.getIncrementalState();
 
+        if (android.tracing.Flags.protologAutoClearIncrementalState()
+                && !internMap.containsKey(string)) {
+            final boolean sizeThresholdReached =
+                    incrementalState.internedStringsSizeBytes + string.length()
+                            >= MAX_INTERNED_STRINGS_SIZE_BYTES_BEFORE_RESET;
+            if (sizeThresholdReached) {
+                incrementalState.reset();
+            }
+        }
+
         if (!incrementalState.clearReported) {
             final ProtoOutputStream os = ctx.newTracePacket(8);
             os.write(SEQUENCE_FLAGS, SEQ_INCREMENTAL_STATE_CLEARED);
@@ -834,6 +820,7 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
         if (!internMap.containsKey(string)) {
             final int internedIndex = internMap.size() + 1;
             internMap.put(string, internedIndex);
+            incrementalState.internedStringsSizeBytes += string.length();
 
             final ProtoOutputStream os = ctx.newTracePacket(64);
             final long token = os.start(INTERNED_DATA);

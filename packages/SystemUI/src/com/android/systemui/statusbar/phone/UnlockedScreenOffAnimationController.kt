@@ -26,8 +26,8 @@ import com.android.systemui.keyguard.WakefulnessLifecycle
 import com.android.systemui.shade.ShadeViewController
 import com.android.systemui.shade.domain.interactor.PanelExpansionInteractor
 import com.android.systemui.shade.domain.interactor.ShadeLockscreenInteractor
-import com.android.systemui.shared.Flags.ambientAod
-import com.android.systemui.statusbar.CircleReveal
+import com.android.systemui.statusbar.LiftReveal
+import com.android.systemui.statusbar.LightRevealEffect
 import com.android.systemui.statusbar.LightRevealScrim
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.StatusBarState
@@ -48,6 +48,7 @@ private const val ANIMATE_IN_KEYGUARD_DELAY = 600L
 
 /** Duration for the light reveal portion of the animation. */
 private const val LIGHT_REVEAL_ANIMATION_DURATION = 500L
+private const val LIGHT_REVEAL_ANIMATION_DURATION_MINMODE = 100L
 
 /**
  * Controller for the unlocked screen off animation, which runs when the device is going to sleep
@@ -83,6 +84,7 @@ constructor(
     private var initialized = false
 
     private lateinit var lightRevealScrim: LightRevealScrim
+    private lateinit var revealEffect: LightRevealEffect
 
     private var animatorDurationScale = 1f
     private var shouldAnimateInKeyguard = false
@@ -99,35 +101,19 @@ constructor(
         ValueAnimator.ofFloat(1f, 0f).apply {
             duration = LIGHT_REVEAL_ANIMATION_DURATION
             interpolator = Interpolators.LINEAR
-            addUpdateListener {
-                if (ambientAod()) return@addUpdateListener
-                if (lightRevealScrim.revealEffect !is CircleReveal) {
-                    lightRevealScrim.revealAmount = it.animatedValue as Float
-                }
-                if (
-                    lightRevealScrim.isScrimAlmostOccludes &&
-                        interactionJankMonitor.isInstrumenting(CUJ_SCREEN_OFF)
-                ) {
-                    // ends the instrument when the scrim almost occludes the screen.
-                    // because the following janky frames might not be perceptible.
-                    interactionJankMonitor.end(CUJ_SCREEN_OFF)
-                }
-            }
             addListener(
                 object : AnimatorListenerAdapter() {
-                    override fun onAnimationCancel(animation: Animator) {
-                        if (ambientAod()) return
-                        if (lightRevealScrim.revealEffect !is CircleReveal) {
-                            lightRevealScrim.revealAmount = 1f
-                        }
-                    }
-
                     override fun onAnimationEnd(animation: Animator) {
                         lightRevealAnimationPlaying = false
                         interactionJankMonitor.end(CUJ_SCREEN_OFF)
                     }
 
                     override fun onAnimationStart(animation: Animator) {
+                        if (dozeParameters.get().isMinModeActive()) {
+                            lightRevealScrim.revealEffect = LiftReveal
+                        } else {
+                            lightRevealScrim.revealEffect = revealEffect
+                        }
                         interactionJankMonitor.begin(
                             notifShadeWindowControllerLazy.get().windowRootView,
                             CUJ_SCREEN_OFF,
@@ -158,6 +144,7 @@ constructor(
     ) {
         this.initialized = true
         this.lightRevealScrim = lightRevealScrim
+        this.revealEffect = lightRevealScrim.revealEffect
         this.centralSurfaces = centralSurfaces
 
         updateAnimatorDurationScale()
@@ -281,7 +268,12 @@ constructor(
         if (shouldPlayUnlockedScreenOffAnimation()) {
             decidedToAnimateGoingToSleep = true
 
-            shouldAnimateInKeyguard = true
+            shouldAnimateInKeyguard = !dozeParameters.get().isMinModeActive()
+            if (shouldAnimateInKeyguard) {
+                lightRevealAnimator.setDuration(LIGHT_REVEAL_ANIMATION_DURATION)
+            } else {
+                lightRevealAnimator.setDuration(LIGHT_REVEAL_ANIMATION_DURATION_MINMODE)
+            }
 
             // Start the animation on the next frame. startAnimation() is called after
             // PhoneWindowManager makes a binder call to System UI on
@@ -353,8 +345,7 @@ constructor(
         // already expanded and showing notifications/QS, the animation looks really messy. For now,
         // disable it if the notification panel is expanded.
         if (
-            (!this::centralSurfaces.isInitialized ||
-                panelExpansionInteractorLazy.get().isPanelExpanded) &&
+            (!this::centralSurfaces.isInitialized || statusBarStateControllerImpl.isExpanded) &&
                 // Status bar might be expanded because we have started
                 // playing the animation already
                 !isAnimationPlaying()

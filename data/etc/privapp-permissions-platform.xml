@@ -63,6 +63,8 @@ applications that come with the platform
     <privapp-permissions package="com.android.launcher3">
         <permission name="android.permission.WRITE_SECURE_SETTINGS"/>
         <permission name="android.permission.READ_SYSTEM_GRAMMATICAL_GENDER"/>
+        <permission name="android.permission.READ_REMOTE_TASKS"/>
+        <permission name="android.permission.REQUEST_TASK_HANDOFF"/>
     </privapp-permissions>
 
     <privapp-permissions package="com.android.location.fused">
@@ -244,6 +246,7 @@ applications that come with the platform
         <!-- Permissions required for reading and logging compat changes -->
         <permission name="android.permission.LOG_COMPAT_CHANGE" />
         <permission name="android.permission.READ_COMPAT_CHANGE_CONFIG" />
+        <permission name="android.permission.UPDATE_APP_OPS_STATS"/>
     </privapp-permissions>
 
     <privapp-permissions package="com.android.server.security.authenticationpolicy">
@@ -505,6 +508,7 @@ applications that come with the platform
         <permission name="android.permission.NEARBY_WIFI_DEVICES" />
         <permission name="android.permission.MANAGE_WIFI_INTERFACES" />
         <permission name="android.permission.OVERRIDE_WIFI_CONFIG" />
+        <permission name="android.permission.WIFI_SET_DEVICE_MOBILITY_STATE" />
         <!-- Permission needed for CTS test - ConcurrencyTest#testP2pExternalApprover
              P2P external approver API sets require MANAGE_WIFI_NETWORK_SELECTION permission. -->
         <permission name="android.permission.MANAGE_WIFI_NETWORK_SELECTION" />

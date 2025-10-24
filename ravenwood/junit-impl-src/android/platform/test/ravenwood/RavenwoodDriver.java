@@ -19,7 +19,6 @@ package android.platform.test.ravenwood;
 import static android.os.UserHandle.SYSTEM;
 
 import static com.android.modules.utils.ravenwood.RavenwoodHelper.RavenwoodInternal.RAVENWOOD_RUNTIME_PATH_JAVA_SYSPROP;
-import static com.android.ravenwood.common.RavenwoodInternalUtils.getRavenwoodRuntimePath;
 
 import static org.junit.Assert.assertThrows;
 
@@ -207,13 +206,6 @@ public class RavenwoodDriver {
         // Do the basic set up for the android sysprops.
         RavenwoodSystemProperties.initialize();
 
-        // Set ICU data file
-        String icuData = getRavenwoodRuntimePath()
-                + "ravenwood-data/"
-                + RavenwoodRuntimeNative.getIcuDataName()
-                + ".dat";
-        RavenwoodRuntimeNative.setSystemProperty("ro.icu.data.path", icuData);
-
         // Enable all log levels for native logging, until we'll have a way to change the native
         // side log level at runtime.
         // Do this after loading RAVENWOOD_NATIVE_RUNTIME_NAME (which backs Os.setenv()),
@@ -295,6 +287,8 @@ public class RavenwoodDriver {
         DeviceConfig_ravenwood.reset();
         Binder.restoreCallingIdentity(
                 RavenwoodEnvironment.getInstance().getDefaultCallingIdentity());
+        RavenwoodAppDriver.getInstance().reset();
+        Looper.getMainLooper().getQueue().resetForTest();
 
         SystemProperties.clearChangeCallbacksForTest();
 

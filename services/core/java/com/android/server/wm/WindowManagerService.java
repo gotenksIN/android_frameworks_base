@@ -141,6 +141,7 @@ import static com.android.server.wm.SensitiveContentPackages.PackageInfo;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_ALL;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_WINDOW_ANIMATION;
 import static com.android.server.wm.WindowContainer.AnimationFlags.CHILDREN;
+import static com.android.server.wm.WindowContainer.SYNC_STATE_WAITING_FOR_DRAW;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_DISPLAY;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_INPUT_METHOD;
@@ -158,7 +159,6 @@ import static com.android.server.wm.WindowManagerInternal.WindowFocusChangeListe
 import static com.android.systemui.shared.Flags.enableLppAssistInvocationEffect;
 import static com.android.window.flags.Flags.enableDeviceStateAutoRotateSettingRefactor;
 import static com.android.window.flags.Flags.multiCrop;
-import static com.android.window.flags.Flags.screenBrightnessDimOnEmulator;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
 
 import android.Manifest;
@@ -247,9 +247,7 @@ import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.AtomicFile;
 import android.util.AtomicFileOutputStream;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.IntArray;
@@ -373,9 +371,7 @@ import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
 import com.android.server.utils.PriorityDump;
-// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
 import com.android.server.am.ProcessFreezerManager;
-// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
 import com.android.window.flags.Flags;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -410,7 +406,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-/** {@hide} */
+/** @hide */
 public class WindowManagerService extends IWindowManager.Stub
         implements Watchdog.Monitor, WindowManagerPolicy.WindowManagerFuncs {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "WindowManagerService" : TAG_WM;
@@ -418,10 +414,8 @@ public class WindowManagerService extends IWindowManager.Stub
 
     static final int LAYOUT_REPEAT_THRESHOLD = 4;
 
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     static WindowState mFocusingWindow;
     String mFocusingActivity;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
     /** The maximum length we will accept for a loaded animation duration:
      * this is 10 seconds.
@@ -497,10 +491,8 @@ public class WindowManagerService extends IWindowManager.Stub
 
     private final DisplayAreaPolicy.Provider mDisplayAreaPolicyProvider;
 
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     private BoostFramework mPerf = null;
 
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     final private KeyguardDisableHandler mKeyguardDisableHandler;
 
     private final RemoteCallbackList<IKeyguardLockedStateListener> mKeyguardLockedStateListeners =
@@ -517,6 +509,11 @@ public class WindowManagerService extends IWindowManager.Stub
     // VR Vr2d Display Id.
     int mVr2dDisplayId = INVALID_DISPLAY;
     boolean mVrModeEnabled = false;
+
+    private static final int WINDOW_INTERACTION_HISTORY_SIZE = 3;
+
+    WindowInteractionTracker mInteractionTracker = new WindowInteractionTracker(
+            WINDOW_INTERACTION_HISTORY_SIZE);
 
     /**
      * Tracks a map of input tokens to info that is used to decide whether to intercept
@@ -1885,9 +1882,7 @@ public class WindowManagerService extends IWindowManager.Stub
             // UID, otherwise we allow unlimited duration. When a UID looses focus we
             // schedule hiding all of its toast windows.
             if (type == TYPE_TOAST) {
-// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 mAtmService.setToastWindow();
-// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
                 if (!displayContent.canAddToastWindowForUid(callingUid)) {
                     ProtoLog.w(WM_ERROR, "Adding more than one toast window for UID at a time.");
                     return WindowManagerGlobal.ADD_DUPLICATE_ADD;
@@ -2444,7 +2439,12 @@ public class WindowManagerService extends IWindowManager.Stub
                 return false;
             }
 
-            return win.cancelAndRedraw(seqId);
+            final boolean cancel = win.cancelAndRedraw(seqId);
+            if (cancel && Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "cancelDraw clientSeqId=" + seqId
+                        + " serverSeqId=" + win.mSyncSeqId + " bufferSeqId=" + win.mBufferSeqId);
+            }
+            return cancel;
         }
     }
 
@@ -2493,6 +2493,11 @@ public class WindowManagerService extends IWindowManager.Stub
                 // The client has reported the sync draw, but we haven't finished it yet.
                 // Don't let the client perform a non-sync draw at this time.
                 result |= RELAYOUT_RES_CANCEL_AND_REDRAW;
+                if (mAlwaysSeqId && Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+                    Trace.instant(TRACE_TAG_WINDOW_MANAGER, "earlyCancelDraw clientSeqId="
+                            + syncSeqId + " serverSeqId=" + win.mSyncSeqId
+                            + " bufferSeqId=" + win.mBufferSeqId);
+                }
             }
 
             final DisplayContent displayContent = win.getDisplayContent();
@@ -2508,6 +2513,8 @@ public class WindowManagerService extends IWindowManager.Stub
             int privateFlagChanges = 0;
             if (attrs != null) {
                 displayPolicy.adjustWindowParamsLw(win, attrs);
+                attrs.privateFlags = sanitizePrivateFlags(attrs.privateFlags,
+                        win.mAttrs.privateFlags, win.getName(), uid, pid);
                 attrs.flags = sanitizeFlagSlippery(attrs.flags, win.getName(), uid, pid);
                 attrs.inputFeatures = sanitizeInputFeatures(attrs.inputFeatures, win.getName(), uid,
                         pid, win.isTrustedOverlay());
@@ -2628,6 +2635,9 @@ public class WindowManagerService extends IWindowManager.Stub
             }
             if ((attrChanges & WindowManager.LayoutParams.ALPHA_CHANGED) != 0) {
                 winAnimator.mAlpha = attrs.alpha;
+            }
+            if ((attrChanges & WindowManager.LayoutParams.TITLE_CHANGED) != 0) {
+                win.mInputWindowHandle.setName(win.getName());
             }
             win.setWindowScale(win.mRequestedWidth, win.mRequestedHeight);
 
@@ -2867,12 +2877,37 @@ public class WindowManagerService extends IWindowManager.Stub
                             : -1;
                     win.markRedrawForSyncReported();
                 } else {
-                    if (mAlwaysSeqId && win.cancelAndRedraw(syncSeqId)) {
+                    outRelayoutResult.syncSeqId = -1;
+                    if (mAlwaysSeqId && (result & RELAYOUT_RES_CANCEL_AND_REDRAW) == 0
+                            && win.cancelAndRedraw(syncSeqId)) {
                         // Surface-placement has resulted in a new configuration or a new sync,
                         // so this current layout is invalid until subsequent reportResized.
-                        result |= RELAYOUT_RES_CANCEL_AND_REDRAW;
+
+                        // However, make a targeted optimization to let the client draw early if the
+                        // relayout result won't change even after the client receives the new
+                        // configuration. If there is an explicit sync, though, the user-perceived
+                        // latency will be worse due to the client drawing content that won't be
+                        // presented; so, don't "optimize" in that case.
+                        final boolean inExplicitSync = syncSeqId <= win.mBufferSeqId
+                                || win.mSyncState == SYNC_STATE_WAITING_FOR_DRAW;
+                        if (!inExplicitSync && win.layoutIgnoresClientConfig()) {
+                            // Returning a seqId indicates, to the client, that it can use this
+                            // result even though it's configuration is out-dated.
+                            outRelayoutResult.syncSeqId = win.mSyncSeqId;
+                            if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+                                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "ignoreCancelDraw seqId="
+                                        + win.mSyncSeqId);
+                            }
+                        } else {
+                            result |= RELAYOUT_RES_CANCEL_AND_REDRAW;
+                            if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+                                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "lateCancelDraw "
+                                        + " clientSeqId=" + syncSeqId
+                                        + " serverSeqId=" + win.mSyncSeqId
+                                        + " bufferSeqId=" + win.mBufferSeqId);
+                            }
+                        }
                     }
-                    outRelayoutResult.syncSeqId = -1;
                 }
             }
 
@@ -2988,15 +3023,11 @@ public class WindowManagerService extends IWindowManager.Stub
 
     void finishDrawingWindow(Session session, IWindow client,
             @Nullable SurfaceControl.Transaction postDrawTransaction, int seqId) {
-// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
         //unfreeze process if the first frame appeared
-// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
         ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
         if (freezer != null && freezer.useFreezerManager()) {
             freezer.startUnfreeze(session.mPackageName, ProcessFreezerManager.COMPLETE_LAUNCH_UNFREEZE);
         }
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
 
         if (postDrawTransaction != null) {
             postDrawTransaction.sanitize(Binder.getCallingPid(), Binder.getCallingUid());
@@ -3820,10 +3851,8 @@ public class WindowManagerService extends IWindowManager.Stub
         if (!android.companion.virtualdevice.flags.Flags.enableAnimationsPerDisplay()) {
             Slog.e(TAG, "Required feature flag is disabled");
             return;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         }
 
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         synchronized (mGlobalLock) {
             DisplayContent displayContent = mRoot.getDisplayContentOrCreate(displayId);
             displayContent.setAnimationsDisabledLocked(disabled);
@@ -4386,7 +4415,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @VisibleForTesting
     boolean enableScreenBrightnessEmulatorDisplayOverlay() {
-        return screenBrightnessDimOnEmulator() && Build.IS_EMULATOR
+        return Build.IS_EMULATOR
                 && mContext.getResources().getBoolean(
                 R.bool.config_windowEnableScreenBrightnessEmulatorDisplayOverlay);
     }
@@ -6799,6 +6828,12 @@ public class WindowManagerService extends IWindowManager.Stub
     boolean updateFocusedWindowLocked(int mode, boolean updateInputWindows) {
         Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "wmUpdateFocus");
         boolean changed = mRoot.updateFocusedWindowLocked(mode, updateInputWindows);
+        if (changed && Flags.systemContentPriority()) {
+            DisplayContent dc = mRoot.getTopFocusedDisplayContent();
+            if (dc != null && updateWindowInteractionHistoryByFocus(dc.mCurrentFocus)) {
+                scheduleAnimationLocked();
+            }
+        }
         Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
         return changed;
     }
@@ -7976,13 +8011,7 @@ public class WindowManagerService extends IWindowManager.Stub
                         + "for a display that does not exist: %d", displayId);
                 return false;
             }
-            if (!displayContent.isSystemDecorationsSupported()) {
-                return false;
-            }
-            if (!displayContent.isWindowingModeSupported(WINDOWING_MODE_FREEFORM)) {
-                return false;
-            }
-            return displayContent.isDefaultDisplay || displayContent.allowContentModeSwitch();
+            return displayContent.isEligibleForDesktopMode();
         }
     }
 
@@ -9525,6 +9554,25 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     /**
+     * Update the interaction history based on focus changes if needed. It assumes that the new
+     * focused window is recently interacted by the user. It returns {@code true} if the history is
+     * updated, otherwise returns {@code false}.
+     */
+    private boolean updateWindowInteractionHistoryByFocus(WindowState focusedWindow) {
+        if (focusedWindow == null) {
+            return false;
+        }
+        WindowState lastInteractedWindow = mInteractionTracker.peek();
+        if (lastInteractedWindow == null || lastInteractedWindow != focusedWindow) {
+            mInteractionTracker.add(focusedWindow);
+            RenderingPrioritizationPolicy.updatePriorityByInteraction(
+                    mInteractionTracker.getRecentlyInteractedWindows());
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * You need ALLOW_SLIPPERY_TOUCHES permission to be able to set FLAG_SLIPPERY.
      */
     private int sanitizeFlagSlippery(int flags, String windowName, int callingUid, int callingPid) {
@@ -9573,6 +9621,42 @@ public class WindowManagerService extends IWindowManager.Stub
             }
         }
         return inputFeatures;
+    }
+
+    private boolean hasFlags(int flags, int mask) {
+        return (flags & mask) != 0;
+    }
+
+    private boolean hasPermission(String permission, int callingPid, int callingUid) {
+        return mContext.checkPermission(permission, callingPid, callingUid)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /**
+     * Ensure the caller has the right permissions to be able to set the requested private flags.
+     */
+    private int sanitizePrivateFlags(int newPrivateFlags, int oldPrivateFlags, String windowName,
+            int callingUid, int callingPid) {
+        final int addedPrivateFlags = ~oldPrivateFlags & newPrivateFlags;
+        int sanitizedFlags = newPrivateFlags;
+        if (hasFlags(addedPrivateFlags,
+                (PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY| PRIVATE_FLAG_TRUSTED_OVERLAY))
+                && !hasPermission(android.Manifest.permission.INTERNAL_SYSTEM_WINDOW,
+                    callingUid, callingPid)) {
+            Slog.w(TAG, "Removing PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY or"
+                    + " PRIVATE_FLAG_TRUSTED_OVERLAY from '" + windowName
+                    + "' because it doesn't have INTERNAL_SYSTEM_WINDOW permission");
+            sanitizedFlags &=
+                    ~(PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY | PRIVATE_FLAG_TRUSTED_OVERLAY);
+        }
+        if (hasFlags(addedPrivateFlags, LayoutParams.PRIVATE_FLAG_INTERCEPT_GLOBAL_DRAG_AND_DROP)
+                && !hasPermission(android.Manifest.permission.MANAGE_ACTIVITY_TASKS, callingUid,
+                    callingPid)) {
+            Slog.w(TAG, "Removing PRIVATE_FLAG_INTERCEPT_GLOBAL_DRAG_AND_DROP from '"
+                + windowName + "' because it doesn't have MANAGE_ACTIVITY_TASKS permission");
+            sanitizedFlags &= ~LayoutParams.PRIVATE_FLAG_INTERCEPT_GLOBAL_DRAG_AND_DROP;
+        }
+        return sanitizedFlags;
     }
 
     /**

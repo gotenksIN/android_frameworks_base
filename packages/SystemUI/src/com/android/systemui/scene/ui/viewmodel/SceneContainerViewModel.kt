@@ -31,6 +31,7 @@ import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.systemui.classifier.Classifier
 import com.android.systemui.classifier.domain.interactor.FalsingInteractor
+import com.android.systemui.desktop.domain.interactor.DesktopInteractor
 import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.ui.viewmodel.AodBurnInViewModel
@@ -48,7 +49,9 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.composable.Overlay
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.shade.shared.model.ShadeMode
+import com.android.systemui.statusbar.core.StatusBarForDesktop
 import com.android.systemui.statusbar.domain.interactor.RemoteInputInteractor
+import com.android.systemui.statusbar.notification.domain.interactor.NotificationContainerInteractor
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
 import com.android.systemui.wallpapers.ui.viewmodel.WallpaperViewModel
 import dagger.assisted.Assisted
@@ -65,11 +68,13 @@ class SceneContainerViewModel
 @AssistedInject
 constructor(
     private val sceneInteractor: SceneInteractor,
+    private val desktopInteractor: DesktopInteractor,
     private val deviceUnlockedInteractor: DeviceUnlockedInteractor,
     private val falsingInteractor: FalsingInteractor,
     private val powerInteractor: PowerInteractor,
     private val onBootTransitionInteractor: OnBootTransitionInteractor,
-    shadeModeInteractor: ShadeModeInteractor,
+    private val shadeModeInteractor: ShadeModeInteractor,
+    private val notificationContainerInteractor: NotificationContainerInteractor,
     private val remoteInputInteractor: RemoteInputInteractor,
     private val logger: SceneLogger,
     hapticsViewModelFactory: SceneContainerHapticsViewModel.Factory,
@@ -122,6 +127,16 @@ constructor(
             initialValue = 1f,
         )
 
+    private val isDesktopStatusBarEnabled by
+        hydrator.hydratedStateOf(
+            traceName = "isDesktopStatusBarEnabled",
+            source =
+                desktopInteractor.useDesktopStatusBar.map { enabled ->
+                    enabled && StatusBarForDesktop.isEnabled
+                },
+            initialValue = false,
+        )
+
     override suspend fun onActivated(): Nothing {
         try {
             // Sends a MotionEventHandler to the owner of the view-model so they can report
@@ -145,6 +160,9 @@ constructor(
             coroutineScope {
                 launch { hydrator.activate() }
                 launch("SceneContainerHapticsViewModel") { hapticsViewModel.activate() }
+                launch("NotificationContainerInteractor") {
+                    notificationContainerInteractor.activate()
+                }
             }
             awaitCancellation()
         } finally {
@@ -188,6 +206,19 @@ constructor(
      * Call this after the [MotionEvent] has finished propagating through the UI hierarchy.
      */
     fun onEmptySpaceMotionEvent(event: MotionEvent) {
+        // Hide dual shade overlays when there is a touch outside the shade window.
+        // This is only applicable when the desktop status bar is enabled.
+        if (
+            shadeModeInteractor.isDualShade &&
+                isDesktopStatusBarEnabled &&
+                event.action == MotionEvent.ACTION_OUTSIDE &&
+                sceneInteractor.currentOverlays.value.isNotEmpty()
+        ) {
+            sceneInteractor.currentOverlays.value.forEach {
+                sceneInteractor.hideOverlay(it, "Empty space touch")
+            }
+        }
+
         // check if the touch is outside the window and if remote input is active.
         // If true, close any active remote inputs.
         if (

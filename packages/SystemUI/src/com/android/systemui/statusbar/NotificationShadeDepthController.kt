@@ -36,6 +36,7 @@ import com.android.app.animation.Interpolators
 import com.android.app.tracing.coroutines.TrackTracer
 import com.android.systemui.Dumpable
 import com.android.systemui.Flags
+import com.android.systemui.Flags.checkDesktopModeForSpacialModelAppPushback
 import com.android.systemui.Flags.spatialModelAppPushback
 import com.android.systemui.animation.ShadeInterpolation
 import com.android.systemui.dagger.SysUISingleton
@@ -58,6 +59,7 @@ import com.android.systemui.util.WallpaperController
 import com.android.systemui.wallpapers.domain.interactor.WallpaperInteractor
 import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteractor
 import com.android.wm.shell.appzoomout.AppZoomOut
+import com.android.wm.shell.desktopmode.DesktopMode
 import dagger.Lazy
 import java.io.PrintWriter
 import java.util.Optional
@@ -91,6 +93,7 @@ constructor(
     private val shadeDisplaysRepository: Lazy<ShadeDisplaysRepository>,
     private val focusedDisplayRepository: FocusedDisplayRepository,
     @Application private val applicationScope: CoroutineScope,
+    private val desktopMode: Optional<DesktopMode>,
     dumpManager: DumpManager,
 ) : ShadeExpansionListener, Dumpable {
     companion object {
@@ -101,8 +104,10 @@ constructor(
         private const val INTERACTION_BLUR_FRACTION = 0.8f
         private const val ANIMATION_BLUR_FRACTION = 1f - INTERACTION_BLUR_FRACTION
         private const val TRANSITION_THRESHOLD = 0.98f
-        private const val PUSHBACK_SCALE_FOR_LAUNCHER = 0.05f;
-        private const val PUSHBACK_SCALE_FOR_APP = 0.025f;
+        private const val PUSHBACK_SCALE_FOR_LAUNCHER = 0.05f
+
+        private const val PUSHBACK_SCALE_FOR_APP = 0.025f
+
         private const val TAG = "DepthController"
     }
 
@@ -122,6 +127,7 @@ constructor(
     private var prevShadeVelocity = 0f
     private var prevDozeAmount: Float = 0f
     @VisibleForTesting var wallpaperSupportsAmbientMode: Boolean = false
+
     // tracks whether app launch transition is in progress. This involves two independent factors
     // that control blur, shade expansion and app launch animation from outside sysui.
     // They can complete out of order, this flag will be reset by the animation that finishes later.
@@ -136,6 +142,8 @@ constructor(
 
     // Shade expansion offset that happens when pulling down on a HUN.
     var panelPullDownMinFraction = 0f
+
+    var existingStatusBarState: Int? = null
 
     var shadeAnimation = DepthAnimation()
 
@@ -292,7 +300,8 @@ constructor(
                 // When the shade is in another display, we don't want to zoom out the background.
                 // Only the default display is supported right now.
                 !isShadeOnDefaultDisplay -> 0f
-                shadeRadius != wakeAndUnlockBlurRadius -> blurRadiusToZoomOut(blurRadius = shadeRadius)
+                shadeRadius != wakeAndUnlockBlurRadius ->
+                    blurRadiusToZoomOut(blurRadius = shadeRadius)
                 else -> 0f
             }
         // Make blur be 0 if it is necessary to stop blur effect.
@@ -310,21 +319,33 @@ constructor(
     }
 
     private fun blurRadiusToZoomOut(blurRadius: Float): Float {
-        var zoomOut = MathUtils.saturate(blurUtils.ratioOfBlurRadius(blurRadius))
-        if (shadeModeInteractor.isSplitShade) {
-            zoomOut = 0f
-        }
+        val disableZoomForMode =
+            if (checkDesktopModeForSpacialModelAppPushback()) {
+                desktopMode
+                    .map { dm ->
+                        dm.isDisplayInDesktopMode(shadeDisplaysRepository.get().displayId.value)
+                    }
+                    .orElse(false)
+            } else {
+                shadeModeInteractor.isSplitShade
+            }
 
-        if (scrimsVisible) {
-            zoomOut = 0f
-        }
+        val zoomOut =
+            when {
+                disableZoomForMode -> 0f
+                scrimsVisible -> 0f
+                else -> MathUtils.saturate(blurUtils.ratioOfBlurRadius(blurRadius))
+            }
         return zoomOut
     }
 
     private val shouldBlurBeOpaque: Boolean
         get() =
-            if (Flags.notificationShadeBlur()) false
-            else scrimsVisible && !areBlursDisabledForAppLaunch
+            if (Flags.notificationShadeBlur()) {
+                false
+            } else {
+                scrimsVisible && !areBlursDisabledForAppLaunch
+            }
 
     @VisibleForTesting
     fun zoomOutAsScale(zoomOutProgress: Float): Float =
@@ -342,7 +363,7 @@ constructor(
             val opaque = shouldBlurBeOpaque
             val blurScale = zoomOutAsScale(zoomOutFromShadeRadius)
             TrackTracer.instantForGroup("shade", "shade_blur_radius", blur)
-            blurUtils.applyBlur(root.viewRootImpl, blur, opaque, blurScale);
+            blurUtils.applyBlur(root.viewRootImpl, blur, opaque, blurScale)
             onBlurApplied(blur, zoomOutFromShadeRadius)
         }
 
@@ -416,6 +437,18 @@ constructor(
     private val statusBarStateCallback =
         object : StatusBarStateController.StateListener {
             override fun onStateChanged(newState: Int) {
+                if (Flags.noShadeBlurOnDreamStart()) {
+                    if (
+                        existingStatusBarState == StatusBarState.KEYGUARD &&
+                            newState == StatusBarState.SHADE &&
+                            keyguardInteractor.isDreaming.value
+                    ) {
+                        return
+                    }
+                }
+
+                existingStatusBarState = newState
+
                 updateShadeAnimationBlur(
                     shadeExpansion,
                     prevTracking,
@@ -653,15 +686,16 @@ constructor(
 
         // Do not blur or zoom out the wallpaper if the blurred wallpaper is not supported.
         if (!windowRootViewBlurInteractor.isBlurredWallpaperSupported) {
-            return;
+            return
         }
 
         if (Flags.bouncerUiRevamp() || Flags.glanceableHubBlurredBackground()) {
             if (windowRootViewBlurInteractor.isBlurCurrentlySupported.value) {
-                updateScheduled = windowRootViewBlurInteractor.requestBlurForShade(
-                    blur,
-                    zoomOutAsScale(zoomOutFromShadeRadius),
-                )
+                updateScheduled =
+                    windowRootViewBlurInteractor.requestBlurForShade(
+                        blur,
+                        zoomOutAsScale(zoomOutFromShadeRadius),
+                    )
                 return
             }
             // When blur is not supported, zoom out still needs to happen when scheduleUpdate
@@ -676,7 +710,7 @@ constructor(
             return
         }
         updateScheduled = true
-        blurUtils.prepareBlur(root.viewRootImpl, blur)
+        blurUtils.prepareBlur(blur)
         choreographer.postFrameCallback(updateBlurCallback)
     }
 
@@ -698,7 +732,7 @@ constructor(
             it.println("shouldApplyShadeBlur: ${shouldApplyShadeBlur()}")
             it.println("shadeAnimation: ${shadeAnimation.radius}")
             it.println("brightnessMirrorRadius: ${brightnessMirrorSpring.radius}")
-            it.println("wakeAndUnlockBlurRadius: ${wakeAndUnlockBlurRadius}")
+            it.println("wakeAndUnlockBlurRadius: $wakeAndUnlockBlurRadius")
             it.println("blursDisabledForAppLaunch: $blursDisabledForAppLaunch")
             it.println("appLaunchTransitionIsInProgress: $appLaunchTransitionIsInProgress")
             it.println("qsPanelExpansion: $qsPanelExpansion")

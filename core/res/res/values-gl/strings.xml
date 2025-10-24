@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Cambiar ao perfil de traballo"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Cambiar ao perfil persoal de <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Cambiar ao perfil de traballo de <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Contactos"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"acceder aos teus contactos"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Contactos e contas"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"acceder aos teus contactos e consultar a lista das túas contas que poden gardar contactos neste dispositivo"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Localización"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"acceder á localización deste dispositivo"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Calendario"</string>
@@ -370,8 +370,8 @@
     <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"facer seguimento ao detalle do movemento dos ollos"</string>
     <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Datos de movemento e contorna"</string>
     <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"facer seguimento dos ollos, da cara e do corpo, e analizar contorna"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Datos de contorna e movemento da cabeza"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"facer seguimento ao detalle da cabeza e analizar contorna"</string>
+    <string name="permgrouplab_xr_tracking_sensitive" msgid="6574264227123545314">"Datos precisos de movemento e contorna"</string>
+    <string name="permgroupdesc_xr_tracking_sensitive" msgid="2480835734248509848">"analiza a contorna e fai un seguimento da cabeza polo miúdo"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Recuperar contido da ventá"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Inspecciona o contido dunha ventá coa que estás interactuando."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"Activar a exploración táctil"</string>
@@ -639,6 +639,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Permite que a aplicación determine a posición relativa entre os dispositivos próximos que usen banda ultralarga"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"interactuar con dispositivos wifi próximos"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Permítelle á aplicación enviar anuncios e conectarse a dispositivos wifi próximos, e determinar a súa posición relativa"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"acceso aos dispositivos da rede local"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Permite que a aplicación acceda aos dispositivos da rede local"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"fixar a posición relativa entre disp. próximos"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Permite que a aplicación determine a posición relativa entre os dispositivos próximos"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Información do servizo de pagos de NFC preferido"</string>
@@ -683,7 +685,7 @@
     <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Permite que a aplicación analice a túa contorna."</string>
     <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"analizar ao detalle a túa contorna"</string>
     <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Permite que a aplicación analice ao detalle a túa contorna."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"facer seguimento dos datos de realidade estendida en segundo plano"</string>
+    <string name="permlab_xr_tracking_in_background" msgid="1714941204255185460">"acceder ao seguimento de realidade estendida en segundo plano"</string>
     <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Permite que a aplicación acceda aos datos de realidade estendida en segundo plano."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"detectar as teclas"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Permite que a aplicación detecte as teclas antes de que o sistema poida procesar as accións e os atallos propios."</string>
@@ -1984,8 +1986,10 @@
     <string name="package_updated_device_owner" msgid="7770195449213776218">"Actualizado pola persoa administradora.\nVai á configuración para ver os permisos concedidos"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Eliminado polo teu administrador"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"Aceptar"</string>
-    <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"Coa función Aforro de batería, actívase o tema escuro e restrínxense ou desactívanse a actividade en segundo plano, algúns efectos visuais e determinadas funcións e conexións de rede."</string>
-    <string name="battery_saver_description" msgid="8518809702138617167">"Coa función Aforro de batería, actívase o tema escuro e restrínxense ou desactívanse a actividade en segundo plano, algúns efectos visuais e determinadas funcións e conexións de rede."</string>
+    <!-- no translation found for battery_saver_description_with_learn_more (8969945879044849461) -->
+    <skip />
+    <!-- no translation found for battery_saver_description (2820475140307374570) -->
+    <skip />
     <string name="data_saver_description" msgid="4995164271550590517">"Para contribuír a reducir o uso de datos, o aforro de datos impide que algunhas aplicacións envíen ou reciban datos en segundo plano. Cando esteas utilizando unha aplicación, esta poderá acceder aos datos, pero é posible que o faga con menos frecuencia. Por exemplo, poida que as imaxes non se mostren ata que as toques."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"Queres activar o aforro de datos?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"Activar"</string>
@@ -2047,12 +2051,9 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"Maximizar"</string>
     <string name="close_button_text" msgid="10603510034455258">"Pechar"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
-    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
-    <skip />
+    <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
+    <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
+    <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Contestar"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Vídeo"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Rexeitar"</string>
@@ -2580,33 +2581,22 @@
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"Aplicacións"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"Xa non se recoñecen as túas impresións dixitais. Configura de novo o desbloqueo dactilar."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Seguranza e privacidade"</string>
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
-    <skip />
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"Desbloquea a pantalla e volve conectar o USB"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"Desbloquea a pantalla para conectar o USB"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"Protección avanzada necesita que se desbloquee a túa pantalla para iniciar a conectividade USB"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"Protección avanzada necesita que se desbloquee a túa pantalla para iniciar a conectividade USB"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"Protección avanzada necesita que se desbloquee a túa pantalla para aumentar a velocidade da carga"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"Para aumentar a velocidade da carga ou iniciar a conectividade USB, Protección avanzada necesita que se desbloquee a túa pantalla"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Silenciar"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Notificacións silenciadas"</string>
-    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
-    <skip />
+    <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Non recibirás ningunha notificación de Protección avanzada respecto da conexión de USB se non reinicias o dispositivo"</string>
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"Actividade USB sospeitosa"</string>
-    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
-    <skip />
+    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="5772698072220844779">"Desactivouse o indicador de datos USB"</string>
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Tes problemas co desbloqueo dactilar?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Toca para consultar os consellos sobre como mellorar o proceso de desbloqueo"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Sen escintileo"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Mantén premido o botón de acendido para apagar a televisión"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Alertas de recursos do sistema"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Consumo excesivo de recursos"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"A aplicación <xliff:g id="APP_NAME">%1$s</xliff:g> consome demasiados recursos."</string>
 </resources>

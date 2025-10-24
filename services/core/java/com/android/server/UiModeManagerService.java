@@ -134,6 +134,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 final class UiModeManagerService extends SystemService {
     private static final String TAG = UiModeManager.class.getSimpleName();
@@ -508,23 +509,36 @@ final class UiModeManagerService extends SystemService {
     private final ContentObserver mContrastObserver = new ContentObserver(mHandler) {
         @Override
         public void onChange(boolean selfChange, Uri uri) {
+            final SparseArray<Float> usersToNotify = new SparseArray<>();
+
             synchronized (mLock) {
                 if (fixContrastAndForceInvertStateForMultiUser()) {
                     for (int i = 0; i < mUiModeManagerCallbacks.size(); i++) {
                         int userId = mUiModeManagerCallbacks.keyAt(i);
                         if (updateContrastLocked(userId)) {
                             float contrast = getContrastLocked(userId);
+                            usersToNotify.append(userId, contrast);
                             mUiModeManagerCallbacks.valueAt(i).broadcast(ignoreRemoteException(
                                     callback -> callback.notifyContrastChanged(contrast)));
                         }
                     }
-                    return;
-                }
-                if (updateContrastLocked()) {
+                } else if (updateContrastLocked()) {
                     float contrast = getContrastLocked();
+                    usersToNotify.append(mCurrentUser, contrast);
                     mUiModeManagerCallbacks.get(mCurrentUser, new RemoteCallbackList<>())
                             .broadcast(ignoreRemoteException(
                                     callback -> callback.notifyContrastChanged(contrast)));
+                }
+            }
+
+            for (int i = 0; i < usersToNotify.size(); i++) {
+                int userId = usersToNotify.keyAt(i);
+                float contrast = usersToNotify.valueAt(i);
+                for (Map.Entry<UiModeManagerInternal.ContrastListenerInternal, Executor> entry :
+                        mLocalService.mContrastListeners.entrySet()) {
+                    UiModeManagerInternal.ContrastListenerInternal listener = entry.getKey();
+                    Executor executor = entry.getValue();
+                    executor.execute(() -> listener.onContrastChange(userId, contrast));
                 }
             }
         }
@@ -1634,7 +1648,7 @@ final class UiModeManagerService extends SystemService {
             return FORCE_INVERT_TYPE_OFF;
         }
 
-        if (!mComputedNightMode) {
+        if (!mComputedNightMode && !isPowerSaveNightModeOverrideNeeded()) {
             return FORCE_INVERT_TYPE_OFF;
         }
 
@@ -2106,7 +2120,7 @@ final class UiModeManagerService extends SystemService {
         updateForceInvertStates();
 
         // Override night mode in power save mode if not in car mode
-        if (mPowerSave && !mCarModeEnabled && !mCar) {
+        if (isPowerSaveNightModeOverrideNeeded()) {
             uiMode &= ~Configuration.UI_MODE_NIGHT_NO;
             uiMode |= Configuration.UI_MODE_NIGHT_YES;
         } else {
@@ -2126,6 +2140,13 @@ final class UiModeManagerService extends SystemService {
         if (!mHoldingConfiguration && (!mWaitForDeviceInactive || mPowerSave)) {
             mConfiguration.uiMode = uiMode;
         }
+    }
+
+    /**
+     * Override night mode in power save mode if not in car mode
+     */
+    private boolean isPowerSaveNightModeOverrideNeeded() {
+        return mPowerSave && !mCarModeEnabled && !mCar;
     }
 
     @UiModeManager.NightMode
@@ -2673,6 +2694,8 @@ final class UiModeManagerService extends SystemService {
     }
 
     public final class LocalService extends UiModeManagerInternal {
+        private final HashMap<ContrastListenerInternal, Executor> mContrastListeners =
+                new HashMap<>();
 
         @Override
         public boolean isNightMode(int displayId) {
@@ -2747,6 +2770,20 @@ final class UiModeManagerService extends SystemService {
                     uiMode |= (mCurUiMode.get() & UI_MODE_NIGHT_MASK);
                 }
                 return uiMode;
+            }
+        }
+
+        @Override
+        public float getContrast(int userId) {
+            synchronized (mLock) {
+                return getContrastLocked(userId);
+            }
+        }
+
+        @Override
+        public void addContrastListener(ContrastListenerInternal listener, Executor executor) {
+            synchronized (mLock) {
+                mContrastListeners.put(listener, executor);
             }
         }
     }

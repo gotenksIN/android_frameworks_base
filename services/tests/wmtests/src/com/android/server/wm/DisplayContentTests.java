@@ -88,6 +88,7 @@ import static com.android.server.wm.TransitionSubject.assertThat;
 import static com.android.server.wm.WindowContainer.AnimationFlags.PARENTS;
 import static com.android.server.wm.WindowContainer.POSITION_TOP;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
+import static com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES;
 import static com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING;
 import static com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE;
 import static com.android.window.flags.Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS;
@@ -102,6 +103,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -989,16 +991,11 @@ public class DisplayContentTests extends WindowTestsBase {
                 "Screen orientation must be defined by the window even on close-to-square display.",
                 overlay.mAttrs.screenOrientation, dc.getOrientation());
 
-        // Assume that a decor window occupies the display height, so the configuration orientation
-        // should be landscape.
-        dc.getDisplayPolicy().getDecorInsetsInfo(ROTATION_0, dc.mBaseDisplayHeight,
-                dc.mBaseDisplayWidth).mConfigFrame.set(0, 0, 1000, 990);
         dc.computeScreenConfiguration(config, ROTATION_0);
         dc.onRequestedOverrideConfigurationChanged(config);
-        assertEquals(Configuration.ORIENTATION_LANDSCAPE, config.orientation);
-        assertEquals(Configuration.ORIENTATION_LANDSCAPE, dc.getNaturalConfigurationOrientation());
+        assertEquals(Configuration.ORIENTATION_PORTRAIT, config.orientation);
         overlay.setOverrideOrientation(SCREEN_ORIENTATION_NOSENSOR);
-        assertEquals(Configuration.ORIENTATION_LANDSCAPE,
+        assertEquals(Configuration.ORIENTATION_PORTRAIT,
                 overlay.getRequestedConfigurationOrientation());
         // Note that getNaturalOrientation is based on logical display size. So it is portrait if
         // the display width equals to height.
@@ -1397,25 +1394,6 @@ public class DisplayContentTests extends WindowTestsBase {
         assertEquals(mAppWindow, mDisplayContent.computeImeControlTarget());
     }
 
-    @SetupWindows(addWindows = W_ACTIVITY)
-    @Test
-    public void testShouldImeAttachedToApp_targetBoundsDifferentFromImeContainer_returnsFalse() {
-        Rect imeContainerBounds = new Rect(0, 0, 100, 100);
-        Rect imeTargetBounds = new Rect(0, 0, 100, 200);
-        spyOn(mAppWindow);
-        spyOn(mAppWindow.mActivityRecord);
-        doReturn(imeTargetBounds).when(mAppWindow).getBounds();
-        doReturn(true).when(mAppWindow.mActivityRecord).matchParentBounds();
-        mDisplayContent.setRemoteInsetsController(createDisplayWindowInsetsController());
-        mDisplayContent.setImeInputTarget(mAppWindow);
-        mDisplayContent.setImeLayeringTarget(mAppWindow);
-        final DisplayArea.Tokens imeContainer = mDisplayContent.getImeContainer();
-        spyOn(imeContainer);
-        doReturn(imeContainerBounds).when(imeContainer).getBounds();
-
-        assertFalse(mDisplayContent.shouldImeAttachedToApp());
-    }
-
     @Test
     public void testUpdateSystemGestureExclusion() {
         final DisplayContent dc = createNewDisplay();
@@ -1757,10 +1735,31 @@ public class DisplayContentTests extends WindowTestsBase {
     }
 
     @Test
+    public void testRotationForActivityInDifferentOrientation() {
+        mDisplayContent.setIgnoreOrientationRequest(false);
+        final ActivityRecord app = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        final DisplayRotation displayRotation = mDisplayContent.getDisplayRotation();
+        final int rotation = displayRotation.getRotation();
+        spyOn(displayRotation);
+        doReturn((rotation + 1) % 4).when(displayRotation).rotationForOrientation(
+                anyInt() /* orientation */, anyInt() /* lastRotation */);
+
+        assertTrue(app.providesOrientation());
+        assertNotEquals(WindowConfiguration.ROTATION_UNDEFINED,
+                mDisplayContent.rotationForActivityInDifferentOrientation(app));
+
+        doReturn(false).when(app).providesOrientation();
+
+        assertEquals(WindowConfiguration.ROTATION_UNDEFINED,
+                mDisplayContent.rotationForActivityInDifferentOrientation(app));
+    }
+
+    @Test
     public void testRespectNonTopVisibleFixedOrientation() {
         spyOn(mWm.mAppCompatConfiguration);
         doReturn(false).when(mWm.mAppCompatConfiguration).isTranslucentLetterboxingEnabled();
         makeDisplayPortrait(mDisplayContent);
+        mDisplayContent.setIgnoreOrientationRequest(false);
         final ActivityRecord nonTopVisible = new ActivityBuilder(mAtm)
                 .setScreenOrientation(SCREEN_ORIENTATION_PORTRAIT)
                 .setCreateTask(true).build();
@@ -1808,6 +1807,7 @@ public class DisplayContentTests extends WindowTestsBase {
         doReturn(false).when(mWm.mAppCompatConfiguration).isTranslucentLetterboxingEnabled();
         setReverseDefaultRotation(mDisplayContent, false);
         makeDisplayPortrait(mDisplayContent);
+        mDisplayContent.setIgnoreOrientationRequest(false);
         final ActivityRecord nonTopVisible = new ActivityBuilder(mAtm).setCreateTask(true)
                 .setScreenOrientation(SCREEN_ORIENTATION_LANDSCAPE).setVisible(false).build();
         new ActivityBuilder(mAtm).setCreateTask(true)
@@ -1936,6 +1936,8 @@ public class DisplayContentTests extends WindowTestsBase {
 
     @Test
     public void testRemoteRotation() {
+        // Shell-transitions version is tested in testRemoteRotationWhenTransitionCombine
+        assumeTrue(!Flags.fallbackTransitionPlayer());
         final DisplayRotation dr = mDisplayContent.getDisplayRotation();
         spyOn(dr);
         doReturn((dr.getRotation() + 2) % 4).when(dr).rotationForOrientation(anyInt(), anyInt());
@@ -1966,6 +1968,45 @@ public class DisplayContentTests extends WindowTestsBase {
         assertTrue(called[0]);
         waitUntilHandlersIdle();
         assertTrue(continued[0]);
+    }
+
+    @Test
+    public void testRemoteRotationWhenTransitionCombine() {
+        // Create 2 visible activities to verify that they can both receive the new configuration.
+        final ActivityRecord activity1 = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        doReturn(true).when(activity1).isSyncFinished(any());
+
+        final TestTransitionPlayer testPlayer = registerTestTransitionPlayer();
+        final DisplayRotation dr = mDisplayContent.getDisplayRotation();
+        spyOn(dr);
+        doReturn((dr.getRotation() + 1) % 4).when(dr).rotationForOrientation(anyInt(), anyInt());
+        final boolean[] called = new boolean[1];
+        mWm.mDisplayChangeController = new IDisplayChangeWindowController.Stub() {
+            @Override
+            public void onDisplayChange(int displayId, int fromRotation, int toRotation,
+                    DisplayAreaInfo newDisplayAreaInfo, IDisplayChangeWindowCallback callback) {
+                try {
+                    called[0] = true;
+                    callback.continueDisplayChange(null);
+                } catch (RemoteException e) {
+                    fail();
+                }
+            }
+        };
+
+        final int origRot = mDisplayContent.getConfiguration().windowConfiguration.getRotation();
+        mDisplayContent.setLastHasContent();
+
+        // Create/collect a transition that will be "interrupted" by the display rotation
+        requestTransition(activity1, WindowManager.TRANSIT_CHANGE);
+
+        mWm.updateRotation(true /* alwaysSendConfiguration */, false /* forceRelayout */);
+        waitUntilHandlersIdle();
+        // Since it got combined (and thus we can't rely on a handleRequest), it should fall-back
+        // to the display-change controller
+        assertTrue(called[0]);
+        assertNotEquals(origRot, mDisplayContent.getConfiguration().windowConfiguration
+                .getRotation());
     }
 
     @Test
@@ -2974,7 +3015,7 @@ public class DisplayContentTests extends WindowTestsBase {
     }
 
     @EnableFlags(FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
-    @DisableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
+    @DisableFlags({FLAG_ENABLE_DESKTOP_WINDOWING_MODE, FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES})
     @Test
     public void desktopWindowingFlagNotEnabled_cameraCompatFreeformPolicyIsNull() {
         assertFalse(createNewDisplay().mAppCompatCameraPolicy.hasSimReqOrientationPolicy());

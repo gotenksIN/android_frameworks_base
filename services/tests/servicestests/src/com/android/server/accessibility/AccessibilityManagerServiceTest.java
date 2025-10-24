@@ -53,6 +53,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -1701,6 +1702,45 @@ public class AccessibilityManagerServiceTest {
     }
 
     @Test
+    public void enableMagnificationAndZoomIn_magnificationAlreadyActive_doesNothing() {
+        mFakePermissionEnforcer.grant(Manifest.permission.MANAGE_ACCESSIBILITY);
+        when(mMockMagnificationController.isAnyMagnificationActivated(anyInt())).thenReturn(true);
+
+        mA11yms.enableMagnificationAndZoomIn(TEST_DISPLAY);
+
+        verify(mMockMagnificationController, after(1000).never())
+                .zoomInMagnification(anyInt(), anyInt());
+    }
+
+    @Test
+    public void enableMagnificationAndZoomIn_inputFilterNotInstalled_doesNothing() {
+        mFakePermissionEnforcer.grant(Manifest.permission.MANAGE_ACCESSIBILITY);
+        when(mMockMagnificationController.isAnyMagnificationActivated(anyInt())).thenReturn(false);
+        mA11yms.onInputFilterInstalled(false);
+
+        mA11yms.enableMagnificationAndZoomIn(TEST_DISPLAY);
+
+        verify(mMockMagnificationController, after(1000).never())
+                .zoomInMagnification(anyInt(), anyInt());
+    }
+
+    @Test
+    public void enableMagnificationAndZoomIn_inputFilterInstalled_zoomIn() throws Exception {
+        mFakePermissionEnforcer.grant(Manifest.permission.MANAGE_ACCESSIBILITY);
+        final AccessibilityUserState userState =
+                mA11yms.mUserStates.get(mA11yms.getCurrentUserIdLocked());
+        userState.setMagnificationModeLocked(
+                TEST_DISPLAY, ACCESSIBILITY_MAGNIFICATION_MODE_FULLSCREEN);
+        mA11yms.onInputFilterInstalled(true);
+        when(mMockMagnificationConnectionManager.isConnected()).thenReturn(true);
+
+        mA11yms.enableMagnificationAndZoomIn(TEST_DISPLAY);
+
+        verify(mMockMagnificationController, timeout(1000))
+                .zoomInMagnification(TEST_DISPLAY, ACCESSIBILITY_MAGNIFICATION_MODE_FULLSCREEN);
+    }
+
+    @Test
     public void restoreShortcutTargets_qs_a11yQsTargetsRestored() {
         String daltonizerTile =
                 AccessibilityShortcutController.DALTONIZER_COMPONENT_NAME.flattenToString();
@@ -2311,7 +2351,7 @@ public class AccessibilityManagerServiceTest {
     }
 
     @Test
-    @EnableFlags(com.android.hardware.input.Flags.FLAG_ENABLE_TALKBACK_AND_MAGNIFIER_KEY_GESTURES)
+    @EnableFlags(com.android.hardware.input.Flags.FLAG_ENABLE_TALKBACK_KEY_GESTURES)
     public void handleKeyGestureEvent_activateTalkBack_trustedService() {
         setupAccessibilityServiceConnection(FLAG_REQUEST_ACCESSIBILITY_BUTTON);
         mFakePermissionEnforcer.grant(Manifest.permission.MANAGE_ACCESSIBILITY);

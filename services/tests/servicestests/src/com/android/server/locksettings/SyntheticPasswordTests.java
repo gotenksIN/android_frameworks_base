@@ -71,6 +71,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * atest FrameworksServicesTests:SyntheticPasswordTests
@@ -136,6 +137,13 @@ public class SyntheticPasswordTests extends BaseLockSettingsServiceTests {
     private void initSpAndSetCredential(int userId, LockscreenCredential credential)
             throws RemoteException {
         mService.initializeSyntheticPassword(userId);
+        List<UserInfo> profiles = mUserManager.getProfiles(userId);
+        if (profiles != null) {
+            // Ensure that any managed profiles have initialized SPs.
+            profiles.stream()
+                    .filter(userInfo -> userInfo.isManagedProfile())
+                    .forEach(userInfo -> mService.initializeSyntheticPassword(userInfo.id));
+        }
         assertTrue(mService.setLockCredential(credential, nonePassword(), userId));
         assertEquals(credential.getType(), mService.getCredentialType(userId));
     }
@@ -828,8 +836,7 @@ public class SyntheticPasswordTests extends BaseLockSettingsServiceTests {
         verify(mAuthSecretService, never()).setPrimaryUserCredential(any(byte[].class));
     }
 
-    @Test
-    public void testUnlockUserWithToken() throws Exception {
+    private void testUnlockUserWithToken_helper() throws Exception {
         LockscreenCredential password = newPassword("password");
         byte[] token = "some-high-entropy-secure-token".getBytes();
         initSpAndSetCredential(PRIMARY_USER_ID, password);
@@ -841,12 +848,28 @@ public class SyntheticPasswordTests extends BaseLockSettingsServiceTests {
         assertTrue(mService.verifyCredential(password, PRIMARY_USER_ID, 0 /* flags */).isMatched());
         assertTrue(mLocalService.isEscrowTokenActive(handle, PRIMARY_USER_ID));
 
-        mService.onUserStopped(PRIMARY_USER_ID);
+        if (android.security.Flags.resetAuthFlagsAndMetricsInLockUser()) {
+            mLocalService.lockUser(PRIMARY_USER_ID);
+        } else {
+            mService.onUserStopped(PRIMARY_USER_ID);
+        }
         assertNull(mLocalService.getUserPasswordMetrics(PRIMARY_USER_ID));
 
         assertTrue(mLocalService.unlockUserWithToken(handle, token, PRIMARY_USER_ID));
         assertEquals(PasswordMetrics.computeForCredential(password),
                 mLocalService.getUserPasswordMetrics(PRIMARY_USER_ID));
+    }
+
+    @Test
+    @DisableFlags(android.security.Flags.FLAG_RESET_AUTH_FLAGS_AND_METRICS_IN_LOCK_USER)
+    public void testUnlockUserWithToken_orig() throws Exception {
+        testUnlockUserWithToken_helper();
+    }
+
+    @Test
+    @EnableFlags(android.security.Flags.FLAG_RESET_AUTH_FLAGS_AND_METRICS_IN_LOCK_USER)
+    public void testUnlockUserWithToken() throws Exception {
+        testUnlockUserWithToken_helper();
     }
 
     @Test

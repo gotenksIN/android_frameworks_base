@@ -33,27 +33,30 @@ import com.android.systemui.display.data.repository.DisplayStateRepository
 import com.android.systemui.display.data.repository.DisplayStateRepositoryImpl
 import com.android.systemui.display.domain.interactor.DisplayStateInteractor
 import com.android.systemui.display.domain.interactor.DisplayStateInteractorImpl
+import com.android.systemui.display.shared.DisplayNotFoundException
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.statusbar.dagger.PerDisplayStatusBarModule
 import com.android.systemui.statusbar.phone.DarkIconDispatcherImpl
 import com.android.systemui.statusbar.phone.SysuiDarkIconDispatcher
 import com.android.systemui.statusbar.pipeline.shared.ui.composable.StatusBarRootFactory
-import com.android.systemui.wallpapers.WallpaperPresentationEnabled
-import com.android.systemui.wallpapers.WallpaperPresentationManager
-import com.android.systemui.wallpapers.domain.interactor.DisplayWallpaperPresentationInteractor
-import com.android.systemui.wallpapers.domain.interactor.DisplayWallpaperPresentationInteractorImpl
-import com.android.systemui.wallpapers.domain.interactor.NoOpDisplayWallpaperPresentationInteractor
+import com.android.systemui.wallpapers.dagger.PerDisplayWallpaperModule
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
-import dagger.multibindings.ElementsIntoSet
+import dagger.multibindings.IntoSet
 import dagger.multibindings.Multibinds
-import javax.inject.Provider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 
 /** Module providing common dependencies for per-display singletons. */
-@Module(includes = [PerDisplayStatusBarModule::class, PerDisplayConfigurationModule::class])
+@Module(
+    includes =
+        [
+            PerDisplayStatusBarModule::class,
+            PerDisplayConfigurationModule::class,
+            PerDisplayWallpaperModule::class,
+        ]
+)
 interface PerDisplaySystemUIModule {
 
     @Multibinds
@@ -76,6 +79,13 @@ interface PerDisplaySystemUIModule {
     fun statusBarRootFactory(statusBarRootFactory: StatusBarRootFactory): StatusBarRootFactory
 
     @Binds @DisplayAware fun darkIconDispatcher(impl: DarkIconDispatcherImpl): DarkIconDispatcher
+
+    @Binds
+    @DisplayAware
+    @IntoSet
+    fun bindDarkIconDispatcherLifecycleListener(
+        impl: DarkIconDispatcherImpl
+    ): SystemUIDisplaySubcomponent.LifecycleListener
 
     @Binds
     @DisplayAware
@@ -102,7 +112,7 @@ interface PerDisplaySystemUIModule {
             displayRepository: DisplayRepository,
         ): Display {
             return displayRepository.getDisplay(displayId)
-                ?: error("Couldn't get the display with id=$displayId")
+                ?: throw DisplayNotFoundException("Couldn't get the display with id=$displayId")
         }
 
         @Provides
@@ -130,32 +140,5 @@ interface PerDisplaySystemUIModule {
         }
 
         @Provides @DisplayAware fun provideDisplayId(@DisplayId displayId: Int): Int = displayId
-
-        @Provides
-        @PerDisplaySingleton
-        @DisplayAware
-        fun bindsDisplayWallpaperPresentationInteractor(
-            @WallpaperPresentationEnabled isWallpaperPresentationEnabled: Boolean,
-            impl: Provider<DisplayWallpaperPresentationInteractorImpl>,
-        ): DisplayWallpaperPresentationInteractor =
-            if (isWallpaperPresentationEnabled) {
-                impl.get()
-            } else {
-                NoOpDisplayWallpaperPresentationInteractor
-            }
-
-        @Provides
-        @PerDisplaySingleton
-        @DisplayAware
-        @ElementsIntoSet
-        fun bindWallpaperPresentationManagerLifecycleListener(
-            @WallpaperPresentationEnabled isWallpaperPresentationEnabled: Boolean,
-            impl: Provider<WallpaperPresentationManager>,
-        ): Set<SystemUIDisplaySubcomponent.LifecycleListener> =
-            if (isWallpaperPresentationEnabled) {
-                setOf(impl.get())
-            } else {
-                emptySet()
-            }
     }
 }

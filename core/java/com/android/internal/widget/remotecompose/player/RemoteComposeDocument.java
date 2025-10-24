@@ -15,6 +15,10 @@
  */
 package com.android.internal.widget.remotecompose.player;
 
+
+import android.annotation.NonNull;
+import android.annotation.Nullable;
+
 import com.android.internal.widget.remotecompose.core.CoreDocument;
 import com.android.internal.widget.remotecompose.core.RemoteComposeBuffer;
 import com.android.internal.widget.remotecompose.core.RemoteContext;
@@ -25,35 +29,38 @@ import com.android.internal.widget.remotecompose.core.serialize.MapSerializer;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.Clock;
+import java.util.Map;
 
-/** Public API to create a new RemoteComposeDocument coming from an input stream */
+/**
+ * Public API to create a new RemoteComposeDocument coming from an input stream
+ */
 public class RemoteComposeDocument {
 
-    CoreDocument mDocument;
+    private @NonNull CoreDocument mDocument;
 
-    public RemoteComposeDocument(byte[] inputStream) {
+    public RemoteComposeDocument(@NonNull byte [] inputStream) {
         this(new ByteArrayInputStream(inputStream), new SystemClock());
     }
 
-    public RemoteComposeDocument(InputStream inputStream) {
+    public RemoteComposeDocument(@NonNull InputStream inputStream) {
         this(inputStream, new SystemClock());
     }
 
-    public RemoteComposeDocument(InputStream inputStream, Clock clock) {
+    public RemoteComposeDocument(@NonNull InputStream inputStream, @NonNull Clock clock) {
         mDocument = new CoreDocument(clock);
         RemoteComposeBuffer buffer = RemoteComposeBuffer.fromInputStream(inputStream);
         mDocument.initFromBuffer(buffer);
     }
 
-    public RemoteComposeDocument(CoreDocument document) {
+    public RemoteComposeDocument(@NonNull CoreDocument document) {
         mDocument = document;
     }
 
-    public CoreDocument getDocument() {
+    public @NonNull CoreDocument getDocument() {
         return mDocument;
     }
 
-    public void setDocument(CoreDocument document) {
+    public void setDocument(@NonNull CoreDocument document) {
         this.mDocument = document;
     }
 
@@ -61,16 +68,29 @@ public class RemoteComposeDocument {
      * Called when an initialization is needed, allowing the document to eg load resources / cache
      * them.
      */
-    public void initializeContext(RemoteContext context) {
-        mDocument.initializeContext(context);
+    public void initializeContext(@NonNull RemoteContext context) {
+        mDocument.initializeContext(context, null);
     }
 
-    /** Returns the width of the document in pixels */
+    /**
+     * Called when an initialization is needed, allowing the document to eg load resources / cache
+     * them.
+     */
+    public void initializeContext(@NonNull RemoteContext context,
+                                  @Nullable Map<Integer, Object> map) {
+        mDocument.initializeContext(context, map);
+    }
+
+    /**
+     * Returns the width of the document in pixels
+     */
     public int getWidth() {
         return mDocument.getWidth();
     }
 
-    /** Returns the height of the document in pixels */
+    /**
+     * Returns the height of the document in pixels
+     */
     public int getHeight() {
         return mDocument.getHeight();
     }
@@ -83,9 +103,9 @@ public class RemoteComposeDocument {
      * Paint the document
      *
      * @param context the provided PaintContext
-     * @param theme the theme we want to use for this document.
+     * @param theme   the theme we want to use for this document.
      */
-    public void paint(RemoteContext context, int theme) {
+    public void paint(@NonNull RemoteContext context, int theme) {
         mDocument.paint(context, theme);
     }
 
@@ -143,13 +163,16 @@ public class RemoteComposeDocument {
         return mDocument.getComponent(id);
     }
 
-    /** Invalidate the document for layout measures. This will trigger a layout remeasure pass. */
+    /**
+     * Invalidate the document for layout measures. This will trigger a layout remeasure pass.
+     */
     public void invalidate() {
         mDocument.invalidateMeasure();
     }
 
     /**
-     * @hide Returns a list of useful statistics for the runtime document
+     * Returns a list of useful statistics for the runtime document
+     *
      * @return array of strings representing some useful statistics
      */
     public String[] getStats() {
@@ -160,7 +183,8 @@ public class RemoteComposeDocument {
     }
 
     /**
-     * @hide Returns the number of sensor listeners
+     * Returns the number of sensor listeners
+     *
      * @param ids
      * @return
      */
@@ -169,15 +193,17 @@ public class RemoteComposeDocument {
     }
 
     /**
-     * @hide Returns the current clock
+     * Returns the current clock
+     *
      * @return
      */
-    public Clock getClock() {
+    public @NonNull Clock getClock() {
         return getDocument().getClock();
     }
 
     /**
-     * @hide Returns true if the current document is an update-only document
+     * Returns true if the current document is an update-only document
+     *
      * @return
      */
     public boolean isUpdateDoc() {
@@ -185,7 +211,8 @@ public class RemoteComposeDocument {
     }
 
     /**
-     * @hide Serialize the document
+     * Serialize the document
+     *
      * @param serializer
      */
     public void serialize(MapSerializer serializer) {

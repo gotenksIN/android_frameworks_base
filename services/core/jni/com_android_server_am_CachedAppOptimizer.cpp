@@ -47,6 +47,7 @@
 #include <utils/Trace.h>
 
 #include <algorithm>
+#include <optional>
 
 using android::base::StringPrintf;
 using android::base::WriteStringToFile;
@@ -84,10 +85,8 @@ namespace android {
 // before starting next VMA batch
 static std::atomic<bool> cancelRunningCompaction;
 
-// QTI_BEGIN: 2023-03-15: Core: CachedAppOptimizer : Pageout File pages during system compaction
 static bool inSystemCompaction = false;
 
-// QTI_END: 2023-03-15: Core: CachedAppOptimizer : Pageout File pages during system compaction
 // A VmaBatch represents a set of VMAs that can be processed
 // as VMAs are processed by client code it is expected that the
 // VMAs get consumed which means they are discarded as they are
@@ -337,12 +336,10 @@ static int getAnonPageAdvice(const Vma& vma) {
     return -1;
 }
 static int getAnyPageAdvice(const Vma& vma) {
-// QTI_BEGIN: 2023-03-15: Core: CachedAppOptimizer : Pageout File pages during system compaction
     if (inSystemCompaction == true) {
         return MADV_PAGEOUT;
     }
 
-// QTI_END: 2023-03-15: Core: CachedAppOptimizer : Pageout File pages during system compaction
     if (vma.inode == 0 && !vma.is_shared) {
         return MADV_PAGEOUT;
     }
@@ -424,10 +421,8 @@ static void compactProcess(int pid, int compactionFlags) {
     bool compactAnon = compactionFlags & COMPACT_ACTION_ANON_FLAG;
     bool compactFile = compactionFlags & COMPACT_ACTION_FILE_FLAG;
 
-// QTI_BEGIN: 2023-12-18: Core: CachedAppOptimizer: prefer use ppr if available
     static std::once_flag checkProcFsFlag;
 
-// QTI_END: 2023-12-18: Core: CachedAppOptimizer: prefer use ppr if available
     VmaToAdviseFunc vmaToAdviseFunc;
 
     if (compactAnon) {
@@ -440,7 +435,6 @@ static void compactProcess(int pid, int compactionFlags) {
         vmaToAdviseFunc = getFilePageAdvice;
     }
 
-// QTI_BEGIN: 2023-12-18: Core: CachedAppOptimizer: prefer use ppr if available
     // check once if per-process reclaim available
     // we don't need to carry it forward once Kernel 5.4 becomes obsolete
     std::call_once(checkProcFsFlag, []() {
@@ -450,15 +444,14 @@ static void compactProcess(int pid, int compactionFlags) {
         }
     });
 
-// QTI_END: 2023-12-18: Core: CachedAppOptimizer: prefer use ppr if available
     compactProcess(pid, vmaToAdviseFunc);
 }
 
-static void compactMemcg(int uid, int pid, int compactionFlags) {
+static std::string profileFromCompactionFlags(int compactionFlags) {
     const bool compactAnon = compactionFlags & COMPACT_ACTION_ANON_FLAG;
     const bool compactFile = compactionFlags & COMPACT_ACTION_FILE_FLAG;
 
-    if (!compactAnon && !compactFile) return;
+    if (!compactAnon && !compactFile) return {};
     std::string profile;
     if (compactAnon && compactFile)
         profile = "CompactFull";
@@ -467,7 +460,11 @@ static void compactMemcg(int uid, int pid, int compactionFlags) {
     else if (compactFile)
         profile = "CompactFile";
 
-    if (isProfileValidForProcess(profile, uid, pid)) {
+    return profile;
+}
+
+static void compactMemcg(int uid, int pid, int compactionFlags) {
+    if (std::string profile = profileFromCompactionFlags(compactionFlags); !profile.empty()) {
         SetProcessProfiles(uid, pid, {profile});
     }
 }
@@ -481,9 +478,7 @@ static void compactMemcg(int uid, int pid, int compactionFlags) {
 static void com_android_server_am_CachedAppOptimizer_compactSystem(JNIEnv *, jobject) {
     std::unique_ptr<DIR, decltype(&closedir)> proc(opendir("/proc"), closedir);
     struct dirent* current;
-// QTI_BEGIN: 2023-03-15: Core: CachedAppOptimizer : Pageout File pages during system compaction
     inSystemCompaction = true;
-// QTI_END: 2023-03-15: Core: CachedAppOptimizer : Pageout File pages during system compaction
     while ((current = readdir(proc.get()))) {
         if (current->d_type != DT_DIR) {
             continue;
@@ -512,9 +507,7 @@ static void com_android_server_am_CachedAppOptimizer_compactSystem(JNIEnv *, job
 
         compactMemcg(status_info.st_uid, pid, COMPACT_ACTION_ANON_FLAG | COMPACT_ACTION_FILE_FLAG);
     }
-// QTI_BEGIN: 2023-03-15: Core: CachedAppOptimizer : Pageout File pages during system compaction
     inSystemCompaction = false;
-// QTI_END: 2023-03-15: Core: CachedAppOptimizer : Pageout File pages during system compaction
 }
 
 static void com_android_server_am_CachedAppOptimizer_cancelCompaction(JNIEnv*, jobject) {
@@ -560,6 +553,28 @@ static void com_android_server_am_CachedAppOptimizer_compactNativeProcess(JNIEnv
     compactProcess(pid, compactionFlags);
 }
 
+static jboolean com_android_server_am_CachedAppOptimizer_compactionFlagsValidForMemcg(
+        JNIEnv* env, jobject, jint compactionFlags) {
+    static std::array<std::optional<bool>, 3> valid;
+
+    if (compactionFlags >= valid.size() || compactionFlags < 0) {
+        jniThrowException(env, "java/lang/IllegalArgumentException", "Invalid compaction flags");
+        return false;
+    }
+
+    if (!valid[compactionFlags]) {
+        std::string profile = profileFromCompactionFlags(compactionFlags);
+        if (profile.empty()) {
+            valid[compactionFlags] = true; // NONE is a no-op
+        } else {
+            // Only call this once per flag combo, per boot, since it's not exactly cheap
+            valid[compactionFlags] = isProfileValidForProcess(profile, getuid(), getpid());
+        }
+    }
+
+    return *valid[compactionFlags];
+}
+
 static const JNINativeMethod sMethods[] = {
         /* name, signature, funcPtr */
         {"cancelCompaction", "()V",
@@ -578,6 +593,8 @@ static const JNINativeMethod sMethods[] = {
          (void*)com_android_server_am_CachedAppOptimizer_compactProcessWithMemcg},
         {"compactNativeProcess", "(II)V",
          (void*)com_android_server_am_CachedAppOptimizer_compactNativeProcess},
+        {"compactionFlagsValidForMemcg", "(I)Z",
+         (void*)com_android_server_am_CachedAppOptimizer_compactionFlagsValidForMemcg},
 };
 
 int register_android_server_am_CachedAppOptimizer(JNIEnv* env)

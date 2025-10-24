@@ -45,6 +45,7 @@ import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.RenderNode;
 import android.hardware.input.InputManager;
+import android.media.quality.PictureProfileHandle;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -209,6 +210,8 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
 
     private float mRequestedHdrHeadroom = 0.f;
     private float mHdrHeadroom = 0.f;
+
+    private PictureProfileHandle mRequestedPictureProfileHandle = null;
 
     /**
      * We use this lock to protect access to mSurfaceControl. Both are accessed on the UI
@@ -1013,6 +1016,29 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         invalidate();
     }
 
+    /**
+     * Sends the picture profile handle to the Composer HAL for application on the surface.
+     * <p>
+     * This method allows a system application to specify a picture profile handle.
+     * The provided {@link PictureProfileHandle} will be propagated to the Composer HAL,
+     * which is then responsible for applying the corresponding display adjustments.
+     * <p>
+     *
+     * <p><b>Example Usage:</b></p>
+     * This is used by TvView to apply a picture profile handle obtained for the current TV input.
+     *
+     * @param handle The non-null {@link PictureProfileHandle} to send to the layer.
+     * @throws IllegalArgumentException if the provided handle is null.
+     * @hide
+     */
+    public void sendPictureProfileHandle(PictureProfileHandle handle) {
+        if (handle == null) {
+            throw new IllegalArgumentException("PictureProfileHandle is null");
+        }
+        mRequestedPictureProfileHandle = handle;
+        updateSurface();
+    }
+
 // QTI_BEGIN: 2020-05-06: Core: SurfaceView: Add API to allow protected content presentation
     /**
      * Control whether the surface view's content should flow through
@@ -1115,7 +1141,8 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
 
     private boolean performSurfaceTransaction(ViewRootImpl viewRoot, Translator translator,
             boolean creating, boolean sizeChanged, boolean hintChanged, boolean relativeZChanged,
-            boolean hdrHeadroomChanged, Transaction surfaceUpdateTransaction) {
+            boolean hdrHeadroomChanged, PictureProfileHandle pictureProfileHandle,
+            Transaction surfaceUpdateTransaction) {
         boolean realSizeChanged = false;
 
         mSurfaceLock.lock();
@@ -1153,6 +1180,10 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
             if (hdrHeadroomChanged || creating) {
                 surfaceUpdateTransaction.setDesiredHdrHeadroom(
                         mBlastSurfaceControl, mHdrHeadroom);
+            }
+            if (pictureProfileHandle != null) {
+                surfaceUpdateTransaction.setPictureProfileHandle(
+                        mBlastSurfaceControl, pictureProfileHandle);
             }
             if (isAboveParent()) {
                 float alpha = getAlpha();
@@ -1299,11 +1330,12 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         final boolean surfaceLifecycleStrategyChanged =
                 mSurfaceLifecycleStrategy != mRequestedSurfaceLifecycleStrategy;
         final boolean hdrHeadroomChanged = mHdrHeadroom != mRequestedHdrHeadroom;
+        final boolean pictureProfileChanged = mRequestedPictureProfileHandle != null;
 
         if (creating || formatChanged || sizeChanged || visibleChanged
                 || alphaChanged || windowVisibleChanged || positionChanged
                 || layoutSizeChanged || hintChanged || relativeZChanged || !mAttachedToWindow
-                || surfaceLifecycleStrategyChanged || hdrHeadroomChanged) {
+                || surfaceLifecycleStrategyChanged || hdrHeadroomChanged || pictureProfileChanged) {
 
             if (DEBUG) Log.i(TAG, System.identityHashCode(this) + " "
                     + "Changes: creating=" + creating
@@ -1342,6 +1374,12 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
                 mSurfaceLifecycleStrategy = mRequestedSurfaceLifecycleStrategy;
                 mHdrHeadroom = mRequestedHdrHeadroom;
 
+                // Picture profiles operate a bit differently. Since the picture profiles can also
+                // be changed when queueing buffers, SurfaceView can't be the single source
+                // of truth for the picture profile.
+                PictureProfileHandle pictureProfileHandle = mRequestedPictureProfileHandle;
+                mRequestedPictureProfileHandle = null;
+
                 mScreenRect.left = mWindowSpaceLeft;
                 mScreenRect.top = mWindowSpaceTop;
                 mScreenRect.right = mWindowSpaceLeft + getWidth();
@@ -1378,7 +1416,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
 
                 final boolean realSizeChanged = performSurfaceTransaction(viewRoot, translator,
                         creating, sizeChanged, hintChanged, relativeZChanged, hdrHeadroomChanged,
-                        surfaceUpdateTransaction);
+                        pictureProfileHandle, surfaceUpdateTransaction);
 
                 try {
                     SurfaceHolder.Callback[] callbacks = null;
@@ -2138,6 +2176,11 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
      * SurfaceView at any time which will override what the application is requesting. Do not apply
      * any {@link SurfaceControl.Transaction} to this SurfaceControl except for reparenting
      * child SurfaceControls. See: {@link SurfaceControl.Transaction#reparent}.
+     *
+     *  The SurfaceControl lifetime follows the SurfaceView's Surface lifetime. You should implement
+     * {@link SurfaceHolder.Callback#surfaceCreated} and
+     * {@link SurfaceHolder.Callback#surfaceDestroyed} to discover when the
+     * SurfaceControl is valid. Outside of that, a {@code null} SurfaceControl will be returned.
      *
      * @return The SurfaceControl for this SurfaceView.
      */

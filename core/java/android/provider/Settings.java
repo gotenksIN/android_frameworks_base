@@ -2543,7 +2543,6 @@ public final class Settings {
      *
      * @hide
      */
-    @FlaggedApi(com.android.internal.telephony.flags.Flags.FLAG_ACTION_SIM_PREFERENCE_SETTINGS)
     @SystemApi
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_SIM_PREFERENCE_SETTINGS =
@@ -5100,7 +5099,7 @@ public final class Settings {
 
         /**
          * @deprecated Use {@link android.provider.Settings.Global#RADIO_WIMAX} instead
-         * {@hide}
+         * @hide
          */
         @Deprecated
         public static final String RADIO_WIMAX = Global.RADIO_WIMAX;
@@ -5126,7 +5125,7 @@ public final class Settings {
         /**
          * @deprecated Use {@link android.provider.Settings.Global#AIRPLANE_MODE_TOGGLEABLE_RADIOS} instead
          *
-         * {@hide}
+         * @hide
          */
         @Deprecated
         @UnsupportedAppUsage
@@ -5856,9 +5855,9 @@ public final class Settings {
          */
         public static final Uri DEFAULT_RINGTONE_URI = getUriFor(RINGTONE);
 
-        /** {@hide} */
+        /** @hide */
         public static final String RINGTONE_CACHE = "ringtone_cache";
-        /** {@hide} */
+        /** @hide */
         public static final Uri RINGTONE_CACHE_URI = getUriFor(RINGTONE_CACHE);
 
         /**
@@ -5878,10 +5877,10 @@ public final class Settings {
          */
         public static final Uri DEFAULT_NOTIFICATION_URI = getUriFor(NOTIFICATION_SOUND);
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NOTIFICATION_SOUND_CACHE = "notification_sound_cache";
-        /** {@hide} */
+        /** @hide */
         public static final Uri NOTIFICATION_SOUND_CACHE_URI = getUriFor(NOTIFICATION_SOUND_CACHE);
 
         /**
@@ -5933,10 +5932,10 @@ public final class Settings {
          */
         public static final Uri DEFAULT_ALARM_ALERT_URI = getUriFor(ALARM_ALERT);
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String ALARM_ALERT_CACHE = "alarm_alert_cache";
-        /** {@hide} */
+        /** @hide */
         public static final Uri ALARM_ALERT_CACHE_URI = getUriFor(ALARM_ALERT_CACHE);
 
         /**
@@ -9679,10 +9678,15 @@ public final class Settings {
          * Whether or not larger size icons are used for the pointer of mouse/trackpad for
          * accessibility.
          * (0 = false, 1 = true)
+         *
+         * @deprecated This setting is no longer in use, as the size of pointer icons is now
+         *             controlled by the {@link #POINTER_SCALE} setting. The value of this setting
+         *             is ignored.
          * @hide
          */
         @UnsupportedAppUsage
         @Readable
+        @Deprecated
         public static final String ACCESSIBILITY_LARGE_POINTER_ICON =
                 "accessibility_large_pointer_icon";
 
@@ -10488,6 +10492,9 @@ public final class Settings {
          * Whether to mirror the built-in display on all connected displays.
          * @hide
          */
+        @TestApi
+        @Readable
+        @SuppressLint({"UnflaggedApi", "NoSettingsProvider"}) // @TestApi purely for CTS support.
         public static final String MIRROR_BUILT_IN_DISPLAY = "mirror_built_in_display";
 
         /**
@@ -12937,6 +12944,7 @@ public final class Settings {
          * Whether to enable camera extensions software fallback.
          * @hide
          */
+        @TestApi
         @Readable
         public static final String CAMERA_EXTENSIONS_FALLBACK = "camera_extensions_fallback";
 
@@ -13837,15 +13845,6 @@ public final class Settings {
         public static final String AAPM_USB_DATA_PROTECTION = "aapm_usb_data_protection";
 
         /**
-         * Tracks if the user has enabled Identity Check before Android 16 QPR1 build. This value
-         * is used to show promo card only to pre-existing users who have opted-in to the feature.
-         *
-         * @hide
-         */
-        public static final String IDENTITY_CHECK_ENABLED_V1 =
-                "identity_check_enabled_v1";
-
-        /**
          * Tracks if the user has seen the promo card for Identity Check.
          * The promo card should only appear once per user via Safety Center.
          *
@@ -13937,7 +13936,7 @@ public final class Settings {
 
         /**
          * Whether Theater Mode is on.
-         * {@hide}
+         * @hide
          */
         @SystemApi
         @Readable
@@ -13957,7 +13956,7 @@ public final class Settings {
         public static final String RADIO_WIFI = "wifi";
 
         /**
-         * {@hide}
+         * @hide
          */
         @Readable
         public static final String RADIO_WIMAX = "wimax";
@@ -13976,7 +13975,7 @@ public final class Settings {
         /**
          * Constant for use in SATELLITE_MODE_RADIOS to specify UWB radio.
          *
-         * {@hide}
+         * @hide
          */
         public static final String RADIO_UWB = "uwb";
 
@@ -13984,7 +13983,7 @@ public final class Settings {
         /**
          * A comma separated list of radios that need to be disabled when satellite mode is on.
          *
-         * {@hide}
+         * @hide
          */
         @Readable
         public static final String SATELLITE_MODE_RADIOS = "satellite_mode_radios";
@@ -13998,7 +13997,7 @@ public final class Settings {
          * When this setting is set to 0, it means the satellite mode is disabled. When this
          * setting is set to 1, it means the satellite mode is enabled.
          *
-         * {@hide}
+         * @hide
          */
         @Readable
         public static final String SATELLITE_MODE_ENABLED = "satellite_mode_enabled";
@@ -14036,7 +14035,7 @@ public final class Settings {
         /**
          * A Long representing a bitmap of profiles that should be disabled when bluetooth starts.
          * See {@link android.bluetooth.BluetoothProfile}.
-         * {@hide}
+         * @hide
          */
         @Readable
         @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
@@ -14842,92 +14841,92 @@ public final class Settings {
         public static final String CONNECTIVITY_METRICS_BUFFER_SIZE =
               "connectivity_metrics_buffer_size";
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_ENABLED = "netstats_enabled";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_POLL_INTERVAL = "netstats_poll_interval";
         /**
          * @deprecated
-         * {@hide}
+         * @hide
          */
         @Deprecated
         @Readable
         public static final String NETSTATS_TIME_CACHE_MAX_AGE = "netstats_time_cache_max_age";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_GLOBAL_ALERT_BYTES = "netstats_global_alert_bytes";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_SAMPLE_ENABLED = "netstats_sample_enabled";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_AUGMENT_ENABLED = "netstats_augment_enabled";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_COMBINE_SUBTYPE_ENABLED =
                 "netstats_combine_subtype_enabled";
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_DEV_BUCKET_DURATION = "netstats_dev_bucket_duration";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_DEV_PERSIST_BYTES = "netstats_dev_persist_bytes";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_DEV_ROTATE_AGE = "netstats_dev_rotate_age";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_DEV_DELETE_AGE = "netstats_dev_delete_age";
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_UID_BUCKET_DURATION = "netstats_uid_bucket_duration";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_UID_PERSIST_BYTES = "netstats_uid_persist_bytes";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_UID_ROTATE_AGE = "netstats_uid_rotate_age";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_UID_DELETE_AGE = "netstats_uid_delete_age";
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_UID_TAG_BUCKET_DURATION =
                 "netstats_uid_tag_bucket_duration";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_UID_TAG_PERSIST_BYTES =
                 "netstats_uid_tag_persist_bytes";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_UID_TAG_ROTATE_AGE = "netstats_uid_tag_rotate_age";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETSTATS_UID_TAG_DELETE_AGE = "netstats_uid_tag_delete_age";
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETPOLICY_QUOTA_ENABLED = "netpolicy_quota_enabled";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETPOLICY_QUOTA_UNLIMITED = "netpolicy_quota_unlimited";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETPOLICY_QUOTA_LIMITED = "netpolicy_quota_limited";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETPOLICY_QUOTA_FRAC_JOBS = "netpolicy_quota_frac_jobs";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETPOLICY_QUOTA_FRAC_MULTIPATH =
                 "netpolicy_quota_frac_multipath";
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String NETPOLICY_OVERRIDE_ENABLED = "netpolicy_override_enabled";
 
@@ -15030,20 +15029,20 @@ public final class Settings {
         @Readable
         public static final String NTP_SERVER_2 = "ntp_server_2";
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String STORAGE_BENCHMARK_INTERVAL = "storage_benchmark_interval";
 
         /**
          * Whether or not Settings should enable psd API.
-         * {@hide}
+         * @hide
          */
         @Readable
         public static final String SETTINGS_USE_PSD_API = "settings_use_psd_api";
 
         /**
          * Whether or not Settings should enable external provider API.
-         * {@hide}
+         * @hide
          */
         @Readable
         public static final String SETTINGS_USE_EXTERNAL_PROVIDER_API =
@@ -15051,7 +15050,7 @@ public final class Settings {
 
         /**
         * Sample validity in seconds to configure for the system DNS resolver.
-        * {@hide}
+        * @hide
         */
         @Readable
         public static final String DNS_RESOLVER_SAMPLE_VALIDITY_SECONDS =
@@ -15059,7 +15058,7 @@ public final class Settings {
 
         /**
         * Success threshold in percent for use with the system DNS resolver.
-        * {@hide}
+        * @hide
         */
         @Readable
         public static final String DNS_RESOLVER_SUCCESS_THRESHOLD_PERCENT =
@@ -15068,14 +15067,14 @@ public final class Settings {
         /**
         * Minimum number of samples needed for statistics to be considered meaningful in the
         * system DNS resolver.
-        * {@hide}
+        * @hide
         */
         @Readable
         public static final String DNS_RESOLVER_MIN_SAMPLES = "dns_resolver_min_samples";
 
         /**
         * Maximum number taken into account for statistics purposes in the system DNS resolver.
-        * {@hide}
+        * @hide
         */
         @Readable
         public static final String DNS_RESOLVER_MAX_SAMPLES = "dns_resolver_max_samples";
@@ -15533,7 +15532,7 @@ public final class Settings {
                "wifi_networks_available_notification_on";
 
         /**
-        * {@hide}
+        * @hide
         */
         @Readable
         public static final String WIMAX_NETWORKS_AVAILABLE_NOTIFICATION_ON =
@@ -16494,7 +16493,7 @@ public final class Settings {
         public static final String
                 INET_CONDITION_DEBOUNCE_DOWN_DELAY = "inet_condition_debounce_down_delay";
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 READ_EXTERNAL_STORAGE_ENFORCED_DEFAULT = "read_external_storage_enforced_default";
@@ -16586,63 +16585,63 @@ public final class Settings {
           *
           * Value is a string, suitable for assignment to PRIVATE_DNS_MODE above.
           *
-          * {@hide}
+          * @hide
           */
         @Readable
         public static final String PRIVATE_DNS_DEFAULT_MODE = "private_dns_default_mode";
 
 
-        /** {@hide} */
+        /** @hide */
         @Readable
         @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
         @SuppressLint("NoSettingsProvider")
         public static final String
                 BLUETOOTH_BTSNOOP_DEFAULT_MODE = "bluetooth_btsnoop_default_mode";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 BLUETOOTH_HEADSET_PRIORITY_PREFIX = "bluetooth_headset_priority_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 BLUETOOTH_A2DP_SINK_PRIORITY_PREFIX = "bluetooth_a2dp_sink_priority_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 BLUETOOTH_A2DP_SRC_PRIORITY_PREFIX = "bluetooth_a2dp_src_priority_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String BLUETOOTH_A2DP_SUPPORTS_OPTIONAL_CODECS_PREFIX =
                 "bluetooth_a2dp_supports_optional_codecs_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String BLUETOOTH_A2DP_OPTIONAL_CODECS_ENABLED_PREFIX =
                 "bluetooth_a2dp_optional_codecs_enabled_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 BLUETOOTH_INPUT_DEVICE_PRIORITY_PREFIX = "bluetooth_input_device_priority_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 BLUETOOTH_MAP_PRIORITY_PREFIX = "bluetooth_map_priority_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 BLUETOOTH_MAP_CLIENT_PRIORITY_PREFIX = "bluetooth_map_client_priority_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 BLUETOOTH_PBAP_CLIENT_PRIORITY_PREFIX = "bluetooth_pbap_client_priority_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 BLUETOOTH_SAP_PRIORITY_PREFIX = "bluetooth_sap_priority_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 BLUETOOTH_PAN_PRIORITY_PREFIX = "bluetooth_pan_priority_";
-        /** {@hide} */
+        /** @hide */
         @Readable
         public static final String
                 BLUETOOTH_HEARING_AID_PRIORITY_PREFIX = "bluetooth_hearing_aid_priority_";
@@ -16650,7 +16649,7 @@ public final class Settings {
         /**
          * Enable/disable radio bug detection
          *
-         * {@hide}
+         * @hide
          */
         @Readable
         public static final String
@@ -16659,7 +16658,7 @@ public final class Settings {
         /**
          * Count threshold of RIL wakelock timeout for radio bug detection
          *
-         * {@hide}
+         * @hide
          */
         @Readable
         public static final String
@@ -16669,7 +16668,7 @@ public final class Settings {
         /**
          * Count threshold of RIL system error for radio bug detection
          *
-         * {@hide}
+         * @hide
          */
         @Readable
         public static final String
@@ -19647,32 +19646,6 @@ public final class Settings {
         @Readable
         public static final String MULTI_SIM_SMS_PROMPT = "multi_sim_sms_prompt";
 
-        /** User preferred subscriptions setting.
-          * This holds the details of the user selected subscription from the card and
-          * the activation status. Each settings string have the comma separated values
-          * iccId,appType,appId,activationStatus,3gppIndex,3gpp2Index
-          * @hide
-         */
-        @UnsupportedAppUsage
-        @Readable
-        public static final String[] MULTI_SIM_USER_PREFERRED_SUBS = {"user_preferred_sub1",
-                "user_preferred_sub2","user_preferred_sub3"};
-
-        /**
-         * Which subscription is enabled for a physical slot.
-         * @hide
-         */
-        @Readable
-        public static final String ENABLED_SUBSCRIPTION_FOR_SLOT = "enabled_subscription_for_slot";
-
-        /**
-         * Whether corresponding logical modem is enabled for a physical slot.
-         * The value 1 - enable, 0 - disable
-         * @hide
-         */
-        @Readable
-        public static final String MODEM_STACK_ENABLED_FOR_SLOT = "modem_stack_enabled_for_slot";
-
         /**
          * Whether to enable new contacts aggregator or not.
          * The value 1 - enable, 0 - disable
@@ -19850,30 +19823,6 @@ public final class Settings {
         public static final String NOTIFICATION_FEEDBACK_ENABLED = "notification_feedback_enabled";
 
         /**
-         * Settings key for the ratio of notification dismissals to notification views - one of the
-         * criteria for showing the notification blocking helper.
-         *
-         * <p>The value is a float ranging from 0.0 to 1.0 (the closer to 0.0, the more intrusive
-         * the blocking helper will be).
-         *
-         * @hide
-         */
-        @Readable
-        public static final String BLOCKING_HELPER_DISMISS_TO_VIEW_RATIO_LIMIT =
-                "blocking_helper_dismiss_to_view_ratio";
-
-        /**
-         * Settings key for the longest streak of dismissals  - one of the criteria for showing the
-         * notification blocking helper.
-         *
-         * <p>The value is an integer greater than 0.
-         *
-         * @hide
-         */
-        @Readable
-        public static final String BLOCKING_HELPER_STREAK_LIMIT = "blocking_helper_streak_limit";
-
-        /**
          * Configuration flags for SQLite Compatibility WAL. Encoded as a key-value list, separated
          * by commas. E.g.: compatibility_wal_supported=true, wal_syncmode=OFF
          *
@@ -19978,23 +19927,6 @@ public final class Settings {
         @Readable
         public static final String SMART_REPLIES_IN_NOTIFICATIONS_FLAGS =
                 "smart_replies_in_notifications_flags";
-
-        /**
-         * Configuration flags for the automatic generation of smart replies and smart actions in
-         * notifications. This is encoded as a key=value list, separated by commas. Ex:
-         * "generate_replies=false,generate_actions=true".
-         *
-         * The following keys are supported:
-         *
-         * <pre>
-         * generate_replies                 (boolean)
-         * generate_actions                 (boolean)
-         * </pre>
-         * @hide
-         */
-        @Readable
-        public static final String SMART_SUGGESTIONS_IN_NOTIFICATIONS_FLAGS =
-                "smart_suggestions_in_notifications_flags";
 
         /**
          * If nonzero, crashes in foreground processes will bring up a dialog.
@@ -20310,15 +20242,6 @@ public final class Settings {
          */
         public static final String PEOPLE_SPACE_CONVERSATION_TYPE =
                 "people_space_conversation_type";
-
-        /**
-         * Whether to show new notification dismissal.
-         * Values are:
-         * 0: Disabled
-         * 1: Enabled
-         * @hide
-         */
-        public static final String SHOW_NEW_NOTIF_DISMISS = "show_new_notif_dismiss";
 
         /**
          * The maximum allowed obscuring opacity by UID to propagate touches.

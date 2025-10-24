@@ -24,11 +24,8 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_DREAM;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
-import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
-import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
-import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_DOCUMENT;
@@ -78,9 +75,7 @@ import android.util.IntArray;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
-// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
 import android.util.BoostFramework;
-// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
 import android.view.InsetsState;
 import android.view.MotionEvent;
 import android.view.WindowManager;
@@ -220,9 +215,7 @@ class RecentTasks {
     private final HashMap<ComponentName, ActivityInfo> mTmpAvailActCache = new HashMap<>();
     private final HashMap<String, ApplicationInfo> mTmpAvailAppCache = new HashMap<>();
     private final SparseBooleanArray mTmpQuietProfileUserIds = new SparseBooleanArray();
-// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
     private final BoostFramework mUxPerf = new BoostFramework();
-// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
     private final Rect mTmpRect = new Rect();
 
     // TODO(b/127498985): This is currently a rough heuristic for interaction inside an app
@@ -1325,28 +1318,22 @@ class RecentTasks {
     void remove(Task task) {
         mTasks.remove(task);
         notifyTaskRemoved(task, false /* wasTrimmed */, false /* killProcess */);
-// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
         if (task != null) {
-// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
             final Intent intent = task.getBaseIntent();
             if (intent == null) return;
             final ComponentName componentName = intent.getComponent();
             if (componentName == null) return;
 
             final String taskPkgName = componentName.getPackageName();
-// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
             if (mUxPerf != null) {
-// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
                 if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                     mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                     mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_KILL, 0, taskPkgName, 0);
                 } else {
                     mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_KILL, taskPkgName, 2, 0, 0);
                 }
-// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
             }
         }
-// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
     }
 
     /**
@@ -2100,18 +2087,8 @@ class RecentTasks {
         final int windowingMode1 = t1.getWindowingMode();
         final int windowingMode2 = t2.getWindowingMode();
 
-        if (com.android.window.flags.Flags.fixTaskCompatibleModes()) {
-            // Unless one of them is pinned and the other is not, all modes are compatible.
-            return (windowingMode1 == windowingMode2) || (windowingMode1 != WINDOWING_MODE_PINNED
-                    && windowingMode2 != WINDOWING_MODE_PINNED);
-        } else {
-            return windowingMode1 == windowingMode2
-                    || windowingMode1 == WINDOWING_MODE_UNDEFINED
-                    || windowingMode2 == WINDOWING_MODE_UNDEFINED
-                    || (windowingMode1 == WINDOWING_MODE_FREEFORM
-                    && windowingMode2 == WINDOWING_MODE_FULLSCREEN)
-                    || (windowingMode1 == WINDOWING_MODE_FULLSCREEN
-                    && windowingMode2 == WINDOWING_MODE_FREEFORM);
-        }
+        // Unless one of them is pinned and the other is not, all modes are compatible.
+        return (windowingMode1 == windowingMode2) || (windowingMode1 != WINDOWING_MODE_PINNED
+                && windowingMode2 != WINDOWING_MODE_PINNED);
     }
 }

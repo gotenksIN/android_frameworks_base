@@ -16,6 +16,7 @@
 
 package android.permission;
 
+import static android.Manifest.permission.PACKAGE_USAGE_STATS;
 import static android.Manifest.permission_group.CAMERA;
 import static android.Manifest.permission_group.LOCATION;
 import static android.Manifest.permission_group.MICROPHONE;
@@ -40,6 +41,8 @@ import static android.telephony.TelephonyManager.CARRIER_PRIVILEGE_STATUS_HAS_AC
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
+import android.annotation.WorkerThread;
 import android.app.ActivityManager;
 import android.app.AppOpsManager;
 import android.companion.virtual.VirtualDevice;
@@ -105,7 +108,7 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
     private static final long DEFAULT_RUNNING_TIME_MS = 5000L;
     private static final long ADDITIONAL_RUNNING_TIME_LOCATION_ONLY_MS =
             10_000L - DEFAULT_RUNNING_TIME_MS;
-    // LINT.ThenChange(/packages/SystemUI/src/com/android/systemui/privacy/PrivacyItemController.kt)
+    // LINT.ThenChange(/packages/SystemUI/src/com/android/systemui/privacy/PrivacyItemController.kt, /packages/SystemUI/src/com/android/systemui/appops/AppOpsControllerImpl.java)
     private static final long DEFAULT_RECENT_TIME_MS = 15000L;
 
     private static boolean shouldShowIndicators() {
@@ -161,6 +164,8 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
     private ArrayMap<UserHandle, Context> mUserContexts;
     private PackageManager mPkgManager;
     private AppOpsManager mAppOpsManager;
+
+    private ActivityManager mActivityManager;
     private VirtualDeviceManager mVirtualDeviceManager;
     @GuardedBy("mAttributionChains")
     private final ArrayMap<Integer, ArrayList<AccessChainLink>> mAttributionChains =
@@ -175,6 +180,7 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
         mContext = context;
         mPkgManager = context.getPackageManager();
         mAppOpsManager = context.getSystemService(AppOpsManager.class);
+        mActivityManager = context.getSystemService(ActivityManager.class);
         mVirtualDeviceManager = context.getSystemService(VirtualDeviceManager.class);
         mUserContexts = new ArrayMap<>();
         mUserContexts.put(Process.myUserHandle(), mContext);
@@ -517,20 +523,11 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
      * <p>TODO(b/422799135): refactor isSystemApp() and isBackgroundApp(). Before this is fixed,
      *           make sure to update AppOpsPrivacyItemMonitor when changing this method
      */
+    @WorkerThread
+    @RequiresPermission(PACKAGE_USAGE_STATS)
     private boolean isBackgroundApp(int uid) {
-        ActivityManager activityManager =  mContext.getSystemService(ActivityManager.class);
-        List<ActivityManager.RunningAppProcessInfo> runningAppProcesses =
-                activityManager.getRunningAppProcesses();
-        if (runningAppProcesses == null) {
-            return false;
-        }
-        for (ActivityManager.RunningAppProcessInfo processInfo : runningAppProcesses) {
-            if (processInfo.uid == uid) {
-                return processInfo.importance
-                        > ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE;
-            }
-        }
-        return false;
+        return mActivityManager.getUidImportance(uid)
+                > ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE;
     }
 
     /**
@@ -623,9 +620,16 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
                         // But if the location indicator is already visible (e.g. an app
                         // transitioned from foreground to background), we should not filter it out
                         // if it's within the holding period.
+                        long lastFgAccess = attrOpEntry.getLastAccessForegroundTime(opFlags);
+                        boolean isBackgroundAndNotRecentlyForeground =
+                                isBackgroundApp(uid)
+                                        && lastFgAccess < currentRunningThreshold
+                                        && !attrOpEntry.isRunning();
                         if (isSystemApp(op, packageName, user, uid)
-                                || (isBackgroundApp(uid) && !isRunning)) {
-                            // Remove the system & background apps for location op
+                                || isBackgroundAndNotRecentlyForeground) {
+                            // Remove system apps and apps that only used location in the
+                            // background. Apps that recently used location in the foreground
+                            // are kept for the holding period.
                             continue;
                         }
                     }

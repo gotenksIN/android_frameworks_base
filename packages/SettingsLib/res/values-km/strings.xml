@@ -87,6 +87,8 @@
     <string name="bluetooth_connecting" msgid="5871702668260192755">"កំពុង​ត​ភ្ជាប់​…"</string>
     <string name="bluetooth_connected" msgid="8065345572198502293">"បាន​ភ្ជាប់ <xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>"</string>
     <string name="bluetooth_pairing" msgid="4269046942588193600">"កំពុង​ផ្គូផ្គង..."</string>
+    <string name="bluetooth_pairing_failure" msgid="6914444518793157913">"មិន​អាច​ផ្គូផ្គងបានទេ"</string>
+    <string name="bluetooth_connection_failure" msgid="384203214661155324">"មិនអាច​ភ្ជាប់​បានទេ​"</string>
     <string name="bluetooth_connected_no_headset" msgid="2224101138659967604">"បាន​ភ្ជាប់ (គ្មាន​ទូរសព្ទ​ទេ)<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>"</string>
     <string name="bluetooth_connected_no_a2dp" msgid="8566874395813947092">"បាន​ភ្ជាប់ (គ្មាន​មេឌៀ​ទេ)<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>"</string>
     <string name="bluetooth_connected_no_headset_no_a2dp" msgid="2893204819854215433">"បាន​ភ្ជាប់ (គ្មាន​ទូរសព្ទ ឬ​មេឌៀ​ទេ)<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>"</string>
@@ -116,6 +118,9 @@
     <string name="bluetooth_hearing_aid_right_active" msgid="2244728507170385397">"សកម្ម (ខាងស្ដាំប៉ុណ្ណោះ)"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="4294571497939983181">"សកម្ម (ខាងឆ្វេង និងខាងស្ដាំ)"</string>
     <string name="bluetooth_hearing_device_ambient_error" msgid="6035857289108813878">"មិនអាចប្ដូរមជ្ឈដ្ឋានជុំវិញបានទេ"</string>
+    <string name="bluetooth_hearing_aids_presets_error" msgid="4523942574698610976">"មិនអាច​ប្ដូរ​ការកំណត់ជាមុន​បានទេ"</string>
+    <!-- no translation found for hearing_device_spinner_item_selected (3884049360428514878) -->
+    <skip />
     <string name="bluetooth_active_media_only_battery_level" msgid="7772517511061834073">"សកម្ម (តែមេឌៀប៉ុណ្ណោះ)។ ថ្ម <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>។"</string>
     <string name="bluetooth_active_media_only_battery_level_untethered" msgid="7444753133664620926">"សកម្ម (តែមេឌៀប៉ុណ្ណោះ)។ ឆ្វេង៖ ថ្ម <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g> ស្ដាំ៖ ថ្ម <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g>។"</string>
     <string name="bluetooth_guest_battery_level" msgid="2820003593899467676">"ឧបករណ៍ភ្ញៀវ។ ថ្ម <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>។"</string>
@@ -345,7 +350,7 @@
     <string name="wifi_non_persistent_mac_randomization_summary" msgid="2159794543105053930">"នៅពេលបើក​មុខងារនេះ អាសយដ្ឋាន MAC របស់ឧបករណ៍នេះ​អាចផ្លាស់ប្ដូរ​ រាល់ពេល​ដែលវា​ភ្ជាប់ជាមួយ​បណ្ដាញ​ដែលបានបើក​ការប្រើ MAC ចៃដន្យ។"</string>
     <string name="wifi_metered_label" msgid="8737187690304098638">"មានការកំណត់"</string>
     <string name="wifi_unmetered_label" msgid="6174142840934095093">"មិនមានការកំណត់"</string>
-    <string name="select_logd_size_title" msgid="1604578195914595173">"ទំហំឡុកជើបាហ្វើ"</string>
+    <string name="select_logd_size_title" msgid="4393502933789367691">"ទំហំបាហ្វើមុខងារធ្វើកំណត់ហេតុ"</string>
     <string name="select_logd_size_dialog_title" msgid="2105401994681013578">"ជ្រើស​ទំហំ Logger per log buffer"</string>
     <string name="dev_logpersist_clear_warning_title" msgid="8631859265777337991">"ជម្រះទំហំផ្ទុក logger ដែលប្រើបានយូរឬ?"</string>
     <string name="dev_logpersist_clear_warning_message" msgid="6447590867594287413">"នៅពេលដែលយើងឈប់ធ្វើការត្រួតពិនិត្យតទៅទៀតដោយប្រើ logger ដែលប្រើបានយូរ យើងត្រូវបានតម្រូវឲ្យលុបទិន្នន័យ logger ដែលមាននៅលើឧបករណ៍របស់អ្នក"</string>
@@ -393,7 +398,7 @@
     <string name="debug_monitoring_category" msgid="1597387133765424994">"តាមដាន"</string>
     <string name="window_management_category" msgid="2015535427098365170">"ការគ្រប់គ្រងវិនដូ"</string>
     <string name="strict_mode" msgid="889864762140862437">"បាន​បើក​មុខងារតឹងរ៉ឹង"</string>
-    <string name="strict_mode_summary" msgid="1838248687233554654">"បញ្ចេញ​ពន្លឺ​អេក្រង់​ពេល​កម្មវិធី​ធ្វើ​ប្រតិបត្តិការ​យូរ​លើ​សែស្រឡាយ​​មេ"</string>
+    <string name="strict_mode_summary" msgid="1838248687233554654">"ភ្លឺភ្លឹបភ្លែតលើអេក្រង់​ពេល​កម្មវិធី​ធ្វើ​ប្រតិបត្តិការ​យូរ​លើសរសៃមេ"</string>
     <string name="pointer_location" msgid="7516929526199520173">"ទីតាំង​ទ្រនិច"</string>
     <string name="pointer_location_summary" msgid="957120116989798464">"អេក្រង់​ត្រួត​គ្នា​បង្ហាញ​ទិន្នន័យ​ប៉ះ​បច្ចុប្បន្ន"</string>
     <string name="show_touches" msgid="8437666942161289025">"បង្ហាញការចុច"</string>
@@ -574,7 +579,7 @@
     <string name="use_system_language_to_select_input_method_subtypes" msgid="4865195835541387040">"ប្រើភាសាប្រព័ន្ធ"</string>
     <string name="failed_to_open_app_settings_toast" msgid="764897252657692092">"បាន​បរាជ័យ​ក្នុង​ការ​បើក​ការ​កំណត់​សម្រាប់ <xliff:g id="SPELL_APPLICATION_NAME">%1$s</xliff:g>"</string>
     <string name="ime_security_warning" msgid="6547562217880551450">"វិធី​សាស្ត្រ​បញ្ចូល​នេះ​អាច​​ប្រមូល​អត្ថបទ​ដែល​អ្នក​វាយ​ទាំងអស់ រួម​មាន​ទិន្នន័យ​ផ្ទាល់ខ្លួន ដូច​ជ ពាក្យ​សម្ងាត់ និង​លេខ​កាត​ឥណទាន។ វា​បាន​មក​ពី​កម្មវិធី <xliff:g id="IME_APPLICATION_NAME">%1$s</xliff:g> ។ ប្រើ​វិធី​សាស្ត្រ​បញ្ចូល​នេះ?"</string>
-    <string name="direct_boot_unaware_dialog_message" msgid="7845398276735021548">"ចំណាំ៖ បន្ទាប់ពីបិទបើកឡើងវិញហើយ កម្មវិធីនេះមិនអាចចាប់ផ្តើមបានទេ រហូតទាល់តែអ្នកដោះសោទូរស័ព្ទរបស់អ្នក"</string>
+    <string name="direct_boot_unaware_dialog_message" msgid="7845398276735021548">"ចំណាំ៖ បន្ទាប់ពីចាប់ផ្ដើមឡើងវិញ កម្មវិធីនេះមិនអាចចាប់ផ្តើមបានទេ រហូតទាល់តែអ្នកដោះសោទូរស័ព្ទរបស់អ្នក"</string>
     <string name="ims_reg_title" msgid="8197592958123671062">"ស្ថានភាព​នៃការ​ចុះឈ្មោះ IMS"</string>
     <string name="ims_reg_status_registered" msgid="884916398194885457">"បាន​ចុះឈ្មោះ"</string>
     <string name="ims_reg_status_not_registered" msgid="2989287366045704694">"មិនបាន​ចុះឈ្មោះ"</string>

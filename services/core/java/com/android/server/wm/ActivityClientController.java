@@ -220,10 +220,18 @@ class ActivityClientController extends IActivityClientController.Stub {
     }
 
     @Override
-    public void activityTopResumedStateLost() {
+    public void activityTopResumedStateLost(IBinder token) {
         final long origId = Binder.clearCallingIdentity();
         synchronized (mGlobalLock) {
-            mTaskSupervisor.handleTopResumedStateReleased(false /* timeout */);
+            if (com.android.window.flags.Flags.fixRapidTopResumedSwitch()) {
+                final ActivityRecord r = ActivityRecord.forTokenLocked(token);
+                if (r != null) {
+                    mTaskSupervisor.handleTopResumedStateReleasedIfNeeded(r, false /* timeout */);
+                }
+            } else {
+                mTaskSupervisor.handleTopResumedStateReleasedIfNeeded(null, false /* timeout */);
+            }
+
         }
         Binder.restoreCallingIdentity(origId);
     }
@@ -560,9 +568,7 @@ class ActivityClientController extends IActivityClientController.Stub {
             final long origId = Binder.clearCallingIdentity();
             Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "finishActivity");
             try {
-// QTI_BEGIN: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
                 r.releaseActivityBoost();
-// QTI_END: 2023-06-28: Core: Perf:Fix the issue that activity boost duration abnormal.
                 final boolean res;
                 final boolean finishWithRootActivity =
                         finishTask == Activity.FINISH_TASK_WITH_ROOT_ACTIVITY;

@@ -112,8 +112,15 @@ flag {
 flag {
     name: "enable_talkback_and_magnifier_key_gestures"
     namespace: "input"
-    description: "Adds key gestures for TalkBack and Magnification"
+    description: "Adds key gestures for Magnification. TalkBack key gesture has been flagged separately under enable_talkback_key_gestures."
     bug: "375277034"
+}
+
+flag {
+    name: "enable_talkback_key_gestures"
+    namespace: "accessibility"
+    description: "Adds key gesture for TalkBack"
+    bug: "441787329"
 }
 
 flag {
@@ -203,15 +210,7 @@ flag {
     bug: "416054433"
 }
 
-flag {
-    name: "fix_keyboard_interceptor_policy_call"
-    namespace: "input"
-    description: "Fixes keyboard interceptor calls to the policy"
-    bug: "358569822"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
+
 
 flag {
     name: "mouse_to_touch_per_app_compat"
@@ -247,4 +246,25 @@ flag {
     description: "Enable pointer capture modes with different touchpad behaviours, and default to relative events from captured touchpads"
     is_exported: true
     bug: "403531245"
+}
+
+flag {
+    name: "enable_partial_screenshot_keyboard_shortcut"
+    namespace: "input"
+    description: "Enables keyboard shortcut for taking partial screenshots via large screen capture UI"
+    bug: "420714826"
+}
+
+flag {
+  name: "keyboard_backlight_shortcuts"
+  namespace: "desktop_input"
+  description: "Enables new keyboard shortcuts to adjust keyboard backlight"
+  bug: "401626732"
+}
+
+flag {
+    name: "bluetooth_wakeup_state_check"
+    namespace: "desktop_pnp"
+    description: "Check Bluetooth HID profile connection state is changed before waking up the device."
+    bug: "440645135"
 }

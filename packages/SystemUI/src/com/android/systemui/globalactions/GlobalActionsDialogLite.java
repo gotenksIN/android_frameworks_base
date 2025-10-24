@@ -954,7 +954,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
                 return false;
             }
             mUiEventLogger.log(GlobalActionsEvent.GA_SHUTDOWN_LONG_PRESS);
-            if (!mUserManager.hasUserRestriction(UserManager.DISALLOW_SAFE_BOOT)) {
+            if (!mUserManager.hasUserRestriction(UserManager.DISALLOW_SAFE_BOOT,
+                    getCurrentUser().getUserHandle())) {
                 mWindowManagerFuncs.reboot(true);
                 return true;
             }
@@ -1098,7 +1099,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
                 return false;
             }
             mUiEventLogger.log(GlobalActionsEvent.GA_REBOOT_LONG_PRESS);
-            if (!mUserManager.hasUserRestriction(UserManager.DISALLOW_SAFE_BOOT)) {
+            if (!mUserManager.hasUserRestriction(UserManager.DISALLOW_SAFE_BOOT,
+                    getCurrentUser().getUserHandle())) {
                 mWindowManagerFuncs.reboot(true);
                 return true;
             }
@@ -2043,16 +2045,14 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             messageView.setSelected(true); // necessary for marquee to work
             mIconView.setImageDrawable(getIcon(context));
             mIconView.setScaleType(ScaleType.CENTER_CROP);
-            if (com.android.systemui.Flags.tvGlobalActionsFocus()) {
-                if (isTv()) {
-                    mIconView.setFocusable(true);
-                    mIconView.setClickable(true);
-                    mIconView.setBackground(mContext.getDrawable(com.android.systemui.res.R.drawable
-                                    .global_actions_lite_button_background));
-                    mIconView.setOnClickListener(i -> onClick());
-                    if (mItems.get(0) == this) {
-                        mIconView.requestFocus();
-                    }
+            if (isTv()) {
+                mIconView.setFocusable(true);
+                mIconView.setClickable(true);
+                mIconView.setBackground(mContext.getDrawable(
+                        com.android.systemui.res.R.drawable.global_actions_lite_button_background));
+                mIconView.setOnClickListener(i -> onClick());
+                if (mItems.get(0) == this) {
+                    mIconView.requestFocus();
                 }
             }
 

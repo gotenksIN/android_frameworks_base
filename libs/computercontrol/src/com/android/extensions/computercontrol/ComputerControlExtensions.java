@@ -17,17 +17,23 @@
 package com.android.extensions.computercontrol;
 
 import android.Manifest;
+import android.annotation.CallbackExecutor;
 import android.annotation.RequiresPermission;
+import android.app.role.RoleManager;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.content.Context;
+import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.os.UserHandle;
+import android.util.ArrayMap;
 import android.view.accessibility.AccessibilityManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 
@@ -39,8 +45,11 @@ import java.util.concurrent.Executor;
  * that enable inputs and outputs for computer control features.
  */
 public class ComputerControlExtensions {
-    // v0 is unstable and may change at any point in time.
-    @VisibleForTesting static final int EXTENSIONS_VERSION = 0;
+    @VisibleForTesting static final int EXTENSIONS_VERSION = 1;
+
+    private final ArrayMap<AutomatedPackageListener,
+            android.companion.virtual.computercontrol.AutomatedPackageListener> mListeners =
+            new ArrayMap<>();
 
     private ComputerControlExtensions() {}
 
@@ -86,6 +95,7 @@ public class ComputerControlExtensions {
         ComputerControlSessionParams sessionParams =
                 new ComputerControlSessionParams.Builder()
                         .setName(params.getName())
+                        .setTargetPackageNames(params.getTargetPackageNames())
                         .setDisplayWidthPx(params.getDisplayWidthPx())
                         .setDisplayHeightPx(params.getDisplayHeightPx())
                         .setDisplayDpi(params.getDisplayDpi())
@@ -95,6 +105,18 @@ public class ComputerControlExtensions {
 
         var sessionCallback =
                 new android.companion.virtual.computercontrol.ComputerControlSession.Callback() {
+
+                    @Override
+                    public void onSessionPending(@NonNull IntentSender intentSender) {
+                        // TODO(b/437901655): Pass this to the caller.
+                        try {
+                            params.getContext().startIntentSender(intentSender, null, 0, 0, 0);
+                        } catch (IntentSender.SendIntentException e) {
+                            callback.onSessionCreationFailed(
+                                    android.companion.virtual.computercontrol
+                                            .ComputerControlSession.ERROR_PERMISSION_DENIED);
+                        }
+                    }
 
                     @Override
                     public void onSessionCreated(
@@ -121,6 +143,51 @@ public class ComputerControlExtensions {
 
         VirtualDeviceManager vdm = params.getContext().getSystemService(VirtualDeviceManager.class);
         vdm.requestComputerControlSession(sessionParams, executor, sessionCallback);
+    }
+
+    /**
+     * Registers a listener to receive notifications when the set of automated apps changes.
+     *
+     * @param context Context to fetch system features.
+     * @param executor The executor where the listener is executed on.
+     * @param listener The listener to add.
+     * @throws SecurityException if the caller does not hold the {@link RoleManager#ROLE_HOME} role.
+     * @see #unregisterAutomatedPackageListener
+     */
+    public void registerAutomatedPackageListener(
+            @NonNull Context context,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull AutomatedPackageListener listener) {
+        VirtualDeviceManager vdm = context.getSystemService(VirtualDeviceManager.class);
+
+        var platformListener =
+                new android.companion.virtual.computercontrol.AutomatedPackageListener() {
+                    @Override
+                    public void onAutomatedPackagesChanged(@NonNull String automatingPackage,
+                            @NonNull List<String> automatedPackages, @NonNull UserHandle user) {
+                        listener.onAutomatedPackagesChanged(
+                                automatingPackage, automatedPackages, user);
+                    }
+                };
+        vdm.registerAutomatedPackageListener(executor, platformListener);
+        mListeners.put(listener, platformListener);
+    }
+
+    /**
+     * Unregisters a listener previously registered with {@link #registerAutomatedPackageListener}.
+     *
+     * @param context Context to fetch system features.
+     * @param listener The listener to unregister.
+     * @throws SecurityException if the caller does not hold the {@link RoleManager#ROLE_HOME} role.
+     * @see #registerAutomatedPackageListener
+     */
+    public void unregisterAutomatedPackageListener(
+            @NonNull Context context, @NonNull AutomatedPackageListener listener) {
+        var platformListener = mListeners.remove(listener);
+        if (platformListener != null) {
+            VirtualDeviceManager vdm = context.getSystemService(VirtualDeviceManager.class);
+            vdm.unregisterAutomatedPackageListener(platformListener);
+        }
     }
 
     /**

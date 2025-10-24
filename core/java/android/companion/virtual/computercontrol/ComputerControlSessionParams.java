@@ -18,11 +18,13 @@ package android.companion.virtual.computercontrol;
 
 import android.annotation.IntRange;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.view.Surface;
 
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Parameters for creating a {@link ComputerControlSession}.
@@ -32,6 +34,7 @@ import java.util.Objects;
 public final class ComputerControlSessionParams implements Parcelable {
 
     private final String mName;
+    private final List<String> mTargetPackageNames;
     private final int mDisplayWidthPx;
     private final int mDisplayHeightPx;
     private final int mDisplayDpi;
@@ -40,12 +43,14 @@ public final class ComputerControlSessionParams implements Parcelable {
 
     private ComputerControlSessionParams(
             @NonNull String name,
+            @Nullable List<String> targetPackageNames,  // TODO(b/437849228): Should be non-null
             int displayWidthPx,
             int displayHeightPx,
             int displayDpi,
-            @NonNull Surface displaySurface,
+            @Nullable Surface displaySurface,
             boolean isDisplayAlwaysUnlocked) {
         mName = name;
+        mTargetPackageNames = targetPackageNames;
         mDisplayWidthPx = displayWidthPx;
         mDisplayHeightPx = displayHeightPx;
         mDisplayDpi = displayDpi;
@@ -55,6 +60,8 @@ public final class ComputerControlSessionParams implements Parcelable {
 
     private ComputerControlSessionParams(Parcel parcel) {
         mName = parcel.readString8();
+        mTargetPackageNames = new ArrayList<>();
+        parcel.readStringList(mTargetPackageNames);
         mDisplayWidthPx = parcel.readInt();
         mDisplayHeightPx = parcel.readInt();
         mDisplayDpi = parcel.readInt();
@@ -66,6 +73,12 @@ public final class ComputerControlSessionParams implements Parcelable {
     @NonNull
     public String getName() {
         return mName;
+    }
+
+    /** Returns the package names of the applications that can be automated during this session. */
+    @Nullable  // TODO(b/437849228): Should be non-null
+    public List<String> getTargetPackageNames() {
+        return mTargetPackageNames;
     }
 
     /** Returns the width of the display, in pixels. */
@@ -84,7 +97,7 @@ public final class ComputerControlSessionParams implements Parcelable {
     }
 
     /** Returns the surface to which the display content should be rendered. */
-    @NonNull
+    @Nullable
     public Surface getDisplaySurface() {
         return mDisplaySurface;
     }
@@ -102,6 +115,7 @@ public final class ComputerControlSessionParams implements Parcelable {
     @Override
     public void writeToParcel(@NonNull Parcel dest, int flags) {
         dest.writeString8(mName);
+        dest.writeStringList(mTargetPackageNames);
         dest.writeInt(mDisplayWidthPx);
         dest.writeInt(mDisplayHeightPx);
         dest.writeInt(mDisplayDpi);
@@ -127,6 +141,7 @@ public final class ComputerControlSessionParams implements Parcelable {
     /** Builder for {@link ComputerControlSessionParams}. */
     public static final class Builder {
         private String mName;
+        private List<String> mTargetPackageNames;
         private int mDisplayWidthPx;
         private int mDisplayHeightPx;
         private int mDisplayDpi;
@@ -148,6 +163,23 @@ public final class ComputerControlSessionParams implements Parcelable {
             return this;
         }
 
+
+        /**
+         * Set the package names of all applications that may be automated during this session.
+         *
+         * <p>All package names specified in the list must meet the following requirements:
+         * <ol>
+         *     <li>The package name has a valid launcher Intent.</li>
+         *     <li>The package name is not the device permission controller.</li>
+         * </ol>
+         */
+        @Nullable  // TODO(b/437849228): Should be non-null
+        public Builder setTargetPackageNames(@NonNull List<String> targetPackageNames) {
+            // TODO(b/437849228): Check for null and non-empty
+            mTargetPackageNames = targetPackageNames;
+            return this;
+        }
+
         /**
          * Sets the width of the display, in pixels.
          *
@@ -156,9 +188,6 @@ public final class ComputerControlSessionParams implements Parcelable {
          */
         @NonNull
         public Builder setDisplayWidthPx(@IntRange(from = 1) int displayWidthPx) {
-            if (displayWidthPx <= 0) {
-                throw new IllegalArgumentException("Display width must be positive");
-            }
             mDisplayWidthPx = displayWidthPx;
             return this;
         }
@@ -171,9 +200,6 @@ public final class ComputerControlSessionParams implements Parcelable {
          */
         @NonNull
         public Builder setDisplayHeightPx(@IntRange(from = 1) int displayHeightPx) {
-            if (displayHeightPx <= 0) {
-                throw new IllegalArgumentException("Display height must be positive");
-            }
             mDisplayHeightPx = displayHeightPx;
             return this;
         }
@@ -186,9 +212,6 @@ public final class ComputerControlSessionParams implements Parcelable {
          */
         @NonNull
         public Builder setDisplayDpi(@IntRange(from = 1) int displayDpi) {
-            if (displayDpi <= 0) {
-                throw new IllegalArgumentException("Display DPI must be positive");
-            }
             mDisplayDpi = displayDpi;
             return this;
         }
@@ -201,7 +224,7 @@ public final class ComputerControlSessionParams implements Parcelable {
          */
         @NonNull
         public Builder setDisplaySurface(@NonNull Surface displaySurface) {
-            mDisplaySurface = Objects.requireNonNull(displaySurface);
+            mDisplaySurface = displaySurface;
             return this;
         }
 
@@ -229,20 +252,24 @@ public final class ComputerControlSessionParams implements Parcelable {
             if (mName == null || mName.isEmpty()) {
                 throw new IllegalArgumentException("Name must be set");
             }
-            if (mDisplaySurface == null) {
-                throw new IllegalArgumentException("Surface must be set");
-            }
-            if (mDisplayWidthPx <= 0) {
-                throw new IllegalArgumentException("Display width must be positive");
-            }
-            if (mDisplayHeightPx <= 0) {
-                throw new IllegalArgumentException("Display height must be positive");
-            }
-            if (mDisplayDpi <= 0) {
-                throw new IllegalArgumentException("Display DPI must be positive");
+            // TODO(b/437849228): Do not allow for unset targetPackageNames
+            if (mDisplaySurface != null) {
+                if (mDisplayWidthPx <= 0) {
+                    throw new IllegalArgumentException(
+                            "Display width must be positive if surface is set");
+                }
+                if (mDisplayHeightPx <= 0) {
+                    throw new IllegalArgumentException(
+                            "Display height must be positive if surface is set");
+                }
+                if (mDisplayDpi <= 0) {
+                    throw new IllegalArgumentException(
+                            "Display DPI must be positive if surface is set");
+                }
             }
             return new ComputerControlSessionParams(
                     mName,
+                    mTargetPackageNames,
                     mDisplayWidthPx,
                     mDisplayHeightPx,
                     mDisplayDpi,

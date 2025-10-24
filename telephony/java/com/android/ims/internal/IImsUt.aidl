@@ -23,7 +23,7 @@ import com.android.ims.internal.IImsUtListener;
 /**
  * Provides the Ut interface interworking to get/set the supplementary service configuration.
  *
- * {@hide}
+ * @hide
  */
 interface IImsUt {
     /**
@@ -129,7 +129,6 @@ interface IImsUt {
     int updateCallBarringWithPassword(int cbType, int action, in String[] barrList,
             int serviceClass, String password);
 
-// QTI_BEGIN: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
     /**
      * Retrieves the configuration of the call forward for specified service class.
      * Returns an integer value to indicate the requestId of the UT request.
@@ -137,5 +136,4 @@ interface IImsUt {
      * otherwise, integer greater than -1 will be returned.
      */
     int queryCFForServiceClass(int condition, String number, int serviceClass);
-// QTI_END: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
 }

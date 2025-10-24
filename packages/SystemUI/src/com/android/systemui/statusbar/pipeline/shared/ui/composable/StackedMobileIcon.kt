@@ -29,6 +29,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -112,7 +114,7 @@ fun StackedMobileIcon(viewModel: StackedMobileIconViewModel, modifier: Modifier 
                 val height = with(LocalDensity.current) { IconHeightSp.toDp() }
                 val paddingEnd = with(LocalDensity.current) { RatIndicatorPaddingSp.toDp() }
                 Image(
-                    painter = painterResource(it.res),
+                    painter = painterResource(it.resId),
                     contentDescription = it.contentDescription?.load(),
                     modifier = Modifier.height(height).padding(end = paddingEnd),
                     colorFilter = ColorFilter.tint(contentColor, BlendMode.SrcIn),
@@ -149,17 +151,26 @@ fun CustomStackedMobileIcon(viewModel: StackedMobileIconViewModel, modifier: Mod
     val padding = with(LocalDensity.current) { IconSpacingSp.toDp() }
     val horizontalArrangement = with(LocalDensity.current) { spacedBy(IconSpacingSp.toDp()) }
 
+    val showSignalStrengthIcon by
+        viewModel.primaryViewModel?.let {
+            it.showSignalStrengthIcon.collectAsStateWithLifecycle(initialValue = true)
+        } ?: run {
+            remember { mutableStateOf(true) }
+        }
+
     Row(
         horizontalArrangement = horizontalArrangement,
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.padding(horizontal = padding),
     ) {
         CustomDualMobileGroupIcon(viewModel)
-        StackedMobileIcon(
-            viewModel = dualSim,
-            color = contentColor,
-            contentDescription = viewModel.contentDescription,
-        )
+        if (showSignalStrengthIcon) {
+            StackedMobileIcon(
+                viewModel = dualSim,
+                color = contentColor,
+                contentDescription = viewModel.contentDescription,
+            )
+        }
 
         if (viewModel.roaming) {
             val height = with(LocalDensity.current) { RoamingIconHeightSp.toDp() }
@@ -224,7 +235,7 @@ private fun CustomMobileGroupIcon(viewModel: MobileIconViewModelCommon) {
 
     networkTypeIcon?.let {
         Image(
-            painter = painterResource(it.res),
+            painter = painterResource(it.resId),
             contentDescription = it.contentDescription?.load(),
             modifier = Modifier.height(height),
             colorFilter = ColorFilter.tint(contentColor, BlendMode.SrcIn),

@@ -36,6 +36,7 @@ import android.hardware.tv.mediaquality.IPictureProfileChangedListener;
 import android.hardware.tv.mediaquality.ISoundProfileAdjustmentListener;
 import android.hardware.tv.mediaquality.ISoundProfileChangedListener;
 import android.hardware.tv.mediaquality.ParamCapability;
+import android.hardware.tv.mediaquality.ParameterDefaultValue;
 import android.hardware.tv.mediaquality.PictureParameter;
 import android.hardware.tv.mediaquality.PictureParameters;
 import android.hardware.tv.mediaquality.SoundParameter;
@@ -423,6 +424,10 @@ public class MediaQualityService extends SystemService {
         private boolean hasPermissionToUpdatePictureProfile(
                 Long dbId, PictureProfile toUpdate, int uid, int pid) {
             PictureProfile fromDb = mMqDatabaseUtils.getPictureProfile(dbId);
+            if (fromDb == null) {
+                Slog.e(TAG, "Failed to get picture profile from db");
+                return false;
+            }
             boolean isPackageOwner = fromDb.getPackageName().equals(getPackageOfUid(uid));
             boolean isSystemAppWithPermission =
                 hasGlobalPictureQualityServicePermission(uid, pid)
@@ -1030,6 +1035,10 @@ public class MediaQualityService extends SystemService {
         private boolean hasPermissionToUpdateSoundProfile(
                 Long dbId, SoundProfile toUpdate, int uid, int pid) {
             SoundProfile fromDb = mMqDatabaseUtils.getSoundProfile(dbId);
+            if (fromDb == null) {
+                Slog.e(TAG, "Failed to get sound profile from db");
+                return false;
+            }
             boolean isPackageOwner = fromDb.getPackageName().equals(getPackageOfUid(uid));
             boolean isSystemAppWithPermission = hasGlobalSoundQualityServicePermission(uid, pid)
                     && fromDb.getProfileType() == PictureProfile.TYPE_SYSTEM;
@@ -1263,7 +1272,7 @@ public class MediaQualityService extends SystemService {
 
         private boolean hasReadColorZonesPermission(int uid, int pid) {
             return mContext.checkPermission(android.Manifest.permission.READ_COLOR_ZONES, pid, uid)
-                    == PackageManager.PERMISSION_GRANTED;
+                    == PackageManager.PERMISSION_GRANTED || uid == Process.SYSTEM_UID;
         }
 
         @Override
@@ -1487,6 +1496,7 @@ public class MediaQualityService extends SystemService {
                         boolean isSupported = pcHal.isSupported;
                         int type = pcHal.defaultValue == null ? 0 : pcHal.defaultValue.getTag() + 1;
                         Bundle bundle = MediaQualityUtils.convertToCaps(type, pcHal.range);
+                        putParamCapDefaultValueIntoBundle(bundle, pcHal.defaultValue);
 
                         pcList.add(new ParameterCapability(name, isSupported, type, bundle));
                     }
@@ -1507,6 +1517,7 @@ public class MediaQualityService extends SystemService {
                                 == null ? 0 : vpcHal.defaultValue.getTag() + 1;
                         Bundle paramRangeBundle = MediaQualityUtils.convertToCaps(
                                 type, vpcHal.range);
+                        putParamCapDefaultValueIntoBundle(paramRangeBundle, vpcHal.defaultValue);
                         MediaQualityUtils.convertToVendorCaps(vpcHal, paramRangeBundle);
                         pcList.add(new ParameterCapability(
                                 name, isSupported, type, paramRangeBundle));
@@ -1747,11 +1758,12 @@ public class MediaQualityService extends SystemService {
     public void updatePictureProfileFromHal(Long dbId, PersistableBundle bundle) {
         int callingUid = Binder.getCallingUid();
         int callingPid = Binder.getCallingPid();
+        PictureProfile pp = mMqDatabaseUtils.getPictureProfile(dbId);
         ContentValues values = MediaQualityUtils.getContentValues(dbId,
-                null,
-                null,
-                null,
-                null,
+                pp.getProfileType(),
+                pp.getName(),
+                pp.getPackageName(),
+                pp.getInputId(),
                 bundle);
 
         updateDatabaseOnPictureProfileAndNotifyManager(
@@ -1774,11 +1786,12 @@ public class MediaQualityService extends SystemService {
     public void updateSoundProfileFromHal(Long dbId, PersistableBundle bundle) {
         int callingUid = Binder.getCallingUid();
         int callingPid = Binder.getCallingPid();
+        SoundProfile sp = mMqDatabaseUtils.getSoundProfile(dbId);
         ContentValues values = MediaQualityUtils.getContentValues(dbId,
-                null,
-                null,
-                null,
-                null,
+                sp.getProfileType(),
+                sp.getName(),
+                sp.getPackageName(),
+                sp.getInputId(),
                 bundle);
 
         updateDatabaseOnSoundProfileAndNotifyManager(values, bundle, callingUid,
@@ -2043,19 +2056,23 @@ public class MediaQualityService extends SystemService {
                             .get(callback);
                     if ((pidUid.first == pid && pidUid.second == uid)
                             || (hasGlobalPictureQualityServicePermission(
-                                    pidUid.second, pidUid.first)
-                            && profile != null
-                            && profile.getProfileType() == PictureProfile.TYPE_SYSTEM)) {
-                        if (mode == ProfileModes.ADD) {
-                            callback.onPictureProfileAdded(profileId, profile);
-                        } else if (mode == ProfileModes.UPDATE) {
-                            callback.onPictureProfileUpdated(profileId, profile);
-                        } else if (mode == ProfileModes.REMOVE) {
-                            callback.onPictureProfileRemoved(profileId, profile);
-                        } else if (mode == ProfileModes.ERROR) {
-                            callback.onError(profileId, errorCode);
-                        } else if (mode == ProfileModes.PARAMETER_CAPABILITY_CHANGED) {
-                            callback.onParameterCapabilitiesChanged(profileId, paramCaps);
+                                    pidUid.second, pidUid.first))) {
+                        if (profile != null
+                                && profile.getProfileType() == PictureProfile.TYPE_SYSTEM) {
+                            switch (mode) {
+                                case ProfileModes.ADD ->
+                                        callback.onPictureProfileAdded(profileId, profile);
+                                case ProfileModes.UPDATE ->
+                                        callback.onPictureProfileUpdated(profileId, profile);
+                                case ProfileModes.REMOVE ->
+                                        callback.onPictureProfileRemoved(profileId, profile);
+                            }
+                        } else {
+                            switch (mode) {
+                                case ProfileModes.ERROR -> callback.onError(profileId, errorCode);
+                                case ProfileModes.PARAMETER_CAPABILITY_CHANGED ->
+                                    callback.onParameterCapabilitiesChanged(profileId, paramCaps);
+                            }
                         }
                     }
                 } catch (RemoteException e) {
@@ -2105,6 +2122,7 @@ public class MediaQualityService extends SystemService {
                 boolean isSupported = cap.isSupported;
                 int type = cap.defaultValue == null ? 0 : cap.defaultValue.getTag() + 1;
                 Bundle bundle = MediaQualityUtils.convertToCaps(type, cap.range);
+                putParamCapDefaultValueIntoBundle(bundle, cap.defaultValue);
 
                 paramCaps.add(new ParameterCapability(name, isSupported, type, bundle));
             }
@@ -2126,24 +2144,24 @@ public class MediaQualityService extends SystemService {
                             .get(callback);
 
                     if ((pidUid.first == pid && pidUid.second == uid)
-                            || (hasGlobalSoundQualityServicePermission(pidUid.second, pidUid.first)
-                                    && profile != null
-                                    && profile.getProfileType() == PictureProfile.TYPE_SYSTEM)) {
-                        if (mode == ProfileModes.ADD) {
-                            userState.mSoundProfileCallbacks.getBroadcastItem(i)
-                                    .onSoundProfileAdded(profileId, profile);
-                        } else if (mode == ProfileModes.UPDATE) {
-                            userState.mSoundProfileCallbacks.getBroadcastItem(i)
-                                    .onSoundProfileUpdated(profileId, profile);
-                        } else if (mode == ProfileModes.REMOVE) {
-                            userState.mSoundProfileCallbacks.getBroadcastItem(i)
-                                    .onSoundProfileRemoved(profileId, profile);
-                        } else if (mode == ProfileModes.ERROR) {
-                            userState.mSoundProfileCallbacks.getBroadcastItem(i)
-                                    .onError(profileId, errorCode);
-                        } else if (mode == ProfileModes.PARAMETER_CAPABILITY_CHANGED) {
-                            userState.mSoundProfileCallbacks.getBroadcastItem(i)
-                                    .onParameterCapabilitiesChanged(profileId, paramCaps);
+                            || (hasGlobalSoundQualityServicePermission(
+                            pidUid.second, pidUid.first))) {
+                        if (profile != null
+                                && profile.getProfileType() == SoundProfile.TYPE_SYSTEM) {
+                            switch (mode) {
+                                case ProfileModes.ADD ->
+                                        callback.onSoundProfileAdded(profileId, profile);
+                                case ProfileModes.UPDATE ->
+                                        callback.onSoundProfileUpdated(profileId, profile);
+                                case ProfileModes.REMOVE ->
+                                        callback.onSoundProfileRemoved(profileId, profile);
+                            }
+                        } else {
+                            switch (mode) {
+                                case ProfileModes.ERROR -> callback.onError(profileId, errorCode);
+                                case ProfileModes.PARAMETER_CAPABILITY_CHANGED ->
+                                    callback.onParameterCapabilitiesChanged(profileId, paramCaps);
+                            }
                         }
                     }
                 } catch (RemoteException e) {
@@ -2323,9 +2341,10 @@ public class MediaQualityService extends SystemService {
             for (ParamCapability cap: caps) {
                 String name = MediaQualityUtils.getParameterName(cap.name);
                 boolean isSupported = cap.isSupported;
-                //Reason for +1: please see getListParameterCapability()
+                //Reason for +1: please see getParameterCapabilityList()
                 int type = cap.defaultValue == null ? 0 : cap.defaultValue.getTag() + 1;
                 Bundle bundle = MediaQualityUtils.convertToCaps(type, cap.range);
+                putParamCapDefaultValueIntoBundle(bundle, cap.defaultValue);
 
                 paramCaps.add(new ParameterCapability(name, isSupported, type, bundle));
             }
@@ -2340,11 +2359,12 @@ public class MediaQualityService extends SystemService {
             for (VendorParamCapability vpcHal: caps) {
                 String name = MediaQualityUtils.getVendorParameterName(vpcHal);
                 boolean isSupported = vpcHal.isSupported;
-                //Reason for +1: please see getListParameterCapability()
+                //Reason for +1: please see getParameterCapabilityList()
                 int type = vpcHal.defaultValue
                         == null ? 0 : vpcHal.defaultValue.getTag() + 1;
                 Bundle paramRangeBundle = MediaQualityUtils.convertToCaps(
                         type, vpcHal.range);
+                putParamCapDefaultValueIntoBundle(paramRangeBundle, vpcHal.defaultValue);
                 MediaQualityUtils.convertToVendorCaps(vpcHal, paramRangeBundle);
                 vendorParamCaps.add(new ParameterCapability(
                         name, isSupported, type, paramRangeBundle));
@@ -2358,7 +2378,14 @@ public class MediaQualityService extends SystemService {
 
         @Override
         public void requestPictureParameters(long pictureProfileId) throws RemoteException {
-            PictureProfile profile = mMqDatabaseUtils.getPictureProfile(pictureProfileId, true);
+            if (DEBUG) {
+                Log.d(TAG, "requestPictureParameters for picture profile id "
+                        + pictureProfileId);
+            }
+            PictureProfile profile = mOriginalHandleToCurrentPictureProfile.get(pictureProfileId);
+            if (profile == null) {
+                profile = mMqDatabaseUtils.getPictureProfile(pictureProfileId, true);
+            }
             if (profile != null) {
                 mHalNotifier.notifyHalOnPictureProfileChange(pictureProfileId,
                         profile.getParameters());
@@ -2879,13 +2906,13 @@ public class MediaQualityService extends SystemService {
         return mContext.checkPermission(
                 android.Manifest.permission.MANAGE_GLOBAL_PICTURE_QUALITY_SERVICE, pid,
                 uid)
-                == PackageManager.PERMISSION_GRANTED;
+                == PackageManager.PERMISSION_GRANTED || uid == Process.SYSTEM_UID;
     }
 
     private boolean hasGlobalSoundQualityServicePermission(int uid, int pid) {
         return mContext.checkPermission(
                        android.Manifest.permission.MANAGE_GLOBAL_SOUND_QUALITY_SERVICE, pid, uid)
-                == PackageManager.PERMISSION_GRANTED;
+                == PackageManager.PERMISSION_GRANTED || uid == Process.SYSTEM_UID;
     }
 
     private PictureProfile getSdrPictureProfile(String profileName, PictureProfile previous) {
@@ -2931,6 +2958,35 @@ public class MediaQualityService extends SystemService {
                 Slog.d(TAG, "putCurrentPictureProfile: key: "
                         + mCurrentPictureHandleToOriginal.getKey(value) + " value: " + value);
             }
+        }
+    }
+
+    private void putParamCapDefaultValueIntoBundle(
+            Bundle bundle, ParameterDefaultValue defaultValue) {
+        if (defaultValue == null) {
+            return;
+        }
+
+        switch (defaultValue.getTag()) {
+            case ParameterDefaultValue.intDefault:
+                bundle.putInt(
+                        ParameterCapability.CAPABILITY_DEFAULT, defaultValue.getIntDefault());
+                break;
+            case ParameterDefaultValue.longDefault:
+                bundle.putLong(
+                        ParameterCapability.CAPABILITY_DEFAULT, defaultValue.getLongDefault());
+                break;
+            case ParameterDefaultValue.doubleDefault:
+                bundle.putDouble(
+                        ParameterCapability.CAPABILITY_DEFAULT, defaultValue.getDoubleDefault());
+                break;
+            case ParameterDefaultValue.stringDefault:
+                bundle.putString(
+                        ParameterCapability.CAPABILITY_DEFAULT, defaultValue.getStringDefault());
+                break;
+            default:
+                Log.d(TAG, "putParamCapDefaultValueIntoBundle: "
+                        + "default value type is not supported for tag " + defaultValue.getTag());
         }
     }
 }

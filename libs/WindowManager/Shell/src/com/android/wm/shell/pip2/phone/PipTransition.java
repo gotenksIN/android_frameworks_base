@@ -195,7 +195,7 @@ public class PipTransition extends PipTransitionController implements
         mExpandHandler = new PipExpandHandler(mContext, mPipSurfaceTransactionHelper,
                 pipBoundsState, pipBoundsAlgorithm,
                 pipTransitionState, pipDisplayLayoutState, pipDesktopState, pipInteractionHandler,
-                splitScreenControllerOptional);
+                pipScheduler, splitScreenControllerOptional, displayController);
         mContentPipHandler = new ContentPipHandler(mContext, mPipSurfaceTransactionHelper,
                 pipTransitionState);
         mPipDisplayChangeObserver = new PipDisplayChangeObserver(pipTransitionState,
@@ -279,6 +279,14 @@ public class PipTransition extends PipTransitionController implements
             );
             return wct;
         }
+
+        final WindowContainerTransaction exitViaExpandWct = mExpandHandler.handleRequest(transition,
+                request);
+        if (exitViaExpandWct != null) {
+            mExitViaExpandTransition = transition;
+            return exitViaExpandWct;
+        }
+
         return null;
     }
 
@@ -354,6 +362,11 @@ public class PipTransition extends PipTransitionController implements
             extra.putParcelable(PIP_TASK_LEASH, pipChange.getLeash());
             extra.putParcelable(PIP_TASK_INFO, pipChange.getTaskInfo());
             mPipTransitionState.setState(PipTransitionState.ENTERING_PIP, extra);
+
+            // TRUSTED_OVERLAY is granted iff Shell successfully receives the transition.
+            ProtoLog.d(WM_SHELL_PICTURE_IN_PICTURE,
+                    "Set TRUSTED_OVERLAY for Task#%d", pipChange.getTaskInfo().taskId);
+            startTransaction.setTrustedOverlay(pipChange.getLeash(), true);
 
             if (isInSwipePipToHomeTransition()) {
                 // If this is the second transition as a part of swipe PiP to home cuj,
@@ -437,9 +450,15 @@ public class PipTransition extends PipTransitionController implements
     }
 
     @Override
+    public boolean requestHasPipEnter(@NonNull TransitionRequestInfo request) {
+        return request.getType() == TRANSIT_PIP || request.getPipChange() != null;
+    }
+
+    @Override
     public boolean isEnteringPip(@NonNull TransitionInfo.Change change,
             @WindowManager.TransitionType int transitType) {
-        if (change.getTaskInfo() != null
+        if (mPipTransitionState.getState() == PipTransitionState.SCHEDULED_ENTER_PIP
+                && change.getTaskInfo() != null
                 && change.getTaskInfo().getWindowingMode() == WINDOWING_MODE_PINNED) {
             // TRANSIT_TO_FRONT, though uncommon with triggering PiP, should semantically also
             // be allowed to animate if the task in question is pinned already - see b/308054074.
@@ -805,6 +824,9 @@ public class PipTransition extends PipTransitionController implements
             mPipBoundsState.setLastPipComponentName(null /* lastPipComponentName */);
         }
 
+        final Rect startBounds = pipChange.getStartAbsBounds();
+        startTransaction.setWindowCrop(pipChange.getLeash(),
+                startBounds.width(), startBounds.height());
         finishTransaction.setAlpha(pipChange.getLeash(), 0f);
         if (mPendingRemoveWithFadeout) {
             PipAlphaAnimator animator = new PipAlphaAnimator(mContext, mPipSurfaceTransactionHelper,

@@ -33,6 +33,8 @@ import static android.app.ActivityManager.INSTR_FLAG_DISABLE_TEST_API_CHECKS;
 import static android.app.ActivityManager.INSTR_FLAG_NO_RESTART;
 import static android.app.ActivityManager.INTENT_SENDER_ACTIVITY;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_ALL;
+import static android.app.ActivityManager.PROCESS_CAPABILITY_CPU_TIME;
+import static android.app.ActivityManager.PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
 import static android.app.ActivityManager.PROCESS_STATE_BOUND_TOP;
 import static android.app.ActivityManager.PROCESS_STATE_IMPORTANT_FOREGROUND;
 import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
@@ -133,6 +135,7 @@ import static android.security.Flags.preventIntentRedirect;
 import static android.security.Flags.preventIntentRedirectCollectNestedKeysOnServerIfNotCollected;
 import static android.security.Flags.preventIntentRedirectShowToastIfNestedKeysNotCollectedRW;
 import static android.security.Flags.preventIntentRedirectThrowExceptionIfNestedKeysNotCollected;
+import static android.server.Flags.enableThemeService;
 import static android.util.FeatureFlagUtils.SETTINGS_ENABLE_MONITOR_PHANTOM_PROCS;
 import static android.view.Display.INVALID_DISPLAY;
 
@@ -164,10 +167,13 @@ import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_SERVICE;
 import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_UID_OBSERVERS;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NAME;
+import static com.android.server.am.CachedAppOptimizer.getUnfreezeReasonCodeFromOomAdjReason;
 import static com.android.server.am.LogcatFetcher.LOGCAT_TIMEOUT_SEC;
 import static com.android.server.am.LogcatFetcher.RESERVED_BYTES_PER_LOGCAT_LINE;
 import static com.android.server.am.MemoryStatUtil.hasMemcg;
+import static com.android.server.am.ProcessList.CACHED_APP_MIN_ADJ;
 import static com.android.server.am.ProcessList.ProcStartHandler;
+import static com.android.server.am.ProcessList.UNKNOWN_ADJ;
 import static com.android.server.flags.Flags.disableSystemCompaction;
 import static com.android.server.net.NetworkPolicyManagerInternal.updateBlockedReasonsWithProcState;
 import static com.android.server.pm.PackageManagerService.PLATFORM_PACKAGE_NAME;
@@ -344,9 +350,7 @@ import android.os.ParcelFileDescriptor;
 import android.os.PowerExemptionManager;
 import android.os.PowerExemptionManager.ReasonCode;
 import android.os.PowerExemptionManager.TempAllowListType;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.os.PowerManager;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.os.PowerManager.ServiceType;
 import android.os.PowerManagerInternal;
 import android.os.Process;
@@ -401,10 +405,8 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
 
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.view.autofill.AutofillManagerInternal;
 import android.widget.Toast;
 
@@ -418,9 +420,7 @@ import com.android.internal.app.ProcessMap;
 import com.android.internal.app.SystemUserHomeActivity;
 import com.android.internal.app.procstats.ProcessState;
 import com.android.internal.app.procstats.ProcessStats;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import com.android.internal.app.ActivityTrigger;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import com.android.internal.content.InstallLocationUtils;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.notification.SystemNotificationChannels;
@@ -464,6 +464,7 @@ import com.android.server.ThreadPriorityBooster;
 import com.android.server.UiThread;
 import com.android.server.Watchdog;
 import com.android.server.am.LowMemDetector.MemFactor;
+import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.appop.AppOpsService;
 import com.android.server.compat.PlatformCompat;
 import com.android.server.contentcapture.ContentCaptureManagerInternal;
@@ -501,9 +502,7 @@ import com.android.server.wm.ActivityTaskManagerService;
 import com.android.server.wm.WindowManagerInternal;
 import com.android.server.wm.WindowManagerService;
 import com.android.server.wm.WindowProcessController;
-// QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
 import com.android.server.ActivityTriggerService;
-// QTI_END: 2019-11-13: Core: Add mechanism to improve consistancy of notification
 
 import dalvik.annotation.optimization.NeverCompile;
 import dalvik.system.VMRuntime;
@@ -646,22 +645,25 @@ public class ActivityManagerService extends IActivityManager.Stub
     private static final int MAX_BUGREPORT_TITLE_SIZE = 100;
     private static final int MAX_BUGREPORT_DESCRIPTION_SIZE = 150;
 
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     /* Freq Aggr boost objects */
     public static BoostFramework mPerfServiceStartHint = null;
     /* UX perf event object */
     public static BoostFramework mUxPerf = new BoostFramework();
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
     public static boolean mForceStopKill = false;
-// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
 
     private static final DateTimeFormatter DROPBOX_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSZ");
 
+    /** Service for optimizing resource usage from background apps. */
+    private CachedAppOptimizer mCachedAppOptimizer;
     OomAdjuster mOomAdjuster;
     @GuardedBy("this")
     ProcessStateController mProcessStateController;
+    /**
+     * Temporary list that are currently being processed for temporary unfreezing.
+     * @see #unfreezeTemporarily(ProcessRecord, int)
+     */
+    private final ArrayList<ProcessRecordInternal> mTmpProcessesToUnfreeze = new ArrayList<>();
 
     static final String EXTRA_TITLE = "android.intent.extra.TITLE";
     static final String EXTRA_DESCRIPTION = "android.intent.extra.DESCRIPTION";
@@ -682,9 +684,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     private Installer mInstaller;
 
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     /** Run all ActivityStacks through this */
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     ActivityTaskSupervisor mTaskSupervisor;
 
     final InstrumentationReporter mInstrumentationReporter = new InstrumentationReporter();
@@ -998,14 +998,10 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int pid = app.getPid();
         synchronized (mPidsSelfLocked) {
             mPidsSelfLocked.doAddInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
             ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
             if (freezer != null && freezer.useFreezerManager()) {
                 freezer.addPidLocked(app);
             }
-// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
         }
         synchronized (sActiveProcessInfoSelfLocked) {
             if (app.processInfo != null) {
@@ -1031,15 +1027,11 @@ public class ActivityManagerService extends IActivityManager.Stub
         final boolean removed;
         synchronized (mPidsSelfLocked) {
             removed = mPidsSelfLocked.doRemoveInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
             ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
             if (freezer != null && freezer.useFreezerManager()) {
                 freezer.removePidLocked(pid, app);
                 freezer.startUnfreeze(app.processName, ProcessFreezerManager.REMOVE_PROCESS_UNFREEZE);
             }
-// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
         }
         if (removed) {
             synchronized (sActiveProcessInfoSelfLocked) {
@@ -1125,17 +1117,13 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         @Override
-        public void onActivityLaunched(long id, ComponentName name, int temperature, int userId) {
+        public void onActivityLaunched(long id, ComponentName name, int temperature,
+                String processName, int uid) {
             mAppProfiler.onActivityLaunched();
             synchronized (ActivityManagerService.this) {
-                ProcessRecord record = null;
-                try {
-                    record = getProcessRecordLocked(name.getPackageName(), mContext
-                            .getPackageManager().getPackageUidAsUser(name.getPackageName(), 0,
-                            userId));
-                } catch (NameNotFoundException nnfe) {
-                    // Ignore, record will be lost.
-                }
+                String processRecordName = Flags.appStartInfoProcessNameFix()
+                        ? processName : name.getPackageName();
+                ProcessRecord record = getProcessRecordLocked(processRecordName, uid);
                 mProcessList.getAppStartInfoTracker().onActivityLaunched(id, name, temperature,
                         record);
             }
@@ -2188,13 +2176,13 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
             try {
-                mActivityManagerService.mOomAdjuster.mCachedAppOptimizer.enableFreezer(false);
+                mActivityManagerService.mCachedAppOptimizer.enableFreezer(false);
 
                 if (!DumpUtils.checkDumpAndUsageStatsPermission(mActivityManagerService.mContext,
                         "meminfo", pw)) return;
                 PriorityDump.dump(mPriorityDumper, fd, pw, args);
             } finally {
-                mActivityManagerService.mOomAdjuster.mCachedAppOptimizer.enableFreezer(true);
+                mActivityManagerService.mCachedAppOptimizer.enableFreezer(true);
             }
         }
     }
@@ -2208,13 +2196,13 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
             try {
-                mActivityManagerService.mOomAdjuster.mCachedAppOptimizer.enableFreezer(false);
+                mActivityManagerService.mCachedAppOptimizer.enableFreezer(false);
 
                 if (!DumpUtils.checkDumpAndUsageStatsPermission(mActivityManagerService.mContext,
                         "gfxinfo", pw)) return;
                 mActivityManagerService.dumpGraphicsHardwareUsage(fd, pw, args);
             } finally {
-                mActivityManagerService.mOomAdjuster.mCachedAppOptimizer.enableFreezer(true);
+                mActivityManagerService.mCachedAppOptimizer.enableFreezer(true);
             }
         }
     }
@@ -2228,13 +2216,13 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
             try {
-                mActivityManagerService.mOomAdjuster.mCachedAppOptimizer.enableFreezer(false);
+                mActivityManagerService.mCachedAppOptimizer.enableFreezer(false);
 
                 if (!DumpUtils.checkDumpAndUsageStatsPermission(mActivityManagerService.mContext,
                         "dbinfo", pw)) return;
                 mActivityManagerService.dumpDbInfo(fd, pw, args);
             } finally {
-                mActivityManagerService.mOomAdjuster.mCachedAppOptimizer.enableFreezer(true);
+                mActivityManagerService.mCachedAppOptimizer.enableFreezer(true);
             }
         }
     }
@@ -2249,7 +2237,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
             try {
-                mActivityManagerService.mOomAdjuster.mCachedAppOptimizer.enableFreezer(false);
+                mActivityManagerService.mCachedAppOptimizer.enableFreezer(false);
 
                 if (!DumpUtils.checkDumpAndUsageStatsPermission(mActivityManagerService.mContext,
                         "cacheinfo", pw)) {
@@ -2258,7 +2246,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
                 mActivityManagerService.dumpBinderCacheContents(fd, pw, args);
             } finally {
-                mActivityManagerService.mOomAdjuster.mCachedAppOptimizer.enableFreezer(true);
+                mActivityManagerService.mCachedAppOptimizer.enableFreezer(true);
             }
         }
     }
@@ -2317,6 +2305,16 @@ public class ActivityManagerService extends IActivityManager.Stub
                     }
                 }
             }
+        }
+
+        @Override
+        public void onUserStarting(@NonNull TargetUser user) {
+            mService.mCoreSettingsObserver.onUserStarting(user.getUserIdentifier());
+        }
+
+        @Override
+        public void onUserStopping(@NonNull TargetUser user) {
+            mService.mCoreSettingsObserver.onUserStopping(user.getUserIdentifier());
         }
 
         public ActivityManagerService getService() {
@@ -2474,7 +2472,10 @@ public class ActivityManagerService extends IActivityManager.Stub
         mProcessList.init(this, activeUids, mPlatformCompat);
         mAppProfiler = new AppProfiler(this, BackgroundThread.getHandler().getLooper(), null);
         mPhantomProcessList = new PhantomProcessList(this);
-        mProcessStateController = new ProcessStateController.Builder(this, mProcessList, activeUids)
+
+        mCachedAppOptimizer = new CachedAppOptimizer(this);
+        mProcessStateController = new ProcessStateController
+                .Builder(this, mProcessList, activeUids, new OomAdjusterCallback())
                 .setHandlerThread(handlerThread)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
@@ -2542,7 +2543,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                 new LowMemDetector(this));
         mPhantomProcessList = new PhantomProcessList(this);
         final Looper activityTaskLooper = DisplayThread.get().getLooper();
-        mProcessStateController = new ProcessStateController.Builder(this, mProcessList, activeUids)
+        mCachedAppOptimizer = new CachedAppOptimizer(this);
+        mProcessStateController = new ProcessStateController
+                .Builder(this, mProcessList, activeUids, new OomAdjusterCallback())
                 .setLockObject(this)
                 .setTopProcessChangeCallback(this::updateTopAppListeners)
                 .setProcessLruUpdater(mProcessList)
@@ -2604,10 +2607,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             Process.setThreadGroupAndCpuset(BackgroundThread.get().getThreadId(),
                     Process.THREAD_GROUP_SYSTEM);
             Process.setThreadGroupAndCpuset(
-                    mOomAdjuster.mCachedAppOptimizer.mCachedAppOptimizerThread.getThreadId(),
-// QTI_BEGIN: 2021-07-06: Core: appcompaction: Enable system compaction at bootup
-                    mOomAdjuster.mCachedAppOptimizer.mCompactionPriority);
-// QTI_END: 2021-07-06: Core: appcompaction: Enable system compaction at bootup
+                    mCachedAppOptimizer.mCachedAppOptimizerThread.getThreadId(),
+                    mCachedAppOptimizer.mCompactionPriority);
         } catch (Exception e) {
             Slog.w(TAG, "Setting background thread cpuset failed");
         }
@@ -2619,15 +2620,13 @@ public class ActivityManagerService extends IActivityManager.Stub
         sCreatorTokenCacheCleaner = new Handler(mHandlerThread.getLooper());
 
         ApplicationSharedMemory applicationSharedMemory = ApplicationSharedMemory.getInstance();
-        if (android.content.pm.Flags.cacheSdkSystemFeatures()) {
-            // Install the cache into the process-wide singleton for in-proc queries, as well as
-            // shared memory. Apps will inflate the cache from shared memory in bindApplication.
-            SystemFeaturesCache systemFeaturesCache =
-                    new SystemFeaturesCache(SystemConfig.getInstance().getAvailableFeatures());
-            SystemFeaturesCache.setInstance(systemFeaturesCache);
-            applicationSharedMemory.writeSystemFeaturesCache(
-                    systemFeaturesCache.getSdkFeatureVersions());
-        }
+        // Install the cache into the process-wide singleton for in-proc queries, as well as
+        // shared memory. Apps will inflate the cache from shared memory in bindApplication.
+        SystemFeaturesCache systemFeaturesCache =
+                new SystemFeaturesCache(SystemConfig.getInstance().getAvailableFeatures());
+        SystemFeaturesCache.setInstance(systemFeaturesCache);
+        applicationSharedMemory.writeSystemFeaturesCache(
+                systemFeaturesCache.getSdkFeatureVersions());
         try {
             mApplicationSharedMemoryReadOnlyFd =
                     applicationSharedMemory.getReadOnlyFileDescriptor();
@@ -2912,9 +2911,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             // During startup, bound applications will always attempt registration of a
             // ContentCaptureOptions listener with the ContentCaptureManager service. Seeding
             // applications with the service handle avoids an unnecessary ServiceManager hop.
-            if (Flags.cacheContentCaptureService()) {
-                addServiceToMap(mAppBindArgs, Context.CONTENT_CAPTURE_MANAGER_SERVICE);
-            }
+            addServiceToMap(mAppBindArgs, Context.CONTENT_CAPTURE_MANAGER_SERVICE);
         }
         return mAppBindArgs;
     }
@@ -3370,10 +3367,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         return mActivityTaskManager.startActivityFromRecents(taskId, bOptions);
     }
 
-// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
     public int startActivityAsUserEmpty(Bundle options) {
-// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         ArrayList<String> pApps = options.getStringArrayList("start_empty_apps");
         if (pApps != null && pApps.size() > 0) {
             Iterator<String> apps_itr = pApps.iterator();
@@ -3388,13 +3382,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                         intent_l = mContext.getPackageManager().getLaunchIntentForPackage(app_str);
                         if (intent_l == null)
                             continue;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         ActivityInfo aInfo = mTaskSupervisor.resolveActivity(intent_l, null,
                                                                           0, null, 0, 0, Binder.getCallingPid());
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         if (aInfo == null)
                             continue;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         empty_app = startProcessLocked(
                             app_str,
                             aInfo.applicationInfo,
@@ -3404,11 +3395,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                            ZYGOTE_POLICY_FLAG_EMPTY /* zygotePolicyFlags */,
                            false /* allowWhileBooting */,
                            false /* isolated */);
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         if (empty_app != null)
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             updateOomAdjLocked(empty_app, OOM_ADJ_REASON_SYSTEM_INIT);
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                     } catch (Exception e) {
                         if (DEBUG_PROCESSES)
                             Slog.w(TAG, "Exception raised trying to start app as empty " + e);
@@ -3419,7 +3407,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         return 1;
     }
 
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     /**
      * This is the internal entry point for handling Activity.finish().
      *
@@ -3613,16 +3600,15 @@ public class ActivityManagerService extends IActivityManager.Stub
                     mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                     mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_KILL, 0, app.processName, 0);
                 }
-// QTI_BEGIN: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
                 mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_KILL, app.processName, 2, 0, pid);
-// QTI_END: 2021-09-23: Core: BoostFramework: Replace PerfHint with PerfEvent.
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
 
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-            EventLogTags.writeAmProcDied(app.userId, pid, app.processName, setAdj, setProcState);
-            if (DEBUG_CLEANUP) Slog.v(TAG_CLEANUP,
-                "Dying app: " + app + ", pid: " + pid + ", thread: " + thread.asBinder());
+            EventLogTags.writeAmProcDied(app.userId, pid, app.processName, setAdj,
+                    setProcState);
+            if (DEBUG_CLEANUP) {
+                Slog.v(TAG_CLEANUP, "Dying app: " + app + ", pid: " + pid + ", thread: "
+                        + thread.asBinder());
+            }
             handleAppDiedLocked(app, pid, false, true, fromBinderDied);
 
             if (doOomAdj) {
@@ -4508,9 +4494,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             mAppErrors.resetProcessCrashTime(packageName == null, appId, userId);
         }
-// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
         mForceStopKill = true;
-// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
 
         synchronized (mProcLock) {
             // Notify first that the package is stopped, so its process won't be restarted
@@ -4787,7 +4771,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         EventLogTags.writeAmProcBound(app.userId, pid, app.processName);
 
         if (mUxPerf != null && app.getHostingRecord() != null && app.getHostingRecord().isTopApp()) {
-// QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
             if (mUxPerf.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
                 int pkgType = mUxPerf.perfGetFeedback(
                                     BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE, app.processName);
@@ -4798,7 +4781,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mUxPerf.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName,
                     pid, BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
             }
-// QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
         }
 
         synchronized (mProcLock) {
@@ -4963,7 +4945,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         preBindInfo.configuration,
                         app.getCompat(),
                         getCommonServicesLocked(app.isolated),
-                        mCoreSettingsObserver.getCoreSettings(),
+                        mCoreSettingsObserver.getCoreSettings(app.userId),
                         buildSerial,
                         autofillOptions,
                         contentCaptureOptions,
@@ -5477,19 +5459,15 @@ public class ActivityManagerService extends IActivityManager.Stub
                                 String data, Bundle extras, boolean ordered,
                                 boolean sticky, int sendingUser) {
                             mBootCompletedTimestamp = SystemClock.uptimeMillis();
-// QTI_BEGIN: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                             // Defer the compaction as system is currently busy
-// QTI_END: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                             mHandler.postDelayed(() -> {
                                 synchronized (mProcLock) {
-                                    mOomAdjuster.mCachedAppOptimizer.compactAllSystem();
-// QTI_BEGIN: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
+                                    mCachedAppOptimizer.compactAllSystem();
                                 }
                             }, mConstants.COMPACTION_DELAY_MS);
                             // Defer the full Pss collection as the system is really busy now.
                             mHandler.postDelayed(() -> {
                                 synchronized (mProcLock) {
-// QTI_END: 2024-03-28: Core: appcompaction: Delay system compaction trigger.
                                     mAppProfiler.requestPssAllProcsLPr(
                                             SystemClock.uptimeMillis(), true, false);
                                 }
@@ -5651,6 +5629,13 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     /** Checks whether the home launch delay feature is enabled. */
     private boolean isHomeLaunchDelayable() {
+        // ThemeManagerService is the long term solution to avoid Boot delays or regressions.
+        // It replaces ThemeOverlayController and calculates themes early in the server,
+        // not waiting for SystemUi
+        if (enableThemeService()) {
+            return false;
+        }
+
         // This feature is disabled on Auto since it seems to add an unacceptably long boot delay
         // without even solving the underlying issue (it merely hits the timeout).
         // This feature is disabled on TV since the ThemeOverlayController is currently not present
@@ -7665,6 +7650,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 reportCurWakefulnessUsageEvent();
                 mActivityTaskManager.onScreenAwakeChanged(isAwake);
                 mProcessStateController.setWakefulness(wakefulness);
+                mCachedAppOptimizer.onWakefulnessChanged(wakefulness);
 
                 updateOomAdjLocked(OOM_ADJ_REASON_UI_VISIBILITY);
             }
@@ -8518,7 +8504,7 @@ public class ActivityManagerService extends IActivityManager.Stub
      * thread of the given process.
      */
     @GuardedBy("mProcLock")
-    static void setFifoPriority(@NonNull ProcessRecord app, boolean enable) {
+    static void setFifoPriority(@NonNull ProcessRecordInternal app, boolean enable) {
         final int pid = app.getPid();
         final int renderThreadTid = app.getRenderThreadTid();
         if (enable) {
@@ -9050,7 +9036,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             if (!disableSystemCompaction()) {
                 // Compact all non-zygote processes to freshen up the page cache.
-                mOomAdjuster.mCachedAppOptimizer.compactAllSystem();
+                mCachedAppOptimizer.compactAllSystem();
             }
 
             mLastIdleTime = now;
@@ -9839,7 +9825,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             final VolatileDropboxEntryStates volatileStates, final StringBuilder sb) {
         sb.append("SystemUptimeMs: ").append(SystemClock.uptimeMillis()).append("\n");
 
-// QTI_BEGIN: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
         // Watchdog thread ends up invoking this function (with
         // a null ProcessRecord) to add the stack file to dropbox.
         // Do not acquire a lock on this (am) in such cases, as it
@@ -9847,12 +9832,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         // is invoked due to unavailability of lock on am and it
         // would prevent watchdog from killing system_server.
         if (process == null) {
-// QTI_END: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
             sb.append("Process: ").append(processName).append("\n");
-// QTI_BEGIN: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
             return;
         }
-// QTI_END: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
         // Note: ProcessRecord 'process' is guarded by the service
         // instance.  (notably process.pkgList, which could otherwise change
         // concurrently during execution of this method)
@@ -10616,8 +10598,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         synchronized(this) {
             mConstants.dump(pw);
-            mOomAdjuster.dumpCachedAppOptimizerSettings(pw);
-            mOomAdjuster.dumpCacheOomRankerSettings(pw);
+            mCachedAppOptimizer.dump(pw);
             pw.println();
             if (dumpAll) {
                 pw.println(
@@ -11132,11 +11113,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 synchronized (this) {
                     mConstants.dump(pw);
                 }
-                synchronized (mProcLock) {
-                    mOomAdjuster.dumpCacheOomRankerSettings(pw);
-                }
             } else if ("cao".equals(cmd)) {
-                mOomAdjuster.dumpCachedAppOptimizerSettings(pw);
+                mCachedAppOptimizer.dump(pw);
             } else if ("timers".equals(cmd)) {
                 AnrTimer.dump(pw, true);
             } else if ("services".equals(cmd) || "s".equals(cmd)) {
@@ -12338,7 +12316,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         return stringifySize(size * 1024, 1024);
     }
 
-// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     private void dumpProcessDmaBufInfo(FileDescriptor fd, PrintWriter pw) {
         List<Debug.DmaBuffer> dmabufs = new ArrayList<>();
         if (!Debug.getProcfsDmaBuffer(dmabufs)) {
@@ -12390,7 +12367,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 kernelRss / 1024, totalRss / 1024, totalPss / 1024));
     }
 
-// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     // Update this version number if you change the 'compact' format.
     private static final int MEMINFO_COMPACT_VERSION = 1;
 
@@ -12409,9 +12385,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         boolean dumpProto;
         boolean mDumpPrivateDirty;
         boolean mDumpAllocatorStats;
-// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
         boolean mDumpDmaBufInfo;
-// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     }
 
     @NeverCompile // Avoid size overhead of debugging code.
@@ -12470,10 +12444,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 opts.dumpProto = true;
             } else if ("--logstats".equals(opt)) {
                 opts.mDumpAllocatorStats = true;
-// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
             } else if ("--dmabuf".equals(opt)) {
                 opts.mDumpDmaBufInfo = true;
-// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
             } else if ("-h".equals(opt) || "--help".equals(opt)) {
                 pw.println("meminfo dump options: [-a] [-d] [-c] [-s] [--oom] [process]");
                 pw.println("  -a: include all available information for each process.");
@@ -12491,22 +12463,18 @@ public class ActivityManagerService extends IActivityManager.Stub
                 pw.println("  --proto: dump data to proto");
                 pw.println("  --logstats: log native allocator statistics.");
                 pw.println("  --unreachable: dump unreachable native memory with libmemunreachable.");
-// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
                 pw.println("  --dmabuf: dump dma buffer information.");
-// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
                 pw.println("If [process] is specified it can be the name or ");
                 pw.println("pid of a specific process to dump.");
                 return;
             } else {
                 pw.println("Unknown argument: " + opt + "; use -h for help");
             }
-// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
         }
 
         if (opts.mDumpDmaBufInfo) {
             dumpProcessDmaBufInfo(fd, pw);
             return;
-// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
         }
 
         String[] innerArgs = new String[args.length-opti];
@@ -13786,7 +13754,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     fromBinderDied || app.isolated /* unlinkDeath */);
 
             // Cancel pending frozen task and clean up frozen record if there is any.
-            mOomAdjuster.mCachedAppOptimizer.onCleanupApplicationRecordLocked(app);
+            mCachedAppOptimizer.onCleanupApplicationRecordLocked(app);
         }
         mAppProfiler.onCleanupApplicationRecordLocked(app);
         mBroadcastQueue.onApplicationCleanupLocked(app);
@@ -13877,15 +13845,12 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             app.setPid(0);
         }
-// QTI_BEGIN: 2020-04-14: Core: IOP Preferred App Fix
 
         // Call Preferred App
         if (app != null) {
             ArrayList<ApplicationExitInfo> results = new ArrayList<ApplicationExitInfo>();
             mProcessList.mAppExitInfoTracker.getExitInfo(
-// QTI_END: 2020-04-14: Core: IOP Preferred App Fix
                     app.processName, app.uid, app.getPid(), 0, results);
-// QTI_BEGIN: 2020-04-14: Core: IOP Preferred App Fix
             if (results != null) {
                 boolean recentAppClose = false;
                 for (int i=0; i<results.size();i++) {
@@ -13898,13 +13863,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                     }
                 }
                 if (recentAppClose) {
-// QTI_END: 2020-04-14: Core: IOP Preferred App Fix
                     mTaskSupervisor.startPreferredApps();
-// QTI_BEGIN: 2020-04-14: Core: IOP Preferred App Fix
                 }
             }
         }
-// QTI_END: 2020-04-14: Core: IOP Preferred App Fix
         return false;
     }
 
@@ -16322,16 +16284,13 @@ public class ActivityManagerService extends IActivityManager.Stub
 
                 enforceDebuggable(proc);
 
-                mOomAdjuster.mCachedAppOptimizer.enableFreezer(false);
+                mCachedAppOptimizer.enableFreezer(false);
 
                 final RemoteCallback intermediateCallback = new RemoteCallback(
-                        new RemoteCallback.OnResultListener() {
-                        @Override
-                        public void onResult(Bundle result) {
+                        result -> {
                             finishCallback.sendResult(result);
-                            mOomAdjuster.mCachedAppOptimizer.enableFreezer(true);
-                        }
-                    }, null);
+                            mCachedAppOptimizer.enableFreezer(true);
+                        }, null);
 
                 thread.dumpHeap(managed, mallocInfo, runGc, dumpBitmaps,
                                 path, fd, intermediateCallback);
@@ -16433,7 +16392,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         try {
-            mOomAdjuster.mCachedAppOptimizer.enableFreezer(false);
+            mCachedAppOptimizer.enableFreezer(false);
 
             for (int i = procs.size() - 1; i >= 0; i--) {
                 ProcessRecord r = procs.get(i);
@@ -16464,7 +16423,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
             }
         } finally {
-            mOomAdjuster.mCachedAppOptimizer.enableFreezer(true);
+            mCachedAppOptimizer.enableFreezer(true);
             proto.flush();
         }
     }
@@ -16505,6 +16464,19 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     void onCoreSettingsChange(Bundle settings) {
+        synchronized (mProcLock) {
+            mProcessList.updateCoreSettingsLOSP(settings);
+        }
+    }
+
+    /**
+     * Called when core settings change for one or more users. This method receives the updated
+     * settings and dispatches them to all relevant application processes.
+     *
+     * @param settings A {@link SparseArray} mapping each user ID to a {@link Bundle} containing
+     * their core settings.
+     */
+    void onCoreSettingsChange(SparseArray<Bundle> settings) {
         synchronized (mProcLock) {
             mProcessList.updateCoreSettingsLOSP(settings);
         }
@@ -16885,8 +16857,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     app = mPidsSelfLocked.get(pid);
                 }
                 if (app != null) {
-                    mOomAdjuster.mCachedAppOptimizer.addFrozenProcessListener(app, executor,
-                            listener);
+                    mCachedAppOptimizer.addFrozenProcessListener(app, executor, listener);
                 }
             }
         }
@@ -17092,13 +17063,11 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
         }
 
-// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
         @Override
         public int startActivityAsUserEmpty(Bundle options) {
             return ActivityManagerService.this.startActivityAsUserEmpty(options);
         }
 
-// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
         @Override
         public void onUserRemoved(int userId) {
             // Clean up UserController state
@@ -17734,10 +17703,14 @@ public class ActivityManagerService extends IActivityManager.Stub
             final ActivityServiceConnectionsHolder holder =
                     (ActivityServiceConnectionsHolder) connectionHolder;
             synchronized (ActivityManagerService.this) {
-                synchronized (mProcLock) {
-                    holder.forEachConnection(cr -> mServices.removeConnectionLocked(
-                            (ConnectionRecord) cr, null /* skipApp */, holder /* skipAct */,
-                            false /* enqueueOomAdj */));
+                try (var unused = mProcessStateController.startServiceBatchSession(
+                        OOM_ADJ_REASON_UNBIND_SERVICE)) {
+                    synchronized (mProcLock) {
+                        holder.forEachConnection(
+                                cr -> mServices.removeConnectionLocked((ConnectionRecord) cr,
+                                        null /* skipApp */, holder /* skipAct */,
+                                        false /* enqueueOomAdj */));
+                    }
                 }
             }
         }
@@ -18167,7 +18140,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             // sends to the activity. After this race issue between WM/ATMS and AMS is solved, this
             // workaround can be removed. (b/213288355)
             if (isNewPending) {
-                mOomAdjuster.mCachedAppOptimizer.unfreezeProcess(pid, OOM_ADJ_REASON_ACTIVITY);
+                mCachedAppOptimizer.unfreezeProcess(pid, OOM_ADJ_REASON_ACTIVITY);
             }
             // We need to update the network rules for the app coming to the top state so that
             // it can access network when the device or the app is in a restricted state
@@ -18571,6 +18544,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
                 thread = record.getThread();
             }
+            if (thread == null) {
+                throw new IllegalStateException("app ActivityThread is null");
+            }
             try {
                 thread.getExecutableMethodFileOffsets(methodDescriptor, callback);
             } catch (RemoteException e) {
@@ -18759,7 +18735,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         final ProcessRecord app = apps.valueAt(iApp);
                         final IApplicationThread thread = app.getOnewayThread();
                         if (thread != null) {
-                            mOomAdjuster.mCachedAppOptimizer.unfreezeTemporarily(app,
+                            mCachedAppOptimizer.unfreezeTemporarily(app,
                                     CachedAppOptimizer.UNFREEZE_REASON_PING);
                             pingCount.incrementAndGet();
                             try {
@@ -18847,7 +18823,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     @Override
     public boolean isProcessFrozen(int pid) {
         enforceCallingPermission(permission.DUMP, "isProcessFrozen()");
-        return mOomAdjuster.mCachedAppOptimizer.isProcessFrozen(pid);
+        return mCachedAppOptimizer.isProcessFrozen(pid);
     }
 
     @Override
@@ -19585,13 +19561,202 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
     }
 
-    @Override
-    public boolean isAppFreezerEnabled() {
-        return mOomAdjuster.mCachedAppOptimizer.useFreezer();
+    /**
+     * The default implementation of {@link OomAdjuster.Callback}.
+     *
+     * <p>This class acts as a proxy for {@link ActivityManagerService}, providing
+     * {@link OomAdjuster} with access to functionalities that are external to the psc package.
+     * As the boundary between the `psc` and `am` packages, it consolidates all type casting from
+     * the `psc` internal record classes to their concrete counterparts. This type cast is safe
+     * because there is only one production implementation.
+     */
+    @VisibleForTesting
+    final class OomAdjusterCallback implements OomAdjuster.Callback {
+        @Override
+        @GuardedBy({"ActivityManagerService.this", "ActivityManagerService.this.mProcLock"})
+        public void onOomAdjustChanged(int oldAdj, int newAdj, ProcessRecordInternal app) {
+            mCachedAppOptimizer.onOomAdjustChanged(oldAdj, newAdj, (ProcessRecord) app);
+        }
+
+        public void onProcessFreezabilityChanged(ProcessRecordInternal app, boolean freezePolicy,
+                @OomAdjReason int oomAdjReason, boolean immediate, int oldOomAdj,
+                boolean shouldNotFreezeChanged) {
+            if (!mCachedAppOptimizer.useFreezer()) {
+                return;
+            }
+
+            // TODO: b/441879937 - Pass useFreezer() information to OomAdjuster and move the trace
+            // logging back to OomAdjuster.
+            if (Flags.traceUpdateAppFreezeStateLsp()) {
+                final boolean oomAdjChanged = (app.getCurAdj() >= mConstants.FREEZER_CUTOFF_ADJ
+                        ^ oldOomAdj >= mConstants.FREEZER_CUTOFF_ADJ) || oldOomAdj == UNKNOWN_ADJ;
+                final boolean hasCpuCapability =
+                        (PROCESS_CAPABILITY_CPU_TIME & app.getCurCapability())
+                                == PROCESS_CAPABILITY_CPU_TIME;
+                final boolean usedToHaveCpuCapability =
+                        (PROCESS_CAPABILITY_CPU_TIME & app.getSetCapability())
+                                == PROCESS_CAPABILITY_CPU_TIME;
+                final boolean cpuCapabilityChanged = hasCpuCapability != usedToHaveCpuCapability;
+                final boolean hasImplicitCpuCapability =
+                        (PROCESS_CAPABILITY_IMPLICIT_CPU_TIME & app.getCurCapability())
+                                == PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
+                final boolean usedToHaveImplicitCpuCapability =
+                        (PROCESS_CAPABILITY_IMPLICIT_CPU_TIME & app.getSetCapability())
+                                == PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
+                final boolean implicitCpuCapabilityChanged =
+                        hasImplicitCpuCapability != usedToHaveImplicitCpuCapability;
+                final int cpuTimeReasons = app.getCurCpuTimeReasons();
+                final int implicitCpuTimeReasons = app.getCurImplicitCpuTimeReasons();
+                if ((oomAdjChanged || shouldNotFreezeChanged || cpuCapabilityChanged
+                        || implicitCpuCapabilityChanged)
+                        && Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+                    Trace.instantForTrack(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                            "FreezeLite",
+                            (app.isFrozen() ? "F" : "-")
+                                    + (app.isPendingFreeze() ? "P" : "-")
+                                    + (/* Keeping for app.isFreezeExempt() */ "-")
+                                    + (app.shouldNotFreeze() ? "N" : "-")
+                                    + (hasCpuCapability ? "T" : "-")
+                                    + (hasImplicitCpuCapability ? "X" : "-")
+                                    + (immediate ? "I" : "-")
+                                    + (freezePolicy ? "Z" : "-")
+                                    + (Flags.cpuTimeCapabilityBasedFreezePolicy() ? "t" : "-")
+                                    + (Flags.prototypeAggressiveFreezing() ? "a" : "-")
+                                    + "/" + app.getPid()
+                                    + "/" + app.getCurAdj()
+                                    + "/" + oldOomAdj
+                                    + "/" + app.shouldNotFreezeReason()
+                                    + "/" + cpuTimeReasons
+                                    + "/" + implicitCpuTimeReasons);
+                    Trace.instantForTrack(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                            CachedAppOptimizer.ATRACE_FREEZER_TRACK,
+                            "updateAppFreezeStateLSP " + app.processName
+                                    + " pid: " + app.getPid()
+                                    + " isFreezeExempt: " + false
+                                    + " isFrozen: " + app.isFrozen()
+                                    + " shouldNotFreeze: " + app.shouldNotFreeze()
+                                    + " shouldNotFreezeReason: " + app.shouldNotFreezeReason()
+                                    + " curAdj: " + app.getCurAdj()
+                                    + " oldOomAdj: " + oldOomAdj
+                                    + " immediate: " + immediate
+                                    + " cpuCapability: " + hasCpuCapability
+                                    + " implicitCpuCapability: " + hasImplicitCpuCapability
+                                    + " cpuTimeReasons: 0x" + Integer.toHexString(cpuTimeReasons)
+                                    + " implicitCpuTimeReasons: 0x"
+                                    + Integer.toHexString(implicitCpuTimeReasons));
+                }
+            }
+
+            if (freezePolicy) {
+                if (Flags.cpuTimeCapabilityBasedFreezePolicy()
+                        && !com.android.server.notification.Flags.allowFreezingIdleNls()
+                        && app.getCurAdj() < CACHED_APP_MIN_ADJ) {
+                    Slog.wtfStack(TAG, "Unexpected non-cached process may get frozen soon: "
+                            + " name: " + app.processName
+                            + " curAdj: " + app.getCurAdj()
+                            + " oldOomAdj: " + oldOomAdj
+                            + " curRawAdj: " + app.getCurRawAdj()
+                            + " maxAdj: " + app.getMaxAdj()
+                            + " adjType: " + app.getAdjType()
+                            + " adjTarget: " + app.getAdjTarget()
+                            + " adjSource: " + app.getAdjSource()
+                            + " adjSourcePrcState: " + app.getAdjSourceProcState()
+                            + " serviceB: " + app.isServiceB()
+                            + " curProcState: " + app.getCurProcState()
+                            + " curRawProcState: " + app.getCurRawProcState()
+                            + " curSchedGroup: " + app.getCurrentSchedulingGroup());
+                }
+                // This process should be frozen.
+                if (immediate && !app.isFrozen()) {
+                    // And it will be frozen immediately.
+                    mCachedAppOptimizer.freezeAppAsyncAtEarliestLSP((ProcessRecord) app);
+                } else if (!app.isFrozen() && !app.isPendingFreeze()) {
+                    mCachedAppOptimizer.freezeAppAsyncLSP((ProcessRecord) app);
+                }
+            } else {
+                // This process should not be frozen.
+                if (app.isFrozen() || app.isPendingFreeze()) {
+                    mCachedAppOptimizer.unfreezeAppLSP((ProcessRecord) app,
+                            CachedAppOptimizer.getUnfreezeReasonCodeFromOomAdjReason(oomAdjReason));
+                }
+            }
+        }
+
+        @Override
+        public void onProcStateUpdated(ProcessRecordInternal appInternal, long now,
+                boolean forceUpdatePssTime) {
+            final ProcessRecord app = (ProcessRecord) appInternal;
+
+            synchronized (mAppProfiler.mProfilerLock) {
+                app.mProfile.updateProcState(app);
+                mAppProfiler.updateNextPssTimeLPf(app.getCurProcState(), app.mProfile, now,
+                        forceUpdatePssTime);
+            }
+        }
     }
 
-    public boolean isAppFreezerExemptInstPkg() {
-        return mOomAdjuster.mCachedAppOptimizer.freezerExemptInstPkg();
+
+    CachedAppOptimizer getCachedAppOptimizer() {
+        return mCachedAppOptimizer;
+    }
+
+    @VisibleForTesting
+    void setCachedAppOptimizer(CachedAppOptimizer cachedAppOptimizer) {
+        mCachedAppOptimizer = cachedAppOptimizer;
+    }
+
+    @Override
+    public boolean isAppFreezerEnabled() {
+        return mCachedAppOptimizer.useFreezer();
+    }
+
+    /**
+     * Temporarily unfreezes the given application process and any other processes it is associated
+     * with (i.e., reachable processes). This operation is only performed if the freezer is enabled
+     * and the application is currently in a frozen or pending-freeze state.
+     *
+     * @param app The application process to unfreeze.
+     * @param reason The {@link OomAdjReason} explaining why the process is being unfrozen.
+     */
+    @GuardedBy("this")
+    void unfreezeTemporarily(ProcessRecord app, @OomAdjReason int reason) {
+        if (!mCachedAppOptimizer.useFreezer()) {
+            return;
+        }
+        synchronized (mProcLock) {
+            if (!app.isFrozen() && !app.isPendingFreeze()) {
+                return;
+            }
+        }
+
+        final int unfrozenReason = getUnfreezeReasonCodeFromOomAdjReason(reason);
+        final ArrayList<ProcessRecordInternal> processesToUnfreeze = mTmpProcessesToUnfreeze;
+        processesToUnfreeze.clear();
+        mOomAdjuster.populateAllReachableProcessesLocked(app, processesToUnfreeze);
+        for (int i = 0; i < processesToUnfreeze.size(); i++) {
+            final ProcessRecord process = (ProcessRecord) processesToUnfreeze.get(i);
+            mCachedAppOptimizer.unfreezeTemporarily(process, unfrozenReason);
+        }
+        processesToUnfreeze.clear();
+    }
+
+    /**
+     * Sets up a broadcast receiver to handle user switch events, which triggers prewarming of
+     * services.
+     */
+    void setupServicePrewarmingOnUserSwitch() {
+        if (!mConstants.KEEP_WARMING_SERVICES.isEmpty()) {
+            final IntentFilter filter = new IntentFilter(Intent.ACTION_USER_SWITCHED);
+            final BroadcastReceiver receiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    synchronized (ActivityManagerService.this) {
+                        mOomAdjuster.prewarmServicesIfNecessary();
+                    }
+                }
+            };
+            mContext.registerReceiverForAllUsers(receiver, filter, null, mHandler);
+        }
     }
 
     /**
@@ -19611,7 +19776,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         // Only system can toggle the freezer state
         if (callerUid == SYSTEM_UID || Build.IS_DEBUGGABLE) {
-            return mOomAdjuster.mCachedAppOptimizer.enableFreezer(enable);
+            return mCachedAppOptimizer.enableFreezer(enable);
         } else {
             throw new SecurityException("Caller uid " + callerUid + " cannot set freezer state ");
         }
@@ -19707,7 +19872,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         synchronized (mPidsSelfLocked) {
             app = mPidsSelfLocked.get(debugPid);
         }
-        mOomAdjuster.mCachedAppOptimizer.binderError(debugPid, app, code, flags, err);
+        mCachedAppOptimizer.binderError(debugPid, app, code, flags, err);
     }
 
     @GuardedBy("this")

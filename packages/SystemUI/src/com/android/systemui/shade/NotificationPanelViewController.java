@@ -1034,8 +1034,10 @@ public final class NotificationPanelViewController implements
             mQsController.updateResources();
             mNotificationsQSContainerController.updateResources();
             updateKeyguardStatusViewAlignment();
-            mKeyguardMediaController.refreshMediaPosition(
-                    "NotificationPanelViewController.updateResources");
+            if (!SceneContainerFlag.isEnabled()) {
+                mKeyguardMediaController.refreshMediaPosition(
+                        "NotificationPanelViewController.updateResources");
+            }
 
             if (splitShadeChanged) {
                 if (isPanelVisibleBecauseOfHeadsUp()) {
@@ -1889,8 +1891,7 @@ public final class NotificationPanelViewController implements
                 || expandedHeight > mHeadsUpStartHeight);
         if (goingBetweenClosedShadeAndExpandedQs && qsShouldExpandWithHeadsUp) {
             float qsExpansionFraction;
-            if (mSplitShadeEnabled && (SceneContainerFlag.isEnabled()
-                    || !Flags.bouncerUiRevamp())) {
+            if (mSplitShadeEnabled) {
                 qsExpansionFraction = 1;
             } else if (isKeyguardShowing()) {
                 // On Keyguard, interpolate the QS expansion linearly to the panel expansion
@@ -3982,8 +3983,13 @@ public final class NotificationPanelViewController implements
         @Override
         public boolean onTouchEvent(MotionEvent event) {
             if (!mUseExternalTouch) {
-                mShadeLog.d("onTouch: external touch handling disabled");
-                return false;
+                if (isLockedShadeHomeGestureEvent(event)) {
+                    mShadeLog.d("onTouch: down motion event in home gesture area");
+                } else {
+                    mShadeLog.d("onTouch: external touch handling disabled");
+                    // Consume touches below notifications on keyguard to allow for expansion
+                    return mStatusBarStateController.getState() == StatusBarState.KEYGUARD;
+                }
             }
 
             if (mAlternateBouncerInteractor.isVisibleState()) {
@@ -4079,6 +4085,11 @@ public final class NotificationPanelViewController implements
 
             handled |= handleTouch(event);
             return !mDozing || handled;
+        }
+
+        private boolean isLockedShadeHomeGestureEvent(MotionEvent event) {
+            return mBarState == SHADE_LOCKED && event.getActionMasked() == MotionEvent.ACTION_DOWN
+                    && isInGestureNavHomeHandleArea(event.getY());
         }
 
         private boolean handleTouch(MotionEvent event) {

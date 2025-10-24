@@ -101,7 +101,7 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
                 mockTDAOrganizer,
                 Optional.of(mockTaskChangeListener),
             )
-        organizer.setOnDesktopTaskInfoChangedListener(taskInfoChangedListener)
+        organizer.addOnDesktopTaskInfoChangedListener(taskInfoChangedListener)
 
         val tda = DisplayAreaInfo(MockToken().token(), DEFAULT_DISPLAY, 0)
         whenever(mockTDAOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)).thenReturn(tda)
@@ -753,6 +753,22 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
     }
 
     @Test
+    fun testDeactivateDesk_deskWasRemoved_skipsInsteadOfThrowing() = runTest {
+        val desk = createDeskSuspending(userId = PRIMARY_USER_ID)
+        organizer.removeDesk(
+            wct = WindowContainerTransaction(),
+            deskId = desk.deskRoot.deskId,
+            userId = PRIMARY_USER_ID,
+        )
+        organizer.onTaskVanished(desk.deskRoot.taskInfo)
+
+        val wct = WindowContainerTransaction()
+        organizer.deactivateDesk(wct, desk.deskRoot.deskId)
+
+        assertThat(wct.isEmpty).isTrue()
+    }
+
+    @Test
     fun isDeskChange_forDeskId() = runTest {
         val desk = createDeskSuspending()
 
@@ -1049,6 +1065,19 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
         organizer.onTaskInfoChanged(task)
 
         verify(taskInfoChangedListener).invoke(task)
+    }
+
+    @Test
+    fun onTaskInfoChanged_taskNotRoot_multipleListeners_invokesAllListeners() = runTest {
+        createDeskSuspending()
+        val task = createFreeformTask().apply { taskId = TEST_CHILD_TASK_ID }
+        val secondListener = mock<(ActivityManager.RunningTaskInfo) -> Unit>()
+        organizer.addOnDesktopTaskInfoChangedListener(secondListener)
+
+        organizer.onTaskInfoChanged(task)
+
+        verify(taskInfoChangedListener).invoke(task)
+        verify(secondListener).invoke(task)
     }
 
     @Test

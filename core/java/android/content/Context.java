@@ -18,7 +18,7 @@ package android.content;
 
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER;
 import static android.app.ondeviceintelligence.flags.Flags.FLAG_ENABLE_ON_DEVICE_INTELLIGENCE_MODULE;
-import static android.app.userrecovery.flags.Flags.FLAG_ENABLE_USER_RECOVERY_MANAGER;
+import static android.app.lskfreset.flags.Flags.FLAG_ENABLE_LSKF_RESET_MANAGER;
 import static android.content.flags.Flags.FLAG_ENABLE_BIND_PACKAGE_ISOLATED_PROCESS;
 import static android.content.flags.Flags.FLAG_ENABLE_UPDATE_SERVICE_BINDINGS;
 import static android.security.Flags.FLAG_SECURE_LOCKDOWN;
@@ -366,6 +366,8 @@ public abstract class Context {
          * @return Return flags in 64 bits long integer.
          * @hide
          */
+        @TestApi
+        @FlaggedApi(FLAG_ENABLE_UPDATE_SERVICE_BINDINGS)
         public long getValue() {
             return mValue;
         }
@@ -786,11 +788,14 @@ public abstract class Context {
     /**
      * These bind flags may be updated (i.e. added or removed) for an existing
      * connection.
+     *
+     * Any updates here should also modify the {@link #getUpdateableFlags} documentation
+     * as well as verify that no checks from {@link #bindService} and
+     * {@code ActiveServices.bindServiceLocked} are being skipped.
      * @hide
      */
     public static final long BIND_UPDATEABLE_FLAGS =
             Context.BIND_NOT_FOREGROUND
-                    | Context.BIND_ABOVE_CLIENT
                     | Context.BIND_ALLOW_OOM_MANAGEMENT
                     | Context.BIND_WAIVE_PRIORITY
                     | Context.BIND_IMPORTANT
@@ -1103,7 +1108,7 @@ public abstract class Context {
      *
      * @return A ID that is unique in the process
      *
-     * {@hide}
+     * @hide
      */
     public int getNextAutofillId() {
         if (sLastAutofillId == View.LAST_APP_AUTOFILL_ID - 1) {
@@ -5330,9 +5335,9 @@ public abstract class Context {
      * @see android.app.usage.NetworkStatsManager
      */
     public static final String NETWORK_STATS_SERVICE = "netstats";
-    /** {@hide} */
+    /** @hide */
     public static final String NETWORK_POLICY_SERVICE = "netpolicy";
-    /** {@hide} */
+    /** @hide */
     public static final String NETWORK_WATCHLIST_SERVICE = "network_watchlist";
 
     /**
@@ -6474,8 +6479,8 @@ public abstract class Context {
      * @see #getSystemService(String)
      * @hide
      */
-    @FlaggedApi(FLAG_ENABLE_USER_RECOVERY_MANAGER)
-    public static final String USER_RECOVERY_SERVICE = "user_recovery";
+    @FlaggedApi(FLAG_ENABLE_LSKF_RESET_MANAGER)
+    public static final String LSKF_RESET_SERVICE = "lskf_reset";
 
 
     /**
@@ -7003,6 +7008,16 @@ public abstract class Context {
      * @hide
      */
     public static final String TASK_CONTINUITY_SERVICE = "task_continuity";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.companion.datatransfer.continuity.UniversalClipboardManager}.
+     *
+     * @see #getSystemService(String)
+     * @see UniversalClipboardManager
+     * @hide
+     */
+    public static final String UNIVERSAL_CLIPBOARD_SERVICE = "universal_clipboard";
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a

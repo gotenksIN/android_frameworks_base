@@ -59,6 +59,7 @@ import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.app.admin.DevicePolicyManager;
 import android.app.compat.CompatChanges;
+import android.app.SetNotificationBackgroundColorRefactor;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
 import android.compat.annotation.UnsupportedAppUsage;
@@ -314,6 +315,15 @@ public class Notification implements Parcelable
      * sends messages.
      */
     public static final String EXTRA_REMOTE_INPUT_DRAFT = "android.remoteInputDraft";
+
+    /**
+     * A boolean indicating that the notification card should show the small icon instead of the
+     * launcher app icon.
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.PACKAGE_VERIFICATION_AGENT)
+    public static final String EXTRA_PREFER_SMALL_ICON = "android.app.preferSmallIcon";
 
     /**
      * The call to WearableExtender#setBackground(Bitmap) will have no effect and the passed
@@ -841,6 +851,8 @@ public class Notification implements Parcelable
                 case R.layout.notification_2025_template_collapsed_metric
                         -> Flags.apiMetricStyle();
                 case R.layout.notification_2025_template_expanded_metric
+                        -> Flags.apiMetricStyle();
+                case R.layout.notification_2025_template_expanded_single_metric
                         -> Flags.apiMetricStyle();
                 default -> false;
             };
@@ -3511,6 +3523,15 @@ public class Notification implements Parcelable
     }
 
     /**
+     * Convert the CharSequence to a string and meke it is safe to put into a bundle.
+     * @hide
+     */
+    public static String safeCharSequenceToString(CharSequence cs) {
+        if (cs == null) return null;
+        return safeString(cs.toString());
+    }
+
+    /**
      * Make sure this CharSequence is safe to put into a bundle, which basically
      * means it had better not be some custom Parcelable implementation.
      * @hide
@@ -4210,7 +4231,7 @@ public class Notification implements Parcelable
     }
 
     /**
-     * {@hide}
+     * @hide
      */
     public static String visibilityToString(int vis) {
         switch (vis) {
@@ -4226,7 +4247,7 @@ public class Notification implements Parcelable
     }
 
     /**
-     * {@hide}
+     * @hide
      */
     public static String priorityToString(@Priority int pri) {
         switch (pri) {
@@ -4246,7 +4267,7 @@ public class Notification implements Parcelable
     }
 
     /**
-     * {@hide}
+     * @hide
      */
     public static String flagsToString(@NotificationFlags int flags) {
         final List<String> flagStrings = new ArrayList<String>();
@@ -6157,6 +6178,9 @@ public class Notification implements Parcelable
             // Small icon doesn't need to be reset, as it's always set. Resetting would prevent
             // re-using the drawable when the notification is updated.
             contentView.setBoolean(R.id.expand_button, "setExpanded", false);
+            if (Flags.apiMetricStyle()) {
+                contentView.setViewVisibility(R.id.app_name_text_divider, View.GONE);
+            }
             contentView.setViewVisibility(R.id.app_name_text, View.GONE);
             contentView.setTextViewText(R.id.app_name_text, null);
             contentView.setViewVisibility(R.id.chronometer, View.GONE);
@@ -6550,13 +6574,16 @@ public class Notification implements Parcelable
 
         private void bindNotificationHeader(RemoteViews contentView, StandardTemplateParams p) {
             bindSmallIcon(contentView, p);
+
+            boolean hasTextToLeft = Flags.apiMetricStyle()
+                && p.mTitleViewId == R.id.alt_title && p.hasTitle();
             // Populate text left-to-right so that separators are only shown between strings
-            boolean hasTextToLeft = bindHeaderAppName(contentView, p, false /* force */);
+            hasTextToLeft |= bindHeaderAppName(contentView, p, false /* force */, hasTextToLeft);
             hasTextToLeft |= bindHeaderTextSecondary(contentView, p, hasTextToLeft);
             hasTextToLeft |= bindHeaderText(contentView, p, hasTextToLeft);
             if (!hasTextToLeft) {
                 // If there's still no text, force add the app name so there is some text.
-                hasTextToLeft |= bindHeaderAppName(contentView, p, true /* force */);
+                hasTextToLeft |= bindHeaderAppName(contentView, p, true /* force */, hasTextToLeft);
             }
             bindHeaderChronometerAndTime(contentView, p, hasTextToLeft);
             bindPhishingAlertIcon(contentView, p);
@@ -6690,7 +6717,7 @@ public class Notification implements Parcelable
          * @return {@code true} if the app name will be visible
          */
         private boolean bindHeaderAppName(RemoteViews contentView, StandardTemplateParams p,
-                boolean force) {
+                boolean force, boolean hasTextToLeft) {
             if (p.mViewType == StandardTemplateParams.VIEW_TYPE_MINIMIZED && !force) {
                 // unless the force flag is set, don't show the app name in the minimized state.
                 return false;
@@ -6708,6 +6735,9 @@ public class Notification implements Parcelable
             contentView.setViewVisibility(R.id.app_name_text, View.VISIBLE);
             contentView.setTextViewText(R.id.app_name_text, loadHeaderAppName());
             contentView.setTextColor(R.id.app_name_text, getSecondaryTextColor(p));
+            if (Flags.apiMetricStyle() && hasTextToLeft) {
+                contentView.setViewVisibility(R.id.app_name_text_divider, View.VISIBLE);
+            }
             return true;
         }
 
@@ -8046,6 +8076,10 @@ public class Notification implements Parcelable
             return R.layout.notification_2025_template_expanded_metric;
         }
 
+        private int getExpandedSingleMetricLayoutResource() {
+            return R.layout.notification_2025_template_expanded_single_metric;
+        }
+
         private int getCollapsedMediaLayoutResource() {
             if (Flags.notificationsRedesignTemplates()) {
                 return R.layout.notification_2025_template_collapsed_media;
@@ -9271,21 +9305,23 @@ public class Notification implements Parcelable
      * This class is a "rebuilder": It attaches to a Builder object and modifies its behavior.
      * Here's an example of how this may be used:
      * <pre class="prettyprint">
-     *
      * Person user = new Person.Builder().setIcon(userIcon).setName(userName).build();
      * MessagingStyle style = new MessagingStyle(user)
      *      .addMessage(messages[1].getText(), messages[1].getTime(), messages[1].getPerson())
      *      .addMessage(messages[2].getText(), messages[2].getTime(), messages[2].getPerson())
      *      .setGroupConversation(hasMultiplePeople());
      *
-     * Notification noti = new Notification.Builder()
+     * Notification notif = new Notification.Builder()
      *     .setContentTitle(&quot;2 new messages with &quot; + sender.toString())
      *     .setContentText(subject)
      *     .setSmallIcon(R.drawable.new_message)
-     *     .setLargeIcon(aBitmap)
      *     .setStyle(style)
      *     .build();
      * </pre>
+     *
+     * Note that this style doesn't display the large icon set via
+     * {@link Builder#setLargeIcon(Icon)}, except as a fallback group icon if the shortcut doesn't
+     * include one. It can, however, display images set via {@link MessagingStyle.Message#setData}.
      */
     public static class MessagingStyle extends Style {
 
@@ -9886,7 +9922,6 @@ public class Notification implements Parcelable
         @NonNull
         private RemoteViews makeMessagingView(int viewType) {
             boolean isCollapsed = viewType != StandardTemplateParams.VIEW_TYPE_EXPANDED;
-            boolean hideRightIcons = viewType != StandardTemplateParams.VIEW_TYPE_NORMAL;
             boolean isConversationLayout = mConversationType != CONVERSATION_TYPE_LEGACY;
             boolean isImportantConversation = mConversationType == CONVERSATION_TYPE_IMPORTANT;
             boolean isLegacyHeaderless = !isConversationLayout && isCollapsed;
@@ -9921,8 +9956,8 @@ public class Notification implements Parcelable
                     .viewType(viewType)
                     .highlightExpander(isConversationLayout)
                     .hideProgress(true)
-                    .hideLeftIcon(isOneToOne)
-                    .hideRightIcon(hideRightIcons || isOneToOne);
+                    .hideLeftIcon(true)
+                    .hideRightIcon(true);
             if (notificationsRedesignTemplates()) {
                 String lastMessage = !mMessages.isEmpty()
                         ? mMessages.getLast().mText.toString() : null;
@@ -9956,9 +9991,11 @@ public class Notification implements Parcelable
                     mBuilder.getPrimaryTextColor(p));
             contentView.setInt(R.id.status_bar_latest_event_content, "setMessageTextColor",
                     mBuilder.getSecondaryTextColor(p));
-            contentView.setInt(R.id.status_bar_latest_event_content,
-                    "setNotificationBackgroundColor",
-                    mBuilder.getBackgroundColor(p));
+            if (!SetNotificationBackgroundColorRefactor.isEnabled()) {
+                contentView.setInt(R.id.status_bar_latest_event_content,
+                        "setNotificationBackgroundColor",
+                        mBuilder.getBackgroundColor(p));
+            }
             contentView.setBoolean(R.id.status_bar_latest_event_content, "setIsCollapsed",
                     isCollapsed);
             contentView.setIcon(R.id.status_bar_latest_event_content, "setAvatarReplacement",
@@ -10144,8 +10181,10 @@ public class Notification implements Parcelable
             } else if (mIsGroupConversation) {
                 contentView.setViewVisibility(R.id.icon, View.GONE);
                 contentView.setViewVisibility(R.id.conversation_icon, View.GONE);
-                contentView.setInt(R.id.status_bar_latest_event_content,
-                        "setNotificationBackgroundColor", mBuilder.getBackgroundColor(p));
+                if (!SetNotificationBackgroundColorRefactor.isEnabled()) {
+                    contentView.setInt(R.id.status_bar_latest_event_content,
+                            "setNotificationBackgroundColor", mBuilder.getBackgroundColor(p));
+                }
                 contentView.setInt(R.id.status_bar_latest_event_content, "setLayoutColor",
                         mBuilder.getSmallIconColor(p));
                 contentView.setBundle(R.id.status_bar_latest_event_content, "setGroupFacePile",
@@ -11062,6 +11101,9 @@ public class Notification implements Parcelable
      *     .setStyle(Notification.CallStyle.forIncomingCall(caller, declineIntent, answerIntent))
      *     .build();
      * </pre>
+     *
+     * <p>Note that this style doesn't display the large icon set via
+     * {@link Builder#setLargeIcon(Icon)}.
      */
     public static class CallStyle extends Style {
         /**
@@ -11482,8 +11524,10 @@ public class Notification implements Parcelable
             // Bind some custom CallLayout properties
             contentView.setInt(R.id.status_bar_latest_event_content, "setLayoutColor",
                     mBuilder.getSmallIconColor(p));
-            contentView.setInt(R.id.status_bar_latest_event_content,
-                    "setNotificationBackgroundColor", mBuilder.getBackgroundColor(p));
+            if (!SetNotificationBackgroundColorRefactor.isEnabled()) {
+                contentView.setInt(R.id.status_bar_latest_event_content,
+                        "setNotificationBackgroundColor", mBuilder.getBackgroundColor(p));
+            }
             contentView.setIcon(R.id.status_bar_latest_event_content, "setLargeIcon",
                     mBuilder.mN.mLargeIcon);
             contentView.setBundle(R.id.status_bar_latest_event_content, "setData",
@@ -11630,7 +11674,7 @@ public class Notification implements Parcelable
      * <p>To use this style with your Notification, feed it to
      * {@link Notification.Builder#setStyle(android.app.Notification.Style)} like so:
      * <pre class="prettyprint">
-     * new Notification.Builder(context)
+     * Notification notif = new Notification.Builder(context)
      *   .setStyle(new MetricStyle()
      *       .addMetric(new Metric(new Metric.FixedInt(1979), "Steps"))
      *       .addMetric(new Metric(
@@ -11640,6 +11684,9 @@ public class Notification implements Parcelable
      *
      * <p>A MetricStyle must contain at least one {@link Metric} object to be valid; an invalid
      * style will be rejected when {@link Builder#build()} is called.
+     *
+     * <p>Note that this style doesn't display the large icon set via
+     * {@link Builder#setLargeIcon(Icon)}.
      */
     @FlaggedApi(Flags.FLAG_API_METRIC_STYLE)
     public static final class MetricStyle extends Style {
@@ -11777,11 +11824,12 @@ public class Notification implements Parcelable
             final StandardTemplateParams p = mBuilder.mParams.reset()
                     .viewType(StandardTemplateParams.VIEW_TYPE_NORMAL)
                     .fillTextsFrom(mBuilder).text(null)
+                    .hideProgress(true)
                     .hideRightIcon(true);
             final TemplateBindResult result = new TemplateBindResult();
             final RemoteViews contentView = getStandardView(
                     mBuilder.getCollapsedMetricLayoutResource(), p, result);
-            return bindMetricStyleMetrics(contentView, /* isExpandedView = */false);
+            return bindMetricStyleMetrics(contentView, p, /* isExpandedView = */ false);
         }
 
         /** @hide */
@@ -11790,11 +11838,12 @@ public class Notification implements Parcelable
             final StandardTemplateParams p = mBuilder.mParams.reset()
                     .viewType(StandardTemplateParams.VIEW_TYPE_HEADS_UP)
                     .fillTextsFrom(mBuilder).text(null)
+                    .hideProgress(true)
                     .hideRightIcon(true);
             final TemplateBindResult result = new TemplateBindResult();
             final RemoteViews contentView = getStandardView(
                     mBuilder.getCollapsedMetricLayoutResource(), p, result);
-            return bindMetricStyleMetrics(contentView, /* isExpandedView = */false);
+            return bindMetricStyleMetrics(contentView, p, /* isExpandedView = */ false);
         }
 
         /** @hide */
@@ -11802,16 +11851,24 @@ public class Notification implements Parcelable
         public RemoteViews makeExpandedContentView() {
             final StandardTemplateParams p = mBuilder.mParams.reset()
                     .viewType(StandardTemplateParams.VIEW_TYPE_EXPANDED)
-                    .fillTextsFrom(mBuilder).text(null)
+                    .hideProgress(true)
+                    .fillTextsFrom(mBuilder)
+                    .text(null)
+                    .titleViewId(R.id.alt_title)
                     .hideRightIcon(true);
             final TemplateBindResult result = new TemplateBindResult();
-            final RemoteViews contentView = getStandardView(
-                    mBuilder.getExpandedMetricLayoutResource(), p, result);
-            return bindMetricStyleMetrics(contentView, /* isExpandedView = */true);
+            final int expandedLayoutRes;
+            if (mMetrics.size() == 1) {
+                expandedLayoutRes = mBuilder.getExpandedSingleMetricLayoutResource();
+            } else {
+                expandedLayoutRes = mBuilder.getExpandedMetricLayoutResource();
+            }
+            final RemoteViews contentView = getStandardView(expandedLayoutRes, p, result);
+            return bindMetricStyleMetrics(contentView, p, /* isExpandedView = */true);
         }
 
         private RemoteViews bindMetricStyleMetrics(
-                RemoteViews contentView, boolean isExpandedView) {
+                RemoteViews contentView, StandardTemplateParams p, boolean isExpandedView) {
             for (int i = 0; i < MAX_METRICS; i++) {
                 final MetricView metricView = MetricView.VIEWS.get(i);
                 if (i < mMetrics.size()) {
@@ -11821,7 +11878,7 @@ public class Notification implements Parcelable
                     final Metric.MetricValue.ValueString valueString = metricValue.toValueString(
                             mBuilder.mContext);
 
-                    final String metricLabel;
+                    final CharSequence metricLabel;
                     if (isExpandedView) {
                         if (Flags.metricStyleUnitInLabel()
                                 && !TextUtils.isEmpty(valueString.subtext())) {
@@ -11838,10 +11895,12 @@ public class Notification implements Parcelable
                                 metric.getLabel());
                     }
 
+                    mBuilder.setTextViewColorSecondary(contentView, metricView.labelId(), p);
                     contentView.setTextViewText(metricView.labelId(), metricLabel);
                     if (Flags.metricStyleUnitInLabel()) {
                         contentView.setViewVisibility(metricView.unitId(), View.GONE);
                     } else if (isExpandedView) {
+                        mBuilder.setTextViewColorSecondary(contentView, metricView.unitId(), p);
                         contentView.setViewVisibility(metricView.unitId(),
                                 TextUtils.isEmpty(valueString.subtext())
                                         ? View.GONE
@@ -11852,9 +11911,15 @@ public class Notification implements Parcelable
                     if (metricValue instanceof Metric.TimeDifference timeDifference) {
                         contentView.setViewVisibility(metricView.textValueId(), View.GONE);
                         contentView.setViewVisibility(metricView.chronometerId(), View.VISIBLE);
+                        mBuilder.setTextViewColorSecondary(contentView, metricView.chronometerId(),
+                                p);
+
                         contentView.setChronometerCountDown(
                                 metricView.chronometerId(), timeDifference.isTimer());
-
+                        contentView.setBoolean(metricView.chronometerId(),
+                                "setUseAdaptiveFormat",
+                                timeDifference.getFormat()
+                                        == Metric.TimeDifference.FORMAT_ADAPTIVE);
                         if (timeDifference.getZeroTime() != null) {
                             contentView.setChronometer(metricView.chronometerId(),
                                     timeDifference.getZeroTime(), /* format= */ null,
@@ -11871,10 +11936,11 @@ public class Notification implements Parcelable
                                     "No zeroTime or pausedDuration for running TimeDifference in "
                                             + metric);
                         }
-                        // TODO(b/434910979): implement format support for Chronometer.
                     } else {
                         contentView.setViewVisibility(metricView.chronometerId(), View.GONE);
                         contentView.setViewVisibility(metricView.textValueId(), View.VISIBLE);
+                        mBuilder.setTextViewColorSecondary(contentView, metricView.textValueId(),
+                                p);
                         contentView.setTextViewText(metricView.textValueId(), valueString.text());
                     }
                 } else {
@@ -11931,9 +11997,9 @@ public class Notification implements Parcelable
          * @param value one of the subclasses of {@link MetricValue}, such as {@link FixedInt}
          * @param label metric label -- should be 10 characters or fewer
          */
-        public Metric(@NonNull MetricValue value, @NonNull String label) {
+        public Metric(@NonNull MetricValue value, @NonNull CharSequence label) {
             mValue = requireNonNull(value);
-            mLabel = safeString(requireNonNull(label));
+            mLabel = safeCharSequenceToString(requireNonNull(label));
             checkArgument(!mLabel.isBlank(), "Metric label is required");
         }
 
@@ -11993,7 +12059,7 @@ public class Notification implements Parcelable
          * notification, but it's recommended to keep this to 10 characters or fewer.
          */
         @NonNull
-        public String getLabel() {
+        public CharSequence getLabel() {
             return mLabel;
         }
 
@@ -12092,22 +12158,18 @@ public class Notification implements Parcelable
          * the duration as a fixed value.
          *
          * <p>This value can also specify its formatting, whether as a "chronometer" (e.g. 43:21)
-         * or an adaptive time (e.g. 43m).
+         * or an adaptive time (e.g. 1h 43m).
          */
         public static final class TimeDifference extends MetricValue {
 
-            /** Formatting option: automatically chosen by the system. */
-            public static final int FORMAT_AUTOMATIC = 0;
-
-            /** Formatting option: adaptive (e.g. 1h 5m; 15m; 1m; now). */
+            /** Formatting option: adaptive (e.g. 1h 5m; 15m; 1m 30s; 5s). */
             public static final int FORMAT_ADAPTIVE = 1;
 
             /** Formatting option: chronometer-style, (e.g. two hours = "2:00:00"). */
-            public static final int FORMAT_CHRONOMETER = 3;
+            public static final int FORMAT_CHRONOMETER = 2;
 
             /** @hide */
             @IntDef(prefix = { "FORMAT_" }, value = {
-                    FORMAT_AUTOMATIC,
                     FORMAT_ADAPTIVE,
                     FORMAT_CHRONOMETER
             })
@@ -12208,7 +12270,7 @@ public class Notification implements Parcelable
                         "Exactly one of zeroTime, zeroElapsedRealtime, or pausedDuration must be "
                                 + "present; received %s,%s,%s",
                         zeroTime, zeroElapsedRealtime, pausedDuration);
-                checkArgument(format >= FORMAT_AUTOMATIC && format <= FORMAT_CHRONOMETER,
+                checkArgument(format >= FORMAT_ADAPTIVE && format <= FORMAT_CHRONOMETER,
                         "Invalid format: %s", format);
                 mZeroTime = zeroTime;
                 mZeroElapsedRealtime = zeroElapsedRealtime;
@@ -12228,7 +12290,7 @@ public class Notification implements Parcelable
                 if (zeroTime != null || zeroElapsedRealtime != null || pausedDuration != null) {
                     return new TimeDifference(zeroTime, zeroElapsedRealtime, pausedDuration,
                             bundle.getBoolean(KEY_COUNT_DOWN),
-                            bundle.getInt(KEY_FORMAT, FORMAT_AUTOMATIC));
+                            bundle.getInt(KEY_FORMAT));
                 } else {
                     return null;
                 }
@@ -12623,9 +12685,9 @@ public class Notification implements Parcelable
              *
              * @param unit optional unit for the value. Limit this to a few characters.
              */
-            public FixedInt(int value, @Nullable String unit) {
+            public FixedInt(int value, @Nullable CharSequence unit) {
                 mValue = value;
-                mUnit = safeString(unit);
+                mUnit = safeCharSequenceToString(unit);
             }
 
             @NonNull
@@ -12675,7 +12737,7 @@ public class Notification implements Parcelable
              * this to just a few characters.
              */
             @Nullable
-            public String getUnit() {
+            public CharSequence getUnit() {
                 return mUnit;
             }
 
@@ -12694,7 +12756,7 @@ public class Notification implements Parcelable
             private static final int LOWER_BOUND_FRACTION_DIGITS = 0;
             private static final int UPPER_BOUND_FRACTION_DIGITS = 6;
             /** @hide */ @TestApi public static final int DEFAULT_MIN_FRACTION_DIGITS = 0;
-            /** @hide */ @TestApi public static final int DEFAULT_MAX_FRACTION_DIGITS = 3;
+            /** @hide */ @TestApi public static final int DEFAULT_MAX_FRACTION_DIGITS = 2;
 
             private static final String KEY_VALUE = "value";
             private static final String KEY_UNIT = "unit";
@@ -12715,10 +12777,10 @@ public class Notification implements Parcelable
             }
 
             /**
-             * Creates a {@link FixedFloat} instance with 0 minimum and 3 maximum fractional digits.
+             * Creates a {@link FixedFloat} instance with 0 minimum and 2 maximum fractional digits.
              * @param unit optional unit for the value. Limit this to a few characters.
              */
-            public FixedFloat(float value, @Nullable String unit) {
+            public FixedFloat(float value, @Nullable CharSequence unit) {
                 this(value, unit, DEFAULT_MIN_FRACTION_DIGITS, DEFAULT_MAX_FRACTION_DIGITS);
             }
 
@@ -12731,13 +12793,13 @@ public class Notification implements Parcelable
              * @throws IllegalArgumentException if {@code minFractionDigits} or {@code
              *     maxFractionDigits} do not respect the specified constraints
              */
-            public FixedFloat(float value, @Nullable String unit,
+            public FixedFloat(float value, @Nullable CharSequence unit,
                     @IntRange(from = LOWER_BOUND_FRACTION_DIGITS, to =
                             UPPER_BOUND_FRACTION_DIGITS) int minFractionDigits,
                     @IntRange(from = LOWER_BOUND_FRACTION_DIGITS, to =
                             UPPER_BOUND_FRACTION_DIGITS) int maxFractionDigits) {
                 mValue = value;
-                mUnit = safeString(unit);
+                mUnit = safeCharSequenceToString(unit);
 
                 checkArgument(minFractionDigits >= LOWER_BOUND_FRACTION_DIGITS
                                 && minFractionDigits <= UPPER_BOUND_FRACTION_DIGITS,
@@ -12809,7 +12871,7 @@ public class Notification implements Parcelable
              * just a few characters.
              */
             @Nullable
-            public String getUnit() {
+            public CharSequence getUnit() {
                 return mUnit;
             }
 
@@ -12850,7 +12912,7 @@ public class Notification implements Parcelable
             /**
              * Creates a {@link FixedString} instance with the specified String.
              */
-            public FixedString(@NonNull String value) {
+            public FixedString(@NonNull CharSequence value) {
                 this(value, null);
             }
 
@@ -12859,9 +12921,9 @@ public class Notification implements Parcelable
              *
              * @param unit optional unit for the value. Limit this to a few characters.
              */
-            public FixedString(@NonNull String value, @Nullable String unit) {
-                mValue = safeString(requireNonNull(value));
-                mUnit = safeString(unit);
+            public FixedString(@NonNull CharSequence value, @Nullable CharSequence unit) {
+                mValue = safeCharSequenceToString(requireNonNull(value));
+                mUnit = safeCharSequenceToString(unit);
             }
 
             @NonNull
@@ -12901,7 +12963,7 @@ public class Notification implements Parcelable
 
             /** The string value. */
             @NonNull
-            public String getValue() {
+            public CharSequence getValue() {
                 return mValue;
             }
 
@@ -12914,7 +12976,7 @@ public class Notification implements Parcelable
              * this to just a few characters.
              */
             @Nullable
-            public String getUnit() {
+            public CharSequence getUnit() {
                 return mUnit;
             }
 
@@ -13911,7 +13973,7 @@ public class Notification implements Parcelable
      * <p>To use this style with your Notification, feed it to
      * {@link Notification.Builder#setStyle(android.app.Notification.Style)} like so:
      * <pre class="prettyprint">
-     * Notification noti = new Notification.Builder()
+     * Notification notif = new Notification.Builder()
      *     .setSmallIcon(R.drawable.ic_stat_player)
      *     .setLargeIcon(albumArtBitmap))
      *     .setCustomContentView(contentView);
@@ -16813,7 +16875,7 @@ public class Notification implements Parcelable
                 }
             }
             // make sure every color has a valid value
-            mProtectionColor = ColorUtils.blendARGB(mPrimaryTextColor, mBackgroundColor, 0.9f);
+            mProtectionColor = ctx.getColor(R.color.surface_effect_3);
             mSemanticRedContainerHighColor =
                     ctx.getColor(R.color.materialColorSemanticRedContainerHigh);
         }

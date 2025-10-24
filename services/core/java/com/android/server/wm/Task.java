@@ -156,9 +156,7 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.service.voice.IVoiceInteractionSession;
-// QTI_BEGIN: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
 import android.util.BoostFramework;
-// QTI_END: 2021-04-19: Core: perf: Move app-launch & uxperf boosts
 import android.util.DisplayMetrics;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
@@ -540,6 +538,8 @@ class Task extends TaskFragment {
      */
     private boolean mDisallowOverrideBoundsForChildren;
 
+    SurfaceControl[] mExcludeLayersFromTaskSnapshot;
+
     /**
      * If the window is allowed to be repositioned by {@link
      * android.app.ActivityManager.AppTask#moveTaskTo}.
@@ -549,9 +549,7 @@ class Task extends TaskFragment {
     private static final int TRANSLUCENT_TIMEOUT_MSG = FIRST_ACTIVITY_TASK_MSG + 1;
 
     private final Handler mHandler;
-// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
     private static final ActivityPluginDelegate mQtiActivityPluginDelegate =
-// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
         new ActivityPluginDelegate();
     private class ActivityTaskHandler extends Handler {
 
@@ -1246,7 +1244,7 @@ class Task extends TaskFragment {
         mRootWindowContainer.updateUIDsPresentOnDisplay();
     }
 
-    private boolean isOverrideBoundsAllowed() {
+    boolean isOverrideBoundsAllowed() {
         Task parentTask = getParent() != null ? getParent().asTask() : null;
         while (parentTask != null) {
             if (parentTask.mDisallowOverrideBoundsForChildren) {
@@ -1353,19 +1351,11 @@ class Task extends TaskFragment {
                 // Pausing the resumed activity because it is occluded by other task fragment, or
                 // should not be remained in resumed state.
                 if (startPausing(false /* uiSleeping*/, resuming, reason)) {
-// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
                     if (mQtiActivityPluginDelegate != null && top != null && top.info != null
-// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
-// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                             && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
-// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
-// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
                         mQtiActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
-// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
-// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                                 getWindowingMode() == WINDOWING_MODE_FULLSCREEN, true);
                     }
-// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                     someActivityPaused[0]++;
                 }
             }
@@ -1373,24 +1363,14 @@ class Task extends TaskFragment {
 
         forAllLeafTaskFragments((taskFrag) -> {
             final ActivityRecord resumedActivity = taskFrag.getResumedActivity();
-// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
             final ActivityRecord top = topRunningActivity();
-// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
             if (resumedActivity != null && !taskFrag.canBeResumed(resuming)) {
                 if (taskFrag.startPausing(false /* uiSleeping*/, resuming, reason)) {
-// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
                     if (mQtiActivityPluginDelegate != null && top != null && top.info != null
-// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
-// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                             && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
-// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
-// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
                         mQtiActivityPluginDelegate.activitySuspendNotification(top.info.packageName,
-// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
-// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                                 getWindowingMode() == WINDOWING_MODE_FULLSCREEN, true);
                     }
-// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                     someActivityPaused[0]++;
                 }
             }
@@ -2899,6 +2879,7 @@ class Task extends TaskFragment {
 
         EventLogTags.writeWmTaskRemoved(mTaskId, getRootTaskId(), getDisplayId(), reason);
         clearPinnedTaskIfNeed();
+        clearExcludeLayersFromTaskSnapshot();
         if (mChildPipActivity != null) {
             mChildPipActivity.clearLastParentBeforePip();
         }
@@ -3401,16 +3382,6 @@ class Task extends TaskFragment {
         // bounds match the area the app lives in.
         // If translucent, we will move the dim to the display area
         return inMultiWindowMode() || !isTranslucentAndVisible();
-    }
-
-    @Override
-    void prepareSurfaces() {
-        mDimmer.resetDimStates();
-        super.prepareSurfaces();
-
-        if (mDimmer.hasDimState() && mDimmer.updateDims(getSyncTransaction())) {
-            scheduleAnimation();
-        }
     }
 
     @Override
@@ -4664,7 +4635,8 @@ class Task extends TaskFragment {
     }
 
     /**
-     * Returns whether this task is forcibly excluded from the Recents list.
+     * Returns whether this task or any of its parent task is forcibly excluded from the Recents
+     * list.
      *
      * <p>This flag is used by {@link RecentTasks#isVisibleRecentTask} to determine
      * if the task should be presented to the user through SystemUI. If this method
@@ -4674,7 +4646,18 @@ class Task extends TaskFragment {
      * @return {@code true} if the task is excluded, {@code false} otherwise.
      */
     boolean isForceExcludedFromRecents() {
-        return mForceExcludedFromRecents;
+        if (mForceExcludedFromRecents) {
+            return true;
+        }
+
+        WindowContainer parent = getParent();
+        while (parent != null && parent.asTask() != null) {
+            if (parent.asTask().isForceExcludedFromRecents()) {
+                return true;
+            }
+            parent = parent.getParent();
+        }
+        return false;
     }
 
     /**
@@ -4705,9 +4688,12 @@ class Task extends TaskFragment {
             return true;
         }
         // Check if PIP is disabled on any parent Task.
-        final WindowContainer parent = getParent();
-        if (parent != null && parent.asTask() != null) {
-            return parent.asTask().isDisablePip();
+        WindowContainer parent = getParent();
+        while (parent != null && parent.asTask() != null) {
+            if (parent.asTask().isDisablePip()) {
+                return true;
+            }
+            parent = parent.getParent();
         }
         return false;
     }
@@ -5384,19 +5370,11 @@ class Task extends TaskFragment {
         }
         final boolean[] resumed = new boolean[1];
         final TaskFragment topFragment = topActivity.getTaskFragment();
-// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
         if (mQtiActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED
-// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
-// QTI_BEGIN: 2024-05-29: Core: Update pauseActivityIfNeeded to avoid NullPointerException
                     && topActivity.info != null) {
-// QTI_END: 2024-05-29: Core: Update pauseActivityIfNeeded to avoid NullPointerException
-// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
             mQtiActivityPluginDelegate.activityInvokeNotification(
-// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
-// QTI_BEGIN: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
                     topActivity.info.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN);
         }
-// QTI_END: 2024-04-04: Core: Update ActivityPluginDelegate notifications for V
         forAllLeafTaskFragments(f -> {
             if (topFragment == f) {
                 return;
@@ -5462,14 +5440,10 @@ class Task extends TaskFragment {
         // Slot the activity into the history root task and proceed
         ProtoLog.i(WM_DEBUG_ADD_REMOVE, "Adding activity %s to task %s", r, activityTask);
 
-// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
         if (mQtiActivityPluginDelegate != null) {
             mQtiActivityPluginDelegate.activityInvokeNotification
-// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
-// QTI_BEGIN: 2021-02-05: Core: Update ActivityPluginDelegate notifications for S
                 (r.info.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN);
         }
-// QTI_END: 2021-02-05: Core: Update ActivityPluginDelegate notifications for S
         if (isActivityTypeHomeOrRecents() && getActivityBelow(r) == null) {
             // If this is the first activity, don't do any fancy animations,
             // because there is nothing for it to animate on top of.
@@ -6487,10 +6461,8 @@ class Task extends TaskFragment {
         return mDisplayContent.getDisplayInfo();
     }
     public void onARStopTriggered(ActivityRecord r) {
-// QTI_BEGIN: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
         if (mQtiActivityPluginDelegate != null && getWindowingMode() != WINDOWING_MODE_UNDEFINED) {
                             mQtiActivityPluginDelegate.activitySuspendNotification
-// QTI_END: 2025-04-10: Core: Add Qti Marking for ActivityPluginDelegate
                                 (r.info.applicationInfo.packageName, getWindowingMode() == WINDOWING_MODE_FULLSCREEN, false);
                         }
     }
@@ -7115,6 +7087,26 @@ class Task extends TaskFragment {
             return false;
         }
         return !DevicePolicyCache.getInstance().isScreenCaptureAllowed(mUserId);
+    }
+
+    void setExcludeLayersFromTaskSnapshot(SurfaceControl[] layers) throws RemoteException {
+        clearExcludeLayersFromTaskSnapshot();
+        for (SurfaceControl layer : layers) {
+            if (!layer.isValid()) {
+                throw new RemoteException("Invalid exclude layer from snapshot");
+            }
+        }
+        mExcludeLayersFromTaskSnapshot = layers;
+    }
+
+    void clearExcludeLayersFromTaskSnapshot() {
+        if (mExcludeLayersFromTaskSnapshot == null) {
+            return;
+        }
+        for (SurfaceControl layer : mExcludeLayersFromTaskSnapshot) {
+            layer.release();
+        }
+        mExcludeLayersFromTaskSnapshot = null;
     }
 
     /**

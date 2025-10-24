@@ -341,7 +341,9 @@ constructor(
 
     val qsMediaTranslationY by derivedStateOf {
         if (
-            qsExpansion > 0f &&
+            !MediaControlsInComposeFlag.isEnabled &&
+                !Flags.mediaControlsTranslationFix() &&
+                qsExpansion > 0f &&
                 !isKeyguardState &&
                 !qqsMediaVisible &&
                 !qsMediaInRow &&
@@ -527,7 +529,7 @@ constructor(
         initMediaHosts() // init regardless of using media (same as current QS).
         coroutineScope {
             launch { hydrateSquishinessInteractor() }
-            if (usingMedia) {
+            if (usingMedia && !MediaControlsInComposeFlag.isEnabled) {
                 launch { hydrateQqsMediaExpansion() }
                 launch { hydrateMediaSquishiness() }
                 launch { hydrateMediaDisappearParameters() }
@@ -542,6 +544,8 @@ constructor(
     }
 
     private fun initMediaHosts() {
+        if (MediaControlsInComposeFlag.isEnabled) return
+
         qqsMediaHost.apply {
             expansion = qqsMediaExpansion
             showsOnlyActiveMedia = true

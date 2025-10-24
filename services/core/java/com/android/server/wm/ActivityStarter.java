@@ -129,9 +129,7 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.service.voice.IVoiceInteractionSession;
 import android.text.TextUtils;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.Pools.SynchronizedPool;
 import android.util.Slog;
 import android.widget.Toast;
@@ -1908,6 +1906,20 @@ class ActivityStarter {
                 transition.setReady(started, false);
             }
         }
+
+        if (android.multiuser.Flags.hsuAllowlistActivities()
+                && isStarted && started.mUserId == UserHandle.USER_SYSTEM) {
+            // TODO(b/412177078): for now we're just logging activities launched on HSU, but once
+            // the allowlist mechanism is in place, we'll need to change this call to log a
+            // successful launch, but also log when it's blocked earlier on (probably before the
+            // check for voice session on executeRequest(), as voice interaction is not supported
+            // on the HSU)
+            var umi = mService.getUserManagerInternal();
+            if (umi.isHeadlessSystemUserMode()) {
+                umi.logLaunchedHsuActivity(started.mActivityComponent);
+            }
+        }
+
         return startedActivityRootTask;
     }
 
@@ -1930,17 +1942,6 @@ class ActivityStarter {
 
         computeLaunchingTaskFlags();
         mIntent.setFlags(mLaunchFlags);
-
-        boolean dreamStopping = false;
-        if (!com.android.window.flags.Flags.removeActivityStarterDreamCallback()) {
-            for (ActivityRecord stoppingActivity : mSupervisor.mStoppingActivities) {
-                if (stoppingActivity.getActivityType()
-                        == WindowConfiguration.ACTIVITY_TYPE_DREAM) {
-                    dreamStopping = true;
-                    break;
-                }
-            }
-        }
 
         // Get top task at beginning because the order may be changed when reusing existing task.
         final Task prevTopRootTask = mPreferredTaskDisplayArea.getFocusedRootTask();
@@ -2070,17 +2071,11 @@ class ActivityStarter {
                 mTargetRootTask.getRootTask().moveToFront("reuseOrNewTask", targetTask);
 
                 final boolean launchBehindDream;
-                if (com.android.window.flags.Flags.removeActivityStarterDreamCallback()) {
-                    final TaskDisplayArea tda = mTargetRootTask.getTaskDisplayArea();
-                    final Task top = (tda != null ? tda.getTopRootTask() : null);
-                    launchBehindDream = (top != null && top != mTargetRootTask)
-                            && top.getActivityType() == WindowConfiguration.ACTIVITY_TYPE_DREAM
-                            && top.getTopNonFinishingActivity() != null;
-                } else {
-                    launchBehindDream = !mTargetRootTask.isTopRootTaskInDisplayArea()
-                            && mService.isDreaming()
-                            && !dreamStopping;
-                }
+                final TaskDisplayArea tda = mTargetRootTask.getTaskDisplayArea();
+                final Task top = (tda != null ? tda.getTopRootTask() : null);
+                launchBehindDream = (top != null && top != mTargetRootTask)
+                        && top.getActivityType() == WindowConfiguration.ACTIVITY_TYPE_DREAM
+                        && top.getTopNonFinishingActivity() != null;
 
                 if (launchBehindDream) {
                     // Launching underneath dream activity (fullscreen, always-on-top). Run the
@@ -3242,9 +3237,7 @@ class ActivityStarter {
 
     /** Places {@link #mStartActivity} in {@code task} or an embedded {@link TaskFragment}. */
     private void addOrReparentStartingActivity(@NonNull Task task, String reason) {
-// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
         mStartActivity.acquireActivityBoost();
-// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
         TaskFragment newParent = task;
         if (mInTaskFragment != null) {
             int embeddingCheckResult = canEmbedActivity(mInTaskFragment, mStartActivity, task);

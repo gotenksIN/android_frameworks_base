@@ -507,7 +507,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
 
             final boolean processWarm = queue.isProcessWarm();
             if (processWarm) {
-                mService.mOomAdjuster.unfreezeTemporarily(queue.app,
+                mService.unfreezeTemporarily(queue.app,
                         CachedAppOptimizer.UNFREEZE_REASON_START_RECEIVER);
                 // The process could be killed as part of unfreezing. So, check again if it
                 // is still warm.
@@ -791,7 +791,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
             }
             queue.enqueueOutgoingBroadcast(r);
             mHistory.onBroadcastFrozenLocked(r);
-            mService.mOomAdjuster.mCachedAppOptimizer.freezeAppAsyncImmediateLSP(r.callerApp);
+            mService.getCachedAppOptimizer().freezeAppAsyncImmediateLSP(r.callerApp);
             return;
         }
         if (DEBUG_BROADCAST || r.debugLog()) {
@@ -1168,7 +1168,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
                     == PowerExemptionManager.TEMPORARY_ALLOW_LIST_TYPE_APP_FREEZING_DELAYED) {
                 // Only delay freezer, don't add to any temp allowlist
                 // TODO: Add a unit test
-                mService.mOomAdjuster.mCachedAppOptimizer.unfreezeTemporarily(app,
+                mService.getCachedAppOptimizer().unfreezeTemporarily(app,
                         CachedAppOptimizer.UNFREEZE_REASON_START_RECEIVER,
                         r.options.getTemporaryAppAllowlistDuration());
             } else {
@@ -1253,7 +1253,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
         final ProcessRecord app = r.resultToApp;
         final IApplicationThread thread = (app != null) ? app.getOnewayThread() : null;
         if (thread != null) {
-            mService.mOomAdjuster.unfreezeTemporarily(
+            mService.unfreezeTemporarily(
                     app, CachedAppOptimizer.UNFREEZE_REASON_FINISH_RECEIVER);
             if (r.shareIdentity && app.uid != r.callingUid) {
                 mService.mPackageManagerInt.grantImplicitAccess(r.userId, r.intent,
@@ -2096,7 +2096,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
                 mService.updateLruProcessLocked(queue.app, false, null);
             }
 
-            mService.mOomAdjuster.unfreezeTemporarily(queue.app,
+            mService.unfreezeTemporarily(queue.app,
                     CachedAppOptimizer.UNFREEZE_REASON_START_RECEIVER);
 
             mService.mProcessStateController.noteBroadcastDeliveryStarted(queue.app,

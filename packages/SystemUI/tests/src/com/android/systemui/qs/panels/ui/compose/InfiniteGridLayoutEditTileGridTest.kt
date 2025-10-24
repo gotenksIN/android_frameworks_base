@@ -16,46 +16,44 @@
 
 package com.android.systemui.qs.panels.ui.compose
 
-import android.platform.test.annotations.DisableFlags
-import android.platform.test.annotations.EnableFlags
-import android.platform.test.flag.junit.FlagsParameterization
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
-import androidx.compose.ui.test.filter
-import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.theme.PlatformTheme
+import com.android.systemui.Flags.qsSplitInternetTile
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.compose.modifiers.resIdToTestTag
 import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.flags.EnableSceneContainer
+import com.android.systemui.haptics.msdl.tileHapticsViewModelFactoryProvider
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
-import com.android.systemui.qs.flags.QsEditModeTabs
 import com.android.systemui.qs.panels.data.repository.defaultLargeTilesRepository
 import com.android.systemui.qs.panels.domain.interactor.iconTilesInteractor
-import com.android.systemui.qs.panels.ui.compose.infinitegrid.infiniteGridLayout
-import com.android.systemui.qs.panels.ui.viewmodel.dynamicIconTilesViewModel
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.InfiniteGridLayout
+import com.android.systemui.qs.panels.ui.viewmodel.InfiniteGridViewModel
+import com.android.systemui.qs.panels.ui.viewmodel.detailsViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.editModeViewModel
+import com.android.systemui.qs.panels.ui.viewmodel.iconTilesViewModel
+import com.android.systemui.qs.panels.ui.viewmodel.infiniteGridViewModelFactory
+import com.android.systemui.qs.panels.ui.viewmodel.textFeedbackContentViewModelFactory
 import com.android.systemui.qs.pipeline.domain.interactor.currentTilesInteractor
 import com.android.systemui.qs.pipeline.shared.TileSpec
 import com.android.systemui.testKosmos
@@ -64,22 +62,33 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import platform.test.runner.parameterized.ParameterizedAndroidJunit4
-import platform.test.runner.parameterized.Parameters
 
 @SmallTest
-@RunWith(ParameterizedAndroidJunit4::class)
-class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTestCase() {
-
-    init {
-        mSetFlagsRule.setFlagsParameterization(flags)
-    }
+@RunWith(AndroidJUnit4::class)
+class InfiniteGridLayoutEditTileGridTest : SysuiTestCase() {
 
     @get:Rule val composeRule = createComposeRule()
 
     private val kosmos = testKosmos().useUnconfinedTestDispatcher()
 
-    private val Kosmos.underTest by Kosmos.Fixture { infiniteGridLayout }
+    private val Kosmos.viewModelUnderTest by
+        Kosmos.Fixture { infiniteGridViewModelFactory.create() }
+
+    private val Kosmos.underTest by
+        Kosmos.Fixture {
+            InfiniteGridLayout(
+                detailsViewModel,
+                iconTilesViewModel,
+                viewModelFactory =
+                    object : InfiniteGridViewModel.Factory {
+                        override fun create(): InfiniteGridViewModel {
+                            return viewModelUnderTest
+                        }
+                    },
+                textFeedbackContentViewModelFactory,
+                tileHapticsViewModelFactoryProvider,
+            )
+        }
 
     @Before
     fun setUp() {
@@ -116,15 +125,10 @@ class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTe
             composeRule.setContent { TestEditTileGrid() }
             composeRule.waitForIdle()
 
-            if (QsEditModeTabs.isEnabled) {
-                // Tap on Layout tab to select
-                composeRule.onNodeWithText("Layout").performClick()
-            }
-
             val stateOnFirstMove =
                 listOf(
                     "bt",
-                    "internet",
+                    internetTileSpec,
                     "flashlight",
                     "dnd",
                     "alarm",
@@ -137,7 +141,7 @@ class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTe
             val stateOnSecondMove =
                 listOf(
                     "bt",
-                    "internet",
+                    internetTileSpec,
                     "alarm",
                     "flashlight",
                     "dnd",
@@ -150,7 +154,9 @@ class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTe
 
             // Perform first move
             // Double tap internet
-            composeRule.onNodeWithContentDescription("internet").performTouchInput { doubleClick() }
+            composeRule.onNodeWithContentDescription(internetTileSpec).performTouchInput {
+                doubleClick()
+            }
             // Tap on bt to position internet in its spot
             composeRule.onNodeWithContentDescription("bt").performClick()
             composeRule.waitForIdle()
@@ -233,13 +239,13 @@ class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTe
             composeRule.waitForIdle()
 
             // Perform first removal.
-            composeRule.onNodeWithContentDescription("internet").performTouchInput {
+            composeRule.onNodeWithContentDescription(internetTileSpec).performTouchInput {
                 click(position = topRight)
             }
             composeRule.waitForIdle()
 
             // Assert the removal happened
-            assertThat(latest!!.find { it.tile.tileSpec == "internet" }).isNull()
+            assertThat(latest!!.find { it.tile.tileSpec == internetTileSpec }).isNull()
 
             // Perform second removal
             composeRule.onNodeWithContentDescription("bt").performTouchInput {
@@ -258,7 +264,7 @@ class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTe
             // Perform second undo
             composeRule.onNodeWithContentDescription("Undo").performClick()
             // Assert that internet is current
-            assertThat(latest!!.find { it.tile.tileSpec == "internet" }).isNotNull()
+            assertThat(latest!!.find { it.tile.tileSpec == internetTileSpec }).isNotNull()
         }
 
     @Test
@@ -267,14 +273,9 @@ class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTe
             composeRule.setContent { TestEditTileGrid() }
             composeRule.waitForIdle()
 
-            if (QsEditModeTabs.isEnabled) {
-                // Tap on Layout tab to select
-                composeRule.onNodeWithText("Layout").performClick()
-            }
-
             // Resize tileA to large
             composeRule
-                .onNodeWithContentDescription("internet")
+                .onNodeWithContentDescription(internetTileSpec)
                 .performClick() // Select
                 .performTouchInput { // Tap on resizing handle
                     click(centerRight)
@@ -302,14 +303,11 @@ class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTe
 
             // Perform second undo
             composeRule.onNodeWithContentDescription("Undo").performClick()
-            assertLargeTiles(setOf("internet", "bt", "dnd", "cast"))
-            assertThat(dynamicIconTilesViewModel.largeTilesState.value.map { it.spec })
-                .containsExactly("internet", "bt", "dnd", "cast")
+            assertLargeTiles(setOf(internetTileSpec, "bt", "dnd", "cast"))
         }
 
     @Test
     @DisableSceneContainer
-    @DisableFlags(QsEditModeTabs.FLAG_NAME)
     fun bothFlagsDisabled_noExtraOptions() =
         kosmos.runTest {
             composeRule.setContent { TestEditTileGrid() }
@@ -322,7 +320,6 @@ class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTe
 
     @Test
     @EnableSceneContainer
-    @DisableFlags(QsEditModeTabs.FLAG_NAME)
     fun onlySceneContainer_onlySettingsOption() =
         kosmos.runTest {
             composeRule.setContent { TestEditTileGrid() }
@@ -333,60 +330,20 @@ class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTe
             composeRule.onNodeWithContentDescription("Options").assertDoesNotExist()
         }
 
-    @Test
-    @DisableSceneContainer
-    @EnableFlags(QsEditModeTabs.FLAG_NAME)
-    fun onlyEditModeTabs_onlyResetOption() =
-        kosmos.runTest {
-            composeRule.setContent { TestEditTileGrid() }
-            composeRule.waitForIdle()
-
-            composeRule.onNodeWithContentDescription("Settings").assertDoesNotExist()
-            composeRule.onNodeWithContentDescription("Reset").assertExists()
-            composeRule.onNodeWithContentDescription("Options").assertDoesNotExist()
-        }
-
-    @Test
-    @EnableSceneContainer
-    @EnableFlags(QsEditModeTabs.FLAG_NAME)
-    fun bothFlags_menuWithOptions() =
-        kosmos.runTest {
-            composeRule.setContent { TestEditTileGrid() }
-            composeRule.waitForIdle()
-
-            composeRule.onNodeWithTag(OPTIONS_DROP_DOWN_TEST_TAG).assertDoesNotExist()
-            composeRule.onNodeWithContentDescription("Settings").assertDoesNotExist()
-            composeRule.onNodeWithContentDescription("Reset").assertDoesNotExist()
-            composeRule.onNodeWithContentDescription("Options").assertExists().performClick()
-
-            composeRule
-                .onNodeWithTag(OPTIONS_DROP_DOWN_TEST_TAG)
-                .onChildren()
-                .filter(hasClickAction())
-                .assertCountEquals(2)
-                .run {
-                    get(0).assertTextEquals("Settings")
-                    get(1).assertTextEquals("Reset")
-                }
-        }
-
     private fun assertLargeTiles(largeSpecs: Set<String>) =
         kosmos.run {
-            assertThat(dynamicIconTilesViewModel.largeTilesState.value.map { it.spec })
+            assertThat(viewModelUnderTest.iconTilesViewModel.largeTilesState.value.map { it.spec })
                 .containsExactlyElementsIn(largeSpecs)
         }
 
     companion object {
 
-        @Parameters(name = "{0}")
-        @JvmStatic
-        fun data() = FlagsParameterization.progressionOf(QsEditModeTabs.FLAG_NAME)
-
         private val AVAILABLE_TILES_GRID_TEST_TAG = resIdToTestTag("AvailableTilesGrid")
         private const val OPTIONS_DROP_DOWN_TEST_TAG = "OptionsDropdown"
+        private val internetTileSpec = if (qsSplitInternetTile()) "wifi" else "internet"
         private val TestEditTiles =
             listOf(
-                TileSpec.create("internet"),
+                TileSpec.create(internetTileSpec),
                 TileSpec.create("bt"),
                 TileSpec.create("flashlight"),
                 TileSpec.create("dnd"),

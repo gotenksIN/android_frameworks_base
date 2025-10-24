@@ -24,7 +24,7 @@ import java.util.Map;
  * the activity manager by an application  when it starts up, for the activity
  * manager to tell the application about things it needs to do.
  *
- * {@hide}
+ * @hide
  */
 oneway interface INativeApplicationThread {
     @UnsupportedAppUsage
@@ -50,4 +50,7 @@ oneway interface INativeApplicationThread {
 
     @UnsupportedAppUsage
     void bindApplication();
+
+    @UnsupportedAppUsage
+    void setProcessState(int state);
 }

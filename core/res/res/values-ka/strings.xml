@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"სამსახურის პროფილზე გადართვა"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"<xliff:g id="APP_NAME">%1$s</xliff:g>-ის პირად ვერსიაზე გადასვლა"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"<xliff:g id="APP_NAME">%1$s</xliff:g>-ის სამსახურის ვერსიაზე გადასვლა"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"კონტაქტები"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"თქვენს კონტაქტებზე წვდომა"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"კონტაქტები და ანგარიშები"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"თქვენს კონტაქტებზე წვდომა და იმ ანგარიშების სიის ნახვა, რომლებსაც ამ მოწყობილობაზე კონტაქტების შენახვა შეუძლია"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"მდებარეობა"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"მოწყობილობის მდებარეობაზე წვდომა"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"კალენდარი"</string>
@@ -370,8 +370,8 @@
     <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"თვალის მოძრაობების ზუსტი განსაზღვრა"</string>
     <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"მოძრაობისა და სივრცის მონაცემები"</string>
     <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"თვალის, სახის, სხეულის მოძრაობების თვალყურის დევნა და სივრცის სკანირება"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"თავის მოძრაობებისა და სივრცის მონაცემები"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"თავის მოძრაობის ზუსტი თვალყურის დევნა და სივრცის სკანირება"</string>
+    <string name="permgrouplab_xr_tracking_sensitive" msgid="6574264227123545314">"მოძრაობისა და სივრცის ზუსტი მონაცემები"</string>
+    <string name="permgroupdesc_xr_tracking_sensitive" msgid="2480835734248509848">"სივრცის ზუსტი სკანირება და თავის მოძრაობის თვალის დევნება"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"ფანჯრის კონტენტის მოძიება"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"იმ ფანჯრის კონტენტის შემოწმება, რომელშიც მუშაობთ."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"„შეხებით აღმოჩენის“ ჩართვა"</string>
@@ -639,6 +639,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"ნებას რთავს აპს, დაადგინოს შედარებითი პოზიცია ახლომახლო ულტრაფართო სიხშირის მოწყობილობების შესახებ"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"ინტერაქცია ახლომახლო Wi-Fi მოწყობილობებთან"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"საშუალებას აძლევს აპს, განაცხადოს ახლომახლო Wi-Fi მოწყობილობების შესახებ, დაუკავშირდეს მათ და განსაზღვროს მათი შედარებითი პოზიცია"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"ადგილობრივ ქსელურ მოწყობილობებზე წვდომა"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"აპს საშუალებას აძლევს, წვდომა იქონიოს ადგილობრივ ქსელურ მოწყობილობებზე"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"ახლომახლო მოწყობილობებთან მიმართ. პოზიციის დადგენა"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"აპისთვის ახლომახლო მოწყობილობებთან მიმართებაში პოზიციის დადგენის ნების დართვა"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"უპირატესი NFC გადახდის სერვისის ინფორმაცია"</string>
@@ -683,7 +685,7 @@
     <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"საშუალებას აძლევს აპს, დაასკანიროს სივრცე თქვენ გარშემო."</string>
     <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"თქვენ გარშემო სივრცის ზუსტი სკანირება"</string>
     <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"საშუალებას აძლევს აპს, ზუსტად დაასკანიროს სივრცე თქვენ გარშემო."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"ფონზე არსებული XR მონაცემების თვალყურის დევნა"</string>
+    <string name="permlab_xr_tracking_in_background" msgid="1714941204255185460">"XR თვალყურის დევნებაზე წვდომა ფონურ რეჟიმში"</string>
     <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"საშუალებას აძლევს აპს, მოიპოვოს წვდომა ფონზე არსებულ XR მონაცემებზე."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"კლავიშების დაჭერა"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"აპს საშუალებას აძლევს, დაიჭიროს კლავიშები, სანამ სისტემა სისტემის მალსახმობებისა და მოქმედებების დამუშავებას შეძლებს."</string>
@@ -1984,8 +1986,10 @@
     <string name="package_updated_device_owner" msgid="7770195449213776218">"განახლებულია თქვენი ადმინისტრატორის მიერ.\nდაშვებული ნებართვების სანახავად გადადით პარამეტრებზე"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"წაიშალა თქვენი ადმინისტრატორის მიერ"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"კარგი"</string>
-    <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"ბატარეის დამზოგი ჩართავს მუქ თემას და შეზღუდავს ან გამორთავს ფონურ აქტივობას, ზოგიერთ ვიზუალურ ეფექტს, გარკვეულ ფუნქციებსა და ზოგიერთ ქსელთან კავშირს."</string>
-    <string name="battery_saver_description" msgid="8518809702138617167">"ბატარეის დამზოგი ჩართავს მუქ თემას და შეზღუდავს ან გამორთავს ფონურ აქტივობას, ზოგიერთ ვიზუალურ ეფექტს, გარკვეულ ფუნქციებსა და ზოგიერთ ქსელთან კავშირს."</string>
+    <!-- no translation found for battery_saver_description_with_learn_more (8969945879044849461) -->
+    <skip />
+    <!-- no translation found for battery_saver_description (2820475140307374570) -->
+    <skip />
     <string name="data_saver_description" msgid="4995164271550590517">"მობილური ინტერნეტის მოხმარების შემცირების მიზნით, მონაცემთა დამზოგველი ზოგიერთ აპს ფონურ რეჟიმში მონაცემთა გაგზავნასა და მიღებას შეუზღუდავს. თქვენ მიერ ამჟამად გამოყენებული აპი მაინც შეძლებს მობილურ ინტერნეტზე წვდომას, თუმცა ამას ნაკლები სიხშირით განახორციელებს. ეს ნიშნავს, რომ, მაგალითად, სურათები არ გამოჩნდება მანამ, სანამ მათ საგანგებოდ არ შეეხებით."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"ჩაირთოს მონაცემთა დამზოგველი?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"ჩართვა"</string>
@@ -2592,10 +2596,7 @@
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"შეეხეთ, რომ მიმოიხილოთ მინიშნებები თქვენი განბლოკვის გამოცდილების გასაუმჯობესებლად"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"არ იციმციმოს"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"ტელევიზორის გამოსართავად ხანგრძლივად დააჭირეთ ჩართვის ღილაკს"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"სისტემის რესურსების გაფრთხილებები"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"რესურსების გადაჭარბებული გამოყენება"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"აპი „<xliff:g id="APP_NAME">%1$s</xliff:g> იყენებს ზედმეტად ბევრ რესურსს“"</string>
 </resources>

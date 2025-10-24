@@ -28,6 +28,7 @@ import com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_BIO
 import com.android.internal.widget.LockscreenCredential
 import com.android.keyguard.KeyguardSecurityModel
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
+import com.android.systemui.authentication.shared.model.AuthenticationMethodModel.Biometric
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel.None
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel.Password
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel.Pattern
@@ -46,6 +47,8 @@ import dagger.Binds
 import dagger.Module
 import java.util.function.Function
 import javax.inject.Inject
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -93,11 +96,11 @@ interface AuthenticationRepository {
      * Timestamp for when the current lockout (aka "throttling") will end, allowing the user to
      * attempt authentication again. Returns `null` if no lockout is active.
      *
-     * Note that the value is in milliseconds and matches [SystemClock.elapsedRealtime].
+     * Note that the value should be compared to [SystemClock.elapsedRealtime].milliseconds.
      *
      * Also note that the value may change when the selected user is changed.
      */
-    val lockoutEndTimestamp: Long?
+    val lockoutEndTime: Duration?
 
     /**
      * Whether lockout has occurred at least once since the last successful authentication of any
@@ -254,10 +257,10 @@ constructor(
     override val failedAuthenticationAttempts: StateFlow<Int> =
         _failedAuthenticationAttempts.asStateFlow()
 
-    override val lockoutEndTimestamp: Long?
+    override val lockoutEndTime: Duration?
         get() =
-            lockPatternUtils.getLockoutAttemptDeadline(selectedUserId).takeIf {
-                clock.elapsedRealtime() < it
+            lockPatternUtils.getLockoutAttemptDeadline(selectedUserId).milliseconds.takeIf {
+                clock.elapsedRealtime().milliseconds < it
             }
 
     private val _hasLockoutOccurred = MutableStateFlow(false)
@@ -413,6 +416,7 @@ constructor(
                 KeyguardSecurityModel.SecurityMode.Password -> Password
                 KeyguardSecurityModel.SecurityMode.Pattern -> Pattern
                 KeyguardSecurityModel.SecurityMode.None -> None
+                KeyguardSecurityModel.SecurityMode.SecureLockDeviceBiometricAuth -> Biometric
                 KeyguardSecurityModel.SecurityMode.Invalid -> error("Invalid security mode!")
             }
         }

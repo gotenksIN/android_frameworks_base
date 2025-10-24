@@ -87,6 +87,8 @@
     <string name="bluetooth_connecting" msgid="5871702668260192755">"正在連線..."</string>
     <string name="bluetooth_connected" msgid="8065345572198502293">"已連接「<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>」"</string>
     <string name="bluetooth_pairing" msgid="4269046942588193600">"正在配對..."</string>
+    <string name="bluetooth_pairing_failure" msgid="6914444518793157913">"無法配對"</string>
+    <string name="bluetooth_connection_failure" msgid="384203214661155324">"無法連線"</string>
     <string name="bluetooth_connected_no_headset" msgid="2224101138659967604">"已連接「<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>」(無手機音訊)"</string>
     <string name="bluetooth_connected_no_a2dp" msgid="8566874395813947092">"已連接「<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>」(無媒體音訊)"</string>
     <string name="bluetooth_connected_no_headset_no_a2dp" msgid="2893204819854215433">"已連接「<xliff:g id="ACTIVE_DEVICE">%1$s</xliff:g>」(無手機或媒體音訊)"</string>
@@ -116,6 +118,9 @@
     <string name="bluetooth_hearing_aid_right_active" msgid="2244728507170385397">"使用中 (僅右側)"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="4294571497939983181">"使用中 (左右兩側)"</string>
     <string name="bluetooth_hearing_device_ambient_error" msgid="6035857289108813878">"無法更新環境聲音"</string>
+    <string name="bluetooth_hearing_aids_presets_error" msgid="4523942574698610976">"無法更新預設"</string>
+    <!-- no translation found for hearing_device_spinner_item_selected (3884049360428514878) -->
+    <skip />
     <string name="bluetooth_active_media_only_battery_level" msgid="7772517511061834073">"啟用 (只限媒體)。<xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> 電量。"</string>
     <string name="bluetooth_active_media_only_battery_level_untethered" msgid="7444753133664620926">"啟用 (只限媒體)，左側：<xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g> 電量，右側：<xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g> 電量。"</string>
     <string name="bluetooth_guest_battery_level" msgid="2820003593899467676">"訪客裝置。<xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> 電量。"</string>
@@ -345,7 +350,7 @@
     <string name="wifi_non_persistent_mac_randomization_summary" msgid="2159794543105053930">"啟用此模式後，每次連接至已啟用 MAC 隨機處理的網絡時，此裝置的 MAC 位址都可能會變更。"</string>
     <string name="wifi_metered_label" msgid="8737187690304098638">"按用量收費"</string>
     <string name="wifi_unmetered_label" msgid="6174142840934095093">"不限數據用量收費"</string>
-    <string name="select_logd_size_title" msgid="1604578195914595173">"記錄器緩衝區空間"</string>
+    <string name="select_logd_size_title" msgid="4393502933789367691">"記錄器緩衝區大小"</string>
     <string name="select_logd_size_dialog_title" msgid="2105401994681013578">"選取每個記錄緩衝區的記錄器空間"</string>
     <string name="dev_logpersist_clear_warning_title" msgid="8631859265777337991">"要清除記錄器的持久儲存空間嗎？"</string>
     <string name="dev_logpersist_clear_warning_message" msgid="6447590867594287413">"當我們不再使用持久記錄器進行監察，便需要清除你裝置上的記錄器資料。"</string>
@@ -393,7 +398,7 @@
     <string name="debug_monitoring_category" msgid="1597387133765424994">"監控"</string>
     <string name="window_management_category" msgid="2015535427098365170">"視窗管理"</string>
     <string name="strict_mode" msgid="889864762140862437">"嚴格模式已啟用"</string>
-    <string name="strict_mode_summary" msgid="1838248687233554654">"當應用程式在主執行緒中進行長時間作業時，讓螢幕閃爍"</string>
+    <string name="strict_mode_summary" msgid="1838248687233554654">"當應用程式在主執行緒中進行長時間操作時，使螢幕閃爍"</string>
     <string name="pointer_location" msgid="7516929526199520173">"指標位置"</string>
     <string name="pointer_location_summary" msgid="957120116989798464">"在重疊式畫面上顯示目前的觸控資料"</string>
     <string name="show_touches" msgid="8437666942161289025">"顯示輕按回應"</string>
@@ -410,7 +415,7 @@
     <string name="show_hw_layers_updates_summary" msgid="5850955890493054618">"在硬件層更新時閃動綠燈"</string>
     <string name="debug_hw_overdraw" msgid="8944851091008756796">"GPU 透支偵錯"</string>
     <string name="disable_overlays" msgid="4206590799671557143">"停用 HW 重疊效果"</string>
-    <string name="disable_overlays_summary" msgid="1954852414363338166">"永遠使用 GPU 進行畫面合成"</string>
+    <string name="disable_overlays_summary" msgid="1954852414363338166">"一律使用 GPU 進行畫面合成"</string>
     <string name="simulate_color_space" msgid="1206503300335835151">"模擬色彩空間"</string>
     <string name="enable_opengl_traces_title" msgid="4638773318659125196">"啟用 OpenGL 追蹤"</string>
     <string name="usb_audio_disable_routing" msgid="3367656923544254975">"停用 USB 音效檔案路由功能"</string>
@@ -450,9 +455,9 @@
     <string name="show_notification_channel_warnings" msgid="3448282400127597331">"顯示通知渠道警告"</string>
     <string name="show_notification_channel_warnings_summary" msgid="68031143745094339">"當應用程式未經有效渠道發佈通知時，在螢幕上顯示警告"</string>
     <string name="force_allow_on_external" msgid="9187902444231637880">"強制允許應用程式寫入到外部儲存空間"</string>
-    <string name="force_allow_on_external_summary" msgid="8525425782530728238">"在任何資訊清單值下，允許將所有符合資格的應用程式寫入到外部儲存完間"</string>
-    <string name="force_resizable_activities" msgid="7143612144399959606">"強制將活動設為可調整尺寸"</string>
-    <string name="force_resizable_activities_summary" msgid="2490382056981583062">"在任何資訊清單值下，允許系統配合多重視窗環境調整所有活動的尺寸。"</string>
+    <string name="force_allow_on_external_summary" msgid="8525425782530728238">"允許將所有應用程式寫入到外部儲存完間，不受資訊清單所設定的值影響"</string>
+    <string name="force_resizable_activities" msgid="7143612144399959606">"強制將活動設為可調整大小"</string>
+    <string name="force_resizable_activities_summary" msgid="2490382056981583062">"將所有活動配合多重視窗環境調整大小，不受資訊清單所設定的值影響"</string>
     <string name="enable_freeform_support" msgid="7599125687603914253">"啟用自由形態視窗"</string>
     <string name="local_backup_password_title" msgid="4631017948933578709">"桌面電腦備份密碼"</string>
     <string name="local_backup_password_summary_none" msgid="7646898032616361714">"桌面電腦的完整備份目前未受保護"</string>

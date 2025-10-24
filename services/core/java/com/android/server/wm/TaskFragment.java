@@ -91,9 +91,7 @@ import android.graphics.Rect;
 import android.os.IBinder;
 import android.os.UserHandle;
 import android.util.ArraySet;
-// QTI_BEGIN: 2021-11-22: Core: perf: Refactor Animation Boost
 import android.util.BoostFramework;
-// QTI_END: 2021-11-22: Core: perf: Refactor Animation Boost
 import android.util.DisplayMetrics;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
@@ -106,9 +104,7 @@ import android.window.TaskFragmentInfo;
 import android.window.TaskFragmentOrganizerToken;
 
 import com.android.internal.annotations.VisibleForTesting;
-// QTI_BEGIN: 2021-11-22: Core: perf: Move ActivityResumeTrigger based on refactored code.
 import com.android.internal.app.ActivityTrigger;
-// QTI_END: 2021-11-22: Core: perf: Move ActivityResumeTrigger based on refactored code.
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.ToBooleanFunction;
 import com.android.server.am.HostingRecord;
@@ -207,13 +203,9 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     private final TaskFragmentOrganizerController mTaskFragmentOrganizerController;
     private final LockTaskController mLockTaskController;
 
-// QTI_BEGIN: 2021-11-22: Core: perf: Refactor Animation Boost
     public BoostFramework mPerf = null;
-// QTI_END: 2021-11-22: Core: perf: Refactor Animation Boost
-// QTI_BEGIN: 2021-11-22: Core: perf: Move ActivityResumeTrigger based on refactored code.
     //ActivityTrigger
     static final ActivityTrigger mActivityTrigger = new ActivityTrigger();
-// QTI_END: 2021-11-22: Core: perf: Move ActivityResumeTrigger based on refactored code.
 
     // TODO(b/233177466): Move mMinWidth and mMinHeight to Task and remove usages in TaskFragment
     /**
@@ -819,6 +811,34 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     @Override
     boolean isEmbedded() {
         return mIsEmbedded;
+    }
+
+
+    /**
+     * Returns true if this container fills its parent by policy or bounds. Similar to
+     * {@link ActivityRecord}, this returns {@code true} if it has override bounds which equals
+     * to its parent bounds
+     */
+    @Override
+    boolean fillsParentBounds() {
+        if (com.android.window.flags.Flags.rootTaskForBubble()) {
+            final int windowingMode = getWindowingMode();
+            if (windowingMode == WINDOWING_MODE_PINNED) {
+                return false;
+            }
+            if (windowingMode == WINDOWING_MODE_FULLSCREEN) {
+                return true;
+            }
+
+            final Rect overrideBounds = getResolvedOverrideBounds();
+            if (overrideBounds.isEmpty()) {
+                return true;
+            }
+            final WindowContainer parent = getParent();
+            return parent == null || parent.getBounds().equals(overrideBounds);
+        }
+
+        return super.fillsParentBounds();
     }
 
     @EmbeddingCheckResult
@@ -1601,15 +1621,12 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         // The activity may be waiting for stop, but that is no longer
         // appropriate for it.
         mTaskSupervisor.mStoppingActivities.remove(next);
-// QTI_BEGIN: 2023-05-22: Core: DSR: Fix broken DSR
 
         if (!next.translucentWindowLaunch)
             next.launching = true;
-// QTI_END: 2023-05-22: Core: DSR: Fix broken DSR
 
         if (DEBUG_SWITCH) Slog.v(TAG_SWITCH, "Resuming " + next);
 
-// QTI_BEGIN: 2021-11-22: Core: perf: Move ActivityResumeTrigger based on refactored code.
         //Trigger Activity Resume
         if (mActivityTrigger != null) {
             mActivityTrigger.activityResumeTrigger(next.intent, next.info,
@@ -1617,7 +1634,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                                                    next.occludesParent());
         }
 
-// QTI_END: 2021-11-22: Core: perf: Move ActivityResumeTrigger based on refactored code.
         mTaskSupervisor.setLaunchSource(next.info.applicationInfo.uid);
 
         ActivityRecord lastResumed = null;
@@ -1718,46 +1734,38 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         // to ignore it when computing the desired screen orientation.
         boolean anim = true;
         final DisplayContent dc = taskDisplayArea.mDisplayContent;
-// QTI_BEGIN: 2021-11-22: Core: perf: Refactor Animation Boost
 
         if (mPerf == null) {
             mPerf = new BoostFramework();
         }
 
-// QTI_END: 2021-11-22: Core: perf: Refactor Animation Boost
         if (prev != null) {
             if (prev.finishing) {
                 if (mTaskSupervisor.mNoAnimActivities.contains(prev)) {
                     anim = false;
-// QTI_BEGIN: 2021-11-22: Core: perf: Refactor Animation Boost
                     if(prev.getTask() != next.getTask() && mPerf != null) {
                        mPerf.perfHint(BoostFramework.VENDOR_HINT_ANIM_BOOST,
                            next.packageName);
                     }
-// QTI_END: 2021-11-22: Core: perf: Refactor Animation Boost
                 }
                 prev.setVisibility(false);
             } else {
                 if (mTaskSupervisor.mNoAnimActivities.contains(next)) {
                     anim = false;
                 } else {
-// QTI_BEGIN: 2021-11-22: Core: perf: Refactor Animation Boost
                     if(prev.getTask() != next.getTask() && mPerf != null) {
                        mPerf.perfHint(BoostFramework.VENDOR_HINT_ANIM_BOOST,
                            next.packageName);
                     }
-// QTI_END: 2021-11-22: Core: perf: Refactor Animation Boost
                 }
             }
         } else {
             if (mTaskSupervisor.mNoAnimActivities.contains(next)) {
                 anim = false;
-// QTI_BEGIN: 2023-10-24: Core: perf: add exit app animation boost for apps exit.
                 // Exit app animation boost
                 if (next != null && mPerf != null) {
                     mPerf.perfHint(BoostFramework.VENDOR_HINT_EXIT_ANIM_BOOST, next.packageName);
                 }
-// QTI_END: 2023-10-24: Core: perf: add exit app animation boost for apps exit.
             }
         } 
 
@@ -2011,22 +2019,18 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return false;
         }
 
-// QTI_BEGIN: 2022-03-20: Core: perf: Move ActivityPauseTrigger based on refactored code.
         //Trigger Activity Pause
         if (mActivityTrigger != null) {
             mActivityTrigger.activityPauseTrigger(prev.intent, prev.info,
                                                   prev.info.applicationInfo);
         }
 
-// QTI_END: 2022-03-20: Core: perf: Move ActivityPauseTrigger based on refactored code.
-// QTI_BEGIN: 2023-06-08: Core: DSR: Fix DSR when we have toast window
         if (mAtmService.getToastWindow() == true) {
             // When we have a toast window, that activity will be translucent.
             prev.translucentWindowLaunch = true;
             mAtmService.resetToastWindow();
         }
 
-// QTI_END: 2023-06-08: Core: DSR: Fix DSR when we have toast window
         ProtoLog.v(WM_DEBUG_STATES, "Moving to PAUSING: %s", prev);
         mPausingActivity = prev;
         mLastPausedActivity = prev;
@@ -2421,6 +2425,12 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         mTmpBounds.set(getResolvedOverrideConfiguration().windowConfiguration.getBounds());
         super.resolveOverrideConfiguration(newParentConfig);
         final Configuration resolvedConfig = getResolvedOverrideConfiguration();
+        final Task thisTask = asTask();
+        if (!resolvedConfig.windowConfiguration.getBounds().isEmpty() && thisTask != null
+                && !thisTask.isOverrideBoundsAllowed()) {
+            // clear the bounds if it is not allowed from its ancestors.
+            resolvedConfig.windowConfiguration.setBounds(new Rect());
+        }
 
         if (mRelativeEmbeddedBounds != null && !mRelativeEmbeddedBounds.isEmpty()) {
             // For embedded TaskFragment, make sure the bounds is set based on the relative bounds.
@@ -2448,7 +2458,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             }
         }
 
-        final Task thisTask = asTask();
         if (thisTask != null) {
             thisTask.resolveLeafTaskOnlyOverrideConfigs(newParentConfig,
                     mTmpBounds /* previousBounds */);
@@ -3463,25 +3472,24 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
     @Override
     void prepareSurfaces() {
-        if (asTask() != null) {
-            super.prepareSurfaces();
-            return;
-        }
-
         mDimmer.resetDimStates();
         super.prepareSurfaces();
 
-        if (mDimmer.updateDims(getSyncTransaction())) {
+        if (mDimmer.hasDimState() && mDimmer.updateDims(getSyncTransaction())) {
             scheduleAnimation();
         }
     }
 
     @Override
     boolean fillsParent() {
-        // From the perspective of policy, we still want to report that this task fills parent
-        // in fullscreen windowing mode even it doesn't match parent bounds because there will be
-        // letterbox around its real content.
-        return getWindowingMode() == WINDOWING_MODE_FULLSCREEN || matchParentBounds();
+        if (!com.android.window.flags.Flags.refactorMatchParentBounds()) {
+            // From the perspective of policy, we still want to report that this task fills parent
+            // in fullscreen windowing mode even it doesn't match parent bounds because there
+            // will be letterbox around its real content.
+            return getWindowingMode() == WINDOWING_MODE_FULLSCREEN || matchParentBounds();
+        }
+
+        return matchParentBounds();
     }
 
     @Override

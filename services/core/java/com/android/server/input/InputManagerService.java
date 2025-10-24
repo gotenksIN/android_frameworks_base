@@ -22,7 +22,7 @@ import static android.view.KeyEvent.KEYCODE_UNKNOWN;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 
 import static com.android.hardware.input.Flags.enableCustomizableInputGestures;
-import static com.android.hardware.input.Flags.fixKeyboardInterceptorPolicyCall;
+import static com.android.hardware.input.Flags.keyboardBacklightShortcuts;
 import static com.android.hardware.input.Flags.keyEventActivityDetection;
 import static com.android.hardware.input.Flags.touchpadVisualizer;
 import static com.android.server.policy.WindowManagerPolicy.ACTION_PASS_TO_USER;
@@ -152,6 +152,7 @@ import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.Watchdog;
 import com.android.server.input.InputManagerInternal.LidSwitchCallback;
+import com.android.server.input.data.InputDataStore;
 import com.android.server.input.debug.FocusEventDebugView;
 import com.android.server.input.debug.TouchpadDebugViewController;
 import com.android.server.policy.WindowManagerPolicy;
@@ -569,7 +570,7 @@ public class InputManagerService extends IInputManager.Stub
         mKeyboardLedController = new KeyboardLedController(mContext, injector.getLooper(),
                 mNative);
         mVirtualInputDeviceController = new VirtualInputDeviceController(
-                mContext.getMainThreadHandler(), this);
+                mContext, mContext.getMainThreadHandler(), this);
         mKeyRemapper = new KeyRemapper(mContext, mNative, mDataStore, injector.getLooper());
         mKeyboardGlyphManager = new KeyboardGlyphManager(mContext, injector.getLooper());
         mPointerIconCache = new PointerIconCache(mContext, mNative);
@@ -1401,7 +1402,8 @@ public class InputManagerService extends IInputManager.Stub
     public void requestPointerCapture(@NonNull IBinder inputChannelToken, int mode) {
         Objects.requireNonNull(inputChannelToken, "inputChannelToken must not be null");
         if (mode != View.POINTER_CAPTURE_MODE_UNCAPTURED
-                && mode != View.POINTER_CAPTURE_MODE_ABSOLUTE) {
+                && mode != View.POINTER_CAPTURE_MODE_ABSOLUTE
+                && mode != View.POINTER_CAPTURE_MODE_RELATIVE) {
             throw new IllegalArgumentException("Invalid pointer capture mode " + mode);
         }
 
@@ -2873,7 +2875,9 @@ public class InputManagerService extends IInputManager.Stub
                 }
                 break;
             case KeyGestureEvent.KEY_GESTURE_TYPE_KEYBOARD_BACKLIGHT_TOGGLE:
-                // TODO(b/367748270): Add functionality to turn keyboard backlight on/off.
+                if (keyboardBacklightShortcuts() && complete) {
+                    mKeyboardBacklightController.toggleKeyboardBacklight(deviceId);
+                }
                 break;
             case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_CAPS_LOCK:
                 if (complete) {
@@ -3933,14 +3937,7 @@ public class InputManagerService extends IInputManager.Stub
 
         @Override
         public long interceptKeyCombinationBeforeAccessibility(@NonNull KeyEvent event) {
-            if (fixKeyboardInterceptorPolicyCall()) {
                 return mKeyGestureController.interceptKeyCombinationBeforeAccessibility(event);
-            } else {
-                return mWindowManagerCallbacks.interceptKeyBeforeDispatching(
-                        /* focusedToken= */null, event)
-                        ? KeyGestureController.KEY_INTERCEPT_RESULT_CONSUMED
-                        : KeyGestureController.KEY_INTERCEPT_RESULT_NOT_CONSUMED;
-            }
         }
 
         @NonNull
@@ -4220,9 +4217,15 @@ public class InputManagerService extends IInputManager.Stub
         }
     }
 
+    @Nullable
+    String getPhysicalLocationPath(int deviceId) {
+        return mNative.getPhysicalLocationPath(deviceId);
+    }
+
     interface KeyboardBacklightControllerInterface {
         default void incrementKeyboardBacklight(int deviceId) {}
         default void decrementKeyboardBacklight(int deviceId) {}
+        default void toggleKeyboardBacklight(int deviceId) {}
         default void registerKeyboardBacklightListener(IKeyboardBacklightListener l, int pid) {}
         default void unregisterKeyboardBacklightListener(IKeyboardBacklightListener l, int pid) {}
         default void onInteractiveChanged(boolean isInteractive) {}

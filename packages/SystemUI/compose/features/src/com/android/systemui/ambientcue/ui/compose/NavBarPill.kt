@@ -16,6 +16,8 @@
 
 package com.android.systemui.ambientcue.ui.compose
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -23,6 +25,10 @@ import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -84,6 +90,7 @@ import com.android.systemui.ambientcue.ui.utils.FilterUtils
 import com.android.systemui.ambientcue.ui.viewmodel.ActionType
 import com.android.systemui.ambientcue.ui.viewmodel.ActionViewModel
 import com.android.systemui.res.R
+import kotlinx.coroutines.delay
 
 @Composable
 fun NavBarPill(
@@ -109,11 +116,6 @@ fun NavBarPill(
     val hideAnimationInProgress = remember { mutableStateOf(false) }
     val expandAnimationInProgress = remember { mutableStateOf(false) }
     val collapseAnimationInProgress = remember { mutableStateOf(false) }
-    LaunchedEffect(expanded) {
-        if (expanded) {
-            wasEverCollapsed = true
-        }
-    }
 
     var expandedSize by remember { mutableStateOf(IntSize.Zero) }
     val visibleState = remember { MutableTransitionState(false) }
@@ -174,6 +176,20 @@ fun NavBarPill(
         onAnimationStateChange = onAnimationStateChange,
     )
 
+    val blurRadius = remember { Animatable(4f) }
+    LaunchedEffect(Unit) {
+        delay(BLUR_DURATION_MILLIS)
+        blurRadius.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(durationMillis = BLUR_FADE_DURATION_MILLIS),
+        )
+    }
+    LaunchedEffect(expanded, expansionAlpha) {
+        if (expanded && expansionAlpha == 0f) {
+            wasEverCollapsed = true
+        }
+    }
+
     val config = LocalConfiguration.current
     val isBoldTextEnabled = config.fontWeightAdjustment > 0
     val fontScale = config.fontScale
@@ -216,7 +232,13 @@ fun NavBarPill(
             },
     ) {
         if (visible && !expanded && showEducation) {
-            FirstTimeEducation(Alignment.CenterHorizontally, onCloseClick = onCloseEducation)
+            AnimatedVisibility(
+                visible = enterProgress == 1f,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut(),
+            ) {
+                FirstTimeEducation(Alignment.CenterHorizontally, onCloseClick = onCloseEducation)
+            }
         }
         Row(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -250,11 +272,6 @@ fun NavBarPill(
                         Modifier.clip(RoundedCornerShape(16.dp))
                             .widthIn(min = navBarWidth, max = maxPillWidth)
                             .background(backgroundColor)
-                            .animatedActionBorder(
-                                strokeWidth = 1.dp,
-                                cornerRadius = 16.dp,
-                                visible = visible,
-                            )
                             .then(
                                 if (expanded) Modifier
                                 else
@@ -302,7 +319,7 @@ fun NavBarPill(
                                 }
                             if ((filteredActions.size == 1 || isMrAction) && !expandedChip) {
                                 expandedChip = true
-                                val hasBackground = filteredActions.size > 1
+                                val hasBackground = (!wasEverCollapsed && filteredActions.size > 1)
                                 // Expanded chip for single action or MR
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -386,8 +403,13 @@ fun NavBarPill(
                 // Inner glow
                 Box(
                     Modifier.matchParentSize()
-                        .padding(1.dp)
-                        .blur(4.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                        // Prevent the border from being invisible due to blur.
+                        .animatedActionBorder(
+                            strokeWidth = 1.dp,
+                            cornerRadius = 16.dp,
+                            visible = visible,
+                        )
+                        .blur(blurRadius.value.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                         .animatedActionBorder(
                             strokeWidth = 1.dp,
                             cornerRadius = 16.dp,
@@ -428,3 +450,6 @@ fun NavBarPill(
         }
     }
 }
+
+private const val BLUR_DURATION_MILLIS = 1500L
+private const val BLUR_FADE_DURATION_MILLIS = 500

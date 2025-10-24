@@ -23,6 +23,13 @@ flag {
 }
 
 flag {
+    name: "close_fullscreen_and_splitscreen_keyboard_shortcut"
+    namespace: "lse_desktop_experience"
+    description: "Enable keyboard shortcut to close fullscreen and split screen tasks"
+    bug: "441147192"
+}
+
+flag {
     name: "close_task_keyboard_shortcut"
     namespace: "lse_desktop_experience"
     description: "Enable keyboard shortcut to close a task"
@@ -37,6 +44,18 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Moves desk creation to coroutines to guarantee non-null default desk"
     bug: "406890311"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "defer_resume_focus_in_non_focused_window"
+    namespace: "lse_desktop_experience"
+    description: "Gates the logic that prevents the system from restoring focus to a view /n"
+                 "within a background window when a user exits touch mode, for instance, /n"
+                 "by pressing an arrow key on a physical keyboard."
+    bug: "438781414"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -156,20 +175,17 @@ flag {
 }
 
 flag {
+    name: "enable_bounds_restoring_on_tiling_exit"
+    namespace: "lse_desktop_experience"
+    description: "Enables restoring to the pre-tiling bounds when exiting tiling."
+    bug: "379664001"
+}
+
+flag {
     name: "enable_bug_fixes_for_secondary_display"
     namespace: "lse_desktop_experience"
     description: "Bugfixes / papercuts to bring Desktop Windowing to secondary displays."
     bug: "382023296"
-}
-
-flag {
-    name: "enable_camera_compat_check_device_rotation_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Whether to use display rotation to specify rotate-and-crop rotation."
-    bug: "395047103"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -321,6 +337,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables crash reporting indicating activity was in desktop."
     bug: "331162483"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_cross_displays_app_launch_transition"
+    namespace: "lse_desktop_experience"
+    description: "Enables a transition for launching an already opened app on another display."
+    bug: "422333177"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -915,6 +941,16 @@ flag {
 }
 
 flag {
+    name: "enable_drawing_app_handle"
+    namespace: "lse_desktop_experience"
+    description: "Enables app handle being drawn programmatically instead of using Drawables."
+    bug: "314288540"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_dream_activity_windowing_exclusion"
     namespace: "lse_desktop_experience"
     description: "When enabled activities with type dream will be exempt from desktop windowing"
@@ -939,6 +975,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Keep desktop open when the last window is minimized."
     bug: "410493575"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_external_display_persistence_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Enables bugfix for desktop persistence on external displays."
+    bug: "437420625"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -1059,6 +1105,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables the key gesture handler for listening to SysUi interested key events."
     bug: "406740557"
+}
+
+flag {
+    name: "enable_launcher_handle_go_home_keyboard_shortcut"
+    namespace: "lse_desktop_experience"
+    description: "Enables handling the go home keyboard shortcut on the Launcher side."
+    bug: "427579352"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1207,6 +1263,16 @@ flag {
 }
 
 flag {
+    name: "enable_per_display_window_decor_view_host_pool"
+    namespace: "lse_desktop_experience"
+    description: "Enables per-display WindowDecoration ViewHost pooling"
+    bug: "440247561"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_persisting_display_size_for_connected_displays"
     namespace: "lse_desktop_experience"
     description: "Enables persisting display size on resolution change for connected displays."
@@ -1225,6 +1291,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Fixes the issue that OnPictureInPictureParamsChanged is sent to a root task."
     bug: "422654539"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_presentation_disallowed_on_unfocused_host_task"
+    namespace: "lse_desktop_experience"
+    description: "Disallows presentations from being shown on their unfocused host tasks."
+    bug: "435586251"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -1758,6 +1834,16 @@ flag {
 }
 
 flag {
+    name: "reenable_app_handle_color_animations"
+    namespace: "lse_desktop_experience"
+    description: "Re-enables the app handle color animations"
+    bug: "441497981"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "remove_desk_on_last_task_removal"
     namespace: "lse_desktop_experience"
     description: "Removes the desk when its last task is removed in touch-first displays"
@@ -1892,6 +1978,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables bugfix to fix recent task icons behavior in taskbar during split screen selection."
     bug: "393513479"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "toggle_fullscreen_state_via_fullscreen_key"
+    namespace: "lse_desktop_experience"
+    description: "Toggles the focused task's fullscreen state when the fullscreen key is pressed."
+    bug: "396483171"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

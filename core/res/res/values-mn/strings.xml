@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Ажлын профайл руу сэлгэх"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Хувийн <xliff:g id="APP_NAME">%1$s</xliff:g> руу сэлгэх"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Ажлын <xliff:g id="APP_NAME">%1$s</xliff:g> руу сэлгэх"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Харилцагчид"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"харилцагч руугаа хандах"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Харилцагч, бүртгэл"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"харилцагч руугаа хандаж, энэ төхөөрөмж дээр харилцагчдыг хадгалах боломжтой бүртгэлийнхээ жагсаалтыг харна уу"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Байршил"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"энэ төхөөрөмжийн байршилд хандалт хийх"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Календарь"</string>
@@ -370,8 +370,10 @@
     <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"нүдний хөдөлгөөнийг нарийвчлан хянах"</string>
     <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Хөдөлгөөн, газрын өгөгдөл"</string>
     <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"нүд, нүүр, биеийг хянах, газар скан хийх"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Толгойн нарийн хөдөлгөөн, газрын өгөгдөл"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"толгойн хөдөлгөөнийг нарийвчлан хянах, газар скан хийх"</string>
+    <!-- no translation found for permgrouplab_xr_tracking_sensitive (6574264227123545314) -->
+    <skip />
+    <!-- no translation found for permgroupdesc_xr_tracking_sensitive (2480835734248509848) -->
+    <skip />
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Цонхны агуулгыг авах"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Таны харилцан үйлчлэх цонхны контентоос шалгах."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"Хүрэлтээр сонсохыг асаах"</string>
@@ -639,6 +641,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Аппад ойролцоох ультра өргөн зурвасын төхөөрөмжүүдийн хоорондох холбоотой байрлалыг тодорхойлохыг зөвшөөрөх"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"ойролцоох Wi-Fi төхөөрөмжүүдтэй харилцах"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Аппад ойролцоох Wi-Fi төхөөрөмжүүдтэй холбоотой байрлалыг мэдэгдэх, холбох, тодорхойлохыг зөвшөөрнө"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"дотоод сүлжээний төхөөрөмжид хандах"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Аппыг дотоод сүлжээний төхөөрөмжид хандахыг зөвшөөрнө"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"ойр төхөөрөмжүүдийн хоорондох харьцангуй байрлалыг тодорхойл"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Аппад ойролцоох төхөөрөмжүүдийн хоорондох харьцангуй байрлалыг тодорхойлохыг зөвшөөрнө үү"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Сонгосон NFC төлбөрийн үйлчилгээний мэдээлэл"</string>
@@ -683,7 +687,8 @@
     <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Аппад таны эргэн тойрныг скан хийхийг зөвшөөрнө."</string>
     <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"таны эргэн тойрны газрыг нарийвчлан скан хийх"</string>
     <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Аппад таны эргэн тойрныг нарийвчлан скан хийхийг зөвшөөрнө."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"ард XR-н өгөгдлийг хянах"</string>
+    <!-- no translation found for permlab_xr_tracking_in_background (1714941204255185460) -->
+    <skip />
     <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Аппад ард XR-н өгөгдөлд хандахыг зөвшөөрнө."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"товчийг буулгах"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Систем нь системийн товчлол, үйлдлийг боловсруулах боломжтой болохоос өмнө товчийг буулгахыг аппад зөвшөөрнө."</string>
@@ -1984,8 +1989,10 @@
     <string name="package_updated_device_owner" msgid="7770195449213776218">"Танай админ шинэчилсэн.\nОлгосон зөвшөөрлийг харахын тулд тохиргоо руу очно уу"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Таны админ устгасан"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"ОК"</string>
-    <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"Батарей хэмнэгч нь Бараан загварыг асааж, дэвсгэрийн үйл ажиллагаа, зарим визуал эффект, тодорхой онцлогууд болон зарим сүлжээний холболтыг хязгаарлах эсвэл унтраана."</string>
-    <string name="battery_saver_description" msgid="8518809702138617167">"Батарей хэмнэгч нь Бараан загварыг асааж, дэвсгэрийн үйл ажиллагаа, зарим визуал эффект, тодорхой онцлогууд болон зарим сүлжээний холболтыг хязгаарлах эсвэл унтраана."</string>
+    <!-- no translation found for battery_saver_description_with_learn_more (8969945879044849461) -->
+    <skip />
+    <!-- no translation found for battery_saver_description (2820475140307374570) -->
+    <skip />
     <string name="data_saver_description" msgid="4995164271550590517">"Дата ашиглалтыг багасгахын тулд дата хэмнэгч нь ар талд ажиллаж буй зарим аппын өгөгдлийг илгээх болон авахаас сэргийлдэг. Таны одоогийн ашиглаж буй апп нь өгөгдөлд хандах боломжтой хэдий ч тогтмол хандахгүй. Энэ нь жишээлбэл зургийг товших хүртэл харагдахгүй гэсэн үг юм."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"Дата хэмнэгчийг асаах уу?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"Асаах"</string>
@@ -2047,12 +2054,9 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"Томруулах"</string>
     <string name="close_button_text" msgid="10603510034455258">"Хаах"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
-    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
-    <skip />
+    <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
+    <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
+    <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Хариулах"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Видео"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Татгалзах"</string>
@@ -2580,33 +2584,22 @@
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"Аппликэйшн"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"Таны хурууны хээг цаашид таних боломжгүй. Хурууны хээгээр түгжээ тайлахыг дахин тохируулна уу."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Аюулгүй байдал, нууцлал"</string>
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
-    <skip />
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"Дэлгэцийн түгжээг тайлж, USB-г дахин холбох"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"USB холбохын тулд дэлгэцийн түгжээг тайлна уу"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"Дэвшилтэт хамгаалалт нь USB холболтыг эхлүүлэхийн тулд таны дэлгэцийн түгжээг тайлсан байхыг шаарддаг"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"Дэвшилтэт хамгаалалт нь USB холболтыг эхлүүлэхийн тулд таны дэлгэцийн түгжээг тайлсан байхыг шаарддаг"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"Дэвшилтэт хамгаалалт нь шуурхай цэнэглэхийн тулд таны дэлгэцийн түгжээг тайлсан байхыг шаарддаг"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"Шуурхай цэнэглэх эсвэл USB холболтыг эхлүүлэхийн тулд Дэвшилтэт хамгаалалт нь таны дэлгэцийн түгжээг тайлсан байхыг шаарддаг"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Чимээгүй болгох"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Мэдэгдлийг чимээгүй болгосон"</string>
-    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
-    <skip />
+    <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Та төхөөрөмжөө дахин эхлүүлэх хүртэл Дэвшилтэт хамгаалалтын USB-н мэдэгдлийг хүлээн авахгүй"</string>
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"USB-н сэжигтэй үйл ажиллагаа"</string>
-    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
-    <skip />
+    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="5772698072220844779">"USB-н өгөгдлийн дохиог идэвхгүй болголоо"</string>
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Хурууны хээгээр түгжээ тайлахтай холбоотой асуудал гарсан уу?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Түгжээг тайлах хэрэглээгээ сайжруулах зөвлөгөөг хянахын тулд товшино уу"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Бүү анивчуул"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"ТВ-ийг унтраах бол Асаах/унтраах товчийг удаан дарна уу"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Системийн нөөцийн сэрэмжлүүлэг"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Нөөцийг хэтрүүлэн ашиглах"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Апп \'<xliff:g id="APP_NAME">%1$s</xliff:g> хэт их нөөц ашиглаж байна.\""</string>
 </resources>

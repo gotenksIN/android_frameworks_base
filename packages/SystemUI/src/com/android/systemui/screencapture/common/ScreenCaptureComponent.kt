@@ -17,22 +17,22 @@
 package com.android.systemui.screencapture.common
 
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters
-import com.android.systemui.screencapture.common.ui.compose.ScreenCaptureContent
+import com.android.systemui.screencapture.ui.ScreenCaptureUi
 import dagger.BindsInstance
 import dagger.Subcomponent
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * Dagger Subcomponent interface for Screen Capture.
- *
- * Actual Subcomponents should extend this interface and be listed as a subcomponent in
- * [ScreenCaptureModule].
+ * Dagger Subcomponent interface for Screen Capture. It's alive while there is an ongoing Screen
+ * Capture or the UI is visible.
  */
 @ScreenCaptureScope
-@Subcomponent(modules = [CommonModule::class, FallbackModule::class])
+@Subcomponent(modules = [ScreenCaptureUiModule::class])
 interface ScreenCaptureComponent {
 
-    val screenCaptureContent: ScreenCaptureContent
+    @ScreenCapture fun coroutineScope(): CoroutineScope
+
+    fun screenCaptureUiFactory(): ScreenCaptureUi.Factory
 
     /**
      * Dagger Subcomponent Builder for [ScreenCaptureComponent].

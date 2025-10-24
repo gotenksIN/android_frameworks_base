@@ -31,19 +31,21 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imeAnimationTarget
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,6 +69,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toAndroidRectF
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -80,6 +83,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -99,6 +103,7 @@ import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.gesture.effect.OffsetOverscrollEffect
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffect
 import com.android.compose.modifiers.thenIf
+import com.android.compose.modifiers.width
 import com.android.compose.nestedscroll.OnStopScope
 import com.android.compose.nestedscroll.PriorityNestedScrollConnection
 import com.android.compose.nestedscroll.ScrollController
@@ -109,6 +114,7 @@ import com.android.systemui.common.ui.compose.windowinsets.LocalScreenCornerRadi
 import com.android.systemui.res.R
 import com.android.systemui.scene.session.ui.composable.SaveableSession
 import com.android.systemui.scene.session.ui.composable.sessionCoroutineScope
+import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.ui.composable.ShadeHeader
 import com.android.systemui.statusbar.notification.stack.shared.model.AccessibilityScrollEvent
@@ -124,6 +130,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import androidx.compose.material3.Text
 
 object Notifications {
     object Elements {
@@ -173,20 +180,32 @@ fun ContentScope.HeadsUpNotificationSpace(
                         stackScrollView.setHeadsUpBottom(boundsInWindow.bottom)
                     }
                 }
-    )
+    ) {
+        if (viewModel.isVisualDebuggingEnabled) {
+            Text(
+                text = "HeadsUpNotificationPlaceholder",
+                color = DEBUG_HUN_COLOR.copy(alpha = 0.7f),
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
+    }
 }
 
 /**
  * A version of [HeadsUpNotificationSpace] that can be swiped up off the top edge of the screen by
  * the user. When swiped up, the heads up notification is snoozed.
+ *
+ * @param useDrawBounds Whether to communicate drawBounds updated to the [stackScrollView]. This
+ *   should be `true` when content rendering the regular stack is not setting draw bounds anymore,
+ *   but HUNs can still appear.
  */
 @Composable
 fun ContentScope.SnoozeableHeadsUpNotificationSpace(
+    useDrawBounds: () -> Boolean,
     stackScrollView: NotificationScrollView,
     viewModel: NotificationsPlaceholderViewModel,
     modifier: Modifier = Modifier,
 ) {
-
     val isSnoozable by viewModel.isHeadsUpOrAnimatingAway.collectAsStateWithLifecycle(false)
 
     var scrollOffset by remember { mutableFloatStateOf(0f) }
@@ -218,6 +237,9 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
             }
         }
 
+    val horizontalAlignment = viewModel.horizontalAlignment
+    val halfScreenWidth = LocalWindowInfo.current.containerSize.width / 2
+
     LaunchedEffect(isSnoozable) { scrollOffset = 0f }
 
     LaunchedEffect(scrollableState.isScrollInProgress) {
@@ -227,14 +249,33 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
         }
     }
 
+    // Wait for being Idle on this content, otherwise LaunchedEffect would fire too soon, and
+    // another transition could override the NSSL stack bounds.
+    val updateDrawBounds = layoutState.transitionState.isIdle() && useDrawBounds()
+
+    LaunchedEffect(updateDrawBounds) {
+        if (updateDrawBounds) {
+            // Reset the stack bounds to avoid caching these values from the previous Scenes, and
+            // not to confuse the StackScrollAlgorithm when it displays a HUN over GONE.
+            stackScrollView.apply {
+                // use -headsUpInset to allow HUN translation outside bounds for snoozing
+                setStackTop(-headsUpInset)
+            }
+        }
+    }
+
     HeadsUpNotificationSpace(
         stackScrollView = stackScrollView,
         viewModel = viewModel,
         modifier =
             modifier
-                .absoluteOffset {
+                // In side-aligned layouts, HUNs are limited to half the screen width.
+                .thenIf(horizontalAlignment != Alignment.CenterHorizontally) {
+                    Modifier.width { halfScreenWidth }
+                }
+                .offset {
                     IntOffset(
-                        x = 0,
+                        x = if (horizontalAlignment == Alignment.End) halfScreenWidth else 0,
                         y =
                             calculateHeadsUpPlaceholderYOffset(
                                 scrollOffset.roundToInt(),
@@ -242,6 +283,18 @@ fun ContentScope.SnoozeableHeadsUpNotificationSpace(
                                 stackScrollView.topHeadsUpHeight,
                             ),
                     )
+                }
+                .onGloballyPositioned {
+                    if (updateDrawBounds) {
+                        stackScrollView.updateDrawBounds(
+                            it.boundsInWindow().toAndroidRectF().apply {
+                                // extend bounds to the screen top to avoid cutting off HUN
+                                // transitions
+                                top = 0f
+                                bottom += headsUpInset
+                            }
+                        )
+                    }
                 }
                 .thenIf(isSnoozable) { Modifier.nestedScroll(snoozeScrollConnection) }
                 .scrollable(orientation = Orientation.Vertical, state = scrollableState),
@@ -497,21 +550,32 @@ fun ContentScope.NotificationScrollingStack(
     }
 
     val scrimNestedScrollConnection =
-        shadeSession.rememberSession(key = "ScrimConnection", scrimOffset, minScrimTop, density) {
-            val flingSpec: DecayAnimationSpec<Float> = splineBasedDecay(density)
-            val flingBehavior = NotificationScrimFlingBehavior(flingSpec)
-            NotificationScrimNestedScrollConnection(
-                scrimOffset = { scrimOffset.value },
-                snapScrimOffset = { value -> coroutineScope.launch { scrimOffset.snapTo(value) } },
-                animateScrimOffset = { value ->
-                    coroutineScope.launch { scrimOffset.animateTo(value) }
-                },
-                minScrimOffset = minScrimOffset,
-                maxScrimOffset = 0f,
-                contentHeight = { stackHeight.intValue.toFloat() },
-                minVisibleScrimHeight = minVisibleScrimHeight,
-                flingBehavior = flingBehavior,
-            )
+        if (supportNestedScrolling) {
+            shadeSession.rememberSession(
+                key = "ScrimConnection",
+                scrimOffset,
+                minScrimTop,
+                density,
+            ) {
+                val flingSpec: DecayAnimationSpec<Float> = splineBasedDecay(density)
+                val flingBehavior = NotificationScrimFlingBehavior(flingSpec)
+                NotificationScrimNestedScrollConnection(
+                    scrimOffset = { scrimOffset.value },
+                    snapScrimOffset = { value ->
+                        coroutineScope.launch { scrimOffset.snapTo(value) }
+                    },
+                    animateScrimOffset = { value ->
+                        coroutineScope.launch { scrimOffset.animateTo(value) }
+                    },
+                    minScrimOffset = minScrimOffset,
+                    maxScrimOffset = 0f,
+                    contentHeight = { stackHeight.intValue.toFloat() },
+                    minVisibleScrimHeight = minVisibleScrimHeight,
+                    flingBehavior = flingBehavior,
+                )
+            }
+        } else {
+            null
         }
 
     val swipeToExpandNotificationScrollConnection =
@@ -568,6 +632,8 @@ fun ContentScope.NotificationScrollingStack(
             jankMonitor.end(CUJ_NOTIFICATION_SHADE_SCROLL_FLING)
         }
     }
+
+    val interactionSource = remember { MutableInteractionSource() }
 
     Box(
         modifier =
@@ -643,7 +709,11 @@ fun ContentScope.NotificationScrollingStack(
                     )
                 }
                 .thenIf(onEmptySpaceClick != null) {
-                    Modifier.clickable(onClick = { onEmptySpaceClick?.invoke() })
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = null, // Prevent flicker on transition
+                        onClick = { onEmptySpaceClick?.invoke() },
+                    )
                 }
     ) {
         Spacer(
@@ -675,8 +745,8 @@ fun ContentScope.NotificationScrollingStack(
                 modifier =
                     Modifier.disableSwipesWhenScrolling()
                         .nestedScroll(swipeToExpandNotificationScrollConnection)
-                        .thenIf(supportNestedScrolling) {
-                            Modifier.nestedScroll(scrimNestedScrollConnection)
+                        .thenIf(supportNestedScrolling && scrimNestedScrollConnection != null) {
+                            Modifier.nestedScroll(scrimNestedScrollConnection!!)
                         }
                         .verticalScroll(scrollState, overscrollEffect = overScrollEffect)
                         .fillMaxWidth()
@@ -706,6 +776,13 @@ fun ContentScope.NotificationScrollingStack(
                                 imeTop.floatValue = screenHeight - coordinates.size.height
                             }
                 )
+                if (viewModel.isVisualDebuggingEnabled) {
+                    Text(
+                        text = "NotificationScrollingStack",
+                        color = DEBUG_BOX_COLOR.copy(alpha = 0.7f),
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                }
             }
         }
         if (shouldIncludeHeadsUpSpace) {
@@ -787,7 +864,15 @@ private fun ContentScope.NotificationPlaceholder(
                         stackScrollView.setStackTop(positionInWindow.y)
                     }
                 }
-    )
+    ) {
+        if (viewModel.isVisualDebuggingEnabled) {
+            Text(
+                text = "NotificationStackPlaceholder",
+                color = DEBUG_STACK_COLOR.copy(alpha = 0.7f),
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
+    }
 }
 
 private suspend fun scrollNotificationStack(
@@ -833,7 +918,10 @@ private fun shouldUseLockscreenStackBounds(state: TransitionState): Boolean {
     return when (state) {
         is TransitionState.Idle -> state.isOnLockscreen()
         is TransitionState.Transition ->
-            state.isTransitioning(from = Scenes.Lockscreen, to = Scenes.Gone)
+            // Keep using the lockscreen stack bounds when there is no placeholder on the next
+            // content
+            state.fromContent == Scenes.Lockscreen && state.toContent != Scenes.Shade ||
+                state.isTransitioningBetween(content = Scenes.Lockscreen, other = Overlays.Bouncer)
     }
 }
 

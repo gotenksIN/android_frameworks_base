@@ -980,6 +980,18 @@ public final class MediaRouter2 {
         }
         mDiscoveryPreference = newDiscoveryPreference;
         updateFilteredRoutesLocked();
+        if (Flags.enableRouteVisibilityControlCompatFixes()) {
+            mHandler.sendMessage(
+                    obtainMessage(
+                            MediaRouter2::dispatchFilteredRoutesUpdatedOnHandler,
+                            this,
+                            mFilteredRoutes));
+            mHandler.sendMessage(
+                    obtainMessage(
+                            MediaRouter2::dispatchControllerUpdatedIfNeededOnHandler,
+                            this,
+                            new HashMap<>(mRoutes)));
+        }
         return true;
     }
 
@@ -1318,6 +1330,18 @@ public final class MediaRouter2 {
         mImpl.setRouteVolume(route, volume);
     }
 
+    /**
+     * Returns the set of apps currently affected by a system session override.
+     *
+     * <p>This method is only supported by proxy routers.
+     *
+     * @see SystemSessionOverridesListener
+     * @hide
+     */
+    public Set<AppId> getSystemSessionOverridesAppIds() {
+        return mImpl.getSystemSessionOverridesAppIds();
+    }
+
     void syncRoutesOnHandler(
             List<MediaRoute2Info> currentRoutes, RoutingSessionInfo currentSystemSessionInfo) {
         if (currentRoutes == null || currentRoutes.isEmpty() || currentSystemSessionInfo == null) {
@@ -1332,7 +1356,7 @@ public final class MediaRouter2 {
         mSystemController.setRoutingSessionInfo(ensureClientPackageNameForSystemSession(
                 currentSystemSessionInfo, mContext.getPackageName()));
         if (!oldInfo.equals(currentSystemSessionInfo)) {
-            notifyControllerUpdated(mSystemController);
+            notifyControllerUpdated(mSystemController, /* shouldShowVolumeUi= */ false);
         }
     }
 
@@ -1396,7 +1420,7 @@ public final class MediaRouter2 {
                     MediaRoute2Info currentRoute = routesMap.get(selectedRoute);
                     MediaRoute2Info oldRoute = mPreviousUnfilteredRoutes.get(selectedRoute);
                     if (!currentRoute.equals(oldRoute)) {
-                        notifyControllerUpdated(controller);
+                        notifyControllerUpdated(controller, /* shouldShowVolumeUi= */ false);
                         break;
                     }
                 }
@@ -1414,6 +1438,10 @@ public final class MediaRouter2 {
                 mRoutes.put(route.getId(), route);
             }
             updateFilteredRoutesLocked();
+            if (Flags.enableRouteVisibilityControlCompatFixes()) {
+                dispatchFilteredRoutesUpdatedOnHandler(mFilteredRoutes);
+                dispatchControllerUpdatedIfNeededOnHandler(mRoutes);
+            }
         }
     }
 
@@ -1423,16 +1451,18 @@ public final class MediaRouter2 {
         mFilteredRoutes =
                 Collections.unmodifiableList(
                         filterRoutesWithCompositePreferenceLocked(List.copyOf(mRoutes.values())));
-        mHandler.sendMessage(
-                obtainMessage(
-                        MediaRouter2::dispatchFilteredRoutesUpdatedOnHandler,
-                        this,
-                        mFilteredRoutes));
-        mHandler.sendMessage(
-                obtainMessage(
-                        MediaRouter2::dispatchControllerUpdatedIfNeededOnHandler,
-                        this,
-                        new HashMap<>(mRoutes)));
+        if (!Flags.enableRouteVisibilityControlCompatFixes()) {
+            mHandler.sendMessage(
+                    obtainMessage(
+                            MediaRouter2::dispatchFilteredRoutesUpdatedOnHandler,
+                            this,
+                            mFilteredRoutes));
+            mHandler.sendMessage(
+                    obtainMessage(
+                            MediaRouter2::dispatchControllerUpdatedIfNeededOnHandler,
+                            this,
+                            new HashMap<>(mRoutes)));
+        }
     }
 
     /**
@@ -1527,7 +1557,7 @@ public final class MediaRouter2 {
                                 sessionInfo, mImpl.getClientPackageName());
             }
             controller.setRoutingSessionInfo(sessionInfo);
-            notifyControllerUpdated(controller);
+            notifyControllerUpdated(controller, /* shouldShowVolumeUi= */ false);
         }
     }
 
@@ -1775,9 +1805,10 @@ public final class MediaRouter2 {
         }
     }
 
-    private void notifyControllerUpdated(RoutingController controller) {
+    private void notifyControllerUpdated(RoutingController controller, boolean shouldShowVolumeUi) {
         for (ControllerCallbackRecord record : mControllerCallbackRecords) {
-            record.mExecutor.execute(() -> record.mCallback.onControllerUpdated(controller));
+            record.mExecutor.execute(
+                    () -> record.mCallback.onControllerUpdated(controller, shouldShowVolumeUi));
         }
     }
 
@@ -1960,6 +1991,23 @@ public final class MediaRouter2 {
          * @see #getSystemController()
          */
         public void onControllerUpdated(@NonNull RoutingController controller) {}
+
+        /**
+         * Equivalent to {@link #onControllerUpdated(RoutingController)} except it adds {@code
+         * shouldShowVolumeUi}, which indicates that a UI affordance should be presented as a result
+         * of this controller update. Likely, because the update is the result of a HW volume key
+         * press.
+         *
+         * <p>By default, this method invokes {@link #onControllerUpdated(RoutingController)}, which
+         * means it's sufficient to override any of the methods in this class to receive controller
+         * update events.
+         *
+         * @hide
+         */
+        public void onControllerUpdated(
+                @NonNull RoutingController controller, boolean shouldShowVolumeUi) {
+            this.onControllerUpdated(controller);
+        }
     }
 
     /**
@@ -2953,6 +3001,13 @@ public final class MediaRouter2 {
          * @param listener The listener to unregister.
          */
         void unregisterSystemSessionOverridesListener(SystemSessionOverridesListener listener);
+
+        /**
+         * Returns the set of apps affected by a system session override.
+         *
+         * @see SystemSessionOverridesListener
+         */
+        Set<AppId> getSystemSessionOverridesAppIds();
     }
 
     /**
@@ -2984,6 +3039,17 @@ public final class MediaRouter2 {
         private final List<InstanceInvalidatedCallbackRecord> mInstanceInvalidatedCallbackRecords =
                 new ArrayList<>();
 
+        /**
+         * Holds the last snapshot of ids of apps affected by a system session override.
+         *
+         * <p>Must hold an immutable set to avoid the need for a copy in {@link
+         * #getSystemSessionOverridesAppIds}.
+         *
+         * @see SystemSessionOverridesListener
+         */
+        @GuardedBy("mLock")
+        private Set<AppId> mLastSystemSessionSessionOverridesLocked = Set.of();
+
         ProxyMediaRouter2Impl(
                 @NonNull Context context,
                 @NonNull String clientPackageName,
@@ -3001,8 +3067,19 @@ public final class MediaRouter2 {
                         mContext.getApplicationContext().getPackageName(),
                         mClientPackageName,
                         mClientUser);
+                initSystemSessionOverridesSnapshot();
             } catch (RemoteException ex) {
                 throw ex.rethrowFromSystemServer();
+            }
+        }
+
+        private void initSystemSessionOverridesSnapshot() throws RemoteException {
+            if (!Flags.enableMirroringInMediaRouter2()) {
+                return;
+            }
+            synchronized (mLock) {
+                mLastSystemSessionSessionOverridesLocked =
+                        Set.copyOf(mMediaRouterService.getSystemSessionOverridesAppIds(mClient));
             }
         }
 
@@ -3583,6 +3660,13 @@ public final class MediaRouter2 {
                             /* executor= */ Runnable::run, listener));
         }
 
+        @Override
+        public Set<AppId> getSystemSessionOverridesAppIds() {
+            synchronized (mLock) {
+                return mLastSystemSessionSessionOverridesLocked;
+            }
+        }
+
         /**
          * Retrieves the system session info for the given package.
          *
@@ -3704,7 +3788,8 @@ public final class MediaRouter2 {
             notifyTransferFailure(route);
         }
 
-        private void onSessionUpdated(@NonNull RoutingSessionInfo session) {
+        private void onSessionUpdated(
+                @NonNull RoutingSessionInfo session, boolean shouldShowVolumeUi) {
             if (!isSessionRelatedToTargetPackageName(session)) {
                 return;
             }
@@ -3717,7 +3802,7 @@ public final class MediaRouter2 {
             } else {
                 controller = new RoutingController(session);
             }
-            notifyControllerUpdated(controller);
+            notifyControllerUpdated(controller, shouldShowVolumeUi);
         }
 
         /**
@@ -3773,7 +3858,8 @@ public final class MediaRouter2 {
             }
         }
 
-        private void onSessionUpdatedOnHandler(@NonNull RoutingSessionInfo updatedSession) {
+        private void onSessionUpdatedOnHandler(
+                @NonNull RoutingSessionInfo updatedSession, boolean shouldShowVolumeUi) {
             for (MediaRouter2Manager.TransferRequest request : mTransferRequests) {
                 String sessionId = request.mOldSessionInfo.getId();
                 if (!TextUtils.equals(sessionId, updatedSession.getId())) {
@@ -3785,7 +3871,7 @@ public final class MediaRouter2 {
                     break;
                 }
             }
-            this.onSessionUpdated(updatedSession);
+            this.onSessionUpdated(updatedSession, shouldShowVolumeUi);
         }
 
         private void onSessionReleasedOnHandler(@NonNull RoutingSessionInfo session) {
@@ -3818,6 +3904,10 @@ public final class MediaRouter2 {
                 updateFilteredRoutesLocked();
             }
             notifyPreferredFeaturesChanged(preference.getPreferredFeatures());
+            if (Flags.enableRouteVisibilityControlCompatFixes()) {
+                dispatchFilteredRoutesUpdatedOnHandler(mFilteredRoutes);
+                dispatchControllerUpdatedIfNeededOnHandler(mRoutes);
+            }
         }
 
         private void onRouteListingPreferenceChangedOnHandler(
@@ -3901,6 +3991,9 @@ public final class MediaRouter2 {
 
         private void notifySystemSessionOverridesChangedOnHandler(List<AppId> appsWithOverrides) {
             var appsWithOverridesAsSet = Set.copyOf(appsWithOverrides);
+            synchronized (mLock) {
+                mLastSystemSessionSessionOverridesLocked = appsWithOverridesAsSet;
+            }
             for (var record : mSystemSessionOverridesListenerRecords) {
                 record.mExecutor.execute(
                         () ->
@@ -3922,12 +4015,14 @@ public final class MediaRouter2 {
             }
 
             @Override
-            public void notifySessionUpdated(RoutingSessionInfo routingSessionInfo) {
+            public void notifySessionUpdated(
+                    RoutingSessionInfo routingSessionInfo, boolean shouldShowVolumeUi) {
                 mHandler.sendMessage(
                         obtainMessage(
                                 ProxyMediaRouter2Impl::onSessionUpdatedOnHandler,
                                 ProxyMediaRouter2Impl.this,
-                                routingSessionInfo));
+                                routingSessionInfo,
+                                shouldShowVolumeUi));
             }
 
             @Override
@@ -4412,6 +4507,12 @@ public final class MediaRouter2 {
                 SystemSessionOverridesListener listener) {
             throw new UnsupportedOperationException(
                     "unregisterSystemSessionOverridesListener is only supported on proxy routers.");
+        }
+
+        @Override
+        public Set<AppId> getSystemSessionOverridesAppIds() {
+            throw new UnsupportedOperationException(
+                    "getAppsWithSystemSessionOverrides is only supported on proxy routers.");
         }
 
         @GuardedBy("mLock")

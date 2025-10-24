@@ -52,25 +52,6 @@ flag {
 }
 
 flag {
-  name: "action_mode_edge_to_edge"
-  namespace: "windowing_frontend"
-  description: "Make contextual action bar edge-to-edge"
-  bug: "379783298"
-  is_fixed_read_only: true
-}
-
-flag {
-  name: "copy_compat_fields_of_window_insets"
-  namespace: "windowing_frontend"
-  description: "Copy mCompatInsetTypes and mCompatIgnoreVisibility from WindowInsets"
-  bug: "409469172"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "close_to_square_config_includes_status_bar"
   namespace: "windowing_frontend"
   description: "On close to square display, when necessary, configuration includes status bar"
@@ -93,49 +74,21 @@ flag {
 }
 
 flag {
-    name: "remove_activity_starter_dream_callback"
-    namespace: "windowing_frontend"
-    description: "Avoid a race with DreamManagerService callbacks for isDreaming by checking Activity state directly"
-    bug: "366452352"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "supports_multi_instance_system_ui"
-    is_exported: true
-    namespace: "multitasking"
-    description: "Feature flag to enable a multi-instance system ui component property."
-    bug: "262864589"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "delegate_unhandled_drags"
-    is_exported: true
-    namespace: "multitasking"
-    description: "Enables delegating unhandled drags to SystemUI"
-    bug: "320797628"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "supports_drag_assistant_to_multiwindow"
-    is_exported: true
-    namespace: "multitasking"
-    description: "Enables support for dragging the assistant into multiwindow"
-    bug: "371206207"
-    is_fixed_read_only: true
-}
-
-flag {
   name: "do_not_force_wallpaper_for_freeform_task"
   namespace: "windowing_frontend"
   description: "Remove legacy condition to reduce overhead"
   bug: "433694978"
   is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "rank_task_layer_with_window_layout"
+  namespace: "windowing_frontend"
+  description: "Reduce lock contention of display thread"
+  bug: "445591466"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
@@ -164,6 +117,16 @@ flag {
   namespace: "windowing_frontend"
   description: "The orientation, aspect ratio, resizability of activity will follow system behavior by default"
   bug: "357141415"
+}
+
+flag {
+  name: "opt_out_override_orientation_to_user"
+  namespace: "windowing_frontend"
+  description: "If apps opt out universal resizable, the override-to-user should not take effect"
+  bug: "443951799"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -212,17 +175,6 @@ flag {
   is_fixed_read_only: true
   metadata {
       purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "fix_show_when_locked_sync_timeout"
-  namespace: "windowing_frontend"
-  description: "Prevent sync timeout from setShowWhenLocked(false) by setting the DisplayContent ready"
-  bug: "411544184"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
   }
 }
 
@@ -336,16 +288,6 @@ flag {
     }
 }
 
-flag {
-    name: "scramble_snapshot_file_name"
-    namespace: "windowing_frontend"
-    description: "Scramble the file name of task snapshot."
-    bug: "293139053"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
 
 flag {
     name: "enable_handlers_debugging_mode"
@@ -366,17 +308,6 @@ flag {
     namespace: "windowing_frontend"
     description: "Add CUJ tags for measuring performance of transition handlers"
     bug: "404190067"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "extending_persistence_snapshot_queue_depth"
-    namespace: "windowing_frontend"
-    description: "Use ImageReader to persist snapshot into disk, and extending the persistence snapshot queue depth."
-    bug: "416144425"
     is_fixed_read_only: true
     metadata {
         purpose: PURPOSE_BUGFIX
@@ -424,32 +355,13 @@ flag {
     bug: "410930250"
 }
 
-flag {
-    name: "screen_brightness_dim_on_emulator"
-    namespace: "wear_systems"
-    description: "Apply screen brightness to emulator display overlay"
-    bug: "418830217"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
+
 
 flag {
     name: "multiple_system_navigation_observer_callbacks"
     namespace: "windowing_frontend"
     description: "Removes restriction that only one back callback with PRIORITY_SYSTEM_NAVIGATION_OBSERVER can be registered"
     bug: "424146227"
-}
-
-flag {
-    name: "ensure_starting_window_remove_from_task"
-    namespace: "windowing_frontend"
-    description: "Trigger the removal of the starting window from the task in case the shared starting data is not attached to itself."
-    bug: "405253899"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -521,3 +433,24 @@ flag {
     description: "Use seq-id for all client config changes (wearOS)"
     bug: "385976595"
 }
+
+flag {
+    name: "ime_back_callback_leak_prevention"
+    namespace: "input_method"
+    description: "Prevents custom ime back callbacks from remaining registered in app process after IME hide"
+    bug: "420870283"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "predictive_back_stop_keycode_back_forwarding"
+    namespace: "windowing_frontend"
+    description: "No longer forward KEYCODE_BACK events when app has enableOnBackInvokedCallback=true"
+    bug: "436871339"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+

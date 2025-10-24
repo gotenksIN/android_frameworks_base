@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// QTI_BEGIN: 2025-02-10: Core: Add copyright markings am: d7be74277a am: d7be74277a
  /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
-// QTI_END: 2025-02-10: Core: Add copyright markings am: d7be74277a am: d7be74277a
 package com.android.server.pm;
 
 import static android.content.pm.Flags.disallowSdkLibsToBeApps;
@@ -143,9 +141,7 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
 import android.os.SystemProperties;
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
 import android.os.SELinux;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -194,9 +190,7 @@ import com.android.server.pm.pkg.PackageStateInternal;
 import com.android.server.pm.pkg.PackageUserStateInternal;
 import com.android.server.pm.pkg.SharedLibraryWrapper;
 import com.android.server.rollback.RollbackManagerInternal;
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
 import com.android.server.utils.TimingsTraceAndSlog;
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
 import com.android.server.utils.WatchedArrayMap;
 import com.android.server.utils.WatchedLongSparseArray;
 
@@ -204,10 +198,8 @@ import dalvik.system.VMRuntime;
 
 import java.io.File;
 import java.io.FileInputStream;
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
 import java.io.FileNotFoundException;
 import java.io.FileReader;
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
 import java.io.IOException;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
@@ -217,9 +209,7 @@ import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
 import java.util.HashMap;
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -228,11 +218,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
 
 final class InstallPackageHelper {
     // One minute over PM WATCHDOG_TIMEOUT
@@ -251,20 +239,14 @@ final class InstallPackageHelper {
     private final SharedLibrariesImpl mSharedLibraries;
     private final PackageManagerServiceInjector mInjector;
     private final UpdateOwnershipHelper mUpdateOwnershipHelper;
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
     private static final String PROPERTY_NO_RIL = "ro.radio.noril";
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
-// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
 
     private static final String PROPERTY_QSPA_Enabled = "ro.boot.vendor.qspa";
-// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
     /**
      * Tracks packages that need to be disabled.
      * Map of package name to its path on the file system.
      */
     final private HashMap<String, String> mPackagesToBeDisabled = new HashMap<>();
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
 
     private final Object mInternalLock = new Object();
     @GuardedBy("mInternalLock")
@@ -1336,7 +1318,7 @@ final class InstallPackageHelper {
                 final ScanResult scanResult = scanPackageTraced(request.getParsedPackage(),
                         request.getParseFlags(), request.getScanFlags(),
                         System.currentTimeMillis(), request.getUser(),
-                        request.getAbiOverride());
+                        request.getAbiOverride(), request.getInstallSource());
                 request.setScanResult(scanResult);
                 request.onScanFinished();
                 if (!scannedPackages.add(packageName)) {
@@ -1785,6 +1767,15 @@ final class InstallPackageHelper {
                         mSharedLibraries.getLatestStaticSharedLibraVersion(parsedPackage);
                 if (libraryInfo != null) {
                     signatureCheckPs = mPm.mSettings.getPackageLPr(libraryInfo.getPackageName());
+                }
+            } else {
+                // To prevent a new package from being installed if its package name is
+                // already in use by an existing static library on the system.
+                WatchedLongSparseArray<SharedLibraryInfo> libraryInfos =
+                        mSharedLibraries.getStaticLibraryInfos(parsedPackage.getPackageName());
+                if (libraryInfos != null && libraryInfos.size() > 0) {
+                    throw new PrepareFailure(INSTALL_FAILED_DUPLICATE_PACKAGE,
+                            "The package name is same as an existing shared libs");
                 }
             }
 
@@ -3941,7 +3932,6 @@ final class InstallPackageHelper {
                 Log.w(TAG, "Dropping cache of " + file.getAbsolutePath());
                 cacher.cleanCachedResult(file);
             }
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
 
             if (mPackagesToBeDisabled.values() != null &&
                     (mPackagesToBeDisabled.values().contains(file.toString()) ||
@@ -3951,7 +3941,6 @@ final class InstallPackageHelper {
                 continue;
             }
 
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
             parallelPackageParser.submit(file, scanParams);
             fileCount++;
         }
@@ -3991,7 +3980,6 @@ final class InstallPackageHelper {
                 Log.w(TAG, "Dropping cache of " + file.getAbsolutePath());
                 cacher.cleanCachedResult(file);
             }
-// QTI_BEGIN: 2025-07-23: Core: Add provision to prevent installation of some apps
 
             if (mPackagesToBeDisabled.values() != null &&
                     (mPackagesToBeDisabled.values().contains(file.toString()) ||
@@ -4001,7 +3989,6 @@ final class InstallPackageHelper {
                 continue;
             }
 
-// QTI_END: 2025-07-23: Core: Add provision to prevent installation of some apps
             orderedResults.add(parallelPackageParser.orderedSubmit(file, scanParams));
         }
         return orderedResults;
@@ -4049,24 +4036,15 @@ final class InstallPackageHelper {
         }
     }
 
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
     /**
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
-// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
      * Read the list of telephony packages that need to be disabled.
-// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
      *
      * For wifi-only devices (modem-less), telephony related applications do not need to run.
      * This method will read the list of packages from a predefined file in the file system,
      * and store it in {@link #mPackagesToBeDisabled}. These applications will be skipped when
      * directories are scanned later.
      */
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
-// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
     protected void readListOfTelephonyPackagesToBeDisabled() {
-// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
-// QTI_BEGIN: 2024-11-13: Core: Add provision to prevent installation of some apps
         boolean wifiOnly = SystemProperties.getBoolean(PROPERTY_NO_RIL, false);
         if (!wifiOnly) {
             // Apps need to be disabled only for modem-less devices
@@ -4127,8 +4105,6 @@ final class InstallPackageHelper {
         }
     }
 
-// QTI_END: 2024-11-13: Core: Add provision to prevent installation of some apps
-// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
 
     /**
      * Read the list of packages that need to be disabled.
@@ -4250,7 +4226,6 @@ final class InstallPackageHelper {
         }
     }
 
-// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
     /**
      * Make sure all system apps that we expected to appear on
      * the userdata partition actually showed up. If they never
@@ -4490,13 +4465,14 @@ final class InstallPackageHelper {
     }
 
     private ScanResult scanPackageTraced(ParsedPackage parsedPackage,
-            final @ParsingPackageUtils.ParseFlags int parseFlags,
-            @PackageManagerService.ScanFlags int scanFlags, long currentTime,
-            @Nullable UserHandle user, String cpuAbiOverride) throws PackageManagerException {
+            @ParsingPackageUtils.ParseFlags int parseFlags,
+            @PackageManagerService.ScanFlags int scanFlags, long scanTime, UserHandle user,
+            @Nullable String cpuAbiOverride, @Nullable InstallSource installSource)
+            throws PackageManagerException {
         Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "scanPackage");
         try {
-            return scanPackageNew(parsedPackage, parseFlags, scanFlags, currentTime, user,
-                    cpuAbiOverride);
+            return scanPackageNew(parsedPackage, parseFlags, scanFlags, scanTime, user,
+                    cpuAbiOverride, installSource);
         } finally {
             Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
         }
@@ -4505,7 +4481,7 @@ final class InstallPackageHelper {
     private ScanRequest prepareInitialScanRequest(@NonNull ParsedPackage parsedPackage,
             @ParsingPackageUtils.ParseFlags int parseFlags,
             @PackageManagerService.ScanFlags int scanFlags,
-            @Nullable UserHandle user, String cpuAbiOverride)
+            @Nullable UserHandle user, String cpuAbiOverride, @Nullable InstallSource installSource)
             throws PackageManagerException {
         final AndroidPackage platformPackage;
         final String realPkgName;
@@ -4515,9 +4491,9 @@ final class InstallPackageHelper {
         final SharedUserSetting sharedUserSetting;
         SharedUserSetting oldSharedUserSetting = null;
 
+        final boolean isSystemApp = AndroidPackageLegacyUtils.isSystem(parsedPackage);
         synchronized (mPm.mLock) {
             platformPackage = mPm.getPlatformPackage();
-            var isSystemApp = AndroidPackageLegacyUtils.isSystem(parsedPackage);
             final String renamedPkgName = mPm.mSettings.getRenamedPackageLPr(
                     AndroidPackageUtils.getRealPackageOrNull(parsedPackage, isSystemApp));
             realPkgName = ScanPackageUtils.getRealPackageName(parsedPackage, renamedPkgName,
@@ -4562,23 +4538,30 @@ final class InstallPackageHelper {
 
         final boolean isPlatformPackage = platformPackage != null
                 && platformPackage.getPackageName().equals(parsedPackage.getPackageName());
-
+        final  String initiatingPackage = installSource != null
+                ? installSource.mInitiatingPackageName : null;
+        // Run 16 KB alignment checks on 4 KB device if evaluated as true for new installations.
+        // To prevent deadlock, move the call of SettingsProvider out of mLock block
+        final boolean enableAlignmentChecks = ScanPackageUtils.enableAlignmentChecks(
+                parsedPackage, mPm.mInjector.getContext(), initiatingPackage,
+                isSystemApp, isPlatformPackage, scanFlags);
         return new ScanRequest(parsedPackage, oldSharedUserSetting,
                 installedPkgSetting == null ? null : installedPkgSetting.getPkg() /* oldPkg */,
                 installedPkgSetting /* packageSetting */,
                 sharedUserSetting,
                 disabledPkgSetting /* disabledPackageSetting */,
                 originalPkgSetting  /* originalPkgSetting */,
-                realPkgName, parseFlags, scanFlags, isPlatformPackage, user, cpuAbiOverride);
+                realPkgName, parseFlags, scanFlags, isPlatformPackage, user, cpuAbiOverride,
+                enableAlignmentChecks);
     }
 
     private ScanResult scanPackageNew(@NonNull ParsedPackage parsedPackage,
             final @ParsingPackageUtils.ParseFlags int parseFlags,
             @PackageManagerService.ScanFlags int scanFlags, long currentTime,
-            @Nullable UserHandle user, String cpuAbiOverride)
+            @Nullable UserHandle user, String cpuAbiOverride, @Nullable InstallSource installSource)
             throws PackageManagerException {
         final ScanRequest initialScanRequest = prepareInitialScanRequest(parsedPackage, parseFlags,
-                scanFlags, user, cpuAbiOverride);
+                scanFlags, user, cpuAbiOverride, installSource);
         final PackageSetting installedPkgSetting = initialScanRequest.mPkgSetting;
         final PackageSetting disabledPkgSetting = initialScanRequest.mDisabledPkgSetting;
 
@@ -4602,7 +4585,7 @@ final class InstallPackageHelper {
                     initialScanRequest.mSharedUserSetting, disabledPkgSetting,
                     initialScanRequest.mOriginalPkgSetting, initialScanRequest.mRealPkgName,
                     parseFlags, scanFlags, initialScanRequest.mIsPlatformPackage, user,
-                    cpuAbiOverride);
+                    cpuAbiOverride, initialScanRequest.mEnableAlignmentChecks);
             return ScanPackageUtils.scanPackageOnly(request, mPm.mInjector, mPm.mFactoryTest,
                     currentTime);
         }
@@ -4618,7 +4601,7 @@ final class InstallPackageHelper {
             final boolean scanSystemPartition =
                 (parseFlags & ParsingPackageUtils.PARSE_IS_SYSTEM_DIR) != 0;
             final ScanRequest initialScanRequest = prepareInitialScanRequest(parsedPackage,
-                    parseFlags, scanFlags, user, null);
+                    parseFlags, scanFlags, user, null /*cpuAbiOverride*/, null /*installSource*/);
             final PackageSetting installedPkgSetting = initialScanRequest.mPkgSetting;
             final PackageSetting originalPkgSetting = initialScanRequest.mOriginalPkgSetting;
             final PackageSetting pkgSetting =
@@ -4629,6 +4612,7 @@ final class InstallPackageHelper {
             final boolean isSystemPkgUpdated;
             final PackageSetting disabledPkgSetting;
             final boolean isUpgrade;
+
             synchronized (mPm.mLock) {
                 isUpgrade = mPm.isDeviceUpgrading();
                 if (scanSystemPartition && !pkgAlreadyExists
@@ -4656,7 +4640,8 @@ final class InstallPackageHelper {
                             initialScanRequest.mSharedUserSetting,
                             null /* disabledPkgSetting */, null /* originalPkgSetting */,
                             null, parseFlags, scanFlags,
-                            initialScanRequest.mIsPlatformPackage, user, null);
+                            initialScanRequest.mIsPlatformPackage, user, null,
+                            initialScanRequest.mEnableAlignmentChecks);
                     ScanPackageUtils.applyPolicy(parsedPackage, scanFlags,
                             mPm.getPlatformPackage(), true);
                     final ScanResult scanResult =
@@ -4858,7 +4843,8 @@ final class InstallPackageHelper {
 
             final long firstInstallTime = System.currentTimeMillis();
             final ScanResult scanResult = scanPackageNew(parsedPackage, parseFlags,
-                    scanFlags | SCAN_UPDATE_SIGNATURE, firstInstallTime, user, null);
+                    scanFlags | SCAN_UPDATE_SIGNATURE, firstInstallTime, user,
+                    null /*cpuAbiOverride*/, null /*installSource*/);
             // Set scan outcome as successful for InitAppScanMetrics.
             metrics.setInitAppScanOutcome(PackageManager.INSTALL_SUCCEEDED);
             return new Pair<>(scanResult, shouldHideSystemApp);

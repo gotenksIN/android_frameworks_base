@@ -26,6 +26,7 @@ import android.text.BidiFormatter
 import android.text.TextUtils
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityManager
+import com.android.hardware.input.Flags
 import com.android.internal.accessibility.common.ShortcutConstants
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
@@ -48,7 +49,9 @@ interface AccessibilityShortcutsRepository {
 
     fun getActionKeyIconResId(): Int
 
-    fun enableShortcutsForTargets(targetName: String)
+    fun enableShortcutsForTargets(enable: Boolean, targetName: String)
+
+    fun enableMagnificationAndZoomIn(displayId: Int)
 }
 
 @SysUISingleton
@@ -80,54 +83,44 @@ constructor(
         targetName: String,
     ): Pair<String, CharSequence>? {
         // TODO: b/419026315 - Update the secondary modifier key label.
-        val secondaryModifierLabel = ShortcutHelperKeys.modifierLabels[MODIFIER_KEY xor metaState]
-        val keyCodeLabel = keyCodeMap[keyCode]
+        val secondaryModifierLabel =
+            ShortcutHelperKeys.modifierLabels[MODIFIER_KEY xor metaState] ?: return null
+        val keyCodeLabel = keyCodeMap[keyCode] ?: return null
 
-        if (secondaryModifierLabel == null || keyCodeLabel == null) {
-            return null
-        }
+        when (keyGestureType) {
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION,
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS -> {
+                val featureName = getFeatureName(keyGestureType, targetName) ?: return null
+                val title = getDialogTitle(keyGestureType, featureName) ?: return null
+                val content =
+                    getDialogContent(
+                        keyGestureType,
+                        secondaryModifierLabel.invoke(context),
+                        keyCodeLabel,
+                        featureName,
+                    ) ?: return null
 
-        if (keyGestureType == KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION) {
-            val featureName =
-                resources.getString(
-                    com.android.settingslib.R.string.accessibility_screen_magnification_title
-                )
-            val title =
-                resources.getString(
-                    R.string.accessibility_key_gesture_magnification_dialog_title,
-                    featureName,
-                )
-            val content =
-                TextUtils.expandTemplate(
-                    resources.getText(
-                        R.string.accessibility_key_gesture_magnification_dialog_content
-                    ),
-                    secondaryModifierLabel.invoke(context),
-                    keyCodeLabel,
-                    featureName,
-                )
-            return Pair(title, content)
-        } else {
-            val featureNameToIntro = getFeatureNameToIntro(keyGestureType, targetName)
-            if (featureNameToIntro == null) {
-                return null
+                return Pair(title, content)
             }
+            else -> {
+                val featureNameToIntro =
+                    getFeatureNameToIntro(keyGestureType, targetName) ?: return null
+                val title =
+                    resources.getString(
+                        R.string.accessibility_key_gesture_dialog_title,
+                        featureNameToIntro.first,
+                    )
+                val content =
+                    TextUtils.expandTemplate(
+                        resources.getText(R.string.accessibility_key_gesture_dialog_content),
+                        secondaryModifierLabel.invoke(context),
+                        keyCodeLabel,
+                        featureNameToIntro.first,
+                        featureNameToIntro.second,
+                    )
 
-            val title =
-                resources.getString(
-                    R.string.accessibility_key_gesture_dialog_title,
-                    featureNameToIntro.first,
-                )
-            val content =
-                TextUtils.expandTemplate(
-                    resources.getText(R.string.accessibility_key_gesture_dialog_content),
-                    secondaryModifierLabel.invoke(context),
-                    keyCodeLabel,
-                    featureNameToIntro.first,
-                    featureNameToIntro.second,
-                )
-
-            return Pair(title, content)
+                return Pair(title, content)
+            }
         }
     }
 
@@ -137,13 +130,89 @@ constructor(
     }
 
     @SuppressLint("MissingPermission") // android.permission.MANAGE_ACCESSIBILITY
-    override fun enableShortcutsForTargets(targetName: String) {
+    override fun enableShortcutsForTargets(enable: Boolean, targetName: String) {
         accessibilityManager.enableShortcutsForTargets(
-            /* enable= */ true,
+            /* enable= */ enable,
             ShortcutConstants.UserShortcutType.KEY_GESTURE,
             setOf(targetName),
             userTracker.userId,
         )
+    }
+
+    @SuppressLint("MissingPermission") // android.permission.MANAGE_ACCESSIBILITY
+    override fun enableMagnificationAndZoomIn(displayId: Int) {
+        accessibilityManager.enableMagnificationAndZoomIn(displayId)
+    }
+
+    private suspend fun getFeatureName(keyGestureType: Int, targetName: String): CharSequence? {
+        return when (keyGestureType) {
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION ->
+                resources.getString(
+                    com.android.settingslib.R.string.accessibility_screen_magnification_title
+                )
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS -> {
+                val componentName = ComponentName.unflattenFromString(targetName)
+                withContext(backgroundDispatcher) {
+                    accessibilityManager
+                        .getInstalledServiceInfoWithComponentName(componentName)
+                        ?.resolveInfo
+                        ?.loadLabel(packageManager)
+                        ?.let { formatFeatureName(it) }
+                }
+            }
+            else -> null
+        }
+    }
+
+    private suspend fun getDialogTitle(keyGestureType: Int, featureName: CharSequence): String? {
+        return when (keyGestureType) {
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION -> {
+                if (Flags.enableMagnifyMagnificationKeyGestureDialog()) {
+                    resources.getString(
+                        R.string.accessibility_key_gesture_magnification_dialog_title,
+                        featureName,
+                    )
+                } else {
+                    resources.getString(
+                        R.string.accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title,
+                        featureName,
+                    )
+                }
+            }
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS -> {
+                resources.getString(
+                    R.string.accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title,
+                    featureName,
+                )
+            }
+            else -> null
+        }
+    }
+
+    private fun getDialogContent(
+        keyGestureType: Int,
+        secondaryModifierLabel: String,
+        keyCodeLabel: String,
+        featureName: CharSequence,
+    ): CharSequence? {
+        val contentTemplateResId: Int? =
+            when (keyGestureType) {
+                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION ->
+                    R.string.accessibility_key_gesture_magnification_dialog_content
+                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS ->
+                    R.string.accessibility_key_gesture_voice_access_dialog_content
+                else -> null
+            }
+
+        return contentTemplateResId?.let { resId ->
+            val contentTemplate = resources.getText(resId)
+            TextUtils.expandTemplate(
+                contentTemplate,
+                secondaryModifierLabel,
+                keyCodeLabel,
+                featureName,
+            )
+        }
     }
 
     private suspend fun getFeatureNameToIntro(
@@ -151,7 +220,6 @@ constructor(
         targetName: String,
     ): Pair<CharSequence, CharSequence>? {
         return when (keyGestureType) {
-            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS,
             KeyGestureEvent.KEY_GESTURE_TYPE_ACTIVATE_SELECT_TO_SPEAK,
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER -> {
                 val accessibilityServiceInfo =
@@ -159,25 +227,21 @@ constructor(
                         accessibilityManager.getInstalledServiceInfoWithComponentName(
                             ComponentName.unflattenFromString(targetName)
                         )
-                    }
+                    } ?: return null
 
-                if (accessibilityServiceInfo == null) {
-                    null
-                } else {
-                    val featureName =
-                        formatFeatureName(
-                            accessibilityServiceInfo.resolveInfo.loadLabel(packageManager)
-                        )
+                val featureName =
+                    formatFeatureName(
+                        accessibilityServiceInfo.resolveInfo.loadLabel(packageManager)
+                    )
 
-                    val intro =
-                        getFeatureIntro(
-                            keyGestureType,
-                            featureName,
-                            accessibilityServiceInfo.loadIntro(packageManager),
-                        )
+                val intro =
+                    getFeatureIntro(
+                        keyGestureType,
+                        featureName,
+                        accessibilityServiceInfo.loadIntro(packageManager),
+                    )
 
-                    Pair(featureName, intro)
-                }
+                Pair(featureName, intro)
             }
             else -> null
         }
@@ -204,9 +268,6 @@ constructor(
                     R.string.accessibility_key_gesture_dialog_talkback_intro,
                     featureName,
                 )
-
-            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS ->
-                resources.getString(R.string.accessibility_key_gesture_dialog_va_intro, featureName)
 
             else -> defaultIntro ?: ""
         }

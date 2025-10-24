@@ -107,7 +107,7 @@ import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams.SoftInputModeFlags;
 import android.view.autofill.AutofillId;
 import android.view.autofill.AutofillManager;
-import android.window.ImeOnBackInvokedDispatcher;
+import android.window.ImeBackCallbackProxy;
 import android.window.WindowOnBackInvokedDispatcher;
 
 import com.android.internal.annotations.GuardedBy;
@@ -117,6 +117,7 @@ import com.android.internal.inputmethod.IConnectionlessHandwritingCallback;
 import com.android.internal.inputmethod.IInputMethodClient;
 import com.android.internal.inputmethod.IInputMethodSession;
 import com.android.internal.inputmethod.IRemoteAccessibilityInputConnection;
+import com.android.internal.inputmethod.IRemoteComputerControlInputConnection;
 import com.android.internal.inputmethod.ImeTracing;
 import com.android.internal.inputmethod.InputBindResult;
 import com.android.internal.inputmethod.InputMethodDebug;
@@ -317,8 +318,8 @@ public final class InputMethodManager {
      * Provide this to {@link IInputMethodManagerGlobalInvoker#startInputOrWindowGainedFocus}
      * to receive {@link android.window.OnBackInvokedCallback} registrations from IME.
      */
-    private final ImeOnBackInvokedDispatcher mImeDispatcher =
-            new ImeOnBackInvokedDispatcher(Handler.getMain()) {
+    private final ImeBackCallbackProxy mImeBackCallbackProxy =
+            new ImeBackCallbackProxy(Handler.getMain()) {
         @Override
         public WindowOnBackInvokedDispatcher getReceivingDispatcher() {
             synchronized (mH) {
@@ -707,6 +708,16 @@ public final class InputMethodManager {
 
     private final DelegateImpl mDelegate = new DelegateImpl();
 
+    /**
+     * State that stores whether we have already tried to request focus again, after the IME
+     * session has been reset. This will lead to show the IME after tapping on a text field, even
+     * if the {@link android.view.InsetsController#mRequestedVisibleTypes} have not changed.
+     * This forces a call to the system server to re-establish the IME session when it would
+     * otherwise not occur.
+     */
+    @GuardedBy("mH")
+    private boolean mFocusRequestedAfterImeSessionReset = false;
+
     private static boolean sPreventImeStartupUnlessTextEditor;
 
     // -----------------------------------------------------------
@@ -946,10 +957,10 @@ public final class InputMethodManager {
                         StartInputReason.WINDOW_FOCUS_GAIN_REPORT_ONLY, mClient,
                         viewForWindowFocus.getWindowToken(), startInputFlags, softInputMode,
                         windowFlags,
-                        null,
-                        null, null,
+                        null, null, null, null,
                         mCurRootView.mContext.getApplicationInfo().targetSdkVersion,
-                        UserHandle.myUserId(), mImeDispatcher, imeRequestedVisible);
+                        UserHandle.myUserId(), mImeBackCallbackProxy.getResultReceiver(),
+                        imeRequestedVisible);
                 Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
             }
         }
@@ -1016,10 +1027,11 @@ public final class InputMethodManager {
                 onImeFocusLost(mCurRootView);
             }
 
-            mImeDispatcher.switchRootView(mCurRootView, rootView);
+            mImeBackCallbackProxy.switchRootView(mCurRootView, rootView);
             mCurRootView = rootView;
             if (wasEmpty && mCurRootView != null) {
-                mImeDispatcher.updateReceivingDispatcher(mCurRootView.getOnBackInvokedDispatcher());
+                mImeBackCallbackProxy
+                        .updateReceivingDispatcher(mCurRootView.getOnBackInvokedDispatcher());
             }
         }
     }
@@ -1257,7 +1269,7 @@ public final class InputMethodManager {
                     final boolean startInput;
                     synchronized (mH) {
                         if (reason == UnbindReason.DISCONNECT_IME) {
-                            mImeDispatcher.clear();
+                            mImeBackCallbackProxy.clear();
                         }
                         if (getBindSequenceLocked() != sequence) {
                             return;
@@ -2130,6 +2142,7 @@ public final class InputMethodManager {
         mCurMethod = null; // for @UnsupportedAppUsage
         // We only reset sequence number for input method, but not accessibility.
         mCurBindState = null;
+        mFocusRequestedAfterImeSessionReset = false;
     }
 
     /**
@@ -2237,7 +2250,7 @@ public final class InputMethodManager {
         }
         mReportInputConnectionOpenedRunner = null;
         // Clear the back callbacks held by the ime dispatcher to avoid memory leaks.
-        mImeDispatcher.clear();
+        mImeBackCallbackProxy.clear();
     }
 
     /**
@@ -3639,15 +3652,21 @@ public final class InputMethodManager {
                     ? editorInfo.targetInputMethodUser.getIdentifier() : UserHandle.myUserId();
             Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "IMM.startInputOrWindowGainedFocus");
 
+            final IRemoteAccessibilityInputConnection accessibilityInputConnection =
+                    servedInputConnection == null ? null
+                            : servedInputConnection.asIRemoteAccessibilityInputConnection();
+            final IRemoteComputerControlInputConnection computerControlInputConnection =
+                    (!android.companion.virtualdevice.flags.Flags.computerControlTyping()
+                            || servedInputConnection == null) ? null
+                            : servedInputConnection.asIRemoteComputerControlInputConnection();
             // async result delivered via MSG_START_INPUT_RESULT.
             final int startInputSeq =
                     IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus(
                             startInputReason, mClient, windowGainingFocus, startInputFlags,
                             softInputMode, windowFlags, editorInfo, servedInputConnection,
-                            servedInputConnection == null ? null
-                                    : servedInputConnection.asIRemoteAccessibilityInputConnection(),
+                            accessibilityInputConnection, computerControlInputConnection,
                             view.getContext().getApplicationInfo().targetSdkVersion, targetUserId,
-                            mImeDispatcher, imeRequestedVisible);
+                            mImeBackCallbackProxy.getResultReceiver(), imeRequestedVisible);
 
             Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
             // Create a runnable for delayed notification to the app that the InputConnection is
@@ -3736,6 +3755,23 @@ public final class InputMethodManager {
     }
 
     /**
+     * A test-only method to set a list of allowed IMEs for the next session.
+     * Note: this will reset on the next window focus.
+     * @param allowedPackages {@link List} of allowed IME packages. Set {@code null} to reset after
+     *                                    the test run.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_ENFORCE_DEVICE_POLICY_IME)
+    @TestApi
+    @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
+    public void setAllowedImesByPolicyForTest(@Nullable List<String> allowedPackages) {
+        synchronized (mH) {
+            IInputMethodManagerGlobalInvoker.setAllowedImesByPolicyForTest(
+                    mClient, allowedPackages);
+        }
+    }
+
+    /**
      * An empty method only to avoid crashes of apps that call this method via reflection and do not
      * handle {@link NoSuchMethodException} in a graceful manner.
      *
@@ -3796,11 +3832,11 @@ public final class InputMethodManager {
     }
 
     /**
-     * Returns the ImeOnBackInvokedDispatcher.
+     * Returns the {@link ImeBackCallbackProxy}.
      * @hide
      */
-    public ImeOnBackInvokedDispatcher getImeOnBackInvokedDispatcher() {
-        return mImeDispatcher;
+    public ImeBackCallbackProxy getImeBackCallbackProxy() {
+        return mImeBackCallbackProxy;
     }
 
     /**
@@ -3901,6 +3937,28 @@ public final class InputMethodManager {
             }
             ImeTracker.forLogging().onProgress(statsToken, ImeTracker.PHASE_CLIENT_VIEW_SERVED);
             setImeVisibilityOnInsetsController(mCurRootView, false, statsToken);
+        }
+    }
+
+
+    /**
+     * @hide
+     */
+    public void requestFocusAfterSessionReset() {
+        synchronized (mH) {
+            if (!mFocusRequestedAfterImeSessionReset && !isImeSessionAvailableLocked()) {
+                final View view = getServedViewLocked();
+                ProtoLog.d(INPUT_METHOD_MANAGER_DEBUG, "requestFocusAfterSessionReset: view=%s",
+                        view);
+                if (view == null) {
+                    return;
+                }
+                // Call into IMMS only once after the binding was cleared (e.g., after pm clear)
+                mFocusRequestedAfterImeSessionReset = true;
+                startInputOnWindowFocusGainInternal(StartInputReason.CHECK_FOCUS,
+                        view /* focusedView */, 0 /* startInputFlags */, 0 /* softInputMode */,
+                        0 /* windowFlags */);
+            }
         }
     }
 
@@ -4617,15 +4675,19 @@ public final class InputMethodManager {
     }
 
     /**
-     * A test API for CTS to check whether there are any pending IME visibility requests.
+     * A test API for CTS to wait until there are no more pending IME visibility requests, up to the
+     * given timeout. This will throw a {@link java.util.concurrent.TimeoutException} if the wait
+     * times out.
      *
-     * @return {@code true} iff there are pending IME visibility requests.
+     * @param timeoutMs the timeout in milliseconds.
+     *
      * @hide
      */
+    @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
     @TestApi
     @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
-    public boolean hasPendingImeVisibilityRequests() {
-        return IInputMethodManagerGlobalInvoker.hasPendingImeVisibilityRequests();
+    public void waitUntilNoPendingRequests(long timeoutMs) {
+        IInputMethodManagerGlobalInvoker.waitUntilNoPendingRequests(timeoutMs);
     }
 
     /**
@@ -4637,8 +4699,8 @@ public final class InputMethodManager {
     @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
     @TestApi
     @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
-    public void finishTrackingPendingImeVisibilityRequests() {
-        IInputMethodManagerGlobalInvoker.finishTrackingPendingImeVisibilityRequests();
+    public void finishTrackingPendingRequests() {
+        IInputMethodManagerGlobalInvoker.finishTrackingPendingRequests();
     }
 
     /**
@@ -4998,7 +5060,7 @@ public final class InputMethodManager {
                 + " mCursorSelEnd=" + mCursorSelEnd
                 + " mCursorCandStart=" + mCursorCandStart
                 + " mCursorCandEnd=" + mCursorCandEnd);
-        mImeDispatcher.dump(p, "  ");
+        mImeBackCallbackProxy.dump(p, "  ");
     }
 
     /**

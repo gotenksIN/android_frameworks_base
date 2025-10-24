@@ -27,8 +27,10 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.ScreenshotSource.SCREENSHOT_KEY_CHORD;
 import static android.view.WindowManager.ScreenshotSource.SCREENSHOT_KEY_OTHER;
 import static android.view.WindowManagerPolicyConstants.FLAG_INTERACTIVE;
+import static android.window.DesktopExperienceFlags.TOGGLE_FULLSCREEN_STATE_VIA_FULLSCREEN_KEY;
 
 import static com.android.hardware.input.Flags.enableNew25q2Keycodes;
+import static com.android.hardware.input.Flags.keyboardBacklightShortcuts;
 import static com.android.hardware.input.Flags.fixSearchModifierFallbacks;
 import static com.android.internal.config.sysui.SystemUiDeviceConfigFlags.SCREENSHOT_KEYCHORD_DELAY;
 
@@ -88,6 +90,7 @@ import com.android.internal.util.ScreenshotHelper;
 import com.android.internal.util.ScreenshotRequest;
 import com.android.server.LocalServices;
 import com.android.server.UiThread;
+import com.android.server.input.data.InputDataStore;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
@@ -764,12 +767,12 @@ final class KeyGestureController {
                 }
                 return true;
             case KeyEvent.KEYCODE_KEYBOARD_BACKLIGHT_TOGGLE:
-                // TODO: Add logic
-                if (!down) {
+                final boolean handleOnDown = keyboardBacklightShortcuts();
+                if (!(handleOnDown ^ down)) {
                     handleKeyGesture(deviceId, new int[]{keyCode}, /* modifierState = */0,
-                            KeyGestureEvent.KEY_GESTURE_TYPE_KEYBOARD_BACKLIGHT_TOGGLE,
-                            KeyGestureEvent.ACTION_GESTURE_COMPLETE, displayId,
-                            focusedToken, /* flags = */0, /* appLaunchData = */null);
+                                KeyGestureEvent.KEY_GESTURE_TYPE_KEYBOARD_BACKLIGHT_TOGGLE,
+                                KeyGestureEvent.ACTION_GESTURE_COMPLETE, displayId,
+                                focusedToken, /* flags = */0, /* appLaunchData = */null);
                 }
                 return true;
             case KeyEvent.KEYCODE_ALL_APPS:
@@ -818,7 +821,9 @@ final class KeyGestureController {
                     if (firstDown) {
                         handleKeyGesture(deviceId, new int[]{KeyEvent.KEYCODE_FULLSCREEN},
                                 /* modifierState = */0,
-                                KeyGestureEvent.KEY_GESTURE_TYPE_MULTI_WINDOW_NAVIGATION,
+                                TOGGLE_FULLSCREEN_STATE_VIA_FULLSCREEN_KEY.isTrue()
+                                        ? KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_FULLSCREEN
+                                        : KeyGestureEvent.KEY_GESTURE_TYPE_MULTI_WINDOW_NAVIGATION,
                                 KeyGestureEvent.ACTION_GESTURE_COMPLETE, displayId,
                                 focusedToken, /* flags = */0, /* appLaunchData = */null);
                     }
@@ -835,6 +840,10 @@ final class KeyGestureController {
                     Toast.makeText(mContext, UiThread.get().getLooper(),
                             mContext.getString(R.string.exit_toast_on_long_press_escape),
                             Toast.LENGTH_SHORT).show();
+                    handleKeyGesture(event.getDeviceId(), new int[]{KeyEvent.KEYCODE_ESCAPE},
+                            metaState, KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK,
+                            KeyGestureEvent.ACTION_GESTURE_START,
+                            displayId, focusedToken, /* flags= */0, /* appLaunchData= */ null);
                     AidlKeyGestureEvent eventToSend = createKeyGestureEvent(event.getDeviceId(),
                             new int[]{KeyEvent.KEYCODE_ESCAPE},
                             metaState, KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK,
@@ -843,7 +852,13 @@ final class KeyGestureController {
                     Message msg = Message.obtain(mHandler, MSG_EXIT_FOCUSED_APP, eventToSend);
                     mHandler.sendMessageDelayed(msg, LONG_PRESS_DURATION_FOR_EXIT_APP_MS);
                 } else if (!down) {
-                    mHandler.removeMessages(MSG_EXIT_FOCUSED_APP);
+                    if (mHandler.hasMessages(MSG_EXIT_FOCUSED_APP)) {
+                        mHandler.removeMessages(MSG_EXIT_FOCUSED_APP);
+                        handleKeyGesture(event.getDeviceId(), new int[]{KeyEvent.KEYCODE_ESCAPE},
+                                metaState, KeyGestureEvent.KEY_GESTURE_TYPE_QUIT_FOCUSED_TASK,
+                                KeyGestureEvent.ACTION_GESTURE_COMPLETE, displayId, focusedToken,
+                                KeyGestureEvent.FLAG_CANCELLED, /* appLaunchData= */ null);
+                    }
                 }
                 break;
             case KeyEvent.KEYCODE_ASSIST:
@@ -1125,6 +1140,7 @@ final class KeyGestureController {
                                 KeyGestureEvent.KEY_GESTURE_TYPE_LANGUAGE_SWITCH,
                                 KeyGestureEvent.ACTION_GESTURE_COMPLETE, displayId,
                                 focusedToken, /* flags = */0, /* appLaunchData = */null);
+                        return true;
                     }
                 }
                 break;
@@ -1139,6 +1155,7 @@ final class KeyGestureController {
                             KeyGestureEvent.KEY_GESTURE_TYPE_ACCESSIBILITY_SHORTCUT,
                             KeyGestureEvent.ACTION_GESTURE_COMPLETE, displayId,
                             focusedToken, /* flags = */0, /* appLaunchData = */null);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_SYSRQ:
@@ -1147,6 +1164,7 @@ final class KeyGestureController {
                             KeyGestureEvent.KEY_GESTURE_TYPE_TAKE_SCREENSHOT,
                             KeyGestureEvent.ACTION_GESTURE_COMPLETE, displayId,
                             focusedToken, /* flags = */0, /* appLaunchData = */null);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_ESCAPE:
@@ -1155,6 +1173,7 @@ final class KeyGestureController {
                             KeyGestureEvent.KEY_GESTURE_TYPE_CLOSE_ALL_DIALOGS,
                             KeyGestureEvent.ACTION_GESTURE_COMPLETE, displayId,
                             focusedToken, /* flags = */0, /* appLaunchData = */null);
+                    return true;
                 }
                 break;
         }
@@ -1450,7 +1469,8 @@ final class KeyGestureController {
                 mInputGestureManager.getCustomInputGestures(userId, null);
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         synchronized (mInputDataStore) {
-            mInputDataStore.writeInputGestureXml(byteArrayOutputStream, true, inputGestureDataList);
+            mInputDataStore.writeData(byteArrayOutputStream, true, inputGestureDataList,
+                    InputGestureData.class);
         }
         return byteArrayOutputStream.toByteArray();
     }
@@ -1460,7 +1480,8 @@ final class KeyGestureController {
         final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(payload);
         List<InputGestureData> inputGestureDataList;
         synchronized (mInputDataStore) {
-            inputGestureDataList = mInputDataStore.readInputGesturesXml(byteArrayInputStream, true);
+            inputGestureDataList = mInputDataStore.readData(byteArrayInputStream, true,
+                    InputGestureData.class);
         }
         for (final InputGestureData inputGestureData : inputGestureDataList) {
             mInputGestureManager.addCustomInputGesture(userId, inputGestureData);
@@ -1584,15 +1605,15 @@ final class KeyGestureController {
             final List<InputGestureData> inputGestureDataList =
                     mInputGestureManager.getCustomInputGestures(userId,
                             null);
-            mInputDataStore.saveInputGestures(userId, inputGestureDataList);
+            mInputDataStore.saveData(userId, inputGestureDataList, InputGestureData.class);
         }
     }
 
     private void loadInputGestures(int userId) {
         synchronized (mInputDataStore) {
             mInputGestureManager.removeAllCustomInputGestures(userId, null);
-            final List<InputGestureData> inputGestureDataList = mInputDataStore.loadInputGestures(
-                    userId);
+            final List<InputGestureData> inputGestureDataList = mInputDataStore.loadData(
+                    userId, InputGestureData.class);
             for (final InputGestureData inputGestureData : inputGestureDataList) {
                 mInputGestureManager.addCustomInputGesture(userId, inputGestureData);
             }

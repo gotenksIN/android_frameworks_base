@@ -19,6 +19,7 @@ package com.android.server.display.mode;
 import static android.hardware.display.DisplayManager.DISPLAY_CATEGORY_ALL_INCLUDING_DISABLED;
 import static android.hardware.display.DisplayManagerInternal.REFRESH_RATE_LIMIT_HIGH_BRIGHTNESS_MODE;
 import static android.os.PowerManager.BRIGHTNESS_INVALID_FLOAT;
+import static android.view.Display.Mode.FLAG_SIZE_OVERRIDE;
 import static android.view.Display.Mode.INVALID_MODE_ID;
 
 import static com.android.server.display.DisplayDeviceConfig.DEFAULT_LOW_REFRESH_RATE;
@@ -81,6 +82,7 @@ import com.android.server.display.config.RefreshRateData;
 import com.android.server.display.config.SupportedModeData;
 import com.android.server.display.feature.DeviceConfigParameterProvider;
 import com.android.server.display.feature.DisplayManagerFlags;
+import com.android.server.display.feature.flags.Flags;
 import com.android.server.display.utils.AmbientFilter;
 import com.android.server.display.utils.AmbientFilterFactory;
 import com.android.server.display.utils.DeviceConfigParsingUtils;
@@ -1277,9 +1279,16 @@ public class DisplayModeDirector {
      */
     public final class AppRequestObserver {
         private final boolean mIgnorePreferredRefreshRate;
+        private final boolean mEnableSizeVote;
+
 
         AppRequestObserver(DisplayManagerFlags flags) {
             mIgnorePreferredRefreshRate = flags.ignoreAppPreferredRefreshRateRequest();
+
+            // Enable size vote if the app resolution change feature is off, or if the feature is on
+            // but not disabled by the config.
+            mEnableSizeVote = !Flags.configureAppResolutionChange() || !mContext.getResources()
+                    .getBoolean(com.android.internal.R.bool.config_appResolutionSwitchVoteDisabled);
         }
 
         /**
@@ -1303,7 +1312,7 @@ public class DisplayModeDirector {
             mVotesStorage.updateVote(displayId, Vote.PRIORITY_APP_REQUEST_BASE_MODE_REFRESH_RATE,
                     baseModeRefreshRateVote);
 
-            if (!isExternalDisplay) {
+            if (!isExternalDisplay && mEnableSizeVote) {
                 Vote sizeVote = getSizeVote(requestedMode);
                 mVotesStorage.updateVote(displayId, Vote.PRIORITY_APP_REQUEST_SIZE, sizeVote);
             }
@@ -1349,7 +1358,7 @@ public class DisplayModeDirector {
         private Vote getBaseModeVote(@Nullable Display.Mode mode, float requestedRefreshRate) {
             Vote vote = null;
             if (mode != null) {
-                if (mode.isSynthetic()) {
+                if ((mode.getFlags() & Display.Mode.FLAG_ARR_RENDER_RATE)  != 0) {
                     vote = Vote.forRequestedRefreshRate(mode.getRefreshRate());
                 } else {
                     vote = Vote.forBaseModeRefreshRate(mode.getRefreshRate());
@@ -1617,7 +1626,11 @@ public class DisplayModeDirector {
             }
             for (var mode : info.supportedModes) {
                 if (mode.getModeId() == info.userPreferredModeId) {
-                    return mode;
+                    if ((mode.getFlags() & FLAG_SIZE_OVERRIDE) != 0) {
+                        return null;
+                    } else {
+                        return mode;
+                    }
                 }
             }
             return null;

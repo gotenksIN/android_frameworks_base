@@ -21,8 +21,10 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="app_label" msgid="4811759950673118541">"System-UI"</string>
     <string name="battery_low_title" msgid="5319680173344341779">"Vil du aktivere Batterisparefunktion?"</string>
-    <string name="battery_low_description" msgid="3282977755476423966">"Du har <xliff:g id="PERCENTAGE">%s</xliff:g> batteri tilbage. Batterisparefunktion aktiverer Mørkt tema, begrænser aktivitet i baggrunden og udskyder notifikationer."</string>
-    <string name="battery_low_intro" msgid="5148725009653088790">"Batterisparefunktion aktiverer Mørkt tema, begrænser aktivitet i baggrunden og udskyder notifikationer."</string>
+    <!-- no translation found for battery_low_description (7848989602036547056) -->
+    <skip />
+    <!-- no translation found for battery_low_intro (8033783734931200690) -->
+    <skip />
     <string name="battery_low_percent_format" msgid="4276661262843170964">"<xliff:g id="PERCENTAGE">%s</xliff:g> tilbage"</string>
     <string name="invalid_charger_title" msgid="938685362320735167">"Enheden kan ikke oplades via USB"</string>
     <string name="invalid_charger_text" msgid="2339310107232691577">"Brug den oplader, der fulgte med din enhed"</string>
@@ -138,36 +140,57 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"Du optager i øjeblikket hele skærmen"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"Du optager i øjeblikket <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"Stop optagelse"</string>
+    <string name="screen_record_entire_screen" msgid="66944996337928170">"Hele skærmen"</string>
+    <string name="screen_record_single_app" msgid="7355880948574569290">"Én app"</string>
+    <string name="screen_record_single_app_hint" msgid="8404332826093639170">"App, der skal optages"</string>
+    <string name="screen_record_single_app_no_recents" msgid="1023249803854209330">"Én app (åbn en app for at vælge)"</string>
     <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"Optag enhedslyd"</string>
     <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"Optag mikrofon"</string>
+    <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"Vis selfiekamera"</string>
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"Vis tryk"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"Vælg en app for at optage"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"Videoen er gemt"</string>
+    <!-- no translation found for screen_record_video_deleted (30786214839944540) -->
+    <skip />
+    <string name="screen_record_undo" msgid="7942716736019800870">"Fortryd"</string>
     <string name="screen_record_retake" msgid="3846643688365398450">"Tag igen"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"Rediger"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"Slet"</string>
-    <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"Tag et screenshot af hele skærmen"</string>
-    <string name="screen_capture_region_selection_button" msgid="515608875142444130">"Tag et screenshot af det markerede område"</string>
-    <!-- no translation found for screen_capture_record_region_selection_button (3699353194755563053) -->
+    <!-- no translation found for screen_record_delete_dialog_title (5868561491974057044) -->
     <skip />
+    <!-- no translation found for screen_record_delete_dialog_content (2610040845214024496) -->
+    <skip />
+    <string name="screen_record_play" msgid="4732544724679889445">"Afspil"</string>
+    <string name="screen_record_pause" msgid="1715012292444967776">"Sæt på pause"</string>
+    <string name="screen_record_mute" msgid="8111682249858638168">"Slå lyden fra"</string>
+    <string name="screen_record_unmute" msgid="2207912659365156472">"Slå lyden til"</string>
+    <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"Tag et screenshot af hele skærmen"</string>
+    <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"Optag hele skærmen"</string>
+    <string name="screen_capture_region_selection_button" msgid="515608875142444130">"Tag et screenshot af det markerede område"</string>
+    <string name="screen_capture_record_region_selection_button" msgid="3699353194755563053">"Optag det valgte område"</string>
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"Screenshot"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Optag"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Del"</string>
-    <!-- no translation found for screen_capture_toolbar_app_window_button_screenshot_a11y (1357560392667941303) -->
+    <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Vælg en app, du vil dele."</string>
+    <string name="screen_share_app_audio_sharing" msgid="7201172218924898712">"Del lyd fra vindue"</string>
+    <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Tag et screenshot af vinduet"</string>
+    <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Optag vinduet"</string>
+    <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Tag et screenshot af det valgte område"</string>
+    <string name="screen_capture_toolbar_region_button_record_a11y" msgid="6829009792885846867">"Optag det valgte område"</string>
+    <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"Tag et screenshot af hele skærmen"</string>
+    <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"Optag hele skærmen"</string>
+    <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"Indstillinger for Screenshot"</string>
+    <!-- no translation found for screen_capture_show_clicks_and_keys (2151690554364148717) -->
     <skip />
-    <!-- no translation found for screen_capture_toolbar_app_window_button_record_a11y (8984966592912823394) -->
+    <!-- no translation found for screen_capture_device_audio (1537290197773737349) -->
     <skip />
-    <!-- no translation found for screen_capture_toolbar_region_button_screenshot_a11y (2102262602357521192) -->
+    <!-- no translation found for screen_capture_microphone_audio (1698835678818747741) -->
     <skip />
-    <!-- no translation found for screen_capture_toolbar_region_button_record_a11y (6829009792885846867) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_fullscreen_button_screenshot_a11y (8699983355979869210) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_fullscreen_button_record_a11y (852148867883959158) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_settings_button_a11y (8014446956996739704) -->
+    <!-- no translation found for screen_capture_front_camera (1214647538302639358) -->
     <skip />
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> x <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
+    <!-- no translation found for screen_share_privacy_indicator_stop_sharing (2297045039651417274) -->
+    <skip />
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"Skærmen deles"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"Indhold deles"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"Vil du stoppe skærmdelingen?"</string>
@@ -211,7 +234,7 @@
     <string name="accessibility_phone_button" msgid="4256353121703100427">"Telefon"</string>
     <string name="accessibility_voice_assist_button" msgid="6497706615649754510">"Taleassistent"</string>
     <string name="accessibility_wallet_button" msgid="1458258783460555507">"Wallet"</string>
-    <string name="accessibility_qr_code_scanner_button" msgid="7521277927692910795">"QR-kodescanner"</string>
+    <string name="accessibility_qr_code_scanner_button" msgid="7521277927692910795">"QR-kode­scanner"</string>
     <string name="accessibility_unlock_button" msgid="3613812140816244310">"Låst op"</string>
     <string name="accessibility_lock_icon" msgid="661492842417875775">"Enheden er låst"</string>
     <string name="accessibility_confirm_biometric_auth_to_unlock" msgid="1600162805010332470">"Bekræft, og lås enheden op"</string>
@@ -411,8 +434,7 @@
     <string name="quick_settings_cast_device_default_name" msgid="6988469571141331700">"Enhed uden navn"</string>
     <string name="quick_settings_cast_detail_empty_text" msgid="2846282280014617785">"Der er ingen tilgængelige enheder"</string>
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Ingen Wi-Fi- eller Ethernet-forbindelse"</string>
-    <!-- no translation found for quick_settings_cast_disconnect (4836025217838730930) -->
-    <skip />
+    <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"Afbryd forbindelse"</string>
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"Lysstyrke"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"Ombytning af farver"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"Farve­korrigering"</string>
@@ -422,8 +444,7 @@
     <string name="quick_settings_close_user_panel" msgid="5599724542275896849">"Luk"</string>
     <string name="quick_settings_connected" msgid="3873605509184830379">"Forbundet"</string>
     <string name="quick_settings_connecting" msgid="2381969772953268809">"Opretter forbindelse…"</string>
-    <!-- no translation found for quick_settings_scanning_for_wifi (5875402701266073463) -->
-    <skip />
+    <string name="quick_settings_scanning_for_wifi" msgid="5875402701266073463">"Søger efter Wi-Fi…"</string>
     <string name="quick_settings_hotspot_label" msgid="1199196300038363424">"Hotspot"</string>
     <string name="quick_settings_hotspot_secondary_label_transient" msgid="7585604088079160564">"Aktiverer…"</string>
     <string name="quick_settings_hotspot_secondary_label_data_saver_enabled" msgid="1280433136266439372">"Datasparefunktion er slået til"</string>
@@ -483,12 +504,15 @@
     <string name="accessibility_hearing_device_pair_new_device" msgid="8440082580186130090">"Klik for at parre en ny enhed"</string>
     <string name="hearing_devices_presets_error" msgid="350363093458408536">"Forindstillingen kunne ikke opdateres"</string>
     <string name="hearing_devices_preset_label" msgid="7878267405046232358">"Forindstilling"</string>
+    <!-- no translation found for hearing_devices_preset_label_left (7427947566560179945) -->
+    <skip />
+    <!-- no translation found for hearing_devices_preset_label_right (1847206329436268522) -->
+    <skip />
     <string name="hearing_devices_input_routing_label" msgid="730396728151232306">"Standardmikrofon til opkald"</string>
   <string-array name="hearing_device_input_routing_options">
     <item msgid="4582190415045337003">"Mikrofon i høreapparat"</item>
     <item msgid="8501466270452446450">"Denne telefons mikrofon"</item>
   </string-array>
-    <string name="hearing_devices_spinner_item_selected" msgid="3137083889662762383">"Valgt"</string>
     <string name="hearing_devices_ambient_label" msgid="629440938614895797">"Omgivelser"</string>
     <string name="hearing_devices_ambient_control_left" msgid="3586965448230412600">"Venstre"</string>
     <string name="hearing_devices_ambient_control_right" msgid="6192137602448918383">"Højre"</string>
@@ -542,7 +566,7 @@
     <string name="zen_mode_set_up" msgid="8231201163894922821">"Ikke konfigureret"</string>
     <string name="zen_mode_no_manual_invocation" msgid="1769975741344633672">"Administrer i indstillingerne"</string>
     <string name="zen_mode_active_modes" msgid="1625850411578488856">"{count,plural, =0{Ingen aktive tilstande}=1{{mode} er aktiv}one{# tilstand er aktiv}other{# tilstande er aktive}}"</string>
-    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"<xliff:g id="NUMBER">%s</xliff:g> tilstande"</string>
+    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"<xliff:g id="NUMBER">%d</xliff:g> tilstande"</string>
     <string name="zen_modes_multiple_on_status" msgid="8120633422509269588">"Til"</string>
     <string name="zen_priority_introduction" msgid="3159291973383796646">"Du bliver ikke forstyrret af lyde eller vibrationer, undtagen fra alarmer, påmindelser, begivenheder og opkald fra udvalgte personer, du selv angiver. Du kan stadig høre alt, du vælger at afspille, f.eks. musik, videoer og spil."</string>
     <string name="zen_alarms_introduction" msgid="3987266042682300470">"Du bliver ikke forstyrret af lyde eller vibrationer, undtagen fra alarmer. Du kan stadig høre alt, du vælger at afspille, f.eks. musik, videoer og spil."</string>
@@ -689,8 +713,8 @@
     <string name="notification_section_header_conversations" msgid="821834744538345661">"Samtaler"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"Ryd alle lydløse notifikationer"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"Åbn indstillinger for notifikationer"</string>
-    <string name="dnd_suppressing_shade_text" msgid="5588252250634464042">"Notifikationer er sat på pause af Forstyr ikke"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{Ingen notifikationer}=1{Notifikationer er sat på pause af {mode}}=2{Notifikationer er sat på pause af {mode} og én anden tilstand}one{Notifikationer er sat på pause af {mode} og # anden tilstand}other{Notifikationer er sat på pause af {mode} og # andre tilstande}}"</string>
+    <string name="caught_up_shade_text" msgid="8166221989384139659">"Du er helt ajour"</string>
     <string name="media_projection_action_text" msgid="3634906766918186440">"Start nu"</string>
     <string name="empty_shade_text" msgid="8935967157319717412">"Ingen notifikationer"</string>
     <string name="no_unseen_notif_text" msgid="395512586119868682">"Ingen nye notifikationer"</string>
@@ -841,7 +865,7 @@
     <string name="wallet_secondary_label_device_locked" msgid="5175862019125370506">"Lås op for at bruge"</string>
     <string name="wallet_error_generic" msgid="257704570182963611">"Dine kort kunne ikke hentes. Prøv igen senere."</string>
     <string name="wallet_lockscreen_settings_label" msgid="3539105300870383570">"Lås skærmindstillinger"</string>
-    <string name="qr_code_scanner_title" msgid="1938155688725760702">"QR-kodescanner"</string>
+    <string name="qr_code_scanner_title" msgid="1938155688725760702">"QR-kode­scanner"</string>
     <string name="qr_code_scanner_updating_secondary_label" msgid="8344598017007876352">"Opdaterer"</string>
     <string name="status_bar_work" msgid="5238641949837091056">"Arbejdsprofil"</string>
     <string name="status_bar_airplane" msgid="4848702508684541009">"Flytilstand"</string>
@@ -884,7 +908,8 @@
     <string name="notification_guts_news_summary" msgid="638697931043407835">"Tophistorier, redaktionelt indhold m.m."</string>
     <string name="notification_guts_social_summary" msgid="3749147631983977040">"Likes, opslag m.m."</string>
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"Nyhedsbreve, anbefalede medier m.m."</string>
-    <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"Aktivér"</string>
+    <!-- no translation found for notification_onboarding_summaries_turn_on (3831339570984683297) -->
+    <skip />
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"Længere samtaler kan nu opsummeres for at give dig en hurtig oversigt"</string>
     <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"Notifikationsorg­anisering samler notifikationer med lavere prioritet og slår lyden fra for dem Tilføj flere kategorier under Indstillinger."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# notifikation}one{# notifikation}other{# notifikationer}}"</string>
@@ -990,6 +1015,7 @@
     <string name="group_system_access_notification_shade" msgid="1619028907006553677">"Se notifikationer"</string>
     <string name="group_system_access_quick_settings_panel" msgid="1844771096582064926">"Se kvikmenuen"</string>
     <string name="group_system_full_screenshot" msgid="5742204844232667785">"Tag et screenshot"</string>
+    <string name="group_system_partial_screenshot" msgid="2114314797127648010">"Tag et delvist screenshot"</string>
     <string name="group_system_access_system_app_shortcuts" msgid="8562482996626694026">"Vis genveje"</string>
     <string name="group_system_go_back" msgid="2730322046244918816">"Gå tilbage"</string>
     <string name="group_system_access_home_screen" msgid="4130366993484706483">"Gå til startskærm"</string>
@@ -1001,7 +1027,6 @@
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"Åbn digital assistent"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"Lås skærm"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"Skriv en note"</string>
-    <string name="group_system_close_window" msgid="1506354809787837043">"Luk det aktuelle vindue"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"Multitasking"</string>
     <string name="system_multitasking_rhs" msgid="8779289852395243004">"Brug opdelt skærm med appen til højre"</string>
     <string name="system_multitasking_lhs" msgid="7348595296208696452">"Brug opdelt skærm med appen til venstre"</string>
@@ -1015,6 +1040,7 @@
     <string name="system_desktop_mode_snap_right_window" msgid="2162560187639411929">"Flyt vinduet til højre"</string>
     <string name="system_desktop_mode_toggle_maximize_window" msgid="4084100093691768239">"Maksimér vinduet"</string>
     <string name="system_desktop_mode_minimize_window" msgid="1248714536732927092">"Minimer vinduet"</string>
+    <string name="system_desktop_mode_close_window" msgid="3072490692608682536">"Luk det aktuelle vindue"</string>
     <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"Skift mellem skriveborde"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"Input"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"Skift til næste sprog"</string>
@@ -1136,16 +1162,15 @@
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"Vil du aktivere <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"Handling "<annotation id="action_key_icon">"ikon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> er tastaturgenvejen til <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_talkback_intro" msgid="1617808784388544741">"<xliff:g id="ID_1">%1$s</xliff:g> er en skærmlæser, der giver dig mulighed for at få elementer læst højt. Den kan være en hjælp for brugere, der har svært ved at se skærmen."</string>
-    <string name="accessibility_key_gesture_dialog_va_intro" msgid="4709198503441288289">"<xliff:g id="ID_1">%1$s</xliff:g> giver dig mulighed for at styre din enhed med stemmen."</string>
     <string name="accessibility_key_gesture_dialog_positive_button_text" msgid="3670746017523589293">"Aktivér"</string>
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_title (5770691510738701250) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_content (7575802369763469379) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_negative_button_text (8393469413785600834) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_positive_button_text (895076240681888057) -->
-    <skip />
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"Vil du aktivere tastaturgenvejen <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"Aktivér ikke"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Aktivér genvej"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"Tastaturgenvejen <xliff:g id="ID_1">%1$s</xliff:g> er aktiveret"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572">"Handlings"<annotation id="action_key_icon">"ikonet"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> er tastaturgenvejen til at bruge hjælpefunktionen <xliff:g id="ID_3">^3</xliff:g>. Dette giver dig mulighed for hurtigt at zoome ind på skærmen for at forstørre indhold. Når forstørrelse er aktiveret, skal du trykke på handlings"<annotation id="action_key_icon">"ikonet"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> og \"+\" eller \"-\" for at justere zoom."</string>
+    <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Deaktiver genvej"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Bevar aktivering"</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"Når du trykker på "<annotation id="action_key_icon">"handlingsikonet"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g>, aktiveres hjælpefunktionen <xliff:g id="ID_3">^3</xliff:g>. Dette giver dig mulighed for at styre din enhed med stemmen."</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Låseskærm"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Lukker ned…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Se håndteringsvejledning"</string>
@@ -1194,12 +1219,9 @@
     <string name="running_foreground_services_title" msgid="5137313173431186685">"Apps, der kører i baggrunden"</string>
     <string name="running_foreground_services_msg" msgid="3009459259222695385">"Tryk for at se info om batteri- og dataforbrug"</string>
     <string name="mobile_data_disable_title" msgid="5366476131671617790">"Vil du deaktivere mobildata?"</string>
-    <!-- no translation found for mobile_data_enable_title (8259903353761259200) -->
-    <skip />
-    <!-- no translation found for mobile_data_enable_message (2013861580086078913) -->
-    <skip />
-    <!-- no translation found for mobile_data_enable_turn_on (5577732543207882533) -->
-    <skip />
+    <string name="mobile_data_enable_title" msgid="8259903353761259200">"Vil du aktivere mobildata?"</string>
+    <string name="mobile_data_enable_message" msgid="2013861580086078913">"Hvis du bruger mobildata, kan der opkræves gebyrer baseret på dit mobilabonnement."</string>
+    <string name="mobile_data_enable_turn_on" msgid="5577732543207882533">"Aktivér"</string>
     <string name="mobile_data_disable_message" msgid="8604966027899770415">"Du vil ikke have data- eller internetadgang via <xliff:g id="CARRIER">%s</xliff:g>. Der vil kun være adgang til internettet via Wi-Fi."</string>
     <string name="mobile_data_disable_message_default_carrier" msgid="6496033312431658238">"dit mobilselskab"</string>
     <string name="auto_data_switch_disable_title" msgid="5146527155665190652">"Vil du skifte tilbage til <xliff:g id="CARRIER">%s</xliff:g>?"</string>
@@ -1479,7 +1501,6 @@
     <string name="clipboard_edit_text_done" msgid="4551887727694022409">"Udfør"</string>
     <string name="clipboard_overlay_text_copied" msgid="1872624400464891363">"Kopieret"</string>
     <string name="clipboard_edit_source" msgid="9156488177277788029">"Fra <xliff:g id="APPNAME">%1$s</xliff:g>"</string>
-    <string name="clipboard_dismiss_description" msgid="3335990369850165486">"Afvis kopieret tekst"</string>
     <string name="clipboard_edit_text_description" msgid="805254383912962103">"Rediger kopieret tekst"</string>
     <string name="clipboard_edit_image_description" msgid="8904857948976041306">"Rediger kopieret billede"</string>
     <string name="clipboard_send_nearby_description" msgid="4629769637846717650">"Send til enhed i nærheden"</string>
@@ -1537,7 +1558,7 @@
     <string name="stylus_battery_low_percentage" msgid="2564243323894629626">"Batteriniveau på styluspen: <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
     <string name="stylus_battery_low_subtitle" msgid="3583843128908823273">"Slut din styluspen til en oplader"</string>
     <string name="stylus_battery_low" msgid="7134370101603167096">"Lavt batteriniveau på styluspen"</string>
-    <string name="video_camera" msgid="7654002575156149298">"Videokamera"</string>
+    <string name="video_camera" msgid="7654002575156149298">"Video­kamera"</string>
     <string name="call_from_work_profile_title" msgid="5418253516453177114">"Du kan ikke foretage opkald via en personlig app"</string>
     <string name="call_from_work_profile_text" msgid="2856337395968118274">"Din organisation tillader kun, at du foretager opkald via arbejdsapps"</string>
     <string name="call_from_work_profile_action" msgid="2937701298133010724">"Skift til arbejdsprofil"</string>
@@ -1619,6 +1640,7 @@
     <string name="shortcut_helper_customize_dialog_reset_button_label" msgid="7645535254306312685">"Ja, nulstil"</string>
     <string name="shortcut_helper_customize_dialog_cancel_button_label" msgid="5595546460431741178">"Annuller"</string>
     <string name="shortcut_helper_add_shortcut_dialog_placeholder" msgid="9154297849458741995">"Tryk på en tast"</string>
+    <string name="shortcut_helper_customizer_action_key_text" msgid="3979063901857046887">"Handling"</string>
     <string name="shortcut_customizer_key_combination_in_use_error_message" msgid="3325858369539848162">"Tastekombinationen er allerede i brug. Prøv en anden kombination."</string>
     <string name="shortcut_customizer_generic_error_message" msgid="3128454624049722741">"Genvejen kan ikke konfigureres."</string>
     <string name="shortcut_helper_plus_symbol" msgid="4534843157353732011">"+"</string>

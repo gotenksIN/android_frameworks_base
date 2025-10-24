@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 package com.android.internal.widget.remotecompose.core;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 
@@ -56,10 +55,18 @@ public interface Platform {
     /**
      * Converts a platform-specific path object into a platform-independent float buffer
      *
-     * @param path
-     * @return
+     * @param path path object
+     * @return float array of the path
      */
     @Nullable float [] pathToFloatArray(@NonNull Object path);
+
+    /**
+     * Parse a path represented as a string and returns a Path object
+     *
+     * @param pathData path data
+     * @return platform path
+     */
+    @NonNull Object parsePath(@NonNull String pathData);
 
     enum LogCategory {
         DEBUG,
@@ -122,6 +129,11 @@ public interface Platform {
 
                 @Override
                 public float[] pathToFloatArray(@NonNull Object path) {
+                    throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public @NonNull Object parsePath(@NonNull String pathData) {
                     throw new UnsupportedOperationException();
                 }
 

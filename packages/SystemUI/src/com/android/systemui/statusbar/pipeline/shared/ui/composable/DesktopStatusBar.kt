@@ -101,7 +101,8 @@ fun DesktopStatusBar(
                     Arrangement.spacedBy(
                         DesktopStatusBar.Dimensions.ElementSpacing,
                         Alignment.Start,
-                    )
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 ClockLegacy(textColor = tint, onClick = null)
 
@@ -120,7 +121,8 @@ fun DesktopStatusBar(
 
         Row(
             horizontalArrangement =
-                Arrangement.spacedBy(DesktopStatusBar.Dimensions.ElementSpacing, Alignment.End)
+                Arrangement.spacedBy(DesktopStatusBar.Dimensions.ElementSpacing, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             val chipsVisibilityModel = viewModel.ongoingActivityChips
             if (chipsVisibilityModel.areChipsAllowed) {
@@ -177,7 +179,10 @@ private fun NotificationsChip(viewModel: HomeStatusBarViewModel, modifier: Modif
         ) { tint ->
             Icon(
                 icon =
-                    Icon.Resource(res = R.drawable.ic_notification_bell, contentDescription = null),
+                    Icon.Resource(
+                        resId = R.drawable.ic_notification_bell,
+                        contentDescription = null,
+                    ),
                 tint = tint,
                 modifier = Modifier.size(20.dp).padding(1.dp),
             )

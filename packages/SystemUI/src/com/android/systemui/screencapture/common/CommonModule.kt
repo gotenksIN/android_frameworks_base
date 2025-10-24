@@ -20,6 +20,8 @@ import android.content.Context
 import com.android.launcher3.icons.IconFactory
 import com.android.systemui.mediaprojection.appselector.data.RecentTaskListProvider
 import com.android.systemui.mediaprojection.appselector.data.ShellRecentTaskListProvider
+import com.android.systemui.screencapture.common.data.repository.ScreenCaptureAppContentRepository
+import com.android.systemui.screencapture.common.data.repository.ScreenCaptureAppContentRepositoryImpl
 import com.android.systemui.screencapture.common.data.repository.ScreenCaptureIconRepository
 import com.android.systemui.screencapture.common.data.repository.ScreenCaptureIconRepositoryImpl
 import com.android.systemui.screencapture.common.data.repository.ScreenCaptureLabelRepository
@@ -35,7 +37,7 @@ import dagger.Module
 import dagger.Provides
 
 /**
- * Dagger Module for bindings common to all [ScreenCaptureComponent]s.
+ * Dagger Module for bindings common to all [ScreenCaptureUiComponent]s.
  *
  * This module must be included in the Subcomponent or replaced with equivalent bindings.
  */
@@ -61,13 +63,18 @@ interface CommonModule {
         impl: ScreenCaptureRecentTaskRepositoryImpl
     ): ScreenCaptureRecentTaskRepository
 
+    @Binds
+    fun bindAppContentRepository(
+        impl: ScreenCaptureAppContentRepositoryImpl
+    ): ScreenCaptureAppContentRepository
+
     @Binds fun bindRecentTaskListProvider(impl: ShellRecentTaskListProvider): RecentTaskListProvider
 
     @Binds fun bindRecentTasksViewModel(impl: RecentTasksViewModelImpl): RecentTasksViewModel
 
     companion object {
         @Provides
-        @ScreenCapture
+        @ScreenCaptureUi
         fun provideIconFactory(context: Context): IconFactory = IconFactory.obtain(context)
     }
 }

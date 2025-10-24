@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.viewinterop.AndroidView
-import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementContentScope
 import com.android.systemui.biometrics.AuthController
 import com.android.systemui.customization.clocks.R as clocksR
 import com.android.systemui.dagger.qualifiers.Application
@@ -48,10 +48,9 @@ import com.android.systemui.log.TouchHandlingViewLogger
 import com.android.systemui.log.dagger.LongPressTouchLog
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementContext
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementProvider
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenScope
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.statusbar.VibratorHelper
@@ -79,24 +78,20 @@ constructor(
     private val msdlPlayer: Lazy<MSDLPlayer>,
     @LongPressTouchLog private val logBuffer: LogBuffer,
 ) : LockscreenElementProvider {
-    override val elements: List<LockscreenElement> by lazy { listOf(lockIconElement) }
+    override val elements: List<LockscreenElement> by lazy { listOf(LockIconElement()) }
 
-    private val lockIconElement =
-        object : LockscreenElement {
-            override val key = LockscreenElementKeys.LockIcon
-            override val context = this@LockIconElementProvider.context
+    private inner class LockIconElement : LockscreenElement {
+        override val key = LockscreenElementKeys.LockIcon
+        override val context = this@LockIconElementProvider.context
 
-            @Composable
-            override fun ContentScope.LockscreenElement(
-                factory: LockscreenElementFactory,
-                context: LockscreenElementContext,
-            ) {
-                LockIcon()
-            }
+        @Composable
+        override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
+            LockIcon()
         }
+    }
 
     @Composable
-    fun ContentScope.LockIcon(overrideColor: Color? = null, modifier: Modifier = Modifier) {
+    fun LockIcon(overrideColor: Color? = null, modifier: Modifier = Modifier) {
         val context = LocalContext.current
 
         AndroidView(

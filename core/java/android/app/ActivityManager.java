@@ -859,6 +859,8 @@ public class ActivityManager {
             PROCESS_CAPABILITY_BFSL,
             PROCESS_CAPABILITY_USER_RESTRICTED_NETWORK,
             PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL,
+            PROCESS_CAPABILITY_CPU_TIME,
+            PROCESS_CAPABILITY_IMPLICIT_CPU_TIME,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ProcessCapability {}
@@ -3444,7 +3446,11 @@ public class ActivityManager {
         }
     }
 
-    /** @hide */
+    /**
+     * Information you can retrieve about a particular connection to a
+     * Service that is currently running in the system.
+     * @hide
+     */
     @TestApi
     @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
     public static final class ConnectionInfo implements Parcelable {
@@ -3513,16 +3519,25 @@ public class ActivityManager {
             return 0;
         }
 
+        /**
+         * Get the bind service flags for the connection.
+         */
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
-        public long getFlags() {
+        public @Context.BindServiceFlagsLongBits long getFlags() {
             return mFlags;
         }
 
+        /**
+         * Get the process name of the client.
+         */
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
         public @NonNull String getProcessName() {
             return mProcessName;
         }
 
+        /**
+         * Get the package name of the client.
+         */
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
         public @NonNull String getPackageName() {
             return mPackageName;
@@ -3546,6 +3561,10 @@ public class ActivityManager {
 
     /**
      * Returns a list of ConnectionInfo for connections bound to a given service.
+     * @param service The component name of the service to return ConnectionInfo
+     * records for.
+     * @return Returns a list of ConnectionInfo records describing each of
+     * the service connections.
      * @hide
      */
     @TestApi
@@ -4248,7 +4267,8 @@ public class ActivityManager {
 
         /**
          * When {@link #importanceReasonPid} is non-0, this is the importance
-         * of the other pid. @hide
+         * of the other pid.
+         * @hide
          */
         public int importanceReasonImportance;
 
@@ -5780,13 +5800,13 @@ public class ActivityManager {
         }
     }
 
-    /** {@hide} */
+    /** @hide */
     public static final int FLAG_OR_STOPPED = 1 << 0;
-    /** {@hide} */
+    /** @hide */
     public static final int FLAG_AND_LOCKED = 1 << 1;
-    /** {@hide} */
+    /** @hide */
     public static final int FLAG_AND_UNLOCKED = 1 << 2;
-    /** {@hide} */
+    /** @hide */
     public static final int FLAG_AND_UNLOCKING_OR_UNLOCKED = 1 << 3;
 
     /**
@@ -5807,7 +5827,7 @@ public class ActivityManager {
         }
     }
 
-    /** {@hide} */
+    /** @hide */
     public boolean isVrModePackageEnabled(ComponentName component) {
         try {
             return getService().isVrModePackageEnabled(component);
@@ -6293,6 +6313,38 @@ public class ActivityManager {
      * See {@link android.app.ActivityManager#getAppTasks()}
      */
     public static class AppTask {
+
+        /**
+         * The windowing layer is not specified. The system will use a
+         * {@link #WINDOWING_LAYER_NORMAL_APP} layer.
+         * @hide
+         */
+        public static final int WINDOWING_LAYER_UNDEFINED = 0;
+        /**
+         * The windowing layer for normal application windows.
+         * @hide
+         */
+        public static final int WINDOWING_LAYER_NORMAL_APP = 1;
+        /**
+         * The windowing layer for pinned windows, these windows are typically displayed above
+         * normal application windows.
+         * @hide
+         */
+        public static final int WINDOWING_LAYER_PINNED = 2;
+
+        /**
+         * Defines the windowing layer for a task, which can affect its Z-ordering.
+         * @hide
+         */
+        @IntDef(prefix = { "WINDOWING_LAYER_" }, value = {
+                WINDOWING_LAYER_UNDEFINED,
+                WINDOWING_LAYER_NORMAL_APP,
+                WINDOWING_LAYER_PINNED,
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        public @interface WindowingLayer {
+        }
+
         private IAppTask mAppTaskImpl;
 
         /** @hide */
@@ -6438,6 +6490,30 @@ public class ActivityManager {
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
+        }
+
+        /**
+         * Requests the windowing layer for this task. This can be used to affect the Z-ordering
+         * of the activity's window relative to other windows.
+         *
+         * <p>
+         * The task will be moved to the requested layer if possible.
+         *
+         * @param layer the {@link WindowingLayer} to move task to.
+         * @param executor an Executor used to invoke the callback
+         * @param callback a callback to receive the result of the request
+         * @hide
+         */
+        // TODO(b/442807136): Complete javadoc, add all requirements and detals needed
+        public void requestWindowingLayer(
+                @WindowingLayer int layer,
+                @NonNull @CallbackExecutor Executor executor,
+                @NonNull OutcomeReceiver<Void, Exception> callback) {
+            Objects.requireNonNull(executor, "executor cannot be null");
+            Objects.requireNonNull(callback, "callback cannot be null");
+            TaskWindowingLayerRequestHandler.requestWindowingLayer(
+                    layer, executor, callback, mAppTaskImpl
+            );
         }
     }
 

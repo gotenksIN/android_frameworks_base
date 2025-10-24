@@ -36,7 +36,6 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
-import static junit.framework.Assert.fail;
 
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -324,7 +323,8 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
                 Display.DEFAULT_DISPLAY);
         when(mMockHandleMenuFactory.create(any(), any(), any(), any(), any(), any(), anyInt(),
                 any(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(),
-                anyBoolean(), anyBoolean(), any(), any(), anyInt(), anyInt(), anyInt(), anyInt()))
+                anyBoolean(), anyBoolean(), any(), any(), any(), anyInt(), anyInt(), anyInt(),
+                anyInt()))
                 .thenReturn(mMockHandleMenu);
         when(mMockMultiInstanceHelper.supportsMultiInstanceSplit(any(), anyInt()))
                 .thenReturn(false);
@@ -662,7 +662,6 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_ENABLE_ACCESSIBLE_CUSTOM_HEADERS)
     public void updateRelayoutParams_freeformAndTransparentAppearance_allowsInputFallthrough() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(/* visible= */ true);
         taskInfo.configuration.windowConfiguration.setWindowingMode(WINDOWING_MODE_FREEFORM);
@@ -690,7 +689,6 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_ENABLE_ACCESSIBLE_CUSTOM_HEADERS)
     public void updateRelayoutParams_freeformButOpaqueAppearance_disallowsInputFallthrough() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(/* visible= */ true);
         taskInfo.configuration.windowConfiguration.setWindowingMode(WINDOWING_MODE_FREEFORM);
@@ -716,8 +714,8 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_ENABLE_ACCESSIBLE_CUSTOM_HEADERS)
-    public void updateRelayoutParams_fullscreen_disallowsInputFallthrough() {
+    @DisableFlags(Flags.FLAG_ENABLE_REMOVE_STATUS_BAR_INPUT_LAYER)
+    public void updateRelayoutParams_fullscreenWithStatusBarInputLayer_disallowsInputFallthrough() {
         final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(/* visible= */ true);
         taskInfo.configuration.windowConfiguration.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
         final RelayoutParams relayoutParams = new RelayoutParams();
@@ -725,6 +723,18 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
         updateRelayoutParams(relayoutParams, taskInfo);
 
         assertThat(relayoutParams.hasInputFeatureSpy()).isFalse();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_REMOVE_STATUS_BAR_INPUT_LAYER)
+    public void updateRelayoutParams_fullscreenWithoutStatusBarInputLayer_isInputFeatureSpy() {
+        final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(/* visible= */ true);
+        taskInfo.configuration.windowConfiguration.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
+        final RelayoutParams relayoutParams = new RelayoutParams();
+
+        updateRelayoutParams(relayoutParams, taskInfo);
+
+        assertThat(relayoutParams.hasInputFeatureSpy()).isTrue();
     }
 
     @Test
@@ -1943,7 +1953,28 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
         try {
             decor.setAnimatingTaskResizeOrReposition(true /* animatingTaskResizeOrReposition */);
         } catch (NullPointerException e) {
-            fail("Attempted to access view holder after window decor is closed");
+            throw new AssertionError(
+                    "Attempted to access view holder after window decor is closed", e);
+        }
+    }
+
+    @Test
+    public void onMaximizeButtonHoverExit_returnsWhenViewHolderIsNull() {
+        // Create a freeform task so the decoration has an AppHeaderViewHolder
+        final ActivityManager.RunningTaskInfo taskInfo = createTaskInfo(true /* visible */);
+        taskInfo.configuration.windowConfiguration.setWindowingMode(WINDOWING_MODE_FREEFORM);
+        final DesktopModeWindowDecoration decor =
+                spy(createWindowDecoration(taskInfo, true /* relayout */));
+
+        // Close the decor to close the view holder and set it to null
+        decor.close();
+
+        // Verify that calling onMaximizeButtonHoverExit does not cause a crash
+        try {
+            decor.onMaximizeButtonHoverExit();
+        } catch (NullPointerException e) {
+            throw new AssertionError(
+                    "Attempted to access view holder after window decor is closed", e);
         }
     }
 
@@ -1953,7 +1984,7 @@ public class DesktopModeWindowDecorationTests extends ShellTestCase {
                 any(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(),
                 anyBoolean(), anyBoolean(), argThat(intent ->
                         (uri == null && intent == null) || intent.getData().equals(uri)),
-                any(), anyInt(), anyInt(), anyInt(), anyInt());
+                any(), any(), anyInt(), anyInt(), anyInt(), anyInt());
     }
 
     private void createMaximizeMenu(DesktopModeWindowDecoration decoration) {

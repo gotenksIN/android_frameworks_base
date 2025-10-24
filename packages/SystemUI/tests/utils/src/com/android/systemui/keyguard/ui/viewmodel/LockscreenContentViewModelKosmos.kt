@@ -24,12 +24,14 @@ import com.android.systemui.keyguard.shared.transition.keyguardTransitionAnimati
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
+import com.android.systemui.statusbar.notification.stack.domain.interactor.notificationStackAppearanceInteractor
 import com.android.systemui.wallpapers.domain.interactor.wallpaperFocalAreaInteractor
 
 val Kosmos.lockscreenContentViewModelFactory by Fixture {
     object : LockscreenContentViewModel.Factory {
         override fun create(
-            keyguardTransitionAnimationCallback: KeyguardTransitionAnimationCallback
+            keyguardTransitionAnimationCallback: KeyguardTransitionAnimationCallback,
+            viewState: ViewStateAccessor,
         ): LockscreenContentViewModel {
             return LockscreenContentViewModel(
                 interactor = keyguardBlueprintInteractor,
@@ -41,6 +43,9 @@ val Kosmos.lockscreenContentViewModelFactory by Fixture {
                     keyguardTransitionAnimationCallbackDelegator,
                 keyguardTransitionAnimationCallback = keyguardTransitionAnimationCallback,
                 wallpaperFocalAreaInteractor = wallpaperFocalAreaInteractor,
+                notificationStackAppearanceInteractor = notificationStackAppearanceInteractor,
+                lockscreenAlphaViewModelFactory = lockscreenAlphaViewModelFactory,
+                viewStateAccessor = viewState,
             )
         }
     }

@@ -16,6 +16,8 @@
 
 package com.android.extensions.computercontrol;
 
+import static android.companion.virtual.computercontrol.ComputerControlSession.ACTION_GO_BACK;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -24,17 +26,20 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertThrows;
 
 import android.app.Activity;
 import android.companion.virtual.computercontrol.IComputerControlSession;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.hardware.display.IVirtualDisplayCallback;
 import android.hardware.display.VirtualDisplay;
 import android.hardware.input.VirtualKeyEvent;
 import android.hardware.input.VirtualTouchEvent;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.util.DisplayMetrics;
+import android.view.Display;
 import android.view.MotionEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.IAccessibilityManager;
@@ -55,19 +60,24 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.concurrent.Executors;
+
 @RequiresFlagsEnabled(android.companion.virtualdevice.flags.Flags.FLAG_COMPUTER_CONTROL_ACCESS)
 @RunWith(AndroidJUnit4.class)
 public class ComputerControlSessionTest {
     private static final int TIMEOUT_MS = 2_000;
     private static final String SESSION_NAME = "test";
+    private static final String TARGET_PACKAGE = "com.android.foo";
     private final Context mContext =
             InstrumentationRegistry.getInstrumentation().getTargetContext();
 
     @Rule public VirtualDeviceRule mVirtualDeviceRule = VirtualDeviceRule.createDefault();
 
+    @Mock IVirtualDisplayCallback mVirtualDisplayCallback;
     @Mock IComputerControlSession mIComputerControlSession;
     private ComputerControlSession mSession;
     private int mVirtualDisplayId;
+    @Mock ComputerControlSession.StabilityListener mStabilityListener;
     @Mock ComputerControlSession.StabilityHintCallback mStabilityHintCallback;
     @Mock IAccessibilityManager mIAccessibilityManager;
 
@@ -96,7 +106,7 @@ public class ComputerControlSessionTest {
                 mContext, mContext.getMainThreadHandler(), mIAccessibilityManager, 0, true);
         mSession = new ComputerControlSession(
                 new android.companion.virtual.computercontrol.ComputerControlSession(
-                        mIComputerControlSession),
+                        Display.INVALID_DISPLAY, mVirtualDisplayCallback, mIComputerControlSession),
                 params, accessibilityManager);
         verify(mIAccessibilityManager).registerProxyForDisplay(any(), eq(mVirtualDisplayId));
         mSession.addStabilityHintCallback(TIMEOUT_MS / 2, mStabilityHintCallback);
@@ -121,7 +131,30 @@ public class ComputerControlSessionTest {
         mSession.close();
         mSession.close();
         verify(mIAccessibilityManager, times(1)).unregisterProxyForDisplay(mVirtualDisplayId);
-        verify(mIComputerControlSession, times(1)).close();
+    }
+
+    @Test
+    public void launchApplication_launchesApplication() throws Exception {
+        mSession.launchApplication(TARGET_PACKAGE);
+        verify(mIComputerControlSession).launchApplication(eq(TARGET_PACKAGE));
+    }
+
+    @Test
+    public void tap_taps() throws Exception {
+        mSession.tap(1, 2);
+        verify(mIComputerControlSession).tap(eq(1), eq(2));
+    }
+
+    @Test
+    public void swipe_swipes() throws Exception {
+        mSession.swipe(1, 2, 3, 4);
+        verify(mIComputerControlSession).swipe(eq(1), eq(2), eq(3), eq(4));
+    }
+
+    @Test
+    public void longPress_longPresses() throws Exception {
+        mSession.longPress(1, 2);
+        verify(mIComputerControlSession).longPress(eq(1), eq(2));
     }
 
     @Test
@@ -185,5 +218,47 @@ public class ComputerControlSessionTest {
         mVirtualDeviceRule.waitAndAssertActivityResumed(componentName, mVirtualDisplayId);
 
         verify(mStabilityHintCallback, timeout(TIMEOUT_MS)).onStabilityHint(false);
+    }
+
+    @Test
+    public void insertText_insertsText() throws Exception {
+        mSession.insertText("test", true, true);
+
+        verify(mIComputerControlSession).insertText(eq("test"), eq(true), eq(true));
+
+        verify(mStabilityHintCallback, timeout(TIMEOUT_MS)).onStabilityHint(false);
+    }
+
+    @Test
+    public void performAction_performsAction() throws Exception {
+        mSession.performAction(ACTION_GO_BACK);
+
+        verify(mIComputerControlSession).performAction(eq(ACTION_GO_BACK));
+
+        verify(mStabilityHintCallback, timeout(TIMEOUT_MS)).onStabilityHint(false);
+    }
+
+    @Test
+    public void setStabilityListener_withNullListener_throwsException() {
+        assertThrows(NullPointerException.class, () -> mSession.setStabilityListener(
+                Executors.newSingleThreadExecutor(), null));
+    }
+
+    @Test
+    public void setStabilityListener_withNullExecutor_throwsException() {
+        assertThrows(NullPointerException.class,
+                () -> mSession.setStabilityListener(null, mStabilityListener));
+    }
+
+    @Test
+    public void setStabilityListener_setsStabilityListener() throws Exception {
+        mSession.setStabilityListener(Executors.newSingleThreadExecutor(), mStabilityListener);
+        verify(mIComputerControlSession).setStabilityListener(any());
+    }
+
+    @Test
+    public void clearStabilityListener_clearsStabilityListener() throws Exception {
+        mSession.clearStabilityListener();
+        verify(mIComputerControlSession).setStabilityListener(eq(null));
     }
 }

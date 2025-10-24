@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Váltás munkaprofilra"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Váltás személyes <xliff:g id="APP_NAME">%1$s</xliff:g>-profilra"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Váltás munkahelyi <xliff:g id="APP_NAME">%1$s</xliff:g>-profilra"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Névjegyek"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"hozzáférés a névjegyekhez"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Névjegyek és fiókok"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"hozzáférhet a névjegyeihez, és megtekintheti azon fiókok listáját, amelyek névjegyeket menthetnek erre az eszközre"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Helyadatok"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"hozzáférés az eszköz földrajzi helyéhez"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Naptár"</string>
@@ -370,8 +370,10 @@
     <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"szemmozgás pontos nyomon követése"</string>
     <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Mozgási és környezetadatok"</string>
     <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"szem, arc és test nyomon követése, valamint a környezet felmérése"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Pontos fejmozgás- és környezetadatok"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"fej pontos nyomon követése és a környezet felmérése"</string>
+    <!-- no translation found for permgrouplab_xr_tracking_sensitive (6574264227123545314) -->
+    <skip />
+    <!-- no translation found for permgroupdesc_xr_tracking_sensitive (2480835734248509848) -->
+    <skip />
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Ablaktartalom lekérdezése"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"A használt ablak tartalmának vizsgálata."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"Felfedezés érintéssel bekapcsolása"</string>
@@ -639,6 +641,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Az alkalmazás meghatározhatja a közeli, ultraszélessávú eszközök közötti relatív pozíciót"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"műveletek végrehajtása a közeli Wi‑Fi-eszközökkel"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Engedélyezi az alkalmazás számára, hogy közzétegye és meghatározza a közeli Wi-Fi-eszközök viszonylagos helyzetét, és csatlakozzon hozzájuk."</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"hozzáférés a helyi hálózati eszközökhöz"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Az alkalmazás hozzáférhet a helyi hálózati eszközökhöz"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"közeli eszközök közötti relatív pozíció meghatározása"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Az alkalmazás meghatározhatja a közeli eszközök közötti relatív pozíciót"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Preferált NFC fizetési szolgáltatási információk"</string>
@@ -683,7 +687,8 @@
     <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Lehetővé teszi az alkalmazás számára a környezet felmérését."</string>
     <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"környező terület pontos felmérése"</string>
     <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Lehetővé teszi az alkalmazás számára a környezet pontos felmérését."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"XR-adatok követése a háttérben"</string>
+    <!-- no translation found for permlab_xr_tracking_in_background (1714941204255185460) -->
+    <skip />
     <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Lehetővé teszi az alkalmazás számára, hogy hozzáférjen az XR-adatokhoz a háttérben."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"billentyűk rögzítése"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Lehetővé teszi az alkalmazás számára, hogy rögzítse a billentyűket, mielőtt a rendszer feldolgozhatja a rendszer billentyűparancsait és műveleteit."</string>
@@ -1984,8 +1989,10 @@
     <string name="package_updated_device_owner" msgid="7770195449213776218">"A rendszergazda által frissítve.\nLépjen a beállításokhoz a megadott engedélyek megtekintéséhez."</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"A rendszergazda által törölve"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"OK"</string>
-    <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"Az Akkumulátorkímélő mód bekapcsolja a Sötét témát, és korlátozza vagy kikapcsolja a háttérbeli tevékenységeket, valamint bizonyos vizuális effekteket, funkciókat és hálózati kapcsolatokat."</string>
-    <string name="battery_saver_description" msgid="8518809702138617167">"Az Akkumulátorkímélő mód bekapcsolja a Sötét témát, és korlátozza vagy kikapcsolja a háttérbeli tevékenységeket, valamint bizonyos vizuális effekteket, funkciókat és hálózati kapcsolatokat."</string>
+    <!-- no translation found for battery_saver_description_with_learn_more (8969945879044849461) -->
+    <skip />
+    <!-- no translation found for battery_saver_description (2820475140307374570) -->
+    <skip />
     <string name="data_saver_description" msgid="4995164271550590517">"Az adatforgalom csökkentése érdekében az Adatforgalom-csökkentő megakadályozza, hogy egyes alkalmazások adatokat küldjenek vagy fogadjanak a háttérben. Az Ön által jelenleg használt alkalmazások hozzáférhetnek az adatokhoz, de csak ritkábban. Ez például azt jelentheti, hogy a képek csak rákoppintás után jelennek meg."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"Bekapcsolja az Adatforgalom-csökkentőt?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"Bekapcsolás"</string>
@@ -2047,12 +2054,9 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"Teljes méret"</string>
     <string name="close_button_text" msgid="10603510034455258">"Bezárás"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
-    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
-    <skip />
+    <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
+    <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
+    <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Fogadás"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Videó"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Elutasítás"</string>
@@ -2580,33 +2584,22 @@
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"Alkalmazások"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"Az ujjlenyomata már nem ismerhető fel. Állítsa be újra a Feloldás ujjlenyomattal funkciót."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Biztonság és adatvédelem"</string>
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
-    <skip />
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"Oldja fel a képernyőt, és csatlakoztassa újra az USB-t"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"A képernyő feloldása az USB-csatlakozáshoz"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"A Speciális védelem megköveteli a képernyőzár feloldását az USB-kapcsolat kezdeményezéséhez"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"A Speciális védelem megköveteli a képernyőzár feloldását az USB-kapcsolat kezdeményezéséhez"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"A Speciális védelem megköveteli a képernyőzár feloldását a gyorsabb töltéshez"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"A gyorsabb töltéshez vagy az USB-kapcsolat kezdeményezéséhez a Speciális védelem megköveteli a képernyőzár feloldását"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Némítás"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Értesítések némítva"</string>
-    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
-    <skip />
+    <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Az eszköz újraindításáig nem kap USB-vel kapcsolatos értesítéseket a Speciális védelemtől"</string>
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"Gyanús USB-tevékenység"</string>
-    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
-    <skip />
+    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="5772698072220844779">"Az USB-adatjel le lett tiltva"</string>
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Problémája adódott a Feloldás ujjlenyomattal funkcióval?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Koppintson a feloldási élmény javítását segítő tippek megtekintéséhez"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Nincs villogás"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"A tévé kikapcsolásához nyomja meg hosszan a bekapcsológombot"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Rendszererőforrás-figyelmeztetések"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Erőforrás túlhasználata"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Az „<xliff:g id="APP_NAME">%1$s</xliff:g>” alkalmazás túl sok erőforrást használ."</string>
 </resources>

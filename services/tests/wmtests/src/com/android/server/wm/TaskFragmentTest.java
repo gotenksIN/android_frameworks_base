@@ -1036,6 +1036,7 @@ public class TaskFragmentTest extends WindowTestsBase {
         final TaskFragment tf = createTaskFragmentWithActivity(task);
         final ActivityRecord activity = tf.getTopMostActivity();
         tf.setVisibleRequested(true);
+        activity.visibleIgnoringKeyguard = true;
         tf.setOverrideOrientation(SCREEN_ORIENTATION_BEHIND);
 
         // Should report the override orientation
@@ -1172,7 +1173,9 @@ public class TaskFragmentTest extends WindowTestsBase {
         final ActivityRecord appLeftBottom = taskFragmentLeft.getBottomMostActivity();
         final ActivityRecord appRightTop = taskFragmentRight.getTopMostActivity();
         appLeftTop.setVisibleRequested(true);
+        appLeftTop.setVisible(true);
         appRightTop.setVisibleRequested(true);
+        appRightTop.setVisible(true);
         final WindowState winLeftTop = createAppWindow(appLeftTop, "winLeftTop");
         final WindowState winLeftBottom = createAppWindow(appLeftBottom, "winLeftBottom");
         final WindowState winRightTop = createAppWindow(appRightTop, "winRightTop");

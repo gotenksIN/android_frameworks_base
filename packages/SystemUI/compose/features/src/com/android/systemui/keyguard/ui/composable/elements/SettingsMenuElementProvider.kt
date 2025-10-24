@@ -28,17 +28,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.isVisible
-import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementContentScope
 import com.android.compose.modifiers.padding
 import com.android.systemui.keyguard.ui.binder.KeyguardSettingsViewBinder
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardSettingsMenuViewModel
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardTouchHandlingViewModel
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementContext
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementProvider
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenScope
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.statusbar.VibratorHelper
@@ -55,21 +54,17 @@ constructor(
     private val vibratorHelper: VibratorHelper,
     private val activityStarter: ActivityStarter,
 ) : LockscreenElementProvider {
-    override val elements: List<LockscreenElement> by lazy { listOf(settingsMenuElement) }
+    override val elements: List<LockscreenElement> by lazy { listOf(SettingsMenuElement()) }
 
-    private val settingsMenuElement =
-        object : LockscreenElement {
-            override val key = LockscreenElementKeys.SettingsMenu
-            override val context = this@SettingsMenuElementProvider.context
+    private inner class SettingsMenuElement : LockscreenElement {
+        override val key = LockscreenElementKeys.SettingsMenu
+        override val context = this@SettingsMenuElementProvider.context
 
-            @Composable
-            override fun ContentScope.LockscreenElement(
-                factory: LockscreenElementFactory,
-                context: LockscreenElementContext,
-            ) {
-                SettingsMenu()
-            }
+        @Composable
+        override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
+            SettingsMenu()
         }
+    }
 
     @Composable
     @SuppressWarnings("InflateParams") // null is passed into the inflate call, on purpose.

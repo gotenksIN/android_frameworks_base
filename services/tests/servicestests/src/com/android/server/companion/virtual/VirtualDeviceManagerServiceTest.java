@@ -107,6 +107,7 @@ import android.platform.test.flag.junit.SetFlagsRule;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.util.ArraySet;
+import android.util.Pair;
 import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.WindowManager;
@@ -159,12 +160,11 @@ public class VirtualDeviceManagerServiceTest {
     private static final int DEVICE_OWNER_UID_2 = DEVICE_OWNER_UID_1 + 1;
     private static final int UID_1 = 0;
     private static final int UID_2 = 10;
-    private static final int UID_3 = 10000;
-    private static final int UID_4 = 10001;
+    private static final String PACKAGE_1 = "com.foo";
+    private static final String PACKAGE_2 = "com.bar";
     private static final int PRODUCT_ID = 10;
     private static final int VENDOR_ID = 5;
     private static final String UNIQUE_ID = "uniqueid";
-    private static final String PHYS = "phys";
     private static final int INPUT_DEVICE_ID = 53;
     private static final int HEIGHT = 1800;
     private static final int WIDTH = 900;
@@ -260,8 +260,6 @@ public class VirtualDeviceManagerServiceTest {
     private IVirtualDeviceSoundEffectListener mSoundEffectListener;
     @Mock
     private IVirtualDisplayCallback mVirtualDisplayCallback;
-    @Mock
-    private Consumer<ArraySet<Integer>> mRunningAppsChangedCallback;
     @Mock
     private VirtualDeviceManagerInternal.AppsOnVirtualDeviceListener mAppsOnVirtualDeviceListener;
     @Mock
@@ -744,7 +742,7 @@ public class VirtualDeviceManagerServiceTest {
     public void getDeviceIdsForUid_differentUidOnDevice_returnsNull() {
         addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
         mDeviceImpl.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_1).onRunningAppsChanged(
-                Sets.newArraySet(UID_2));
+                Sets.newArraySet(new Pair<>(UID_2, PACKAGE_2)));
 
         assertThat(mLocalService.getDeviceIdsForUid(UID_1)).isEmpty();
         assertThat(mVdmNative.getDeviceIdsForUid(UID_1)).isEmpty();
@@ -754,7 +752,7 @@ public class VirtualDeviceManagerServiceTest {
     public void getDeviceIdsForUid_oneUidOnDevice_returnsCorrectId() {
         addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
         mDeviceImpl.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_1).onRunningAppsChanged(
-                Sets.newArraySet(UID_1));
+                Sets.newArraySet(new Pair<>(UID_1, PACKAGE_1)));
 
         int deviceId = mDeviceImpl.getDeviceId();
         assertThat(mLocalService.getDeviceIdsForUid(UID_1)).containsExactly(deviceId);
@@ -766,7 +764,7 @@ public class VirtualDeviceManagerServiceTest {
         addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
 
         mDeviceImpl.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_1).onRunningAppsChanged(
-                Sets.newArraySet(UID_1, UID_2));
+                Sets.newArraySet(new Pair<>(UID_1, PACKAGE_1), new Pair<>(UID_2, PACKAGE_2)));
 
         int deviceId = mDeviceImpl.getDeviceId();
         assertThat(mLocalService.getDeviceIdsForUid(UID_1)).containsExactly(deviceId);
@@ -780,7 +778,7 @@ public class VirtualDeviceManagerServiceTest {
         addVirtualDisplay(secondDevice, DISPLAY_ID_2);
 
         secondDevice.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_2).onRunningAppsChanged(
-                Sets.newArraySet(UID_1));
+                Sets.newArraySet(new Pair<>(UID_1, PACKAGE_1)));
 
         int deviceId = secondDevice.getDeviceId();
         assertThat(mLocalService.getDeviceIdsForUid(UID_1)).containsExactly(deviceId);
@@ -796,9 +794,9 @@ public class VirtualDeviceManagerServiceTest {
 
 
         mDeviceImpl.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_1).onRunningAppsChanged(
-                Sets.newArraySet(UID_1));
+                Sets.newArraySet(new Pair<>(UID_1, PACKAGE_1)));
         secondDevice.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_2).onRunningAppsChanged(
-                Sets.newArraySet(UID_1, UID_2));
+                Sets.newArraySet(new Pair<>(UID_1, PACKAGE_1), new Pair<>(UID_2, PACKAGE_2)));
 
         assertThat(mLocalService.getDeviceIdsForUid(UID_1)).containsExactly(
                 mDeviceImpl.getDeviceId(), secondDevice.getDeviceId());
@@ -811,7 +809,8 @@ public class VirtualDeviceManagerServiceTest {
         addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1, Display.FLAG_TRUSTED);
         mDeviceImpl.createVirtualKeyboard(KEYBOARD_CONFIG, BINDER);
 
-        mVdms.notifyRunningAppsChanged(mDeviceImpl.getDeviceId(), Sets.newArraySet(UID_1));
+        mDeviceImpl.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_1).onRunningAppsChanged(
+                Sets.newArraySet(new Pair<>(UID_1, PACKAGE_1)));
 
         LocaleList localeList = mLocalService.getPreferredLocaleListForUid(UID_1);
         assertThat(localeList).isEqualTo(
@@ -820,7 +819,9 @@ public class VirtualDeviceManagerServiceTest {
 
     @Test
     public void getPreferredLocaleListForApp_noKeyboardAttached_nullLocaleHints() {
-        mVdms.notifyRunningAppsChanged(mDeviceImpl.getDeviceId(), Sets.newArraySet(UID_1));
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1, Display.FLAG_TRUSTED);
+        mDeviceImpl.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_1).onRunningAppsChanged(
+                Sets.newArraySet(new Pair<>(UID_1, PACKAGE_1)));
 
         // no preceding call to createVirtualKeyboard()
         assertThat(mLocalService.getPreferredLocaleListForUid(UID_1)).isNull();
@@ -854,8 +855,10 @@ public class VirtualDeviceManagerServiceTest {
         mDeviceImpl.createVirtualKeyboard(firstKeyboardConfig, BINDER);
         secondDevice.createVirtualKeyboard(secondKeyboardConfig, secondBinder);
 
-        mVdms.notifyRunningAppsChanged(mDeviceImpl.getDeviceId(), Sets.newArraySet(UID_1));
-        mVdms.notifyRunningAppsChanged(secondDevice.getDeviceId(), Sets.newArraySet(UID_1));
+        mDeviceImpl.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_1).onRunningAppsChanged(
+                Sets.newArraySet(new Pair<>(UID_1, PACKAGE_1)));
+        secondDevice.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_2).onRunningAppsChanged(
+                Sets.newArraySet(new Pair<>(UID_1, PACKAGE_1)));
 
         LocaleList localeList = mLocalService.getPreferredLocaleListForUid(UID_1);
         assertThat(localeList).isEqualTo(
@@ -887,7 +890,7 @@ public class VirtualDeviceManagerServiceTest {
     @Test
     public void onPersistentDeviceIdsRemoved_listenersNotified() {
         mLocalService.registerPersistentDeviceIdRemovedListener(mPersistentDeviceIdRemovedListener);
-        mLocalService.onPersistentDeviceIdsRemoved(Set.of(mDeviceImpl.getPersistentDeviceId()));
+        mVdms.onPersistentDeviceIdsRemoved(Set.of(mDeviceImpl.getPersistentDeviceId()));
         TestableLooper.get(this).processAllMessages();
 
         verify(mPersistentDeviceIdRemovedListener).accept(mDeviceImpl.getPersistentDeviceId());
@@ -978,51 +981,16 @@ public class VirtualDeviceManagerServiceTest {
     @Test
     public void onAppsOnVirtualDeviceChanged_singleVirtualDevice_listenersNotified() {
         ArraySet<Integer> uids = new ArraySet<>(Arrays.asList(UID_1, UID_2));
+        ArraySet<Pair<Integer, String>> packageUids = new ArraySet<>(Arrays.asList(
+                new Pair<>(UID_1, PACKAGE_1), new Pair<>(UID_2, PACKAGE_2)));
         mLocalService.registerAppsOnVirtualDeviceListener(mAppsOnVirtualDeviceListener);
 
-        mVdms.notifyRunningAppsChanged(mDeviceImpl.getDeviceId(), uids);
+        mVdms.onRunningAppsChanged(
+                mDeviceImpl.getDeviceId(), VIRTUAL_DEVICE_OWNER_PACKAGE, uids, packageUids);
         TestableLooper.get(this).processAllMessages();
 
-        verify(mAppsOnVirtualDeviceListener).onAppsOnAnyVirtualDeviceChanged(uids);
-    }
-
-    @Test
-    public void onAppsOnVirtualDeviceChanged_multipleVirtualDevices_listenersNotified() {
-        createVirtualDevice(VIRTUAL_DEVICE_ID_2, DEVICE_OWNER_UID_2);
-
-        ArraySet<Integer> uidsOnDevice1 = new ArraySet<>(Arrays.asList(UID_1, UID_2));
-        ArraySet<Integer> uidsOnDevice2 = new ArraySet<>(Arrays.asList(UID_3, UID_4));
-        mLocalService.registerAppsOnVirtualDeviceListener(mAppsOnVirtualDeviceListener);
-
-        // Notifies that the running apps on the first virtual device has changed.
-        mVdms.notifyRunningAppsChanged(mDeviceImpl.getDeviceId(), uidsOnDevice1);
-        TestableLooper.get(this).processAllMessages();
-        verify(mAppsOnVirtualDeviceListener).onAppsOnAnyVirtualDeviceChanged(
-                new ArraySet<>(Arrays.asList(UID_1, UID_2)));
-
-        // Notifies that the running apps on the second virtual device has changed.
-        mVdms.notifyRunningAppsChanged(VIRTUAL_DEVICE_ID_2, uidsOnDevice2);
-        TestableLooper.get(this).processAllMessages();
-        // The union of the apps running on both virtual devices are sent to the listeners.
-        verify(mAppsOnVirtualDeviceListener).onAppsOnAnyVirtualDeviceChanged(
-                new ArraySet<>(Arrays.asList(UID_1, UID_2, UID_3, UID_4)));
-
-        // Notifies that the running apps on the first virtual device has changed again.
-        uidsOnDevice1.remove(UID_2);
-        mVdms.notifyRunningAppsChanged(mDeviceImpl.getDeviceId(), uidsOnDevice1);
-        mLocalService.onAppsOnVirtualDeviceChanged();
-        TestableLooper.get(this).processAllMessages();
-        // The union of the apps running on both virtual devices are sent to the listeners.
-        verify(mAppsOnVirtualDeviceListener).onAppsOnAnyVirtualDeviceChanged(
-                new ArraySet<>(Arrays.asList(UID_1, UID_3, UID_4)));
-
-        // Notifies that the running apps on the first virtual device has changed but with the same
-        // set of UIDs.
-        mVdms.notifyRunningAppsChanged(mDeviceImpl.getDeviceId(), uidsOnDevice1);
-        mLocalService.onAppsOnVirtualDeviceChanged();
-        TestableLooper.get(this).processAllMessages();
-        // Listeners should not be notified.
-        verifyNoMoreInteractions(mAppsOnVirtualDeviceListener);
+        verify(mAppsOnVirtualDeviceListener).onAppsRunningOnVirtualDeviceChanged(
+                mDeviceImpl.getDeviceId(), uids);
     }
 
     @Test
@@ -1234,13 +1202,20 @@ public class VirtualDeviceManagerServiceTest {
     }
 
     @Test
-    public void closedDevice_lateCallToRunningAppsChanged_isIgnored() {
+    public void closedDevice_emptyRunningApps_sent() {
         mLocalService.registerAppsOnVirtualDeviceListener(mAppsOnVirtualDeviceListener);
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
         int deviceId = mDeviceImpl.getDeviceId();
-        mDeviceImpl.close();
-        mVdms.notifyRunningAppsChanged(deviceId, Sets.newArraySet(UID_1));
+        mDeviceImpl.getDisplayWindowPolicyControllerForTest(DISPLAY_ID_1).onRunningAppsChanged(
+                Sets.newArraySet(new Pair<>(UID_2, PACKAGE_2)));
         TestableLooper.get(this).processAllMessages();
-        verify(mAppsOnVirtualDeviceListener, never()).onAppsOnAnyVirtualDeviceChanged(any());
+        verify(mAppsOnVirtualDeviceListener)
+                .onAppsRunningOnVirtualDeviceChanged(deviceId, Sets.newArraySet(UID_2));
+
+        mDeviceImpl.close();
+        TestableLooper.get(this).processAllMessages();
+        verify(mAppsOnVirtualDeviceListener)
+                .onAppsRunningOnVirtualDeviceChanged(deviceId, new ArraySet<>());
     }
 
     @Test
@@ -1393,34 +1368,6 @@ public class VirtualDeviceManagerServiceTest {
 
         verify(mContext).startActivityAsUser(argThat(intent ->
                 intent.filterEquals(blockedAppIntent)), any(), any());
-    }
-
-    @Test
-    public void registerRunningAppsChangedListener_onRunningAppsChanged_listenersNotified() {
-        ArraySet<Integer> uids = new ArraySet<>(Arrays.asList(UID_1, UID_2));
-        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
-        GenericWindowPolicyController gwpc = mDeviceImpl.getDisplayWindowPolicyControllerForTest(
-                DISPLAY_ID_1);
-
-        gwpc.onRunningAppsChanged(uids);
-        mDeviceImpl.onRunningAppsChanged(uids);
-
-        assertThat(gwpc.getRunningAppsChangedListenersSizeForTesting()).isEqualTo(1);
-        verify(mRunningAppsChangedCallback).accept(new ArraySet<>(Arrays.asList(UID_1, UID_2)));
-    }
-
-    @Test
-    public void noRunningAppsChangedListener_onRunningAppsChanged_doesNotThrowException() {
-        ArraySet<Integer> uids = new ArraySet<>(Arrays.asList(UID_1, UID_2));
-        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
-        GenericWindowPolicyController gwpc = mDeviceImpl.getDisplayWindowPolicyControllerForTest(
-                DISPLAY_ID_1);
-        gwpc.unregisterRunningAppsChangedListener(mDeviceImpl);
-
-        // This call should not throw any exceptions.
-        gwpc.onRunningAppsChanged(uids);
-
-        assertThat(gwpc.getRunningAppsChangedListenersSizeForTesting()).isEqualTo(0);
     }
 
     @Test
@@ -1650,7 +1597,6 @@ public class VirtualDeviceManagerServiceTest {
                         mPendingTrampolineCallback,
                         mActivityListener,
                         mSoundEffectListener,
-                        mRunningAppsChangedCallback,
                         params,
                         new DisplayManagerGlobal(mIDisplayManager),
                         new VirtualCameraController(DEVICE_POLICY_DEFAULT, virtualDeviceId),

@@ -57,6 +57,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 
 /** Models UI state for the content of the bouncer overlay. */
@@ -82,6 +83,9 @@ constructor(
 ) : HydratedActivatable() {
     private val _selectedUserImage = MutableStateFlow<Bitmap?>(null)
     val selectedUserImage: StateFlow<Bitmap?> = _selectedUserImage.asStateFlow()
+
+    private val _selectedUserName = MutableStateFlow<Text?>(null)
+    val selectedUserName: StateFlow<Text?> = _selectedUserName.asStateFlow()
 
     val message: BouncerMessageViewModel by lazy { bouncerMessageViewModelFactory.create() }
 
@@ -146,7 +150,8 @@ constructor(
      * Whether to show a "back" button on bouncer. This is enabled for large screen interaction as
      * these typically don't rely on touch gestures to go back.
      */
-    val showBackButton = bouncerInteractor.isImproveLargeScreenInteractionEnabled
+    val showBackButton =
+        Flags.backButtonOnBouncer() && bouncerInteractor.isImproveLargeScreenInteractionEnabled
 
     private val _isInputPreferredOnLeftSide = MutableStateFlow(false)
     val isInputPreferredOnLeftSide = _isInputPreferredOnLeftSide.asStateFlow()
@@ -175,8 +180,7 @@ constructor(
                 ),
             )
 
-    private val _isInputEnabled =
-        MutableStateFlow(authenticationInteractor.lockoutEndTimestamp == null)
+    private val _isInputEnabled = MutableStateFlow(authenticationInteractor.lockoutEndTime == null)
     private val isInputEnabled: StateFlow<Boolean> = _isInputEnabled.asStateFlow()
 
     override suspend fun onActivated(): Nothing {
@@ -185,6 +189,7 @@ constructor(
             launch { message.activate() }
             launch {
                 authenticationInteractor.authenticationMethod
+                    .filter { it !is AuthenticationMethodModel.Biometric }
                     .map(::getChildViewModel)
                     .collectLatest { childViewModelOrNull ->
                         _authMethodViewModel.value = childViewModelOrNull
@@ -208,6 +213,10 @@ constructor(
                         it.image.toBitmap(iconSize, iconSize)
                     }
                     .collect { _selectedUserImage.value = it }
+            }
+
+            launch {
+                userSwitcher.selectedUser.map { it.name }.collect { _selectedUserName.value = it }
             }
 
             launch {

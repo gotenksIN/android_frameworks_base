@@ -24,25 +24,26 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.dimensionResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.android.compose.animation.scene.ContentScope
-import com.android.compose.modifiers.padding
+import com.android.compose.animation.scene.ElementContentScope
 import com.android.systemui.customization.clocks.R as clocksR
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardClockViewModel
+import com.android.systemui.plugins.keyguard.VRectF
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementContext
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory
-import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementFactory.Companion.lockscreenElement
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.Clock
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.Smartspace
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementProvider
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenScope
+import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenScope.Companion.LockscreenElement
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
 import javax.inject.Inject
@@ -64,12 +65,12 @@ constructor(
         override val context = this@ClockRegionElementProvider.context
 
         @Composable
-        override fun ContentScope.LockscreenElement(
-            factory: LockscreenElementFactory,
-            context: LockscreenElementContext,
-        ) {
+        override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
             val shouldDateWeatherBeBelowSmallClock: Boolean by
                 keyguardClockViewModel.shouldDateWeatherBeBelowSmallClock
+                    .collectAsStateWithLifecycle()
+            val clockBounds: VRectF by
+                keyguardClockViewModel.clockEventController.smallClockBounds
                     .collectAsStateWithLifecycle()
 
             // Horizontal Padding is handled internally within the SmartspaceCards element. This
@@ -83,12 +84,17 @@ constructor(
                         Modifier.padding(horizontal = xPadding)
                             .padding(top = dimensionResource(R.dimen.keyguard_clock_top_margin)),
                 ) {
-                    factory.lockscreenElement(Clock.Small, context)
+                    with(LocalDensity.current) {
+                        LockscreenElement(
+                            Clock.Small,
+                            Modifier.widthIn(min = clockBounds.width.toDp())
+                                .heightIn(min = clockBounds.height.toDp()),
+                        )
+                    }
 
                     if (!shouldDateWeatherBeBelowSmallClock) {
-                        factory.lockscreenElement(
+                        LockscreenElement(
                             Smartspace.DWA.SmallClock.Column,
-                            context,
                             Modifier.padding(
                                 horizontal =
                                     dimensionResource(R.dimen.smartspace_padding_horizontal)
@@ -98,14 +104,13 @@ constructor(
                 }
 
                 if (shouldDateWeatherBeBelowSmallClock) {
-                    factory.lockscreenElement(
+                    LockscreenElement(
                         Smartspace.DWA.SmallClock.Row,
-                        context,
                         Modifier.padding(horizontal = xPadding),
                     )
                 }
 
-                factory.lockscreenElement(Smartspace.Cards, context)
+                LockscreenElement(Smartspace.Cards)
             }
         }
     }
@@ -115,12 +120,12 @@ constructor(
         override val context = this@ClockRegionElementProvider.context
 
         @Composable
-        override fun ContentScope.LockscreenElement(
-            factory: LockscreenElementFactory,
-            context: LockscreenElementContext,
-        ) {
+        override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
             val shouldDateWeatherBeBelowLargeClock: Boolean by
                 keyguardClockViewModel.shouldDateWeatherBeBelowLargeClock
+                    .collectAsStateWithLifecycle()
+            val clockBounds: VRectF by
+                keyguardClockViewModel.clockEventController.largeClockBounds
                     .collectAsStateWithLifecycle()
 
             // Horizontal Padding is handled internally within the SmartspaceCards element. This
@@ -140,18 +145,17 @@ constructor(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (!shouldDateWeatherBeBelowLargeClock) {
-                        factory.lockscreenElement(
+                        LockscreenElement(
                             Smartspace.DWA.LargeClock.Above,
-                            context,
                             Modifier.padding(horizontal = xPadding),
                         )
                     }
 
-                    factory.lockscreenElement(
+                    LockscreenElement(
                         Smartspace.Cards,
-                        context,
-                        // Always reserve space for smartspace cards, even if they're not visible.
-                        // This keeps the clock position stable when smartspace enters/exits.
+                        // Always reserve space for smartspace cards, even if they're not
+                        // visible. This keeps the clock position stable when smartspace
+                        // enters/exits.
                         Modifier.heightIn(
                             min = dimensionResource(clocksR.dimen.enhanced_smartspace_height)
                         ),
@@ -167,9 +171,15 @@ constructor(
                         ),
                     modifier = Modifier.padding(horizontal = xPadding).fillMaxWidth().weight(1f),
                 ) {
-                    factory.lockscreenElement(Clock.Large, context)
+                    with(LocalDensity.current) {
+                        LockscreenElement(
+                            Clock.Large,
+                            Modifier.widthIn(min = clockBounds.width.toDp())
+                                .heightIn(min = clockBounds.height.toDp()),
+                        )
+                    }
                     if (shouldDateWeatherBeBelowLargeClock) {
-                        factory.lockscreenElement(Smartspace.DWA.LargeClock.Below, context)
+                        LockscreenElement(Smartspace.DWA.LargeClock.Below)
                     }
                 }
             }

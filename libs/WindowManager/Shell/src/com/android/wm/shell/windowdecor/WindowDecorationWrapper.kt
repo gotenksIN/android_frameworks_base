@@ -179,10 +179,10 @@ private constructor(
      * Returns the valid drag area for this task associated with the window decor if the task can be
      * dragged. Otherwise, returns null.
      */
-    fun calculateValidDragArea() =
+    fun getValidDragArea() =
         when {
-            defaultWindowDecor != null -> requireDefaultWindowDecor().calculateValidDragArea()
-            desktopWindowDecor != null -> requireDesktopWindowDecor().calculateValidDragArea()
+            defaultWindowDecor != null -> requireDefaultWindowDecor().lastValidDragArea
+            desktopWindowDecor != null -> requireDesktopWindowDecor().lastValidDragArea
             captionWindowDecoration != null -> requireCaptionWindowDecor().calculateValidDragArea()
             else -> error("Expected Non-null window decoration")
         }
@@ -700,6 +700,35 @@ private constructor(
             defaultWindowDecor != null -> requireDefaultWindowDecor().a11yAnnounceNewFocusedWindow()
             desktopWindowDecor != null -> requireDesktopWindowDecor().a11yAnnounceNewFocusedWindow()
             else -> error("Expected Non-null default or desktop window decoration")
+        }
+
+    /**
+     * Updates last App-to-Web education request timestamp. Returns true if new request to show
+     * education has been received.
+     */
+    fun updateAppToWebEducationRequestTimestamp(
+        latestOpenInBrowserEducationTimestamp: Long
+    ): Boolean =
+        when {
+            desktopWindowDecor != null -> {
+                requireDesktopWindowDecor()
+                    .updateAppToWebEducationRequestTimestamp(latestOpenInBrowserEducationTimestamp)
+            }
+            else -> false
+        }
+
+    /** Returns [true] if browser session is available to switch from App-to-Web. */
+    fun isBrowserSessionAvailable() =
+        when {
+            desktopWindowDecor != null -> requireDesktopWindowDecor().isBrowserSessionAvailable()
+            else -> false
+        }
+
+    /** Returns [true] if captured link is available. */
+    fun isCapturedLinkAvailable() =
+        when {
+            desktopWindowDecor != null -> requireDesktopWindowDecor().isCapturedLinkAvailable
+            else -> false
         }
 
     /** Factory for [WindowDecorationWrapper]. */

@@ -23,7 +23,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,9 +41,11 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
-import com.android.compose.windowsizeclass.calculateWindowSizeClass
+import androidx.window.core.layout.WindowSizeClass
+import com.android.compose.windowsizeclass.LocalWindowSizeClass
 import com.android.systemui.ambientcue.ui.utils.AmbientCueAnimationState
 import com.android.systemui.ambientcue.ui.viewmodel.ActionViewModel
 import com.android.systemui.ambientcue.ui.viewmodel.AmbientCueViewModel
@@ -95,7 +96,27 @@ fun AmbientCueContainer(
                 )
             }
             is PillStyleViewModel.ShortPillStyle -> {
-                val pillPositionInWindow = pillStyle.position
+                val screenWidthPx = LocalWindowInfo.current.containerSize.width
+                val largeScreen =
+                    LocalWindowSizeClass.current.isAtLeastBreakpoint(
+                        WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND,
+                        WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND,
+                    )
+                val pillCenterX = pillStyle.position?.center?.x
+                val pillPositionInWindow =
+                    if (pillCenterX != null) {
+                        if (largeScreen && pillCenterX < screenWidthPx / 2) {
+                            val pillRightPadding = with(LocalDensity.current) { 58.dp.toPx() }
+                            Rect(
+                                left = screenWidthPx - pillRightPadding - pillStyle.position.width,
+                                top = pillStyle.position.top,
+                                right = screenWidthPx - pillRightPadding,
+                                bottom = pillStyle.position.bottom,
+                            )
+                        } else {
+                            pillStyle.position
+                        }
+                    } else null
                 TaskBarAnd3ButtonAmbientCue(
                     viewModel = viewModel,
                     actions = actions,
@@ -110,6 +131,7 @@ fun AmbientCueContainer(
                             Modifier
                         },
                     onAnimationStateChange = onAnimationStateChange,
+                    largeScreen = largeScreen,
                 )
             }
             is PillStyleViewModel.Uninitialized -> {}
@@ -127,19 +149,20 @@ private fun TaskBarAnd3ButtonAmbientCue(
     onShouldInterceptTouches: (Boolean, Rect?) -> Unit,
     modifier: Modifier = Modifier,
     onAnimationStateChange: (Int, AmbientCueAnimationState) -> Unit,
+    largeScreen: Boolean = false,
 ) {
     val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
     val portrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
     var pillCenter by remember { mutableStateOf(Offset.Zero) }
     var pillSize by remember { mutableStateOf(Size(0)) }
-    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val screenWidthPx = LocalWindowInfo.current.containerSize.width
     var touchableRegion by remember { mutableStateOf<Rect?>(null) }
     LaunchedEffect(expanded, touchableRegion) {
         onShouldInterceptTouches(true, if (expanded) null else touchableRegion)
     }
     val content = LocalContext.current
     val rotation = content.display.rotation
+    if (largeScreen && rotation == ROTATION_270) return
 
     ActionList(
         actions = actions,
@@ -151,12 +174,16 @@ private fun TaskBarAnd3ButtonAmbientCue(
         showEducation = viewModel.showLongPressEducation,
         modifier =
             modifier.graphicsLayer {
-                if (portrait) {
+                if (portrait || largeScreen) {
                     translationX = screenWidthPx - size.width
                     translationY = pillCenter.y - size.height
                 } else {
                     if (rotation == ROTATION_90) {
-                        translationX = screenWidthPx - pillSize.height - size.width
+                        translationX =
+                            screenWidthPx -
+                                pillSize.width -
+                                size.width -
+                                LANDSCAPE_PADDING.dp.toPx()
                         translationY = pillCenter.y - pillSize.width
                     } else if (rotation == ROTATION_270) {
                         translationX = pillSize.width
@@ -165,7 +192,7 @@ private fun TaskBarAnd3ButtonAmbientCue(
                 }
             },
         padding =
-            if (portrait) {
+            if (portrait || largeScreen) {
                 PaddingValues(
                     start = ACTIONS_HORIZONTAL_PADDING.dp,
                     end = ACTIONS_HORIZONTAL_PADDING.dp,
@@ -182,15 +209,17 @@ private fun TaskBarAnd3ButtonAmbientCue(
         portrait = portrait,
         pillCenter = pillCenter,
         pillWidth = pillSize.width,
+        pillHeight = pillSize.height,
         rotation = rotation,
-        inTaskBarOr3ButtonMode = true,
+        taskBarMode = largeScreen,
     )
     ShortPill(
         actions = actions,
         visible = visible,
-        horizontal = portrait,
+        horizontal = portrait || largeScreen,
         expanded = expanded,
         rotation = rotation,
+        taskBarMode = largeScreen,
         modifier =
             if (pillPositionInWindow == null) {
                 modifier.padding(bottom = 12.dp, end = 24.dp).onGloballyPositioned {
@@ -200,7 +229,7 @@ private fun TaskBarAnd3ButtonAmbientCue(
                 Modifier.graphicsLayer {
                         translationX = pillCenter.x - size.width / 2
                         translationY = pillCenter.y - size.height / 2
-                        pillSize = size
+                        pillSize = Size(pillPositionInWindow.width, pillPositionInWindow.height)
                     }
                     .onGloballyPositioned { layoutCoordinates ->
                         layoutCoordinates.parentCoordinates?.let { parentCoordinates ->
@@ -235,11 +264,16 @@ private fun NavBarAmbientCue(
     modifier: Modifier = Modifier,
     onAnimationStateChange: (Int, AmbientCueAnimationState) -> Unit,
 ) {
-    val windowWidthSizeClass = calculateWindowSizeClass().widthSizeClass
-
     val navBarWidth =
-        if (windowWidthSizeClass == WindowWidthSizeClass.Compact) NAV_BAR_PILL_WIDTH_DP.dp
-        else NAV_BAR_PILL_LARGE_WIDTH_DP.dp
+        if (
+            LocalWindowSizeClass.current.isWidthAtLeastBreakpoint(
+                WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND
+            )
+        ) {
+            NAV_BAR_PILL_LARGE_WIDTH_DP.dp
+        } else {
+            NAV_BAR_PILL_WIDTH_DP.dp
+        }
 
     val scope = rememberCoroutineScope()
 
@@ -291,4 +325,5 @@ private const val NAV_BAR_HEIGHT_DP = 24 // R.dimen.taskbar_stashed_size from La
 private const val SHORT_PILL_ACTIONS_VERTICAL_PADDING = 38
 private const val NAV_BAR_ACTIONS_PADDING = NAV_BAR_HEIGHT_DP + 24
 private const val ACTIONS_HORIZONTAL_PADDING = 32
-private const val ACTIONS_TOP_PADDING = 32
+private const val ACTIONS_TOP_PADDING = 42
+private const val LANDSCAPE_PADDING = 65

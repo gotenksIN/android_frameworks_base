@@ -39,6 +39,7 @@ import android.view.MotionEvent
 import android.view.SurfaceControl
 import android.view.WindowInsets.Type.statusBars
 import android.window.DesktopExperienceFlags
+import com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn
 import com.android.dx.mockito.inline.extended.StaticMockitoSession
 import com.android.internal.jank.InteractionJankMonitor
 import com.android.internal.policy.DesktopModeCompatPolicy
@@ -49,6 +50,7 @@ import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestRunningTaskInfoBuilder
 import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.apptoweb.AppToWebGenericLinksParser
+import com.android.wm.shell.apptoweb.AppToWebRepositoryImpl
 import com.android.wm.shell.apptoweb.AssistContentRequester
 import com.android.wm.shell.bubbles.BubbleController
 import com.android.wm.shell.common.DisplayChangeController
@@ -72,7 +74,6 @@ import com.android.wm.shell.desktopmode.FakeShellDesktopState
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository
 import com.android.wm.shell.desktopmode.data.DesktopRepository
 import com.android.wm.shell.desktopmode.education.AppHandleEducationController
-import com.android.wm.shell.desktopmode.education.AppToWebEducationController
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter
 import com.android.wm.shell.recents.RecentsTransitionHandler
@@ -140,6 +141,7 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
     protected val mockWindowManager = mock<IWindowManager>()
     protected val mockInteractionJankMonitor = mock<InteractionJankMonitor>()
     protected val mockGenericLinksParser = mock<AppToWebGenericLinksParser>()
+    protected val mockAppToWebRepository = mock<AppToWebRepositoryImpl>()
     protected val mockUserHandle = mock<UserHandle>()
     protected val mockAssistContentRequester = mock<AssistContentRequester>()
     protected val bgExecutor = TestShellExecutor()
@@ -159,7 +161,6 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
         mock<DesktopModeWindowDecorViewModel.TaskPositionerFactory>()
     protected val mockTaskPositioner = mock<TaskPositioner>()
     protected val mockAppHandleEducationController = mock<AppHandleEducationController>()
-    protected val mockAppToWebEducationController = mock<AppToWebEducationController>()
     protected val mockFocusTransitionObserver = mock<FocusTransitionObserver>()
     protected val mockCaptionHandleRepository = mock<WindowDecorCaptionRepository>()
     protected val mockDesktopRepository: DesktopRepository = mock<DesktopRepository>()
@@ -204,6 +205,7 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
 
     fun setUpCommon() {
         spyContext = spy(mContext)
+        spyContext.setMockPackageManager(packageManager)
         doNothing().`when`(spyContext).startActivity(any())
         doNothing().`when`(mockWindowDecoration).a11yAnnounceNewFocusedWindow()
         shellInit = ShellInit(testShellExecutor)
@@ -217,7 +219,7 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
         whenever(mockDesktopUserRepositories.getProfile(anyInt())).thenReturn(mockDesktopRepository)
         whenever(mockUserProfileContexts[anyInt()]).thenReturn(spyContext)
         whenever(mockUserProfileContexts.getOrCreate(anyInt())).thenReturn(spyContext)
-        desktopModeCompatPolicy = DesktopModeCompatPolicy(spyContext)
+        desktopModeCompatPolicy = spy(DesktopModeCompatPolicy(spyContext))
         appHandleAndHeaderVisibilityHelper =
             AppHandleAndHeaderVisibilityHelper(
                 displayController = mockDisplayController,
@@ -248,6 +250,7 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
                 Optional.of(mockDesktopTasksController),
                 mockDesktopImmersiveController,
                 mockGenericLinksParser,
+                mockAppToWebRepository,
                 mockAssistContentRequester,
                 mockWindowDecorViewHostSupplier,
                 mockMultiInstanceHelper,
@@ -261,7 +264,6 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
                 mockInteractionJankMonitor,
                 Optional.of(mockTasksLimiter),
                 mockAppHandleEducationController,
-                mockAppToWebEducationController,
                 appHandleAndHeaderVisibilityHelper,
                 mockCaptionHandleRepository,
                 Optional.of(mockActivityOrientationChangeHandler),
@@ -333,8 +335,9 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
         whenever(displayLayout.getStableBounds(any())).thenAnswer { i ->
             (i.arguments.first() as Rect).set(STABLE_BOUNDS)
         }
-        spyContext.setMockPackageManager(packageManager)
-        whenever(packageManager.getHomeActivities(ArrayList())).thenReturn(homeComponentName)
+        doReturn(HOME_LAUNCHER_PACKAGE_NAME)
+            .whenever(desktopModeCompatPolicy)
+            .getDefaultHomePackage(any())
         whenever(mockDesktopTasksController.getNextFocusedTask(any())).thenReturn(testTaskId)
         whenever(windowDecorByTaskIdSpy.get(testTaskId)).thenReturn(mockWindowDecoration)
     }
@@ -367,6 +370,7 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
                         statusBars()
                     }
                 userId = context.userId
+                baseActivity = ComponentName(/* pkg= */ "", /* cls= */ "")
             }
     }
 
@@ -392,7 +396,7 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
         if (task.windowingMode == WINDOWING_MODE_MULTI_WINDOW) {
             whenever(mockSplitScreenController.isTaskInSplitScreen(task.taskId)).thenReturn(true)
         }
-        whenever(decoration.calculateValidDragArea()).thenReturn(Rect(0, 60, 2560, 1600))
+        whenever(decoration.getValidDragArea()).thenReturn(Rect(0, 60, 2560, 1600))
         return decoration
     }
 

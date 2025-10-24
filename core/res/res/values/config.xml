@@ -1548,6 +1548,19 @@
          False means the pattern should not be visible by default. -->
     <bool name="config_lockPatternVisibleDefault">true</bool>
 
+    <!-- If true, then enable the failed authentication lock feature (aka adaptive auth) which
+         locks the device after repeated authentication failures. Setting this to false weakens user
+         protection and is not recommended for production devices. -->
+    <bool name="config_enableFailedAuthLock">true</bool>
+
+    <!-- The maximum number of failed authentication attempts allowed before the device is locked,
+         if failed authentication lock is enabled -->
+    <integer name="config_maxAllowedFailedAuthAttempts">5</integer>
+
+    <!-- Whether to show a user-facing toggle for failed authentication lock if the feature is
+         enabled. -->
+    <bool name="config_enableFailedAuthLockToggle">true</bool>
+
     <!-- Control the behavior when the user long presses the home button.
             0 - Nothing
             1 - Launch all apps intent
@@ -2967,6 +2980,18 @@
      during initialization when the setting is still null. -->
     <bool name="config_dozePickupGestureEnabled">true</bool>
 
+    <!-- Control whether doze is enabled by default. This value will be used during initialization
+     when the setting is still null. -->
+    <bool name="config_dozeEnabled">true</bool>
+
+    <!-- Control whether the single tap gesture is enabled by default. This value will be used
+     during initialization when the setting is still null. -->
+    <bool name="config_dozeTapGestureEnabled">true</bool>
+
+    <!-- Control whether the double tap gesture is enabled by default. This value will be used
+     during initialization when the setting is still null. -->
+    <bool name="config_dozeDoubleTapGestureEnabled">true</bool>
+
     <!-- Control whether the always on display mode is enabled by default. This value will be used
          during initialization when the setting is still null. -->
     <bool name="config_dozeAlwaysOnEnabled">true</bool>
@@ -4034,6 +4059,7 @@
     <!-- Flag specifying whether the device will use the "allow_hold_in_ims_call" carrier config
          option.  When false, the device will support holding of IMS calls, regardless of the
          carrier config setting. -->
+    <!-- @deprecated all carriers should support hold so this is obsolete -->
     <bool name="config_device_respects_hold_carrier_config">true</bool>
 
     <!-- Flag specifying whether VT should be available for carrier: independent of
@@ -4455,6 +4481,24 @@
 
     <!-- Indicating if ringtone vibration settings supported or not. -->
     <bool name="config_ringtoneVibrationSettingsSupported">false</bool>
+
+    <!-- Mapping for the ringtone vibration pattern name to metric ID for logging
+         ringtone vibration customization.
+     Example:
+     <string-array name="config_ringtoneVibrationPatternToMetricIdMapping" translatable="false">
+       <item>Classic_ringtone.xml,101</item>
+       <item>Bumps.xml,102</item>
+     </string-array> -->
+    <string-array name="config_ringtoneVibrationPatternToMetricIdMapping" translatable="false" />
+
+    <!-- Mapping for the notification vibration pattern name to metric ID for logging
+         notification vibration customization.
+     Example:
+     <string-array name="config_notificationVibrationPatternToMetricIdMapping" translatable="false">
+       <item>Classic_notification.xml,201</item>
+       <item>Taps.xml,202</item>
+     </string-array> -->
+    <string-array name="config_notificationVibrationPatternToMetricIdMapping" translatable="false" />
 
     <!-- If the device should still vibrate even in low power mode, for certain priority vibrations
      (e.g. accessibility, alarms). This is mainly for Wear devices that don't have speakers. -->
@@ -6137,6 +6181,9 @@
     <!-- The list of packages that will use ANGLE as the GLES driver -->
     <string-array name="config_angleAllowList"></string-array>
 
+    <!-- The list of packages that will not use ANGLE as the GLES driver -->
+    <string-array name="config_angleDenyList"></string-array>
+
     <!-- The list of packages to automatically opt in to refresh rate suppressing by small area
     detection. Format of this array should be packageName:threshold and threshold value should
      be between 0 to 1-->
@@ -7547,7 +7594,7 @@
     <integer name="config_maxDesktopWindowingActiveTasks">0</integer>
 
     <!-- Maximum number desks on a device running Desktop Windowing. Set to 0 for unlimited. -->
-    <integer name="config_maxDesktopWindowingDesks">0</integer>
+    <integer name="config_maxDesktopWindowingDesks">4</integer>
 
     <!-- Whether a display enters desktop mode by default when the windowing mode of the display's
          root TaskDisplayArea is set to WINDOWING_MODE_FREEFORM. -->
@@ -7696,6 +7743,12 @@
         Packages in this list share the same App Function access settings. In the UI, they are
         presented as a single "Device Settings" item rather than individually. -->
     <string-array name="config_appFunctionDeviceSettingsPackages" translatable="false">
+    </string-array>
+
+    <!-- Defines the default allowlist of package names for preloaded agents authorized to use App
+         Function features. This static list operates as a fallback allowlist in case the
+         updatable allowlist is not available. -->
+    <string-array name="config_defaultAppFunctionAgentAllowlist" translatable="false">
     </string-array>
 
     <!-- Package name for developer verification service provider app [DO NOT TRANSLATE] -->

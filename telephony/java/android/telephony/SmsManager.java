@@ -34,7 +34,9 @@ import android.annotation.SuppressAutoDoc;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.TestApi;
+import android.app.AppOpsManager;
 import android.app.PendingIntent;
+import android.app.admin.DevicePolicyManager;
 import android.app.role.RoleManager;
 import android.companion.AssociationInfo;
 import android.companion.CompanionDeviceManager;
@@ -606,9 +608,7 @@ public final class SmsManager {
     public void sendTextMessage(
             String destinationAddress, String scAddress, String text,
             PendingIntent sentIntent, PendingIntent deliveryIntent) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(75, destinationAddress);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         sendTextMessageInternal(destinationAddress, scAddress, text, sentIntent, deliveryIntent,
                 true /* persistMessage*/, getOpPackageName(), getAttributionTag(),
                 0L /* messageId */);
@@ -738,7 +738,7 @@ public final class SmsManager {
      *  Any Other values included Negative considered as Invalid Validity Period of the message.
      *
      * @throws IllegalArgumentException if destinationAddress or text are empty
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public void sendTextMessage(
@@ -1385,7 +1385,7 @@ public final class SmsManager {
      *  Any Other values included Negative considered as Invalid Validity Period of the message.
      *
      * @throws IllegalArgumentException if destinationAddress or data are empty
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     public void sendMultipartTextMessage(
@@ -1571,9 +1571,7 @@ public final class SmsManager {
     public void sendDataMessage(
             String destinationAddress, String scAddress, short destinationPort,
             byte[] data, PendingIntent sentIntent, PendingIntent deliveryIntent) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(73, destinationAddress);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (TextUtils.isEmpty(destinationAddress)) {
             throw new IllegalArgumentException("Invalid destinationAddress");
         }
@@ -1910,9 +1908,7 @@ public final class SmsManager {
     @RequiresPermission(Manifest.permission.ACCESS_MESSAGES_ON_ICC)
     public boolean copyMessageToIcc(
             @Nullable byte[] smsc, @NonNull byte[] pdu, @StatusOnIcc int status) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(79);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         boolean success = false;
 
         if (pdu == null) {
@@ -1951,14 +1947,12 @@ public final class SmsManager {
      * @return true for success, false if the operation fails. Failure can be due to IPC failure,
      * RIL/modem error which results in SMS failed to be deleted on SIM
      *
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     @RequiresPermission(Manifest.permission.ACCESS_MESSAGES_ON_ICC)
     public boolean deleteMessageFromIcc(int messageIndex) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(80);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         boolean success = false;
 
         try {
@@ -1997,14 +1991,12 @@ public final class SmsManager {
      * @param pdu the raw PDU to store
      * @return true for success
      *
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     @RequiresPermission(Manifest.permission.ACCESS_MESSAGES_ON_ICC)
     public boolean updateMessageOnIcc(int messageIndex, int newStatus, byte[] pdu) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(81);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         boolean success = false;
 
         try {
@@ -2038,7 +2030,7 @@ public final class SmsManager {
      *
      * @return <code>List</code> of <code>SmsMessage</code> objects for valid records only.
      *
-     * {@hide}
+     * @hide
      */
     @RequiresPermission(Manifest.permission.ACCESS_MESSAGES_ON_ICC)
     public @NonNull List<SmsMessage> getMessagesFromIcc() {
@@ -2051,7 +2043,7 @@ public final class SmsManager {
      * This is similar to {@link #getMessagesFromIcc} except that it will return ArrayList.
      * Suggested to use {@link #getMessagesFromIcc} instead.
      *
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     public ArrayList<SmsMessage> getAllMessagesFromIcc() {
@@ -2108,7 +2100,7 @@ public final class SmsManager {
      *
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_MESSAGING}.
-     * {@hide}
+     * @hide
      */
     @Deprecated
     @SystemApi
@@ -2174,7 +2166,7 @@ public final class SmsManager {
      *          {@link PackageManager#FEATURE_TELEPHONY_MESSAGING}.
      *
      * @deprecated Use {@link TelephonyManager#setCellBroadcastIdRanges} instead.
-     * {@hide}
+     * @hide
      */
     @Deprecated
     @SystemApi
@@ -3803,6 +3795,9 @@ public final class SmsManager {
             for (AssociationInfo info : getAllCdmAssociations(userContext)) {
                 trustedPackages.add(info.getPackageName());
             }
+
+            // Apps with the READ_OTP_SMS app op have access
+            trustedPackages.addAll(getSmsOtpAppOpPackages(userContext));
         } finally {
             Binder.restoreCallingIdentity(token);
             Trace.endSection();
@@ -3835,6 +3830,10 @@ public final class SmsManager {
                 return true;
             }
 
+            if (userContext.getSystemService(DevicePolicyManager.class).isDeviceManaged()) {
+                return true;
+            }
+
             // All system apps have access to OTPs in SMS messages
             if (isSystemApp(userContext, packageName)) {
                 return true;
@@ -3858,6 +3857,9 @@ public final class SmsManager {
                 }
             }
 
+            if (hasSmsOtpAppOp(userContext, packageName, uid)) {
+                return true;
+            }
         } finally {
             Trace.endSection();
             Binder.restoreCallingIdentity(token);
@@ -3879,6 +3881,20 @@ public final class SmsManager {
     private static boolean isTrustedOtpSmsRoleHolder(Context context, String packageName, int uid) {
         return getTrustedOtpSmsRolePackages(context, UserHandle.getUserHandleForUid(uid))
                 .contains(packageName);
+    }
+
+    private static boolean hasSmsOtpAppOp(Context context, String packageName, int uid) {
+        AppOpsManager aom = context.getSystemService(AppOpsManager.class);
+        return aom.checkOpNoThrow(AppOpsManager.OP_READ_OTP_SMS, uid, packageName)
+                == AppOpsManager.MODE_ALLOWED;
+    }
+
+
+    @SuppressLint("MissingPermission")
+    private static List<String> getSmsOtpAppOpPackages(Context context) {
+        AppOpsManager aom = context.getSystemService(AppOpsManager.class);
+        return aom.getPackagesWithNonDefaultUidMode(
+                AppOpsManager.OP_READ_OTP_SMS, AppOpsManager.MODE_ALLOWED);
     }
 
     private static boolean isSystemApp(Context context, String packageName) {

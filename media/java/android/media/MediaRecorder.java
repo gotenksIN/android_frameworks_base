@@ -636,13 +636,11 @@ public class MediaRecorder implements AudioRouting,
         /** Opus data in a Ogg container */
         public static final int OGG = 11;
 
-// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
         /** @hide QCP file format */
         public static final int QCP = 20;
 
         /** @hide WAVE media file format*/
         public static final int WAVE = 21;
-// QTI_END: 2018-02-19: Audio: add support for extended formats
     };
 
     /**
@@ -690,14 +688,12 @@ public class MediaRecorder implements AudioRouting,
         public static final int OPUS = 7;
         /** High Efficiency AAC with Parametric Stereo coding (HE-AAC v2, object type PS) */
         public static final int HE_AAC_PS = 8;
-// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
         /** @hide EVRC audio codec */
         public static final int EVRC = 10;
         /** @hide QCELP audio codec */
         public static final int QCELP = 11;
         /** @hide Linear PCM audio codec */
         public static final int LPCM = 12;
-// QTI_END: 2018-02-19: Audio: add support for extended formats
         /** @hide MPEGH audio codec */
         public static final int MPEGH = 13;
         /** @hide High Efficiency AAC V2 (HE-AAC V2) audio codec */
@@ -1541,55 +1537,55 @@ public class MediaRecorder implements AudioRouting,
      * events are unhidden so that application knows how to extract the track
      * id and the informational event type from onInfo callback.
      *
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_LIST_START        = 1000;
     /** Signal the completion of the track for the recording session.
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_COMPLETION_STATUS = 1000;
     /** Indicate the recording progress in time (ms) during recording.
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_PROGRESS_IN_TIME  = 1001;
     /** Indicate the track type: 0 for Audio and 1 for Video.
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_TYPE              = 1002;
     /** Provide the track duration information.
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_DURATION_MS       = 1003;
     /** Provide the max chunk duration in time (ms) for the given track.
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_MAX_CHUNK_DUR_MS  = 1004;
     /** Provide the total number of recordd frames.
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_ENCODED_FRAMES    = 1005;
     /** Provide the max spacing between neighboring chunks for the given track.
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INTER_CHUNK_TIME_MS    = 1006;
     /** Provide the elapsed time measuring from the start of the recording
      * till the first output frame of the given track is received, excluding
      * any intentional start time offset of a recording session for the
      * purpose of eliminating the recording sound in the recorded file.
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_INITIAL_DELAY_MS  = 1007;
     /** Provide the start time difference (delay) betweeen this track and
      * the start of the movie.
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_START_OFFSET_MS   = 1008;
     /** Provide the total number of data (in kilo-bytes) encoded.
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_DATA_KBYTES       = 1009;
     /**
-     * {@hide}
+     * @hide
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_LIST_END          = 2000;
 

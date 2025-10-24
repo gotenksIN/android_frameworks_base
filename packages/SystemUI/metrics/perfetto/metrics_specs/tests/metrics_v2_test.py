@@ -14,6 +14,10 @@
 # limitations under the License.
 
 from metrics_specs.tests.utils import android_bitmap_metric_trace
+from metrics_specs.tests.utils import android_sf_critical_work_main_thread_trace
+from metrics_specs.tests.utils import android_dmabuf_per_process_metric_trace
+from metrics_specs.tests.utils import android_sf_critical_work_region_sampling_trace
+from metrics_specs.tests.utils import android_gralloc_buffers_per_process_metric_trace
 from metrics_specs.tests.utils import test_helper
 import unittest
 
@@ -31,6 +35,54 @@ class MetricsV2Test(unittest.TestCase):
                 "android_bitmap_metric_min_val",
                 "android_bitmap_metric_max_val",
                 "android_bitmap_metric_avg_val",
+            ]
+        )
+
+    def test_android_sf_critical_work_main_thread_metric(self):
+        self.helper.verify_metric(
+            spec_file="android_sf_critical_work_main_thread.textproto",
+            trace_proto_bytes = android_sf_critical_work_main_thread_trace.get_proto(),
+            expected_output_file = "android_sf_critical_work_main_thread_output.txt",
+            metric_ids = [
+                "android_sf_critical_work_main_thread_cuj_max_dur",
+                "android_sf_critical_work_main_thread_cuj_avg_dur",
+                "android_sf_critical_work_main_thread_cuj_count",
+            ]
+        )
+
+    def test_android_dmabuf_per_process_metric(self):
+        self.helper.verify_metric(
+            spec_file="android_dmabuf_per_process_metric.textproto",
+            trace_proto_bytes = android_dmabuf_per_process_metric_trace.get_proto(),
+            expected_output_file = "android_dmabuf_per_process_metric_output.txt",
+            metric_ids = [
+                "android_dmabuf_per_process_metric_min_val",
+                "android_dmabuf_per_process_metric_max_val",
+                "android_dmabuf_per_process_metric_avg_val",
+            ]
+        )
+
+    def test_android_sf_critical_work_region_sampling_metric(self):
+        self.helper.verify_metric(
+            spec_file="android_sf_critical_work_region_sampling.textproto",
+             trace_proto_bytes = android_sf_critical_work_region_sampling_trace.get_proto(),
+             expected_output_file = "android_sf_critical_work_region_sampling_output.txt",
+             metric_ids = [
+                 "android_sf_critical_work_region_sampling_cuj_max_dur",
+                 "android_sf_critical_work_region_sampling_cuj_avg_dur",
+                 "android_sf_critical_work_region_sampling_cuj_count",
+             ]
+        )
+
+    def test_android_gralloc_buffers_per_process_metric(self):
+        self.helper.verify_metric(
+            spec_file="android_gralloc_buffers_per_process_metric.textproto",
+            trace_proto_bytes = android_gralloc_buffers_per_process_metric_trace.get_proto(),
+            expected_output_file = "android_gralloc_buffers_per_process_metric_output.txt",
+            metric_ids = [
+                "android_gralloc_buffers_per_process_metric_min_val",
+                "android_gralloc_buffers_per_process_metric_max_val",
+                "android_gralloc_buffers_per_process_metric_avg_val",
             ]
         )
 

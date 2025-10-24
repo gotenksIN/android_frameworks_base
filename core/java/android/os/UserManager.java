@@ -184,8 +184,9 @@ public class UserManager {
 
     /**
      * User type representing a clone profile. Clone profile is a user profile type used to run
-     * second instance of an otherwise single user App (eg, messengers). Currently only the
-     * {@link android.content.pm.UserInfo#isMain()} user can have a clone profile.
+     * a second instance of an otherwise single user App (eg, messengers). Currently only the main
+     * user (which is the first full user set up on the device, usually the system user)
+     * can have a clone profile.
      */
     @FlaggedApi(android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE)
     public static final String USER_TYPE_PROFILE_CLONE = "android.os.usertype.profile.CLONE";
@@ -892,7 +893,8 @@ public class UserManager {
      * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_DEBUGGING_FEATURES}
      * can set this restriction using the DevicePolicyManager APIs mentioned below.
      *
-     * <p>The default value is <code>false</code>.
+     * <p>Default is <code>true</code> for newly created work profile on or after the
+     * 2025-04 security patch level. Otherwise, the default is <code>false</code>.
      *
      * <p>Key for user restrictions.
      * <p>Type: Boolean
@@ -2440,6 +2442,10 @@ public class UserManager {
     @SystemApi
     public static final int REMOVE_RESULT_ERROR_MAIN_USER_PERMANENT_ADMIN = -5;
 
+    // TODO(b/444663119): expose as @SystemApi
+    // TODO(b/419105275): Currently, the headless system user is also an admin user. When we
+    // disallow the removal of last admin user, we mean the last admin user that's not the HSU.
+    // If/When b/419105275 removes the admin flag from HSU, this comment should be removed.
     /**
      * A response code from {@link #removeUserWhenPossible(UserHandle, boolean)} indicating that
      * user being removed cannot be removed because it is
@@ -2447,12 +2453,16 @@ public class UserManager {
      *
      * @hide
      */
-    // TODO(b/419105275): Currently, the headless system user is also an admin user. When we
-    // disallow the removal of last admin user, we mean the last admin user that's not the HSU.
-    // If/When b/419105275 removes the admin flag from HSU, this comment should be removed.
-    @FlaggedApi(android.multiuser.Flags.FLAG_DISALLOW_REMOVING_LAST_ADMIN_USER)
-    @SystemApi
     public static final int REMOVE_RESULT_ERROR_LAST_ADMIN_USER = -6;
+
+    // TODO(b/444663119): expose as @SystemApi
+    /**
+     * A response code from {@link #removeUserWhenPossible(UserHandle, boolean)} indicating that
+     * user being removed cannot be removed because it is the Device Owner on this device.
+     *
+     * @hide
+     */
+    public static final int REMOVE_RESULT_DEVICE_OWNER = -7;
 
     /**
      * Possible response codes from {@link #removeUserWhenPossible(UserHandle, boolean)}.
@@ -2469,6 +2479,7 @@ public class UserManager {
             REMOVE_RESULT_ERROR_SYSTEM_USER,
             REMOVE_RESULT_ERROR_MAIN_USER_PERMANENT_ADMIN,
             REMOVE_RESULT_ERROR_LAST_ADMIN_USER,
+            REMOVE_RESULT_DEVICE_OWNER,
             REMOVE_RESULT_ERROR_UNKNOWN,
     })
     @Retention(RetentionPolicy.SOURCE)
@@ -3423,10 +3434,12 @@ public class UserManager {
      * class.)
      *
      * @return whether the context user can add a private profile.
+     * @deprecated evaluate canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, userId) > 0 instead
      * @hide
      */
+    @Deprecated
     @TestApi
-    @FlaggedApi(android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE)
+    @FlaggedApi(android.multiuser.Flags.FLAG_CONSISTENT_MAX_USERS)
     @RequiresPermission(anyOf = {
             Manifest.permission.MANAGE_USERS,
             Manifest.permission.CREATE_USERS,

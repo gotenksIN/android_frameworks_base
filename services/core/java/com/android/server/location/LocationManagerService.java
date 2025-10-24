@@ -262,11 +262,9 @@ public class LocationManagerService extends ILocationManager.Stub implements
     private final GeofenceManager mGeofenceManager;
     private volatile @Nullable GnssManagerService mGnssManagerService = null;
 
-// QTI_BEGIN: 2018-04-10: Core: NLP Combo feature
     private String mComboNlpPackageName;
     private String mComboNlpReadyMarker;
     private String mComboNlpScreenMarker;
-// QTI_END: 2018-04-10: Core: NLP Combo feature
 
     private ProxyGeocodeProvider mGeocodeProvider;
 
@@ -545,14 +543,12 @@ public class LocationManagerService extends ILocationManager.Stub implements
         }
 
         mComboNlpPackageName = mContext.getResources().getString(
-// QTI_BEGIN: 2018-04-10: Core: NLP Combo feature
             com.android.internal.R.string.config_comboNetworkLocationProvider);
         if (mComboNlpPackageName != null) {
             mComboNlpReadyMarker = mComboNlpPackageName + ".nlp:ready";
             mComboNlpScreenMarker = mComboNlpPackageName + ".nlp:screen";
         }
 
-// QTI_END: 2018-04-10: Core: NLP Combo feature
         if (Flags.populationDensityProvider()) {
             long startTime = System.currentTimeMillis();
             setProxyPopulationDensityProvider(
@@ -569,11 +565,13 @@ public class LocationManagerService extends ILocationManager.Stub implements
             setLocationFudgerCache(new LocationFudgerCache(mPopulationDensityProvider));
         }
 
-        // bind to hardware activity recognition
-        HardwareActivityRecognitionProxy hardwareActivityRecognitionProxy =
-                HardwareActivityRecognitionProxy.createAndRegister(mContext);
-        if (hardwareActivityRecognitionProxy == null) {
-            Log.e(TAG, "unable to bind ActivityRecognitionProxy");
+        if (!Flags.disableHardwareAr()) {
+            // bind to hardware activity recognition
+            HardwareActivityRecognitionProxy hardwareActivityRecognitionProxy =
+                    HardwareActivityRecognitionProxy.createAndRegister(mContext);
+            if (hardwareActivityRecognitionProxy == null) {
+                Log.e(TAG, "unable to bind ActivityRecognitionProxy");
+            }
         }
 
         // bind to gnss geofence proxy

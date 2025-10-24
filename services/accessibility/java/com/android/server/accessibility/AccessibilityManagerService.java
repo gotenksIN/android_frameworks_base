@@ -46,6 +46,7 @@ import static android.view.accessibility.AccessibilityManager.FlashNotificationR
 
 import static com.android.hardware.input.Flags.enableSelectToSpeakKeyGestures;
 import static com.android.hardware.input.Flags.enableTalkbackAndMagnifierKeyGestures;
+import static com.android.hardware.input.Flags.enableTalkbackKeyGestures;
 import static com.android.hardware.input.Flags.enableVoiceAccessKeyGestures;
 import static com.android.internal.accessibility.AccessibilityShortcutController.ACCESSIBILITY_HEARING_AIDS_COMPONENT_NAME;
 import static com.android.internal.accessibility.AccessibilityShortcutController.MAGNIFICATION_COMPONENT_NAME;
@@ -262,6 +263,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     //       their capabilities are ready.
     private static final int WAIT_INPUT_FILTER_INSTALL_TIMEOUT_MS = 1000;
 
+    private static final int WAIT_MAGNIFICATION_CONNECTION_TIMEOUT_MILLIS = 1000;
 
     // This postpones state changes events when a window doesn't exist with the expectation that
     // a race condition will resolve. It is determined by observing elapsed time of the
@@ -672,8 +674,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_ACTIVATE_SELECT_TO_SPEAK);
         }
         if (enableTalkbackAndMagnifierKeyGestures()) {
-            supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER);
             supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION);
+        }
+        if (enableTalkbackKeyGestures()) {
+            supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER);
         }
         if (enableVoiceAccessKeyGestures()) {
             supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS);
@@ -812,6 +816,11 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         synchronized (mLock) {
             userId = mCurrentUserId;
         }
+
+        final int displayId =
+                event.getDisplayId() != INVALID_DISPLAY
+                        ? event.getDisplayId()
+                        : getLastNonProxyTopFocusedDisplayId();
         List<String> shortcutTargets = getAccessibilityShortcutTargets(
                 KEY_GESTURE, userId);
         if (!shortcutTargets.contains(targetName)) {
@@ -828,12 +837,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             // Launch a systemui dialog to confirm enabling the service and to activate the first
             // time.
             launchKeyGestureConfirmDialog(
-                    gestureType, event.getModifierState(), keyCodes[0], targetName);
+                    gestureType, event.getModifierState(), keyCodes[0], targetName, displayId);
             return;
         }
 
-        final int displayId = event.getDisplayId() != INVALID_DISPLAY
-                ? event.getDisplayId() : getLastNonProxyTopFocusedDisplayId();
         performAccessibilityShortcutInternal(displayId, KEY_GESTURE, targetName);
     }
 
@@ -1972,6 +1979,36 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         }
     }
 
+    @Override
+    @EnforcePermission(MANAGE_ACCESSIBILITY)
+    public void enableMagnificationAndZoomIn(int displayId) {
+        enableMagnificationAndZoomIn_enforcePermission();
+
+        BackgroundThread.getHandler()
+                .post(
+                        () -> {
+                            if (!waitForInputFilterInstalled()) {
+                                Slog.w(
+                                        LOG_TAG,
+                                        "Cannot enableMagnificationAndZoomIn because the "
+                                                + "AccessibilityInputFilter is not installed.");
+                                return;
+                            }
+
+                            if (!waitForMagnificationConnection()) {
+                                Slog.w(
+                                        LOG_TAG,
+                                        "Cannot enableMagnificationAndZoomIn because the "
+                                                + "MagnificationConnection is not established.");
+                                return;
+                            }
+
+                            getMagnificationController()
+                                    .zoomInMagnification(
+                                            displayId, getMagnificationMode(displayId));
+                        });
+    }
+
     /**
      * Called when a gesture is detected on a display by the framework.
      *
@@ -2564,7 +2601,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             @KeyGestureEvent.KeyGestureType int type,
             int metaState,
             int keyCode,
-            String targetName) {
+            String targetName,
+            int displayId) {
         final Intent intent = new Intent(ACTION_LAUNCH_KEY_GESTURE_CONFIRM_DIALOG);
         intent.setFlags(Intent.FLAG_RECEIVER_FOREGROUND);
         intent.setPackage(mContext.getString(com.android.internal.R.string.config_systemUi));
@@ -2572,6 +2610,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         intent.putExtra(KeyGestureEventConstants.META_STATE, metaState);
         intent.putExtra(KeyGestureEventConstants.KEY_CODE, keyCode);
         intent.putExtra(KeyGestureEventConstants.TARGET_NAME, targetName);
+        intent.putExtra(KeyGestureEventConstants.DISPLAY_ID, displayId);
         mContext.sendBroadcastAsUser(intent, UserHandle.SYSTEM);
     }
 
@@ -4484,13 +4523,11 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 enable, shortcutType, shortcutTargets, userId));
 
         if (shortcutType == UserShortcutType.KEY_GESTURE) {
-            if(!enableTalkbackAndMagnifierKeyGestures() &&
-                    (shortcutTargets.contains(MAGNIFICATION_CONTROLLER_NAME) ||
-                            shortcutTargets.contains(mContext.getString(
-                                    R.string.config_defaultAccessibilityService)))) {
+            if (!enableTalkbackAndMagnifierKeyGestures()
+                    && shortcutTargets.contains(MAGNIFICATION_CONTROLLER_NAME)) {
                 Slog.w(LOG_TAG,
-                        "KEY_GESTURE type magnification and TalkBack shortcuts are disabled by "
-                                + "feature flag");
+                        "KEY_GESTURE type magnification shortcuts are disabled by feature "
+                                + "flag");
                 return;
             }
             if (!enableSelectToSpeakKeyGestures() && shortcutTargets.contains(mContext.getString(
@@ -4498,6 +4535,13 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 Slog.w(LOG_TAG,
                         "KEY_GESTURE type select to speak shortcuts are disabled by feature "
                                 + "flag");
+                return;
+            }
+            if (!enableTalkbackKeyGestures()
+                    && shortcutTargets.contains(mContext.getString(
+                                    R.string.config_defaultAccessibilityService))) {
+                Slog.w(LOG_TAG,
+                        "KEY_GESTURE type TalkBack shortcuts are disabled by feature flag");
                 return;
             }
             if (!enableVoiceAccessKeyGestures() && shortcutTargets.contains(mContext.getString(
@@ -6724,19 +6768,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     @EnforcePermission(INJECT_EVENTS)
     public void injectInputEventToInputFilter(InputEvent event) {
         injectInputEventToInputFilter_enforcePermission();
-        synchronized (mLock) {
-            final long endMillis =
-                    SystemClock.uptimeMillis() + WAIT_INPUT_FILTER_INSTALL_TIMEOUT_MS;
-            while (!mInputFilterInstalled && (SystemClock.uptimeMillis() < endMillis)) {
-                try {
-                    mLock.wait(endMillis - SystemClock.uptimeMillis());
-                } catch (InterruptedException ie) {
-                    /* ignore */
-                }
-            }
-        }
 
-        if (mInputFilterInstalled && mInputFilter != null) {
+        if (waitForInputFilterInstalled()) {
             mInputFilter.onInputEvent(event,
                     WindowManagerPolicy.FLAG_PASS_TO_USER | WindowManagerPolicy.FLAG_INJECTED);
         } else {
@@ -7078,5 +7111,44 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         if ((shortcutType & (TRIPLETAP | TWOFINGER_DOUBLETAP)) != 0) {
             throw new IllegalArgumentException("Tap shortcuts are not supported.");
         }
+    }
+
+    /**
+     * Returns true if the input filter is installed before time-out. This method should not be
+     * called on the main thread as it can block.
+     */
+    private boolean waitForInputFilterInstalled() {
+        synchronized (mLock) {
+            final long endMillis =
+                    SystemClock.uptimeMillis() + WAIT_INPUT_FILTER_INSTALL_TIMEOUT_MS;
+            while (!mInputFilterInstalled && (SystemClock.uptimeMillis() < endMillis)) {
+                try {
+                    mLock.wait(endMillis - SystemClock.uptimeMillis());
+                } catch (InterruptedException ie) {
+                    /* ignore */
+                }
+            }
+        }
+        return mInputFilterInstalled && mInputFilter != null;
+    }
+
+    /**
+     * Returns true if MagnificationConnection is available before time-out. This method should not
+     * be called on the main thread as it can block.
+     */
+    private boolean waitForMagnificationConnection() {
+        synchronized (mLock) {
+            final long endMillis =
+                    SystemClock.uptimeMillis() + WAIT_MAGNIFICATION_CONNECTION_TIMEOUT_MILLIS;
+            while (!getMagnificationConnectionManager().isConnected()
+                    && (SystemClock.uptimeMillis() < endMillis)) {
+                try {
+                    mLock.wait(endMillis - SystemClock.uptimeMillis());
+                } catch (InterruptedException ie) {
+                    /* ignore */
+                }
+            }
+        }
+        return getMagnificationConnectionManager().isConnected();
     }
 }

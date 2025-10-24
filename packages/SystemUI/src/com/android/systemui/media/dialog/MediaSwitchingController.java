@@ -21,7 +21,6 @@ import static android.media.RouteListingPreference.EXTRA_ROUTE_ID;
 import static android.media.RoutingChangeInfo.ENTRY_POINT_SYSTEM_OUTPUT_SWITCHER;
 import static android.provider.Settings.ACTION_BLUETOOTH_SETTINGS;
 
-import static com.android.media.flags.Flags.allowOutputSwitcherListRearrangementWithinTimeout;
 import static com.android.media.flags.Flags.enableOutputSwitcherRedesign;
 import static com.android.systemui.Flags.enableOutputSwitcherAudioSharingButton;
 import static com.android.systemui.media.dialog.MediaItem.MediaItemType.TYPE_GROUP_DIVIDER;
@@ -75,12 +74,10 @@ import com.android.settingslib.media.InputMediaDevice;
 import com.android.settingslib.media.InputRouteManager;
 import com.android.settingslib.media.LocalMediaManager;
 import com.android.settingslib.media.MediaDevice;
-import com.android.settingslib.utils.ThreadUtils;
 import com.android.settingslib.volume.data.repository.AudioSharingRepository;
 import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.animation.DialogTransitionAnimator;
 import com.android.systemui.dagger.qualifiers.Background;
-import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.media.nearby.NearbyMediaDevicesManager;
 import com.android.systemui.monet.ColorScheme;
 import com.android.systemui.plugins.ActivityStarter;
@@ -102,12 +99,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
-
-import javax.inject.Inject;
 
 /**
  * Controller for a dialog that allows users to switch media output and input devices, control
@@ -147,8 +143,7 @@ public class MediaSwitchingController
     private final NearbyMediaDevicesManager mNearbyMediaDevicesManager;
     private final Map<String, Integer> mNearbyDeviceInfoMap = new ConcurrentHashMap<>();
     private final MediaSession.Token mToken;
-    @Inject @Main Executor mMainExecutor;
-    @Inject @Background Executor mBackgroundExecutor;
+    private final Executor mBackgroundExecutor;
     @VisibleForTesting
     boolean mIsRefreshing = false;
     @VisibleForTesting
@@ -177,6 +172,12 @@ public class MediaSwitchingController
     private boolean mInAudioSharing = false;
     @Nullable private Job mAudioShareJob = null;
 
+    private Optional<MediaDevice> mCurrentInputDevice;
+
+    public Optional<MediaDevice> getCurrentInputDevice() {
+        return mCurrentInputDevice;
+    }
+
     @VisibleForTesting
     final InputRouteManager.InputDeviceCallback mInputDeviceCallback =
             new InputRouteManager.InputDeviceCallback() {
@@ -184,6 +185,8 @@ public class MediaSwitchingController
                 public void onInputDeviceListUpdated(@NonNull List<MediaDevice> devices) {
                     synchronized (mInputMediaDevicesLock) {
                         buildInputMediaItems(devices);
+                        mCurrentInputDevice =
+                                devices.stream().filter(MediaDevice::isSelected).findFirst();
                         mCallback.onDeviceListChanged();
                     }
                 }
@@ -205,6 +208,7 @@ public class MediaSwitchingController
             PowerExemptionManager powerExemptionManager,
             KeyguardManager keyGuardManager,
             SystemClock clock,
+            @Background Executor backgroundExecutor,
             VolumePanelGlobalStateInteractor volumePanelGlobalStateInteractor,
             UserTracker userTracker,
             JavaAdapter javaAdapter,
@@ -220,6 +224,7 @@ public class MediaSwitchingController
         mPowerExemptionManager = powerExemptionManager;
         mKeyGuardManager = keyGuardManager;
         mClock = clock;
+        mBackgroundExecutor = backgroundExecutor;
         mUserTracker = userTracker;
         mToken = token;
         mVolumePanelGlobalStateInteractor = volumePanelGlobalStateInteractor;
@@ -248,7 +253,12 @@ public class MediaSwitchingController
                 String packageName, UserHandle userHandle, MediaSession.Token token);
     }
 
-    protected void start(@NonNull Callback cb) {
+    /**
+     * Initializes the variables and starts this controller.
+     * @param cb the callback associated with this controller.
+     */
+    @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
+    public void start(@NonNull Callback cb) {
         mStartTime = mClock.elapsedRealtime();
         synchronized (mMediaDevicesLock) {
             mCachedMediaDevices.clear();
@@ -652,12 +662,12 @@ public class MediaSwitchingController
 
     /**  Whether it's allowed to change device list order and categories. */
     private boolean isDeviceListRearrangementAllowed() {
-        return allowOutputSwitcherListRearrangementWithinTimeout()
-                && mClock.elapsedRealtime() - mStartTime <= LIST_CHANGE_ALLOWED_TIMEOUT_MS;
+        return mClock.elapsedRealtime() - mStartTime <= LIST_CHANGE_ALLOWED_TIMEOUT_MS;
     }
 
     private boolean enableInputRouting() {
-        return Flags.enableAudioInputDeviceRoutingAndVolumeControl();
+        return Flags.enableAudioInputDeviceRoutingAndVolumeControl()
+                && mContext.getResources().getBoolean(R.bool.config_enableInputRouting);
     }
 
     private void buildInputMediaItems(List<MediaDevice> devices) {
@@ -726,24 +736,17 @@ public class MediaSwitchingController
         // If input routing is supported and the device is an input device, call mInputRouteManager
         // to handle routing.
         if (enableInputRouting() && device instanceof InputMediaDevice) {
-            var unused =
-                    ThreadUtils.postOnBackgroundThread(
-                            () -> {
-                                mInputRouteManager.selectDevice(device);
-                            });
+            mBackgroundExecutor.execute(() -> mInputRouteManager.selectDevice(device));
             return;
         }
 
         mMetricLogger.updateOutputEndPoints(getCurrentConnectedMediaDevice(), device);
-
-        ThreadUtils.postOnBackgroundThread(
-                () -> {
-                    mLocalMediaManager.connectDevice(
-                            device,
-                            new RoutingChangeInfo(
-                                    ENTRY_POINT_SYSTEM_OUTPUT_SWITCHER,
-                                    device.isSuggestedDevice()));
-                });
+        mBackgroundExecutor.execute(() -> mLocalMediaManager.connectDevice(
+                device,
+                new RoutingChangeInfo(
+                        ENTRY_POINT_SYSTEM_OUTPUT_SWITCHER,
+                        device.isSuggestedDevice()))
+        );
     }
 
     private List<MediaItem> getOutputDeviceList(boolean addConnectDeviceButton) {
@@ -890,9 +893,7 @@ public class MediaSwitchingController
     }
 
     void adjustVolume(MediaDevice device, int volume) {
-        ThreadUtils.postOnBackgroundThread(() -> {
-            mLocalMediaManager.adjustDeviceVolume(device, volume);
-        });
+        mBackgroundExecutor.execute(() -> mLocalMediaManager.adjustDeviceVolume(device, volume));
     }
 
     void logInteractionAdjustVolume(MediaDevice device) {

@@ -28,6 +28,7 @@ import androidx.test.filters.SmallTest
 import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.dump.DumpManager
+import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.kosmos.applicationCoroutineScope
@@ -67,6 +68,7 @@ import org.mockito.junit.MockitoJUnit
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 @TestableLooper.RunWithLooper(setAsMainLooper = true)
+@DisableSceneContainer
 class KeyguardMediaControllerTest : SysuiTestCase() {
 
     @Mock private lateinit var mediaHost: MediaHost
@@ -126,6 +128,8 @@ class KeyguardMediaControllerTest : SysuiTestCase() {
             kosmos.setHasMedia(visible = true, active = true)
         } else {
             verify(mediaHost).expansion = MediaHostState.EXPANDED
+            verify(mediaHost)
+                .addVisibilityChangeListener(keyguardMediaController::onMediaHostVisibilityChanged)
         }
     }
 

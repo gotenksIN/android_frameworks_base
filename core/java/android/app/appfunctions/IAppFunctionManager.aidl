@@ -21,6 +21,7 @@ import android.app.appfunctions.IAppFunctionEnabledCallback;
 import android.app.appfunctions.IExecuteAppFunctionCallback;
 import android.os.ICancellationSignal;
 import android.os.UserHandle;
+import android.content.Intent;
 import android.content.pm.SignedPackageParcel;
 
 import java.util.List;
@@ -90,8 +91,7 @@ interface IAppFunctionManager {
     List<SignedPackageParcel> getAgentAllowlist();
 
     @EnforcePermission("MANAGE_APP_FUNCTION_ACCESS")
-    void setAgentAllowlistEnabled(boolean enabled);
+    void clearAccessHistory(int userId);
 
-    @EnforcePermission("MANAGE_APP_FUNCTION_ACCESS")
-    boolean isAgentAllowlistEnabled();
+    Intent createRequestAccessIntent(in String targetPackageName);
 }

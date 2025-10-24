@@ -357,6 +357,7 @@
     <uses-permission android:name="android.permission.REQUEST_COMPANION_PROFILE_VIRTUAL_DEVICE" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_PROFILE_WATCH" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_PROFILE_GLASSES" />
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_PROFILE_MEDICAL" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_SELF_MANAGED" />
     <uses-permission android:name="android.permission.USE_COMPANION_TRANSPORTS" />
     <uses-permission android:name="android.permission.REQUEST_OBSERVE_DEVICE_UUID_PRESENCE" />
@@ -619,6 +620,7 @@
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
     <uses-permission android:name="android.permission.MANAGE_WIFI_INTERFACES" />
     <uses-permission android:name="android.permission.OVERRIDE_WIFI_CONFIG" />
+    <uses-permission android:name="android.permission.WIFI_SET_DEVICE_MOBILITY_STATE" />
     <!-- Permission needed for CTS test - ConcurrencyTest#testP2pExternalApprover
          P2P external approver API sets require MANAGE_WIFI_NETWORK_SELECTION permission. -->
     <uses-permission android:name="android.permission.MANAGE_WIFI_NETWORK_SELECTION" />
@@ -1049,6 +1051,7 @@
 
     <!-- Permission required for CTS test - CtsMediaProjectionTestCases -->
     <uses-permission android:name="android.permission.MANAGE_MEDIA_PROJECTION" />
+
 
     <application
         android:label="@string/app_label"

@@ -80,21 +80,6 @@ flag {
 }
 
 flag {
-    name: "adpf_use_fmq_channel"
-    namespace: "game"
-    description: "Guards use of the FMQ channel for ADPF"
-    bug: "315894228"
-}
-
-flag {
-    name: "adpf_use_fmq_channel_fixed"
-    namespace: "game"
-    description: "Guards use of the FMQ channel for ADPF with a readonly flag"
-    is_fixed_read_only: true
-    bug: "315894228"
-}
-
-flag {
     name: "adpf_use_load_hints"
     namespace: "game"
     description: "Guards use of the ADPF public load hints behind a readonly flag"
@@ -239,6 +224,30 @@ flag {
 }
 
 flag {
+    name: "enable_angle_deny_list"
+    namespace: "gpu"
+    description: "Whether to use native driver for apps in the denylist"
+    bug: "434014731"
+}
+
+flag {
+    name: "enable_angle_for_games"
+    namespace: "gpu"
+    description: "Whether to use angle driver for games not in the denylist"
+    bug: "440630034"
+}
+
+flag {
+    name: "enforce_strict_file_mode_check"
+    namespace: "backstage_power"
+    description: "Throw an IllegalArgumentException if the file mode passed to ParcelFileDescriptor#parseMode is unknown."
+    bug: "414387646"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "get_private_space_settings"
     namespace: "profile_experiences"
     description: "Guards a new Private Profile API in LauncherApps"
@@ -357,10 +366,10 @@ flag {
 }
 
 flag {
-    name: "query_angle_choice_flag"
-    namespace: "gpu"
-    description: "Unconditionally querying ANGLE choice to fix a driver load malfunction"
-    bug: "408439360"
+    name: "parcel_string_cache_enabled"
+    namespace: "system_performance"
+    description: "Enable JNIStringCache in Parcel"
+    bug: "442140362"
 }
 
 flag {
@@ -417,6 +426,13 @@ flag {
      namespace: "system_performance"
      description: "Whether MessageQueue can use the new concurrent implementation in any process"
      bug: "418770969"
+}
+
+flag {
+    name: "use_query_angle_choice"
+    namespace: "gpu"
+    description: "Use new query for ANGLE choice"
+    bug: "408439360"
 }
 
 flag {

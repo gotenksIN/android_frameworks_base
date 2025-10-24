@@ -15,6 +15,7 @@
  */
 package com.android.internal.widget.remotecompose.player.platform;
 
+
 import android.annotation.NonNull;
 import android.content.Context;
 import android.hardware.Sensor;
@@ -87,7 +88,6 @@ public class SensorSupport {
     }
 
     private void registerListener() {
-        Sensor[] s = {mAcc, mGyro, mMag, mLight};
         if (mListener != null) {
             unregisterListener();
         }

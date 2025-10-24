@@ -20,14 +20,17 @@ import android.content.res.Configuration
 import android.content.testableContext
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
+import androidx.compose.ui.geometry.Rect
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.systemui.Flags.FLAG_NOTIFICATION_SHADE_BLUR
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
 import com.android.systemui.authentication.domain.interactor.AuthenticationResult
 import com.android.systemui.authentication.domain.interactor.authenticationInteractor
 import com.android.systemui.flags.EnableSceneContainer
+import com.android.systemui.keyguard.ui.transitions.blurConfig
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runCurrent
@@ -39,6 +42,7 @@ import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.se
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAwakeForTest
 import com.android.systemui.power.domain.interactor.powerInteractor
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
+import com.android.systemui.qs.panels.data.repository.qsPanelAppearanceRepository
 import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.domain.startable.sceneContainerStartable
@@ -179,36 +183,51 @@ class QuickSettingsShadeOverlayContentViewModelTest : SysuiTestCase() {
             underTest.onPanelShapeInWindowChanged(expected)
 
             assertThat(actual).isEqualTo(expected)
+            assertThat(kosmos.qsPanelAppearanceRepository.qsPanelShape.value).isEqualTo(expected)
 
             disposable.dispose()
         }
 
     @Test
-    fun showHeader_desktopFeatureSetDisabled_true() =
+    fun onShadeBoundsChanged_forwardsToShadeOverlayInteractor() =
         kosmos.runTest {
-            setEnableDesktopFeatureSet(false)
+            var shadeBounds: android.graphics.Rect? = null
+            shadeInteractor.addShadeOverlayBoundsListener { shadeBounds = it }
+            assertThat(shadeBounds).isNull()
+
+            val bounds = Rect(0f, 0f, 100f, 100f)
+            val expectedShadeBounds = android.graphics.Rect(0, 0, 100, 100)
+
+            underTest.onShadeOverlayBoundsChanged(bounds)
+            assertThat(shadeBounds).isEqualTo(expectedShadeBounds)
+        }
+
+    @Test
+    fun showHeader_desktopStatusBarDisabled_true() =
+        kosmos.runTest {
+            setUseDesktopStatusBar(false)
             assertThat(underTest.showHeader).isTrue()
         }
 
     @Test
     @EnableFlags(StatusBarForDesktop.FLAG_NAME)
-    fun showHeader_desktopFeatureSetEnabled_statusBarForDesktopEnabled_false() =
+    fun showHeader_desktopStatusBarEnabled_statusBarForDesktopEnabled_false() =
         kosmos.runTest {
-            setEnableDesktopFeatureSet(true)
+            setUseDesktopStatusBar(true)
             assertThat(underTest.showHeader).isFalse()
         }
 
     @Test
     @DisableFlags(StatusBarForDesktop.FLAG_NAME)
-    fun showHeader_desktopFeatureSetEnabled_statusBarForDesktopDisabled_true() =
+    fun showHeader_desktopStatusBarEnabled_statusBarForDesktopDisabled_true() =
         kosmos.runTest {
-            setEnableDesktopFeatureSet(true)
+            setUseDesktopStatusBar(true)
             assertThat(underTest.showHeader).isTrue()
         }
 
-    private fun Kosmos.setEnableDesktopFeatureSet(enable: Boolean) {
+    private fun Kosmos.setUseDesktopStatusBar(enable: Boolean) {
         testableContext.orCreateTestableResources.addOverride(
-            R.bool.config_enableDesktopFeatureSet,
+            R.bool.config_useDesktopStatusBar,
             enable,
         )
         configurationController.onConfigurationChanged(Configuration())
@@ -239,6 +258,63 @@ class QuickSettingsShadeOverlayContentViewModelTest : SysuiTestCase() {
             fakeWindowRootViewBlurRepository.isBlurSupported.value = false
 
             assertThat(underTest.isTransparencyEnabled).isFalse()
+        }
+
+    @Test
+    @EnableFlags(FLAG_NOTIFICATION_SHADE_BLUR)
+    fun calculateTargetBlurRadius() =
+        kosmos.runTest {
+            // Only bouncer shown: no blur.
+            fakeWindowRootViewBlurRepository.isBlurSupported.value = true
+            assertThat(
+                    underTest.calculateTargetBlurRadius(
+                        transitionState =
+                            TransitionState.Idle(
+                                currentScene = Scenes.Lockscreen,
+                                currentOverlays = setOf(Overlays.Bouncer),
+                            )
+                    )
+                )
+                .isEqualTo(0f)
+
+            // Quick Settings shade and bouncer shown: apply blur.
+            assertThat(
+                    underTest.calculateTargetBlurRadius(
+                        transitionState =
+                            TransitionState.Idle(
+                                currentScene = Scenes.Lockscreen,
+                                currentOverlays =
+                                    setOf(Overlays.Bouncer, Overlays.QuickSettingsShade),
+                            )
+                    )
+                )
+                .isEqualTo(blurConfig.maxBlurRadiusPx)
+
+            // No bouncer shown: no blur.
+            assertThat(
+                    underTest.calculateTargetBlurRadius(
+                        transitionState =
+                            TransitionState.Idle(
+                                currentScene = Scenes.Lockscreen,
+                                currentOverlays = setOf(Overlays.QuickSettingsShade),
+                            )
+                    )
+                )
+                .isEqualTo(0)
+
+            // Blur not supported: no blur.
+            fakeWindowRootViewBlurRepository.isBlurSupported.value = false
+            assertThat(
+                    underTest.calculateTargetBlurRadius(
+                        transitionState =
+                            TransitionState.Idle(
+                                currentScene = Scenes.Lockscreen,
+                                currentOverlays =
+                                    setOf(Overlays.Bouncer, Overlays.QuickSettingsShade),
+                            )
+                    )
+                )
+                .isEqualTo(0f)
         }
 
     private fun Kosmos.lockDevice() {

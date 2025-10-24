@@ -221,7 +221,7 @@
     <string name="network_logging_notification_title" msgid="554983187553845004">"Seade on hallatud"</string>
     <string name="network_logging_notification_text" msgid="1327373071132562512">"Teie organisatsioon haldab seda seadet ja võib jälgida võrguliiklust. Puudutage üksikasjade vaatamiseks."</string>
     <string name="location_changed_notification_title" msgid="3620158742816699316">"Rakendused pääsevad teie asukohale juurde"</string>
-    <string name="location_changed_notification_text" msgid="7158423339982706912">"Lisateabe saamiseks võtke ühendust IT-administraatoriga"</string>
+    <string name="location_changed_notification_text" msgid="7158423339982706912">"Lisateabe saamiseks võtke ühendust IT-administraatoriga."</string>
     <string name="geofencing_service" msgid="3826902410740315456">"Geotarastamise teenus"</string>
     <string name="country_detector" msgid="7023275114706088854">"Riigi tuvastaja"</string>
     <string name="location_service" msgid="2439187616018455546">"Asukohateenus"</string>
@@ -265,7 +265,7 @@
     <string name="shutdown_confirm" product="watch" msgid="2977299851200240146">"Teie kell lülitub välja."</string>
     <string name="shutdown_confirm" product="default" msgid="136816458966692315">"Teie telefon lülitub välja."</string>
     <string name="shutdown_confirm_question" msgid="796151167261608447">"Kas soovite välja lülitada?"</string>
-    <string name="reboot_safemode_title" msgid="5853949122655346734">"Ohutus režiimis taaskäivitamine"</string>
+    <string name="reboot_safemode_title" msgid="5853949122655346734">"Taaskäivitamine turvarežiimis"</string>
     <string name="reboot_safemode_confirm" msgid="1658357874737219624">"Kas soovite taaskäivitada ohutus režiimis? See keelab kõik installitud kolmandate osapoolte rakendused. Need taastatakse pärast uuesti taaskäivitamist."</string>
     <string name="recent_tasks_title" msgid="8183172372995396653">"Hiljutised"</string>
     <string name="no_recent_tasks" msgid="9063946524312275906">"Hiljutisi rakendusi pole."</string>
@@ -336,8 +336,8 @@
     <string name="managed_profile_label" msgid="7316778766973512382">"Lülitu tööprofiilile"</string>
     <string name="user_owner_app_label" msgid="1553595155465750298">"Lülita <xliff:g id="APP_NAME">%1$s</xliff:g> isiklikule profiilile"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Lülita <xliff:g id="APP_NAME">%1$s</xliff:g> tööprofiilile"</string>
-    <string name="permgrouplab_contacts" msgid="4254143639307316920">"Kontaktid"</string>
-    <string name="permgroupdesc_contacts" msgid="9163927941244182567">"juurdepääs kontaktidele"</string>
+    <string name="permgrouplab_contacts" msgid="7443702399615347952">"Kontaktid ja kontod"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"Selle loaga rakendused pääsevad juurde teie kontaktidele ja näevad loendit kontodest, mis saavad salvestada sellesse seadmesse kontakte."</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"Asukoht"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"Juurdepääs selle seadme asukohale"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Kalender"</string>
@@ -370,8 +370,8 @@
     <string name="permgroupdesc_xr_eye_sensitive" msgid="6050967250223079001">"täpne silmade liikumise jälgimine"</string>
     <string name="permgrouplab_xr_tracking" msgid="766634536453394700">"Liikumise ja ala andmed"</string>
     <string name="permgroupdesc_xr_tracking" msgid="812429788288001595">"silmade, näo ja keha jälgimine ning ala skannimine"</string>
-    <string name="permgrouplab_xr_tracking_sensitive" msgid="4346975608010051186">"Täpse pealiikumise ja ala andmed"</string>
-    <string name="permgroupdesc_xr_tracking_sensitive" msgid="7925014193164562556">"täpne pea jälgimine ja ala skannimine"</string>
+    <string name="permgrouplab_xr_tracking_sensitive" msgid="6574264227123545314">"Täpsed liikumise ja ala andmed"</string>
+    <string name="permgroupdesc_xr_tracking_sensitive" msgid="2480835734248509848">"skanni täpselt ala ja jälgi pead"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Akna sisu toomine"</string>
     <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Kasutatava akna sisu kontrollimine."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"Puudutusega sirvimise sisselülitamine"</string>
@@ -639,6 +639,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Võimaldab rakendusel määrata lähedalasuvate ülilairibaühendust kasutavate seadmete suhtelise kauguse üksteisest"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"Läheduses olevate WiFi-seadmetega suhtlemine"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Lubab rakendusel läheduses olevatele WiFi-seadmetele reklaamida, nendega ühenduse luua ja määrata nende suhteline asend"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"kohaliku võrgu seadmetele juurdepääs"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Võimaldab rakendusel kohaliku võrgu seadmetele juurde pääseda."</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"Määrata läheduses olevate seadmete suhtelise kauguse üksteisest."</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Võimaldab rakendusel määrata läheduses olevate seadmete suhtelise kauguse üksteisest"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Eelistatud NFC-makseteenuse teave"</string>
@@ -683,7 +685,7 @@
     <string name="permdesc_scene_understanding_coarse" msgid="847344305502345475">"Võimaldab rakendusel skannida teie ümbrust."</string>
     <string name="permlab_scene_understanding_fine" msgid="2899904960307462936">"täpne teid ümbritseva ala skannimine"</string>
     <string name="permdesc_scene_understanding_fine" msgid="4848943859506977588">"Võimaldab rakendusel täpselt skannida teie ümbrust."</string>
-    <string name="permlab_xr_tracking_in_background" msgid="8659516810430027774">"XR-i andmete taustal jälgimine"</string>
+    <string name="permlab_xr_tracking_in_background" msgid="1714941204255185460">"juurdepääs XR-i jälgimisele taustal"</string>
     <string name="permdesc_xr_tracking_in_background" msgid="3151744132692357005">"Võimaldab rakendusel pääseda juurde XR-i andmetele taustal."</string>
     <string name="permlab_capture_keyboard" msgid="4076894823382693032">"võtmete haldamine"</string>
     <string name="permdesc_capture_keyboard" msgid="4192269470684407219">"Võimaldab rakendusel hallata võtmeid enne, kui süsteem saab töödelda süsteemi otseteid ja toiminguid."</string>
@@ -1052,7 +1054,7 @@
     <string name="lockscreen_pattern_correct" msgid="8050630103651508582">"Õige."</string>
     <string name="lockscreen_pattern_wrong" msgid="2940138714468358458">"Proovige uuesti"</string>
     <string name="lockscreen_password_wrong" msgid="8605355913868947490">"Proovige uuesti"</string>
-    <string name="lockscreen_storage_locked" msgid="634993789186443380">"Ava kõigi funktsioonide ja andmete nägemiseks"</string>
+    <string name="lockscreen_storage_locked" msgid="634993789186443380">"Avage kõigi funktsioonide ja andmete nägemiseks"</string>
     <string name="faceunlock_multiple_failures" msgid="681991538434031708">"Maksimaalne näoga avamise katsete arv on ületatud"</string>
     <string name="lockscreen_missing_sim_message_short" msgid="1229301273156907613">"SIM-i pole"</string>
     <string name="lockscreen_missing_sim_message" product="tablet" msgid="3986843848305639161">"Tahvelarvutis pole SIM-i."</string>
@@ -1128,7 +1130,7 @@
     <string name="keyguard_accessibility_sim_pin_unlock" msgid="4895939120871890557">"SIM-kaardi PIN-koodiga avamine."</string>
     <string name="keyguard_accessibility_sim_puk_unlock" msgid="3459003464041899101">"SIM-kaardi PUK-koodiga avamine."</string>
     <string name="keyguard_accessibility_password_unlock" msgid="6130186108581153265">"Parooliga avamine."</string>
-    <string name="keyguard_accessibility_secure_lock_device_biometric_unlock" msgid="1884638289137214044">"Biomeetriaga avamine turvalukuseadme jaoks."</string>
+    <string name="keyguard_accessibility_secure_lock_device_biometric_unlock" msgid="1884638289137214044">"Turvalukuseadme avamine biomeetriaga."</string>
     <string name="keyguard_accessibility_pattern_area" msgid="1419570880512350689">"Mustri ala."</string>
     <string name="keyguard_accessibility_slide_area" msgid="4331399051142520176">"Lohistamisala."</string>
     <string name="password_keyboard_label_symbol_key" msgid="2716255580853511949">"?123"</string>
@@ -1984,8 +1986,10 @@
     <string name="package_updated_device_owner" msgid="7770195449213776218">"Värskendas teie administraator.\nAntud õiguste vaatamiseks avage seaded"</string>
     <string name="package_deleted_device_owner" msgid="2292335928930293023">"Administraator on selle kustutanud"</string>
     <string name="confirm_battery_saver" msgid="5247976246208245754">"OK"</string>
-    <string name="battery_saver_description_with_learn_more" msgid="5444908404021316250">"Akusäästja lülitab sisse tumeda teema ja lülitab välja taustategevused, mõned visuaalsed efektid, teatud funktsioonid ja võrguühendused või piirab neid."</string>
-    <string name="battery_saver_description" msgid="8518809702138617167">"Akusäästja lülitab sisse tumeda teema ja lülitab välja taustategevused, mõned visuaalsed efektid, teatud funktsioonid ja võrguühendused või piirab neid."</string>
+    <!-- no translation found for battery_saver_description_with_learn_more (8969945879044849461) -->
+    <skip />
+    <!-- no translation found for battery_saver_description (2820475140307374570) -->
+    <skip />
     <string name="data_saver_description" msgid="4995164271550590517">"Andmekasutuse vähendamiseks keelab andmemahu säästja mõne rakenduse puhul andmete taustal saatmise ja vastuvõtmise. Rakendus, mida praegu kasutate, pääseb andmesidele juurde, kuid võib seda teha väiksema sagedusega. Seetõttu võidakse näiteks pildid kuvada alles siis, kui neid puudutate."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"Lülitada andmemahu säästja sisse?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"Lülita sisse"</string>
@@ -2047,12 +2051,9 @@
     <string name="maximize_button_text" msgid="4258922519914732645">"Maksimeeri"</string>
     <string name="close_button_text" msgid="10603510034455258">"Sule"</string>
     <string name="notification_messaging_title_template" msgid="772857526770251989">"<xliff:g id="CONVERSATION_TITLE">%1$s</xliff:g>: <xliff:g id="SENDER_NAME">%2$s</xliff:g>"</string>
-    <!-- no translation found for notification_metric_label_unit (309618413505128451) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_unit_separator (5631839566551764472) -->
-    <skip />
-    <!-- no translation found for notification_metric_label_separator (8416027475779515033) -->
-    <skip />
+    <string name="notification_metric_label_unit" msgid="309618413505128451">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>)"</string>
+    <string name="notification_metric_label_unit_separator" msgid="5631839566551764472">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g> (<xliff:g id="METRIC_UNIT">%2$s</xliff:g>):"</string>
+    <string name="notification_metric_label_separator" msgid="8416027475779515033">"<xliff:g id="METRIC_LABEL">%1$s</xliff:g>:"</string>
     <string name="call_notification_answer_action" msgid="5999246836247132937">"Vasta"</string>
     <string name="call_notification_answer_video_action" msgid="2086030940195382249">"Video"</string>
     <string name="call_notification_decline_action" msgid="3700345945214000726">"Keeldu"</string>
@@ -2090,7 +2091,7 @@
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Hädaolukord"</string>
     <string name="set_up_screen_lock_title" msgid="8346083801616474030">"Seadistage ekraanilukk"</string>
     <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"Seadistage ekraanilukk"</string>
-    <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Seadistage oma privaatse ruumi jaoks seadmele ekraanilukk"</string>
+    <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Seadistage oma privaatse ruumi jaoks seadmele ekraanilukk."</string>
     <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"Privaatse ruumi kustutamiseks määrake selles seadmes ekraanilukk"</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"Rakendus ei ole saadaval"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"<xliff:g id="APP_NAME">%1$s</xliff:g> ei ole praegu saadaval."</string>
@@ -2580,33 +2581,22 @@
     <string name="keyboard_shortcut_group_applications" msgid="3010389163951364798">"Rakendused"</string>
     <string name="fingerprint_loe_notification_msg" msgid="3927447270148854546">"Teie sõrmejälgi ei saa enam tuvastada. Seadistage sõrmejäljega avamine uuesti."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Turvalisus ja privaatsus"</string>
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_title (3711633462195368964) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_notification_title (2426356396215833585) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_replug_notification_text (3936428118409384816) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_data_notification_text (8392199274984083972) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_notification_text (6563939109526112446) -->
-    <skip />
-    <!-- no translation found for usb_apm_usb_plugged_in_when_locked_charge_data_notification_text (411509882563364946) -->
-    <skip />
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"Avage ekraanikuva ja ühendage USB uuesti."</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"USB-ga ühendamiseks avage ekraanikuva"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"USB-ühenduse loomiseks nõuab täiustatud kaitse ekraanikuva avamist."</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"USB-ühenduse loomiseks nõuab täiustatud kaitse ekraanikuva avamist."</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"Kiiremaks laadimiseks nõuab täiustatud kaitse ekraanikuva avamist."</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"Kiiremaks laadimiseks või USB-ühenduse loomiseks nõuab täiustatud kaitse ekraanikuva avamist."</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Vaigista"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Märguanded on vaigistatud"</string>
-    <!-- no translation found for usb_apm_usb_notification_silenced_text (8394777105856033342) -->
-    <skip />
+    <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Te ei saa täiustatud kaitse USB märguandeid enne, kui seadme taaskäivitate."</string>
     <string name="usb_apm_usb_suspicious_activity_notification_title" msgid="3461195995882871461">"Kahtlane tegevus USB-ga"</string>
-    <!-- no translation found for usb_apm_usb_suspicious_activity_notification_text (5772698072220844779) -->
-    <skip />
+    <string name="usb_apm_usb_suspicious_activity_notification_text" msgid="5772698072220844779">"USB andmesignaal on keelatud."</string>
     <string name="fingerprint_frr_notification_title" msgid="3668331918920659093">"Kas teil on sõrmejäljega avamisega probleeme?"</string>
     <string name="fingerprint_frr_notification_msg" msgid="2162966846624639252">"Puudutage, et vaadata üle nõuanded lukust avamise kogemuse täiustamiseks"</string>
     <string name="no_blink_accessibility_text_cursor_blink_label" msgid="223072797385428874">"Vilkumise keelamine"</string>
     <string name="long_press_power_to_turn_off_tv_toast" msgid="2231397748028498986">"Teleri väljalülitamiseks vajutage pikalt toitenuppu"</string>
-    <!-- no translation found for tv_watchdog_notification_channel_name (4936803270000103737) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_title (195239206215922517) -->
-    <skip />
-    <!-- no translation found for tv_watchdog_notification_content (6444873431710133936) -->
-    <skip />
+    <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Süsteemiressursside hoiatused"</string>
+    <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Liigne ressursikasutus"</string>
+    <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Rakendus <xliff:g id="APP_NAME">%1$s</xliff:g> kasutab liiga palju ressursse."</string>
 </resources>

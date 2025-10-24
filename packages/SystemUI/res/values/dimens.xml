@@ -144,8 +144,8 @@
     <dimen name="status_bar_bottom_aligned_margin_rotation_180">-1px</dimen>
     <dimen name="status_bar_bottom_aligned_margin_rotation_270">-1px</dimen>
 
-    <!-- Height of the system icons container view in the status bar -->
-    <dimen name="status_bar_system_icons_height">@dimen/status_bar_icon_size_sp</dimen>
+    <!-- Height of the icon container views in the status bar -->
+    <dimen name="status_bar_icon_container_height">@dimen/status_bar_icon_size_sp</dimen>
 
     <!-- New sp height of notification icons in the status bar -->
     <dimen name="status_bar_icon_size_sp">@*android:dimen/status_bar_icon_size_sp</dimen>
@@ -407,6 +407,9 @@
     <!-- Extra space for guts bundle feedback button -->
     <dimen name="notification_guts_bundle_feedback_size">48dp</dimen>
 
+    <!-- The height of notification bundle headers -->
+    <dimen name="notification_bundle_header_height">48dp</dimen>
+
     <!-- Size of icon buttons in notification info. -->
     <!-- 24dp for the icon itself + 16dp * 2 for top and bottom padding -->
     <dimen name="notification_2025_guts_button_size">56dp</dimen>
@@ -465,6 +468,11 @@
     <!-- the padding on the top of the statusbar (usually 0) -->
     <dimen name="status_bar_padding_top">0dp</dimen>
 
+    <!-- The padding used in case there are no rounded corners. -->
+    <dimen name="status_bar_padding_without_rounded_corners">
+        @dimen/ongoing_appops_dot_min_padding
+    </dimen>
+
     <!-- the radius of the overflow dot in the status bar -->
     <dimen name="overflow_dot_radius">2sp</dimen>
 
@@ -521,9 +529,6 @@
     <!-- some constraints use a negative margin. must be aligned with overlay_border_width, above;
          overlay_border_width_neg = overlay_border_width * -1 -->
     <dimen name="overlay_border_width_neg">-4dp</dimen>
-    <dimen name="overlay_shade_panel_shape_radius">
-        @dimen/aux_spacing_overlay_panel_shape_radius
-    </dimen>
 
     <dimen name="clipboard_preview_size">@dimen/overlay_x_scale</dimen>
     <dimen name="clipboard_overlay_min_font">10sp</dimen>
@@ -588,6 +593,14 @@
 
     <dimen name="notifications_unseen_footer_icon_size">16dp</dimen>
 
+    <!-- The size of the icon shown in the shade when there are no notifications -->
+    <dimen name="empty_shade_icon_size">32dp</dimen>
+    <!-- The spacing between the icon and the text shown in the shade when there are no
+         notifications. -->
+    <dimen name="empty_shade_icon_bottom_margin">16dp</dimen>
+    <dimen name="empty_shade_vertical_padding">32dp</dimen>
+    <dimen name="empty_shade_horizontal_padding">16dp</dimen>
+
     <!-- Height of the status bar header bar when on Keyguard -->
     <dimen name="status_bar_header_height_keyguard">@dimen/status_bar_height</dimen>
 
@@ -631,19 +644,6 @@
     <dimen name="shelf_and_lock_icon_overlap">@dimen/notification_shelf_height</dimen>
 
     <dimen name="notification_panel_margin_horizontal">0dp</dimen>
-
-    <!--
-    The width of the shade overlay panel (both notifications and quick settings). On Compact screens
-    in portrait orientation (< w600dp) this is ignored, and the shade layout takes up the full
-    screen width.
-    -->
-    <dimen name="shade_panel_width">412dp</dimen>
-
-    <!--
-    The horizontal distance between the shade overlay panel (both notifications and quick settings)
-    and the edge of the screen. This is zero only on Compact screens (< sw600dp).
-    -->
-    <dimen name="shade_panel_margin_horizontal">0dp</dimen>
 
     <dimen name="brightness_mirror_height">48dp</dimen>
 
@@ -1293,6 +1293,7 @@
 
     <!-- Biometric Auth Credential values -->
     <dimen name="biometric_auth_icon_size">48dp</dimen>
+    <dimen name="biometric_auth_back_button_size">40dp</dimen>
 
     <!-- Biometric Auth pattern view size, better to align keyguard_security_width -->
     <dimen name="biometric_auth_pattern_view_size">348dp</dimen>
@@ -1385,6 +1386,7 @@
     <dimen name="qs_media_action_play_pause_width">72dp</dimen>
     <dimen name="qs_seamless_height">24dp</dimen>
     <dimen name="qs_seamless_icon_size">12dp</dimen>
+    <dimen name="qs_media_button_stroke_width">1dp</dimen>
     <dimen name="qs_media_disabled_seekbar_height">1dp</dimen>
     <dimen name="qs_media_enabled_seekbar_height">2dp</dimen>
     <dimen name="qs_media_app_icon_size">24dp</dimen>
@@ -1398,7 +1400,6 @@
     <dimen name="qs_media_seekbar_progress_amplitude">1.5dp</dimen>
     <dimen name="qs_media_seekbar_progress_phase">8dp</dimen>
     <dimen name="qs_media_seekbar_progress_stroke_width">2dp</dimen>
-    <dimen name="qs_media_session_collapsed_legacy_guideline">144dp</dimen>
     <dimen name="qs_media_session_collapsed_guideline">168dp</dimen>
     <dimen name="qs_media_session_collapsed_guideline_with_arrows">216dp</dimen>
 
@@ -1635,6 +1636,7 @@
     <dimen name="media_output_item_icon_padding">12dp</dimen>
     <dimen name="media_output_item_expand_icon_width">28dp</dimen>
     <dimen name="media_output_item_expand_icon_height">20dp</dimen>
+    <item name="media_output_item_disabled_alpha" format="float" type="dimen">0.6</item>
 
     <!-- Distance that the full shade transition takes in order to complete by tapping on a button
          like "expand". -->
@@ -1967,9 +1969,6 @@
     <!-- Hearing devices dialog related dimensions -->
     <dimen name="hearing_devices_layout_margin">12dp</dimen>
     <dimen name="hearing_devices_small_title_padding_horizontal">16dp</dimen>
-    <dimen name="hearing_devices_preset_spinner_padding">22dp</dimen>
-    <dimen name="hearing_devices_preset_spinner_icon_size">24dp</dimen>
-    <dimen name="hearing_devices_preset_spinner_background_radius">28dp</dimen>
     <dimen name="hearing_devices_tool_icon_size">28dp</dimen>
 
     <!-- Height percentage of the parent container occupied by the communal view -->
@@ -2284,13 +2283,6 @@
     <!-- rear_display_animation_width_opened - 2 * rear_display_dialog_slider_corner_radius -->
     <dimen name="rear_display_progress_width">231dp</dimen>
     <!-- Rear display mode end -->
-
-    <!-- Spacing attributes to overwrite -->
-    <dimen name="aux_spacing_overlay_panel_shape_radius">46dp</dimen>
-    <dimen name="overlay_qs_layout_brightness_thumb_height">52dp</dimen>
-    <dimen name="overlay_qs_layout_brightness_thumb_width">4dp</dimen>
-    <dimen name="overlay_qs_layout_brightness_track_height">40dp</dimen>
-    <!-- Spacing attributes to overwrite end -->
 
     <!-- Tile Details start-->
     <dimen name="tile_details_toggle_row_height">48dp</dimen>

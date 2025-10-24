@@ -756,9 +756,7 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
     int createSessionInternal(SessionParams params, String installerPackageName,
             String installerAttributionTag, int callingUid, int userId)
             throws IOException {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(90);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         final Computer snapshot = mPm.snapshotComputer();
         snapshot.enforceCrossUserPermission(callingUid, userId, true, true, "createSession");
 
@@ -2143,6 +2141,11 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             resultsList.add(results[i]);
         }
         mDeveloperVerifierController.addExperiment(packageName, verificationPolicy, resultsList);
+    }
+
+    @Override
+    public void clearDeveloperVerificationExperiment(String packageName) {
+        mDeveloperVerifierController.clearExperiment(packageName);
     }
 
     void onUserAdded(int userId) {

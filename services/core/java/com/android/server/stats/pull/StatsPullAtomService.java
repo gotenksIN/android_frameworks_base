@@ -50,6 +50,8 @@ import static android.telephony.TelephonyManager.UNKNOWN_CARRIER_ID;
 import static android.util.MathUtils.constrain;
 import static android.view.Display.HdrCapabilities.HDR_TYPE_INVALID;
 
+import static com.android.internal.os.MemcgProcMemoryUtil.readHighWaterMarkMemorySnapshot;
+import static com.android.internal.os.MemcgProcMemoryUtil.readMemcgMemorySnapshot;
 import static com.android.internal.os.ProcfsMemoryUtil.DmaBufType;
 import static com.android.internal.os.ProcfsMemoryUtil.getProcessCmdlines;
 import static com.android.internal.os.ProcfsMemoryUtil.readCmdlineFromProcfs;
@@ -76,6 +78,7 @@ import static com.android.internal.util.FrameworkStatsLog.TIME_ZONE_DETECTOR_STA
 import static com.android.internal.util.FrameworkStatsLog.TIME_ZONE_DETECTOR_STATE__DETECTION_MODE__TELEPHONY;
 import static com.android.internal.util.FrameworkStatsLog.TIME_ZONE_DETECTOR_STATE__DETECTION_MODE__UNKNOWN;
 import static com.android.server.stats.Flags.addMobileBytesTransferByProcStatePuller;
+import static com.android.server.stats.Flags.addMemcgMemoryInformationPuller;
 import static com.android.server.stats.pull.IonMemoryUtil.readProcessSystemIonHeapSizesFromDebugfs;
 import static com.android.server.stats.pull.IonMemoryUtil.readSystemIonHeapSizeFromDebugfs;
 import static com.android.server.stats.pull.netstats.NetworkStatsUtils.fromPublicNetworkStats;
@@ -213,6 +216,8 @@ import com.android.internal.os.KernelCpuUidTimeReader.KernelCpuUidClusterTimeRea
 import com.android.internal.os.KernelCpuUidTimeReader.KernelCpuUidFreqTimeReader;
 import com.android.internal.os.KernelCpuUidTimeReader.KernelCpuUidUserSysTimeReader;
 import com.android.internal.os.LooperStats;
+import com.android.internal.os.MemcgProcMemoryUtil.MemcgHighWaterMarkMemorySnapshot;
+import com.android.internal.os.MemcgProcMemoryUtil.MemcgMemorySnapshot;
 import com.android.internal.os.PowerProfile;
 import com.android.internal.os.ProcessCpuTracker;
 import com.android.internal.os.ProcfsMemoryUtil;
@@ -227,7 +232,6 @@ import com.android.server.LocalManagerRegistry;
 import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.SystemServiceManager;
-import com.android.server.am.MemoryStatUtil.MemoryStat;
 import com.android.server.health.HealthServiceWrapper;
 import com.android.server.notification.NotificationManagerService;
 import com.android.server.pinner.PinnerService;
@@ -468,6 +472,10 @@ public class StatsPullAtomService extends SystemService {
      */
     public static final boolean ENABLE_MOBILE_DATA_STATS_AGGREGATED_PULLER =
                 addMobileBytesTransferByProcStatePuller();
+
+    public static final boolean ENABLE_MEMCG_STATS_PULLER =
+                addMemcgMemoryInformationPuller();
+
     private static final ArrayMap<String, Integer> mPreviousThermalThrottlingStatus =
             new ArrayMap<>();
     // Puller locks
@@ -853,6 +861,10 @@ public class StatsPullAtomService extends SystemService {
                         return pullCachedAppsHighWatermark(atomTag, data);
                     case FrameworkStatsLog.PRESSURE_STALL_INFORMATION:
                         return pullPressureStallInformation(atomTag, data);
+                    case FrameworkStatsLog.MEMCG_MEMORY_SNAPSHOT:
+                        return pullMemcgProcessMemoryInformation(atomTag, data);
+                    case FrameworkStatsLog.MEMCG_MEMORY_HIGH_WATER_MARK_SNAPSHOT:
+                        return pullMemcgProcessHighMemoryHighWatermark(atomTag, data);
                     default:
                         throw new UnsupportedOperationException("Unknown tagId=" + atomTag);
                 }
@@ -1053,6 +1065,10 @@ public class StatsPullAtomService extends SystemService {
         registerCachedAppsHighWatermarkPuller();
         registerPressureStallInformation();
         registerBatteryLife();
+        if (ENABLE_MEMCG_STATS_PULLER) {
+            registerMemcgInformation();
+            registerMemcgMemoryHighWaterMark();
+        }
     }
 
     private void initMobileDataStatsPuller() {
@@ -5230,6 +5246,71 @@ public class StatsPullAtomService extends SystemService {
                     psiData.getFullAvg60SecPercentage(),
                     psiData.getFullAvg300SecPercentage(),
                     psiData.getFullTotalUsec()));
+        }
+        return StatsManager.PULL_SUCCESS;
+    }
+
+    private void registerMemcgInformation() {
+        int tagId = FrameworkStatsLog.MEMCG_MEMORY_SNAPSHOT;
+        mStatsManager.setPullAtomCallback(
+                tagId,
+                new PullAtomMetadata.Builder()
+                        .setCoolDownMillis(MILLIS_PER_SEC)
+                        .build(),
+                DIRECT_EXECUTOR,
+                mStatsCallbackImpl
+        );
+    }
+
+    private void registerMemcgMemoryHighWaterMark() {
+        int tagId = FrameworkStatsLog.MEMCG_MEMORY_HIGH_WATER_MARK_SNAPSHOT;
+        mStatsManager.setPullAtomCallback(
+                tagId,
+                new PullAtomMetadata.Builder()
+                        .setCoolDownMillis(MILLIS_PER_SEC)
+                        .build(),
+                DIRECT_EXECUTOR,
+                mStatsCallbackImpl
+        );
+    }
+
+    int pullMemcgProcessMemoryInformation(int atomTag, List<StatsEvent> pulledData) {
+        List<ProcessMemoryState> managedProcessList =
+                LocalServices.getService(ActivityManagerInternal.class)
+                        .getMemoryStateForProcesses();
+        for (ProcessMemoryState managedProcess : managedProcessList) {
+            final MemcgMemorySnapshot snapshot = readMemcgMemorySnapshot(managedProcess.pid);
+            if (snapshot == null) {
+                continue;
+            }
+            pulledData.add(FrameworkStatsLog.buildStatsEvent(
+                    atomTag,
+                    managedProcess.uid,
+                    managedProcess.processName,
+                    snapshot.memcgMemoryInBytes / 1024,
+                    snapshot.memcgSwapMemoryInBytes / 1024
+            ));
+        }
+        return StatsManager.PULL_SUCCESS;
+    }
+
+    int pullMemcgProcessHighMemoryHighWatermark(int atomTag, List<StatsEvent> pulledData) {
+        List<ProcessMemoryState> managedProcessList =
+                LocalServices.getService(ActivityManagerInternal.class)
+                        .getMemoryStateForProcesses();
+        for (ProcessMemoryState managedProcess : managedProcessList) {
+            final MemcgHighWaterMarkMemorySnapshot snapshot =
+                    readHighWaterMarkMemorySnapshot(managedProcess.pid);
+            if (snapshot == null) {
+                continue;
+            }
+            pulledData.add(FrameworkStatsLog.buildStatsEvent(
+                    atomTag,
+                    managedProcess.uid,
+                    managedProcess.processName,
+                    snapshot.memcgMemoryPeakInBytes / 1024,
+                    snapshot.memcgSwapMemoryPeakInBytes / 1024
+            ));
         }
         return StatsManager.PULL_SUCCESS;
     }

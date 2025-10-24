@@ -33,7 +33,9 @@ import java.util.function.Supplier;
 
 /**
  * Utility class to read the flags used in the display manager server.
+ * @deprecated use {@link Flags} directly, see b/440342129
  */
+@Deprecated
 public class DisplayManagerFlags {
     private static final String TAG = "DisplayManagerFlags";
 
@@ -225,11 +227,6 @@ public class DisplayManagerFlags {
             Flags::hdrBrightnessSetting
     );
 
-    private final FlagState mDispatchDisplayModeWithVsyncOffsets = new FlagState(
-            Flags.FLAG_ENABLE_ON_MODE_CHANGED_VSYNC_PHASE_OFFSET,
-            Flags::enableOnModeChangedVsyncPhaseOffset
-    );
-
     private final FlagState mEnableDefaultDisplayInTopologySwitch = new FlagState(
             Flags.FLAG_ENABLE_DEFAULT_DISPLAY_IN_TOPOLOGY_SWITCH,
             DesktopExperienceFlags.ENABLE_DEFAULT_DISPLAY_IN_TOPOLOGY_SWITCH::isTrue
@@ -257,6 +254,11 @@ public class DisplayManagerFlags {
     private final FlagState mIsMinmodeCapBrightnessEnabled = new FlagState(
             Flags.FLAG_MINMODE_CAP_BRIGHTNESS_ENABLED,
             Flags::minmodeCapBrightnessEnabled
+    );
+
+    private final FlagState mSyntheticModesV2 = new FlagState(
+            Flags.FLAG_ENABLE_SYNTHETIC_MODES_V2,
+            Flags::enableSyntheticModesV2
     );
 
     private final FlagState mIsSingleAppEventForModeAndFrameRateOverrideEnabled = new FlagState(
@@ -490,10 +492,6 @@ public class DisplayManagerFlags {
         return mHdrBrightnessSetting.isEnabled();
     }
 
-    public boolean isDispatchDisplayModeWithVsyncOffsetsEnabled() {
-        return mDispatchDisplayModeWithVsyncOffsets.isEnabled();
-    }
-
     public boolean isDefaultDisplayInTopologySwitchEnabled() {
         return mEnableDefaultDisplayInTopologySwitch.isEnabled();
     }
@@ -519,6 +517,10 @@ public class DisplayManagerFlags {
 
     public boolean isMinmodeCapBrightnessEnabled() {
         return mIsMinmodeCapBrightnessEnabled.isEnabled();
+    }
+
+    public boolean isSyntheticModesV2Enabled() {
+        return mSyntheticModesV2.isEnabled();
     }
 
     public boolean isSingleAppEventForModeAndFrameRateOverrideEnabled() {
@@ -578,7 +580,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mSetBrightnessByUnit);
         pw.println(" " + mDelayImplicitRrRegistrationUntilRrAccessed);
         pw.println(" " + mHdrBrightnessSetting);
-        pw.println(" " + mDispatchDisplayModeWithVsyncOffsets);
         pw.println(" " + mEnableDefaultDisplayInTopologySwitch);
         pw.println(" " + mModeSwitchWithoutSaving);
         pw.println(" " + mEnsureColorFadeWhenTurningOn);
@@ -586,6 +587,7 @@ public class DisplayManagerFlags {
         pw.println(" " + mEnableUpdatedDisplayConnectionDialogFlagState);
         pw.println(" " + mIsLoggingForDisplayEventsEnabled);
         pw.println(" " + mIsMinmodeCapBrightnessEnabled);
+        pw.println(" " + mSyntheticModesV2);
         pw.println(" " + mIsSingleAppEventForModeAndFrameRateOverrideEnabled);
         pw.println(" " + mIsDisplayMirrorInLockTaskModeEnabled);
         pw.println(" " + mIsSizeOverrideForExternalDisplaysEnabled);

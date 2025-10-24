@@ -35,6 +35,7 @@ import static android.view.IWindowManager.FIXED_TO_USER_ROTATION_IF_NO_AUTO_ROTA
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.any;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.anyBoolean;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.anyInt;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.anyString;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.atLeast;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.atMost;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
@@ -53,7 +54,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.never;
 
 import android.app.WindowConfiguration;
 import android.content.ContentResolver;
@@ -249,9 +249,11 @@ public class DisplayRotationTests {
 
         freezeRotation(Surface.ROTATION_180);
 
-        verify(mockDeviceStateAutoRotateSettingController,
-                times(1)).requestAccelerometerRotationSettingChange(eq(false),
-                eq(Surface.ROTATION_180));
+        verify(mockDeviceStateAutoRotateSettingController, times(1))
+                .requestAccelerometerRotationSettingChange(
+                        /* autoRotate= */ eq(false),
+                        /* userRotation= */ eq(Surface.ROTATION_180),
+                        /* caller= */ anyString());
     }
 
     @Test
@@ -265,9 +267,11 @@ public class DisplayRotationTests {
 
         thawRotation();
 
-        verify(mockDeviceStateAutoRotateSettingController,
-                times(1)).requestAccelerometerRotationSettingChange(eq(true),
-                anyInt());
+        verify(mockDeviceStateAutoRotateSettingController, times(1))
+                .requestAccelerometerRotationSettingChange(
+                        /* autoRotate= */ eq(true),
+                        /* userRotation= */ anyInt(),
+                        /* caller= */ anyString());
     }
 
     @Test
@@ -282,9 +286,11 @@ public class DisplayRotationTests {
 
         freezeRotation(DisplayRotation.USE_CURRENT_ROTATION);
 
-        verify(mockDeviceStateAutoRotateSettingController,
-                times(1)).requestAccelerometerRotationSettingChange(eq(false),
-                eq(Surface.ROTATION_90));
+        verify(mockDeviceStateAutoRotateSettingController, times(1))
+                .requestAccelerometerRotationSettingChange(
+                        /* autoRotate= */ eq(false),
+                        /* userRotation= */ eq(Surface.ROTATION_90),
+                        /* caller= */ anyString());
     }
 
     @Test
@@ -1162,20 +1168,6 @@ public class DisplayRotationTests {
     }
 
     @Test
-    public void testHalfFoldOverrideDisabled_halfFolded_rotationOverrideIsNotApplied() throws Exception {
-        mBuilder.setSupportHalfFoldAutoRotateOverride(false);
-        mBuilder.build();
-        configureDisplayRotation(SCREEN_ORIENTATION_LANDSCAPE, false, false);
-        enableOrientationSensor();
-        mTarget.foldStateChanged(DeviceStateController.DeviceStateEnum.OPEN);
-        freezeRotation(Surface.ROTATION_270);
-
-        mTarget.foldStateChanged(DeviceStateController.DeviceStateEnum.HALF_FOLDED);
-
-        verify(mMockDisplayRotationReversionController, never()).beforeOverrideApplied(anyInt());
-    }
-
-    @Test
     public void sensorRotation_locked_halfFolded_configOff_rotationUnchanged() throws Exception {
         mBuilder.setIsFoldable(true);
         mBuilder.setSupportHalfFoldAutoRotateOverride(false);
@@ -1197,7 +1189,7 @@ public class DisplayRotationTests {
         // ... half-fold -> still no rotation
         mTarget.foldStateChanged(DeviceStateController.DeviceStateEnum.HALF_FOLDED);
         assertTrue(waitForUiHandler());
-        verify(sMockWm, never()).updateRotation(false, false);
+        verify(sMockWm).updateRotation(false, false);
         assertTrue(waitForUiHandler());
         assertEquals(Surface.ROTATION_270, mTarget.rotationForOrientation(
                 SCREEN_ORIENTATION_UNSPECIFIED, Surface.ROTATION_0));

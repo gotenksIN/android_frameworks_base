@@ -249,6 +249,7 @@ java_library {
         "android.system.suspend.control.internal-java",
         "devicepolicyprotosnano",
         "ImmutabilityAnnotation",
+        "DevicePolicyAnnotation",
 
         "com.android.sysprop.localization",
         "PlatformProperties",
@@ -369,6 +370,7 @@ java_defaults {
         "staledataclass-annotation-processor",
         "error_prone_android_framework",
         "systemfeatures-metadata-processor",
+        "DevicePolicyAnnotationProcessor",
     ],
     // Exports needed for staledataclass-annotation-processor, see b/139342589.
     javacflags: [
@@ -444,6 +446,7 @@ java_library {
     name: "framework-non-updatable-unbundled-impl-libs",
     static_libs: [
         "framework-location.impl",
+        "framework-network-security-config.impl",
         "framework-virtualization.impl",
     ] + select(soong_config_variable("ANDROID", "release_crashrecovery_module"), {
         "true": [],
@@ -500,8 +503,11 @@ java_library {
         "//frameworks/base:__subpackages__",
         "//packages/modules/NeuralNetworks:__subpackages__",
         // TODO(b/429127828): Clean this up along with RELEASE_TELEPHONY_MODULE
-        "//packages/modules/Telephony/framework:__subpackages__",
+        "//packages/modules/Telephony:__subpackages__",
         "//packages/modules/Virtualization:__subpackages__",
+    ],
+    libs: [
+        "framework-network-security-config.stubs.module_lib",
     ],
     compile_dex: false,
     headers_only: true,
@@ -589,6 +595,7 @@ java_library {
         "framework-minus-apex",
         "framework-platform-compat-config",
         "framework-location-compat-config",
+        "framework-network-security-config-compat-config",
         "services-platform-compat-config",
         "icu4j-platform-compat-config",
         "TeleService-platform-compat-config",

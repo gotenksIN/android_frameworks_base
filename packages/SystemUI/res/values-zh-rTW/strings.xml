@@ -21,8 +21,10 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="app_label" msgid="4811759950673118541">"系統 UI"</string>
     <string name="battery_low_title" msgid="5319680173344341779">"要開啟省電模式嗎？"</string>
-    <string name="battery_low_description" msgid="3282977755476423966">"電池電量還剩 <xliff:g id="PERCENTAGE">%s</xliff:g>。省電模式會開啟深色主題、限制背景活動，並延遲顯示通知。"</string>
-    <string name="battery_low_intro" msgid="5148725009653088790">"省電模式會開啟深色主題、限制背景活動，並延遲顯示通知。"</string>
+    <!-- no translation found for battery_low_description (7848989602036547056) -->
+    <skip />
+    <!-- no translation found for battery_low_intro (8033783734931200690) -->
+    <skip />
     <string name="battery_low_percent_format" msgid="4276661262843170964">"僅剩 <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
     <string name="invalid_charger_title" msgid="938685362320735167">"無法透過 USB 充電"</string>
     <string name="invalid_charger_text" msgid="2339310107232691577">"使用裝置隨附的充電器"</string>
@@ -138,36 +140,57 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"目前正在錄製整個螢幕的畫面"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"目前正在錄製「<xliff:g id="APP_NAME">%1$s</xliff:g>」的畫面"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"停止錄製"</string>
+    <string name="screen_record_entire_screen" msgid="66944996337928170">"整個畫面"</string>
+    <string name="screen_record_single_app" msgid="7355880948574569290">"單一應用程式"</string>
+    <string name="screen_record_single_app_hint" msgid="8404332826093639170">"要錄製畫面的應用程式"</string>
+    <string name="screen_record_single_app_no_recents" msgid="1023249803854209330">"單一應用程式 (開啟應用程式即可選擇)"</string>
     <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"錄製裝置音訊"</string>
     <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"錄製麥克風音訊"</string>
+    <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"顯示自拍鏡頭"</string>
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"顯示觸控操作過程"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"選擇要錄製的應用程式"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"影片已儲存"</string>
+    <!-- no translation found for screen_record_video_deleted (30786214839944540) -->
+    <skip />
+    <string name="screen_record_undo" msgid="7942716736019800870">"復原"</string>
     <string name="screen_record_retake" msgid="3846643688365398450">"重錄"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"編輯"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"刪除"</string>
-    <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"拍攝整個畫面的螢幕截圖"</string>
-    <string name="screen_capture_region_selection_button" msgid="515608875142444130">"拍攝所選區域的螢幕截圖"</string>
-    <!-- no translation found for screen_capture_record_region_selection_button (3699353194755563053) -->
+    <!-- no translation found for screen_record_delete_dialog_title (5868561491974057044) -->
     <skip />
+    <!-- no translation found for screen_record_delete_dialog_content (2610040845214024496) -->
+    <skip />
+    <string name="screen_record_play" msgid="4732544724679889445">"播放"</string>
+    <string name="screen_record_pause" msgid="1715012292444967776">"暫停"</string>
+    <string name="screen_record_mute" msgid="8111682249858638168">"靜音"</string>
+    <string name="screen_record_unmute" msgid="2207912659365156472">"取消靜音"</string>
+    <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"拍攝整個畫面的螢幕截圖"</string>
+    <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"錄製整個畫面"</string>
+    <string name="screen_capture_region_selection_button" msgid="515608875142444130">"拍攝所選區域的螢幕截圖"</string>
+    <string name="screen_capture_record_region_selection_button" msgid="3699353194755563053">"錄製所選區域"</string>
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"螢幕截圖"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"錄影"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"共用"</string>
-    <!-- no translation found for screen_capture_toolbar_app_window_button_screenshot_a11y (1357560392667941303) -->
+    <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"選取要分享畫面的應用程式"</string>
+    <string name="screen_share_app_audio_sharing" msgid="7201172218924898712">"分享視窗音訊"</string>
+    <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"擷取視窗螢幕截圖"</string>
+    <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"錄製視窗"</string>
+    <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"擷取所選區域的螢幕截圖"</string>
+    <string name="screen_capture_toolbar_region_button_record_a11y" msgid="6829009792885846867">"錄製所選區域"</string>
+    <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"擷取整個畫面的螢幕截圖"</string>
+    <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"錄製整個畫面"</string>
+    <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"螢幕畫面擷取設定"</string>
+    <!-- no translation found for screen_capture_show_clicks_and_keys (2151690554364148717) -->
     <skip />
-    <!-- no translation found for screen_capture_toolbar_app_window_button_record_a11y (8984966592912823394) -->
+    <!-- no translation found for screen_capture_device_audio (1537290197773737349) -->
     <skip />
-    <!-- no translation found for screen_capture_toolbar_region_button_screenshot_a11y (2102262602357521192) -->
+    <!-- no translation found for screen_capture_microphone_audio (1698835678818747741) -->
     <skip />
-    <!-- no translation found for screen_capture_toolbar_region_button_record_a11y (6829009792885846867) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_fullscreen_button_screenshot_a11y (8699983355979869210) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_fullscreen_button_record_a11y (852148867883959158) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_settings_button_a11y (8014446956996739704) -->
+    <!-- no translation found for screen_capture_front_camera (1214647538302639358) -->
     <skip />
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> x <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
+    <!-- no translation found for screen_share_privacy_indicator_stop_sharing (2297045039651417274) -->
+    <skip />
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"正在分享畫面"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"正在分享內容"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"停止分享？"</string>
@@ -411,8 +434,7 @@
     <string name="quick_settings_cast_device_default_name" msgid="6988469571141331700">"未命名的裝置"</string>
     <string name="quick_settings_cast_detail_empty_text" msgid="2846282280014617785">"沒有可用裝置"</string>
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"沒有 Wi-Fi 或乙太網路連線"</string>
-    <!-- no translation found for quick_settings_cast_disconnect (4836025217838730930) -->
-    <skip />
+    <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"中斷連線"</string>
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"亮度"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"色彩反轉"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"色彩校正"</string>
@@ -422,8 +444,7 @@
     <string name="quick_settings_close_user_panel" msgid="5599724542275896849">"關閉"</string>
     <string name="quick_settings_connected" msgid="3873605509184830379">"已連線"</string>
     <string name="quick_settings_connecting" msgid="2381969772953268809">"連線中..."</string>
-    <!-- no translation found for quick_settings_scanning_for_wifi (5875402701266073463) -->
-    <skip />
+    <string name="quick_settings_scanning_for_wifi" msgid="5875402701266073463">"正在掃描 Wi‑Fi..."</string>
     <string name="quick_settings_hotspot_label" msgid="1199196300038363424">"無線基地台"</string>
     <string name="quick_settings_hotspot_secondary_label_transient" msgid="7585604088079160564">"開啟中…"</string>
     <string name="quick_settings_hotspot_secondary_label_data_saver_enabled" msgid="1280433136266439372">"數據節省模式已開啟"</string>
@@ -483,12 +504,15 @@
     <string name="accessibility_hearing_device_pair_new_device" msgid="8440082580186130090">"按一下即可配對新裝置"</string>
     <string name="hearing_devices_presets_error" msgid="350363093458408536">"無法更新預設設定"</string>
     <string name="hearing_devices_preset_label" msgid="7878267405046232358">"預設"</string>
+    <!-- no translation found for hearing_devices_preset_label_left (7427947566560179945) -->
+    <skip />
+    <!-- no translation found for hearing_devices_preset_label_right (1847206329436268522) -->
+    <skip />
     <string name="hearing_devices_input_routing_label" msgid="730396728151232306">"預設通話麥克風"</string>
   <string-array name="hearing_device_input_routing_options">
     <item msgid="4582190415045337003">"助聽器麥克風"</item>
     <item msgid="8501466270452446450">"這支手機的麥克風"</item>
   </string-array>
-    <string name="hearing_devices_spinner_item_selected" msgid="3137083889662762383">"已選取"</string>
     <string name="hearing_devices_ambient_label" msgid="629440938614895797">"環境"</string>
     <string name="hearing_devices_ambient_control_left" msgid="3586965448230412600">"左"</string>
     <string name="hearing_devices_ambient_control_right" msgid="6192137602448918383">"右"</string>
@@ -542,7 +566,7 @@
     <string name="zen_mode_set_up" msgid="8231201163894922821">"未設定"</string>
     <string name="zen_mode_no_manual_invocation" msgid="1769975741344633672">"在「設定」中管理"</string>
     <string name="zen_mode_active_modes" msgid="1625850411578488856">"{count,plural, =0{未啟用任何模式}=1{已啟用 {mode} 個模式}other{已啟用 # 個模式}}"</string>
-    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"<xliff:g id="NUMBER">%s</xliff:g>個模式"</string>
+    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"<xliff:g id="NUMBER">%d</xliff:g>個模式"</string>
     <string name="zen_modes_multiple_on_status" msgid="8120633422509269588">"開啟"</string>
     <string name="zen_priority_introduction" msgid="3159291973383796646">"裝置不會發出音效或震動造成干擾，但是會保留與鬧鐘、提醒、活動和指定來電者有關的設定。如果你選擇播放音樂、影片和遊戲等內容，還是可以聽見相關音訊。"</string>
     <string name="zen_alarms_introduction" msgid="3987266042682300470">"裝置不會發出音效或震動造成干擾，但是會保留鬧鐘響鈴。如果你選擇播放音樂、影片和遊戲等內容，還是可以聽見相關音訊。"</string>
@@ -689,8 +713,8 @@
     <string name="notification_section_header_conversations" msgid="821834744538345661">"對話"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"清除所有靜音通知"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"開啟通知設定"</string>
-    <string name="dnd_suppressing_shade_text" msgid="5588252250634464042">"「零打擾」模式已將通知設為暫停"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{沒有通知}=1{「{mode}」模式已將通知設為暫停}=2{「{mode}」和另一個模式已將通知設為暫停}other{「{mode}」和另外 # 個模式已將通知設為暫停}}"</string>
+    <string name="caught_up_shade_text" msgid="8166221989384139659">"全都看過了"</string>
     <string name="media_projection_action_text" msgid="3634906766918186440">"立即開始"</string>
     <string name="empty_shade_text" msgid="8935967157319717412">"沒有通知"</string>
     <string name="no_unseen_notif_text" msgid="395512586119868682">"沒有新通知"</string>
@@ -824,7 +848,7 @@
     <string name="volume_panel_hint_vibrate" msgid="4136223145435914132">"震動"</string>
     <string name="media_output_label_title" msgid="872824698593182505">"正在播放「<xliff:g id="LABEL">%s</xliff:g>」的裝置："</string>
     <string name="media_output_title_without_playing" msgid="3825663683169305013">"音訊播放位置"</string>
-    <string name="media_output_title_ongoing_call" msgid="208426888064112006">"通話中"</string>
+    <string name="media_output_title_ongoing_call" msgid="208426888064112006">"目前通話裝置"</string>
     <string name="system_ui_tuner" msgid="1471348823289954729">"系統使用者介面調整精靈"</string>
     <string name="status_bar" msgid="4357390266055077437">"狀態列"</string>
     <string name="demo_mode" msgid="263484519766901593">"系統 UI 展示模式"</string>
@@ -884,7 +908,8 @@
     <string name="notification_guts_news_summary" msgid="638697931043407835">"焦點新聞、社論等等"</string>
     <string name="notification_guts_social_summary" msgid="3749147631983977040">"喜歡的項目、貼文等等"</string>
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"電子報、推薦媒體等等"</string>
-    <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"開啟"</string>
+    <!-- no translation found for notification_onboarding_summaries_turn_on (3831339570984683297) -->
+    <skip />
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"如果對話較長，系統現在可以歸納成摘要，方便你快速掌握重點"</string>
     <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"通知整理工具會將優先順序較低的通知分類，並設為靜音。如要新增更多類別，請前往「設定」。"</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# 則通知}other{# 則通知}}"</string>
@@ -990,6 +1015,7 @@
     <string name="group_system_access_notification_shade" msgid="1619028907006553677">"查看通知"</string>
     <string name="group_system_access_quick_settings_panel" msgid="1844771096582064926">"查看快速設定"</string>
     <string name="group_system_full_screenshot" msgid="5742204844232667785">"拍攝螢幕截圖"</string>
+    <string name="group_system_partial_screenshot" msgid="2114314797127648010">"擷取部分螢幕畫面"</string>
     <string name="group_system_access_system_app_shortcuts" msgid="8562482996626694026">"顯示快速鍵"</string>
     <string name="group_system_go_back" msgid="2730322046244918816">"返回"</string>
     <string name="group_system_access_home_screen" msgid="4130366993484706483">"前往主畫面"</string>
@@ -1001,7 +1027,6 @@
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"開啟數位助理"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"螢幕鎖定"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"新增記事"</string>
-    <string name="group_system_close_window" msgid="1506354809787837043">"關閉目前的視窗"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"多工處理"</string>
     <string name="system_multitasking_rhs" msgid="8779289852395243004">"使用分割畫面，並在右側顯示應用程式"</string>
     <string name="system_multitasking_lhs" msgid="7348595296208696452">"使用分割畫面，並在左側顯示應用程式"</string>
@@ -1015,6 +1040,7 @@
     <string name="system_desktop_mode_snap_right_window" msgid="2162560187639411929">"將視窗移至右側"</string>
     <string name="system_desktop_mode_toggle_maximize_window" msgid="4084100093691768239">"將視窗放到最大"</string>
     <string name="system_desktop_mode_minimize_window" msgid="1248714536732927092">"將視窗縮到最小"</string>
+    <string name="system_desktop_mode_close_window" msgid="3072490692608682536">"關閉目前的視窗"</string>
     <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"在桌面之間移動"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"輸入"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"切換到下一個語言"</string>
@@ -1136,16 +1162,15 @@
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"要開啟「<xliff:g id="ID_1">%1$s</xliff:g>」嗎？"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"動作 "<annotation id="action_key_icon">"icon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> 鍵是使用「<xliff:g id="ID_3">^3</xliff:g>」的鍵盤快速鍵。<xliff:g id="ID_4">^4</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_talkback_intro" msgid="1617808784388544741">"<xliff:g id="ID_1">%1$s</xliff:g> 是螢幕閱讀器，可朗讀畫面上的項目。如果使用者無法看清楚螢幕，這項功能就能派上用場。"</string>
-    <string name="accessibility_key_gesture_dialog_va_intro" msgid="4709198503441288289">"有了 <xliff:g id="ID_1">%1$s</xliff:g>，不必動手就能控制裝置。"</string>
     <string name="accessibility_key_gesture_dialog_positive_button_text" msgid="3670746017523589293">"開啟"</string>
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_title (5770691510738701250) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_content (7575802369763469379) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_negative_button_text (8393469413785600834) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_positive_button_text (895076240681888057) -->
-    <skip />
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"要開啟 <xliff:g id="ID_1">%1$s</xliff:g> 的鍵盤快速鍵嗎？"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"不要開啟"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"開啟快速鍵"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"「<xliff:g id="ID_1">%1$s</xliff:g>」鍵盤快速鍵已開啟"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572">"快捷操作鍵 "<annotation id="action_key_icon">"icon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> 鍵是「<xliff:g id="ID_3">^3</xliff:g>」(無障礙功能) 的鍵盤快速鍵，可以快速放大畫面內容。這項功能開啟後，請同時按下快捷操作鍵 "<annotation id="action_key_icon">"icon"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> 鍵，再按「+」或「-」鍵調整縮放比例。"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"停用快速鍵"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"保持開啟"</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"按下「動作」圖示 "<annotation id="action_key_icon">"icon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> 鍵，即可開啟 <xliff:g id="ID_3">^3</xliff:g> (無障礙功能)，不必動手就能操控裝置。"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"螢幕鎖定"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"關機中…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"查看處理步驟"</string>
@@ -1194,12 +1219,9 @@
     <string name="running_foreground_services_title" msgid="5137313173431186685">"在背景執行的應用程式"</string>
     <string name="running_foreground_services_msg" msgid="3009459259222695385">"輕觸即可查看電池和數據用量詳情"</string>
     <string name="mobile_data_disable_title" msgid="5366476131671617790">"要關閉行動數據嗎？"</string>
-    <!-- no translation found for mobile_data_enable_title (8259903353761259200) -->
-    <skip />
-    <!-- no translation found for mobile_data_enable_message (2013861580086078913) -->
-    <skip />
-    <!-- no translation found for mobile_data_enable_turn_on (5577732543207882533) -->
-    <skip />
+    <string name="mobile_data_enable_title" msgid="8259903353761259200">"要開啟行動數據嗎？"</string>
+    <string name="mobile_data_enable_message" msgid="2013861580086078913">"使用行動數據可能會產生費用，具體情況視行動資費方案而定。"</string>
+    <string name="mobile_data_enable_turn_on" msgid="5577732543207882533">"開啟"</string>
     <string name="mobile_data_disable_message" msgid="8604966027899770415">"你將無法透過「<xliff:g id="CARRIER">%s</xliff:g>」使用行動數據或網際網路，只能利用 Wi-Fi 上網。"</string>
     <string name="mobile_data_disable_message_default_carrier" msgid="6496033312431658238">"你的電信業者"</string>
     <string name="auto_data_switch_disable_title" msgid="5146527155665190652">"要切換回「<xliff:g id="CARRIER">%s</xliff:g>」嗎？"</string>
@@ -1400,7 +1422,7 @@
     <string name="select_conversation_title" msgid="6716364118095089519">"對話小工具"</string>
     <string name="select_conversation_text" msgid="3376048251434956013">"輕觸對話即可新增至主畫面"</string>
     <string name="no_conversations_text" msgid="5354115541282395015">"最近的對話會顯示在這裡"</string>
-    <string name="priority_conversations" msgid="3967482288896653039">"優先對話"</string>
+    <string name="priority_conversations" msgid="3967482288896653039">"重要對話"</string>
     <string name="recent_conversations" msgid="8531874684782574622">"最近的對話"</string>
     <string name="days_timestamp" msgid="5821854736213214331">"<xliff:g id="DURATION">%1$s</xliff:g> 天前"</string>
     <string name="one_week_timestamp" msgid="4925600765473875590">"1 週前"</string>
@@ -1479,7 +1501,6 @@
     <string name="clipboard_edit_text_done" msgid="4551887727694022409">"完成"</string>
     <string name="clipboard_overlay_text_copied" msgid="1872624400464891363">"已複製"</string>
     <string name="clipboard_edit_source" msgid="9156488177277788029">"來自「<xliff:g id="APPNAME">%1$s</xliff:g>」"</string>
-    <string name="clipboard_dismiss_description" msgid="3335990369850165486">"關閉剪貼簿"</string>
     <string name="clipboard_edit_text_description" msgid="805254383912962103">"編輯複製的文字"</string>
     <string name="clipboard_edit_image_description" msgid="8904857948976041306">"編輯複製的圖片"</string>
     <string name="clipboard_send_nearby_description" msgid="4629769637846717650">"傳送到鄰近裝置"</string>
@@ -1619,6 +1640,7 @@
     <string name="shortcut_helper_customize_dialog_reset_button_label" msgid="7645535254306312685">"是，請重設"</string>
     <string name="shortcut_helper_customize_dialog_cancel_button_label" msgid="5595546460431741178">"取消"</string>
     <string name="shortcut_helper_add_shortcut_dialog_placeholder" msgid="9154297849458741995">"按下按鍵"</string>
+    <string name="shortcut_helper_customizer_action_key_text" msgid="3979063901857046887">"快捷操作鍵"</string>
     <string name="shortcut_customizer_key_combination_in_use_error_message" msgid="3325858369539848162">"按鍵組合重複，請試試其他組合。"</string>
     <string name="shortcut_customizer_generic_error_message" msgid="3128454624049722741">"無法設定捷徑。"</string>
     <string name="shortcut_helper_plus_symbol" msgid="4534843157353732011">"+"</string>

@@ -3,6 +3,7 @@ package com.android.systemui.scene
 import android.view.View
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.systemui.classifier.domain.interactor.falsingInteractor
+import com.android.systemui.desktop.domain.interactor.desktopInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
 import com.android.systemui.haptics.msdl.msdlPlayer
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
@@ -27,6 +28,7 @@ import com.android.systemui.scene.ui.viewmodel.dualShadeEducationalTooltipsViewM
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.statusbar.domain.interactor.remoteInputInteractor
+import com.android.systemui.statusbar.notification.stack.domain.interactor.notificationContainerInteractor
 import com.android.systemui.wallpapers.ui.viewmodel.wallpaperViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.mockito.kotlin.mock
@@ -98,6 +100,7 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
         ): SceneContainerViewModel =
             SceneContainerViewModel(
                 sceneInteractor = sceneInteractor,
+                desktopInteractor = desktopInteractor,
                 deviceUnlockedInteractor = deviceUnlockedInteractor,
                 falsingInteractor = falsingInteractor,
                 powerInteractor = powerInteractor,
@@ -113,6 +116,7 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
                 burnIn = aodBurnInViewModel,
                 clock = keyguardClockViewModel,
                 onBootTransitionInteractor = onBootTransitionInteractor,
+                notificationContainerInteractor = notificationContainerInteractor,
                 dualShadeEducationalTooltipsViewModelFactory =
                     dualShadeEducationalTooltipsViewModelFactory,
                 animateQsTilesViewModelFactory = animateQsTilesViewModelFactory,

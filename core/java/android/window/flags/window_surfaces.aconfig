@@ -21,14 +21,6 @@ flag {
     bug: "295038072"
 }
 
-flag {
-    namespace: "window_surfaces"
-    name: "surface_control_input_receiver"
-    is_exported: true
-    description: "Enable public API to register an InputReceiver for a SurfaceControl"
-    is_fixed_read_only: true
-    bug: "278757236"
-}
 
 flag {
     namespace: "window_surfaces"
@@ -37,14 +29,6 @@ flag {
     description: "Enable screen recording callbacks public API"
     is_fixed_read_only: true
     bug: "304574518"
-}
-
-flag {
-    namespace: "window_surfaces"
-    name: "sync_screen_capture"
-    description: "Create a screen capture API that blocks in SurfaceFlinger"
-    is_fixed_read_only: true
-    bug: "321263247"
 }
 
 flag {
@@ -101,6 +85,13 @@ flag {
 }
 
 flag {
+    name: "scvh_set_focusable"
+    namespace: "window_surfaces"
+    description: "Adds a focusable flag to SurfaceControlViewHost"
+    bug: "425415517"
+}
+
+flag {
     name: "scvh_surface_control_lifetime_fix"
     namespace: "window_surfaces"
     description: "Fix lifetime issue with SurfaceControl's created by SCVH"
@@ -116,6 +107,33 @@ flag {
     namespace: "window_surfaces"
     description: "Use input-reported focus state when composing accessibility window info"
     bug: "424253885"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "system_content_priority"
+    namespace: "window_surfaces"
+    description: "Enable prioritization for windows based on the importance of the content, from the system perspective."
+    bug: "431285755"
+}
+
+flag {
+    name: "deprecate_surface_animation_frame_callback"
+    namespace: "window_surfaces"
+    description: "Utilize postVsyncCallback from Choreographer for SurfaceAnimationRunner allowing more precise scheduling via vsyncId."
+    bug: "443142083"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "deprecate_window_animator_frame_callback"
+    namespace: "window_surfaces"
+    description: "Utilize postVsyncCallback from Choreographer for WindowAnimator allowing more precise scheduling via vsyncId."
+    bug: "443142083"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

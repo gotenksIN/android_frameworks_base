@@ -672,15 +672,6 @@ public final class NotificationEntry extends ListEntry {
         }
     }
 
-    public void sendAccessibilityEvent(int eventType) {
-        if (com.android.systemui.Flags.notificationsHunAccessibilityRefactor()) {
-            return;
-        }
-        if (row != null) {
-            row.sendAccessibilityEvent(eventType);
-        }
-    }
-
     /**
      * Used by NotificationMediaManager to determine... things
      * @return {@code true} if we are a media notification
@@ -764,8 +755,8 @@ public final class NotificationEntry extends ListEntry {
         return row;
     }
 
-    public void setUserLocked(boolean userLocked) {
-        if (row != null) row.setUserLocked(userLocked);
+    public void setUserSwipingToExpandRow(boolean isUserSwiping) {
+        if (row != null) row.setUserSwipingToExpandRow(isUserSwiping);
     }
 
     public void notifyHeightChanged(boolean needsAnimation) {

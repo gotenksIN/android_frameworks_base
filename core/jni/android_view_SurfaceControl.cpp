@@ -78,16 +78,17 @@ namespace android {
 
 using gui::FocusRequest;
 
+static const char* const IllegalArgumentException = "java/lang/IllegalArgumentException";
+static const char* const IllegalStateException = "java/lang/IllegalStateException";
+static const char* const OutOfResourcesException = "android/view/Surface$OutOfResourcesException";
+
 static void doThrowNPE(JNIEnv* env) {
     jniThrowNullPointerException(env, NULL);
 }
 
 static void doThrowIAE(JNIEnv* env, const char* msg = nullptr) {
-    jniThrowException(env, "java/lang/IllegalArgumentException", msg);
+    jniThrowException(env, IllegalArgumentException, msg);
 }
-
-static const char* const OutOfResourcesException =
-    "android/view/Surface$OutOfResourcesException";
 
 static struct {
     jclass clazz;
@@ -107,6 +108,7 @@ static struct {
     jclass clazz;
     jmethodID ctor;
     jfieldID isInternal;
+    jfieldID port;
     jfieldID density;
     jfieldID secure;
     jfieldID deviceProductInfo;
@@ -176,6 +178,11 @@ static struct {
     jclass clazz;
     jmethodID ctor;
 } gDeviceProductInfoManufactureDateClassInfo;
+
+static struct {
+    jclass clazz;
+    jmethodID ctor;
+} gDeviceProductInfoEdidStructureMetadataClassInfo;
 
 static struct {
     jclass clazz;
@@ -514,8 +521,7 @@ static jlong nativeCreate(JNIEnv* env, jclass clazz, jobject sessionObj,
     if (parcel && !parcel->objectsCount()) {
         status_t err = metadata.readFromParcel(parcel);
         if (err != NO_ERROR) {
-          jniThrowException(env, "java/lang/IllegalArgumentException",
-                            "Metadata parcel has wrong format");
+            jniThrowException(env, IllegalArgumentException, "Metadata parcel has wrong format");
         }
     }
 
@@ -526,16 +532,20 @@ static jlong nativeCreate(JNIEnv* env, jclass clazz, jobject sessionObj,
 
     status_t err = client->createSurfaceChecked(String8(name.c_str()), w, h, format, &surface,
                                                 flags, parentHandle, std::move(metadata));
-    if (err == NAME_NOT_FOUND) {
-        jniThrowException(env, "java/lang/IllegalArgumentException", NULL);
-        return 0;
-    } else if (err != NO_ERROR) {
-        jniThrowException(env, OutOfResourcesException, statusToString(err).c_str());
-        return 0;
+    switch (err) {
+        case NO_ERROR:
+            surface->incStrong((void*)nativeCreate);
+            return reinterpret_cast<jlong>(surface.get());
+        case NAME_NOT_FOUND:
+            jniThrowException(env, IllegalArgumentException, NULL);
+            return 0;
+        case NO_MEMORY:
+            jniThrowException(env, OutOfResourcesException, NULL);
+            return 0;
+        default:
+            jniThrowException(env, IllegalStateException, statusToString(err).c_str());
+            return 0;
     }
-
-    surface->incStrong((void *)nativeCreate);
-    return reinterpret_cast<jlong>(surface.get());
 }
 
 static void release(SurfaceControl* ctrl) {
@@ -590,8 +600,7 @@ static void nativeSetEarlyWakeupStart(JNIEnv* env, jclass clazz, jlong transacti
     gui::EarlyWakeupInfo earlyWakeupInfo;
     status_t err = earlyWakeupInfo.readFromParcel(infoParcel);
     if (err != NO_ERROR) {
-        jniThrowException(env, "java/lang/IllegalArgumentException",
-                          "EarlyWakeupInfo parcel has wrong format");
+        jniThrowException(env, IllegalArgumentException, "EarlyWakeupInfo parcel has wrong format");
         return;
     }
 
@@ -609,8 +618,7 @@ static void nativeSetEarlyWakeupEnd(JNIEnv* env, jclass clazz, jlong transaction
     gui::EarlyWakeupInfo earlyWakeupInfo;
     status_t err = earlyWakeupInfo.readFromParcel(infoParcel);
     if (err != NO_ERROR) {
-        jniThrowException(env, "java/lang/IllegalArgumentException",
-                          "EarlyWakeupInfo parcel has wrong format");
+        jniThrowException(env, IllegalArgumentException, "EarlyWakeupInfo parcel has wrong format");
         return;
     }
 
@@ -1065,7 +1073,7 @@ static void nativeAddTransactionBarrier(JNIEnv* env, jclass clazz, jlong transac
     gui::TransactionBarrier barrier;
     status_t err = barrier.readFromParcel(barrierParcel);
     if (err != NO_ERROR) {
-        jniThrowException(env, "java/lang/IllegalArgumentException",
+        jniThrowException(env, IllegalArgumentException,
                           "TransactionBarrier parcel has wrong format");
         return;
     }
@@ -1231,7 +1239,7 @@ static void nativeSetBoxShadowSettings(JNIEnv* env, jclass clazz, jlong transact
     gui::BoxShadowSettings settings;
     status_t err = settings.readFromParcel(settingsParcel);
     if (err != NO_ERROR) {
-        jniThrowException(env, "java/lang/IllegalArgumentException",
+        jniThrowException(env, IllegalArgumentException,
                           "BoxShadowSettings parcel has wrong format");
         return;
     }
@@ -1252,8 +1260,7 @@ static void nativeSetBorderSettings(JNIEnv* env, jclass clazz, jlong transaction
     gui::BorderSettings settings;
     status_t err = settings.readFromParcel(settingsParcel);
     if (err != NO_ERROR) {
-        jniThrowException(env, "java/lang/IllegalArgumentException",
-                          "BorderSettings parcel has wrong format");
+        jniThrowException(env, IllegalArgumentException, "BorderSettings parcel has wrong format");
         return;
     }
 
@@ -1532,9 +1539,16 @@ static jobject convertDeviceProductInfoToJavaObject(JNIEnv* env,
         connectionToSinkType = IDeviceProductInfoConstants::CONNECTION_TO_SINK_TRANSITIVE;
     }
 
+    jobject edidStructureMetadata =
+            env->NewObject(gDeviceProductInfoEdidStructureMetadataClassInfo.clazz,
+                           gDeviceProductInfoEdidStructureMetadataClassInfo.ctor,
+                           info->edidStructureMetadata.version,
+                           info->edidStructureMetadata.revision);
+    jint videoInputType = info->inputType;
+
     return env->NewObject(gDeviceProductInfoClassInfo.clazz, gDeviceProductInfoClassInfo.ctor, name,
                           manufacturerPnpId, productId, modelYear, manufactureDate,
-                          connectionToSinkType);
+                          connectionToSinkType, edidStructureMetadata, videoInputType);
 }
 
 static jobject nativeGetStaticDisplayInfo(JNIEnv* env, jclass clazz, jlong id) {
@@ -1548,6 +1562,7 @@ static jobject nativeGetStaticDisplayInfo(JNIEnv* env, jclass clazz, jlong id) {
 
     const bool isInternal = info.connectionType == ui::DisplayConnectionType::Internal;
     env->SetBooleanField(object, gStaticDisplayInfoClassInfo.isInternal, isInternal);
+    env->SetIntField(object, gStaticDisplayInfoClassInfo.port, info.port);
     env->SetFloatField(object, gStaticDisplayInfoClassInfo.density, info.density);
     env->SetBooleanField(object, gStaticDisplayInfoClassInfo.secure, info.secure);
     env->SetObjectField(object, gStaticDisplayInfoClassInfo.deviceProductInfo,
@@ -2906,6 +2921,7 @@ int register_android_view_SurfaceControl(JNIEnv* env)
     gStaticDisplayInfoClassInfo.clazz = MakeGlobalRefOrDie(env, infoClazz);
     gStaticDisplayInfoClassInfo.ctor = GetMethodIDOrDie(env, infoClazz, "<init>", "()V");
     gStaticDisplayInfoClassInfo.isInternal = GetFieldIDOrDie(env, infoClazz, "isInternal", "Z");
+    gStaticDisplayInfoClassInfo.port = GetFieldIDOrDie(env, infoClazz, "port", "I");
     gStaticDisplayInfoClassInfo.density = GetFieldIDOrDie(env, infoClazz, "density", "F");
     gStaticDisplayInfoClassInfo.secure = GetFieldIDOrDie(env, infoClazz, "secure", "Z");
     gStaticDisplayInfoClassInfo.deviceProductInfo =
@@ -3000,8 +3016,9 @@ int register_android_view_SurfaceControl(JNIEnv* env)
                              "Ljava/lang/String;"
                              "Ljava/lang/String;"
                              "Ljava/lang/Integer;"
-                             "Landroid/hardware/display/DeviceProductInfo$ManufactureDate;"
-                             "I)V");
+                             "Landroid/hardware/display/DeviceProductInfo$ManufactureDate;I"
+                             "Landroid/hardware/display/"
+                             "DeviceProductInfo$EdidStructureMetadata;I)V");
 
     jclass deviceProductInfoManufactureDateClazz =
             FindClassOrDie(env, "android/hardware/display/DeviceProductInfo$ManufactureDate");
@@ -3010,6 +3027,13 @@ int register_android_view_SurfaceControl(JNIEnv* env)
     gDeviceProductInfoManufactureDateClassInfo.ctor =
             GetMethodIDOrDie(env, deviceProductInfoManufactureDateClazz, "<init>",
                              "(Ljava/lang/Integer;Ljava/lang/Integer;)V");
+
+    jclass deviceProductInfoEdidStructureMetadataClazz =
+            FindClassOrDie(env, "android/hardware/display/DeviceProductInfo$EdidStructureMetadata");
+    gDeviceProductInfoEdidStructureMetadataClassInfo.clazz =
+            MakeGlobalRefOrDie(env, deviceProductInfoEdidStructureMetadataClazz);
+    gDeviceProductInfoEdidStructureMetadataClassInfo.ctor =
+            GetMethodIDOrDie(env, deviceProductInfoEdidStructureMetadataClazz, "<init>", "(II)V");
 
     jclass displayedContentSampleClazz = FindClassOrDie(env,
             "android/hardware/display/DisplayedContentSample");

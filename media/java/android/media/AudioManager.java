@@ -29,8 +29,6 @@ import static android.media.audio.Flags.FLAG_SCO_MANAGED_BY_AUDIO;
 import static android.media.audio.Flags.FLAG_SUPPORTED_DEVICE_TYPES_API;
 import static android.media.audio.Flags.FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT;
 import static android.media.audio.Flags.autoPublicVolumeApiHardening;
-import static android.media.audio.Flags.cacheGetStreamMinMaxVolume;
-import static android.media.audio.Flags.cacheGetStreamVolume;
 import static android.media.audiopolicy.Flags.FLAG_ENABLE_FADE_MANAGER_CONFIGURATION;
 import static android.media.audiopolicy.Flags.FLAG_MULTI_ZONE_AUDIO;
 
@@ -1291,10 +1289,9 @@ public class AudioManager {
      * @hide
      **/
     public static void clearVolumeCache(String api) {
-        if (cacheGetStreamMinMaxVolume() && (VOLUME_MAX_CACHING_API.equals(api)
-                || VOLUME_MIN_CACHING_API.equals(api))) {
+        if (VOLUME_MAX_CACHING_API.equals(api) || VOLUME_MIN_CACHING_API.equals(api)) {
             IpcDataCache.invalidateCache(IpcDataCache.MODULE_SYSTEM, api);
-        } else if (cacheGetStreamVolume() && VOLUME_CACHING_API.equals(api)) {
+        } else if (VOLUME_CACHING_API.equals(api)) {
             IpcDataCache.invalidateCache(IpcDataCache.MODULE_SYSTEM, api);
         } else {
             Log.w(TAG, "invalid clearVolumeCache for api " + api);
@@ -1339,15 +1336,7 @@ public class AudioManager {
      * @see #getStreamVolume(int)
      */
     public int getStreamMaxVolume(int streamType) {
-        if (cacheGetStreamMinMaxVolume()) {
-            return mVolMaxCache.query(new VolumeCacheQuery(streamType, QUERY_VOL_MAX));
-        }
-        final IAudioService service = getService();
-        try {
-            return service.getStreamMaxVolume(streamType);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        return mVolMaxCache.query(new VolumeCacheQuery(streamType, QUERY_VOL_MAX));
     }
 
     /**
@@ -1375,15 +1364,7 @@ public class AudioManager {
      */
     @TestApi
     public int getStreamMinVolumeInt(int streamType) {
-        if (cacheGetStreamMinMaxVolume()) {
-            return mVolMinCache.query(new VolumeCacheQuery(streamType, QUERY_VOL_MIN));
-        }
-        final IAudioService service = getService();
-        try {
-            return service.getStreamMinVolume(streamType);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        return mVolMinCache.query(new VolumeCacheQuery(streamType, QUERY_VOL_MIN));
     }
 
     /**
@@ -1395,15 +1376,7 @@ public class AudioManager {
      * @see #setStreamVolume(int, int, int)
      */
     public int getStreamVolume(int streamType) {
-        if (cacheGetStreamVolume()) {
-            return mVolCache.query(new VolumeCacheQuery(streamType, QUERY_VOL));
-        }
-        final IAudioService service = getService();
-        try {
-            return service.getStreamVolume(streamType);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        return mVolCache.query(new VolumeCacheQuery(streamType, QUERY_VOL));
     }
 
     // keep in sync with frameworks/av/services/audiopolicy/common/include/Volume.h
@@ -3940,7 +3913,6 @@ public class AudioManager {
      *
      */
     public void setParameters(String keyValuePairs) {
-// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
         List swbKeys = Arrays.asList("bt_lc3_swb","bt_swb");
         boolean hasSwbParams= false;
         String[] kvpairs = keyValuePairs.split(";");
@@ -3949,11 +3921,7 @@ public class AudioManager {
             hasSwbParams = swbKeys.contains(kv[0]);
             break;
         }
-// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
-// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
         final IAudioService service = getService();
-// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
-// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
         if (hasSwbParams) {
             try {
                 service.setSwbParameters(keyValuePairs);
@@ -3967,10 +3935,7 @@ public class AudioManager {
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
-// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
-// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
         }
-// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     }
 
     /**
@@ -4007,14 +3972,12 @@ public class AudioManager {
     @RequiresPermission(Manifest.permission.BLUETOOTH_STACK)
     public void setBluetoothHeadsetProperties(@NonNull String name, boolean hasNrecEnabled,
             boolean hasWbsEnabled) {
-// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
         final IAudioService service = getService();
         try {
             service.setScoParameters(name, hasNrecEnabled, hasWbsEnabled);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     }
 
     /**
@@ -6282,7 +6245,7 @@ public class AudioManager {
     }
 
      /**
-      * {@hide}
+      * @hide
       */
      private final IBinder mICallBack = new Binder();
 
@@ -6981,7 +6944,7 @@ public class AudioManager {
      * @param device type of device connected/disconnected (AudioManager.DEVICE_OUT_xxx)
      * @param state  new connection state: 1 connected, 0 disconnected
      * @param name   device name
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     @RequiresPermission(Manifest.permission.MODIFY_AUDIO_ROUTING)
@@ -7014,7 +6977,7 @@ public class AudioManager {
      * Indicate wired accessory connection state change.
      * @param device {@link AudioDeviceAttributes} of the device to "fake-connect"
      * @param connected true for connected, false for disconnected
-     * {@hide}
+     * @hide
      */
     @TestApi
     @RequiresPermission(Manifest.permission.MODIFY_AUDIO_ROUTING)
@@ -7037,7 +7000,7 @@ public class AudioManager {
      * @param previousDevice Bluetooth device disconnected or null if there is no disconnected
      * devices
      * @param info contain all info related to the device. {@link BluetoothProfileConnectionInfo}
-     * {@hide}
+     * @hide
      */
     @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
     @RequiresPermission(Manifest.permission.BLUETOOTH_STACK)
@@ -7052,7 +7015,6 @@ public class AudioManager {
         }
     }
 
-// QTI_BEGIN: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
      /**
      * Indicate A2DP source or sink active device change and eventually suppress
      * the {@link AudioManager.ACTION_AUDIO_BECOMING_NOISY} intent.
@@ -7085,8 +7047,7 @@ public class AudioManager {
          }
     }
 
-// QTI_END: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
-    /** {@hide} */
+    /** @hide */
     public IRingtonePlayer getRingtonePlayer() {
         try {
             return getService().getRingtonePlayer();
@@ -9048,6 +9009,13 @@ public class AudioManager {
      */
     public static boolean hasHapticChannelsImpl(@NonNull Context context, @NonNull Uri uri) {
         MediaExtractor extractor = new MediaExtractor();
+        if (context.getUserId() == UserHandle.USER_CURRENT) {
+            // Use the current userId to create user context to avoid the exception thrown
+            // during getting content provider accessing non-positive specialized user ID
+            // (USER_CURRENT) through context.getUserId().
+            context = context.createContextAsUser(
+                    UserHandle.of(UserHandle.myUserId()), 0);
+        }
         try {
             extractor.setDataSource(context, uri, null);
             for (int i = 0; i < extractor.getTrackCount(); i++) {

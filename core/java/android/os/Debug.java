@@ -1387,8 +1387,16 @@ public final class Debug
      *            in ".trace", it will be appended for you.
      * @param bufferSize The maximum amount of trace data we gather. If not
      *            given, it defaults to 8MB.
-     * @param flags Flags to control method tracing. The only one that is
-     *            currently defined is {@link #TRACE_COUNT_ALLOCS}.
+     * @param flags Flags to control method tracing. The following flags are supported:
+     *            0x0001 {@link #TRACE_COUNT_ALLOCS}
+     *
+     *            Flags to control time source: These are available with API #34 and higher.
+     *            0x0010 Report the elapsed time since the start of the trace.
+     *            0x0100 Report the time the thread has spent on the CPU since the start of the
+     *                   trace. Please note that the thread cpu incurs a significant (typically
+     *                   2-3x) performance penalty. Use this flag only when necessary.
+     *            If neither of these flags are set, both the elapsed time and the thread cpu time
+     *            are reported.
      */
     public static void startMethodTracing(String tracePath, int bufferSize, int flags) {
         VMDebug.startMethodTracing(fixTracePath(tracePath), bufferSize, flags, false, 0);
@@ -2672,7 +2680,7 @@ public final class Debug
      * These properties are only set during platform debugging, and are not
      * meant to be used as a general-purpose properties store.
      *
-     * {@hide}
+     * @hide
      *
      * @param cl The class to (possibly) modify
      * @param partial If false, sets all static fields, otherwise, only set
@@ -2796,7 +2804,7 @@ public final class Debug
      * Return a string consisting of methods and locations at multiple call stack levels.
      * @param depth the number of levels to return, starting with the immediate caller.
      * @return a string describing the call stack.
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     public static String getCallers(final int depth) {
@@ -2812,7 +2820,7 @@ public final class Debug
      * Return a string consisting of methods and locations at multiple call stack levels.
      * @param depth the number of levels to return, starting with the immediate caller.
      * @return a string describing the call stack.
-     * {@hide}
+     * @hide
      */
     public static String getCallers(final int start, int depth) {
         final StackTraceElement[] callStack = Thread.currentThread().getStackTrace();
@@ -2830,7 +2838,7 @@ public final class Debug
      * @param depth the number of levels to return, starting with the immediate caller.
      * @param linePrefix prefix to put in front of each location.
      * @return a string describing the call stack.
-     * {@hide}
+     * @hide
      */
     public static String getCallers(final int depth, String linePrefix) {
         final StackTraceElement[] callStack = Thread.currentThread().getStackTrace();
@@ -2843,7 +2851,7 @@ public final class Debug
 
     /**
      * @return a String describing the immediate caller of the calling method.
-     * {@hide}
+     * @hide
      */
     @UnsupportedAppUsage
     public static String getCaller() {

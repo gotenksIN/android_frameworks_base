@@ -747,6 +747,20 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      */
     int mFrameRateSelectionPriority = RefreshRatePolicy.LAYER_PRIORITY_UNSET;
 
+
+    /**
+     * A value representing the importance of the window from the system perspective. A higher
+     * priority value means the window will get preferred access to the limited resource in
+     * rendering.
+     */
+    int mSystemContentPriority = 0;
+    /**
+     * A score contributing to the {@link mSystemContentPriority}. This score is calculated based on
+     * the recent user interaction history. The newer interacted window will typically get a higher
+     * score.
+     */
+    int mInteractionPriorityScore = 0;
+
     /**
      * This is the frame rate which is passed to SurfaceFlinger if the window set a
      * preferredDisplayModeId or is part of the high refresh rate deny list.
@@ -756,7 +770,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     static final int BLAST_TIMEOUT_DURATION = 5000; /* milliseconds */
 
-    class DrawHandler {
+    static class DrawHandler {
         final Consumer<SurfaceControl.Transaction> mConsumer;
         final int mSeqId;
 
@@ -765,7 +779,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             mConsumer = consumer;
         }
     }
-    private final List<DrawHandler> mDrawHandlers = new ArrayList<>();
+    private final ArrayList<DrawHandler> mDrawHandlers = new ArrayList<>();
 
     /**
      * Indicates whether inset animations are currently running within the Window.
@@ -3276,11 +3290,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     boolean destroySurface(boolean cleanupOnResume, boolean appStopped) {
         boolean destroyedSomething = false;
 
-        // Copying to a different list as multiple children can be removed.
-        final ArrayList<WindowState> childWindows = new ArrayList<>(mChildren);
-        for (int i = childWindows.size() - 1; i >= 0; --i) {
-            final WindowState c = childWindows.get(i);
-            destroyedSomething |= c.destroySurface(cleanupOnResume, appStopped);
+        if (!mChildren.isEmpty()) {
+            // Copying to a different list as multiple children can be removed.
+            final ArrayList<WindowState> childWindows = new ArrayList<>(mChildren);
+            for (int i = childWindows.size() - 1; i >= 0; --i) {
+                final WindowState c = childWindows.get(i);
+                destroyedSomething |= c.destroySurface(cleanupOnResume, appStopped);
+            }
         }
 
         if (!(appStopped || mWindowRemovalAllowed || cleanupOnResume)) {
@@ -4583,9 +4599,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         final SparseArray<InsetsSource> mergedLocalInsetsSources =
                 createMergedSparseArray(localInsetsSourcesFromParent, mLocalInsetsSources);
 
-        // Insets provided by the IME window can effect all the windows below it and hence it needs
-        // to be visited in the correct order. Because of which updateAboveInsetsState() can't be
-        // used here and instead forAllWindows() is used.
+        // ForAllWindows is the reliable way to visit the IME window and the windows within this
+        // WindowState in the correct order. updateAboveInsetsState doesn't take the real order of
+        // IME into account.
         forAllWindows(w -> {
             if (!w.mAboveInsetsState.equals(aboveInsetsState)) {
                 w.mAboveInsetsState.set(aboveInsetsState);
@@ -4593,8 +4609,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             }
 
             if (!mergedLocalInsetsSources.contentEquals(w.mMergedLocalInsetsSources)) {
-                w.mMergedLocalInsetsSources = mergedLocalInsetsSources;
-                insetsChangedWindows.add(w);
+                // The traversal will reach IME if this window is an IME target window. However, we
+                // should not copy the local insets to the IME window. The forAllWindow will reach
+                // all IME containers by the logic in {@link #applyImeWindowsIfNeeded}.
+                if (!w.mIsImWindow) {
+                    w.mMergedLocalInsetsSources = mergedLocalInsetsSources;
+                    insetsChangedWindows.add(w);
+                }
             }
 
             final SparseArray<InsetsSourceProvider> providers = w.mInsetsSourceProviders;
@@ -4937,7 +4958,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 new WindowAnimationSpec(anim, position, false /* canSkipFirstFrame */,
                         0 /* windowCornerRadius */),
                 mWmService.mSurfaceAnimationRunner);
-        final Transaction t = mActivityRecord != null
+        final Transaction t = mActivityRecord != null && mActivityRecord.isVisibleRequested()
                 ? getSyncTransaction() : getPendingTransaction();
         startAnimation(t, adapter);
         commitPendingTransaction();
@@ -5190,6 +5211,14 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
     }
 
+    private void updateSystemContentPriorityIfNeeded() {
+        int newPriority = mInteractionPriorityScore;
+        if (newPriority != mSystemContentPriority) {
+            getPendingTransaction().setSystemContentPriority(mSurfaceControl, newPriority);
+            mSystemContentPriority = newPriority;
+        }
+    }
+
     @Override
     void prepareSurfaces() {
         mIsDimming = false;
@@ -5197,6 +5226,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             updateSurfacePositionNonOrganized();
             // Send information to SurfaceFlinger about the priority of the current window.
             updateFrameRateSelectionPriorityIfNeeded();
+            updateSystemContentPriorityIfNeeded();
             if (isVisibleRequested()) {
                 updateScaleIfNeeded();
             }
@@ -5928,6 +5958,17 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return syncGroup.mSyncMethod;
     }
 
+    void useBlastForNextSync() {
+        if (mSyncMethodOverride == BLASTSyncEngine.METHOD_BLAST) return;
+        mSyncMethodOverride = BLASTSyncEngine.METHOD_BLAST;
+        final BLASTSyncEngine.SyncGroup syncGroup = getSyncGroup();
+        // If not in sync, then the seqId will be incremented in prepareSync (when added)
+        if (syncGroup == null || syncGroup.mSyncMethod == BLASTSyncEngine.METHOD_BLAST) {
+            return;
+        }
+        mBufferSeqId = mSyncSeqId + 1;
+    }
+
     boolean shouldSyncWithBuffers() {
         if (!mDrawHandlers.isEmpty()) return true;
         return getSyncMethod() == BLASTSyncEngine.METHOD_BLAST;
@@ -5985,41 +6026,38 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     /**
      * Drain the draw handlers, called from finishDrawing()
-     * See {@link WindowState#mPendingDrawHandlers}
      */
-    boolean executeDrawHandlers(SurfaceControl.Transaction t, int seqId) {
-        boolean hadHandlers = false;
+    private boolean executeDrawHandlers(@Nullable SurfaceControl.Transaction t, int seqId) {
+        final int numDrawHandlers = mDrawHandlers.size();
+        if (numDrawHandlers == 0) {
+            return false;
+        }
+
         boolean applyHere = false;
         if (t == null) {
             t = mTmpTransaction;
             applyHere = true;
         }
 
-        final List<DrawHandler> handlersToRemove = new ArrayList<>();
-        // Iterate forwards to ensure we process in the same order
-        // we added.
-        for (int i = 0; i < mDrawHandlers.size(); i++) {
+        final ArrayList<DrawHandler> consumedHandlers = new ArrayList<>();
+        // Iterate in the order the handlers were added.
+        for (int i = 0; i < numDrawHandlers; i++) {
             final DrawHandler h = mDrawHandlers.get(i);
             if (h.mSeqId <= seqId) {
                 h.mConsumer.accept(t);
-                handlersToRemove.add(h);
-                hadHandlers = true;
+                consumedHandlers.add(h);
             }
         }
-        for (int i = 0; i < handlersToRemove.size(); i++) {
-            final DrawHandler h = handlersToRemove.get(i);
-            mDrawHandlers.remove(h);
+        if (consumedHandlers.isEmpty()) {
+            return false;
         }
 
-        if (hadHandlers) {
-            mWmService.mH.removeMessages(WINDOW_STATE_BLAST_SYNC_TIMEOUT, this);
-        }
-
+        mDrawHandlers.removeAll(consumedHandlers);
+        mWmService.mH.removeMessages(WINDOW_STATE_BLAST_SYNC_TIMEOUT, this);
         if (applyHere) {
             t.apply();
         }
-
-        return hadHandlers;
+        return true;
     }
 
     /**
@@ -6110,12 +6148,25 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (!mWmService.mAlwaysSeqId) {
             return mPrepareSyncSeqId > 0;
         }
-        final boolean cancel = Math.max(mSyncSeqId, mBufferSeqId) > seqId;
-        if (cancel) {
-            Trace.instant(TRACE_TAG_WINDOW_MANAGER, "cancelDraw clientSeqId=" + seqId
-                    + " serverSeqId=" + mSyncSeqId + " bufferSeqId=" + mBufferSeqId);
-        }
-        return cancel;
+        return Math.max(mSyncSeqId, mBufferSeqId) > seqId;
+    }
+
+    /**
+     * Normally, if the client hasn't received the latest configuration yet, we can't assume that
+     * the layout parameters are accurate (since they can depend on the configuration).
+     *
+     * However, there are specific situations where layout logic ignores configuration-dependent
+     * layout params AND where we are confident that those layout params aren't, themselves,
+     * configuration-dependent. We can use this information for certain optimizations.
+     *
+     * @return {@code true} if this window's client configuration is irrelevant to layout.
+     */
+    boolean layoutIgnoresClientConfig() {
+        // We are only confident that fullscreen system-ui windows remain fullscreen regardless of
+        // of configuration.
+        return mActivityRecord == null && !mIsWallpaper
+                && mAttrs.width == WindowManager.LayoutParams.MATCH_PARENT
+                && mAttrs.height == WindowManager.LayoutParams.MATCH_PARENT;
     }
 
     public boolean isActivityWindow() {

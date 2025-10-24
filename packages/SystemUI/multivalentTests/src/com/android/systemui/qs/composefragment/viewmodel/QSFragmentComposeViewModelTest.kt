@@ -28,6 +28,7 @@ import com.android.systemui.Flags
 import com.android.systemui.Flags.FLAG_QS_COMPOSE_FRAGMENT_EARLY_EXPANSION
 import com.android.systemui.common.ui.data.repository.fakeConfigurationRepository
 import com.android.systemui.coroutines.collectLastValue
+import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.media.controls.domain.pipeline.legacyMediaDataManagerImpl
 import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager
@@ -36,6 +37,7 @@ import com.android.systemui.media.controls.ui.view.MediaHostState
 import com.android.systemui.media.controls.ui.view.qqsMediaHost
 import com.android.systemui.media.controls.ui.view.qsMediaHost
 import com.android.systemui.media.remedia.data.repository.setHasMedia
+import com.android.systemui.media.remedia.shared.flag.MediaControlsInComposeFlag
 import com.android.systemui.qs.composefragment.viewmodel.MediaState.ACTIVE_MEDIA
 import com.android.systemui.qs.composefragment.viewmodel.MediaState.ANY_MEDIA
 import com.android.systemui.qs.composefragment.viewmodel.MediaState.NO_MEDIA
@@ -236,6 +238,8 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
         }
 
     @Test
+    @DisableSceneContainer
+    @DisableFlags(Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE)
     fun qqsMediaHost_initializedCorrectly() =
         with(kosmos) {
             testScope.testWithinLifecycle {
@@ -248,6 +252,8 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
         }
 
     @Test
+    @DisableSceneContainer
+    @DisableFlags(Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE)
     fun qsMediaHost_initializedCorrectly() =
         with(kosmos) {
             testScope.testWithinLifecycle {
@@ -263,9 +269,10 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
     fun qqsMediaVisible_onlyWhenActiveMedia() =
         with(kosmos) {
             testScope.testWithinLifecycle {
-                whenever(mediaCarouselController.isLockedAndHidden()).thenReturn(false)
-
-                assertThat(underTest.qqsMediaVisible).isEqualTo(underTest.qqsMediaHost.visible)
+                if (!MediaControlsInComposeFlag.isEnabled) {
+                    whenever(mediaCarouselController.isLockedAndHidden()).thenReturn(false)
+                    assertThat(underTest.qqsMediaVisible).isEqualTo(underTest.qqsMediaHost.visible)
+                }
 
                 setMediaState(NO_MEDIA)
                 assertThat(underTest.qqsMediaVisible).isFalse()
@@ -282,9 +289,10 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
     fun qsMediaVisible_onAnyMedia() =
         with(kosmos) {
             testScope.testWithinLifecycle {
-                whenever(mediaCarouselController.isLockedAndHidden()).thenReturn(false)
-
-                assertThat(underTest.qsMediaVisible).isEqualTo(underTest.qsMediaHost.visible)
+                if (!MediaControlsInComposeFlag.isEnabled) {
+                    whenever(mediaCarouselController.isLockedAndHidden()).thenReturn(false)
+                    assertThat(underTest.qsMediaVisible).isEqualTo(underTest.qsMediaHost.visible)
+                }
 
                 setMediaState(NO_MEDIA)
                 assertThat(underTest.qsMediaVisible).isFalse()
@@ -357,6 +365,8 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
         }
 
     @Test
+    @DisableSceneContainer
+    @DisableFlags(Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE)
     fun qqsMediaExpansion_collapsedMediaInLandscape() =
         with(kosmos) {
             testScope.testWithinLifecycle {
@@ -372,6 +382,8 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
         }
 
     @Test
+    @DisableSceneContainer
+    @DisableFlags(Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE)
     fun qqsMediaExpansion_notCollapsedMediaInLandscape_alwaysExpanded() =
         with(kosmos) {
             testScope.testWithinLifecycle {
@@ -387,6 +399,8 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
         }
 
     @Test
+    @DisableSceneContainer
+    @DisableFlags(Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE)
     fun qqsMediaExpansion_reactsToChangesInCollapsedMediaInLandscape() =
         with(kosmos) {
             testScope.testWithinLifecycle {
@@ -402,6 +416,8 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
         }
 
     @Test
+    @DisableSceneContainer
+    @DisableFlags(Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE)
     fun applyQsScrollPositionForClipping() =
         with(kosmos) {
             testScope.testWithinLifecycle {
@@ -418,6 +434,8 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
         }
 
     @Test
+    @DisableSceneContainer
+    @DisableFlags(Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE)
     fun shouldUpdateMediaSquishiness_inSplitShadeFalse_mediaSquishinessSet() =
         with(kosmos) {
             testScope.testWithinLifecycle {
@@ -436,6 +454,8 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
         }
 
     @Test
+    @DisableSceneContainer
+    @DisableFlags(Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE)
     fun inSplitShade_differentStatusBarState_mediaSquishinessSet() =
         with(kosmos) {
             testScope.testWithinLifecycle {
@@ -457,6 +477,8 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
         }
 
     @Test
+    @DisableSceneContainer
+    @DisableFlags(Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE)
     fun disappearParams() =
         with(kosmos) {
             testScope.testWithinLifecycle {
@@ -570,6 +592,9 @@ class QSFragmentComposeViewModelTest : AbstractQSFragmentComposeViewModelTest() 
             val activeMedia = state == ACTIVE_MEDIA
             val anyMedia = state != NO_MEDIA
             setHasMedia(visible = anyMedia, active = activeMedia)
+
+            if (MediaControlsInComposeFlag.isEnabled) return
+
             whenever(legacyMediaDataManagerImpl.hasActiveMedia()).thenReturn(activeMedia)
             whenever(legacyMediaDataManagerImpl.hasAnyMedia()).thenReturn(anyMedia)
             qqsMediaHost.showsOnlyActiveMedia = true

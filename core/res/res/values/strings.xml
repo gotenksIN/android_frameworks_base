@@ -1003,9 +1003,9 @@
     <string name="managed_profile_app_label">Switch to work <xliff:g id="app_name" example="Gmail">%1$s</xliff:g></string>
 
     <!-- Title of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permgrouplab_contacts">Contacts</string>
+    <string name="permgrouplab_contacts">Contacts and accounts</string>
     <!-- Description of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permgroupdesc_contacts">access your contacts</string>
+    <string name="permgroupdesc_contacts">access your contacts and see the list of your accounts that can save contacts on this device</string>
 
     <!-- Title of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permgrouplab_location">Location</string>
@@ -1089,9 +1089,9 @@
     <string name="permgroupdesc_xr_tracking">track eyes, face, body, and scan area</string>
 
     <!-- Title of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=40]-->
-    <string name="permgrouplab_xr_tracking_sensitive">Precise head movement and area data</string>
+    <string name="permgrouplab_xr_tracking_sensitive">Precise movement and area data</string>
     <!-- Description of a category of application permissions, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=NONE]-->
-    <string name="permgroupdesc_xr_tracking_sensitive">precisely track head and scan area</string>
+    <string name="permgroupdesc_xr_tracking_sensitive">precisely scan area and track head</string>
 
     <!-- Title for the capability of an accessibility service to retrieve window content. -->
     <string name="capability_title_canRetrieveWindowContent">Retrieve window content</string>
@@ -1878,6 +1878,11 @@
     <string name="permdesc_nearby_wifi_devices">Allows the app to advertise, connect, and determine the relative position of nearby Wi\u2011Fi devices</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=50]-->
+    <string name="permlab_access_local_network">access local network devices</string>
+    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=120]-->
+    <string name="permdesc_access_local_network">Allows the app to access local network devices</string>
+
+    <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=50]-->
     <string name="permlab_ranging">determine relative position between nearby devices</string>
     <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=120]-->
     <string name="permdesc_ranging">Allow the app to determine relative position between nearby devices</string>
@@ -1997,7 +2002,7 @@
     <string name="permdesc_scene_understanding_fine">Allows the app to precisely scan your surroundings.</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
-    <string name="permlab_xr_tracking_in_background">track XR data in the background</string>
+    <string name="permlab_xr_tracking_in_background">access XR tracking in the background</string>
     <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permdesc_xr_tracking_in_background">Allows the app to access XR data in the background.</string>
 
@@ -4434,6 +4439,15 @@
          information. -->
     <string name="gpsVerifNo">No</string>
 
+    <!-- Title for a notification that is shown when a user's location is shared for an emergency. -->
+    <string name="emergency_location_notification_title">Location shared for emergency</string>
+    <!-- Detailed message for a notification that is shown when a user's location is shared for an emergency. -->
+    <string name="emergency_location_notification_message">Emergency services received your location from your carrier</string>
+    <!-- Notification action when a user's location is shared for an emergency, that takes the user to a help center article. -->
+    <string name="emergency_location_notification_learn_more">Learn more</string>
+    <!-- DO NOT TRANSLATE. URL for the "Learn more" link on the emergency location notification. -->
+    <string name="emergency_location_notification_learn_more_url" translatable="false">https://support.google.com/android/answer/9319337?sjid=9024468350750903013-NC#send_location_automatically&amp;zippy=%2Csend-your-location-automatically</string>
+
     <!-- Error message when the sync tried to delete too many things -->
     <string name="sync_too_many_deletes">Delete limit exceeded</string>
     <!-- Dialog message for when there are too many deletes that would take place and we want user confirmation -->
@@ -5462,11 +5476,11 @@
     <!-- [CHAR LIMIT=25] String for confirmation button to enable a feature gated by the battery saver warning-->
     <string name="confirm_battery_saver">OK</string>
 
-    <!-- [CHAR_LIMIT=NONE] Battery saver: Feature description, with a "learn more" link. -->
-    <string name="battery_saver_description_with_learn_more">Battery Saver turns on Dark theme and limits or turns off background activity, some visual effects, certain features, and some network connections.</string>
+    <!-- [CHAR_LIMIT=NONE] [BACKUP_MESSAGE_ID: 5444908404021316250] Battery saver: Feature description, with a "learn more" link. -->
+    <string name="battery_saver_description_with_learn_more">Battery Saver turns on dark theme and limits or turns off background activity, some visual effects, certain features, and some network connections.</string>
 
-    <!-- [CHAR_LIMIT=NONE] Battery saver: Feature description, without a "learn more" link. -->
-    <string name="battery_saver_description">Battery Saver turns on Dark theme and limits or turns off background activity, some visual effects, certain features, and some network connections.</string>
+    <!-- [CHAR_LIMIT=NONE] [BACKUP_MESSAGE_ID: 8518809702138617167] Battery saver: Feature description, without a "learn more" link. -->
+    <string name="battery_saver_description">Battery Saver turns on dark theme and limits or turns off background activity, some visual effects, certain features, and some network connections.</string>
 
     <!-- [CHAR_LIMIT=NONE] Data saver: Feature description -->
     <string name="data_saver_description">To help reduce data usage, Data Saver prevents some apps from sending or receiving data in the background. An app you’re currently using can access data, but may do so less frequently. This may mean, for example, that images don’t display until you tap them.</string>

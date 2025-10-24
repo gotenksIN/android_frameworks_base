@@ -16,9 +16,7 @@
 
 package com.android.server.wm;
 
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.InsetsFrameProvider.SOURCE_ARBITRARY_RECTANGLE;
@@ -94,9 +92,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.content.pm.ApplicationInfo;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -112,9 +108,7 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Slog;
@@ -212,15 +206,10 @@ public class DisplayPolicy {
     private final boolean mDeskDockEnablesAccelerometer;
     private final AccessibilityManager mAccessibilityManager;
 
-// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
     private static boolean SCROLL_BOOST_SS_ENABLE = false;
-// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
     private static boolean SILKY_SCROLLS_ENABLE = false;
-// QTI_BEGIN: 2024-11-12: Performance: Send drag end event for silkyscrolls lite am: fa1f3be78e am: fa1f3be78e
     private static boolean SILKY_SCROLLS_LITE_ENABLE = false;
-// QTI_END: 2024-11-12: Performance: Send drag end event for silkyscrolls lite am: fa1f3be78e am: fa1f3be78e
     private static boolean isLowRAM = false;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
     /*
      * @hide
@@ -228,14 +217,9 @@ public class DisplayPolicy {
     BoostFramework mPerfBoostDrag = null;
     BoostFramework mPerfBoostFling = null;
     BoostFramework mPerfBoostPrefling = null;
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-04-15: Core: perf: Use get API for perf Properties.
     BoostFramework mPerf = new BoostFramework();
-// QTI_END: 2019-04-15: Core: perf: Use get API for perf Properties.
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     private boolean mIsPerfBoostFlingAcquired;
 
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     private final Object mServiceAcquireLock = new Object();
     private long mPanicTime;
     private final long mPanicThresholdMs;
@@ -469,16 +453,12 @@ public class DisplayPolicy {
 
     private String getAppPackageName() {
         String currentPackage;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         try {
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             ActivityManager.RunningTaskInfo rti = ActivityTaskManager.getService().getTasks(
                 1, false /* filterVisibleRecents */, false /*keepIntentExtra */,
                 INVALID_DISPLAY).get(0);
             currentPackage = rti.topActivity.getPackageName();
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         } catch (Exception e) {
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             currentPackage = null;
         }
         return currentPackage;
@@ -513,12 +493,10 @@ public class DisplayPolicy {
         } else {
             isGame = (BoostType.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                       currentPackage) == BoostFramework.WorkloadType.GAME);
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         }
         return isGame;
     }
 
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     DisplayPolicy(WindowManagerService service, DisplayContent displayContent) {
         mService = service;
         mContext = displayContent.isDefaultDisplay ? service.mContext
@@ -551,9 +529,7 @@ public class DisplayPolicy {
         if (mPerf != null) {
             SCROLL_BOOST_SS_ENABLE = Boolean.parseBoolean(mPerf.perfGetProp("vendor.perf.gestureflingboost.enable", "false"));
             SILKY_SCROLLS_ENABLE = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.perf.ss", "false"));
-// QTI_BEGIN: 2024-11-12: Performance: Send drag end event for silkyscrolls lite am: fa1f3be78e am: fa1f3be78e
             SILKY_SCROLLS_LITE_ENABLE = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.perf.silkyscrolls_lite", "false"));
-// QTI_END: 2024-11-12: Performance: Send drag end event for silkyscrolls lite am: fa1f3be78e am: fa1f3be78e
         }
         isLowRAM = SystemProperties.getBoolean("ro.config.low_ram", false);
 
@@ -661,10 +637,8 @@ public class DisplayPolicy {
                     }
                 }
 
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                     @Override
                     public void onVerticalFling(int duration) {
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         String currentPackage = getAppPackageName();
                         if (currentPackage == null) {
                             Slog.e(TAG, "Error: package name null");
@@ -676,7 +650,6 @@ public class DisplayPolicy {
                             return;
                         }
                         if (SCROLL_BOOST_SS_ENABLE) {
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             if (mPerfBoostFling == null) {
                                 mPerfBoostFling = new BoostFramework();
                                 mIsPerfBoostFlingAcquired = false;
@@ -685,7 +658,6 @@ public class DisplayPolicy {
                                 Slog.e(TAG, "Error: boost object null");
                                 return;
                             }
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             boolean isGame = isTopAppGame(currentPackage, mPerfBoostFling);
                             if (!isGame) {
                                 if (mPerfBoostFling.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
@@ -736,13 +708,11 @@ public class DisplayPolicy {
                                         mIsPerfBoostFlingAcquired = true;
                                 }
                             }
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         }
                     }
 
                     @Override
                     public void onScroll(boolean started) {
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         String currentPackage = getAppPackageName();
                         if (currentPackage == null) {
                             Slog.e(TAG, "Error: package name null");
@@ -754,7 +724,6 @@ public class DisplayPolicy {
                             return;
                         }
                         boolean isGame;
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         if (mPerfBoostDrag == null) {
                             mPerfBoostDrag = new BoostFramework();
                         }
@@ -762,9 +731,7 @@ public class DisplayPolicy {
                             Slog.e(TAG, "Error: boost object null");
                             return;
                         }
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         if (SCROLL_BOOST_SS_ENABLE && started) {
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             if (mPerfBoostPrefling == null) {
                                 mPerfBoostPrefling = new BoostFramework();
                             }
@@ -772,7 +739,6 @@ public class DisplayPolicy {
                                 Slog.e(TAG, "Error: boost object null");
                                 return;
                             }
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             isGame = isTopAppGame(currentPackage, mPerfBoostPrefling);
                             if (!isGame) {
                                 if (mPerfBoostPrefling.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
@@ -784,13 +750,9 @@ public class DisplayPolicy {
                                         currentActivity, -1, BoostFramework.Scroll.PREFILING);
                                 }
                             }
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         }
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         isGame = isTopAppGame(currentPackage, mPerfBoostDrag);
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         if (!isGame && started) {
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             if (SILKY_SCROLLS_ENABLE) {
                                 if(mPerfBoostDrag.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
                                     mPerfBoostDrag.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
@@ -802,36 +764,26 @@ public class DisplayPolicy {
                             if(mPerfBoostDrag.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
                                mPerfBoostDrag.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
                                     mPerfBoostDrag.perfHint(BoostFramework.VENDOR_HINT_DRAG_BOOST,
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                                             currentPackage, -1, 1);
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             } else {
                                 mPerfBoostDrag.perfHint(BoostFramework.VENDOR_HINT_DRAG_BOOST,
                                             currentActivity, -1, 1);
                             }
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                         } else {
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2024-11-12: Performance: Send drag end event for silkyscrolls lite am: fa1f3be78e am: fa1f3be78e
                             if (SILKY_SCROLLS_ENABLE || SILKY_SCROLLS_LITE_ENABLE){
-// QTI_END: 2024-11-12: Performance: Send drag end event for silkyscrolls lite am: fa1f3be78e am: fa1f3be78e
                             if(mPerfBoostDrag.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
                                mPerfBoostDrag.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
                                     mPerfBoostDrag.perfEvent(BoostFramework.VENDOR_HINT_DRAG_END, currentPackage);
                                } else {
                                    mPerfBoostDrag.perfEvent(BoostFramework.VENDOR_HINT_DRAG_END, currentActivity);
                                }
-// QTI_BEGIN: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
                             } else if (mPerfBoostDrag.board_first_api_lvl >= BoostFramework.VENDOR_V_API_LEVEL) {
                                mPerfBoostDrag.perfHintRelease();
-// QTI_END: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
                             }
-// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                             mPerfBoostDrag.perfLockRelease();
                         }
                     }
 
-// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                 @Override
                 public void onUpOrCancel() {
                     final WindowOrientationListener listener = getOrientationListener();
@@ -2312,7 +2264,6 @@ public class DisplayPolicy {
         static class Info {
             // TODO(b/409608996):
             //  Remove mNonDecorInsets, mConfigInsets -> always empty
-            //  Remove mNonDecorFrame, mConfigFrame -> always the same as display frame
             /**
              * The insets for the areas that could never be removed, i.e. display cutout and
              * navigation bar. Note that its meaning is actually "decor insets". The "non" is just
@@ -2336,23 +2287,16 @@ public class DisplayPolicy {
              */
             final Rect mOverrideNonDecorInsets = new Rect();
 
-            /** The display frame available after excluding {@link #mNonDecorInsets}. */
-            final Rect mNonDecorFrame = new Rect();
-
             /**
-             * The available (stable) screen size that we should report for the configuration.
-             * This must be no larger than {@link #mNonDecorFrame}; it may be smaller than that
-             * to account for more transient decoration like a status bar.
-             */
-            final Rect mConfigFrame = new Rect();
-
-            /**
-             * Override value of mConfigFrame for app compatibility purpose.
+             * Override available (stable) screen size for app compatibility purpose.
+             * This must be no larger than {@link #mOverrideNonDecorFrame}; it may be smaller than
+             * that to account for more transient decoration like a status bar.
              */
             final Rect mOverrideConfigFrame = new Rect();
 
             /**
-             * Override value of mNonDecorFrame for app compatibility purpose.
+             * Override display frame which excludes {@link #mOverrideNonDecorInsets} for app
+             * compatibility purpose.
              */
             final Rect mOverrideNonDecorFrame = new Rect();
 
@@ -2374,8 +2318,6 @@ public class DisplayPolicy {
                         overrideConfigInsets.right, overrideConfigInsets.bottom);
                 mOverrideNonDecorInsets.set(overrideDecorInsets.left, overrideDecorInsets.top,
                         overrideDecorInsets.right, overrideDecorInsets.bottom);
-                mNonDecorFrame.set(displayFrame);
-                mConfigFrame.set(displayFrame);
                 mOverrideConfigFrame.set(displayFrame);
                 mOverrideConfigFrame.inset(mOverrideConfigInsets);
                 mOverrideNonDecorFrame.set(displayFrame);
@@ -2388,8 +2330,6 @@ public class DisplayPolicy {
                 mConfigInsets.set(other.mConfigInsets);
                 mOverrideConfigInsets.set(other.mOverrideConfigInsets);
                 mOverrideNonDecorInsets.set(other.mOverrideNonDecorInsets);
-                mNonDecorFrame.set(other.mNonDecorFrame);
-                mConfigFrame.set(other.mConfigFrame);
                 mOverrideConfigFrame.set(other.mOverrideConfigFrame);
                 mOverrideNonDecorFrame.set(other.mOverrideNonDecorFrame);
                 mNeedUpdate = false;
@@ -2402,9 +2342,7 @@ public class DisplayPolicy {
                         + ", overrideNonDecorInsets=" + mOverrideNonDecorInsets.toShortString(tmpSb)
                         + ", configInsets=" + mConfigInsets.toShortString(tmpSb)
                         + ", overrideConfigInsets=" + mOverrideConfigInsets.toShortString(tmpSb)
-                        + ", nonDecorFrame=" + mNonDecorFrame.toShortString(tmpSb)
                         + ", overrideNonDecorFrame=" + mOverrideNonDecorFrame.toShortString(tmpSb)
-                        + ", configFrame=" + mConfigFrame.toShortString(tmpSb)
                         + ", overrideConfigFrame=" + mOverrideConfigFrame.toShortString(tmpSb)
                         + '}';
             }
@@ -2507,9 +2445,7 @@ public class DisplayPolicy {
         final DecorInsets.Info newInfo = mDecorInsets.mTmpInfo;
         newInfo.update(mDisplayContent, rotation, dw, dh);
         final DecorInsets.Info currentInfo = getDecorInsetsInfo(rotation, dw, dh);
-        final boolean sameConfigFrame = newInfo.mConfigFrame.equals(currentInfo.mConfigFrame);
-        if (sameConfigFrame
-                && newInfo.mOverrideConfigFrame.equals(currentInfo.mOverrideConfigFrame)) {
+        if (newInfo.mOverrideConfigFrame.equals(currentInfo.mOverrideConfigFrame)) {
             return false;
         }
         if (mCachedDecorInsets != null && !mCachedDecorInsets.canPreserve() && mScreenOnFully) {
@@ -2522,7 +2458,7 @@ public class DisplayPolicy {
             // clients receive the new states earlier.
             return true;
         }
-        return !sameConfigFrame;
+        return false;
     }
 
     DecorInsets.Info getDecorInsetsInfo(int rotation, int w, int h) {
@@ -2594,9 +2530,11 @@ public class DisplayPolicy {
         final ArrayList<InsetsSource> preservedSources = mCachedDecorInsets.mPreservedInsets;
         final InsetsState state = copyState ? new InsetsState(originalState) : originalState;
         for (int i = preservedSources.size() - 1; i >= 0; i--) {
-            final InsetsSource cacheSource = preservedSources.get(i);
-            if (state.peekSource(cacheSource.getId()) != null) {
-                state.addSource(new InsetsSource(cacheSource));
+            final InsetsSource cachedSource = preservedSources.get(i);
+            final InsetsSource originalSource = state.peekSource(cachedSource.getId());
+            if (originalSource != null) {
+                state.addSource(new InsetsSource(cachedSource)
+                        .setVisible(originalSource.isVisible()));
             }
         }
         return state;
@@ -2869,12 +2807,14 @@ public class DisplayPolicy {
     }
 
     void updateSystemBarAttributes() {
+        // The focused window always needs to be sent to System UI regardless of filling
+        // display when the remote insets controller is controlling system bars.
+        final boolean isRemoteControlling = isRemoteInsetsControllerControllingSystemBars();
         // If there is no window focused, there will be nobody to handle the events
         // anyway, so just hang on in whatever state we're in until things settle down.
         WindowState winCandidate =
-                mFocusedWindow != null && fillsDisplayWindowingMode(mFocusedWindow)
-                        ? mFocusedWindow
-                        : mTopFullscreenOpaqueWindowState;
+                mFocusedWindow != null && (isRemoteControlling || fillsDisplayWindowingMode(
+                        mFocusedWindow)) ? mFocusedWindow : mTopFullscreenOpaqueWindowState;
 
         // Immersive mode confirmation should never affect the system bar visibility, otherwise
         // it will unhide the navigation bar and hide itself.
@@ -2884,7 +2824,7 @@ public class DisplayPolicy {
                 // Let notification shade control the system bar visibility.
                 winCandidate = mNotificationShade;
             } else if (mLastFocusedWindow != null && mLastFocusedWindow.canReceiveKeys()
-                    && fillsDisplayWindowingMode(mLastFocusedWindow)) {
+                    && (isRemoteControlling || fillsDisplayWindowingMode(mLastFocusedWindow))) {
                 // Immersive mode confirmation took the focus from mLastFocusedWindow which was
                 // controlling the system bar visibility. Let it keep controlling the visibility.
                 winCandidate = mLastFocusedWindow;
@@ -2894,7 +2834,8 @@ public class DisplayPolicy {
         }
         if (winCandidate == null) {
             final ActivityRecord focusedApp = mDisplayContent.mFocusedApp;
-            if (focusedApp == null || fillsDisplayWindowingMode(focusedApp)) {
+            if (focusedApp == null
+                    || (isRemoteControlling || fillsDisplayWindowingMode(focusedApp))) {
                 // Don't change the system UI controlling window when the new one is not ready.
                 return;
             }

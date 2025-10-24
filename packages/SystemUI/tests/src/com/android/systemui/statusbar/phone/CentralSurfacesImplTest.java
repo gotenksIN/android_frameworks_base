@@ -28,7 +28,6 @@ import static android.provider.Settings.Global.HEADS_UP_NOTIFICATIONS_ENABLED;
 import static android.provider.Settings.Global.HEADS_UP_ON;
 
 import static com.android.systemui.flags.Flags.SHORTCUT_LIST_SEARCH_LAYOUT;
-import static com.android.systemui.shared.Flags.FLAG_AMBIENT_AOD;
 import static com.android.systemui.statusbar.StatusBarState.KEYGUARD;
 import static com.android.systemui.statusbar.StatusBarState.SHADE;
 import static com.android.systemui.statusbar.phone.CentralSurfaces.MSG_DISMISS_KEYBOARD_SHORTCUTS_MENU;
@@ -107,7 +106,6 @@ import com.android.systemui.accessibility.floatingmenu.AccessibilityFloatingMenu
 import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.assist.AssistManager;
 import com.android.systemui.back.domain.interactor.BackActionInteractor;
-import com.android.systemui.biometrics.AuthRippleController;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.charging.WiredChargingRippleController;
@@ -140,7 +138,6 @@ import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.qs.flags.QSComposeFragment;
 import com.android.systemui.res.R;
 import com.android.systemui.scene.domain.interactor.WindowRootViewVisibilityInteractor;
-import com.android.systemui.scene.domain.startable.ScrimStartable;
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.settings.brightness.BrightnessSliderController;
@@ -201,6 +198,7 @@ import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.ExtensionController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserInfoControllerImpl;
+import com.android.systemui.statusbar.policy.domain.interactor.DeviceProvisioningInteractor;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
 import com.android.systemui.statusbar.window.StatusBarWindowControllerStore;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
@@ -242,7 +240,6 @@ import javax.inject.Provider;
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 @RunWithLooper(setAsMainLooper = true)
-@EnableFlags(FLAG_AMBIENT_AOD)
 public class CentralSurfacesImplTest extends SysuiTestCase {
 
     private static final DeviceState FOLD_STATE_FOLDED = new DeviceState(
@@ -290,7 +287,6 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     @Mock private DozeScrimController mDozeScrimController;
     @Mock private Lazy<BiometricUnlockController> mBiometricUnlockControllerLazy;
     @Mock private BiometricUnlockController mBiometricUnlockController;
-    @Mock private AuthRippleController mAuthRippleController;
     @Mock private KeyguardViewMediator mKeyguardViewMediator;
     @Mock private NotificationLockscreenUserManager mLockscreenUserManager;
     @Mock private NotificationRemoteInputManager mRemoteInputManager;
@@ -449,7 +445,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                         Optional.of(mBubbles),
                         mContext,
                         mNotificationManager,
-                        mNotificationSettingsInteractor);
+                        mNotificationSettingsInteractor,
+                        mock(DeviceProvisioningInteractor.class));
         mVisualInterruptionDecisionProvider.start();
 
         mContext.addMockSystemService(TrustManager.class, mock(TrustManager.class));
@@ -604,9 +601,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 (Lazy<NotificationActivityStarter>) () -> mNotificationActivityStarter,
                 mNotifTransitionAnimControllerProvider,
                 mDozeParameters,
-                mScrimController,
+                () -> mScrimController,
                 mBiometricUnlockControllerLazy,
-                mAuthRippleController,
                 mDozeServiceHost,
                 mBackActionInteractor,
                 mPowerManager,
@@ -1196,25 +1192,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableSceneContainer
-    public void brightnesShowingChanged_sceneContainerFlagEnabled_ScrimControllerNotified() {
-        final ScrimStartable scrimStartable = mKosmos.getScrimStartable();
-        scrimStartable.start();
-
-        mBrightnessMirrorShowingRepository.setMirrorShowing(true);
-        mTestScope.getTestScheduler().runCurrent();
-        verify(mScrimController, atLeastOnce()).transitionTo(ScrimState.BRIGHTNESS_MIRROR);
-
-        mBrightnessMirrorShowingRepository.setMirrorShowing(false);
-        mTestScope.getTestScheduler().runCurrent();
-        ArgumentCaptor<ScrimState> captor = ArgumentCaptor.forClass(ScrimState.class);
-        // The default is to call the one with the callback argument
-        verify(mScrimController, atLeastOnce()).transitionTo(captor.capture());
-        assertThat(captor.getValue()).isNotEqualTo(ScrimState.BRIGHTNESS_MIRROR);
-    }
-
-    @Test
-    @DisableSceneContainer // ScrimStartable updates scrims when the scene framework is enabled.
+    @DisableSceneContainer // Scrims updated elsewhere when the scene framework is enabled.
     @EnableFlags(QSComposeFragment.FLAG_NAME)
     public void brightnesShowingChanged_qsUiRefactorFlagEnabled_ScrimControllerNotified() {
         mBrightnessMirrorShowingRepository.setMirrorShowing(true);
@@ -1231,7 +1209,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     }
 
     @Test
-    @DisableSceneContainer // ScrimStartable updates scrims when the scene framework is enabled.
+    @DisableSceneContainer // Scrims updated elsewhere when the scene framework is enabled.
     @DisableFlags(QSComposeFragment.FLAG_NAME)
     public void brightnesShowingChanged_flagsDisabled_ScrimControllerNotified() {
         mBrightnessMirrorShowingRepository.setMirrorShowing(true);

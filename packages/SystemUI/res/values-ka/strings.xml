@@ -21,8 +21,10 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="app_label" msgid="4811759950673118541">"სისტემის UI"</string>
     <string name="battery_low_title" msgid="5319680173344341779">"გსურთ ბატარეის დამზოგის ჩართვა?"</string>
-    <string name="battery_low_description" msgid="3282977755476423966">"თქვენი ბატარეა დატენილია <xliff:g id="PERCENTAGE">%s</xliff:g>-ზე. ბატარეის დამზოგი ჩართავს მუქ თემას, შეზღუდავს აქტივობას ფონურ რეჟიმში და შეტყობინებების მიღება შეფერხდება."</string>
-    <string name="battery_low_intro" msgid="5148725009653088790">"ბატარეის დამზოგი ჩართავს მუქ თემას, შეზღუდავს აქტივობას ფონურ რეჟიმში და შეტყობინებების მიღება შეფერხდება."</string>
+    <!-- no translation found for battery_low_description (7848989602036547056) -->
+    <skip />
+    <!-- no translation found for battery_low_intro (8033783734931200690) -->
+    <skip />
     <string name="battery_low_percent_format" msgid="4276661262843170964">"დარჩენილია <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
     <string name="invalid_charger_title" msgid="938685362320735167">"USB-თ დატენვა ვერ ხერხდება"</string>
     <string name="invalid_charger_text" msgid="2339310107232691577">"გამოიყენეთ დამტენი, რომელიც თქვენს მოწყობილობას მოჰყვა"</string>
@@ -138,36 +140,50 @@
     <string name="screenrecord_stop_dialog_message" msgid="6262768207331626817">"თქვენ ამჟამად იწერთ თქვენს მთლიან ეკრანს"</string>
     <string name="screenrecord_stop_dialog_message_specific_app" msgid="5995770227684523244">"თქვენ ამჟამად იწერთ <xliff:g id="APP_NAME">%1$s</xliff:g>-ს"</string>
     <string name="screenrecord_stop_dialog_button" msgid="2883812564938194350">"ჩაწერის შეწყვეტა"</string>
+    <string name="screen_record_entire_screen" msgid="66944996337928170">"მთელი ეკრანი"</string>
+    <string name="screen_record_single_app" msgid="7355880948574569290">"ერთი აპი"</string>
+    <string name="screen_record_single_app_hint" msgid="8404332826093639170">"ჩასაწერი აპი"</string>
+    <string name="screen_record_single_app_no_recents" msgid="1023249803854209330">"ერთი აპი (ასარჩევად გახსენით აპი)"</string>
     <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"მოწყობილობის აუდიოს ჩაწერა"</string>
     <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"მიკროფონის ჩაწერა"</string>
+    <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"სელფის კამერის ჩვენება"</string>
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"შეხების ჩვენება"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"აპის არჩევა ჩასაწერად"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"ვიდეო შენახულია"</string>
+    <string name="screen_record_video_deleted" msgid="30786214839944540">"ვიდეო წაშლილია"</string>
+    <string name="screen_record_undo" msgid="7942716736019800870">"მოქმედების გაუქმება"</string>
     <string name="screen_record_retake" msgid="3846643688365398450">"ხელახლა გადაღება"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"რედაქტირება"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"წაშლა"</string>
+    <string name="screen_record_delete_dialog_title" msgid="5868561491974057044">"წაიშალოს ეს ჩანაწერი?"</string>
+    <string name="screen_record_delete_dialog_content" msgid="2610040845214024496">"ამ ჩანაწერის წაშლით ვიდეო სამუდამოდ წაიშლება."</string>
+    <string name="screen_record_play" msgid="4732544724679889445">"დაკვრა"</string>
+    <string name="screen_record_pause" msgid="1715012292444967776">"დაპაუზება"</string>
+    <string name="screen_record_mute" msgid="8111682249858638168">"დადუმება"</string>
+    <string name="screen_record_unmute" msgid="2207912659365156472">"დადუმების მოხსნა"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"სრული ეკრანის ანაბეჭდის გადაღება"</string>
+    <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"მთლიანი ეკრანის ჩაწერა"</string>
     <string name="screen_capture_region_selection_button" msgid="515608875142444130">"ეკრანის მონიშნული მონაკვეთის ანაბეჭდის გადაღება"</string>
-    <!-- no translation found for screen_capture_record_region_selection_button (3699353194755563053) -->
-    <skip />
+    <string name="screen_capture_record_region_selection_button" msgid="3699353194755563053">"არჩეული მონაკვეთის ჩაწერა"</string>
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"ეკრანის ანაბეჭდი"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"ჩაწერა"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"გაზიარება"</string>
-    <!-- no translation found for screen_capture_toolbar_app_window_button_screenshot_a11y (1357560392667941303) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_app_window_button_record_a11y (8984966592912823394) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_region_button_screenshot_a11y (2102262602357521192) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_region_button_record_a11y (6829009792885846867) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_fullscreen_button_screenshot_a11y (8699983355979869210) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_fullscreen_button_record_a11y (852148867883959158) -->
-    <skip />
-    <!-- no translation found for screen_capture_toolbar_settings_button_a11y (8014446956996739704) -->
-    <skip />
+    <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"გასაზიარებელი აპის არჩევა"</string>
+    <string name="screen_share_app_audio_sharing" msgid="7201172218924898712">"ფანჯრის აუდიოს გაზიარება"</string>
+    <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"ფანჯრის ეკრანის ანაბეჭდის გადაღება"</string>
+    <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"ფანჯრის ჩაწერა"</string>
+    <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"ეკრანის მონიშნული მონაკვეთის ანაბეჭდის გადაღება"</string>
+    <string name="screen_capture_toolbar_region_button_record_a11y" msgid="6829009792885846867">"არჩეული მონაკვეთის ჩაწერა"</string>
+    <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"მთლიანი ეკრანის ანაბეჭდის გადაღება"</string>
+    <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"მთლიანი ეკრანის ჩაწერა"</string>
+    <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"ეკრანის აღბეჭდვის პარამეტრები"</string>
+    <string name="screen_capture_show_clicks_and_keys" msgid="2151690554364148717">"დაწკ. და კლავიშების ჩვენება"</string>
+    <string name="screen_capture_device_audio" msgid="1537290197773737349">"მოწყობილობის აუდიო"</string>
+    <string name="screen_capture_microphone_audio" msgid="1698835678818747741">"მიკროფონი"</string>
+    <string name="screen_capture_front_camera" msgid="1214647538302639358">"წინა კამერა"</string>
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> x <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
+    <!-- no translation found for screen_share_privacy_indicator_stop_sharing (2297045039651417274) -->
+    <skip />
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"მიმდინარეობს ეკრანის გაზიარება"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"კონტენტის გაზიარება"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"გსურთ ეკრანის გაზიარების შეწყვეტა?"</string>
@@ -481,12 +497,15 @@
     <string name="accessibility_hearing_device_pair_new_device" msgid="8440082580186130090">"დააწკაპუნეთ ახალი მოწყობილობის დასაწყვილებლად"</string>
     <string name="hearing_devices_presets_error" msgid="350363093458408536">"წინასწარ დაყენებული პარამეტრების განახლება ვერ მოხერხდა"</string>
     <string name="hearing_devices_preset_label" msgid="7878267405046232358">"წინასწარ დაყენებული"</string>
+    <!-- no translation found for hearing_devices_preset_label_left (7427947566560179945) -->
+    <skip />
+    <!-- no translation found for hearing_devices_preset_label_right (1847206329436268522) -->
+    <skip />
     <string name="hearing_devices_input_routing_label" msgid="730396728151232306">"ნაგულისხმევი მიკროფონი ზარებისთვის"</string>
   <string-array name="hearing_device_input_routing_options">
     <item msgid="4582190415045337003">"სმენის მოწყობილობის მიკროფონი"</item>
     <item msgid="8501466270452446450">"ამ ტელეფონის მიკროფონი"</item>
   </string-array>
-    <string name="hearing_devices_spinner_item_selected" msgid="3137083889662762383">"არჩეულია"</string>
     <string name="hearing_devices_ambient_label" msgid="629440938614895797">"გარემოცვა"</string>
     <string name="hearing_devices_ambient_control_left" msgid="3586965448230412600">"მარცხენა"</string>
     <string name="hearing_devices_ambient_control_right" msgid="6192137602448918383">"მარჯვენა"</string>
@@ -540,7 +559,7 @@
     <string name="zen_mode_set_up" msgid="8231201163894922821">"არ არის დაყენებული"</string>
     <string name="zen_mode_no_manual_invocation" msgid="1769975741344633672">"პარამეტრებში მართვა"</string>
     <string name="zen_mode_active_modes" msgid="1625850411578488856">"{count,plural, =0{აქტიური რეჟიმები არ მოიძებნა}=1{{mode} აქტიურია}other{აქტიურია # რეჟიმი}}"</string>
-    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"<xliff:g id="NUMBER">%s</xliff:g> რეჟიმი"</string>
+    <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"<xliff:g id="NUMBER">%d</xliff:g> რეჟიმი"</string>
     <string name="zen_modes_multiple_on_status" msgid="8120633422509269588">"ჩართული"</string>
     <string name="zen_priority_introduction" msgid="3159291973383796646">"თქვენ მიერ მითითებული მაღვიძარების, შეხსენებების, მოვლენებისა და ზარების გარდა, არავითარი ხმა და ვიბრაცია არ შეგაწუხებთ. თქვენ მაინც შეძლებთ სასურველი კონტენტის, მაგალითად, მუსიკის, ვიდეოებისა და თამაშების აუდიოს მოსმენა."</string>
     <string name="zen_alarms_introduction" msgid="3987266042682300470">"მაღვიძარების გარდა, არავითარი ხმა და ვიბრაცია არ შეგაწუხებთ. თქვენ მაინც შეძლებთ სასურველი კონტენტის, მაგალითად, მუსიკის, ვიდეოებისა და თამაშების აუდიოს მოსმენა."</string>
@@ -687,8 +706,8 @@
     <string name="notification_section_header_conversations" msgid="821834744538345661">"საუბრები"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"ყველა ჩუმი შეტყობინების გასუფთავება"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"შეტყობინების პარამეტრების გახსნა"</string>
-    <string name="dnd_suppressing_shade_text" msgid="5588252250634464042">"შეტყობინებები დაპაუზდა „არ შემაწუხოთ“ რეჟიმის მეშვეობით"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{შეტყობინებები არ არის}=1{შეტყობინებები შეჩერებულია {mode}-ის გამო}=2{შეტყობინებები შეჩერებულია {mode}-ის და ერთი სხვა რეჟიმის გამო}other{შეტყობინებები შეჩერებულია {mode}-ის და # სხვა რეჟიმის გამო}}"</string>
+    <string name="caught_up_shade_text" msgid="8166221989384139659">"მეტი არაფერია"</string>
     <string name="media_projection_action_text" msgid="3634906766918186440">"დაწყება ახლავე"</string>
     <string name="empty_shade_text" msgid="8935967157319717412">"შეტყობინებები არ არის."</string>
     <string name="no_unseen_notif_text" msgid="395512586119868682">"ახალი შეტყობინებები არ არის"</string>
@@ -882,7 +901,7 @@
     <string name="notification_guts_news_summary" msgid="638697931043407835">"მთავარი ამბები, სარედაქციო სტატიები და სხვა"</string>
     <string name="notification_guts_social_summary" msgid="3749147631983977040">"მოწონებები, პოსტები და სხვა"</string>
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"ნიუსლეთერები, რეკომენდებული მედია და სხვა"</string>
-    <string name="notification_onboarding_summaries_turn_on" msgid="5050003857531272655">"ჩართვა"</string>
+    <string name="notification_onboarding_summaries_turn_on" msgid="3831339570984683297">"ჩართვა პარამეტრებში"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"ახლა უკვე შესაძლებელია თქვენი უფრო გრძელი საუბრების შეჯამება სწრაფი მიმოხილვების მისაღებად"</string>
     <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"შეტყობინებების ორგანიზატორი აერთიანებს და ადუმებს დაბალი პრიორიტეტის შეტყობინებებს. მეტი კატეგორიის დამატება პარამეტრებიდან შეგიძლიათ."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# შეტყობინება}other{# შეტყობინება}}"</string>
@@ -988,6 +1007,7 @@
     <string name="group_system_access_notification_shade" msgid="1619028907006553677">"შეტყობინებების ნახვა"</string>
     <string name="group_system_access_quick_settings_panel" msgid="1844771096582064926">"სწრაფი პარამეტრების ნახვა"</string>
     <string name="group_system_full_screenshot" msgid="5742204844232667785">"ეკრანის ანაბეჭდის გადაღება"</string>
+    <string name="group_system_partial_screenshot" msgid="2114314797127648010">"ეკრანის ნაწილობრივი ანაბეჭდის გადაღება"</string>
     <string name="group_system_access_system_app_shortcuts" msgid="8562482996626694026">"მალსახმობების ჩვენება"</string>
     <string name="group_system_go_back" msgid="2730322046244918816">"უკან დაბრუნება"</string>
     <string name="group_system_access_home_screen" msgid="4130366993484706483">"მთავარ ეკრანზე გადასვლა"</string>
@@ -999,7 +1019,6 @@
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"ციფრული ასისტენტის გახსნა"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"ჩაკეტილი ეკრანი"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"ჩაინიშნეთ"</string>
-    <string name="group_system_close_window" msgid="1506354809787837043">"მიმდინარე ფანჯრის დახურვა"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"მრავალამოცანიანი რეჟიმი"</string>
     <string name="system_multitasking_rhs" msgid="8779289852395243004">"ეკრანის გაყოფის გამოყენება აპზე მარჯვნივ"</string>
     <string name="system_multitasking_lhs" msgid="7348595296208696452">"ეკრანის გაყოფის გამოყენება აპზე მარცხნივ"</string>
@@ -1013,6 +1032,7 @@
     <string name="system_desktop_mode_snap_right_window" msgid="2162560187639411929">"ფანჯრის მარჯვნივ გადაადგილება"</string>
     <string name="system_desktop_mode_toggle_maximize_window" msgid="4084100093691768239">"ფანჯრის გაშლა"</string>
     <string name="system_desktop_mode_minimize_window" msgid="1248714536732927092">"ფანჯრის ჩაკეცვა"</string>
+    <string name="system_desktop_mode_close_window" msgid="3072490692608682536">"მიმდინარე ფანჯრის დახურვა"</string>
     <string name="system_multiple_desktop_mode_switch_between_desks" msgid="6093884593003003708">"დესკტოპებს შორის გადატანა"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"შეყვანა"</string>
     <string name="input_switch_input_language_next" msgid="3782155659868227855">"შემდეგ ენაზე გადართვა"</string>
@@ -1134,16 +1154,15 @@
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"ჩაირთოს <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"მოქმედების "<annotation id="action_key_icon">"ხატულა"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> არის კლავიატურის მალსახმობი <xliff:g id="ID_3">^3</xliff:g>-ის გამოსაყენებლად. <xliff:g id="ID_4">^4</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_talkback_intro" msgid="1617808784388544741">"<xliff:g id="ID_1">%1$s</xliff:g> არის ეკრანის წამკითხველი, რომელიც საშუალებას გაძლევთ, მოისმინოთ ხმამაღლა წარმოთქმული ტექსტი. ეს ეხმარება მხედველობის შეზღუდვის მქონე ადამიანებს, რომლებსაც ეკრანის ყურება უჭირთ."</string>
-    <string name="accessibility_key_gesture_dialog_va_intro" msgid="4709198503441288289">"<xliff:g id="ID_1">%1$s</xliff:g> საშუალებას გაძლევთ, თქვენი მოწყობილობა უკონტაქტოდ მართოთ."</string>
     <string name="accessibility_key_gesture_dialog_positive_button_text" msgid="3670746017523589293">"ჩართვა"</string>
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_title (5770691510738701250) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_content (7575802369763469379) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_negative_button_text (8393469413785600834) -->
-    <skip />
-    <!-- no translation found for accessibility_key_gesture_magnification_dialog_positive_button_text (895076240681888057) -->
-    <skip />
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"გსურთ, ჩაირთოს <xliff:g id="ID_1">%1$s</xliff:g> კლავიატურის მალსახმობი?"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"არ ჩაირთოს"</string>
+    <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"მალსახმობის ჩართვა"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"<xliff:g id="ID_1">%1$s</xliff:g> კლავიატურის მალსახმობი ჩართულია"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572">"მოქმედების "<annotation id="action_key_icon">"ხატულა"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> არის კლავიატურის მალსახმობი <xliff:g id="ID_3">^3</xliff:g>-ის, მარტივი წვდომის ფუნქციის გამოსაყენებლად. ეს საშუალებას გაძლევთ, სწრაფად გაადიდოთ მასშტაბი ეკრანზე კონტენტის გასადიდებლად. როდესაც გადიდება ჩართულია, მასშტაბის კორექტირებისთვის დააჭირეთ მოქმედების "<annotation id="action_key_icon">"ხატულას"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> და „+“ ან „-“."</string>
+    <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"მალსახმობის გამორთვა"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"დარჩეს ჩართული"</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"დაჭერა მოქმედების "<annotation id="action_key_icon">"ხატულაზე"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> რთავს <xliff:g id="ID_3">^3</xliff:g>-ს, მარტივი წვდომის ფუნქციას. ეს საშუალებას გაძლევთ, თქვენი მოწყობილობა უკონტაქტოდ მართოთ."</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"ჩაკეტილი ეკრანი"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"მიმდინარეობს გამორთვა…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"მისაღები ზომების გაცნობა"</string>
@@ -1474,7 +1493,6 @@
     <string name="clipboard_edit_text_done" msgid="4551887727694022409">"მზადაა"</string>
     <string name="clipboard_overlay_text_copied" msgid="1872624400464891363">"კოპირებულია"</string>
     <string name="clipboard_edit_source" msgid="9156488177277788029">"<xliff:g id="APPNAME">%1$s</xliff:g>-დან"</string>
-    <string name="clipboard_dismiss_description" msgid="3335990369850165486">"კოპირებული ტექსტის უარყოფა"</string>
     <string name="clipboard_edit_text_description" msgid="805254383912962103">"კოპირებული ტექსტის რედაქტირება"</string>
     <string name="clipboard_edit_image_description" msgid="8904857948976041306">"კოპირებული სურათის რედაქტირება"</string>
     <string name="clipboard_send_nearby_description" msgid="4629769637846717650">"ახლომახლო მოწყობილობაზე გაგზავნა"</string>
@@ -1614,6 +1632,7 @@
     <string name="shortcut_helper_customize_dialog_reset_button_label" msgid="7645535254306312685">"დიახ, გადაყენდეს"</string>
     <string name="shortcut_helper_customize_dialog_cancel_button_label" msgid="5595546460431741178">"გაუქმება"</string>
     <string name="shortcut_helper_add_shortcut_dialog_placeholder" msgid="9154297849458741995">"დააჭირეთ კლავიშს"</string>
+    <string name="shortcut_helper_customizer_action_key_text" msgid="3979063901857046887">"მოქმედება"</string>
     <string name="shortcut_customizer_key_combination_in_use_error_message" msgid="3325858369539848162">"კლავიშების კომბინაცია უკვე გამოიყენება. ცადეთ სხვა კომბინაცია."</string>
     <string name="shortcut_customizer_generic_error_message" msgid="3128454624049722741">"მალსახმობის დაყენება ვერ ხერხდება."</string>
     <string name="shortcut_helper_plus_symbol" msgid="4534843157353732011">"+"</string>

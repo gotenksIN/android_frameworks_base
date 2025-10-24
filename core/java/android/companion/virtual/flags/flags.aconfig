@@ -246,3 +246,53 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "computer_control_consent"
+    namespace: "virtual_devices"
+    description: "Show a consent dialog for computer control session creation"
+    bug: "437901655"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "automated_app_launch_interception"
+    namespace: "virtual_devices"
+    description: "Show a warning dialog when launching an automated app"
+    bug: "442627126"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "computer_control_activity_policy_strict"
+    namespace: "virtual_devices"
+    description: "Implements a strict Activity policy for ComputerControl VirtualDevices"
+    bug: "437849470"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "computer_control_typing"
+    namespace: "virtual_devices"
+    description: "Support input connection based CC text manipulation APIs"
+    bug: "422134565"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "computer_control_config_change_override"
+    namespace: "virtual_devices"
+    description: "Overrides configuration changes for display moves from/to ComputerControl VirtualDisplays"
+    bug: "437848392"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}

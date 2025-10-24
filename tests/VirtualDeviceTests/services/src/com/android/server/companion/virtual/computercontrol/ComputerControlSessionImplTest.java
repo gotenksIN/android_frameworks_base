@@ -34,10 +34,13 @@ import static com.android.server.companion.virtual.computercontrol.ComputerContr
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assert.assertThrows;
+import static org.mockito.AdditionalMatchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
@@ -48,6 +51,7 @@ import static org.mockito.Mockito.when;
 import android.annotation.SuppressLint;
 import android.app.ActivityOptions;
 import android.companion.virtual.ActivityPolicyExemption;
+import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager.VirtualDevice;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.audio.AudioCapture;
@@ -91,6 +95,7 @@ import android.platform.test.flag.junit.SetFlagsRule;
 import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.KeyEvent;
+import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
@@ -138,8 +143,9 @@ public class ComputerControlSessionImplTest {
             List.of(TARGET_PACKAGE_1, TARGET_PACKAGE_2);
     private static final String UNDECLARED_TARGET_PACKAGE = "com.android.baz";
     private static final String TARGET_CLASS = "com.android.foo.FooActivity";
-    private static final Set<UserHandle> ALLOWED_USERS =
-            Set.of(UserHandle.of(100), UserHandle.of(200));
+    private static final long GLOBAL_TIMEOUT_MILLIS = 10000L;
+    private static final ComponentName TEST_COMPONENT = new ComponentName(TARGET_PACKAGE_1,
+            TARGET_CLASS);
 
     @Rule
     public SetFlagsRule mSetFlagsRule = new SetFlagsRule();
@@ -164,6 +170,8 @@ public class ComputerControlSessionImplTest {
     @Mock
     private IComputerControlLifecycleCallback mLifecycleCallback;
     @Mock
+    private Surface mClientSurface;
+    @Mock
     private Consumer<ComputerControlSessionImpl> mOnClosedListener;
     @Mock
     private VirtualDevice mVirtualDevice;
@@ -185,6 +193,9 @@ public class ComputerControlSessionImplTest {
     private AudioInjection mAudioInjection;
     @Mock
     private AudioCapture mAudioCapture;
+    @Mock
+    private UserHandle mUserHandle;
+
     @Captor
     private ArgumentCaptor<Intent> mIntentArgumentCaptor;
     @Captor
@@ -199,6 +210,8 @@ public class ComputerControlSessionImplTest {
     private ArgumentCaptor<VirtualDpadConfig> mVirtualDpadConfigArgumentCaptor;
     @Captor
     private ArgumentCaptor<VirtualKeyboardConfig> mVirtualKeyboardConfigArgumentCaptor;
+    @Captor
+    private ArgumentCaptor<VirtualDeviceManager.ActivityListener> mActivityListenerArgumentCaptor;
 
     private SurfaceControl.Transaction mTransaction;
     private AutoCloseable mMockitoSession;
@@ -276,6 +289,7 @@ public class ComputerControlSessionImplTest {
 
     @Test
     @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_TYPING)
+    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_USER_RESTRICTION)
     public void createSessionWithoutDisplaySurface_appliesCorrectParams() throws Exception {
         createComputerControlSession(mDefaultParams);
 
@@ -287,7 +301,7 @@ public class ComputerControlSessionImplTest {
                 .getDevicePolicy(POLICY_TYPE_RECENTS))
                 .isEqualTo(DEVICE_POLICY_DEFAULT);
         assertThat(mVirtualDeviceParamsArgumentCaptor.getValue()
-                .getAllowedUsers()).isEqualTo(ALLOWED_USERS);
+                .getAllowedUsers()).isEqualTo(Set.of(UserHandle.of(USER_ID)));
 
         verify(mVirtualDevice).createVirtualDisplay(
                 mVirtualDisplayConfigArgumentCaptor.capture(), any(), any());
@@ -331,6 +345,14 @@ public class ComputerControlSessionImplTest {
         assertThat(virtualTouchscreenConfig.getInputDeviceName()).contains(
                 mDefaultParams.getName());
         assertThat(virtualTouchscreenConfig.getProductId()).isEqualTo(PRODUCT_ID_TOUCHSCREEN);
+    }
+
+    @Test
+    public void createSession_canCloseSessionBeforeInitializing() throws Exception {
+        createComputerControlSessionWithoutInitializing(mDefaultParams, GLOBAL_TIMEOUT_MILLIS);
+        mSession.close();
+
+        verify(mOnClosedListener).accept(eq(mSession));
     }
 
     @Test
@@ -654,11 +676,47 @@ public class ComputerControlSessionImplTest {
                 () -> mSession.attachNotificationInfo(3, "hello2"));
     }
 
+    @Test
+    @EnableFlags({Flags.FLAG_COMPUTER_CONTROL_BLOCKED_STATE,
+            Flags.FLAG_COMPUTER_CONTROL_BLOCK_INPUT_AND_SCREENSHOTS})
+    public void blockedState_updatesVirtualDisplaySurface()
+            throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+        verify(mVirtualDevice).addActivityListener(any(),
+                mActivityListenerArgumentCaptor.capture());
+        verify(mVirtualDisplay).setSurface(eq(mClientSurface));
+
+        mActivityListenerArgumentCaptor.getValue().onSecureWindowShown(VIRTUAL_DISPLAY_ID,
+                TEST_COMPONENT, mUserHandle);
+        verify(mVirtualDisplay).setSurface(not(eq(mClientSurface)));
+        clearInvocations(mVirtualDisplay);
+
+        mActivityListenerArgumentCaptor.getValue().onSecureWindowHidden(VIRTUAL_DISPLAY_ID);
+        verify(mVirtualDisplay).setSurface(eq(mClientSurface));
+    }
+
+    @Test
+    public void notifyActivityListener_beforeInitialization_setsNullSurface()
+            throws RemoteException {
+        createComputerControlSessionWithoutInitializing(mDefaultParams, GLOBAL_TIMEOUT_MILLIS);
+        verify(mVirtualDevice).addActivityListener(any(),
+                mActivityListenerArgumentCaptor.capture());
+
+        mActivityListenerArgumentCaptor.getValue().onDisplayEmpty(VIRTUAL_DISPLAY_ID);
+        verify(mVirtualDisplay).setSurface(isNull());
+    }
+
     private void createComputerControlSession(ComputerControlSessionParams params) {
-        createComputerControlSession(params, /* globalSessionTimeoutDurationMs = */ 10000L);
+        createComputerControlSession(params, GLOBAL_TIMEOUT_MILLIS);
     }
 
     private void createComputerControlSession(
+            ComputerControlSessionParams params, long globalSessionTimeoutDurationMs) {
+        createComputerControlSessionWithoutInitializing(params, globalSessionTimeoutDurationMs);
+        mSession.initialize(mLifecycleCallback, mClientSurface);
+    }
+
+    private void createComputerControlSessionWithoutInitializing(
             ComputerControlSessionParams params, long globalSessionTimeoutDurationMs) {
         DisplayManagerGlobal displayManagerGlobal = new DisplayManagerGlobal(mDisplayManager);
         displayManagerGlobal.disableLocalDisplayInfoCaches();
@@ -666,8 +724,7 @@ public class ComputerControlSessionImplTest {
                 mContext, displayManagerGlobal, mViewConfiguration, globalSessionTimeoutDurationMs,
                 () -> mTransaction, mAppToken, params,
                 new AttributionSource(UserHandle.getUid(USER_ID, 0), "com.package", "tag"),
-                mVirtualDeviceFactory, ALLOWED_USERS, mOnClosedListener);
-        mSession.setLifecycleCallback(mLifecycleCallback);
+                mVirtualDeviceFactory, mOnClosedListener);
     }
 
     @SuppressLint("MissingPermission")

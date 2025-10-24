@@ -107,8 +107,9 @@ import org.mockito.kotlin.whenever
 import org.mockito.quality.Strictness
 
 /**
- * Tests of [DesktopModeWindowDecorViewModel] Usage: atest
- * WMShellUnitTests:DesktopModeWindowDecorViewModelTests
+ * Tests of [DesktopModeWindowDecorViewModel]
+ *
+ * Usage: atest WMShellUnitTests:DesktopModeWindowDecorViewModelTests
  */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @SmallTest
@@ -258,27 +259,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_APP_HEADER_STATE_CHANGE_ANNOUNCEMENTS)
-    fun testCloseButtonInFreeform_closeWindow() {
-        val onClickListenerCaptor = argumentCaptor<View.OnClickListener>()
-        val decor =
-            createOpenTaskDecoration(
-                windowingMode = WINDOWING_MODE_FREEFORM,
-                onCaptionButtonClickListener = onClickListenerCaptor,
-            )
-
-        val view = mock<View> { on { id } doReturn R.id.close_window }
-        whenever(mockDesktopTasksController.closeTask(decor.taskInfo))
-            .thenReturn(DesktopTasksController.CloseTaskResult.CLOSED_DESKTOP)
-
-        onClickListenerCaptor.firstValue.onClick(view)
-
-        verify(mockDesktopTasksController, never()).getNextFocusedTask(decor.taskInfo)
-        verify(mockDesktopTasksController).closeTask(decor.taskInfo)
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_APP_HEADER_STATE_CHANGE_ANNOUNCEMENTS)
     fun testCloseButtonInFreeform_withStateChangeAnnouncementFlag_closeWindow() {
         val onClickListenerCaptor = argumentCaptor<View.OnClickListener>()
         val decor =
@@ -297,30 +277,8 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         verify(mockDesktopTasksController).closeTask(decor.taskInfo)
     }
 
-    @EnableFlags(Flags.FLAG_ENABLE_MINIMIZE_BUTTON)
-    @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_APP_HEADER_STATE_CHANGE_ANNOUNCEMENTS)
-    fun testMinimizeButtonInFreeform_minimizeWindow() {
-        val onClickListenerCaptor = argumentCaptor<View.OnClickListener>()
-        val decor =
-            createOpenTaskDecoration(
-                windowingMode = WINDOWING_MODE_FREEFORM,
-                onCaptionButtonClickListener = onClickListenerCaptor,
-            )
-
-        val view = mock<View> { on { id } doReturn R.id.minimize_window }
-
-        onClickListenerCaptor.firstValue.onClick(view)
-
-        verify(mockDesktopTasksController, never()).getNextFocusedTask(decor.taskInfo)
-        verify(mockDesktopTasksController)
-            .minimizeTask(decor.taskInfo, MinimizeReason.MINIMIZE_BUTTON)
-    }
-
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MINIMIZE_BUTTON,
-        Flags.FLAG_ENABLE_DESKTOP_APP_HEADER_STATE_CHANGE_ANNOUNCEMENTS,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MINIMIZE_BUTTON)
     fun testMinimizeButtonInFreeform_withStateChangeAnnouncementFlag_minimizeWindow() {
         val onClickListenerCaptor = argumentCaptor<View.OnClickListener>()
         val decor =
@@ -339,7 +297,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODALS_POLICY)
     fun testDecorationIsNotCreatedForNoDisplayActivities() {
         val task =
             createTask(windowingMode = WINDOWING_MODE_FULLSCREEN).apply {
@@ -351,7 +308,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODALS_POLICY)
     fun testDecorationIsNotCreatedForTopTranslucentActivities() {
         val task =
             createTask(windowingMode = WINDOWING_MODE_FULLSCREEN).apply {
@@ -364,7 +320,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODALS_POLICY)
     fun testDecorationIsNotCreatedForSystemUIActivities() {
         // Set task as systemUI package
         val systemUIPackageName =
@@ -381,7 +336,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODALS_POLICY)
     fun testDecorationIsNotCreatedForDefaultHomePackage() {
         val task =
             createTask(windowingMode = WINDOWING_MODE_FULLSCREEN).apply {
@@ -545,27 +499,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_DISABLE_NON_RESIZABLE_APP_SNAP_RESIZING)
-    fun testOnSnapResizeLeft_nonResizable_decorSnappedLeft() {
-        val windowDecorationActions = createDefaultWindowActions()
-        val decor =
-            createOpenTaskDecoration(windowingMode = WINDOWING_MODE_FREEFORM).apply {
-                taskInfo.isResizeable = false
-            }
-
-        windowDecorationActions.onLeftSnap(decor.taskInfo.taskId, InputMethod.UNKNOWN_INPUT_METHOD)
-
-        verify(mockDesktopTasksController)
-            .handleInstantSnapResizingTask(
-                eq(decor.taskInfo),
-                eq(SnapPosition.LEFT),
-                eq(ResizeTrigger.SNAP_LEFT_MENU),
-                eq(InputMethod.UNKNOWN_INPUT_METHOD),
-            )
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_DISABLE_NON_RESIZABLE_APP_SNAP_RESIZING)
     fun testOnSnapResizeLeft_nonResizable_decorNotSnapped() {
         val windowDecorationActions = createDefaultWindowActions()
         val decor =
@@ -604,27 +537,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_DISABLE_NON_RESIZABLE_APP_SNAP_RESIZING)
-    fun testOnSnapResizeRight_nonResizable_decorSnappedRight() {
-        val windowDecorationActions = createDefaultWindowActions()
-        val decor =
-            createOpenTaskDecoration(windowingMode = WINDOWING_MODE_FREEFORM).apply {
-                taskInfo.isResizeable = false
-            }
-
-        windowDecorationActions.onRightSnap(decor.taskInfo.taskId, InputMethod.UNKNOWN_INPUT_METHOD)
-
-        verify(mockDesktopTasksController)
-            .handleInstantSnapResizingTask(
-                eq(decor.taskInfo),
-                eq(SnapPosition.RIGHT),
-                eq(ResizeTrigger.SNAP_RIGHT_MENU),
-                eq(InputMethod.UNKNOWN_INPUT_METHOD),
-            )
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_DISABLE_NON_RESIZABLE_APP_SNAP_RESIZING)
     fun testOnSnapResizeRight_nonResizable_decorNotSnapped() {
         val windowDecorationActions = createDefaultWindowActions()
         val decor =

@@ -74,34 +74,57 @@ class PinnedLayerController(shellInit: ShellInit, private val transitions: Trans
             return null
         }
 
-        // TODO(b/444435367): Do nothing for already visible pinned task.
+        // There's either a pin request or an already pinned task is brought to foreground.
         val wct = WindowContainerTransaction()
-
-        // Based on the previous checks, it's either not pinned and request contains a pin request
-        // or an already pinned task is brought to foreground.
         if (windowingLayerChange.isLayerPinningRequest() || request.isOpeningPinnedRequest()) {
-            val transitions = mutableSetOf<ActiveTransition>()
-            activeTransitions[transition] = transitions
-
-            wct.merge(getLayerPinnedWct(triggerTask.token), /* transfer= */ true)
-            transitions += ActiveTransition.Pin(triggerTask, windowingLayerChange?.remoteCallback)
+            createPinTransition(transition, triggerTask, windowingLayerChange?.remoteCallback, wct)
         }
 
         // Unpinning can occur as a side-effect of another action, check if a task (not necessary
         // the pinned one) is eligible to be unpinned.
         val isUnpinningNeeded =
             containsActivePinningTransition(transition) || request.isClosingPinnedRequest()
-        val task = if (request.isClosingPinnedRequest()) triggerTask else currentPinnedTask
-        if (isUnpinningNeeded && task != null) {
-            val transitions = activeTransitions.getOrPut(transition) { mutableSetOf() }
-            transitions += ActiveTransition.Unpin(task)
-            wct.merge(
-                getLayerUnpinnedWct(task.token, isMinimizing = request.type != TRANSIT_CLOSE),
-                /* transfer= */ true,
-            )
+        val candidateTaskForUnpin =
+            when {
+                triggerTask.token != currentPinnedTask?.token -> currentPinnedTask
+                request.isClosingPinnedRequest() -> triggerTask
+                else -> null
+            }
+        if (isUnpinningNeeded && candidateTaskForUnpin != null) {
+            createUnpinTransition(transition, candidateTaskForUnpin, wct,
+                isMinimizing = request.type != TRANSIT_CLOSE)
         }
 
-        return wct.takeUnless { it.isEmpty }
+        return wct.takeUnless { activeTransitions[transition].isNullOrEmpty() }
+    }
+
+    /** Pins a task and adds it to the active transitions for the given transition token. */
+    private fun createPinTransition(
+        transition: IBinder,
+        task: TaskInfo,
+        remoteCallback: IRemoteCallback?,
+        wct: WindowContainerTransaction,
+    ) {
+        val transitions = activeTransitions.getOrPut(transition) { mutableSetOf() }
+        transitions += ActiveTransition.Pin(task, remoteCallback)
+        wct.merge(getLayerPinnedWct(task.token), /* transfer= */ true)
+    }
+
+    /**
+     * Unpins a specific task and adds it to the active transitions for the given transition token.
+     */
+    private fun createUnpinTransition(
+        transition: IBinder,
+        task: TaskInfo,
+        wct: WindowContainerTransaction,
+        isMinimizing: Boolean = false,
+    ) {
+        val transitions = activeTransitions.getOrPut(transition) { mutableSetOf() }
+        transitions += ActiveTransition.Unpin(task)
+        wct.merge(
+            getLayerUnpinnedWct(task.token, isMinimizing),
+            /* transfer= */ true,
+        )
     }
 
     private fun WindowingLayerChange?.isLayerPinningRequest(): Boolean {
@@ -181,7 +204,13 @@ class PinnedLayerController(shellInit: ShellInit, private val transitions: Trans
         val transitions = activeTransitions.remove(transition) ?: return
         transitions.forEach { transition ->
             if (transition is ActiveTransition.Pin && transition.resultCallback != null) {
-                sendWindowingLayerResult(RESULT_FAILED_BAD_STATE, transition.resultCallback)
+                // An already pinned task can re-request to be pinned again, since this that leads
+                // to a no-op the transition is aborted. In this case we want to send approved
+                // result.
+                val result =
+                    if (isPinned(transition.taskInfo.taskId)) RESULT_APPROVED
+                    else RESULT_FAILED_BAD_STATE
+                sendWindowingLayerResult(result, transition.resultCallback)
             }
         }
     }

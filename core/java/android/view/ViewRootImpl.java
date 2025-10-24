@@ -120,6 +120,7 @@ import static android.view.accessibility.Flags.reduceWindowContentChangedEventTh
 import static android.view.flags.Flags.disableDrawWakeLock;
 import static android.view.flags.Flags.sensitiveContentAppProtection;
 import static android.view.flags.Flags.sensitiveContentPrematureProtectionRemovedFix;
+import static android.view.flags.Flags.toolkitDisableCategoryOnMrr;
 import static android.view.flags.Flags.toolkitFrameRateDebug;
 import static android.view.flags.Flags.toolkitFrameRateTouchBoost25q1;
 import static android.view.flags.Flags.toolkitInitialTouchBoost;
@@ -1278,6 +1279,7 @@ public final class ViewRootImpl implements ViewParent,
     private static final boolean sEnableVrr = ViewProperties.vrr_enabled().orElse(true);
     private static final boolean sToolkitInitialTouchBoostFlagValue = toolkitInitialTouchBoost();
     private static boolean sToolkitFrameRateDebugFlagValue =  toolkitFrameRateDebug();
+    private static boolean sToolkitDisableCategoryOnMrrFlagValue =  toolkitDisableCategoryOnMrr();
 
     static {
         sToolkitSetFrameRateReadOnlyFlagValue = toolkitSetFrameRateReadOnly();
@@ -2278,10 +2280,12 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private boolean hasSystemApplicationOverlayAppOp() {
+        final Context viewContext = mView != null && mView.mContext != null
+                ? mView.mContext : mContext;
         return mContext.getSystemService(AppOpsManager.class).checkOpRawNoThrow(
                 AppOpsManager.OPSTR_SYSTEM_APPLICATION_OVERLAY,
-                mView.mContext.getAttributionSource().getUid(),
-                mView.mContext.getPackageName(), null) == AppOpsManager.MODE_ALLOWED;
+                viewContext.getAttributionSource().getUid(),
+                viewContext.getPackageName(), null) == AppOpsManager.MODE_ALLOWED;
     }
 
     private int adjustLayoutInDisplayCutoutMode(WindowManager.LayoutParams attrs) {
@@ -10910,6 +10914,8 @@ public final class ViewRootImpl implements ViewParent,
 
         @Override
         public void onFocusEvent(boolean hasFocus) {
+            EventLog.writeEvent(LOGTAG_INPUT_FOCUS,
+                    "ViewRootImpl focus=" + hasFocus + " for " + getTitle());
             windowFocusChanged(hasFocus);
         }
 
@@ -13526,7 +13532,10 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private boolean shouldSetFrameRateCategory() {
-        // use toolkitSetFrameRate flag to gate the change
+        // We only want to call setFrameRateCategory when it supports ARR.
+        if (sToolkitDisableCategoryOnMrrFlagValue) {
+            return shouldEnableDvrr() && mSurface.isValid() && mDisplay.hasArrSupport();
+        }
         return shouldEnableDvrr() && mSurface.isValid();
     }
 
@@ -13766,6 +13775,14 @@ public final class ViewRootImpl implements ViewParent,
         mHandler.removeMessages(MSG_TOUCH_BOOST_TIMEOUT);
         mHandler.sendEmptyMessageDelayed(MSG_TOUCH_BOOST_TIMEOUT,
                 boostTimeOut);
+    }
+
+    /**
+     * Get the value of mDisplay.hasArrSupport()
+     */
+    @VisibleForTesting
+    public boolean getHasArrSupport() {
+        return mDisplay.hasArrSupport();
     }
 
     /**

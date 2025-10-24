@@ -1492,11 +1492,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     @GuardedBy("mOomAdjObserverLock")
     OomAdjObserver mCurOomAdjObserver;
 
-    @GuardedBy("mOomAdjObserverLock")
-    int mCurOomAdjUid;
-
     /**
-     * Dedicated lock for {@link #mCurOomAdjObserver} and {@link #mCurOomAdjUid}.
+     * Dedicated lock for {@link #mCurOomAdjObserver}.
      */
     final Object mOomAdjObserverLock = new Object();
 
@@ -3292,22 +3289,22 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     void setOomAdjObserver(int uid, OomAdjObserver observer) {
         synchronized (mOomAdjObserverLock) {
-            mCurOomAdjUid = uid;
             mCurOomAdjObserver = observer;
+            mProcessStateController.setDebugUid(uid);
         }
     }
 
     void clearOomAdjObserver() {
         synchronized (mOomAdjObserverLock) {
-            mCurOomAdjUid = -1;
             mCurOomAdjObserver = null;
+            mProcessStateController.clearDebugUid();
         }
     }
 
     void reportUidInfoMessageLocked(String tag, String msg, int uid) {
         Slog.i(TAG, msg);
         synchronized (mOomAdjObserverLock) {
-            if (mCurOomAdjObserver != null && uid == mCurOomAdjUid) {
+            if (mCurOomAdjObserver != null && uid == mProcessStateController.getDebugUid()) {
                 mUiHandler.obtainMessage(DISPATCH_OOM_ADJ_OBSERVER_MSG, msg).sendToTarget();
             }
         }
@@ -11558,9 +11555,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             pw.println("  mFgsStartTempAllowList:");
             final long currentTimeNow = System.currentTimeMillis();
-            final long tempAllowlistCurrentTime =
-                    com.android.server.deviceidle.Flags.useCpuTimeForTempAllowlist()
-                            ? SystemClock.uptimeMillis() : SystemClock.elapsedRealtime();
+            final long tempAllowlistCurrentTime = SystemClock.uptimeMillis();
             mFgsStartTempAllowList.forEach((uid, entry) -> {
                 pw.print("    " + UserHandle.formatUid(uid) + ": ");
                 entry.second.dump(pw);
@@ -15724,11 +15719,10 @@ public class ActivityManagerService extends IActivityManager.Stub
     @Nullable
     ProcessRecord getTopApp() {
         final WindowProcessController wpc = mAtmInternal != null ? mAtmInternal.getTopApp() : null;
-        final ProcessRecord r = wpc != null ? (ProcessRecord) wpc.mOwner : null;
-        if (!Flags.pushActivityStateToOomadjuster()) {
-            updateTopAppListeners(r);
+        if (wpc == null) {
+            return null;
         }
-        return r;
+        return (ProcessRecord) wpc.mOwner;
     }
 
     void updateTopAppListeners(ProcessRecord r) {
@@ -19727,13 +19721,19 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         @Override
         public void onProcStateUpdated(ProcessRecordInternal appInternal, long now,
-                boolean forceUpdatePssTime) {
+                boolean forceUpdatePssTime, boolean doingAll) {
             final ProcessRecord app = (ProcessRecord) appInternal;
 
             synchronized (mAppProfiler.mProfilerLock) {
                 app.mProfile.updateProcState(app);
                 mAppProfiler.updateNextPssTimeLPf(app.getCurProcState(), app.mProfile, now,
                         forceUpdatePssTime);
+            }
+
+            if (!doingAll && app.getSetProcState() != app.getCurProcState()) {
+                synchronized (mProcessStats.mLock) {
+                    setProcessTrackerStateLOSP(app, mProcessStats.getMemFactorLocked());
+                }
             }
         }
 

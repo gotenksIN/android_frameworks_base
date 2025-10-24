@@ -74,7 +74,6 @@ import android.window.DesktopExperienceFlags.ENABLE_BUG_FIXES_FOR_SECONDARY_DISP
 import android.window.DesktopExperienceFlags.ENABLE_NON_DEFAULT_DISPLAY_SPLIT
 import android.window.DesktopExperienceFlags.ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY
 import android.window.DesktopModeFlags
-import android.window.DesktopModeFlags.DISABLE_NON_RESIZABLE_APP_SNAP_RESIZE
 import android.window.DesktopModeFlags.ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER
 import android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY
 import android.window.RemoteTransition
@@ -2641,19 +2640,17 @@ class DesktopTasksController(
         val displayLayout = displayController.getDisplayLayout(displayId) ?: return
         val bounds = calculateDefaultDesktopTaskBounds(displayLayout)
         val deskId = getOrCreateDefaultDeskId(displayId, userId) ?: return
-        if (DesktopModeFlags.ENABLE_CASCADING_WINDOWS.isTrue) {
-            val stableBounds = Rect().also { displayLayout.getStableBounds(it) }
-            cascadeWindow(
-                context,
-                recentTasksController,
-                repository,
-                shellTaskOrganizer,
-                bounds,
-                displayLayout,
-                deskId,
-                stableBounds,
-            )
-        }
+        val stableBounds = Rect().also { displayLayout.getStableBounds(it) }
+        cascadeWindow(
+            context,
+            recentTasksController,
+            repository,
+            shellTaskOrganizer,
+            bounds,
+            displayLayout,
+            deskId,
+            stableBounds,
+        )
         val ops =
             ActivityOptions.fromBundle(options).apply {
                 launchWindowingMode = WINDOWING_MODE_FREEFORM
@@ -3168,7 +3165,7 @@ class DesktopTasksController(
         resizeTrigger: ResizeTrigger,
         inputMethod: InputMethod,
     ) {
-        if (!isSnapResizingAllowed(taskInfo)) {
+        if (!taskInfo.isResizeable) {
             val displayContext = displayController.getDisplayContext(taskInfo.displayId) ?: context
             Toast.makeText(
                     displayContext,
@@ -3199,7 +3196,7 @@ class DesktopTasksController(
         motionEvent: MotionEvent,
     ) {
         releaseVisualIndicator()
-        if (!isSnapResizingAllowed(taskInfo)) {
+        if (!taskInfo.isResizeable) {
             interactionJankMonitor.begin(
                 taskSurface,
                 context,
@@ -3249,9 +3246,6 @@ class DesktopTasksController(
             )
         }
     }
-
-    private fun isSnapResizingAllowed(taskInfo: RunningTaskInfo) =
-        taskInfo.isResizeable || !DISABLE_NON_RESIZABLE_APP_SNAP_RESIZE.isTrue
 
     private fun getSnapBounds(displayId: Int, position: SnapPosition): Rect {
         val displayLayout = displayController.getDisplayLayout(displayId) ?: return Rect()
@@ -4976,7 +4970,7 @@ class DesktopTasksController(
             displayLayout.getStableBoundsForDesktopMode(stableBounds)
             hasLayoutGravityApplied = applyLayoutGravityIfNeeded(taskInfo, bounds, stableBounds)
         }
-        if (DesktopModeFlags.ENABLE_CASCADING_WINDOWS.isTrue && !hasLayoutGravityApplied) {
+        if (!hasLayoutGravityApplied) {
             cascadeWindow(
                 context,
                 recentTasksController,
@@ -5034,10 +5028,7 @@ class DesktopTasksController(
             wct.setWindowingMode(taskInfo.token, targetWindowingMode)
         }
         wct.setBounds(taskInfo.token, Rect())
-
-        if (Flags.appCompatRefactoringSetAppboundsToNullWhenEmpty()) {
-            wct.setAppBounds(taskInfo.token, null)
-        }
+        wct.setAppBounds(taskInfo.token, null)
 
         if (desktopConfig.useDesktopOverrideDensity) {
             wct.setDensityDpi(taskInfo.token, getDefaultDensityDpi())

@@ -25,14 +25,13 @@ import com.android.systemui.screencapture.ScreenCaptureEvent
 import com.android.systemui.screencapture.common.ScreenCapture
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters
 import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModel
-import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModelImpl
 import com.android.systemui.screencapture.domain.interactor.ScreenCaptureUiInteractor
 import com.android.systemui.screencapture.record.largescreen.domain.interactor.ScreenshotInteractor
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureRegion
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureType
 import com.android.systemui.screenrecord.ScreenRecordingAudioSource
-import com.android.systemui.screenrecord.domain.ScreenRecordingParameters
-import com.android.systemui.screenrecord.domain.interactor.ScreenRecordingServiceInteractor
+import com.android.systemui.screenrecord.data.repository.ScreenRecordingServiceRepository
+import com.android.systemui.screenrecord.shared.model.ScreenRecordingParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -50,13 +49,13 @@ constructor(
     @Background private val backgroundScope: CoroutineScope,
     private val windowManager: WindowManager,
     private val screenshotInteractor: ScreenshotInteractor,
-    private val drawableLoaderViewModelImpl: DrawableLoaderViewModelImpl,
+    private val drawableLoaderViewModel: DrawableLoaderViewModel,
     private val screenCaptureUiInteractor: ScreenCaptureUiInteractor,
-    private val screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
+    private val screenRecordingServiceRepository: ScreenRecordingServiceRepository,
     private val uiEventLogger: UiEventLogger,
     @ScreenCapture private val screenCaptureUiParams: ScreenCaptureUiParameters,
     toolbarViewModelFactory: PreCaptureToolbarViewModel.Factory,
-) : HydratedActivatable(), DrawableLoaderViewModel by drawableLoaderViewModelImpl {
+) : HydratedActivatable(), DrawableLoaderViewModel by drawableLoaderViewModel {
 
     private val recordingParameters = screenCaptureUiParams as ScreenCaptureUiParameters.Record
     private val isShowingUiFlow = MutableStateFlow(true)
@@ -170,7 +169,7 @@ constructor(
         closeUi()
 
         backgroundScope.launch {
-            screenRecordingServiceInteractor.startRecording(
+            screenRecordingServiceRepository.startRecording(
                 // TODO(b/437971334): Get options from the UI.
                 ScreenRecordingParameters(
                     captureTarget = null, // Fullscreen.

@@ -147,6 +147,16 @@ flag {
 }
 
 flag {
+    name: "jni_delete_local_reference_gnss_antenna_info_builder"
+    namespace: "location"
+    description: "Flag for deleting local reference for gnssAntennaInfoBuilder"
+    bug: "451136946"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "service_watcher_unstable_fallback"
     namespace: "location"
     description: "Flag for service watcher to fallback on an unstable service"
@@ -181,16 +191,6 @@ flag {
     description: "Changes the getAdasAllowlist API from hidden to system"
     bug: "362287534"
     is_exported: true
-}
-
-flag {
-    name: "fix_glonass_almanac_frequency_channel_range"
-    namespace: "location"
-    description: "Fix GLONASS almanac frequency channel range"
-    bug: "428050932"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

@@ -93,7 +93,6 @@ import com.android.internal.app.HeavyWeightSwitcherActivity;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.Watchdog;
-import com.android.server.am.Flags;
 import com.android.server.am.psc.AsyncBatchSession;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.art.ReasonMapping;
@@ -892,13 +891,16 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     }
 
     /**
-     * Check if any Activity is visible and not pinned.
+     * Check if any Activity is visible (or visibility requested) and not pinned.
      */
     boolean hasVisibleNotPinnedActivity() {
         if (!hasVisibleActivities()) return false;
         for (int i = mActivities.size() - 1; i >= 0; --i) {
             final ActivityRecord activityRecord = mActivities.get(i);
-            if (activityRecord.isVisible() && !activityRecord.inPinnedWindowingMode()) return true;
+            if ((activityRecord.isVisible() || activityRecord.isVisibleRequested())
+                    && !activityRecord.inPinnedWindowingMode()) {
+                return true;
+            }
         }
         return false;
     }
@@ -1484,18 +1486,11 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
             }
 
             // Posting on handler so WM lock isn't held when we call into AM.
-            if (Flags.pushActivityStateToOomadjuster()) {
-                // updateProcessInfo can trigger an OomAdjuster update, let the
-                // ProcessStateController batch session handle it.
-                batchSession.enqueue(
-                        () -> mListener.updateProcessInfo(updateServiceConnectionActivities,
-                                activityChange, updateOomAdj));
-            } else {
-                final Message m = PooledLambda.obtainMessage(
-                        WindowProcessListener::updateProcessInfo,
-                        mListener, updateServiceConnectionActivities, activityChange, updateOomAdj);
-                mAtm.mH.sendMessage(m);
-            }
+            // updateProcessInfo can trigger an OomAdjuster update, let the
+            // ProcessStateController batch session handle it.
+            batchSession.enqueue(
+                    () -> mListener.updateProcessInfo(updateServiceConnectionActivities,
+                            activityChange, updateOomAdj));
         }
     }
 
@@ -1573,17 +1568,10 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
             // Posting the message at the front of queue so WM lock isn't held when we call into AM,
             // and the process state of starting activity can be updated quicker which will give it
             // a higher scheduling group.
-            if (Flags.pushActivityStateToOomadjuster()) {
-                batchSession.postToHead();
-                batchSession.enqueue(
-                        () -> mListener.onStartActivity(topProcessState, shouldSetProfileProc(),
-                                packageName, info.applicationInfo.longVersionCode));
-            } else {
-                final Message m = PooledLambda.obtainMessage(WindowProcessListener::onStartActivity,
-                        mListener, topProcessState, shouldSetProfileProc(), packageName,
-                        info.applicationInfo.longVersionCode);
-                mAtm.mH.sendMessageAtFrontOfQueue(m);
-            }
+            batchSession.postToHead();
+            batchSession.enqueue(
+                    () -> mListener.onStartActivity(topProcessState, shouldSetProfileProc(),
+                            packageName, info.applicationInfo.longVersionCode));
         }
     }
 

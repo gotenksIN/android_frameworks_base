@@ -437,7 +437,7 @@ public abstract class OomAdjuster {
 
         /** Notifies the client component when a process's process state is updated. */
         void onProcStateUpdated(ProcessRecordInternal app, long now,
-                boolean forceUpdatePssTime);
+                boolean forceUpdatePssTime, boolean doingAll);
 
         /** Notifies when the process group for an application process has been updated. */
         void onProcessGroupUpdated(ProcessRecordInternal app, int group);
@@ -558,6 +558,9 @@ public abstract class OomAdjuster {
 
         /** The previous process that showed an activity. */
         @Nullable ProcessRecordInternal getPreviousProcess();
+
+        /** Checks whether the debugging messages should be reported for the given process's UID. */
+        boolean isDebugEnabled(ProcessRecordInternal app);
     }
 
     boolean isChangeEnabled(@CachedCompatChangeId int cachedCompatChangeId,
@@ -1629,13 +1632,7 @@ public abstract class OomAdjuster {
             initialize(app, adj, foregroundActivities, hasVisibleActivities, procState,
                     schedGroup, processCurTop, reportDebugMsgs);
 
-            final int flags;
-            if (Flags.pushActivityStateToOomadjuster()) {
-                flags = mApp.getActivityStateFlags();
-            } else {
-                flags = mApp.getActivityStateFlagsLegacy();
-            }
-
+            final int flags = mApp.getActivityStateFlags();
             if ((flags & ACTIVITY_STATE_FLAG_IS_VISIBLE) != 0) {
                 onVisibleActivity(flags);
             } else if ((flags & ACTIVITY_STATE_FLAG_IS_PAUSING_OR_PAUSED) != 0) {
@@ -1643,12 +1640,7 @@ public abstract class OomAdjuster {
             } else if ((flags & ACTIVITY_STATE_FLAG_IS_STOPPING) != 0) {
                 onStoppingActivity((flags & ACTIVITY_STATE_FLAG_IS_STOPPING_FINISHING) != 0);
             } else {
-                final long ts;
-                if (Flags.pushActivityStateToOomadjuster()) {
-                    ts = mApp.getPerceptibleTaskStoppedTimeMillis();
-                } else {
-                    ts = mApp.getPerceptibleTaskStoppedTimeMillisLegacy();
-                }
+                final long ts = mApp.getPerceptibleTaskStoppedTimeMillis();
                 onOtherActivity(ts);
             }
 
@@ -1670,7 +1662,6 @@ public abstract class OomAdjuster {
 
             mApp.setCachedAdj(mAdj);
             mApp.setCachedForegroundActivities(mForegroundActivities);
-            mApp.setCachedHasVisibleActivities(mHasVisibleActivities);
             mApp.setCachedProcState(mProcState);
             mApp.setCachedSchedGroup(mSchedGroup);
             mApp.setCachedAdjType(mAdjType);
@@ -1859,67 +1850,39 @@ public abstract class OomAdjuster {
     }
 
     protected int getTopProcessState() {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            return mGlobalState.getTopProcessState();
-        } else {
-            return mService.mAtmInternal.getTopProcessState();
-        }
+        return mGlobalState.getTopProcessState();
     }
 
     protected boolean useTopSchedGroupForTopProcess() {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            if (mGlobalState.isUnlocking()) {
-                // Keyguard is unlocking, suppress the top process priority for now.
-                return false;
-            }
-            if (mGlobalState.hasExpandedNotificationShade()) {
-                // The notification shade is occluding the top process, suppress top.
-                return false;
-            }
-            return true;
-        } else {
-            return mService.mAtmInternal.useTopSchedGroupForTopProcess();
+        if (mGlobalState.isUnlocking()) {
+            // Keyguard is unlocking, suppress the top process priority for now.
+            return false;
         }
+        if (mGlobalState.hasExpandedNotificationShade()) {
+            // The notification shade is occluding the top process, suppress top.
+            return false;
+        }
+        return true;
     }
 
     protected ProcessRecordInternal getTopProcess() {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            return mGlobalState.getTopProcess();
-        } else {
-            return mService.getTopApp();
-        }
+        return mGlobalState.getTopProcess();
     }
 
     protected boolean isHomeProcess(ProcessRecordInternal proc) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            return mGlobalState.getHomeProcess() == proc;
-        } else {
-            return proc.getCachedIsHomeProcess();
-        }
+        return mGlobalState.getHomeProcess() == proc;
     }
 
     protected boolean isHeavyWeightProcess(ProcessRecordInternal proc) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            return mGlobalState.getHeavyWeightProcess() == proc;
-        } else {
-            return proc.getCachedIsHeavyWeight();
-        }
+        return mGlobalState.getHeavyWeightProcess() == proc;
     }
 
     protected boolean isVisibleDozeUiProcess(ProcessRecordInternal proc) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            return mGlobalState.getShowingUiWhileDozingProcess() == proc;
-        } else {
-            return proc.isShowingUiWhileDozing();
-        }
+        return mGlobalState.getShowingUiWhileDozingProcess() == proc;
     }
 
     protected boolean isPreviousProcess(ProcessRecordInternal proc) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            return mGlobalState.getPreviousProcess() == proc;
-        } else {
-            return proc.getCachedIsPreviousProcess();
-        }
+        return mGlobalState.getPreviousProcess() == proc;
     }
 
     /**
@@ -2199,7 +2162,7 @@ public abstract class OomAdjuster {
         final UidRecordInternal uidRec = state.getUidRecord();
 
         final boolean reportDebugMsgs = DEBUG_SWITCH || DEBUG_OOM_ADJ
-                        || mService.mCurOomAdjUid == state.getApplicationUid();
+                        || mGlobalState.isDebugEnabled(state);
 
         if (state.getCurRawAdj() != state.getSetRawAdj()) {
             state.setSetRawAdj(state.getCurRawAdj());
@@ -2248,7 +2211,7 @@ public abstract class OomAdjuster {
                 if(state.getSetAdj() == PREVIOUS_APP_ADJ &&
                         (state.getCurAdj() >= CACHED_APP_MIN_ADJ &&
                         state.getCurAdj() <= CACHED_APP_MAX_ADJ) &&
-                            state.hasActivities()) {
+                            state.getHasActivities()) {
                     Slog.d(TAG,"App adj change from previous state to cached state : "
                             + state.getPid() + " " + state.processName);
                     if (mPerf != null) {
@@ -2394,7 +2357,7 @@ public abstract class OomAdjuster {
                         + (state.getNextPssTime() - now) + ": " + state);
             }
         }
-        mCallback.onProcStateUpdated(state, now, forceUpdatePssTime);
+        mCallback.onProcStateUpdated(state, now, forceUpdatePssTime, doingAll);
 
         int oldProcState = state.getSetProcState();
         if (state.getSetProcState() != state.getCurProcState()) {
@@ -2420,13 +2383,6 @@ public abstract class OomAdjuster {
             maybeUpdateLastTopTime(state, now);
 
             state.setSetProcState(state.getCurProcState());
-            if (!doingAll) {
-                synchronized (mService.mProcessStats.mLock) {
-                    // TODO: b/441408003 - Decouple the AMS usage out of OomAdjuster.
-                    mService.setProcessTrackerStateLOSP((ProcessRecord) state,
-                            mService.mProcessStats.getMemFactorLocked());
-                }
-            }
         } else if (state.getHasReportedInteraction()) {
             final boolean fgsInteractionChangeEnabled = state.getCachedCompatChange(
                     CACHED_COMPAT_CHANGE_USE_SHORT_FGS_USAGE_INTERACTION_TIME);

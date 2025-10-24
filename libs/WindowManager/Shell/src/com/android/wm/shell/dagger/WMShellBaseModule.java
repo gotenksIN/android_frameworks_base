@@ -88,13 +88,13 @@ import com.android.wm.shell.compatui.CompatUIShellCommandHandler;
 import com.android.wm.shell.compatui.CompatUIStatusManager;
 import com.android.wm.shell.compatui.api.CompatUIComponentFactory;
 import com.android.wm.shell.compatui.api.CompatUIComponentIdGenerator;
+import com.android.wm.shell.compatui.api.CompatUIComponentRepository;
 import com.android.wm.shell.compatui.api.CompatUIHandler;
 import com.android.wm.shell.compatui.api.CompatUIRepository;
 import com.android.wm.shell.compatui.api.CompatUIState;
 import com.android.wm.shell.compatui.components.RestartButtonSpecKt;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIComponentFactory;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIHandler;
-import com.android.wm.shell.compatui.impl.DefaultCompatUIRepository;
 import com.android.wm.shell.compatui.impl.DefaultComponentIdGenerator;
 import com.android.wm.shell.desktopmode.DesktopMode;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
@@ -322,6 +322,7 @@ public abstract class WMShellBaseModule {
             Lazy<CompatUIShellCommandHandler> compatUIShellCommandHandler,
             Lazy<AccessibilityManager> accessibilityManager,
             CompatUIRepository compatUIRepository,
+            CompatUIComponentRepository compatUIComponentRepository,
             Optional<DesktopUserRepositories> desktopUserRepositories,
             @NonNull CompatUIState compatUIState,
             @NonNull CompatUIComponentIdGenerator componentIdGenerator,
@@ -335,8 +336,9 @@ public abstract class WMShellBaseModule {
         }
         if (Flags.appCompatUiFramework()) {
             return Optional.of(
-                    new DefaultCompatUIHandler(compatUIRepository, compatUIState,
-                            componentIdGenerator, compatUIComponentFactory, mainExecutor));
+                    new DefaultCompatUIHandler(compatUIRepository, compatUIComponentRepository,
+                            compatUIState, componentIdGenerator, compatUIComponentFactory,
+                            mainExecutor));
         }
         return Optional.of(
                 new CompatUIController(
@@ -381,8 +383,10 @@ public abstract class WMShellBaseModule {
     static CompatUIComponentFactory provideCompatUIComponentFactory(
             @NonNull Context context,
             @NonNull SyncTransactionQueue syncQueue,
+            @NonNull CompatUIComponentRepository compatUIComponentRepository,
             @NonNull DisplayController displayController) {
-        return new DefaultCompatUIComponentFactory(context, syncQueue, displayController);
+        return new DefaultCompatUIComponentFactory(context, syncQueue, displayController,
+                compatUIComponentRepository);
     }
 
     @WMSingleton
@@ -395,8 +399,8 @@ public abstract class WMShellBaseModule {
     @Provides
     static CompatUIRepository provideCompatUIRepository() {
         // TODO(b/360288344) Integrate Dagger Multibinding
-        final CompatUIRepository repository = new DefaultCompatUIRepository();
-        repository.addSpec(RestartButtonSpecKt.getRestartButtonSpec());
+        final CompatUIRepository repository = new CompatUIRepository();
+        repository.registerSpec(RestartButtonSpecKt.getRestartButtonSpec());
         return repository;
     }
 

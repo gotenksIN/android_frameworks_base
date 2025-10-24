@@ -51,6 +51,7 @@ import com.android.wm.shell.desktopmode.CaptionState
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository
+import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
 import com.android.wm.shell.shared.desktopmode.DesktopState
@@ -88,7 +89,6 @@ import kotlinx.coroutines.launch
 class AppHandleController(
     taskInfo: RunningTaskInfo,
     windowDecorViewHostSupplier: WindowDecorViewHostSupplier<WindowDecorViewHost>,
-    private val context: Context,
     private val userContext: Context,
     private val transitions: Transitions,
     private val displayController: DisplayController,
@@ -100,7 +100,8 @@ class AppHandleController(
     private val decorationSurface: SurfaceControl,
     @ShellMainThread private val mainHandler: Handler,
     @ShellMainThread private val mainDispatcher: MainCoroutineDispatcher,
-    @ShellMainThread mainScope: CoroutineScope,
+    @ShellMainThread private val mainScope: CoroutineScope,
+    @ShellBackgroundThread bgScope: CoroutineScope,
     private val windowManagerWrapper: WindowManagerWrapper,
     private val multiInstanceHelper: MultiInstanceHelper,
     private val windowDecorHandleRepository: WindowDecorCaptionRepository,
@@ -125,7 +126,7 @@ class AppHandleController(
         taskInfo,
         windowDecorViewHostSupplier,
         taskOrganizer,
-        mainScope,
+        bgScope,
         surfaceControlBuilderSupplier,
         surfaceControlViewHostFactory,
     ),
@@ -350,7 +351,7 @@ class AppHandleController(
         if (isOpenByDefaultDialogActive) return
         openByDefaultDialog =
             OpenByDefaultDialog(
-                context,
+                decorWindowContext,
                 userContext,
                 transitions,
                 taskInfo,
@@ -527,7 +528,7 @@ class AppHandleController(
                 captionWidth = captionLayoutResult.captionWidth,
                 windowManagerWrapper = windowManagerWrapper,
                 desktopState = desktopState,
-                context = context,
+                context = decorWindowContext,
                 snapshotList = snapshotList,
                 onIconClickListener = { requestedTaskId ->
                     closeManageWindowsMenu()
@@ -546,7 +547,9 @@ class AppHandleController(
         SystemBarUtils.getStatusBarHeight(decorWindowContext.resources, display.cutout)
 
     override fun getCaptionWidth(): Int =
-        context.resources.getDimensionPixelSize(R.dimen.desktop_mode_fullscreen_decor_caption_width)
+        decorWindowContext.resources.getDimensionPixelSize(
+            R.dimen.desktop_mode_fullscreen_decor_caption_width
+        )
 
     override val occludingElements: List<OccludingElement> = emptyList()
 

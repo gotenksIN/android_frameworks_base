@@ -286,7 +286,7 @@ cc_defaults_for_libandroid_runtime {
                 "android_tracing_PerfettoProducer.cpp",
             ] + select(release_flag("RELEASE_NATIVE_FRAMEWORK_PROTOTYPE"), {
                 true: [
-                    "android_os_ZygoteProcess.cpp",
+                    "android_os_NativeZygoteProcess.cpp",
                 ],
                 default: [],
             }),
@@ -427,7 +427,7 @@ cc_defaults_for_libandroid_runtime {
                 "tensorflow_headers",
             ] + select(release_flag("RELEASE_NATIVE_FRAMEWORK_PROTOTYPE"), {
                 true: [
-                    "libzygote_schema_headers",
+                    "libzygote_messages_schema_headers",
                 ],
                 default: [],
             }),

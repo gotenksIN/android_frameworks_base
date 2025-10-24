@@ -41,6 +41,7 @@ import android.app.role.OnRoleHoldersChangedListener;
 import android.app.role.RoleManager;
 import android.app.supervision.ISupervisionListener;
 import android.app.supervision.ISupervisionManager;
+import android.app.supervision.PackagePolicy;
 import android.app.supervision.Policy;
 import android.app.supervision.SupervisionManager;
 import android.app.supervision.SupervisionManagerInternal;
@@ -54,6 +55,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
+import android.content.pm.ResolveInfo;
 import android.content.pm.UserInfo;
 import android.os.Binder;
 import android.os.Bundle;
@@ -337,6 +339,64 @@ public class SupervisionService extends ISupervisionManager.Stub {
     @Override
     public void setPolicy(@UserIdInt int userId, @NonNull Policy policy) {
         // TODO(b/446218039): Implement policy verification and storage.
+
+        executeOnServiceThread(
+                () -> {
+                    applyPolicy(userId, policy);
+                    dispatchSupervisionAppServiceEvent(
+                            userId, listener -> listener.onPolicyChanged(policy));
+                });
+    }
+
+    @Override
+    public List<ResolveInfo> querySupervisionApprovalActivities(int userId) {
+        // TODO(b/444529979): Implement the querySupervisionApprovalActivities.
+        return List.of();
+    }
+
+    private void clearAllPolicies(@UserIdInt int userId) {
+        if (!Flags.enableSupervisionManagerPolicyApis()) {
+            return;
+        }
+        synchronized (getLockObject()) {
+            SupervisionUserData data = getUserDataLocked(userId);
+            if (data.policies.isEmpty()) {
+                return;
+            }
+            data.policies.clear();
+            mSupervisionSettings.saveUserData();
+        }
+    }
+
+    private void applyPolicy(@UserIdInt int userId, @NonNull Policy policy) {
+        switch (policy) {
+            case PackagePolicy pp -> applyPackagePolicy(userId, pp);
+            default -> Slogf.w(SupervisionLog.TAG, "Unsupported policy type.");
+        }
+    }
+
+    private void applyPackagePolicy(@UserIdInt int userId, PackagePolicy policy) {
+        String packageName = policy.getPackageName();
+        int restrictionType = policy.getRestrictionType();
+        switch (restrictionType) {
+            case PackagePolicy.RESTRICTION_TYPE_BLOCKED ->
+                    setApplicationHiddenForUser(userId, packageName, policy.isEnabled());
+            default ->
+                    Slogf.w(
+                            SupervisionLog.TAG,
+                            "Unsupported restriction type: %s for package: %s",
+                            restrictionType,
+                            packageName);
+        }
+    }
+
+    private void setApplicationHiddenForUser(
+            @UserIdInt int userId, String packageName, boolean hidden) {
+        DevicePolicyManagerInternal dpmi = mInjector.getDpmInternal();
+        if (dpmi != null) {
+            dpmi.setApplicationHiddenBySystem(SupervisionManager.SUPERVISION_SYSTEM_ENTITY,
+                    packageName, userId, hidden);
+        }
     }
 
     /**
@@ -450,6 +510,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
                     dispatchSupervisionEvent(
                             userId, listener -> listener.onSetSupervisionEnabled(userId, false));
                     clearAllDevicePoliciesAndSuspendedPackages(userId);
+                    clearAllPolicies(userId);
                 });
     }
 
@@ -743,20 +804,14 @@ public class SupervisionService extends ISupervisionManager.Stub {
         return UserHandle.isSameApp(Binder.getCallingUid(), Process.SYSTEM_UID);
     }
 
-    private void updateSupervisionRoleHolders(@UserIdInt int userId) {
-        List<String> roleHolders =
-                mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, UserHandle.of(userId));
-        synchronized (getLockObject()) {
-            SupervisionUserData data = getUserDataLocked(userId);
-            data.supervisionRoleHolders.clear();
-            data.supervisionRoleHolders.addAll(roleHolders);
-            if (Flags.persistentSupervisionSettings()) {
-                mSupervisionSettings.saveUserData();
-            }
-        }
-    }
-
-    private List<String> getRemovedSupervisionRoleHolders(@UserIdInt int userId) {
+    /**
+     * Updates the cache of supervision role holders for a given user and returns the ones that were
+     * removed.
+     *
+     * @param userId The ID of the user for whom to update the role holders.
+     * @return A list of the supervision role holders that were removed.
+     */
+    private List<String> updateSupervisionRoleHolders(@UserIdInt int userId) {
         List<String> newRoleHolders =
                 mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, UserHandle.of(userId));
 
@@ -1013,7 +1068,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
                         () -> {
                             maybeApplyUserRestrictionsFor(user);
                             List<String> removedRoleHolders =
-                                    getRemovedSupervisionRoleHolders(user.getIdentifier());
+                                    updateSupervisionRoleHolders(user.getIdentifier());
                             clearSuspendedPackagesFor(user.getIdentifier(), removedRoleHolders);
                         });
             }

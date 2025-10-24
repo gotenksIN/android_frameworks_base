@@ -18,9 +18,11 @@ package com.android.systemui.screencapture.common.ui.viewmodel
 
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.Color
+import com.android.systemui.lifecycle.Activatable
+import com.android.systemui.screencapture.common.domain.model.TargetModel
 
 /** A view model for capture targets. */
-interface TargetViewModel<T : Any> {
+interface TargetViewModel<T : TargetModel> : Activatable {
     /** The model that this view model is backed by */
     val model: T
     /** The icon associated with the target, if any. */
@@ -31,8 +33,4 @@ interface TargetViewModel<T : Any> {
     val thumbnail: Result<Bitmap>?
     /** The background color associated with the target. Alpha channel removed. */
     val backgroundColorOpaque: Color
-
-    interface Factory<T : Any> {
-        fun create(model: T): TargetViewModel<T>
-    }
 }

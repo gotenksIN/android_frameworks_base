@@ -403,6 +403,15 @@ flag {
     description: "Have the status bar *always* use region sampling to calculate icon contrast"
     bug: "365120736"
 }
+
+flag {
+    name: "status_bar_event_forwarding_modernization"
+    namespace: "systemui"
+    description: "Forward touch/click events directly from compose instead of relying on the "
+        " PhoneStatusBarView. "
+    bug: "450582765"
+}
+
 flag {
     name: "icon_refresh_2025"
     namespace: "systemui"
@@ -553,6 +562,16 @@ flag {
     namespace: "systemui"
     description: "Feature flag for the assistant icon in desktop status bar"
     bug: "440281094"
+}
+
+flag {
+    name: "status_bar_chronometer_fixes"
+    namespace: "systemui"
+    description: "Fixes ticking behavior for the chronometer used in status bar chips"
+    bug: "450909625"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -820,6 +839,13 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+    name: "qs_sizes_in_tile_request_dialog"
+    namespace: "systemui"
+    description: "Allows for selecting a tile's size in the tile request dialog."
+    bug: "445464782"
 }
 
 flag {
@@ -1215,6 +1241,16 @@ flag {
    namespace: "systemui"
    description: "Update for determining the next SIM subscription ID for a given state"
    bug: "410750970"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
+   name: "doze_time_tick_invalid_state_check"
+   namespace: "systemui"
+   description: "Ignore requests to schedule a doze time tick while in an invalid state"
+   bug: "448867811"
    metadata {
         purpose: PURPOSE_BUGFIX
    }
@@ -1670,6 +1706,13 @@ flag {
 }
 
 flag {
+    name: "large_screen_region_recording"
+    namespace: "systemui"
+    description: "Enables the region recording option on large screen devices."
+    bug: "450918585"
+}
+
+flag {
     name: "large_screen_screenshot_save_location"
     namespace: "systemui"
     description: "Enables ability to specify a custom save location for screenshots within settings menu on large screen devices."
@@ -2022,6 +2065,26 @@ flag {
     namespace: "systemui"
     description: "Fix a flicker in activity launch animations originating from the Cast QS dialog"
     bug: "437996864"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_shade_header_wrong_dnd_icon_size"
+    namespace: "lse_desktop_experience"
+    description: "Fix DnD icon size in shade header on connected displays"
+    bug: "445347372"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_notes_role_in_freeform"
+    namespace: "note"
+    description: "Fix issues related to notes role under the freeform environment."
+    bug: "451909067"
     metadata {
        purpose: PURPOSE_BUGFIX
     }

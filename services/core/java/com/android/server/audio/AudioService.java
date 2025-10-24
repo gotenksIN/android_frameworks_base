@@ -50,6 +50,8 @@ import static android.media.AudioDeviceVolumeManager.DEVICE_VOLUME_BEHAVIOR_UNSE
 import static android.media.AudioDeviceVolumeManager.DEVICE_VOLUME_BEHAVIOR_VARIABLE;
 import static android.media.AudioManager.AUDIO_DEVICE_CATEGORY_HEADPHONES;
 import static android.media.AudioManager.FLAG_ABSOLUTE_VOLUME;
+import static android.media.AudioManager.FOCUS_ISOLATION_EXIT_LOSE_FOCUS;
+import static android.media.AudioManager.FOCUS_ISOLATION_EXIT_RETAIN_FOCUS;
 import static android.media.AudioManager.MODE_ASSISTANT_CONVERSATION;
 import static android.media.AudioManager.RINGER_MODE_NORMAL;
 import static android.media.AudioManager.RINGER_MODE_SILENT;
@@ -165,6 +167,7 @@ import android.media.AudioFormat;
 import android.media.AudioHalVersionInfo;
 import android.media.AudioManager;
 import android.media.AudioManager.AudioDeviceCategory;
+import android.media.AudioManager.FocusIsolationExitMode;
 import android.media.AudioManagerInternal;
 import android.media.AudioMixerAttributes;
 import android.media.AudioPlaybackConfiguration;
@@ -4578,6 +4581,9 @@ public class AudioService extends IAudioService.Stub
         }
 
         if (!registeredAsAbsoluteVolume) {
+            if (muted) {
+                newIndex = getVssForStreamOrDefault(streamType).getMinIndex();
+            }
             if (streamTypeAlias == getBluetoothContextualVolumeStream()
                     && AudioSystem.DEVICE_OUT_ALL_A2DP_SET.contains(deviceType)
                     && (flags & AudioManager.FLAG_BLUETOOTH_ABS_VOLUME) == 0) {
@@ -12192,7 +12198,7 @@ public class AudioService extends IAudioService.Stub
         }
 
         mmi.record();
-        return mMediaFocusControl.requestAudioFocus(aa, focusReqType, cb, fd,
+        return mMediaFocusControl.requestAudioFocus(uid, aa, focusReqType, cb, fd,
                 clientId, callingPackageName, flags, sdk,
                 forceFocusDuckingForAccessibility(aa, focusReqType, uid), -1 /*testUid, ignored*/,
                 permissionOverridesCheck);
@@ -12210,7 +12216,8 @@ public class AudioService extends IAudioService.Stub
             Log.e(TAG, reason);
             return AudioManager.AUDIOFOCUS_REQUEST_FAILED;
         }
-        return mMediaFocusControl.requestAudioFocus(aa, focusReqType, cb, fd,
+        return mMediaFocusControl.requestAudioFocus(Binder.getCallingUid(),
+                aa, focusReqType, cb, fd,
                 clientId, callingPackageName, flags,
                 sdk, false /*forceDuck*/, fakeUid, true /*permissionOverridesCheck*/);
     }
@@ -12298,6 +12305,26 @@ public class AudioService extends IAudioService.Stub
             return AudioManager.AUDIOFOCUS_REQUEST_FAILED;
         }
         return mMediaFocusControl.abandonAudioFocus(fd, clientId, aa, callingPackageName);
+    }
+
+    /** see {@link AudioManager#enterFocusIsolation(int)} */
+    @Override
+    @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
+    public boolean enterFocusIsolation(int uid, IBinder cb) {
+        super.enterFocusIsolation_enforcePermission();
+        Objects.requireNonNull(cb);
+        return mMediaFocusControl.enterFocusIsolation(uid, cb);
+    }
+
+    /** see {@link AudioManager#exitFocusIsolation(AudioManager.FocusIsolationToken, int)}. */
+    @Override
+    @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
+    public boolean exitFocusIsolation(IBinder cb, @FocusIsolationExitMode int mode) {
+        super.exitFocusIsolation_enforcePermission();
+        if (mode != FOCUS_ISOLATION_EXIT_LOSE_FOCUS && mode != FOCUS_ISOLATION_EXIT_RETAIN_FOCUS) {
+            throw new IllegalArgumentException("Invalid focus isolation exit mode " + mode);
+        }
+        return mMediaFocusControl.exitFocusIsolation(cb, mode);
     }
 
     /** see {@link AudioManager#getFocusDuckedUidsForTest()} */

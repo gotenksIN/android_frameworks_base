@@ -22,15 +22,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.dimensionResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.scene.ElementContentScope
+import com.android.compose.animation.scene.Key
+import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.keyguard.ui.viewmodel.KeyguardQuickAffordancesCombinedViewModel
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenLowerRegionViewModel
 import com.android.systemui.lifecycle.rememberViewModel
+import com.android.systemui.plugins.keyguard.ui.composable.elements.BaseLockscreenElement.ElementSource
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys.IndicationArea
@@ -41,19 +48,23 @@ import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenSc
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
 import javax.inject.Inject
+import kotlinx.coroutines.flow.map
 
+@SysUISingleton
 /** Provides a combined element for all lockscreen ui above the lock icon */
 class LockscreenLowerRegionElementProvider
 @Inject
 constructor(
     @ShadeDisplayAware private val context: Context,
     private val viewModelFactory: LockscreenLowerRegionViewModel.Factory,
+    private val quickAffordancesCombinedViewModel: KeyguardQuickAffordancesCombinedViewModel,
 ) : LockscreenElementProvider {
     override val elements: List<LockscreenElement> by lazy { listOf(LowerRegionElement()) }
 
     private inner class LowerRegionElement : LockscreenElement {
         override val key = LockscreenElementKeys.Region.Lower
         override val context = this@LockscreenLowerRegionElementProvider.context
+        override val source = ElementSource.STANDARD
 
         @Composable
         override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
@@ -68,12 +79,7 @@ constructor(
                                 dimensionResource(R.dimen.keyguard_affordance_horizontal_offset)
                         ),
             ) {
-                Box(
-                    Modifier.graphicsLayer { translationX = viewModel.unfoldTranslations.start }
-                        .wrapContentHeight(Alignment.Bottom, unbounded = true)
-                ) {
-                    LockscreenElement(Shortcuts.Start)
-                }
+                ShortcutElement(Shortcuts.Start, viewModel)
 
                 Box(
                     Modifier.weight(1f)
@@ -82,13 +88,58 @@ constructor(
                     LockscreenElement(IndicationArea)
                 }
 
-                Box(
-                    Modifier.graphicsLayer { translationX = viewModel.unfoldTranslations.end }
-                        .wrapContentHeight(Alignment.Bottom, unbounded = true)
-                ) {
-                    LockscreenElement(Shortcuts.End)
-                }
+                ShortcutElement(Shortcuts.End, viewModel)
             }
         }
+
+        @Composable
+        private fun LockscreenScope<ElementContentScope>.ShortcutElement(
+            key: Key,
+            viewModel: LockscreenLowerRegionViewModel,
+        ) {
+            val endVisible by
+                quickAffordancesCombinedViewModel.endButton
+                    .map { it.isVisible }
+                    .collectAsStateWithLifecycle(initialValue = false)
+
+            val startVisible by
+                quickAffordancesCombinedViewModel.startButton
+                    .map { it.isVisible }
+                    .collectAsStateWithLifecycle(initialValue = false)
+
+            // If neither shortcut is visible, do not display anything to allow indication area
+            // and other features to take the full width of the device.
+            if (!startVisible && !endVisible) {
+                return
+            }
+
+            val unfoldTranslations =
+                when (key) {
+                    Shortcuts.Start -> {
+                        viewModel.unfoldTranslations.start
+                    }
+
+                    Shortcuts.End -> {
+                        viewModel.unfoldTranslations.end
+                    }
+                    else -> {
+                        throw IllegalArgumentException("Invalid keyguard shortcut key: $key")
+                    }
+                }
+
+            LockscreenElement(
+                key,
+                Modifier.graphicsLayer { translationX = unfoldTranslations }
+                    .wrapContentHeight(Alignment.Bottom, unbounded = true)
+                    .size(
+                        height = dimensionResource(R.dimen.keyguard_affordance_fixed_height),
+                        width = dimensionResource(R.dimen.keyguard_affordance_fixed_width),
+                    ),
+            )
+        }
+    }
+
+    private companion object {
+        private const val TAG = "LowerRegionElement"
     }
 }

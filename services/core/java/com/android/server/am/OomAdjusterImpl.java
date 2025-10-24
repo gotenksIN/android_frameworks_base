@@ -1167,8 +1167,7 @@ public class OomAdjusterImpl extends OomAdjuster {
         app.setShouldNotFreeze(uidRec != null && uidRec.isCurAllowListed(), false /* dryRun */,
                 ProcessCachedOptimizerRecord.SHOULD_NOT_FREEZE_REASON_UID_ALLOWLISTED, mAdjSeq);
 
-        final boolean reportDebugMsgs =
-                DEBUG_OOM_ADJ_REASON || mService.mCurOomAdjUid == app.getApplicationUid();
+        final boolean reportDebugMsgs = DEBUG_OOM_ADJ_REASON || mGlobalState.isDebugEnabled(app);
 
         final ProcessServiceRecordInternal psr = app.getServices();
 
@@ -1854,8 +1853,7 @@ public class OomAdjusterImpl extends OomAdjuster {
         final int prevSchedGroup = schedGroup;
         final int prevCapability = capability;
 
-        final boolean reportDebugMsgs =
-                DEBUG_OOM_ADJ_REASON || mService.mCurOomAdjUid == app.getApplicationUid();
+        final boolean reportDebugMsgs = DEBUG_OOM_ADJ_REASON || mGlobalState.isDebugEnabled(app);
 
         if (!dryRun) {
             app.setCurBoundByNonBgRestrictedApp(app.isCurBoundByNonBgRestrictedApp()
@@ -2307,8 +2305,7 @@ public class OomAdjusterImpl extends OomAdjuster {
         final int prevSchedGroup = schedGroup;
         final int prevCapability = capability;
 
-        final boolean reportDebugMsgs =
-                DEBUG_OOM_ADJ_REASON || mService.mCurOomAdjUid == app.getApplicationUid();
+        final boolean reportDebugMsgs = DEBUG_OOM_ADJ_REASON || mGlobalState.isDebugEnabled(app);
 
         // We always propagate PROCESS_CAPABILITY_BFSL to providers here,
         // but, right before actually setting it to the process,

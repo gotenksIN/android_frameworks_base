@@ -16,19 +16,27 @@
 
 package com.android.systemui.screencapture.record.largescreen.domain.interactor
 
-import com.android.systemui.screencapture.common.ScreenCaptureUiScope
+import android.net.Uri
+import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.screencapture.record.largescreen.data.repository.LargeScreenCaptureParametersRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 
-@ScreenCaptureUiScope
+@SysUISingleton
 class LargeScreenCaptureParametersInteractor
 @Inject
 constructor(private val largeScreenSettingsRepository: LargeScreenCaptureParametersRepository) {
     val customSaveLocationUriString: Flow<String> =
         largeScreenSettingsRepository.customSaveLocationUriString
 
-    suspend fun setCustomSaveLocation(uriString: String) {
-        largeScreenSettingsRepository.updateCustomSaveLocationUriString(uriString)
+    val isCustomSaveLocationActive: Flow<Boolean> =
+        largeScreenSettingsRepository.isCustomSaveLocationActive
+
+    suspend fun setCustomSaveLocation(uri: Uri?) {
+        largeScreenSettingsRepository.updateCustomSaveLocationUriString(uri)
+    }
+
+    suspend fun setIsCustomSaveLocationActive(isActive: Boolean) {
+        largeScreenSettingsRepository.updateIsCustomSaveLocationActive(isActive)
     }
 }

@@ -31,7 +31,7 @@ import com.android.app.tracing.traceSection
 import com.android.wm.shell.R
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.common.DisplayController
-import com.android.wm.shell.shared.annotations.ShellMainThread
+import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.windowdecor.WindowDecorLinearLayout
 import com.android.wm.shell.windowdecor.WindowDecoration2
 import com.android.wm.shell.windowdecor.WindowDecorationActions
@@ -48,20 +48,19 @@ import kotlinx.coroutines.CoroutineScope
 class AppPinnedController(
     taskInfo: RunningTaskInfo,
     windowDecorViewHostSupplier: WindowDecorViewHostSupplier<WindowDecorViewHost>,
-    private val context: Context,
     private val decorWindowContext: Context,
     private val displayController: DisplayController,
     private val onTouchListener: View.OnTouchListener,
     private val onGenericMotionEventListener: View.OnGenericMotionListener,
     private val windowDecorationActions: WindowDecorationActions,
     taskOrganizer: ShellTaskOrganizer,
-    @ShellMainThread mainScope: CoroutineScope,
+    @ShellBackgroundThread bgScope: CoroutineScope,
 ) :
     CaptionController<WindowDecorLinearLayout>(
         taskInfo,
         windowDecorViewHostSupplier,
         taskOrganizer,
-        mainScope,
+        bgScope,
     ) {
 
     companion object {
@@ -122,14 +121,14 @@ class AppPinnedController(
         arrayListOf(
             OccludingElement(
                 width =
-                    context.resources.getDimensionPixelSize(
+                    decorWindowContext.resources.getDimensionPixelSize(
                         R.dimen.desktop_mode_pinned_header_margin_start
                     ),
                 alignment = OccludingElement.Alignment.START,
             ),
             OccludingElement(
                 width =
-                    context.resources.getDimensionPixelSize(
+                    decorWindowContext.resources.getDimensionPixelSize(
                         R.dimen.desktop_mode_pinned_header_margin_end
                     ),
                 alignment = OccludingElement.Alignment.END,
@@ -137,8 +136,9 @@ class AppPinnedController(
         )
 
     override fun getCaptionHeight(): Int =
-        context.resources.getDimensionPixelSize(R.dimen.desktop_mode_pinned_header_height) +
-            getCaptionTopPadding()
+        decorWindowContext.resources.getDimensionPixelSize(
+            R.dimen.desktop_mode_pinned_header_height
+        ) + getCaptionTopPadding()
 
     override fun getCaptionWidth(): Int =
         taskInfo.getConfiguration().windowConfiguration.bounds.width()

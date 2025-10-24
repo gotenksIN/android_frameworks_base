@@ -308,6 +308,13 @@
       ]
     },
     {
+      "name": "FunctionalTestsDesktopMode-fundamentals-OpenAppInBrowserTest",
+      "keywords": [
+        "device",
+        "desktop"
+      ]
+    },
+    {
       "name": "FunctionalTestsDesktopMode-fundamentals-OpenAppsInDesktopModeTest",
       "keywords": [
         "device",
@@ -322,7 +329,7 @@
       ]
     },
     {
-      "name": "FunctionalTestsDesktopMode-fundamentals-SwitchBetweenDesktopAndFullscreenTest",
+      "name": "FunctionalTestsDesktopMode-fundamentals-SwitchBetweenDesktopAndFullScreenTest",
       "keywords": [
         "device",
         "desktop"
@@ -575,6 +582,13 @@
     },
     {
       "name": "FunctionalTestsDesktopMode-overview-SwitchBetweenDesktopAndSplitScreenTest",
+      "keywords": [
+        "device",
+        "desktop"
+      ]
+    },
+    {
+      "name": "FunctionalTestsDesktopMode-pip-PipInDesktopWindowingTest",
       "keywords": [
         "device",
         "desktop"

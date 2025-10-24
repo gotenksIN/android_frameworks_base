@@ -57,6 +57,7 @@ import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger.DesktopUiEventE
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository
 import com.android.wm.shell.desktopmode.isTaskMaximized
+import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.splitscreen.SplitScreenController
@@ -99,7 +100,6 @@ import kotlinx.coroutines.launch
 class AppHeaderController(
     taskInfo: RunningTaskInfo,
     windowDecorViewHostSupplier: WindowDecorViewHostSupplier<WindowDecorViewHost>,
-    private val context: Context,
     private val userContext: Context,
     private val displayController: DisplayController,
     private val taskResourceLoader: WindowDecorTaskResourceLoader,
@@ -112,7 +112,8 @@ class AppHeaderController(
     @ShellMainThread private val mainHandler: Handler,
     @ShellMainThread private val mainExecutor: ShellExecutor,
     @ShellMainThread private val mainDispatcher: MainCoroutineDispatcher,
-    @ShellMainThread mainScope: CoroutineScope,
+    @ShellMainThread private val mainScope: CoroutineScope,
+    @ShellBackgroundThread bgScope: CoroutineScope,
     private val syncQueue: SyncTransactionQueue,
     private val rootTaskDisplayAreaOrganizer: RootTaskDisplayAreaOrganizer,
     private val windowManagerWrapper: WindowManagerWrapper,
@@ -144,7 +145,7 @@ class AppHeaderController(
         taskInfo,
         windowDecorViewHostSupplier,
         taskOrganizer,
-        mainScope,
+        bgScope,
         surfaceControlBuilderSupplier,
         surfaceControlViewHostFactory,
     ),
@@ -193,11 +194,7 @@ class AppHeaderController(
                 .isTrue ||
             DesktopExperienceFlags.ENABLE_APP_HANDLE_POSITION_REPORTING.isTrue
     private val dimensions =
-        if (DesktopExperienceFlags.ENABLE_TALL_APP_HEADERS.isTrue) {
-            LargeAppHeaderDimensions(decorWindowContext.resources)
-        } else {
-            DefaultAppHeaderDimensions(decorWindowContext.resources)
-        }
+        LargeAppHeaderDimensions(decorWindowContext.resources)
 
     private var isMaximizeMenuHovered = false
     private var isAppHeaderMaximizeButtonHovered = false
@@ -448,7 +445,7 @@ class AppHeaderController(
         if (isOpenByDefaultDialogActive) return
         openByDefaultDialog =
             OpenByDefaultDialog(
-                context,
+                decorWindowContext,
                 userContext,
                 transitions,
                 taskInfo,
@@ -616,7 +613,7 @@ class AppHeaderController(
                         captionLayoutResult.captionTopPadding,
                 displayController = displayController,
                 rootTdaOrganizer = rootTaskDisplayAreaOrganizer,
-                context = context,
+                context = decorWindowContext,
                 desktopUserRepositories = desktopUserRepositories,
                 surfaceControlBuilderSupplier = surfaceControlBuilderSupplier,
                 surfaceControlTransactionSupplier = surfaceControlTransactionSupplier,
@@ -689,7 +686,7 @@ class AppHeaderController(
 
     /** Returns the valid drag area for a task based on elements in the app chip. */
     override fun calculateValidDragArea(): Rect {
-        val resources = context.resources
+        val resources = decorWindowContext.resources
         val leftButtonsWidth =
             resources.getDimensionPixelSize(R.dimen.desktop_mode_app_details_width_minus_text) +
                 viewHolder.appNameTextWidth

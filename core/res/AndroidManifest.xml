@@ -7096,6 +7096,14 @@
     <permission android:name="android.permission.MEDIA_CONTENT_CONTROL"
         android:protectionLevel="signature|privileged" />
 
+    <!-- Allows an application to override the owner of a MediaSession.
+         <p> Not for use by third-party applications due to privacy of media applications.<p>
+         @FlaggedApi(com.android.media.mediasession.flags.Flags.FLAG_OVERRIDE_MEDIA_SESSION_OWNER)
+         -->
+    <permission android:name="android.permission.OVERRIDE_MEDIA_SESSION_OWNER"
+        android:protectionLevel="signature|privileged"
+        android:featureFlag="com.android.media.mediasession.flags.override_media_session_owner"/>
+
     <!-- Allows an application to control the routing of media apps.
          <p>Only for use by role COMPANION_DEVICE_WATCH</p>
          @FlaggedApi("com.android.media.flags.enable_privileged_routing_for_media_routing_control")
@@ -9611,6 +9619,26 @@
             android:requiresPurposeTargetSdkVersion="37">
             <valid-purpose android:name="notForIdentification" />
     </permission>
+
+    <!-- Must be required by a
+         {@link android.service.personalcontext.renderer.InsightRendererService}, to ensure that
+         only the system can bind to it.
+         <p>Protection level: signature
+         @FlaggedApi(android.service.personalcontext.Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
+    -->
+    <permission android:name="android.permission.BIND_INSIGHT_RENDERER_SERVICE"
+        android:protectionLevel="signature"
+        android:featureFlag="android.service.personalcontext.enable_personal_context_service" />
+
+    <!-- Must be required by a
+         {@link android.service.personalcontext.embedded.InsightSurfaceVisualizerService}, to ensure
+         that only the system can bind to it.
+         <p>Protection level: signature
+         @FlaggedApi(android.service.personalcontext.Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
+    -->
+    <permission android:name="android.permission.BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE"
+        android:protectionLevel="signature"
+        android:featureFlag="android.service.personalcontext.enable_personal_context_service" />
 
     <!-- Attribution for Geofencing service. -->
     <attribution android:tag="GeofencingService" android:label="@string/geofencing_service"/>

@@ -3353,6 +3353,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     static class TaskInfoHelper implements Consumer<ActivityRecord> {
         private TaskInfo mInfo;
         private ActivityRecord mTopRunning;
+        private boolean mCreatedByOrganizer;
 
         ActivityRecord fillAndReturnTop(Task task, TaskInfo info) {
             info.numActivities = 0;
@@ -3360,6 +3361,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             info.capturedLink = null;
             info.capturedLinkTimestamp = 0;
             mInfo = info;
+            mCreatedByOrganizer = task.mCreatedByOrganizer;
             task.forAllActivities(this);
             final ActivityRecord top = mTopRunning;
             mTopRunning = null;
@@ -3373,7 +3375,8 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                     && mInfo.capturedLink == null) {
                 setCapturedLink(r);
             }
-            if (r.mLaunchCookie != null) {
+            if (r.mLaunchCookie != null && (!com.android.window.flags.Flags.rootTaskForBubble()
+                    || !mCreatedByOrganizer)) {
                 mInfo.addLaunchCookie(r.mLaunchCookie);
             }
             if (r.finishing) {

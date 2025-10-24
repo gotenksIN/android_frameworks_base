@@ -64,18 +64,23 @@ constructor(
     /**
      * Creates listener using [DarkIconDispatcher] to determine light or dark color of the overlay
      */
-    fun createDarkAwareListener(view: View): StatusOverlayHoverListener? {
+    fun createDarkAwareListener(
+        view: View,
+        customHeightPx: Int? = null,
+    ): StatusOverlayHoverListener? {
         val darkIconDispatcher = view.darkIconDispatcher ?: return null
-        return createDarkAwareListener(view, darkIconDispatcher.darkChangeFlow())
+        return createDarkAwareListener(view, darkIconDispatcher.darkChangeFlow(), customHeightPx)
     }
 
     /**
      * Creates listener using provided [DarkChange] producer to determine light or dark color of the
      * overlay
      */
+    @JvmOverloads
     fun createDarkAwareListener(
         view: View,
         darkFlow: StateFlow<DarkChange>,
+        customHeightPx: Int? = null,
     ): StatusOverlayHoverListener? {
         val configurationController = view.statusBarConfigurationController ?: return null
         return StatusOverlayHoverListener(
@@ -83,6 +88,7 @@ constructor(
             configurationController,
             view.resources,
             darkFlow.map { toHoverTheme(view, it) },
+            customHeightPx,
         )
     }
 
@@ -119,12 +125,12 @@ class StatusOverlayHoverListener(
     configurationController: ConfigurationController,
     private val resources: Resources,
     private val themeFlow: Flow<HoverTheme>,
+    private val customHeightPx: Int? = null,
 ) : OnHoverListener {
 
     @ColorInt private var darkColor: Int = 0
     @ColorInt private var lightColor: Int = 0
     private var cornerRadius = 0f
-
     private var lastTheme = HoverTheme.LIGHT
 
     val backgroundColor
@@ -151,14 +157,22 @@ class StatusOverlayHoverListener(
 
     override fun onHover(v: View, event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_HOVER_ENTER) {
+            val verticalMarginPx =
+                if (customHeightPx == null) {
+                    0
+                } else if (customHeightPx >= v.height || customHeightPx <= 0) {
+                    0
+                } else {
+                    (v.height - customHeightPx) / 2
+                }
             val drawable =
                 PaintDrawable(backgroundColor).apply {
                     setCornerRadius(cornerRadius)
                     setBounds(
                         /*left = */ 0,
-                        /*top = */ 0,
+                        /*top = */ verticalMarginPx,
                         /*right = */ v.width,
-                        /*bottom = */ v.height,
+                        /*bottom = */ v.height - verticalMarginPx,
                     )
                 }
             v.overlay.add(drawable)

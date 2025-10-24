@@ -135,7 +135,6 @@ public final class MessageQueue {
     private static final VarHandle sMptrRefCount;
     private volatile long mMptrRefCountValue = 0;
 
-
     private volatile Message mSyncBarrier = null;
 
     /* ------------------------------------------------------------------------------------------ */
@@ -189,6 +188,16 @@ public final class MessageQueue {
         if (UserHandle.isCore(Process.myUid())) {
             return true;
         }
+
+        // Also explicitly allow SystemUI processes.
+        // SystemUI doesn't run in a core UID, but we want to give it the performance boost,
+        // and we know that it's safe to use the concurrent implementation in SystemUI.
+        if (processName.equals("com.android.systemui")
+                || processName.startsWith("com.android.systemui:")) {
+            return true;
+        }
+        // On Android distributions where SystemUI has a different process name,
+        // the above condition may need to be adjusted accordingly.
 
         // We can lift these restrictions in the future after we've made it possible for test
         // authors to test Looper and MessageQueue without resorting to reflection.
@@ -413,33 +422,51 @@ public final class MessageQueue {
         }
 
         while (true) {
-            long waitState = mWaitState;
-            long newWaitState;
-            boolean needWake = false;
-            Message barrier = msg.isAsynchronous() ? null : mSyncBarrier;
-            boolean reCheckBarrier = false;
+            final long waitState = mWaitState;
+            final long newWaitState;
+            final boolean needWake;
+            final Message checkBarrier;
 
             if (WaitState.isCounter(waitState)) {
+                // Looper is already awake
                 newWaitState = WaitState.incrementCounter(waitState);
+                checkBarrier = null;
+                needWake = false;
+            } else if (msg.when >= WaitState.getTSMillis(waitState)) {
+                // The enqueued message is not earlier than the current wake
+                // deadline, so we don't need to wake.
+                newWaitState = WaitState.incrementDeadline(waitState);
+                checkBarrier = null;
+                needWake = false;
+            } else if (msg.isAsynchronous()) {
+                // The enqueued message has an earlier deadline.
+                // It is async, so it can bypass barriers.
+                newWaitState = WaitState.initCounter();
+                checkBarrier = null;
+                needWake = true;
             } else {
-                final long TSmillis = WaitState.getTSMillis(waitState);
-                boolean weComeBeforeBarrier = barrier != null && msg.when <= barrier.when;
-                if (weComeBeforeBarrier || (msg.when < TSmillis
-                        && (!WaitState.hasSyncBarrier(waitState) || msg.isAsynchronous()))) {
-                    newWaitState = WaitState.initCounter();
-                    needWake = true;
-                } else {
+                // We may need to wake up, depending on the state of the sync barrier.
+                Message barrier = WaitState.hasSyncBarrier(waitState) ? mSyncBarrier : null;
+                boolean blockedByBarrier =
+                        barrier != null && Message.compareMessages(barrier, msg) < 0;
+                if (blockedByBarrier) {
                     newWaitState = WaitState.incrementDeadline(waitState);
-                    reCheckBarrier = true;
+                    checkBarrier = barrier;
+                    needWake = false;
+                } else {
+                    newWaitState = WaitState.initCounter();
+                    checkBarrier = null;
+                    needWake = true;
                 }
             }
+
             if (sWaitState.compareAndSet(this, waitState, newWaitState)) {
-                if (reCheckBarrier && barrier != mSyncBarrier) {
+                if (checkBarrier != null && checkBarrier != mSyncBarrier) {
                     /*
-                     * If barrier state changed underneath us and we chose not to wake the
-                     * looper thread, we have to recheck to ensure that the barrier we saw was
-                     * actually in place while we did the CAS.
-                     */
+                    * If barrier state changed underneath us and we chose not to wake the
+                    * looper thread, we have to recheck to ensure that the barrier we saw was
+                    * actually in place while we did the CAS.
+                    */
                     continue;
                 }
                 if (needWake) {
@@ -447,6 +474,7 @@ public final class MessageQueue {
                 }
                 return true;
             }
+            // Failed to update wait state, loop and retry
         }
     }
 

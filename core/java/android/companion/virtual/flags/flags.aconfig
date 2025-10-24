@@ -318,6 +318,16 @@ flag {
 }
 
 flag {
+    name: "computer_control_block_input_and_screenshots"
+    namespace: "virtual_devices"
+    description: "Block agent input and screenshots whenever we are in the 'blocked' state"
+    bug: "442540670"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "virtual_camera_stable_stream_id"
     namespace: "virtual_devices"
     description: "Assign the index at which a stream has been added to the virtual camera config as its id."
@@ -352,6 +362,16 @@ flag {
     namespace: "virtual_devices"
     description: "Intercept audio streams for playback and capture on a ComputerControlSession"
     bug: "446853112"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "gwpc_secure_window_state_tracking"
+    namespace: "virtual_devices"
+    description: "Track secure states across activity launches in GenericWindowPolicyController"
+    bug: "449765707"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

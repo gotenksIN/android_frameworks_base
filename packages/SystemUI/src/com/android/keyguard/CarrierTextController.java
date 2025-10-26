@@ -16,13 +16,17 @@
 
 package com.android.keyguard;
 
+// QTI_BEGIN: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 import android.content.res.Configuration;
+// QTI_END: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 import android.telephony.TelephonyManager;
 
 import com.android.systemui.util.ViewController;
 
+// QTI_BEGIN: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 import java.util.Locale;
 
+// QTI_END: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 import javax.inject.Inject;
 
 /**
@@ -31,7 +35,9 @@ import javax.inject.Inject;
 public class CarrierTextController extends ViewController<CarrierText> {
     private final CarrierTextManager mCarrierTextManager;
     private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
+// QTI_BEGIN: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
     private Locale mLocale;
+// QTI_END: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
     private final CarrierTextManager.CarrierTextCallback mCarrierTextCallback =
             new CarrierTextManager.CarrierTextCallback() {
                 @Override
@@ -62,8 +68,10 @@ public class CarrierTextController extends ViewController<CarrierText> {
                 .setDebugLocationString(mView.getDebugLocation())
                 .build();
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
+// QTI_BEGIN: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
         mView.setOnConfigurationChangedListener(this::refreshInfoIfNeeded);
         mLocale = mView.getResources().getConfiguration().locale;
+// QTI_END: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
     }
 
     @Override
@@ -81,6 +89,7 @@ public class CarrierTextController extends ViewController<CarrierText> {
     protected void onViewDetached() {
         mCarrierTextManager.setListening(null);
     }
+// QTI_BEGIN: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 
     private void refreshInfoIfNeeded(Configuration newConfig) {
         if (mLocale != newConfig.locale) {
@@ -90,4 +99,5 @@ public class CarrierTextController extends ViewController<CarrierText> {
         }
 
     }
+// QTI_END: 2023-07-13: Android_UI: SystemUI: Follow system settings to switch carrier name language
 }

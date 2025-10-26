@@ -13,30 +13,10 @@ flag {
 }
 
 flag {
-    name: "clear_reusable_scvh_on_release"
-    namespace: "lse_desktop_experience"
-    description: "Resets the views of reusable SCVHs when released"
-    bug: "432324168"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "close_fullscreen_and_splitscreen_keyboard_shortcut"
     namespace: "lse_desktop_experience"
     description: "Enable keyboard shortcut to close fullscreen and split screen tasks"
     bug: "441147192"
-}
-
-flag {
-    name: "close_task_keyboard_shortcut"
-    namespace: "lse_desktop_experience"
-    description: "Enable keyboard shortcut to close a task"
-    bug: "416437920"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -69,13 +49,6 @@ flag {
     metadata {
        purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "disable_non_resizable_app_snap_resizing"
-    namespace: "lse_desktop_experience"
-    description: "Stops non-resizable app desktop windows from being snap resized"
-    bug: "325240072"
 }
 
 flag {
@@ -278,13 +251,6 @@ flag {
 }
 
 flag {
-    name: "enable_cascading_windows"
-    namespace: "lse_desktop_experience"
-    description: "Whether to apply cascading effect for placing multiple windows when first launched"
-    bug: "325240051"
-}
-
-flag {
     name: "enable_close_lid_interaction"
     namespace: "lse_desktop_experience"
     description: "Enables new interaction that occurs when device lid is closed."
@@ -364,16 +330,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables the animation that occurs when the app handle of a task in immersive mode is shown or hidden."
     bug: "375252977"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_desktop_app_header_state_change_announcements"
-    namespace: "lse_desktop_experience"
-    description: "Enables desktop windowing state change announcements for Talkback"
-    bug: "398732993"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -731,16 +687,6 @@ flag {
 }
 
 flag {
-    name: "enable_desktop_windowing_exit_by_minimize_transition_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables exit desktop windowing by minimize transition & motion polish changes"
-    bug: "390161102"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_desktop_windowing_exit_transitions"
     namespace: "lse_desktop_experience"
     description: "Enables exit desktop windowing transition & motion polish changes"
@@ -769,13 +715,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Hides the App Handle when in fullscreen immersive mode"
     bug: "336368019"
-}
-
-flag {
-    name: "enable_desktop_windowing_modals_policy"
-    namespace: "lse_desktop_experience"
-    description: "Enables policy for modals activities"
-    bug: "319492844"
 }
 
 flag {
@@ -879,16 +818,6 @@ flag {
 }
 
 flag {
-    name: "enable_dialog_display_fixes"
-    namespace: "lse_desktop_experience"
-    description: "Enables fixes that ensure external display dialogs are shown on the correct display"
-    bug: "438457648"
-    metadata {
-         purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_display_compat_mode"
     namespace: "lse_desktop_experience"
     description: "Enables display compat mode for connected displays."
@@ -988,16 +917,6 @@ flag {
 }
 
 flag {
-    name: "enable_dynamic_radius_computation_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables bugfix to compute the corner/shadow radius of desktop windows dynamically with the current window context."
-    bug: "399630464"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_empty_desk_on_minimize"
     namespace: "lse_desktop_experience"
     description: "Keep desktop open when the last window is minimized."
@@ -1005,6 +924,13 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enable_enhanced_app_to_web_transition"
+    namespace: "lse_desktop_experience"
+    description: "Enables the enhanced app-to-web transition feature."
+    bug: "448269346"
 }
 
 flag {
@@ -1172,28 +1098,6 @@ flag {
 }
 
 flag {
-    name: "enable_modals_fullscreen_with_permission"
-    namespace: "lse_desktop_experience"
-    description: "Uses permissions to understand if modal fullscreen is allowed for /n"
-                 "transparent activities."
-    bug: "394714626"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_modals_fullscreen_with_platform_signature"
-    namespace: "lse_desktop_experience"
-    description: "Uses platform signature to understand if modal fullscreen is allowed for /n"
-                 "transparent activities."
-    bug: "407759199"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_move_to_next_display_shortcut"
     namespace: "lse_desktop_experience"
     description: "Add new keyboard shortcut of moving a task into next display"
@@ -1314,16 +1218,6 @@ flag {
 }
 
 flag {
-    name: "enable_pip_params_update_notification_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Fixes the issue that OnPictureInPictureParamsChanged is sent to a root task."
-    bug: "422654539"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_presentation_disallowed_on_unfocused_host_task"
     namespace: "lse_desktop_experience"
     description: "Disallows presentations from being shown on their unfocused host tasks."
@@ -1362,6 +1256,13 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enable the reject home transition, which runs if home is invoked on a display which lacks a home."
     bug: "378443899"
+}
+
+flag {
+    name: "enable_remembered_bounds"
+    namespace: "lse_desktop_experience"
+    description: "Enable the remembered launch bounds feature."
+    bug: "391869747"
 }
 
 flag {
@@ -1471,16 +1372,6 @@ flag {
     bug: "408503553"
     metadata {
         purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_tall_app_headers"
-    namespace: "lse_desktop_experience"
-    description: "Increases the height of the app headers to minimum a11y requirements."
-    bug: "397592755"
-    metadata {
-      purpose: PURPOSE_BUGFIX
     }
 }
 
@@ -1693,16 +1584,6 @@ flag {
 }
 
 flag {
-    name: "fix_leaking_visual_indicator"
-    namespace: "lse_desktop_experience"
-    description: "Fixes a visual indicator leak that blocked input to non-top apps"
-    bug: "418225224"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "force_close_top_transparent_fullscreen_task"
     namespace: "lse_desktop_experience"
     description: "If a top transparent fullscreen task is on top of desktop mode, force it to /n"
@@ -1726,17 +1607,6 @@ flag {
     description: "Grant MANAGE_KEY_GESTURES permission to the recents holder."
     bug: "406452076"
     is_fixed_read_only: true
-}
-
-flag {
-    name: "ignore_current_params_in_desktop_launch_params"
-    namespace: "lse_desktop_experience"
-    description: "Ignore the current params when resolving desktop specific launch params in the /n"
-                 "desktop mode launch params modifier."
-    bug: "419222219"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1810,17 +1680,6 @@ flag {
 }
 
 flag {
-    name: "preserve_recents_task_configuration_on_relaunch"
-    namespace: "lse_desktop_experience"
-    description: "Preserve the orientation and aspect ratio of task if it was previously in /n"
-                 "recents with a running activity."
-    bug: "405141594"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "reenable_app_handle_animations"
     namespace: "lse_desktop_experience"
     description: "Re-enables the app handle animations"
@@ -1873,17 +1732,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables repository based persistence to run on background thread."
     bug: "436785583"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "respect_fullscreen_activity_option_in_desktop_launch_params"
-    namespace: "lse_desktop_experience"
-    description: "Prevents DesktopModeLaunchParamsModifier from modifying launch params for /n"
-                 "activities which request fullscreen via their activity options."
-    bug: "416032057"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

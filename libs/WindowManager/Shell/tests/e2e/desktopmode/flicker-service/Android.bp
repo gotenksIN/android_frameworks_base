@@ -70,7 +70,6 @@ test_module_config {
         "com.android.wm.shell.flicker.fundamentals.SwitchToDesktopFromOverviewFlickerTest",
         "com.android.wm.shell.flicker.fundamentals.SwitchToHomeFromDesktopTest",
         "com.android.wm.shell.flicker.fundamentals.SwitchToOverviewFromDesktopFlickerTest",
-        "com.android.wm.shell.flicker.fundamentals.UnlockIntoDesktopFromLockScreenFlickerTest",
         "com.android.wm.shell.flicker.immersive.EnterImmersiveViaHeaderMenuFlickerTest",
         "com.android.wm.shell.flicker.keyboardshortcuts.ActionTabSwitchToDesktopAppFlickerTest",
         "com.android.wm.shell.flicker.keyboardshortcuts.AltTabSwitchInDesktopModeFlickerTest",
@@ -89,7 +88,6 @@ test_module_config {
         "com.android.wm.shell.flicker.maximize.MaximizeUnfocusedAppWindowFlickerTest",
         "com.android.wm.shell.flicker.minimize.MinimizeAppsFlickerTest",
         "com.android.wm.shell.flicker.minimize.MinimizeAutoPipAppWindowFlickerTest",
-        "com.android.wm.shell.flicker.multiinstance.LaunchNewInstanceFromAppWindowMenuFlickerTest",
         "com.android.wm.shell.flicker.multiinstance.ManageOpenInstancesFromAppHeaderFlickerTest",
         "com.android.wm.shell.flicker.multiinstance.ManageOpenInstancesFromAppMenuFlickerTest",
         "com.android.wm.shell.flicker.multiinstance.ManageOpenInstancesFromTaskbarMenuFlickerTest",
@@ -301,13 +299,6 @@ test_module_config {
 }
 
 test_module_config {
-    name: "WMShellFlickerTestsDesktopMode-fundamentals-UnlockIntoDesktopFromLockScreenFlickerTest",
-    base: "WMShellFlickerTestsDesktopMode",
-    test_suites: ["device-tests"],
-    include_filters: ["com.android.wm.shell.flicker.fundamentals.UnlockIntoDesktopFromLockScreenFlickerTest"],
-}
-
-test_module_config {
     name: "WMShellFlickerTestsDesktopMode-immersive-EnterImmersiveViaHeaderMenuFlickerTest",
     base: "WMShellFlickerTestsDesktopMode",
     test_suites: ["device-tests"],
@@ -431,13 +422,6 @@ test_module_config {
     base: "WMShellFlickerTestsDesktopMode",
     test_suites: ["device-tests"],
     include_filters: ["com.android.wm.shell.flicker.minimize.MinimizeAutoPipAppWindowFlickerTest"],
-}
-
-test_module_config {
-    name: "WMShellFlickerTestsDesktopMode-multiinstance-LaunchNewInstanceFromAppWindowMenuFlickerTest",
-    base: "WMShellFlickerTestsDesktopMode",
-    test_suites: ["device-tests"],
-    include_filters: ["com.android.wm.shell.flicker.multiinstance.LaunchNewInstanceFromAppWindowMenuFlickerTest"],
 }
 
 test_module_config {

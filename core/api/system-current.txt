@@ -1193,7 +1193,9 @@ package android.app {
     method @NonNull @RequiresPermission(android.Manifest.permission.STATUS_BAR) public android.app.StatusBarManager.DisableInfo getDisableInfo();
     method @RequiresPermission(android.Manifest.permission.STATUS_BAR) public int getNavBarMode();
     method @RequiresPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) public void registerNearbyMediaDevicesProvider(@NonNull android.media.NearbyMediaDevicesProvider);
+    method @FlaggedApi("com.android.server.telecom.flags.resolve_hidden_dependencies_two") @RequiresPermission(android.Manifest.permission.STATUS_BAR) public void removeIcon(@NonNull String);
     method @RequiresPermission(android.Manifest.permission.STATUS_BAR) public void setDisabledForSetup(boolean);
+    method @FlaggedApi("com.android.server.telecom.flags.resolve_hidden_dependencies_two") @RequiresPermission(android.Manifest.permission.STATUS_BAR) public void setIcon(@NonNull String, @DrawableRes int, int, @Nullable String);
     method @RequiresPermission(android.Manifest.permission.STATUS_BAR) public void setNavBarMode(int);
     method @RequiresPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) public void unregisterNearbyMediaDevicesProvider(@NonNull android.media.NearbyMediaDevicesProvider);
     method @RequiresPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) public void updateMediaTapToTransferReceiverDisplay(int, @NonNull android.media.MediaRoute2Info, @Nullable android.graphics.drawable.Icon, @Nullable CharSequence);
@@ -3606,6 +3608,7 @@ package android.companion.datatransfer.continuity {
     field public static final int HANDOFF_AVAILABILITY_STATUS_DISABLED_BY_POLICY = 1; // 0x1
     field public static final int HANDOFF_AVAILABILITY_STATUS_UNSUPPORTED_HARDWARE = 2; // 0x2
     field public static final int HANDOFF_REQUEST_RESULT_FAILURE_DEVICE_NOT_FOUND = 5; // 0x5
+    field public static final int HANDOFF_REQUEST_RESULT_FAILURE_HANDOFF_DISABLED = 7; // 0x7
     field public static final int HANDOFF_REQUEST_RESULT_FAILURE_NO_DATA_PROVIDED_BY_TASK = 2; // 0x2
     field public static final int HANDOFF_REQUEST_RESULT_FAILURE_OTHER_INTERNAL_ERROR = 6; // 0x6
     field public static final int HANDOFF_REQUEST_RESULT_FAILURE_SENDER_LOST_CONNECTION = 3; // 0x3
@@ -5253,7 +5256,7 @@ package android.graphics.fonts {
 
   public class FontManager {
     method @NonNull @RequiresPermission(android.Manifest.permission.UPDATE_FONTS) public android.text.FontConfig getFontConfig();
-    method @FlaggedApi("com.android.text.flags.insert_font_family") public int insertFontFamilyBefore(@NonNull android.graphics.fonts.FontFamilyUpdateRequest, @NonNull String, @IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.insert_font_family") @RequiresPermission(android.Manifest.permission.UPDATE_FONTS) public int insertFontFamilyBefore(@NonNull android.graphics.fonts.FontFamilyUpdateRequest, @NonNull String, @IntRange(from=0) int);
     method @RequiresPermission(android.Manifest.permission.UPDATE_FONTS) public int updateFontFamily(@NonNull android.graphics.fonts.FontFamilyUpdateRequest, @IntRange(from=0) int);
     field public static final int RESULT_ERROR_DOWNGRADING = -5; // 0xfffffffb
     field public static final int RESULT_ERROR_FAILED_TO_WRITE_FONT_FILE = -1; // 0xffffffff
@@ -8243,12 +8246,12 @@ package android.media {
   }
 
   public class Ringtone {
-    method @FlaggedApi("com.android.server.telecom.flags.resolve_hidden_dependencies_two") public boolean hasHapticChannels();
+    method @FlaggedApi("com.android.media.flags.release_ringtone_as_api") public boolean hasHapticChannels();
   }
 
   public class RingtoneManager {
     method @RequiresPermission(android.Manifest.permission.WRITE_SETTINGS) public static void ensureDefaultRingtones(@NonNull android.content.Context);
-    method @FlaggedApi("com.android.server.telecom.flags.resolve_hidden_dependencies_two") @Nullable public static android.media.Ringtone getRingtone(@NonNull android.content.Context, @NonNull android.net.Uri, @Nullable android.media.VolumeShaper.Configuration, @NonNull android.media.AudioAttributes);
+    method @FlaggedApi("com.android.media.flags.release_ringtone_as_api") @Nullable public static android.media.Ringtone getRingtone(@NonNull android.content.Context, @NonNull android.net.Uri, @Nullable android.media.VolumeShaper.Configuration, @NonNull android.media.AudioAttributes);
   }
 
   public final class RouteDiscoveryPreference implements android.os.Parcelable {
@@ -14075,6 +14078,7 @@ package android.service.notification {
     method public void onPanelHidden();
     method public void onPanelRevealed(int);
     method public void onSuggestedReplySent(@NonNull String, @NonNull CharSequence, int);
+    method @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public void onSystemAdjustmentsRequest(@NonNull java.util.List<android.service.notification.Adjustment>);
     method public final void setAdjustmentTypeSupportedState(@NonNull String, boolean);
     method public final void unsnoozeNotification(@NonNull String);
     field public static final String ACTION_NOTIFICATION_ASSISTANT_DETAIL_SETTINGS = "android.service.notification.action.NOTIFICATION_ASSISTANT_DETAIL_SETTINGS";
@@ -14173,6 +14177,128 @@ package android.service.persistentdata {
     field public static final int FLASH_LOCK_LOCKED = 1; // 0x1
     field public static final int FLASH_LOCK_UNKNOWN = -1; // 0xffffffff
     field public static final int FLASH_LOCK_UNLOCKED = 0; // 0x0
+  }
+
+}
+
+package android.service.personalcontext {
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class PersonalContextManager {
+    method public void publishInsight(@NonNull java.util.List<android.service.personalcontext.insight.ContextInsight>);
+    method public void publishTriggeringHint(@NonNull java.util.List<android.service.personalcontext.hint.ContextHint>, @Nullable android.service.personalcontext.RenderToken);
+    field public static final String PERSONAL_CONTEXT_SERVICE = "personal_context";
+  }
+
+}
+
+package android.service.personalcontext.embedded {
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public class InsightSurfaceClient {
+    method @NonNull public java.util.List<android.service.personalcontext.hint.ContextHint> getHints();
+    method @NonNull public java.util.List<android.service.personalcontext.embedded.InsightSurfaceClient.InsightReceiver> getReceivers();
+  }
+
+  public static final class InsightSurfaceClient.Builder {
+    ctor public InsightSurfaceClient.Builder(@NonNull android.content.Context, @NonNull android.view.SurfaceView);
+    method @NonNull public android.service.personalcontext.embedded.InsightSurfaceClient.Builder addHint(@NonNull android.service.personalcontext.hint.ContextHint);
+    method @NonNull public android.service.personalcontext.embedded.InsightSurfaceClient.Builder addReceiver(@NonNull android.service.personalcontext.embedded.InsightSurfaceClient.InsightReceiver);
+    method @NonNull public android.service.personalcontext.embedded.InsightSurfaceClient build();
+  }
+
+  public static interface InsightSurfaceClient.InsightReceiver {
+    method public boolean onReceive(@NonNull android.service.personalcontext.insight.ContextInsight);
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class InsightSurfaceClientInfo implements android.os.Parcelable {
+    method public int describeContents();
+    method @NonNull public android.content.res.Configuration getConfiguration();
+    method public int getDisplayId();
+    method public int getHeightMeasureSpec();
+    method @NonNull public java.util.UUID getId();
+    method @NonNull public android.window.InputTransferToken getInputTransferToken();
+    method public int getWidthMeasureSpec();
+    method public void onReceiveInsight(@NonNull android.service.personalcontext.insight.ContextInsight);
+    method public void onSurfaceCreated(@NonNull android.view.SurfaceControlViewHost.SurfacePackage);
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.embedded.InsightSurfaceClientInfo> CREATOR;
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class InsightSurfaceVisualizerService extends android.app.Service {
+    ctor public InsightSurfaceVisualizerService();
+    method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
+    method public abstract void onClientConnected(@NonNull android.service.personalcontext.embedded.InsightSurfaceClientInfo);
+    method public abstract void onClientDisconnected(@NonNull android.service.personalcontext.embedded.InsightSurfaceClientInfo);
+    method @Nullable public abstract android.view.View onCreateEmbeddedView(@NonNull android.content.Context, @NonNull java.util.List<android.service.personalcontext.insight.ContextInsight>, @NonNull android.service.personalcontext.embedded.InsightSurfaceClientInfo);
+    field public static final String SERVICE_INTERFACE = "android.service.personalcontext.embedded.InsightSurfaceVisualizerService";
+  }
+
+}
+
+package android.service.personalcontext.hint {
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ContextHintWithSignature implements android.os.Parcelable {
+    method public int describeContents();
+    method @NonNull public java.util.List<android.service.personalcontext.hint.ContextHintWithSignature> getAttributionHints();
+    method @NonNull public android.service.personalcontext.hint.ContextHint getContextHint();
+    method @NonNull public String getOriginatingPackage();
+    method @Nullable public android.service.personalcontext.RenderToken getRenderToken();
+    method @NonNull public static <T extends java.util.Collection<android.service.personalcontext.hint.ContextHint>> T unwrapInto(@NonNull java.util.Collection<android.service.personalcontext.hint.ContextHintWithSignature>, @NonNull T);
+    method @NonNull public static java.util.List<android.service.personalcontext.hint.ContextHint> unwrapList(@NonNull java.util.Collection<android.service.personalcontext.hint.ContextHintWithSignature>);
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.hint.ContextHintWithSignature> CREATOR;
+  }
+
+}
+
+package android.service.personalcontext.refiner {
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class HintRefinerService extends android.app.Service {
+    ctor public HintRefinerService();
+    method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
+    method public void onConnected();
+    method public abstract void onRefine(@NonNull java.util.List<android.service.personalcontext.hint.ContextHint>, @NonNull java.util.function.Consumer<java.util.List<android.service.personalcontext.hint.ContextHint>>);
+  }
+
+}
+
+package android.service.personalcontext.renderer {
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class InsightRendererService extends android.app.Service {
+    ctor public InsightRendererService();
+    method @NonNull public final android.service.personalcontext.RenderToken mintRenderToken();
+    method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
+    method @NonNull public abstract android.service.personalcontext.renderer.RendererFilter onRegistered();
+    method public abstract void onRender(@NonNull java.util.List<android.service.personalcontext.insight.ContextInsight>, boolean);
+    field public static final String SERVICE_INTERFACE = "android.service.personalcontext.renderer.InsightRendererService";
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class RendererFilter implements android.os.Parcelable {
+    method public int describeContents();
+    method @NonNull public java.util.Set<java.lang.Integer> getValidHintTypes();
+    method @NonNull public java.util.Set<java.lang.Integer> getValidInsightTypes();
+    method public boolean shouldIncludeRenderedInsights();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.renderer.RendererFilter> CREATOR;
+  }
+
+  public static final class RendererFilter.Builder {
+    ctor public RendererFilter.Builder();
+    method @NonNull public android.service.personalcontext.renderer.RendererFilter.Builder addValidHintType(int);
+    method @NonNull public android.service.personalcontext.renderer.RendererFilter.Builder addValidInsightType(int);
+    method @NonNull public android.service.personalcontext.renderer.RendererFilter build();
+    method @NonNull public android.service.personalcontext.renderer.RendererFilter.Builder setShouldIncludeRenderedInsights(boolean);
+  }
+
+}
+
+package android.service.personalcontext.understander {
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContextUnderstanderService extends android.app.Service {
+    ctor public ContextUnderstanderService();
+    method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
+    method public void onConnected();
+    method public abstract void onUnderstand(@NonNull java.util.List<android.service.personalcontext.hint.ContextHint>);
+    method public final void understood(@NonNull java.util.List<android.service.personalcontext.insight.ContextInsight>);
   }
 
 }
@@ -17241,6 +17367,8 @@ package android.telephony.ims {
     field public static final String EXTRA_CNAP = "cnap";
     field public static final String EXTRA_CODEC = "Codec";
     field public static final String EXTRA_CONFERENCE = "android.telephony.ims.extra.CONFERENCE";
+    field @FlaggedApi("android.telecom.flags.is_using_crs") public static final String EXTRA_CRS_AUDIO_MODE = "android.telephony.ims.extra.CRS_AUDIO_MODE";
+    field @FlaggedApi("android.telecom.flags.is_using_crs") public static final String EXTRA_CRS_MEDIA_TYPE = "android.telephony.ims.extra.CRS_MEDIA_TYPE";
     field public static final String EXTRA_DIALSTRING = "dialstring";
     field public static final String EXTRA_DISPLAY_TEXT = "DisplayText";
     field public static final String EXTRA_EMERGENCY_CALL = "e_call";

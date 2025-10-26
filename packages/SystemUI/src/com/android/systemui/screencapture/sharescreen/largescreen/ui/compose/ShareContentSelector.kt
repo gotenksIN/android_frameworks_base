@@ -37,6 +37,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,21 +47,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.android.systemui.res.R
+import com.android.systemui.screencapture.common.domain.model.TargetModel
 import com.android.systemui.screencapture.common.ui.compose.LoadingIcon
 import com.android.systemui.screencapture.common.ui.compose.loadIcon
-import com.android.systemui.screencapture.common.ui.viewmodel.RecentTaskViewModel
-import com.android.systemui.screencapture.sharescreen.largescreen.ui.viewmodel.AudioSwitchViewModel
-import com.android.systemui.screencapture.sharescreen.largescreen.ui.viewmodel.ShareContentListViewModel
+import com.android.systemui.screencapture.common.ui.viewmodel.TargetViewModel
+import com.android.systemui.screencapture.common.ui.viewmodel.TargetsViewModel
 
 @Composable
-fun ShareContentSelector(
-    shareContentListViewModel: ShareContentListViewModel,
-    audioSwitchViewModel: AudioSwitchViewModel,
-    recentTaskViewModelFactory: RecentTaskViewModel.Factory,
-) {
-    val selectedRecentTaskViewModel = shareContentListViewModel.selectedRecentTaskViewModel
-    val itemSelected = selectedRecentTaskViewModel != null
-
+fun <T : TargetModel> ShareContentSelector(targetsViewModel: TargetsViewModel<T>) {
     Surface(color = MaterialTheme.colorScheme.surfaceBright, shape = RoundedCornerShape(20.dp)) {
         Column(
             modifier =
@@ -68,6 +62,7 @@ fun ShareContentSelector(
                     .padding(start = 10.dp, top = 14.dp, end = 10.dp, bottom = 2.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            val selectedItem by targetsViewModel.selectedTarget
             Text(
                 text = stringResource(R.string.screen_share_app_window_sharing_title),
                 modifier = Modifier.padding(start = 8.dp, end = 8.dp).height(24.dp).fillMaxWidth(),
@@ -78,19 +73,15 @@ fun ShareContentSelector(
                 modifier = Modifier.padding(start = 4.dp, end = 4.dp),
             ) {
                 // The sharing content item list.
-                ShareContentList(
-                    viewModel = shareContentListViewModel,
-                    recentTaskViewModelFactory = recentTaskViewModelFactory,
-                    selectedRecentTaskViewModel = selectedRecentTaskViewModel,
-                )
+                ShareContentList(viewModel = targetsViewModel)
                 ItemPreview(
-                    preview = selectedRecentTaskViewModel?.thumbnail?.getOrNull()?.asImageBitmap(),
+                    preview = selectedItem?.thumbnail?.getOrNull()?.asImageBitmap(),
                     modifier = Modifier.weight(1f).height(140.dp).width(230.dp),
-                    itemSelected = itemSelected,
+                    itemSelected = selectedItem != null,
                 )
             }
             DisclaimerText()
-            AudioSwitch(audioSwitchViewModel, selectedRecentTaskViewModel)
+            AudioSwitch(targetsViewModel, selectedItem)
         }
     }
 }
@@ -137,11 +128,11 @@ private fun DisclaimerText() {
 }
 
 @Composable
-private fun AudioSwitch(
-    audioSwitchViewModel: AudioSwitchViewModel,
-    selectedRecentTaskViewModel: RecentTaskViewModel?,
+private fun <T : TargetModel> AudioSwitch(
+    targetsViewModel: TargetsViewModel<T>,
+    selectedTargetViewModel: TargetViewModel<T>?,
 ) {
-    val checked = audioSwitchViewModel.audioSwitchChecked
+    val checked by targetsViewModel.captureAudio
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -151,7 +142,7 @@ private fun AudioSwitch(
         LoadingIcon(
             icon =
                 loadIcon(
-                        viewModel = audioSwitchViewModel,
+                        viewModel = targetsViewModel,
                         resId = R.drawable.ic_speaker_on,
                         contentDescription = null,
                     )
@@ -165,10 +156,8 @@ private fun AudioSwitch(
         )
         Switch(
             checked = checked,
-            onCheckedChange = {
-                audioSwitchViewModel.audioSwitchChecked = !audioSwitchViewModel.audioSwitchChecked
-            },
-            enabled = selectedRecentTaskViewModel != null,
+            onCheckedChange = targetsViewModel::setCaptureAudio,
+            enabled = selectedTargetViewModel != null,
             thumbContent =
                 if (checked) {
                     {

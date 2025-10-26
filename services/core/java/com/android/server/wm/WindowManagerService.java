@@ -2608,23 +2608,14 @@ public class WindowManagerService extends IWindowManager.Stub
             }
 
             if (DEBUG_LAYOUT) {
-                Slog.v(
-                        TAG_WM,
-                        "Relayout "
-                                + win
-                                + ": viewVisibility="
-                                + viewVisibility
-                                + " req="
-                                + requestedWidth
-                                + "x"
-                                + requestedHeight
-                                + " "
-                                + win.mAttrs);
+                Slog.v(TAG_WM, "Relayout " + win + ": viewVisibility=" + viewVisibility
+                        + " req=" + requestedWidth + "x" + requestedHeight + " " + win.mAttrs);
             }
             if ((attrChanges & WindowManager.LayoutParams.ALPHA_CHANGED) != 0) {
                 winAnimator.mAlpha = attrs.alpha;
             }
             if ((attrChanges & WindowManager.LayoutParams.TITLE_CHANGED) != 0) {
+                win.updateName();
                 win.mInputWindowHandle.setName(win.getName());
             }
             win.setWindowScale(win.mRequestedWidth, win.mRequestedHeight);
@@ -5904,6 +5895,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
     public void systemReady() {
         mSystemReady = true;
+        mAnimatorScale.onSystemReady();
         mPolicy.systemReady();
         mRoot.forAllDisplayPolicies(DisplayPolicy::systemReady);
         mSnapshotController.systemReady();
@@ -8852,7 +8844,7 @@ public class WindowManagerService extends IWindowManager.Stub
             final String imeLayeringTargetName;
             final String imeInputTargetName;
             final String imeControlTargetName;
-            final String imeSurfaceParentName;
+            final String imeParentName;
             synchronized (mGlobalLock) {
                 focusedWindowName = String.valueOf(mWindowMap.get(focusedToken));
                 requestWindowName = String.valueOf(mWindowMap.get(requestToken));
@@ -8861,7 +8853,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     imeLayeringTargetName = String.valueOf(dc.getImeLayeringTarget());
                     imeInputTargetName =  String.valueOf(dc.getImeInputTarget());
                     imeControlTargetName = String.valueOf(dc.getImeControlTarget());
-                    imeSurfaceParentName = String.valueOf(dc.mInputMethodSurfaceParent);
+                    imeParentName = String.valueOf(dc.getImeParent());
                     if (show) {
                         dc.onShowImeRequested();
                     }
@@ -8869,11 +8861,11 @@ public class WindowManagerService extends IWindowManager.Stub
                     imeLayeringTargetName = "no-display";
                     imeInputTargetName = "no-display";
                     imeControlTargetName = "no-display";
-                    imeSurfaceParentName = "no-display";
+                    imeParentName = "no-display";
                 }
             }
             return new ImeTargetInfo(focusedWindowName, requestWindowName, imeLayeringTargetName,
-                    imeInputTargetName, imeControlTargetName, imeSurfaceParentName);
+                    imeInputTargetName, imeControlTargetName, imeParentName);
         }
 
         @Override

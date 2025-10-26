@@ -20,7 +20,6 @@ import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenEl
 import dagger.Binds
 import dagger.Module
 import dagger.multibindings.IntoSet
-import dagger.multibindings.Multibinds
 
 @Module
 interface ElementProviderModule {
@@ -86,5 +85,9 @@ interface ElementProviderModule {
 
     @Binds @IntoSet fun mediaElementProvider(impl: MediaElementProvider): LockscreenElementProvider
 
-    @Multibinds fun oemElementProviders(): Set<OEMElementProvider>
+    @Binds
+    @IntoSet
+    fun ambientIndicationAreaProvider(
+        impl: AmbientIndicationAreaProvider
+    ): LockscreenElementProvider
 }

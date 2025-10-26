@@ -181,6 +181,13 @@ flag {
 }
 
 flag {
+    name: "lockscreen_larger_timeout_time_units"
+    namespace: "security"
+    description: "Show larger time units than seconds on lockscreen"
+    bug: "443823194"
+}
+
+flag {
     name: "manage_lockout_end_time_in_service"
     namespace: "security"
     description: "Manage lockout end time in LockSettingsService rather than LockPatternUtils"
@@ -195,4 +202,15 @@ flag {
     namespace: "security"
     description: "Indicate explicitly that duplicate failed lockscreen guesses are duplicates"
     bug: "322014085"
+}
+
+flag {
+  name: "thread_safe_key_generation"
+  namespace: "hardware_backed_security"
+  description: "Retry key generation requests when the key generation thread is busy"
+  bug: "445922389"
+  is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }

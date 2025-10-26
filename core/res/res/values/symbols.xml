@@ -236,6 +236,7 @@
   <java-symbol type="id" name="metric_chronometer_1" />
   <java-symbol type="id" name="metric_chronometer_2" />
   <java-symbol type="id" name="alt_title" />
+  <java-symbol type="id" name="alt_subtext" />
   <java-symbol type="id" name="app_name_text_divider" />
   <java-symbol type="id" name="status_bar_latest_event_content" />
   <java-symbol type="id" name="notification_main_column" />
@@ -564,6 +565,7 @@
   <java-symbol type="color" name="surface_effect_1" />
   <java-symbol type="color" name="surface_effect_2" />
   <java-symbol type="color" name="surface_effect_3" />
+  <java-symbol type="color" name="surface_effect_0_fallback" />
   <java-symbol type="color" name="tab_indicator_text_v4" />
 
   <java-symbol type="dimen" name="accessibility_touch_slop" />
@@ -2137,6 +2139,7 @@
   <java-symbol type="bool" name="config_enableActivityRecognitionHardwareOverlay" />
   <java-symbol type="bool" name="config_defaultAdasGnssLocationEnabled" />
   <java-symbol type="bool" name="config_enableFusedLocationOverlay" />
+  <java-symbol type="bool" name="config_fullscreenRequestSupported" />
   <java-symbol type="bool" name="config_enableGnssLocationOverlay" />
   <java-symbol type="bool" name="config_fusedLocationOverlayUnstableFallback" />
   <java-symbol type="bool" name="config_gnssLocationOverlayUnstableFallback" />
@@ -4742,6 +4745,7 @@
   <java-symbol type="array" name="config_highRefreshRateBlacklist" />
   <java-symbol type="array" name="config_angleAllowList" />
   <java-symbol type="array" name="config_angleDenyList" />
+  <java-symbol type="array" name="config_angleGlobalDenyList" />
   <java-symbol type="array" name="config_forceSlowJpegModeList" />
   <java-symbol type="array" name="pause_wallpaper_render_when_state_change" />
   <java-symbol type="bool" name="config_pauseWallpaperRenderWhenStateChangeEnabled" />
@@ -6414,4 +6418,7 @@
 
   <!-- Whether to force color fade. -->
   <java-symbol type="bool" name="config_forceColorFade" />
+
+  <!-- The location button render service component name -->
+  <java-symbol type="string" name="config_locationButtonRenderService" />
 </resources>

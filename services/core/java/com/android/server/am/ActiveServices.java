@@ -7860,7 +7860,7 @@ public final class ActiveServices {
             }
         }
 
-        try (var unused = mAm.mProcessStateController.startBatchSession(
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
                 OOM_ADJ_REASON_STOP_SERVICE)) {
 
         try {

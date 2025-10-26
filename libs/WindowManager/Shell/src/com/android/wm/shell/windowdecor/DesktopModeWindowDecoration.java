@@ -763,16 +763,14 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                     mDragPositioningCallback,
                     mSurfaceControlBuilderSupplier,
                     mSurfaceControlTransactionSupplier,
-                    mDisplayController,
-                    mDesktopModeEventLogger);
+                    mDisplayController);
         }
         final DragResizeInputListener newListener = mDragResizeListener;
         final int touchSlop = ViewConfiguration.get(mResult.mRootView.getContext())
                 .getScaledTouchSlop();
         final Resources res = mResult.mRootView.getResources();
         final DragResizeWindowGeometry newGeometry = new DragResizeWindowGeometry(
-                DesktopExperienceFlags.ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX.isTrue()
-                        ? mResult.mCornerRadius : mRelayoutParams.mCornerRadius,
+                mResult.mCornerRadius,
                 new Size(mResult.mWidth, mResult.mHeight),
                 getResizeEdgeHandleSize(res), getResizeHandleEdgeInset(res),
                 getFineResizeCornerSize(res), getLargeResizeCornerSize(res),
@@ -1042,9 +1040,8 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                         return Unit.INSTANCE;
                     },
                     mDesktopModeUiEventLogger,
-                    /* dimensions = */ DesktopExperienceFlags.ENABLE_TALL_APP_HEADERS.isTrue()
-                            ? new LargeAppHeaderDimensions(mDecorWindowContext.getResources())
-                            : new DefaultAppHeaderDimensions(mDecorWindowContext.getResources())
+                    /* dimensions= */ new LargeAppHeaderDimensions(
+                            mDecorWindowContext.getResources())
                     );
         }
         throw new IllegalArgumentException("Unexpected layout resource id");
@@ -1246,26 +1243,17 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                             ? R.style.BorderSettingsFocusedLight
                             : R.style.BorderSettingsUnfocusedLight;
                 }
-            } else if (DesktopExperienceFlags.ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX.isTrue()) {
+            } else {
                 relayoutParams.mShadowRadiusId = hasGlobalFocus
                         ? R.dimen.freeform_decor_shadow_focused_thickness
                         : R.dimen.freeform_decor_shadow_unfocused_thickness;
-
-            } else {
-                relayoutParams.mShadowRadius = hasGlobalFocus
-                        ? context.getResources().getDimensionPixelSize(
-                        R.dimen.freeform_decor_shadow_focused_thickness)
-                        : context.getResources().getDimensionPixelSize(
-                                R.dimen.freeform_decor_shadow_unfocused_thickness);
             }
         } else {
             if (DesktopExperienceFlags.ENABLE_FREEFORM_BOX_SHADOWS.isTrue()) {
                 relayoutParams.mBoxShadowSettingsIds = null;
                 relayoutParams.mBorderSettingsId = Resources.ID_NULL;
-            } else if (DesktopExperienceFlags.ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX.isTrue()) {
-                relayoutParams.mShadowRadiusId = Resources.ID_NULL;
             } else {
-                relayoutParams.mShadowRadius = INVALID_SHADOW_RADIUS;
+                relayoutParams.mShadowRadiusId = Resources.ID_NULL;
             }
         }
         relayoutParams.mApplyStartTransactionOnDraw = applyStartTransactionOnDraw;
@@ -1293,13 +1281,8 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         relayoutParams.mWindowDecorConfig = windowDecorConfig;
 
         if (desktopConfig.useRoundedCorners()) {
-            if (DesktopExperienceFlags.ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX.isTrue()) {
-                relayoutParams.mCornerRadiusId = shouldIgnoreCornerRadius ? Resources.ID_NULL :
-                        getCornerRadiusId(relayoutParams.mLayoutResId);
-            } else {
-                relayoutParams.mCornerRadius = shouldIgnoreCornerRadius ? INVALID_CORNER_RADIUS :
-                        getCornerRadius(context, relayoutParams.mLayoutResId);
-            }
+            relayoutParams.mCornerRadiusId = shouldIgnoreCornerRadius ? Resources.ID_NULL :
+                    getCornerRadiusId(relayoutParams.mLayoutResId);
         }
         // Set opaque background for all freeform tasks to prevent freeform tasks below
         // from being visible if freeform task window above is translucent.

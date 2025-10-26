@@ -40,8 +40,6 @@ import android.os.SystemProperties;
 import android.util.Size;
 import android.view.Display;
 import android.view.Gravity;
-import android.window.DesktopExperienceFlags;
-import android.window.DesktopModeFlags;
 
 import com.android.internal.policy.DesktopModeCompatUtils;
 
@@ -87,8 +85,7 @@ public final class DesktopModeBoundsCalculator {
                 && options.getFlexibleLaunchSize() && !hasFullscreenOverride;
         // If cascading is also enabled, the position of the options bounds must be respected
         // during the size update.
-        final boolean shouldRespectOptionPosition =
-                updateOptionBoundsSize && DesktopModeFlags.ENABLE_CASCADING_WINDOWS.isTrue();
+        final boolean shouldRespectOptionPosition = updateOptionBoundsSize;
         // Calculate caption height for target display if needed.
         final Display targetDisplay = displayContent.getDisplay();
         final Context displayContext = task.mWmService.mContext.createDisplayContext(targetDisplay);
@@ -247,8 +244,7 @@ public final class DesktopModeBoundsCalculator {
     private static @Configuration.Orientation int getActivityConfigurationOrientation(
             @NonNull ActivityRecord activity, @NonNull Task task,
             @Configuration.Orientation int stableBoundsOrientation) {
-        if (DesktopExperienceFlags.PRESERVE_RECENTS_TASK_CONFIGURATION_ON_RELAUNCH.isTrue()
-                && task.inRecents && task.topRunningActivity() != null) {
+        if (task.inRecents && task.topRunningActivity() != null) {
             // If task in resents with running activity, inherit existing activity orientation.
             final WindowConfiguration windowConfiguration =
                     task.topRunningActivity().getWindowConfiguration();

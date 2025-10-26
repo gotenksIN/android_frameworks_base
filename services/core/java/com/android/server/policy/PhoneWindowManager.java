@@ -799,7 +799,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     requestBugreportForTv();
                     break;
                 case MSG_DISPATCH_BACK_KEY_TO_AUTOFILL:
-                    mAutofillManagerInternal.onBackKeyPressed();
+                    final int displayId2 = msg.arg1;
+                    final int userId = mUserManagerInternal.getUserAssignedToDisplay(displayId2);
+                    mAutofillManagerInternal.onBackKeyPressed(userId);
                     break;
                 case MSG_SYSTEM_KEY_PRESS:
                     KeyEvent event = (KeyEvent) msg.obj;
@@ -1015,7 +1017,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     // returns true if the key was handled and should not be passed to the user
-    private boolean backKeyPress() {
+    private boolean backKeyPress(int displayId) {
         mLogger.count("key_back_press", 1);
         // Cache handled state
         boolean handled = mBackKeyHandled;
@@ -1042,7 +1044,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         if (mAutofillManagerInternal != null) {
-            mHandler.sendMessage(mHandler.obtainMessage(MSG_DISPATCH_BACK_KEY_TO_AUTOFILL));
+            mHandler.sendMessage(mHandler.obtainMessage(
+                    MSG_DISPATCH_BACK_KEY_TO_AUTOFILL, displayId, 0 /* unused */));
         }
         return handled;
     }
@@ -2463,7 +2466,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         // register for Bluetooth HID profile broadcasts.
         filter = new IntentFilter(ACTION_CONNECTION_STATE_CHANGED);
-        mContext.registerReceiver(mBluetoothHidReceiver, filter);
+        mContext.registerReceiverForAllUsers(mBluetoothHidReceiver, filter, null, null);
 
         mVibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
 
@@ -2664,7 +2667,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             switch (event.getType()) {
                 case SINGLE_KEY_GESTURE_TYPE_PRESS:
                     if (event.getPressCount() == 1) {
-                        mBackKeyHandled |= backKeyPress();
+                        mBackKeyHandled |= backKeyPress(event.getDisplayId());
                     }
                     break;
                 case SINGLE_KEY_GESTURE_TYPE_LONG_PRESS:
@@ -4585,7 +4588,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     mBackKeyHandled = false;
                 } else {
                     if (!hasLongPressOnBackBehavior()) {
-                        mBackKeyHandled |= backKeyPress();
+                        mBackKeyHandled |= backKeyPress(event.getDisplayId());
                     }
                     // Don't pass back press to app if we've already handled it via long press
                     if (mBackKeyHandled) {

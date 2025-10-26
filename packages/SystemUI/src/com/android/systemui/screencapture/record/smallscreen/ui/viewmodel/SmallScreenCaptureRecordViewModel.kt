@@ -33,13 +33,12 @@ import com.android.systemui.screencapture.common.domain.interactor.ScreenCapture
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureTarget
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
 import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModel
-import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModelImpl
 import com.android.systemui.screencapture.domain.interactor.ScreenCaptureUiInteractor
 import com.android.systemui.screencapture.record.domain.interactor.ScreenCaptureRecordFeaturesInteractor
 import com.android.systemui.screencapture.record.ui.viewmodel.ScreenCaptureRecordParametersViewModel
-import com.android.systemui.screenrecord.domain.ScreenRecordingParameters
-import com.android.systemui.screenrecord.domain.interactor.ScreenRecordingServiceInteractor
-import com.android.systemui.screenrecord.domain.interactor.Status
+import com.android.systemui.screenrecord.data.repository.ScreenRecordingServiceRepository
+import com.android.systemui.screenrecord.data.repository.Status
+import com.android.systemui.screenrecord.shared.model.ScreenRecordingParameters
 import com.android.systemui.shared.system.ActivityManagerWrapper
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -52,15 +51,15 @@ class SmallScreenCaptureRecordViewModel
 @AssistedInject
 constructor(
     @Background private val bgContext: CoroutineContext,
-    private val screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
+    private val screenRecordingServiceRepository: ScreenRecordingServiceRepository,
     recordDetailsAppSelectorViewModelFactory: RecordDetailsAppSelectorViewModel.Factory,
     screenCaptureRecordParametersViewModelFactory: ScreenCaptureRecordParametersViewModel.Factory,
     recordDetailsTargetViewModelFactory: RecordDetailsTargetViewModel.Factory,
-    private val drawableLoaderViewModelImpl: DrawableLoaderViewModelImpl,
+    private val drawableLoaderViewModel: DrawableLoaderViewModel,
     private val screenCaptureUiInteractor: ScreenCaptureUiInteractor,
     private val markupInteractor: ScreenCaptureMarkupInteractor,
     private val activityManager: ActivityManagerWrapper,
-) : HydratedActivatable(), DrawableLoaderViewModel by drawableLoaderViewModelImpl {
+) : HydratedActivatable(), DrawableLoaderViewModel by drawableLoaderViewModel {
 
     val recordDetailsAppSelectorViewModel: RecordDetailsAppSelectorViewModel =
         recordDetailsAppSelectorViewModelFactory.create()
@@ -70,18 +69,18 @@ constructor(
         recordDetailsTargetViewModelFactory.create()
 
     val isRecording: Boolean by
-        screenRecordingServiceInteractor.status
+        screenRecordingServiceRepository.status
             .map { it.isRecording }
             .hydratedStateOf(
                 traceName = "SmallScreenCaptureRecordViewModel#isRecording",
-                initialValue = screenRecordingServiceInteractor.status.value.isRecording,
+                initialValue = screenRecordingServiceRepository.status.value.isRecording,
             )
 
     var detailsPopup: RecordDetailsPopupType by mutableStateOf(RecordDetailsPopupType.Settings)
         private set
 
     var shouldShowDetails: Boolean by
-        mutableStateOf(!screenRecordingServiceInteractor.status.value.isRecording)
+        mutableStateOf(!screenRecordingServiceRepository.status.value.isRecording)
         private set
 
     val markupEnabled: Boolean? by
@@ -93,7 +92,7 @@ constructor(
     val shouldShowMarkupButton: Boolean = ScreenCaptureRecordFeaturesInteractor.isMarkupAvailable
 
     val shouldShowSettingsButton: Boolean by
-        screenRecordingServiceInteractor.status
+        screenRecordingServiceRepository.status
             .map { status ->
                 if (status.isRecording) {
                     true
@@ -104,7 +103,7 @@ constructor(
             }
             .hydratedStateOf(
                 traceName = "SmallScreenCaptureRecordViewModel#shouldShowSettingsButton",
-                initialValue = !screenRecordingServiceInteractor.status.value.isRecording,
+                initialValue = !screenRecordingServiceRepository.status.value.isRecording,
             )
 
     override suspend fun onActivated() {
@@ -141,8 +140,10 @@ constructor(
     }
 
     suspend fun onPrimaryButtonTapped() {
-        if (screenRecordingServiceInteractor.status.value.isRecording) {
-            screenRecordingServiceInteractor.stopRecording(StopReason.STOP_HOST_APP)
+        if (screenRecordingServiceRepository.status.value.isRecording) {
+            withContext(bgContext) {
+                screenRecordingServiceRepository.stopRecording(StopReason.STOP_HOST_APP)
+            }
         } else {
             startRecording()
         }
@@ -155,7 +156,7 @@ constructor(
         when (target) {
             is ScreenCaptureTarget.Fullscreen -> {
                 val shouldShowTaps = recordDetailsParametersViewModel.shouldShowTaps ?: return
-                screenRecordingServiceInteractor.startRecording(
+                screenRecordingServiceRepository.startRecording(
                     ScreenRecordingParameters(
                         captureTarget = null,
                         displayId = target.displayId,
@@ -187,7 +188,7 @@ constructor(
                         target.displayId
                     }
 
-                screenRecordingServiceInteractor.startRecording(
+                screenRecordingServiceRepository.startRecording(
                     ScreenRecordingParameters(
                         captureTarget =
                             MediaProjectionCaptureTarget(

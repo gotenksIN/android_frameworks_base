@@ -196,8 +196,7 @@ public class DesktopModeLaunchParamsModifierTests extends
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
-            Flags.FLAG_RESPECT_FULLSCREEN_ACTIVITY_OPTION_IN_DESKTOP_LAUNCH_PARAMS})
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
     public void testAppliesFullscreenAndReturnDoneIfRequestViaActivityOptions() {
         setupDesktopModeLaunchParamsModifier();
         when(mTarget.isEnteringDesktopMode(any(), any(), any(), any(), any())).thenReturn(true);
@@ -454,19 +453,6 @@ public class DesktopModeLaunchParamsModifierTests extends
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
-    @DisableFlags(Flags.FLAG_IGNORE_CURRENT_PARAMS_IN_DESKTOP_LAUNCH_PARAMS)
-    public void testReturnsSkipIfCurrentParamsHasBounds() {
-        setupDesktopModeLaunchParamsModifier();
-
-        final Task task = new TaskBuilder(mSupervisor).setActivityType(
-                ACTIVITY_TYPE_STANDARD).build();
-        mCurrent.mBounds.set(/* left */ 0, /* top */ 0, /* right */ 100, /* bottom */ 100);
-        assertEquals(RESULT_SKIP, new CalculateRequestBuilder().setTask(task).calculate());
-    }
-
-    @Test
-    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
-            Flags.FLAG_IGNORE_CURRENT_PARAMS_IN_DESKTOP_LAUNCH_PARAMS})
     public void testIgnoreCurrentParamsBounds() {
         setupDesktopModeLaunchParamsModifier();
 
@@ -496,7 +482,6 @@ public class DesktopModeLaunchParamsModifierTests extends
 
     @Test
     @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
-            Flags.FLAG_PRESERVE_RECENTS_TASK_CONFIGURATION_ON_RELAUNCH,
             Flags.FLAG_ENABLE_FREEFORM_DISPLAY_LAUNCH_PARAMS})
     public void testPreserveOrientationAndAspectRatioFromRecentsTaskRelaunch() {
         setupDesktopModeLaunchParamsModifier();
@@ -1964,25 +1949,6 @@ public class DesktopModeLaunchParamsModifierTests extends
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
-    @DisableFlags(Flags.FLAG_IGNORE_CURRENT_PARAMS_IN_DESKTOP_LAUNCH_PARAMS)
-    public void testInheritWindowingModeFromCurrentParams() {
-        setupDesktopModeLaunchParamsModifier();
-
-        final Task task = new TaskBuilder(mSupervisor).setActivityType(
-                ACTIVITY_TYPE_STANDARD).build();
-        final TaskDisplayArea currTaskDisplayArea = mock(TaskDisplayArea.class);
-        mCurrent.mPreferredTaskDisplayArea = currTaskDisplayArea;
-        mCurrent.mWindowingMode = WINDOWING_MODE_FREEFORM;
-
-        assertEquals(RESULT_CONTINUE, new CalculateRequestBuilder().setTask(task).calculate());
-        assertEquals(task.getRootTask().getDisplayArea(), mResult.mPreferredTaskDisplayArea);
-        assertNotEquals(currTaskDisplayArea, mResult.mPreferredTaskDisplayArea);
-        assertEquals(WINDOWING_MODE_FREEFORM, mResult.mWindowingMode);
-    }
-
-    @Test
-    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
-            Flags.FLAG_IGNORE_CURRENT_PARAMS_IN_DESKTOP_LAUNCH_PARAMS})
     public void testDoesntInheritWindowingModeFromCurrentParams() {
         setupDesktopModeLaunchParamsModifier();
         doCallRealMethod().when(mTarget).isEnteringDesktopMode(any(), any(), any(), any(), any());

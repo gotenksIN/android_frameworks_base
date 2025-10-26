@@ -1176,7 +1176,6 @@ public class NotificationManager {
      * Apps can request this permission by sending the user to the activity that matches the system
      * intent action {@link android.provider.Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS}.
      */
-    @FlaggedApi(android.app.Flags.FLAG_API_RICH_ONGOING)
     public boolean canPostPromotedNotifications() {
         INotificationManager service = service();
         try {
@@ -1191,7 +1190,6 @@ public class NotificationManager {
      * @hide
      */
     @TestApi
-    @FlaggedApi(android.app.Flags.FLAG_API_RICH_ONGOING)
     public void setCanPostPromotedNotifications(@NonNull String pkg, int uid, boolean allowed) {
         INotificationManager service = service();
         try {
@@ -2250,6 +2248,20 @@ public class NotificationManager {
         INotificationManager service = service();
         try {
             service.disallowAssistantAdjustment(mContext.getUserId(), capability);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(android.service.personalcontext.Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
+    public void requestSystemAdjustments(@NonNull List<Adjustment> adjustments) {
+        INotificationManager service = service();
+        try {
+            service.requestSystemAdjustments(adjustments);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

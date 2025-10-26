@@ -24,7 +24,6 @@ import androidx.test.filters.SmallTest
 import com.android.internal.logging.uiEventLoggerFake
 import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.lifecycle.activateIn
@@ -68,6 +67,16 @@ class PreCaptureToolbarViewModelTest : SysuiTestCase() {
     @DisableFlags(Flags.FLAG_LARGE_SCREEN_RECORDING)
     fun screenRecordingSupported_whenFeatureDisabled_isFalse() =
         kosmos.runTest { assertThat(viewModel.screenRecordingSupported).isFalse() }
+
+    @Test
+    @EnableFlags(Flags.FLAG_LARGE_SCREEN_SCREENSHOT_SAVE_LOCATION)
+    fun customSaveLocationSupported_whenFeatureEnabled_isTrue() =
+        kosmos.runTest { assertThat(viewModel.customSaveLocationSupported).isTrue() }
+
+    @Test
+    @DisableFlags(Flags.FLAG_LARGE_SCREEN_SCREENSHOT_SAVE_LOCATION)
+    fun customSaveLocationSupported_whenFeatureDisabled_isFalse() =
+        kosmos.runTest { assertThat(viewModel.customSaveLocationSupported).isFalse() }
 
     @Test
     fun updateOpacityForRegionBox_isInteracting_opacityIsZero() =
@@ -120,31 +129,8 @@ class PreCaptureToolbarViewModelTest : SysuiTestCase() {
         kosmos.runTest { assertThat(viewModel.customSaveLocationUriString).isEmpty() }
 
     @Test
-    fun updateCustomSaveLocationUriString_updatesState_whenNonEmpty() =
-        kosmos.runTest {
-            val testUri = "content://media/external/downloads/123"
-
-            assertThat(viewModel.customSaveLocationUriString).isEmpty()
-
-            viewModel.updateCustomSaveLocationUriString(testUri)
-            runCurrent()
-
-            assertThat(viewModel.customSaveLocationUriString).isEqualTo(testUri)
-        }
-
-    @Test
-    fun updateCustomSaveLocationUriString_updatesState_whenEmpty() =
-        kosmos.runTest {
-            val testUri = "content://media/external/downloads/456"
-            viewModel.updateCustomSaveLocationUriString(testUri)
-            runCurrent()
-            assertThat(viewModel.customSaveLocationUriString).isEqualTo(testUri)
-
-            viewModel.updateCustomSaveLocationUriString("")
-            runCurrent()
-
-            assertThat(viewModel.customSaveLocationUriString).isEmpty()
-        }
+    fun isCustomSaveLocationActive_initialValue_isFalse() =
+        kosmos.runTest { assertThat(viewModel.isCustomSaveLocationActive).isFalse() }
 
     @Test
     fun recordParametersViewModel_updatesAudioSourceState() =

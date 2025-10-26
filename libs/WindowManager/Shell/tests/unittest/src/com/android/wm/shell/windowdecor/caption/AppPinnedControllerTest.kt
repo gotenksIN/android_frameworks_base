@@ -54,20 +54,19 @@ class AppPinnedControllerTest : ShellTestCase() {
     private val mockMotionListener = mock<View.OnGenericMotionListener>()
     private val mockDecorationActions = mock<WindowDecorationActions>()
     private val mockTaskOrganizer = mock<ShellTaskOrganizer>()
-    private val mockMainScope = mock<CoroutineScope>()
+    private val mockBgScope = mock<CoroutineScope>()
 
     private fun createController() =
         AppPinnedController(
             taskInfo,
             mockDecorViewHostSupplier,
             mContext,
-            mContext,
             mockDisplayController,
             mockTouchListener,
             mockMotionListener,
             mockDecorationActions,
             mockTaskOrganizer,
-            mockMainScope,
+            mockBgScope,
         )
 
     @Before

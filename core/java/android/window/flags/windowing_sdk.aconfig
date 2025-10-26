@@ -94,7 +94,6 @@ flag {
     name: "root_task_for_bubble"
     description: "Using a root task to manage Bubble tasks"
     bug: "407669465"
-    is_fixed_read_only: true
 }
 
 flag {
@@ -128,6 +127,16 @@ flag {
     name: "fix_bubble_trampoline_launch_twice"
     description: "Fix the transition when a Task Trampoline is launched to Bubble twice"
     bug: "448009266"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "allow_multi_window_non_resizable_activities"
+    description: "Allows non-resizable activities to be launched into WINDOWING_MODE_MULTI_WINDOW."
+    bug: "419379112"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

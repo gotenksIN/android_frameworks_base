@@ -53,9 +53,9 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.UserHandle;
-// QTI_BEGIN: 2021-05-07: Core: Disable PendingIntent explicit mutability enforcement.
+// QTI_BEGIN: 2021-05-07: AndroidCore: Disable PendingIntent explicit mutability enforcement.
 import android.os.SystemProperties;
-// QTI_END: 2021-05-07: Core: Disable PendingIntent explicit mutability enforcement.
+// QTI_END: 2021-05-07: AndroidCore: Disable PendingIntent explicit mutability enforcement.
 import android.util.AndroidException;
 import android.util.ArraySet;
 import android.util.Log;

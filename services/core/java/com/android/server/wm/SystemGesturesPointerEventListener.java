@@ -187,10 +187,10 @@ class SystemGesturesPointerEventListener implements PointerEventListener {
             case MotionEvent.ACTION_DOWN:
                 mSwipeFireable = true;
                 mDebugFireable = true;
-// QTI_BEGIN: 2025-07-04: Core: Releasing prv boost when Action down event occurs
+// QTI_BEGIN: 2025-07-04: Performance: Releasing prv boost when Action down event occurs
                 if (mScrollFired)
                   mCallbacks.onScroll(false);
-// QTI_END: 2025-07-04: Core: Releasing prv boost when Action down event occurs
+// QTI_END: 2025-07-04: Performance: Releasing prv boost when Action down event occurs
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
                 mScrollFired = false;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
@@ -465,9 +465,11 @@ class SystemGesturesPointerEventListener implements PointerEventListener {
             if(Math.abs(velocityY) >= Math.abs(velocityX))
                 mCallbacks.onVerticalFling(duration);
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2019-07-16: Performance: perf: Convert Horizontal Scroll to GestureFlingBoost.
             else
                 mCallbacks.onHorizontalFling(duration);
 
+// QTI_END: 2019-07-16: Performance: perf: Convert Horizontal Scroll to GestureFlingBoost.
             mLastFlingTime = now;
             mCallbacks.onFling(duration);
             return true;
@@ -495,7 +497,9 @@ class SystemGesturesPointerEventListener implements PointerEventListener {
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         void onVerticalFling(int durationMs);
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2019-07-16: Performance: perf: Convert Horizontal Scroll to GestureFlingBoost.
         void onHorizontalFling(int durationMs);
+// QTI_END: 2019-07-16: Performance: perf: Convert Horizontal Scroll to GestureFlingBoost.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         void onScroll(boolean started);
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"

@@ -1069,12 +1069,14 @@ class ProcessRecord implements WindowProcessListener {
     @GuardedBy({"mService", "mProcLock"})
     void setKilled(boolean killed) {
         mKilled = killed;
+// QTI_BEGIN: 2025-08-17: Performance: pinner: allow to trigger unpin event by am foce-stop and pin event was triggered by start-activity
         if (killed && processName.equals(info.packageName)) {
             if (mService.mUxPerf != null) {
                 mService.mUxPerf.perfHint(
                     BoostFramework.VENDOR_HINT_UNPIN_FILE, info.packageName, 0, 0);
             }
         }
+// QTI_END: 2025-08-17: Performance: pinner: allow to trigger unpin event by am foce-stop and pin event was triggered by start-activity
     }
 
     @GuardedBy(anyOf = {"mService", "mProcLock"})
@@ -1362,26 +1364,32 @@ class ProcessRecord implements WindowProcessListener {
                     mKillTime = SystemClock.uptimeMillis();
                 }
             }
+// QTI_BEGIN: 2025-08-17: Performance: pinner: allow to trigger unpin event by am foce-stop and pin event was triggered by start-activity
             if (mService.mUxPerf != null && !mService.mForceStopKill
                 && !mErrorState.isNotResponding() && !mErrorState.isCrashing()) {
                 if (mService.mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                     mService.mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                     mService.mUxPerf.perfUXEngine_events(
                         BoostFramework.UXE_EVENT_KILL, 0, this.processName, 0);
+// QTI_END: 2025-08-17: Performance: pinner: allow to trigger unpin event by am foce-stop and pin event was triggered by start-activity
                 }
+// QTI_BEGIN: 2025-08-17: Performance: pinner: allow to trigger unpin event by am foce-stop and pin event was triggered by start-activity
                 mService.mUxPerf.perfEvent(
                     BoostFramework.VENDOR_HINT_KILL,this.processName, 2, 0,getPid());
-// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
+// QTI_END: 2025-08-17: Performance: pinner: allow to trigger unpin event by am foce-stop and pin event was triggered by start-activity
+// QTI_BEGIN: 2019-06-26: Performance: Fix PreferredApps CTS issue.
             } else {
                 mService.mForceStopKill = false;
-// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
+// QTI_END: 2019-06-26: Performance: Fix PreferredApps CTS issue.
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
             }
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
+// QTI_BEGIN: 2025-08-17: Performance: pinner: allow to trigger unpin event by am foce-stop and pin event was triggered by start-activity
             if (mService.mUxPerf != null && processName.equals(info.packageName)) {
                 mService.mUxPerf.perfHint(
                     BoostFramework.VENDOR_HINT_UNPIN_FILE, info.packageName, 0, 0);
             }
+// QTI_END: 2025-08-17: Performance: pinner: allow to trigger unpin event by am foce-stop and pin event was triggered by start-activity
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         }
     }
@@ -1732,10 +1740,12 @@ class ProcessRecord implements WindowProcessListener {
             }
             if (packageName != null) {
                 addPackage(packageName, versionCode, mService.mProcessStats);
+// QTI_BEGIN: 2025-08-17: Performance: pinner: allow to trigger unpin event by am foce-stop and pin event was triggered by start-activity
                 if (mService.mUxPerf != null && processName.equals(packageName)) {
                     mService.mUxPerf.perfHint(
                             BoostFramework.VENDOR_HINT_PIN_FILE, packageName, 0, 0);
                 }
+// QTI_END: 2025-08-17: Performance: pinner: allow to trigger unpin event by am foce-stop and pin event was triggered by start-activity
             }
 
             // Update oom adj first, we don't want the additional states are involved in this round.

@@ -56,9 +56,9 @@ import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnec
 import com.android.systemui.statusbar.policy.data.repository.FakeUserSetupRepository
 import com.android.systemui.testKosmos
 import com.android.systemui.util.CarrierConfigTracker
-// QTI_BEGIN: 2025-04-15: Data: SystemUI: Readapt Mobile Icon Features For Kairos part 2
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 2
 import com.android.systemui.util.mockito.mock
-// QTI_END: 2025-04-15: Data: SystemUI: Readapt Mobile Icon Features For Kairos part 2
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 2
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
@@ -137,9 +137,9 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 testScope.backgroundScope,
                 context,
                 flags,
-// QTI_BEGIN: 2025-04-15: Data: SystemUI: Readapt Mobile Icon Features For Kairos part 2
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 2
                 mock(),
-// QTI_END: 2025-04-15: Data: SystemUI: Readapt Mobile Icon Features For Kairos part 2
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 2
             )
 
         interactor =
@@ -157,7 +157,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 repository,
                 context,
                 MobileIconCarrierIdOverridesFake(),
-// QTI_BEGIN: 2025-04-15: Data: SystemUI: Readapt Mobile Icon Features For Kairos part 2
+// QTI_BEGIN: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 2
                 mock(),
                 mock(),
                 mock(),
@@ -167,7 +167,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 mock(),
                 mock(),
                 mock(),
-// QTI_END: 2025-04-15: Data: SystemUI: Readapt Mobile Icon Features For Kairos part 2
+// QTI_END: 2025-04-15: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos part 2
             )
         createAndSetViewModel()
     }

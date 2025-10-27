@@ -73,15 +73,19 @@ public class KeyguardSimPinViewController
         @Override
         public void onSimStateChanged(int subId, int slotId, int simState) {
             Log.v(TAG, "onSimStateChanged(subId=" + subId + ",slotId=" + slotId
+// QTI_BEGIN: 2021-06-08: Android_UI: SystemUI:PIN unlock string still display after unlock
                 + ",simState=" + simState + ")");
+// QTI_END: 2021-06-08: Android_UI: SystemUI:PIN unlock string still display after unlock
             // If subId has gone to PUK required then we need to go to the PUK screen.
             if (subId == mSubId && simState == TelephonyManager.SIM_STATE_PUK_REQUIRED) {
                 getKeyguardSecurityCallback().showCurrentSecurityScreen();
                 return;
             }
 
+// QTI_BEGIN: 2021-06-08: Android_UI: SystemUI:PIN unlock string still display after unlock
             if ((simState == TelephonyManager.SIM_STATE_READY)
                 || (simState == TelephonyManager.SIM_STATE_LOADED)) {
+// QTI_END: 2021-06-08: Android_UI: SystemUI:PIN unlock string still display after unlock
                 mRemainingAttempts = -1;
                 resetState();
             } else {
@@ -164,8 +168,10 @@ public class KeyguardSimPinViewController
             mSimUnlockProgressDialog.dismiss();
             mSimUnlockProgressDialog = null;
         }
+// QTI_BEGIN: 2021-06-08: Android_UI: SystemUI:PIN unlock string still display after unlock
 
         mMessageAreaController.setMessage("");
+// QTI_END: 2021-06-08: Android_UI: SystemUI:PIN unlock string still display after unlock
     }
 
     @Override
@@ -381,10 +387,13 @@ public class KeyguardSimPinViewController
 
     private void handleSubInfoChangeIfNeeded() {
         int subId = mKeyguardUpdateMonitor
+// QTI_BEGIN: 2021-06-08: Android_UI: SystemUI:PIN unlock string still display after unlock
                 .getUnlockedSubIdForState(TelephonyManager.SIM_STATE_PIN_REQUIRED);
         if (SubscriptionManager.isValidSubscriptionId(subId)) {
+// QTI_END: 2021-06-08: Android_UI: SystemUI:PIN unlock string still display after unlock
             Log.v(TAG, "handleSubInfoChangeIfNeeded mSubId="+mSubId+" subId="+ subId);
             mShowDefaultMessage = true;
+// QTI_BEGIN: 2021-06-08: Android_UI: SystemUI:PIN unlock string still display after unlock
             if(subId != mSubId){
               mSubId = subId;
               mRemainingAttempts = -1;
@@ -392,11 +401,14 @@ public class KeyguardSimPinViewController
         }else{
             //false by default and keep false except in PIN lock state
             mShowDefaultMessage = false;
+// QTI_END: 2021-06-08: Android_UI: SystemUI:PIN unlock string still display after unlock
         }
     }
+// QTI_BEGIN: 2024-06-12: Android_UI: SystemUI: fix "Enter your PIN" freshed issue.
 
     @Override
     protected int getInitialMessageResId() {
         return 0;
     }
+// QTI_END: 2024-06-12: Android_UI: SystemUI: fix "Enter your PIN" freshed issue.
 }

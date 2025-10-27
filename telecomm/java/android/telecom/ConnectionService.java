@@ -2555,23 +2555,33 @@ public abstract class ConnectionService extends Service {
         findConnectionForAction(callId, "abort").onAbort();
     }
 
+// QTI_BEGIN: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
     /** {@hide} */
     protected void answerVideo(String callId, int videoState) {
+// QTI_END: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
         Log.i(this, "answerVideo %s", callId);
+// QTI_BEGIN: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
         if (mConnectionById.containsKey(callId)) {
             findConnectionForAction(callId, "answer").onAnswer(videoState);
         } else {
             findConferenceForAction(callId, "answer").onAnswer(videoState);
         }
+// QTI_END: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
     }
 
+// QTI_BEGIN: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
     /** {@hide} */
     protected void answer(String callId) {
+// QTI_END: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
         Log.i(this, "answer %s", callId);
         if (mConnectionById.containsKey(callId)) {
+// QTI_BEGIN: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
             findConnectionForAction(callId, "answer").onAnswer();
+// QTI_END: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
         } else {
+// QTI_BEGIN: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
             findConferenceForAction(callId, "answer").onAnswer();
+// QTI_END: 2021-04-16: Telephony: IMS: Fix issue with answering call for some 3rd party apps
         }
     }
 

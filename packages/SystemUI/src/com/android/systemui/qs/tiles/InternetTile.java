@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
+// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 /**
  * Changes from Qualcomm Innovation Center are provided under the following license:
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 package com.android.systemui.qs.tiles;
 
 import android.annotation.NonNull;
@@ -67,7 +69,9 @@ import com.android.systemui.statusbar.connectivity.NetworkController;
 import com.android.systemui.statusbar.connectivity.SignalCallback;
 import com.android.systemui.statusbar.connectivity.WifiIcons;
 import com.android.systemui.statusbar.connectivity.WifiIndicators;
+// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import com.android.systemui.util.CarrierNameCustomization;
+// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 
 import java.io.PrintWriter;
 
@@ -94,7 +98,9 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
     private final InternetDialogManager mInternetDialogManager;
     private final WifiStateWorker mWifiStateWorker;
     final Handler mHandler;
+// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
     private CarrierNameCustomization mCarrierNameCustomization;
+// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 
     @Inject
     public InternetTile(
@@ -111,7 +117,9 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
             AccessPointController accessPointController,
             InternetDialogManager internetDialogManager,
             WifiStateWorker wifiStateWorker,
+// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
             CarrierNameCustomization carrierNameCustomization
+// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
     ) {
         super(host, uiEventLogger, backgroundLooper, mainHandler, falsingManager, metricsLogger,
                 statusBarStateController, activityStarter, qsLogger);
@@ -122,7 +130,9 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
         mAccessPointController = accessPointController;
         mDataController = mController.getMobileDataController();
         mController.observe(getLifecycle(), mSignalCallback);
+// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
         mCarrierNameCustomization = carrierNameCustomization;
+// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
     }
 
     @Override

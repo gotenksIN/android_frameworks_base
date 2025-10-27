@@ -31,39 +31,51 @@
 package android.util;
 
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 import android.app.ActivityThread;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.content.Context;
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 import android.database.ContentObserver;
-// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
 import android.graphics.BLASTBufferQueue;
-// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 import android.net.Uri;
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 import android.os.Binder;
 import android.os.Process;
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
 import android.os.SystemProperties;
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 import android.provider.Settings;
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 import android.util.Log;
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
 import dalvik.system.PathClassLoader;
 
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_BEGIN: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
 import java.util.LinkedHashMap;
 import java.util.Map;
-// QTI_END: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_END: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
 /** @hide */
@@ -78,20 +90,21 @@ public class BoostFramework {
     private static final String UXPERFORMANCE_JAR = "/system/framework/UxPerformance.jar";
     private static final String UXPERFORMANCE_CLASS = "com.qualcomm.qti.UxPerformance";
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2022-01-09: Core: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2022-01-09: Performance: Perf: Added support for app type in launch hint
     public  static final float PERF_HAL_V22 = 2.2f;
     public  static final float PERF_HAL_V23 = 2.3f;
-// QTI_END: 2022-01-09: Core: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2022-07-20: Core: PrefApps: Migrate to Perf Hal for PA feature
+// QTI_END: 2022-01-09: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2022-07-20: Performance: PrefApps: Migrate to Perf Hal for PA feature
     public static final int VENDOR_T_API_LEVEL = 33;
-// QTI_END: 2022-07-20: Core: PrefApps: Migrate to Perf Hal for PA feature
+// QTI_END: 2022-07-20: Performance: PrefApps: Migrate to Perf Hal for PA feature
 // QTI_BEGIN: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
     public static final int VENDOR_V_API_LEVEL = 202404;
 // QTI_END: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
-// QTI_BEGIN: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_BEGIN: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
     public final int board_first_api_lvl = SystemProperties.getInt("ro.board.first_api_level", 0);
     public final int board_api_lvl = SystemProperties.getInt("ro.board.api_level", 0);
-// QTI_END: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_END: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     //key in privider settings global
     public static final String KEY_LEGACY_UI_PERF_PKGS = "LEGACY_UI_PERF_PROCS";
     public static final String KEY_GPU_PREFER = "UI_PERF_GPU_PREFER";
@@ -99,52 +112,61 @@ public class BoostFramework {
     public static final String KEY_CPU_AGGRESSIVE = "UI_PERF_CPU_AGGRESSIVE";
     public static final String KEY_CPU_GPU = "UI_PERF_CPU_GPU";
     public static final String KEY_PKGS = "UI_PERF_PKGS";
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     public static final String KEY_IGNORE_PKGS = "UI_PERF_IGNORE_PKGS";
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     //ui perf mode controller in android space
     public static final String UI_PERF_PROP = "debug.ui.perfmode.enable";
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     public static final String UI_LEGACY_PERF_PROP = "sys.ui.legacy_perfmode.enable";
     //Deprecated, will be removed soon.
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     public static final String UI_PERF_PROC_PROP = "debug.ui.perfmode.process";
 
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 /** @hide */
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
     private static boolean sIsLoaded = false;
     private static Class<?> sPerfClass = null;
     private static Method sAcquireFunc = null;
     private static Method sPerfHintFunc = null;
     private static Method sReleaseFunc = null;
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
     private static Method sPerfHintRelFunc = null;
 // QTI_END: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
     private static Method sReleaseHandlerFunc = null;
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
-// QTI_BEGIN: 2018-11-10: Core: Add perfGetFeedback api support from framework
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
+// QTI_BEGIN: 2018-11-10: Performance: Add perfGetFeedback api support from framework
     private static Method sFeedbackFunc = null;
-// QTI_END: 2018-11-10: Core: Add perfGetFeedback api support from framework
-// QTI_BEGIN: 2021-07-12: Core: perf: Added support for new API.
+// QTI_END: 2018-11-10: Performance: Add perfGetFeedback api support from framework
+// QTI_BEGIN: 2021-07-12: Performance: perf: Added support for new API.
     private static Method sFeedbackFuncExtn = null;
-// QTI_END: 2021-07-12: Core: perf: Added support for new API.
-// QTI_BEGIN: 2019-01-29: Core: framework: Adding support for perf get prop in Boostframework
+// QTI_END: 2021-07-12: Performance: perf: Added support for new API.
+// QTI_BEGIN: 2019-01-29: Performance: framework: Adding support for perf get prop in Boostframework
     private static Method sPerfGetPropFunc = null;
-// QTI_END: 2019-01-29: Core: framework: Adding support for perf get prop in Boostframework
-// QTI_BEGIN: 2020-08-26: Core: perf: Added new API support
+// QTI_END: 2019-01-29: Performance: framework: Adding support for perf get prop in Boostframework
+// QTI_BEGIN: 2020-08-26: Performance: perf: Added new API support
     private static Method sAcqAndReleaseFunc = null;
-// QTI_END: 2020-08-26: Core: perf: Added new API support
-// QTI_BEGIN: 2021-07-12: Core: perf: Added support for new API.
+// QTI_END: 2020-08-26: Performance: perf: Added new API support
+// QTI_BEGIN: 2021-07-12: Performance: perf: Added support for new API.
     private static Method sperfHintAcqRelFunc = null;
     private static Method sperfHintRenewFunc = null;
     private static Method sPerfEventFunc = null;
-// QTI_END: 2021-07-12: Core: perf: Added support for new API.
-// QTI_BEGIN: 2022-01-09: Core: Perf: Added support for app type in launch hint
+// QTI_END: 2021-07-12: Performance: perf: Added support for new API.
+// QTI_BEGIN: 2022-01-09: Performance: Perf: Added support for app type in launch hint
     private static Method sPerfGetPerfHalVerFunc = null;
-// QTI_END: 2022-01-09: Core: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_END: 2022-01-09: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
     private static Method sPerfSyncRequest = null;
-// QTI_END: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_END: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
 
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
     private static Method sIOPStart = null;
@@ -176,60 +198,64 @@ public class BoostFramework {
     public static final int VENDOR_HINT_MTP_BOOST = 0x00001086;
     public static final int VENDOR_HINT_DRAG_BOOST = 0x00001087;
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-27: Core: framework/base: add parallel verifyV1
+// QTI_BEGIN: 2018-03-27: Performance: framework/base: add parallel verifyV1
     public static final int VENDOR_HINT_PACKAGE_INSTALL_BOOST = 0x00001088;
-// QTI_END: 2018-03-27: Core: framework/base: add parallel verifyV1
-// QTI_BEGIN: 2018-04-23: Core: Add perf hint for rotation latency
+// QTI_END: 2018-03-27: Performance: framework/base: add parallel verifyV1
+// QTI_BEGIN: 2018-04-23: Performance: Add perf hint for rotation latency
     public static final int VENDOR_HINT_ROTATION_LATENCY_BOOST = 0x00001089;
-// QTI_END: 2018-04-23: Core: Add perf hint for rotation latency
-// QTI_BEGIN: 2018-05-09: Core: Add perf hint for screen rotation animation
+// QTI_END: 2018-04-23: Performance: Add perf hint for rotation latency
+// QTI_BEGIN: 2018-05-09: Performance: Add perf hint for screen rotation animation
     public static final int VENDOR_HINT_ROTATION_ANIM_BOOST = 0x00001090;
-// QTI_END: 2018-05-09: Core: Add perf hint for screen rotation animation
-// QTI_BEGIN: 2019-05-06: Core: Add perf hint for performance mode
+// QTI_END: 2018-05-09: Performance: Add perf hint for screen rotation animation
+// QTI_BEGIN: 2019-05-06: Performance: Add perf hint for performance mode
     public static final int VENDOR_HINT_PERFORMANCE_MODE = 0x00001091;
-// QTI_END: 2019-05-06: Core: Add perf hint for performance mode
-// QTI_BEGIN: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_END: 2019-05-06: Performance: Add perf hint for performance mode
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
     public static final int VENDOR_HINT_APP_UPDATE = 0x00001092;
     public static final int VENDOR_HINT_KILL = 0x00001093;
-// QTI_END: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
-// QTI_BEGIN: 2020-07-07: Core: Correct hint-id to resolve conflict
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_BEGIN: 2020-07-07: Performance: Correct hint-id to resolve conflict
     public static final int VENDOR_HINT_BOOST_RENDERTHREAD = 0x00001096;
-// QTI_END: 2020-07-07: Core: Correct hint-id to resolve conflict
-// QTI_BEGIN: 2023-12-10: Core: Send top-app pid and renderthread tid to perf-hal
+// QTI_END: 2020-07-07: Performance: Correct hint-id to resolve conflict
+// QTI_BEGIN: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
     public static final int VENDOR_HINT_PASS_PID = 0x0000109C;
-// QTI_END: 2023-12-10: Core: Send top-app pid and renderthread tid to perf-hal
+// QTI_END: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     public static final int VENDOR_HINT_SCENARIO_GPU = 0x000010AA;
     public static final int VENDOR_HINT_SCENARIO_CPU = 0x000010AB;
     public static final int VENDOR_HINT_SCENARIO_CPU_GPU = 0x000010AC;
     public static final int VENDOR_HINT_SCENARIO_CPU_AGGRESSIVE = 0x000010AD;
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     //perf events
     public static final int VENDOR_HINT_FIRST_DRAW = 0x00001042;
     public static final int VENDOR_HINT_TAP_EVENT = 0x00001043;
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+// QTI_BEGIN: 2022-03-01: Performance: perf: Add drag start end perf event
     public static final int VENDOR_HINT_DRAG_START = 0x00001051;
     public static final int VENDOR_HINT_DRAG_END = 0x00001052;
-// QTI_BEGIN: 2025-08-05: Core: base: pin/unpin files based on launch and exit for vendor pinner service
+// QTI_END: 2022-03-01: Performance: perf: Add drag start end perf event
+// QTI_BEGIN: 2025-08-05: Performance: base: pin/unpin files based on launch and exit for vendor pinner service
     public static final int VENDOR_HINT_PIN_FILE = 0x0000105E;
     public static final int VENDOR_HINT_UNPIN_FILE = 0x0000105F;
-// QTI_END: 2025-08-05: Core: base: pin/unpin files based on launch and exit for vendor pinner service
+// QTI_END: 2025-08-05: Performance: base: pin/unpin files based on launch and exit for vendor pinner service
 // QTI_BEGIN: 2022-05-26: Core: perf: IME boost
     //Ime Launch Boost Hint
     public static final int VENDOR_HINT_IME_LAUNCH_EVENT = 0x0000109F;
 // QTI_END: 2022-05-26: Core: perf: IME boost
-// QTI_BEGIN: 2023-10-24: Core: perf: add exit app animation boost for apps exit.
+// QTI_BEGIN: 2023-10-24: Performance: perf: add exit app animation boost for apps exit.
     //App exit animation boost
     public static final int VENDOR_HINT_EXIT_ANIM_BOOST = 0x000010A9;
-// QTI_END: 2023-10-24: Core: perf: add exit app animation boost for apps exit.
+// QTI_END: 2023-10-24: Performance: perf: add exit app animation boost for apps exit.
 
-// QTI_BEGIN: 2018-11-10: Core: Add perfGetFeedback api support from framework
+// QTI_BEGIN: 2018-11-10: Performance: Add perfGetFeedback api support from framework
     //feedback hints
     public static final int VENDOR_FEEDBACK_WORKLOAD_TYPE = 0x00001601;
     public static final int VENDOR_FEEDBACK_LAUNCH_END_POINT = 0x00001602;
-// QTI_END: 2018-11-10: Core: Add perfGetFeedback api support from framework
-// QTI_BEGIN: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_END: 2018-11-10: Performance: Add perfGetFeedback api support from framework
+// QTI_BEGIN: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
     public static final int VENDOR_FEEDBACK_PA_FW = 0x00001604;
-// QTI_END: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_END: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
 
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
     //UXE Events and Triggers
@@ -245,7 +271,7 @@ public class BoostFramework {
     public static final int UXE_EVENT_PKG_INSTALL = 8;
 
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_BEGIN: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
     //New Hints while porting IOP to Perf Hal.
     public static final int VENDOR_HINT_BINDAPP = 0x000010A0;
     public static final int VENDOR_HINT_WARM_LAUNCH = 0x000010A1; //SUB_LAUNCH
@@ -253,13 +279,13 @@ public class BoostFramework {
     public static final int VENDOR_HINT_PKG_INSTALL = 0x000010A3;
     public static final int VENDOR_HINT_PKG_UNINSTALL = 0x000010A4;
 
-// QTI_END: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
-// QTI_BEGIN: 2020-07-09: Core: Hooks for background apps transition
+// QTI_END: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
     //perf opcodes
     public static final int MPCTLV3_GPU_IS_APP_FG = 0X42820000;
     public static final int MPCTLV3_GPU_IS_APP_BG = 0X42824000;
 
-// QTI_END: 2020-07-09: Core: Hooks for background apps transition
+// QTI_END: 2020-07-09: Performance: Hooks for background apps transition
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     public class Scroll {
         public static final int VERTICAL = 1;
@@ -274,81 +300,81 @@ public class BoostFramework {
         public static final int BOOST_V3 = 3;
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         public static final int BOOST_GAME = 4;
-// QTI_BEGIN: 2019-04-11: Core: Boostframework: Adding reserved hint types for launch boost
+// QTI_BEGIN: 2019-04-11: Performance: Boostframework: Adding reserved hint types for launch boost
         public static final int RESERVED_1 = 5;
         public static final int RESERVED_2 = 6;
-// QTI_END: 2019-04-11: Core: Boostframework: Adding reserved hint types for launch boost
-// QTI_BEGIN: 2022-01-17: Core: Perf: Updated launch hint types
+// QTI_END: 2019-04-11: Performance: Boostframework: Adding reserved hint types for launch boost
+// QTI_BEGIN: 2022-01-17: Performance: Perf: Updated launch hint types
         public static final int RESERVED_3 = 7;
         public static final int RESERVED_4 = 8;
         public static final int RESERVED_5 = 9;
-// QTI_END: 2022-01-17: Core: Perf: Updated launch hint types
-// QTI_BEGIN: 2022-04-20: Core: perf: Fix for Activity launch hint when LAL is enabled.
+// QTI_END: 2022-01-17: Performance: Perf: Updated launch hint types
+// QTI_BEGIN: 2022-04-20: Performance: perf: Fix for Activity launch hint when LAL is enabled.
         public static final int ACTIVITY_LAUNCH_BOOST = 10;
-// QTI_END: 2022-04-20: Core: perf: Fix for Activity launch hint when LAL is enabled.
+// QTI_END: 2022-04-20: Performance: perf: Fix for Activity launch hint when LAL is enabled.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         public static final int TYPE_SERVICE_START = 100;
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
         public static final int TYPE_START_PROC = 101;
-// QTI_END: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
-// QTI_BEGIN: 2019-10-17: Core: BoostFramework: New hintType for App Starting from BG.
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_BEGIN: 2019-10-17: Performance: BoostFramework: New hintType for App Starting from BG.
         public static final int TYPE_START_APP_FROM_BG = 102;
-// QTI_END: 2019-10-17: Core: BoostFramework: New hintType for App Starting from BG.
-// QTI_BEGIN: 2019-10-22: Core: Perf: Boost UI thread during app launching
+// QTI_END: 2019-10-17: Performance: BoostFramework: New hintType for App Starting from BG.
+// QTI_BEGIN: 2019-10-22: Performance: Perf: Boost UI thread during app launching
         public static final int TYPE_ATTACH_APPLICATION = 103;
-// QTI_END: 2019-10-22: Core: Perf: Boost UI thread during app launching
+// QTI_END: 2019-10-22: Performance: Perf: Boost UI thread during app launching
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     };
 
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2023-12-10: Core: Send top-app pid and renderthread tid to perf-hal
+// QTI_BEGIN: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
     public class PassPid {
         public static final int APP_PID = 4;
         public static final int RENDER_TID = 5;
     }
 
-// QTI_END: 2023-12-10: Core: Send top-app pid and renderthread tid to perf-hal
+// QTI_END: 2023-12-10: Performance: Send top-app pid and renderthread tid to perf-hal
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
     public class Draw {
         public static final int EVENT_TYPE_V1 = 1;
     };
 
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-11-10: Core: Modify game detection logic
+// QTI_BEGIN: 2018-11-10: Performance: Modify game detection logic
     public class WorkloadType {
         public static final int NOT_KNOWN = 0;
         public static final int APP = 1;
         public static final int GAME = 2;
         public static final int BROWSER = 3;
         public static final int PREPROAPP = 4;
-// QTI_END: 2018-11-10: Core: Modify game detection logic
-// QTI_BEGIN: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_END: 2018-11-10: Performance: Modify game detection logic
+// QTI_BEGIN: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
         public static final int VIDEO = 5;
         public static final int APP_OF_INTEREST = 6;
-// QTI_END: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
-// QTI_BEGIN: 2018-11-10: Core: Modify game detection logic
+// QTI_END: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
+// QTI_BEGIN: 2018-11-10: Performance: Modify game detection logic
     };
 
-// QTI_END: 2018-11-10: Core: Modify game detection logic
+// QTI_END: 2018-11-10: Performance: Modify game detection logic
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 /** @hide */
     public BoostFramework() {
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
         initFunctions();
 
         try {
             if (sPerfClass != null) {
                 mPerf = sPerfClass.newInstance();
             }
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
             if (sUxPerfClass != null) {
                 mUxPerf = sUxPerfClass.newInstance();
             }
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
         }
         catch(Exception e) {
             Log.e(TAG,"BoostFramework() : Exception_2 = " + e);
@@ -357,15 +383,15 @@ public class BoostFramework {
 
 /** @hide */
     public BoostFramework(Context context) {
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
-// QTI_BEGIN: 2020-04-03: Core: Add support for UxPerformance to receive context information.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
+// QTI_BEGIN: 2020-04-03: Performance: Add support for UxPerformance to receive context information.
         this(context, false);
     }
 
 /** @hide */
     public BoostFramework(Context context, boolean isTrusted) {
-// QTI_END: 2020-04-03: Core: Add support for UxPerformance to receive context information.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2020-04-03: Performance: Add support for UxPerformance to receive context information.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
         initFunctions();
 
         try {
@@ -374,11 +400,11 @@ public class BoostFramework {
                 if (cons != null)
                     mPerf = cons.newInstance(context);
             }
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
             if (sUxPerfClass != null) {
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2020-04-03: Core: Add support for UxPerformance to receive context information.
+// QTI_BEGIN: 2020-04-03: Performance: Add support for UxPerformance to receive context information.
                 if (isTrusted) {
                     Constructor cons = sUxPerfClass.getConstructor(Context.class);
                     if (cons != null)
@@ -386,19 +412,19 @@ public class BoostFramework {
                 } else {
                     mUxPerf = sUxPerfClass.newInstance();
                 }
-// QTI_END: 2020-04-03: Core: Add support for UxPerformance to receive context information.
+// QTI_END: 2020-04-03: Performance: Add support for UxPerformance to receive context information.
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
             }
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
         }
         catch(Exception e) {
             Log.e(TAG,"BoostFramework() : Exception_3 = " + e);
         }
     }
 
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
-// QTI_BEGIN: 2018-10-31: Core: Support the perflock request from system/priv apps whose domain are untrusted
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
+// QTI_BEGIN: 2018-10-31: Performance: Support the perflock request from system/priv apps whose domain are untrusted
 /** @hide */
     public BoostFramework(boolean isUntrustedDomain) {
         initFunctions();
@@ -418,43 +444,43 @@ public class BoostFramework {
         }
     }
 
-// QTI_END: 2018-10-31: Core: Support the perflock request from system/priv apps whose domain are untrusted
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-10-31: Performance: Support the perflock request from system/priv apps whose domain are untrusted
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
     private void initFunctions () {
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         synchronized(BoostFramework.class) {
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
             if (sIsLoaded == false) {
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                 try {
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
                     sPerfClass = Class.forName(PERFORMANCE_CLASS);
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
                     Class[] argClasses = new Class[] {int.class, int[].class};
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
                     sAcquireFunc = sPerfClass.getMethod("perfLockAcquire", argClasses);
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
                     argClasses = new Class[] {int.class, String.class, int.class, int.class};
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
                     sPerfHintFunc = sPerfClass.getMethod("perfHint", argClasses);
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 
                     argClasses = new Class[] {};
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
                     sReleaseFunc = sPerfClass.getMethod("perfLockRelease", argClasses);
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 
 // QTI_BEGIN: 2024-10-24: Performance: Added perf hint release support am: 9f4fce0d31
                     argClasses = new Class[] {};
@@ -464,20 +490,20 @@ public class BoostFramework {
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                     argClasses = new Class[] {int.class};
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
                     sReleaseHandlerFunc = sPerfClass.getDeclaredMethod("perfLockReleaseHandler", argClasses);
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 
-// QTI_BEGIN: 2018-11-10: Core: Add perfGetFeedback api support from framework
+// QTI_BEGIN: 2018-11-10: Performance: Add perfGetFeedback api support from framework
                     argClasses = new Class[] {int.class, String.class};
                     sFeedbackFunc = sPerfClass.getMethod("perfGetFeedback", argClasses);
 
-// QTI_END: 2018-11-10: Core: Add perfGetFeedback api support from framework
-// QTI_BEGIN: 2021-07-12: Core: perf: Added support for new API.
+// QTI_END: 2018-11-10: Performance: Add perfGetFeedback api support from framework
+// QTI_BEGIN: 2021-07-12: Performance: perf: Added support for new API.
                     argClasses = new Class[] {int.class, String.class, int.class, int[].class};
                     sFeedbackFuncExtn = sPerfClass.getMethod("perfGetFeedbackExtn", argClasses);
 
-// QTI_END: 2021-07-12: Core: perf: Added support for new API.
+// QTI_END: 2021-07-12: Performance: perf: Added support for new API.
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                     argClasses = new Class[] {int.class, String.class, String.class};
                     sIOPStart =   sPerfClass.getDeclaredMethod("perfIOPrefetchStart", argClasses);
@@ -486,27 +512,27 @@ public class BoostFramework {
                     sIOPStop =  sPerfClass.getDeclaredMethod("perfIOPrefetchStop", argClasses);
 
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2019-01-29: Core: framework: Adding support for perf get prop in Boostframework
+// QTI_BEGIN: 2019-01-29: Performance: framework: Adding support for perf get prop in Boostframework
                     argClasses = new Class[] {String.class, String.class};
                     sPerfGetPropFunc = sPerfClass.getMethod("perfGetProp", argClasses);
 
-// QTI_END: 2019-01-29: Core: framework: Adding support for perf get prop in Boostframework
-// QTI_BEGIN: 2020-08-26: Core: perf: Added new API support
+// QTI_END: 2019-01-29: Performance: framework: Adding support for perf get prop in Boostframework
+// QTI_BEGIN: 2020-08-26: Performance: perf: Added new API support
                     argClasses = new Class[] {int.class, int.class, int.class, int.class, int[].class};
                     sAcqAndReleaseFunc = sPerfClass.getMethod("perfLockAcqAndRelease", argClasses);
 
-// QTI_END: 2020-08-26: Core: perf: Added new API support
-// QTI_BEGIN: 2021-07-12: Core: perf: Added support for new API.
+// QTI_END: 2020-08-26: Performance: perf: Added new API support
+// QTI_BEGIN: 2021-07-12: Performance: perf: Added support for new API.
                     argClasses = new Class[] {int.class, String.class, int.class, int[].class};
                     sPerfEventFunc = sPerfClass.getMethod("perfEvent", argClasses);
 
-// QTI_END: 2021-07-12: Core: perf: Added support for new API.
-// QTI_BEGIN: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_END: 2021-07-12: Performance: perf: Added support for new API.
+// QTI_BEGIN: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
                     argClasses = new Class[] {int.class};
                     sPerfSyncRequest = sPerfClass.getMethod("perfSyncRequest", argClasses);
 
-// QTI_END: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
-// QTI_BEGIN: 2021-07-12: Core: perf: Added support for new API.
+// QTI_END: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_BEGIN: 2021-07-12: Performance: perf: Added support for new API.
                     argClasses = new Class[] {int.class, int.class, String.class, int.class,
                                               int.class, int.class, int[].class};
                     sperfHintAcqRelFunc = sPerfClass.getMethod("perfHintAcqRel", argClasses);
@@ -515,8 +541,8 @@ public class BoostFramework {
                                               int.class, int.class, int[].class};
                     sperfHintRenewFunc = sPerfClass.getMethod("perfHintRenew", argClasses);
 
-// QTI_END: 2021-07-12: Core: perf: Added support for new API.
-// QTI_BEGIN: 2022-01-09: Core: Perf: Added support for app type in launch hint
+// QTI_END: 2021-07-12: Performance: perf: Added support for new API.
+// QTI_BEGIN: 2022-01-09: Performance: Perf: Added support for app type in launch hint
                     try {
                         argClasses = new Class[] {};
                         sPerfGetPerfHalVerFunc = sPerfClass.getMethod("perfGetHalVer", argClasses);
@@ -526,13 +552,13 @@ public class BoostFramework {
                         sPerfGetPerfHalVerFunc = null;
                     }
 
-// QTI_END: 2022-01-09: Core: Perf: Added support for app type in launch hint
+// QTI_END: 2022-01-09: Performance: Perf: Added support for app type in launch hint
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                     try {
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2019-05-30: Performance: Perf: Change for AGPE
                         argClasses = new Class[] {int.class, int.class, String.class, int.class, String.class};
-// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_END: 2019-05-30: Performance: Perf: Change for AGPE
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                         sUXEngineEvents =  sPerfClass.getDeclaredMethod("perfUXEngine_events",
                                                                           argClasses);
@@ -545,9 +571,9 @@ public class BoostFramework {
                     }
 
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
                     sIsLoaded = true;
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
                 }
                 catch(Exception e) {
@@ -562,9 +588,9 @@ public class BoostFramework {
 
                     Class[] argUxClasses = new Class[] {int.class, String.class, String.class};
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2019-05-30: Performance: Perf: Change for AGPE
                     sUxIOPStart = sUxPerfClass.getDeclaredMethod("perfIOPrefetchStart", argUxClasses);
-// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_END: 2019-05-30: Performance: Perf: Change for AGPE
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 
                     sUxIsLoaded = true;
@@ -583,12 +609,12 @@ public class BoostFramework {
         int ret = -1;
         try {
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
             if (sAcquireFunc != null) {
                 Object retVal = sAcquireFunc.invoke(mPerf, duration, list);
                 ret = (int)retVal;
             }
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
@@ -601,12 +627,12 @@ public class BoostFramework {
         int ret = -1;
         try {
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
             if (sReleaseFunc != null) {
                 Object retVal = sReleaseFunc.invoke(mPerf);
                 ret = (int)retVal;
             }
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
@@ -637,12 +663,12 @@ public class BoostFramework {
         int ret = -1;
         try {
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
             if (sReleaseHandlerFunc != null) {
                 Object retVal = sReleaseHandlerFunc.invoke(mPerf, handle);
                 ret = (int)retVal;
             }
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
             Log.e(TAG,"Exception " + e);
@@ -665,23 +691,23 @@ public class BoostFramework {
         int ret = -1;
         try {
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-03-21: Core: add perf_service into system_process.
+// QTI_BEGIN: 2018-03-21: Performance: add perf_service into system_process.
             if (sPerfHintFunc != null) {
                 Object retVal = sPerfHintFunc.invoke(mPerf, hint, userDataStr, userData1, userData2);
                 ret = (int)retVal;
             }
-// QTI_END: 2018-03-21: Core: add perf_service into system_process.
+// QTI_END: 2018-03-21: Performance: add perf_service into system_process.
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
         } catch(Exception e) {
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
-// QTI_BEGIN: 2018-11-10: Core: Add perfGetFeedback api support from framework
+// QTI_BEGIN: 2018-11-10: Performance: Add perfGetFeedback api support from framework
             Log.e(TAG,"Exception " + e);
         }
         return ret;
     }
 
-// QTI_END: 2018-11-10: Core: Add perfGetFeedback api support from framework
-// QTI_BEGIN: 2022-01-09: Core: Perf: Added support for app type in launch hint
+// QTI_END: 2018-11-10: Performance: Add perfGetFeedback api support from framework
+// QTI_BEGIN: 2022-01-09: Performance: Perf: Added support for app type in launch hint
 /** @hide */
     public double getPerfHalVersion() {
         double retVal = PERF_HAL_V22;
@@ -696,19 +722,19 @@ public class BoostFramework {
         return retVal;
     }
 
-// QTI_END: 2022-01-09: Core: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2018-11-10: Core: Add perfGetFeedback api support from framework
+// QTI_END: 2022-01-09: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2018-11-10: Performance: Add perfGetFeedback api support from framework
 /** @hide */
-// QTI_END: 2018-11-10: Core: Add perfGetFeedback api support from framework
-// QTI_BEGIN: 2021-07-12: Core: perf: Added support for new API.
+// QTI_END: 2018-11-10: Performance: Add perfGetFeedback api support from framework
+// QTI_BEGIN: 2021-07-12: Performance: perf: Added support for new API.
     public int perfGetFeedback(int req, String pkg_name) {
-// QTI_END: 2021-07-12: Core: perf: Added support for new API.
-// QTI_BEGIN: 2018-11-10: Core: Add perfGetFeedback api support from framework
+// QTI_END: 2021-07-12: Performance: perf: Added support for new API.
+// QTI_BEGIN: 2018-11-10: Performance: Add perfGetFeedback api support from framework
         int ret = -1;
         try {
             if (sFeedbackFunc != null) {
-// QTI_END: 2018-11-10: Core: Add perfGetFeedback api support from framework
-// QTI_BEGIN: 2021-07-12: Core: perf: Added support for new API.
+// QTI_END: 2018-11-10: Performance: Add perfGetFeedback api support from framework
+// QTI_BEGIN: 2021-07-12: Performance: perf: Added support for new API.
                 Object retVal = sFeedbackFunc.invoke(mPerf, req, pkg_name);
                 ret = (int)retVal;
             }
@@ -724,12 +750,12 @@ public class BoostFramework {
         try {
             if (sFeedbackFuncExtn != null) {
                 Object retVal = sFeedbackFuncExtn.invoke(mPerf, req, pkg_name, numArgs, list);
-// QTI_END: 2021-07-12: Core: perf: Added support for new API.
-// QTI_BEGIN: 2018-11-10: Core: Add perfGetFeedback api support from framework
+// QTI_END: 2021-07-12: Performance: perf: Added support for new API.
+// QTI_BEGIN: 2018-11-10: Performance: Add perfGetFeedback api support from framework
                 ret = (int)retVal;
             }
         } catch(Exception e) {
-// QTI_END: 2018-11-10: Core: Add perfGetFeedback api support from framework
+// QTI_END: 2018-11-10: Performance: Add perfGetFeedback api support from framework
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             Log.e(TAG,"Exception " + e);
         }
@@ -749,13 +775,13 @@ public class BoostFramework {
         }
         try {
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2019-05-30: Performance: Perf: Change for AGPE
              Object retVal = sUxIOPStart.invoke(mUxPerf, pid, pkgName, codePath);
              ret = (int) retVal;
          } catch (Exception e) {
              Log.e(TAG, "Ux Perf Exception " + e);
          }
-// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_END: 2019-05-30: Performance: Perf: Change for AGPE
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 
         return ret;
@@ -776,28 +802,28 @@ public class BoostFramework {
 /** @hide */
     public int perfUXEngine_events(int opcode, int pid, String pkgName, int lat) {
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2019-05-30: Performance: Perf: Change for AGPE
         return perfUXEngine_events(opcode, pid, pkgName, lat, null);
      }
 
 /** @hide */
     public int perfUXEngine_events(int opcode, int pid, String pkgName, int lat, String codePath) {
-// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_END: 2019-05-30: Performance: Perf: Change for AGPE
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         int ret = -1;
         try {
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2019-04-15: Core: Moving property to iop hal
+// QTI_BEGIN: 2019-04-15: Performance: Moving property to iop hal
             if (sUXEngineEvents == null) {
-// QTI_END: 2019-04-15: Core: Moving property to iop hal
+// QTI_END: 2019-04-15: Performance: Moving property to iop hal
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                 return ret;
             }
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2019-05-30: Performance: Perf: Change for AGPE
 
             Object retVal = sUXEngineEvents.invoke(mPerf, opcode, pid, pkgName, lat,codePath);
-// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_END: 2019-05-30: Performance: Perf: Change for AGPE
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
             ret = (int) retVal;
         } catch (Exception e) {
@@ -812,9 +838,9 @@ public class BoostFramework {
         String ret = null;
         try {
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2019-04-15: Core: Moving property to iop hal
+// QTI_BEGIN: 2019-04-15: Performance: Moving property to iop hal
             if (sUXEngineTrigger == null) {
-// QTI_END: 2019-04-15: Core: Moving property to iop hal
+// QTI_END: 2019-04-15: Performance: Moving property to iop hal
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                 return ret;
             }
@@ -827,7 +853,7 @@ public class BoostFramework {
     }
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 
-// QTI_BEGIN: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_BEGIN: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
 /** @hide */
     public String perfSyncRequest(int opcode) {
         String ret = null;
@@ -842,12 +868,12 @@ public class BoostFramework {
         }
         return ret;
     }
-// QTI_END: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
+// QTI_END: 2022-06-06: Performance: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
 
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
 /** @hide */
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2019-01-29: Core: framework: Adding support for perf get prop in Boostframework
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2019-01-29: Performance: framework: Adding support for perf get prop in Boostframework
     public String perfGetProp(String prop_name, String def_val) {
         String ret = "";
         try {
@@ -862,9 +888,9 @@ public class BoostFramework {
         }
         return ret;
     }
-// QTI_END: 2019-01-29: Core: framework: Adding support for perf get prop in Boostframework
+// QTI_END: 2019-01-29: Performance: framework: Adding support for perf get prop in Boostframework
 
-// QTI_BEGIN: 2020-08-26: Core: perf: Added new API support
+// QTI_BEGIN: 2020-08-26: Performance: perf: Added new API support
 /** @hide */
     public int perfLockAcqAndRelease(int handle, int duration, int numArgs,int reserveNumArgs, int... list) {
         int ret = -1;
@@ -879,8 +905,8 @@ public class BoostFramework {
         return ret;
     }
 
-// QTI_END: 2020-08-26: Core: perf: Added new API support
-// QTI_BEGIN: 2021-07-12: Core: perf: Added support for new API.
+// QTI_END: 2020-08-26: Performance: perf: Added new API support
+// QTI_BEGIN: 2021-07-12: Performance: perf: Added support for new API.
 /** @hide */
     public void perfEvent(int eventId, String pkg_name) {
         perfEvent(eventId, pkg_name, 0);
@@ -959,8 +985,8 @@ public class BoostFramework {
         return ret;
     }
 
-// QTI_END: 2021-07-12: Core: perf: Added support for new API.
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2021-07-12: Performance: perf: Added support for new API.
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
     /** @hide */
     public static class ScrollOptimizer {
         /** @hide */
@@ -972,23 +998,23 @@ public class BoostFramework {
                 "/system/framework/QXPerformance.jar";
         private static final String SCROLL_OPT_CLASS =
                 "com.qualcomm.qti.QXPerformance.ScrollOptimizer";
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
         private static boolean sScrollOptProp = false;
-// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
         private static boolean sScrollOptEnable = false;
         private static boolean sQXIsLoaded = false;
         private static Class<?> sQXPerfClass = null;
         private static Method sSetFrameInterval = null;
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2022-11-22: Core: Filter multi-layer cases for pre-rendering
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2022-11-22: Performance: Filter multi-layer cases for pre-rendering
         private static Method sDisableOptimizer = null;
-// QTI_END: 2022-11-22: Core: Filter multi-layer cases for pre-rendering
-// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2022-11-22: Performance: Filter multi-layer cases for pre-rendering
+// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
         private static Method sSetBLASTBufferQueue = null;
-// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
         private static Method sSetMotionType = null;
         private static Method sSetVsyncTime = null;
         private static Method sSetUITaskStatus = null;
@@ -1001,13 +1027,13 @@ public class BoostFramework {
             if (sQXIsLoaded) return;
 
             try {
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
                 sScrollOptProp = SystemProperties.getBoolean(SCROLL_OPT_PROP, false);
                 if (!sScrollOptProp) {
                     sScrollOptEnable = false;
-// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
                     sQXIsLoaded = true;
                     return;
                 }
@@ -1019,17 +1045,17 @@ public class BoostFramework {
                 sSetFrameInterval = sQXPerfClass.getMethod(
                         "setFrameInterval", argClasses);
 
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2022-11-22: Core: Filter multi-layer cases for pre-rendering
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2022-11-22: Performance: Filter multi-layer cases for pre-rendering
                 argClasses = new Class[]{boolean.class};
                 sDisableOptimizer = sQXPerfClass.getMethod("disableOptimizer", argClasses);
 
-// QTI_END: 2022-11-22: Core: Filter multi-layer cases for pre-rendering
-// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2022-11-22: Performance: Filter multi-layer cases for pre-rendering
+// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
                 argClasses = new Class[]{BLASTBufferQueue.class};
                 sSetBLASTBufferQueue = sQXPerfClass.getMethod("setBLASTBufferQueue", argClasses);
-// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
 
                 argClasses = new Class[]{int.class};
                 sSetMotionType = sQXPerfClass.getMethod("setMotionType", argClasses);
@@ -1054,21 +1080,21 @@ public class BoostFramework {
             } catch (Exception e) {
                 Log.e(TAG, "initQXPerfFuncs failed");
                 e.printStackTrace();
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2022-11-22: Core: Filter multi-layer cases for pre-rendering
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2022-11-22: Performance: Filter multi-layer cases for pre-rendering
             } finally {
                 // If frameworks and perf changes don't match(may not built together)
                 // or other exception, need to set sQXIsLoaded as true to avoid retry.
                 sQXIsLoaded = true;
-// QTI_END: 2022-11-22: Core: Filter multi-layer cases for pre-rendering
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2022-11-22: Performance: Filter multi-layer cases for pre-rendering
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
             }
         }
 
         /** @hide */
         public static void setFrameInterval(long frameIntervalNanos) {
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2022-07-25: Core: Reduce redundant calls of frame interval update
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2022-07-25: Performance: Reduce redundant calls of frame interval update
             if (sQXIsLoaded) {
                 if (sScrollOptEnable && sSetFrameInterval != null) {
                     try {
@@ -1079,13 +1105,13 @@ public class BoostFramework {
                 }
                 return;
             }
-// QTI_END: 2022-07-25: Core: Reduce redundant calls of frame interval update
-// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+// QTI_END: 2022-07-25: Performance: Reduce redundant calls of frame interval update
+// QTI_BEGIN: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
             Thread initThread = new Thread(new Runnable() {
                 @Override
                 public void run() {
-// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
-// QTI_BEGIN: 2022-11-22: Core: perf: Add lock protection for initialization in ScrollOptimizer
+// QTI_END: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2022-11-22: Performance: perf: Add lock protection for initialization in ScrollOptimizer
                     synchronized(ScrollOptimizer.class) {
                         try {
                             initQXPerfFuncs();
@@ -1096,23 +1122,23 @@ public class BoostFramework {
                         } catch (Exception e) {
                             Log.e(TAG, "Failed to run initThread.");
                             e.printStackTrace();
-// QTI_END: 2022-11-22: Core: perf: Add lock protection for initialization in ScrollOptimizer
-// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+// QTI_END: 2022-11-22: Performance: perf: Add lock protection for initialization in ScrollOptimizer
+// QTI_BEGIN: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
                         }
                     }
-// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
                 }
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
             });
             initThread.start();
-// QTI_END: 2020-12-14: Core: Fix StrictMode violation and add filter for scroll mode
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2020-12-14: Performance: Fix StrictMode violation and add filter for scroll mode
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
         }
 
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2022-11-22: Core: Filter multi-layer cases for pre-rendering
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2022-11-22: Performance: Filter multi-layer cases for pre-rendering
         /** @hide */
         public static void disableOptimizer(boolean disabled) {
             if (sScrollOptEnable && sDisableOptimizer != null) {
@@ -1124,21 +1150,21 @@ public class BoostFramework {
             }
         }
 
-// QTI_END: 2022-11-22: Core: Filter multi-layer cases for pre-rendering
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2022-11-22: Performance: Filter multi-layer cases for pre-rendering
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
         /** @hide */
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
         public static void setBLASTBufferQueue(BLASTBufferQueue blastBufferQueue) {
             if (sScrollOptEnable && sSetBLASTBufferQueue != null) {
-// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
                 try {
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
+// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
                     sSetBLASTBufferQueue.invoke(null, blastBufferQueue);
-// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -1232,10 +1258,12 @@ public class BoostFramework {
             return newFrameTimeNanos;
         }
     }
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
 
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     //UI PERF START
-// QTI_BEGIN: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
     private static class LRUMap<K,V> extends LinkedHashMap<K,V> {
         private final int maxSize;
 
@@ -1250,13 +1278,16 @@ public class BoostFramework {
         }
     }
 
-// QTI_END: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_END: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     private static class UIPerfMode {
         private static UIPerfMode instance = null;
         private static String UI_PERF_ENABLE = "sys.ui.perfmode.enable";
-// QTI_BEGIN: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
         private static String UI_PERF_ENHANCEMENT = "ro.vendor.ui.perfmode_enhance";
-// QTI_END: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_END: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
         private Context mContext;
         private String[] mUIPerfProcs = null;
         private String[] mLegacyUIPerfProcs = null;
@@ -1269,9 +1300,11 @@ public class BoostFramework {
         private UiPerfProcsObserver observer = null;
         private boolean mUIPerfEnhance = false;
         private BoostFramework mPerf = new BoostFramework();
-// QTI_BEGIN: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
         private LRUMap<String,Boolean> mLRUMap = new LRUMap(30);
-// QTI_END: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_END: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 
         private class UiPerfProcsObserver extends ContentObserver {
             private Context mContext = null;
@@ -1291,7 +1324,11 @@ public class BoostFramework {
                     Binder.restoreCallingIdentity(callingId);
                 } catch (Exception e) {}
             }
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 
         /** @hide */
         public static UIPerfMode getInstance(Context context) {
@@ -1299,7 +1336,11 @@ public class BoostFramework {
                 if (!ActivityThread.isSystem() ||
                         !SystemProperties.getBoolean(UI_PERF_ENABLE, false)) {
                     return null;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
                 }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
                 if (context != null) {
                     if (instance == null) {
                         instance = new UIPerfMode(context);
@@ -1311,9 +1352,13 @@ public class BoostFramework {
                     return instance;
                 }
                 return null;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
             }
         }
 
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
         private UIPerfMode(Context context) {
             if (context != null) {
                 mContext = context.getApplicationContext();
@@ -1334,12 +1379,20 @@ public class BoostFramework {
                             Boolean.parseBoolean(mPerf.perfGetProp(UI_PERF_ENHANCEMENT,
                                                                    "false"));
                     }
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
                 }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
             } catch (Exception e) {
                 mUiPerfInited = false;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
             }
         }
 
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
         private void update() {
             try {
                 if (mContext != null) {
@@ -1377,12 +1430,20 @@ public class BoostFramework {
                                      KEY_IGNORE_PKGS);
                     if (str != null && !str.isEmpty()) {
                         mIgnoreProcs = str.split(";");
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
                     }
                 }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
             } catch (Exception e) {
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
             }
         }
 
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
         /** @hide */
         public void clean() {
             if (mContext != null && observer != null) {
@@ -1390,7 +1451,11 @@ public class BoostFramework {
                     mContext.getContentResolver().unregisterContentObserver(observer);
                 } catch (Exception e) {}
             }
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 
         /** @hide */
         public boolean isInit() {
@@ -1408,9 +1473,13 @@ public class BoostFramework {
                         if (pkgName.equals(mUIPerfProcs[i])) {
                             return true;
                         }
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
                     }
                 }
             }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
             return enhance(pkgName);
         }
 
@@ -1448,7 +1517,8 @@ public class BoostFramework {
                         }
                     }
                 }
-// QTI_BEGIN: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
                 if (mLRUMap.containsKey(pkgName)) {
                     return mLRUMap.get(pkgName);
                 }
@@ -1460,8 +1530,11 @@ public class BoostFramework {
                     }
                 }
                 mLRUMap.put(pkgName, false);
-// QTI_END: 2025-07-16: Core: Perf: Add using WLC to detect UI perf target
+// QTI_END: 2025-07-16: Performance: Perf: Add using WLC to detect UI perf target
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
             }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
             return false;
         }
 
@@ -1488,9 +1561,13 @@ public class BoostFramework {
                             hint = VENDOR_HINT_PERFORMANCE_MODE;
                             return hint;
                         }
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
                     }
                 }
             }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
             return hint;
         }
 
@@ -1531,58 +1608,99 @@ public class BoostFramework {
                             hint = VENDOR_HINT_SCENARIO_CPU_AGGRESSIVE;
                             return hint;
                         }
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
                     }
                 }
             }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
             return hint;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
     }
 
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     /** @hide */
     public boolean shouldUseUiPerf(Context context, String pkgName) {
         UIPerfMode uiPerf = UIPerfMode.getInstance(context);
         if (uiPerf != null) {
             return uiPerf.shouldUseUiPerf(pkgName);
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
         return false;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     }
 
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     /** @hide */
     public void updateUiPerfState(Context context, String pkgName, int pid) {
         UIPerfMode uiPerf = UIPerfMode.getInstance(context);
         if (uiPerf != null) {
             uiPerf.updateUiPerfState(pkgName, pid);
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
     }
 
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     /** @hide */
     public int getLegacyUiPerfHint(Context context, String pkgName) {
         int hint = -1;
         UIPerfMode uiPerf = UIPerfMode.getInstance(context);
         if (uiPerf != null) {
             hint = uiPerf.getLegacyUiPerfHint(pkgName);
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
         return hint;
     }
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     /** @hide */
     public int getUiPerfHint(Context context, String activityName) {
         int hint = -1;
         UIPerfMode uiPerf = UIPerfMode.getInstance(context);
         if (uiPerf != null) {
             hint = uiPerf.getUiPerfHint(activityName);
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
         return hint;
     }
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     /** @hide */
     public static boolean shouldUseUiPerf() {
         if (SystemProperties.getInt(UI_PERF_PROP, 0) == Process.myPid()) {
             return true;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
         return false;
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
     //UI PERF END
+// QTI_END: 2025-06-12: Performance: Perf: Enable UI perf mode automatically according to pid
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 };
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.

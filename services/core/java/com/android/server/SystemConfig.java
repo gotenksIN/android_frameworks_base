@@ -113,11 +113,11 @@ public class SystemConfig {
     // property for runtime configuration differentation in product
     private static final String PRODUCT_SKU_PROPERTY = "ro.boot.hardware.sku";
 
-// QTI_BEGIN: 2024-11-13: Core: Allow runtime configurations based on the baseband
+// QTI_BEGIN: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
     // property for runtime configuration differentiation based on baseband type
     private static final String NO_RIL_PROPERTY = "ro.radio.noril";
 
-// QTI_END: 2024-11-13: Core: Allow runtime configurations based on the baseband
+// QTI_END: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
     private static final ArrayMap<String, ArraySet<String>> EMPTY_PERMISSIONS =
             new ArrayMap<>();
 
@@ -744,7 +744,7 @@ public class SystemConfig {
         }
 
 // QTI_END: 2020-03-09: Core: SystemConfig: Allow runtime differentiation of vendor configurations
-// QTI_BEGIN: 2024-11-13: Core: Allow runtime configurations based on the baseband
+// QTI_BEGIN: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
         boolean noRilSupport = SystemProperties.getBoolean(NO_RIL_PROPERTY, false);
         if (noRilSupport) {
             String noRilDir = "noRil";
@@ -756,7 +756,7 @@ public class SystemConfig {
                     vendorPermissionFlag);
         }
 
-// QTI_END: 2024-11-13: Core: Allow runtime configurations based on the baseband
+// QTI_END: 2024-11-13: Telephony: Allow runtime configurations based on the baseband
         // Allow ODM to customize system configs as much as Vendor, because /odm is another
         // vendor partition other than /vendor.
         int odmPermissionFlag = vendorPermissionFlag;

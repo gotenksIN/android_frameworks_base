@@ -34,16 +34,16 @@ import android.os.PowerManager;
 import android.telephony.PhoneStateListener;
 import android.telephony.PreciseCallState;
 import android.telephony.ServiceState;
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
 import com.android.internal.location.GpsNetInitiatedHandler;
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
 import com.android.server.FgThread;
 
 import java.net.Inet4Address;
@@ -52,10 +52,10 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.HashMap;
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
 import java.util.HashSet;
 import java.util.Iterator;
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -114,11 +114,11 @@ class GnssNetworkConnectivityHandler {
     private HashMap<Network, NetworkAttributes> mAvailableNetworkAttributes =
             new HashMap<>(HASH_MAP_INITIAL_CAPACITY_TO_TRACK_CONNECTED_NETWORKS);
 
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
     // Phone State Listeners to track all the active sub IDs
     private HashMap<Integer, SubIdPhoneStateListener> mPhoneStateListeners;
 
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
     private final ConnectivityManager mConnMgr;
 
     private final Handler mHandler;
@@ -127,11 +127,11 @@ class GnssNetworkConnectivityHandler {
     private int mAGpsDataConnectionState;
     private InetAddress mAGpsDataConnectionIpAddr;
     private int mAGpsType;
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
     private int mActiveSubId = -1;
     private final GpsNetInitiatedHandler mNiHandler;
 
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
 
     private final Context mContext;
 
@@ -206,39 +206,39 @@ class GnssNetworkConnectivityHandler {
 
     GnssNetworkConnectivityHandler(Context context,
             GnssNetworkListener gnssNetworkListener,
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
             Looper looper,
             GpsNetInitiatedHandler niHandler) {
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
         mContext = context;
         mGnssNetworkListener = gnssNetworkListener;
 
         SubscriptionManager subManager = mContext.getSystemService(SubscriptionManager.class);
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
         if (subManager != null) {
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
             if (Flags.subscriptionsChangedListenerThread()) {
                 subManager.addOnSubscriptionsChangedListener(FgThread.getExecutor(),
                         mOnSubscriptionsChangeListener);
             } else {
                 subManager.addOnSubscriptionsChangedListener(mOnSubscriptionsChangeListener);
             }
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
         }
 
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
         PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         mWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_KEY);
 
         mHandler = new Handler(looper);
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
         mNiHandler = niHandler;
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
         mConnMgr = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
         mSuplConnectivityCallback = null;
     }
 
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
     /**
      * SubId Phone State Listener is used cache the last active Sub ID when a call is made,
      * which will be used during an emergency call to set the Network Specifier to the particular
@@ -251,11 +251,11 @@ class GnssNetworkConnectivityHandler {
         }
         @Override
         public void onPreciseCallStateChanged(PreciseCallState state) {
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
             if (PreciseCallState.PRECISE_CALL_STATE_ACTIVE == state.getForegroundCallState()
                     || PreciseCallState.PRECISE_CALL_STATE_DIALING
                     == state.getForegroundCallState()) {
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
                 mActiveSubId = mSubId;
                 if (DEBUG) Log.d(TAG, "mActiveSubId: " + mActiveSubId);
             }
@@ -277,9 +277,9 @@ class GnssNetworkConnectivityHandler {
             SubscriptionManager subManager = mContext.getSystemService(SubscriptionManager.class);
             TelephonyManager telManager = mContext.getSystemService(TelephonyManager.class);
             if (subManager != null && telManager != null) {
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
                 subManager = subManager.createForAllUserProfiles();
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
                 List<SubscriptionInfo> subscriptionInfoList =
                         subManager.getActiveSubscriptionInfoList();
                 HashSet<Integer> activeSubIds = new HashSet<Integer>();
@@ -330,7 +330,7 @@ class GnssNetworkConnectivityHandler {
         }
     };
 
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
     void registerNetworkCallbacks() {
         // register for connectivity change events.
         NetworkRequest.Builder networkRequestBuilder = new NetworkRequest.Builder();
@@ -657,17 +657,17 @@ class GnssNetworkConnectivityHandler {
             }
         }
 
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
         // During an emergency call, and when we have cached the Active Sub Id, we set the
         // Network Specifier so that the network request goes to the correct Sub Id
         if (mNiHandler.getInEmergency() && mActiveSubId >= 0) {
             if (DEBUG) Log.d(TAG, "Adding Network Specifier: " + Integer.toString(mActiveSubId));
             networkRequestBuilder.setNetworkSpecifier(Integer.toString(mActiveSubId));
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
             networkRequestBuilder.removeCapability(NET_CAPABILITY_NOT_RESTRICTED);
-// QTI_BEGIN: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_BEGIN: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
         }
-// QTI_END: 2020-03-25: Core: Set the Network Specifier on Emergency SUPL
+// QTI_END: 2020-03-25: GPS: Set the Network Specifier on Emergency SUPL
         NetworkRequest networkRequest = networkRequestBuilder.build();
         // Make sure we only have a single request.
         if (mSuplConnectivityCallback != null) {

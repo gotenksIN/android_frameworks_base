@@ -359,6 +359,7 @@ public class CachedAppOptimizer {
     static final int UID_FROZEN_STATE_CHANGED_MSG = 6;
     static final int DEADLOCK_WATCHDOG_MSG = 7;
     static final int BINDER_ERROR_MSG = 8;
+    static final int VENDOR_COMPACT_ALL_MSG = 9;
 
     // When free swap falls below this percentage threshold any full (file + anon)
     // compactions will be downgraded to file only compactions to reduce pressure
@@ -556,6 +557,7 @@ public class CachedAppOptimizer {
     private final ProcessDependencies mProcessDependencies;
     private final ProcLocksReader mProcLocksReader;
     public static BoostFramework mPerf = new BoostFramework();
+    public static boolean vendorCompactAll = false;
 
     private final Freezer mFreezer;
 
@@ -639,6 +641,9 @@ public class CachedAppOptimizer {
         boolean debugCompaction =
                     Boolean.valueOf(mPerf.perfGetProp("vendor.appcompact.debug_app_compact",
                         "false"));
+        vendorCompactAll =
+                    Boolean.valueOf(mPerf.perfGetProp("vendor.appcompact.compactAll",
+                        "true"));
         int threadPriority =
                     Integer.valueOf(mPerf.perfGetProp("vendor.appcompact.thread_priority",
                         String.valueOf(Process.THREAD_GROUP_BACKGROUND)));
@@ -860,15 +865,24 @@ public class CachedAppOptimizer {
             if (mDebugCompaction) {
                 Slog.d(TAG_AM, "compactAllSystem");
             }
-            Trace.instantForTrack(
-                    Trace.TRACE_TAG_ACTIVITY_MANAGER, ATRACE_COMPACTION_TRACK, "compactAllSystem");
-            mCompactionHandler.sendMessage(mCompactionHandler.obtainMessage(
-                                              COMPACT_SYSTEM_MSG));
+
+            if(vendorCompactAll == true) {
+                Trace.instantForTrack(
+                        Trace.TRACE_TAG_ACTIVITY_MANAGER, ATRACE_COMPACTION_TRACK, "vendorCompactAll");
+                mCompactionHandler.sendMessage(mCompactionHandler.obtainMessage(
+                                                  VENDOR_COMPACT_ALL_MSG));
+            } else {
+                Trace.instantForTrack(
+                        Trace.TRACE_TAG_ACTIVITY_MANAGER, ATRACE_COMPACTION_TRACK, "compactAllSystem");
+                mCompactionHandler.sendMessage(mCompactionHandler.obtainMessage(
+                                                  COMPACT_SYSTEM_MSG));
+            }
         }
     }
 
     private native void compactSystem();
     private native void compactSystemWithMemcg();
+    private native void vendorCompactAll();
 
     /**
      * Enable binder reports via generic netlink
@@ -2024,6 +2038,16 @@ public class CachedAppOptimizer {
                     } else {
                         compactSystem();
                     }
+                    long memFreedAfter = getMemoryFreedCompaction();
+                    long memFreed = memFreedAfter - memFreedBefore;
+                    mCompactStatsManager.logSystemCompactionPerformed(memFreed);
+                    Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+                    break;
+                }
+                case VENDOR_COMPACT_ALL_MSG: {
+                    Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "vendorCompactAll");
+                    long memFreedBefore = getMemoryFreedCompaction();
+                    vendorCompactAll();
                     long memFreedAfter = getMemoryFreedCompaction();
                     long memFreed = memFreedAfter - memFreedBefore;
                     mCompactStatsManager.logSystemCompactionPerformed(memFreed);

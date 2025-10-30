@@ -1439,6 +1439,22 @@ public final class Settings {
             "android.settings.HARD_KEYBOARD_SETTINGS";
 
     /**
+     * Activity Action: Show settings to configure the game controllers.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_GAME_CONTROLLER_SETTINGS =
+            "android.settings.GAME_CONTROLLER_SETTINGS";
+
+    /**
      * Activity Action: Adds a word to the user dictionary.
      * <p>
      * In some cases, a matching Activity may not exist, so ensure you
@@ -3044,6 +3060,18 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_APP_PERMISSIONS_SETTINGS =
             "android.settings.APP_PERMISSIONS_SETTINGS";
+
+    /**
+     * Activity Action: Show screen to manage supervision settings.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     */
+    @FlaggedApi(android.app.supervision.flags.Flags.FLAG_ENABLE_SUPERVISION_SETTINGS_UI_UPDATES)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_SUPERVISION_SETTINGS =
+            "android.settings.SUPERVISION_SETTINGS";
 
     // End of Intent actions for Settings
 
@@ -13890,12 +13918,29 @@ public final class Settings {
                 "identity_check_promo_card_shown";
 
         /**
+         * Tracks if the user has seen the promo card for Identity Check x MTL.
+         * The promo card should only appear once per user via Safety Center.
+         *
+         * @hide
+         */
+        public static final String IDENTITY_CHECK_WATCH_PROMO_CARD_SHOWN =
+                "identity_check_watch_promo_card_shown";
+
+        /**
          * Tracks if the user has interacted with the Identity Check promo notification.
          * The notification should only appear once per user via Safety Center.
          * @hide
          */
         public static final String IDENTITY_CHECK_NOTIFICATION_VIEW_DETAILS_CLICKED =
                 "identity_check_notification_view_details_clicked";
+
+        /**
+         * Tracks if the user has interacted with the Identity Check x MTL promo notification.
+         * The notification should only appear once per user via Safety Center.
+         * @hide
+         */
+        public static final String IDENTITY_CHECK_WATCH_NOTIFICATION_VIEW_DETAILS_CLICKED =
+                "identity_check_watch_notification_view_details_clicked";
     }
 
     /**
@@ -21484,6 +21529,22 @@ public final class Settings {
              * @hide
              */
             public static final int STATUS_TRAY_CONFIGURATION_SYSTEM_HIDDEN = 1;
+
+            /**
+             * Indicates that all elements of the system status tray should be rendered by the home
+             * application.
+             *
+             * @hide
+             */
+            public static final int STATUS_TRAY_CONFIGURATION_HOME_HOSTED = 2;
+
+            /**
+             * Indicates that all elements of the system status tray should be shown within system
+             * UI.
+             *
+             * @hide
+             */
+            public static final int STATUS_TRAY_CONFIGURATION_SYSTEM_UI_HOSTED = 3;
 
             /**
              * Configuration of system status tray in wear.

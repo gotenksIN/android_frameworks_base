@@ -79,6 +79,16 @@ flag {
 }
 
 flag {
+    name: "enable_add_window_decoration_to_all_tasks"
+    namespace: "lse_desktop_experience"
+    description: "Adds window decorations to all tasks, even if caption is not being shown."
+    bug: "445542519"
+    metadata {
+            purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_app_handle_position_reporting"
     namespace: "lse_desktop_experience"
     description: "Report app handle position to the SysUi."
@@ -293,6 +303,13 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enable window drag between connected displays."
     bug: "381172172"
+}
+
+flag {
+    name: "enable_consolidated_window_options"
+    namespace: "lse_desktop_experience"
+    description: "Whether to consolidate window options into MaximizeMenu"
+    bug: "411680007"
 }
 
 flag {
@@ -701,6 +718,13 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enable_desktop_windowing_free_floating_pip"
+    namespace: "lse_desktop_experience"
+    description: "Enables free-floating PiP in desktop windowing."
+    bug: "416788567"
 }
 
 flag {
@@ -1339,16 +1363,6 @@ flag {
 }
 
 flag {
-    name: "enable_shrink_window_bounds_after_drag"
-    namespace: "lse_desktop_experience"
-    description: "Enables shrinking oversize windows after dragged to a smaller display."
-    bug: "403486903"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_size_compat_mode_improvements_for_connected_displays"
     namespace: "lse_desktop_experience"
     description: "Enable some improvements in size compat mode for connected displays."
@@ -1564,16 +1578,6 @@ flag {
 }
 
 flag {
-  name: "exclude_caption_from_app_bounds"
-  namespace: "lse_desktop_experience"
-  description: "Whether caption insets are excluded from app bounds in freeform"
-  bug: "388014743"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "exclude_desk_roots_from_desktop_tasks"
   namespace: "lse_desktop_experience"
   description: "Do not include desk root tasks in freeform/desktop tasks"
@@ -1607,17 +1611,6 @@ flag {
     description: "Grant MANAGE_KEY_GESTURES permission to the recents holder."
     bug: "406452076"
     is_fixed_read_only: true
-}
-
-flag {
-    name: "ignore_override_task_bounds_if_incompatible_with_display"
-    namespace: "lse_desktop_experience"
-    description: "Ignores a tasks override bounds during the desktop launch params bounds /n"
-                 "calculation if the bounds do not fit in the displays stable bounds."
-    bug: "422364585"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

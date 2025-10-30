@@ -1948,6 +1948,7 @@ public class AudioDeviceBroker {
                 + ", applied " + mBluetoothLeSuspendedApplied);
 
         mBtHelper.dump(pw, prefix);
+        pw.println();
     }
 
     //---------------------------------------------------------------------

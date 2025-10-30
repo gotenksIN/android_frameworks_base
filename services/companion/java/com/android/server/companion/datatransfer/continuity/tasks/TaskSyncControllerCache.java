@@ -19,20 +19,22 @@ package com.android.server.companion.datatransfer.continuity.tasks;
 import android.annotation.NonNull;
 import android.app.ActivityTaskManager;
 import android.content.Context;
+import android.content.pm.PackageManager;
 
 import com.android.server.LocalServices;
-import com.android.server.companion.datatransfer.continuity.FeatureControllerCache;
+import com.android.server.companion.datatransfer.continuity.MultiUserResourceCache;
 import com.android.server.companion.datatransfer.continuity.connectivity.TaskContinuityMessenger;
 import com.android.server.wm.ActivityTaskManagerInternal;
 
 import java.util.Objects;
 
-public class TaskSyncControllerCache extends FeatureControllerCache<TaskSyncController> {
+public class TaskSyncControllerCache extends MultiUserResourceCache<TaskSyncController> {
 
     private final Context mContext;
     private final TaskContinuityMessenger mTaskContinuityMessenger;
     private final ActivityTaskManager mActivityTaskManager;
     private final ActivityTaskManagerInternal mActivityTaskManagerInternal;
+    private final PackageManager mPackageManager;
 
     public TaskSyncControllerCache(
             @NonNull Context context, @NonNull TaskContinuityMessenger taskContinuityMessenger) {
@@ -42,13 +44,21 @@ public class TaskSyncControllerCache extends FeatureControllerCache<TaskSyncCont
                 Objects.requireNonNull(context.getSystemService(ActivityTaskManager.class));
         mActivityTaskManagerInternal =
                 Objects.requireNonNull(LocalServices.getService(ActivityTaskManagerInternal.class));
+        mPackageManager = Objects.requireNonNull(context.getPackageManager());
     }
 
     @Override
-    protected TaskSyncController createFeatureControllerForUser(int userId) {
+    protected TaskSyncController createResourceForUser(int userId) {
         return new TaskSyncController(
+                userId,
                 mTaskContinuityMessenger,
-                new TaskBroadcaster(mTaskContinuityMessenger, new RunningTaskFetcher(mContext)),
+                new TaskBroadcaster(
+                        mTaskContinuityMessenger,
+                        new RunningTaskFetcher(
+                                userId,
+                                mActivityTaskManager,
+                                mActivityTaskManagerInternal,
+                                mPackageManager)),
                 new RemoteTaskStore(),
                 mActivityTaskManager,
                 mActivityTaskManagerInternal);

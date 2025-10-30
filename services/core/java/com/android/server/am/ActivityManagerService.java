@@ -489,6 +489,7 @@ import com.android.server.am.LowMemDetector.MemFactor;
 import com.android.server.am.psc.ActiveUidsInternal;
 import com.android.server.am.psc.ProcessListInternal.ProcessChangeItem;
 import com.android.server.am.psc.ProcessRecordInternal;
+import com.android.server.am.psc.UidRecordInternal;
 import com.android.server.appop.AppOpsService;
 import com.android.server.compat.PlatformCompat;
 import com.android.server.contentcapture.ContentCaptureManagerInternal;
@@ -18832,6 +18833,12 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
     }
 
+    String getBroadcastConstant(@NonNull String key) {
+        Objects.requireNonNull(key);
+        enforceCallingPermission(permission.DUMP, "getBroadcastConstant()");
+        return mBroadcastQueue.getBroadcastConstant(key);
+    }
+
     boolean shouldIgnoreDeliveryGroupPolicy(@Nullable String broadcastAction) {
         if (broadcastAction == null) {
             return false;
@@ -19762,6 +19769,47 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         public void onProcStateSeqIncremented(ActiveUidsInternal activeUids) {
             mProcessList.notifyProcStateChangedForNetworkLOSP((ActiveUids) activeUids);
+        }
+
+        @Override
+        public void onUidLastBackgroundTimeUpdated(UidRecordInternal uidRec, long nowElapsed,
+                OomAdjusterDebugLogger logger) {
+            final boolean shouldLog = logger.shouldLog(uidRec.getUid());
+            if (shouldLog) {
+                logger.logSetLastBackgroundTime(uidRec.getUid(), nowElapsed);
+            }
+            if (mDeterministicUidIdle || !mHandler.hasMessages(IDLE_UIDS_MSG)) {
+                // Note: the background settle time is in elapsed realtime, while
+                // the handler time base is uptime.  All this means is that we may
+                // stop background uids later than we had intended, but that only
+                // happens because the device was sleeping so we are okay anyway.
+                if (shouldLog) {
+                    logger.logScheduleUidIdle1(uidRec.getUid(), mConstants.BACKGROUND_SETTLE_TIME);
+                }
+                mHandler.sendEmptyMessageDelayed(IDLE_UIDS_MSG, mConstants.BACKGROUND_SETTLE_TIME);
+            }
+        }
+
+        @Override
+        public void onProcessBackgroundRestricted(ProcessRecordInternal app) {
+            mHandler.post(() -> {
+                synchronized (ActivityManagerService.this) {
+                    mServices.stopAllForegroundServicesLocked(app.uid, app.getPackageName());
+                }
+            });
+        }
+
+        @Override
+        public void onProcessCached(ProcessRecordInternal app, OomAdjusterDebugLogger logger) {
+            if (mDeterministicUidIdle || !mHandler.hasMessages(IDLE_UIDS_MSG)) {
+                if (logger.shouldLog(app.uid)) {
+                    logger.logScheduleUidIdle2(
+                            app.getUidRecord().getUid(), app.getPid(),
+                            mConstants.mKillBgRestrictedAndCachedIdleSettleTimeMs);
+                }
+                mHandler.sendEmptyMessageDelayed(IDLE_UIDS_MSG,
+                        mConstants.mKillBgRestrictedAndCachedIdleSettleTimeMs);
+            }
         }
     }
 

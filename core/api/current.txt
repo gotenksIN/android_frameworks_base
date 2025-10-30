@@ -168,6 +168,7 @@ package android {
     field public static final String MANAGE_DEVICE_POLICY_CERTIFICATES = "android.permission.MANAGE_DEVICE_POLICY_CERTIFICATES";
     field public static final String MANAGE_DEVICE_POLICY_COMMON_CRITERIA_MODE = "android.permission.MANAGE_DEVICE_POLICY_COMMON_CRITERIA_MODE";
     field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final String MANAGE_DEVICE_POLICY_CONTENT_PROTECTION = "android.permission.MANAGE_DEVICE_POLICY_CONTENT_PROTECTION";
+    field @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public static final String MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS = "android.permission.MANAGE_DEVICE_POLICY_CONTENT_RESTRICTION_APPS";
     field public static final String MANAGE_DEVICE_POLICY_DEBUGGING_FEATURES = "android.permission.MANAGE_DEVICE_POLICY_DEBUGGING_FEATURES";
     field public static final String MANAGE_DEVICE_POLICY_DEFAULT_SMS = "android.permission.MANAGE_DEVICE_POLICY_DEFAULT_SMS";
     field public static final String MANAGE_DEVICE_POLICY_DEVICE_IDENTIFIERS = "android.permission.MANAGE_DEVICE_POLICY_DEVICE_IDENTIFIERS";
@@ -4562,7 +4563,7 @@ package android.app {
     method @Deprecated public final boolean isChild();
     method public boolean isDestroyed();
     method public boolean isFinishing();
-    method @FlaggedApi("android.companion.enable_task_continuity") public final boolean isHandoffEnabled();
+    method @FlaggedApi("android.companion.task_continuity") public final boolean isHandoffEnabled();
     method public boolean isImmersive();
     method public boolean isInMultiWindowMode();
     method public boolean isInPictureInPictureMode();
@@ -4606,7 +4607,7 @@ package android.app {
     method public void onEnterAnimationComplete();
     method public boolean onGenericMotionEvent(android.view.MotionEvent);
     method public void onGetDirectActions(@NonNull android.os.CancellationSignal, @NonNull java.util.function.Consumer<java.util.List<android.app.DirectAction>>);
-    method @FlaggedApi("android.companion.enable_task_continuity") @Nullable public android.app.HandoffActivityData onHandoffActivityDataRequested(@NonNull android.app.HandoffActivityDataRequestInfo);
+    method @FlaggedApi("android.companion.task_continuity") @Nullable public android.app.HandoffActivityData onHandoffActivityDataRequested(@NonNull android.app.HandoffActivityDataRequestInfo);
     method public boolean onKeyDown(int, android.view.KeyEvent);
     method public boolean onKeyLongPress(int, android.view.KeyEvent);
     method public boolean onKeyMultiple(int, int, android.view.KeyEvent);
@@ -4708,7 +4709,7 @@ package android.app {
     method public final void setFeatureDrawableResource(int, @DrawableRes int);
     method public final void setFeatureDrawableUri(int, android.net.Uri);
     method public void setFinishOnTouchOutside(boolean);
-    method @FlaggedApi("android.companion.enable_task_continuity") public final void setHandoffEnabled(boolean);
+    method @FlaggedApi("android.companion.task_continuity") public final void setHandoffEnabled(boolean);
     method public void setImmersive(boolean);
     method public void setInheritShowWhenLocked(boolean);
     method public void setIntent(android.content.Intent);
@@ -6205,7 +6206,7 @@ package android.app {
     method public void setRequestedApplicationGrammaticalGender(int);
   }
 
-  @FlaggedApi("android.companion.enable_task_continuity") public final class HandoffActivityData implements android.os.Parcelable {
+  @FlaggedApi("android.companion.task_continuity") public final class HandoffActivityData implements android.os.Parcelable {
     method @NonNull public static android.app.HandoffActivityData createWebHandoff(@NonNull android.net.Uri);
     method public int describeContents();
     method @Nullable public android.content.ComponentName getComponentName();
@@ -6215,14 +6216,14 @@ package android.app {
     field @NonNull public static final android.os.Parcelable.Creator<android.app.HandoffActivityData> CREATOR;
   }
 
-  @FlaggedApi("android.companion.enable_task_continuity") public static final class HandoffActivityData.Builder {
+  @FlaggedApi("android.companion.task_continuity") public static final class HandoffActivityData.Builder {
     ctor public HandoffActivityData.Builder(@NonNull android.content.ComponentName);
     method @NonNull public android.app.HandoffActivityData build();
     method @NonNull public android.app.HandoffActivityData.Builder setExtras(@NonNull android.os.PersistableBundle);
     method @NonNull public android.app.HandoffActivityData.Builder setFallbackUri(@Nullable android.net.Uri);
   }
 
-  @FlaggedApi("android.companion.enable_task_continuity") public final class HandoffActivityDataRequestInfo {
+  @FlaggedApi("android.companion.task_continuity") public final class HandoffActivityDataRequestInfo {
     ctor public HandoffActivityDataRequestInfo(boolean);
     method public boolean isActiveRequest();
   }
@@ -10466,7 +10467,7 @@ package android.companion {
     field public static final String EXTRA_ASSOCIATION = "android.companion.extra.ASSOCIATION";
     field @Deprecated public static final String EXTRA_DEVICE = "android.companion.extra.DEVICE";
     field public static final int FLAG_CALL_METADATA = 1; // 0x1
-    field @FlaggedApi("android.companion.enable_task_continuity") public static final int FLAG_TASK_CONTINUITY = 2; // 0x2
+    field @FlaggedApi("android.companion.task_continuity") public static final int FLAG_TASK_CONTINUITY = 2; // 0x2
     field public static final int RESULT_CANCELED = 0; // 0x0
     field public static final int RESULT_DISCOVERY_TIMEOUT = 2; // 0x2
     field public static final int RESULT_INTERNAL_ERROR = 3; // 0x3
@@ -26099,6 +26100,7 @@ package android.media {
     method public static android.media.Ringtone getRingtone(android.content.Context, android.net.Uri);
     method public int getRingtonePosition(android.net.Uri);
     method public android.net.Uri getRingtoneUri(int);
+    method @FlaggedApi("android.media.audio.support_per_phone_account_ringtone") @Nullable public static android.net.Uri getRingtoneUriForPhoneAccountHandle(@NonNull android.content.Context, @Nullable android.telecom.PhoneAccountHandle);
     method public boolean getStopPreviousRingtone();
     method public static android.net.Uri getValidRingtoneUri(android.content.Context);
     method public boolean hasHapticChannels(int);
@@ -26109,6 +26111,7 @@ package android.media {
     method @Nullable public static android.content.res.AssetFileDescriptor openDefaultRingtoneUri(@NonNull android.content.Context, @NonNull android.net.Uri) throws java.io.FileNotFoundException;
     method public static void setActualDefaultRingtoneUri(android.content.Context, int, android.net.Uri);
     method @Deprecated public void setIncludeDrm(boolean);
+    method @FlaggedApi("android.media.audio.support_per_phone_account_ringtone") public static void setRingtoneUri(@NonNull android.content.Context, @Nullable android.net.Uri, @Nullable android.telecom.PhoneAccountHandle);
     method public void setStopPreviousRingtone(boolean);
     method public void setType(int);
     method public void stopPreviousRingtone();
@@ -38687,12 +38690,11 @@ package android.provider {
     field public static final int FLAG_WEB_LINKABLE = 4096; // 0x1000
     field public static final String MIME_TYPE_DIR = "vnd.android.document/directory";
     field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_AVAILABLE_LOCALLY = 1; // 0x1
-    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_DOWNLOAD_ERROR = 64; // 0x40
-    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_DOWNLOAD_PROGRESS = 16; // 0x10
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_DOWNLOAD_ERROR = 32; // 0x20
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_DOWNLOAD_PROGRESS = 8; // 0x8
     field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_LOCAL_CHANGES = 2; // 0x2
-    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_REMOTE_CHANGES = 4; // 0x4
-    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_UPLOAD_ERROR = 32; // 0x20
-    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_UPLOAD_PROGRESS = 8; // 0x8
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_UPLOAD_ERROR = 16; // 0x10
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_UPLOAD_PROGRESS = 4; // 0x4
   }
 
   public static final class DocumentsContract.Path implements android.os.Parcelable {
@@ -38999,6 +39001,7 @@ package android.provider {
     field public static final String ACTION_SHOW_WORK_POLICY_INFO = "android.settings.SHOW_WORK_POLICY_INFO";
     field public static final String ACTION_SOUND_SETTINGS = "android.settings.SOUND_SETTINGS";
     field @Deprecated public static final String ACTION_STORAGE_VOLUME_ACCESS_SETTINGS = "android.settings.STORAGE_VOLUME_ACCESS_SETTINGS";
+    field @FlaggedApi("android.app.supervision.flags.enable_supervision_settings_ui_updates") public static final String ACTION_SUPERVISION_SETTINGS = "android.settings.SUPERVISION_SETTINGS";
     field public static final String ACTION_SYNC_SETTINGS = "android.settings.SYNC_SETTINGS";
     field @FlaggedApi("android.provider.expose_system_update_settings") public static final String ACTION_SYSTEM_UPDATE_SETTINGS = "android.settings.SYSTEM_UPDATE_SETTINGS";
     field @FlaggedApi("android.provider.system_regional_preferences_api_enabled") public static final String ACTION_TEMPERATURE_UNIT_SETTINGS = "android.settings.TEMPERATURE_UNIT_SETTINGS";
@@ -43205,6 +43208,18 @@ package android.service.personalcontext.hint {
 
 package android.service.personalcontext.insight {
 
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ActionableInsight extends android.service.personalcontext.insight.ContextInsight {
+    method @NonNull public android.content.Intent createActionIntent();
+    method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails getDisplayDetails();
+    method public int getInsightType();
+  }
+
+  public static final class ActionableInsight.Builder {
+    ctor public ActionableInsight.Builder(@NonNull android.content.Intent, @NonNull android.service.personalcontext.insight.InsightDisplayDetails);
+    method @NonNull public android.service.personalcontext.insight.ActionableInsight build();
+    method @NonNull public android.service.personalcontext.insight.ActionableInsight.Builder setOriginHints(@NonNull java.util.List<android.service.personalcontext.hint.ContextHint>);
+  }
+
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class BundleInsight extends android.service.personalcontext.insight.ContextInsight {
     method @NonNull public android.os.Bundle getDataBundle();
     method public int getInsightType();
@@ -43221,8 +43236,26 @@ package android.service.personalcontext.insight {
     method @NonNull public final java.util.UUID getInsightId();
     method public abstract int getInsightType();
     method @NonNull public final java.util.List<android.service.personalcontext.hint.ContextHint> getOriginHints();
+    field public static final int INSIGHT_TYPE_ACTIONABLE = 2; // 0x2
     field public static final int INSIGHT_TYPE_BUNDLE = 1; // 0x1
     field public static final int INSIGHT_TYPE_ERROR = -1; // 0xffffffff
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class InsightDisplayDetails implements android.os.Parcelable {
+    method public int describeContents();
+    method @Nullable public CharSequence getContentDescription();
+    method @Nullable public android.graphics.drawable.Icon getIcon();
+    method @Nullable public CharSequence getTitle();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.insight.InsightDisplayDetails> CREATOR;
+  }
+
+  public static final class InsightDisplayDetails.Builder {
+    ctor public InsightDisplayDetails.Builder(@NonNull CharSequence);
+    ctor public InsightDisplayDetails.Builder(@NonNull android.graphics.drawable.Icon);
+    ctor public InsightDisplayDetails.Builder(@NonNull CharSequence, @NonNull android.graphics.drawable.Icon);
+    method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails build();
+    method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails.Builder setContentDescription(@Nullable CharSequence);
   }
 
 }
@@ -44844,7 +44877,7 @@ package android.telephony {
     field public static final String KEY_SUPPORTS_DEVICE_TO_DEVICE_COMMUNICATION_USING_DTMF_BOOL = "supports_device_to_device_communication_using_dtmf_bool";
     field public static final String KEY_SUPPORTS_DEVICE_TO_DEVICE_COMMUNICATION_USING_RTP_BOOL = "supports_device_to_device_communication_using_rtp_bool";
     field public static final String KEY_SUPPORTS_SDP_NEGOTIATION_OF_D2D_RTP_HEADER_EXTENSIONS_BOOL = "supports_sdp_negotiation_of_d2d_rtp_header_extensions_bool";
-    field @FlaggedApi("com.android.server.telecom.flags.is_using_unidirectional_video_service") public static final String KEY_SUPPORTS_UNIDIRECTIONAL_VIDEO_SERVICE_BOOL = "supports_unidirectional_video_service_bool";
+    field @FlaggedApi("android.telecom.flags.is_using_unidirectional_video_service") public static final String KEY_SUPPORTS_UNIDIRECTIONAL_VIDEO_SERVICE_BOOL = "supports_unidirectional_video_service_bool";
     field @FlaggedApi("com.android.server.telecom.flags.is_using_video_ringback") public static final String KEY_SUPPORTS_VIDEO_RINGBACK_BOOL = "supports_video_back_tone_bool";
     field public static final String KEY_SUPPORT_3GPP_CALL_FORWARDING_WHILE_ROAMING_BOOL = "support_3gpp_call_forwarding_while_roaming_bool";
     field public static final String KEY_SUPPORT_ADD_CONFERENCE_PARTICIPANTS_BOOL = "support_add_conference_participants_bool";

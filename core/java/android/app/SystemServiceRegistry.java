@@ -40,6 +40,8 @@ import android.app.appfunctions.AppFunctionManagerConfiguration;
 import android.app.appfunctions.IAppFunctionManager;
 import android.app.appsearch.AppSearchManagerFrameworkInitializer;
 import android.app.blob.BlobStoreManagerFrameworkInitializer;
+import android.app.contentrestriction.ContentRestrictionManager;
+import android.app.contentrestriction.IContentRestrictionManager;
 import android.app.contentsuggestions.ContentSuggestionsManager;
 import android.app.contentsuggestions.IContentSuggestionsManager;
 import android.app.contextualsearch.ContextualSearchManager;
@@ -1506,7 +1508,7 @@ public final class SystemServiceRegistry {
             }
         });
 
-        if (android.companion.Flags.enableTaskContinuity()) {
+        if (android.companion.Flags.taskContinuity()) {
             registerService(Context.TASK_CONTINUITY_SERVICE, TaskContinuityManager.class,
                     new CachedServiceFetcher<TaskContinuityManager>() {
                         @Override
@@ -1872,6 +1874,23 @@ public final class SystemServiceRegistry {
                         }
                         return new E2eeContactKeysManager(ctx);
                     }});
+
+      registerService(Context.CONTENT_RESTRICTION_SERVICE, ContentRestrictionManager.class,
+                new CachedServiceFetcher<>() {
+                    @Override
+                    public ContentRestrictionManager createService(ContextImpl ctx)
+                            throws ServiceNotFoundException {
+                        if (!android.app.contentrestriction.flags.Flags.contentRestrictionApi()) {
+                            throw new ServiceNotFoundException(
+                                    "ContentRestrictionManager is not supported");
+                        }
+                        IBinder iBinder = ServiceManager.getServiceOrThrow(
+                                Context.CONTENT_RESTRICTION_SERVICE);
+                        IContentRestrictionManager service =
+                                IContentRestrictionManager.Stub.asInterface(iBinder);
+                        return new ContentRestrictionManager(ctx, service);
+                    }
+                });
 
         registerService(Context.SUPERVISION_SERVICE, SupervisionManager.class,
                 new CachedServiceFetcher<>() {

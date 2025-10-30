@@ -165,6 +165,7 @@ import com.android.server.connectivity.PacProxyService;
 import com.android.server.content.ContentService;
 import com.android.server.contentcapture.ContentCaptureManagerInternal;
 import com.android.server.contentcapture.ContentCaptureManagerService;
+import com.android.server.contentrestriction.ContentRestrictionService;
 import com.android.server.contentsuggestions.ContentSuggestionsManagerService;
 import com.android.server.contextualsearch.ContextualSearchManagerService;
 import com.android.server.coverage.CoverageService;
@@ -1696,6 +1697,12 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(ROLE_SERVICE_CLASS);
             t.traceEnd();
 
+            if (android.app.contentrestriction.flags.Flags.contentRestrictionApi()) {
+                t.traceBegin("StartContentRestrictionService");
+                mSystemServiceManager.startService(ContentRestrictionService.Lifecycle.class);
+                t.traceEnd();
+            }
+
             t.traceBegin("StartSupervisionService");
             mSystemServiceManager.startService(SupervisionService.Lifecycle.class);
             t.traceEnd();
@@ -1968,15 +1975,13 @@ public final class SystemServer implements Dumpable {
         }
         t.traceEnd();
 
-        if (com.android.window.flags.Flags.restoreUserAspectRatioSettingsUsingService()) {
-            t.traceBegin("StartUAppWindowLayoutSettingsService");
-            try {
-                mSystemServiceManager.startService(AppWindowLayoutSettingsService.class);
-            } catch (Throwable e) {
-                reportWtf("starting AppWindowLayoutSettingsService service", e);
-            }
-            t.traceEnd();
+        t.traceBegin("StartUAppWindowLayoutSettingsService");
+        try {
+            mSystemServiceManager.startService(AppWindowLayoutSettingsService.class);
+        } catch (Throwable e) {
+            reportWtf("starting AppWindowLayoutSettingsService service", e);
         }
+        t.traceEnd();
 
         t.traceBegin("StartGrammarInflectionService");
         try {
@@ -2704,7 +2709,7 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (android.companion.Flags.enableTaskContinuity()) {
+            if (android.companion.Flags.taskContinuity()) {
                 t.traceBegin("StartTaskContinuityService");
                 mSystemServiceManager.startService(TaskContinuityManagerService.class);
                 t.traceEnd();

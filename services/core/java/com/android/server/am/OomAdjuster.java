@@ -25,6 +25,7 @@ import static android.app.ActivityManager.PROCESS_CAPABILITY_ALL;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_ALL_IMPLICIT;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_BFSL;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_CPU_TIME;
+import static android.app.ActivityManager.PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_NONE;
 import static android.app.ActivityManager.PROCESS_STATE_BOUND_FOREGROUND_SERVICE;
@@ -85,7 +86,6 @@ import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_PSS;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_UID_OBSERVERS;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_USAGE_STATS;
 import static com.android.server.am.ActivityManagerService.FOLLOW_UP_OOMADJUSTER_UPDATE_MSG;
-import static com.android.server.am.ActivityManagerService.IDLE_UIDS_MSG;
 import static com.android.server.am.ActivityManagerService.TAG_LRU;
 import static com.android.server.am.ActivityManagerService.TAG_OOM_ADJ;
 import static com.android.server.am.ActivityManagerService.TAG_UID_OBSERVERS;
@@ -455,6 +455,16 @@ public abstract class OomAdjuster {
 
         /** Notifies when the process state sequence number has been incremented for active UIDs. */
         void onProcStateSeqIncremented(ActiveUidsInternal activeUids);
+
+        /** Notifies when the {@link UidRecordInternal}'s last background time is updated. */
+        void onUidLastBackgroundTimeUpdated(UidRecordInternal uidRec, long nowElapsed,
+                OomAdjusterDebugLogger logger);
+
+        /** Notifies when a process becomes effectively background restricted. */
+        void onProcessBackgroundRestricted(ProcessRecordInternal app);
+
+        /** Notifies when a process transitions to a cached state. */
+        void onProcessCached(ProcessRecordInternal app, OomAdjusterDebugLogger logger);
     }
 
     @VisibleForTesting
@@ -1468,22 +1478,7 @@ public abstract class OomAdjuster {
                                 || uidRec.isSetAllowListed()
                                 || uidRec.getLastBackgroundTime() == 0) {
                             uidRec.setLastBackgroundTime(nowElapsed);
-                            if (shouldLog) {
-                                mLogger.logSetLastBackgroundTime(uidRec.getUid(), nowElapsed);
-                            }
-                            if (mService.mDeterministicUidIdle
-                                    || !mService.mHandler.hasMessages(IDLE_UIDS_MSG)) {
-                                // Note: the background settle time is in elapsed realtime, while
-                                // the handler time base is uptime.  All this means is that we may
-                                // stop background uids later than we had intended, but that only
-                                // happens because the device was sleeping so we are okay anyway.
-                                if (shouldLog) {
-                                    mLogger.logScheduleUidIdle1(uidRec.getUid(),
-                                            mConstants.BACKGROUND_SETTLE_TIME);
-                                }
-                                mService.mHandler.sendEmptyMessageDelayed(IDLE_UIDS_MSG,
-                                        mConstants.BACKGROUND_SETTLE_TIME); // XXX
-                            }
+                            mCallback.onUidLastBackgroundTimeUpdated(uidRec, nowElapsed, mLogger);
                         }
                         if (uidRec.isIdle() && !uidRec.isSetIdle()) {
                             uidChange |= UidRecord.CHANGE_IDLE;
@@ -2147,6 +2142,17 @@ public abstract class OomAdjuster {
         return clientCpuCaps;
     }
 
+    /**
+     * @return the audio capability from a client (of a service binding or provider).
+     */
+    protected int getAudioCapabilitiesFromClient(ProcessRecordInternal client) {
+        // Similar to bfsl/cpu, there isn't a compelling reason to prevent the capability
+        // to control/play audio from propagating through binds: if the client has the
+        // capability, we generally want the service it binds to to hold the capability as well
+        // (e.g. TTS).
+        return client.getCurCapability() & PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL;
+    }
+
     /** Inform the oomadj observer of changes to oomadj. Used by tests. */
     @GuardedBy("mService")
     protected void reportOomAdjMessageLocked(String tag, String msg) {
@@ -2416,12 +2422,7 @@ public abstract class OomAdjuster {
         if (curBoundByNonBgRestrictedApp != state.isSetBoundByNonBgRestrictedApp()) {
             state.setSetBoundByNonBgRestrictedApp(curBoundByNonBgRestrictedApp);
             if (!curBoundByNonBgRestrictedApp && state.isBackgroundRestricted()) {
-                mService.mHandler.post(() -> {
-                    synchronized (mService) {
-                        mService.mServices.stopAllForegroundServicesLocked(
-                                state.uid, state.getPackageName());
-                    }
-                });
+                mCallback.onProcessBackgroundRestricted(state);
             }
         }
 
@@ -2435,16 +2436,7 @@ public abstract class OomAdjuster {
             // process became eligible and then schedule a check for eligible processes after
             // a background settling time, if needed.
             state.setLastCachedTime(nowElapsed);
-            if (mService.mDeterministicUidIdle
-                    || !mService.mHandler.hasMessages(IDLE_UIDS_MSG)) {
-                if (mLogger.shouldLog(state.uid)) {
-                    mLogger.logScheduleUidIdle2(
-                            uidRec.getUid(), state.getPid(),
-                            mConstants.mKillBgRestrictedAndCachedIdleSettleTimeMs);
-                }
-                mService.mHandler.sendEmptyMessageDelayed(IDLE_UIDS_MSG,
-                        mConstants.mKillBgRestrictedAndCachedIdleSettleTimeMs);
-            }
+            mCallback.onProcessCached(state, mLogger);
         }
         state.setSetCached(state.isCached());
         if (((oldProcState != state.getSetProcState()) || (oldOomAdj != state.getSetAdj()))

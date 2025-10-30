@@ -954,6 +954,10 @@ package android.companion.virtual {
     method public void playSoundEffect(int, int);
   }
 
+  public static interface VirtualDeviceManager.ActivityListener {
+    method public default void onActivityLaunchRequested(int, @NonNull android.content.ComponentName, int);
+  }
+
   public final class VirtualDeviceParams implements android.os.Parcelable {
     field public static final int DEVICE_POLICY_INVALID = -1; // 0xffffffff
   }
@@ -4334,6 +4338,14 @@ package android.view.textservice {
 
   public final class SpellCheckerSubtype implements android.os.Parcelable {
     field public static final int SUBTYPE_ID_NONE = 0; // 0x0
+  }
+
+}
+
+package android.webkit {
+
+  public final class WebViewDelegate {
+    ctor @FlaggedApi("android.webkit.selection_action_menu_client") public WebViewDelegate();
   }
 
 }

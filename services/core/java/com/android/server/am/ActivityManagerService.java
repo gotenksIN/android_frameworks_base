@@ -8481,6 +8481,17 @@ public class ActivityManagerService extends IActivityManager.Stub
                         setThreadPriority(proc.getRenderThreadTid(),
                             THREAD_PRIORITY_TOP_APP_BOOST);
                     }
+
+                    if (mOomAdjuster.mUsePerfCoreAffinity) {
+                        if (!proc.info.isSystemApp() && !proc.info.isUpdatedSystemApp()
+                                && proc.processName.equals(proc.info.packageName)) {
+                            try {
+                                Process.setPerfCoreAffinity(proc.getRenderThreadTid(), true);
+                            } catch (Exception e) {
+                                Slog.e("UI_Affinity", "Failed to set perf core affinity", e);
+                            }
+                        }
+                    }
                 }
             } else {
                 if (DEBUG_OOM_ADJ) {

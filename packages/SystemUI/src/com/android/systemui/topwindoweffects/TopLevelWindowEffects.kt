@@ -112,7 +112,7 @@ constructor(
                                 isGestureOngoing = false
                                 squeezeProgress = 0f
                                 setRequestTopUi(false)
-                            } else {
+                            } else if (gestureProgress.progress > 0f) {
                                 if (!isGestureOngoing) {
                                     isGestureOngoing = true
                                     setRequestTopUi(true)

@@ -517,6 +517,7 @@ java_aconfig_library {
     apex_available: [
         "//apex_available:platform",
         "com.android.conscrypt",
+        "com.android.permission",
         "com.android.tethering",
         "com.android.wifi",
     ],
@@ -883,6 +884,11 @@ cc_aconfig_library {
             enabled: true,
         },
     },
+    min_sdk_version: "apex_inherit",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.webapp",
+    ],
 }
 
 // Media BetterTogether
@@ -920,6 +926,13 @@ aconfig_declarations {
 java_aconfig_library {
     name: "com.android.media.flags.editing-aconfig-java",
     aconfig_declarations: "com.android.media.flags.editing-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+java_aconfig_library {
+    name: "com.android.media.flags.editing-aconfig-java-host",
+    aconfig_declarations: "com.android.media.flags.editing-aconfig",
+    host_supported: true,
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 

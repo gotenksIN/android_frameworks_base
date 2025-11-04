@@ -279,8 +279,14 @@ sealed interface TransitionState {
         /** Whether user input is currently driving the transition. */
         abstract val isUserInputOngoing: Boolean
 
-        /** Additional gesture context whenever the transition is driven by a user gesture. */
-        abstract val gestureContext: GestureContext?
+        /**
+         * Provides contextual information to fine-tune animations.
+         *
+         * This is used to adjust motion based on details that cannot be inferred from the states
+         * alone, such as gesture velocity or the direction of the animation.
+         */
+        open val gestureContext: GestureContext?
+            get() = transformationSpec.defaultGestureContext
 
         /**
          * True when the transition reached the end and the progress won't be updated anymore.
@@ -301,13 +307,13 @@ sealed interface TransitionState {
          * also be less than `0` or greater than `1` when using transitions with a spring
          * AnimationSpec or when flinging quickly during a swipe gesture.
          */
-        internal open val previewProgress: Float = 0f
+        open val previewProgress: Float = 0f
 
         /** The current velocity of [previewProgress], in progress units. */
-        internal open val previewProgressVelocity: Float = 0f
+        open val previewProgressVelocity: Float = 0f
 
         /** Whether the transition is currently in the preview stage */
-        internal open val isInPreviewStage: Boolean = false
+        open val isInPreviewStage: Boolean = false
 
         /**
          * The current [TransformationSpecImpl] and other values associated to this transition from

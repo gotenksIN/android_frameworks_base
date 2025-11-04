@@ -44,6 +44,7 @@ import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteract
 import com.android.systemui.deviceentry.shared.model.DeviceUnlockSource
 import com.android.systemui.kairos.internal.util.fastForEach
 import com.android.systemui.keyguard.DismissCallbackRegistry
+import com.android.systemui.keyguard.domain.interactor.KeyguardDismissActionInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardEnabledInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardOcclusionInteractor
@@ -160,6 +161,7 @@ constructor(
     private val shadeDisplaysInteractor: Lazy<ShadeDisplaysInteractor>,
     private val surfaceBehindInteractor: KeyguardSurfaceBehindInteractor,
     private val lockscreenUserManager: NotificationLockscreenUserManager,
+    private val keyguardDismissActionInteractor: KeyguardDismissActionInteractor,
 ) : CoreStartable {
     private val centralSurfaces: CentralSurfaces?
         get() = centralSurfacesOptLazy.get().getOrNull()
@@ -400,39 +402,37 @@ constructor(
 
     private fun handleSimUnlock() {
         applicationScope.launch {
-            simBouncerInteractor
-                .get()
-                .isAnySimSecure
-                .sample(deviceUnlockedInteractor.deviceUnlockStatus, ::Pair)
-                .collect { (isAnySimLocked, unlockStatus) ->
-                    when {
-                        isAnySimLocked -> {
-                            sceneInteractor.showOverlay(
-                                overlay = Overlays.Bouncer,
-                                loggingReason = "Need to authenticate locked SIM card.",
-                            )
-                        }
-                        unlockStatus.isUnlocked &&
-                            deviceEntryInteractor.canSwipeToEnter.value == false -> {
-                            val loggingReason =
-                                "All SIM cards unlocked and device already unlocked and" +
-                                    " lockscreen doesn't require a swipe to dismiss."
-                            switchToScene(
-                                targetSceneKey = Scenes.Gone,
-                                loggingReason = loggingReason,
-                            )
-                        }
-                        else -> {
-                            val loggingReason =
-                                "All SIM cards unlocked and device still locked" +
-                                    " or lockscreen still requires a swipe to dismiss."
-                            switchToScene(
-                                targetSceneKey = Scenes.Lockscreen,
-                                loggingReason = loggingReason,
-                            )
-                        }
+            simBouncerInteractor.get().isAnySimSecure.collect { isAnySimLocked ->
+                val unlockStatus = deviceUnlockedInteractor.deviceUnlockStatus.value
+                when {
+                    isAnySimLocked -> {
+                        switchToScene(
+                            targetSceneKey = Scenes.Lockscreen,
+                            loggingReason = "SIM unlock required",
+                        )
+                        sceneInteractor.showOverlay(
+                            overlay = Overlays.Bouncer,
+                            loggingReason = "Need to authenticate locked SIM card.",
+                        )
+                    }
+                    unlockStatus.isUnlocked &&
+                        deviceEntryInteractor.canSwipeToEnter.value == false -> {
+                        val loggingReason =
+                            "All SIM cards unlocked and device already unlocked and" +
+                                " lockscreen doesn't require a swipe to dismiss."
+                        switchToScene(targetSceneKey = Scenes.Gone, loggingReason = loggingReason)
+                    }
+                    else -> {
+                        val loggingReason =
+                            "All SIM cards unlocked and device still locked" +
+                                " or lockscreen still requires a swipe to dismiss."
+                        switchToScene(
+                            targetSceneKey = Scenes.Lockscreen,
+                            loggingReason = loggingReason,
+                        )
                     }
                 }
+            }
         }
     }
 
@@ -495,7 +495,11 @@ constructor(
                     ) {
                         uiEventLogger.log(BouncerUiEvent.BOUNCER_DISMISS_EXTENDED_ACCESS)
                     }
+
                     val leaveShadeOpen = statusBarStateController.leaveOpenOnKeyguardHide()
+                    val willAnimateDismissAction =
+                        keyguardDismissActionInteractor.willAnimateDismissActionOnLockscreen.value
+
                     when {
                         isAlternateBouncerVisible -> {
                             // When the device becomes unlocked when the alternate bouncer is
@@ -543,7 +547,18 @@ constructor(
                                             HideOverlayCommand.HideAll
                                         },
                                     loggingReason = loggingReason,
-                                    instantlySnapScenes = true,
+                                    // Only snap instantly if we don't need to run the transition
+                                    // for the dismiss animation.
+                                    instantlySnapScenes = !willAnimateDismissAction,
+                                )
+                            } else if (targetScene == Scenes.Shade && willAnimateDismissAction) {
+                                SwitchSceneCommand.SwitchToScene(
+                                    targetSceneKey = Scenes.Gone,
+                                    loggingReason =
+                                        "device was unlocked with primary bouncer" +
+                                            " showing, from shade, and we're animating the" +
+                                            " dismiss (from Shade -> Gone)",
+                                    instantlySnapScenes = false,
                                 )
                             } else {
                                 if (previousScene.value != Scenes.Gone) {
@@ -669,7 +684,7 @@ constructor(
                             )
                         }
                     } else if (
-                        authenticationInteractor.get().getAuthenticationMethod() ==
+                        authenticationInteractor.get().authenticationMethod.value ==
                             AuthenticationMethodModel.Sim
                     ) {
                         sceneInteractor.showOverlay(

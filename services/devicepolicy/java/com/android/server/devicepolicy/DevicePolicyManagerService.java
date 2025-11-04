@@ -12812,7 +12812,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
 
         synchronized (getLockObject()) {
             ActiveAdmin admin = getProfileOwnerOrDeviceOwnerLocked(caller.getUserId());
-            admin.permittedAccessiblityServices = packageList;
+            admin.mPermittedAccessibilityServices = packageList;
             saveSettingsLocked(UserHandle.getCallingUserId());
         }
         final String[] packageArray =
@@ -12837,7 +12837,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
 
         synchronized (getLockObject()) {
             ActiveAdmin admin = getProfileOwnerOrDeviceOwnerLocked(caller.getUserId());
-            return admin.permittedAccessiblityServices;
+            return admin.mPermittedAccessibilityServices;
         }
     }
 
@@ -12863,7 +12863,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 final int N = policy.mAdminList.size();
                 for (int j = 0; j < N; j++) {
                     ActiveAdmin admin = policy.mAdminList.get(j);
-                    List<String> fromAdmin = admin.permittedAccessiblityServices;
+                    List<String> fromAdmin = admin.mPermittedAccessibilityServices;
                     if (fromAdmin != null) {
                         if (result == null) {
                             result = new ArrayList<>(fromAdmin);
@@ -12923,11 +12923,11 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             if (admin == null) {
                 return false;
             }
-            if (admin.permittedAccessiblityServices == null) {
+            if (admin.mPermittedAccessibilityServices == null) {
                 return true;
             }
             return checkPackagesInPermittedListOrSystem(Collections.singletonList(packageName),
-                    admin.permittedAccessiblityServices, userHandle);
+                    admin.mPermittedAccessibilityServices, userHandle);
         }
     }
 
@@ -18481,10 +18481,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             Preconditions.checkCallAuthorization(
                     mPermissions.hasPermission(MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY, caller),
                     "Permission MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY is required to set the "
-                            + "Organization ID.");
+                            + "Organization name.");
             Preconditions.checkState(
                     isDeviceManagedUnchecked() || hasProfileOwner(caller.getUserId()),
-                    "Organization ID can only be set on managed device or profile.");
+                    "Organization name can only be set on managed device or profile.");
         } else {
             Objects.requireNonNull(who, "ComponentName is null");
             caller = getCallerIdentity(who);
@@ -18513,15 +18513,31 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (!mHasFeature) {
             return null;
         }
-        CallerIdentity caller = getCallerIdentity(who);
+        CallerIdentity caller;
 
-        Objects.requireNonNull(who, "ComponentName is null");
-        Preconditions.checkCallingUser(isManagedProfile(caller.getUserId()));
-        Preconditions.checkCallAuthorization(isDeviceOwner(caller) || isProfileOwner(caller));
+        if (Flags.multiUserManagementDeviceProvisioning()) {
+            caller = getCallerIdentity(who, callerPackageName);
+            Preconditions.checkState(
+                    isDeviceManagedUnchecked() || hasProfileOwner(caller.getUserId()),
+                    "Organization name can only be read on managed device or profile.");
+            Preconditions.checkCallAuthorization(
+                    mPermissions.hasPermission(MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY, caller),
+                    "Permission MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY is required to read the "
+                            + "Organization Name.");
+        } else {
+            caller = getCallerIdentity(who);
+            Objects.requireNonNull(who, "ComponentName is null");
+            Preconditions.checkCallingUser(isManagedProfile(caller.getUserId()));
+            Preconditions.checkCallAuthorization(isDeviceOwner(caller) || isProfileOwner(caller));
+        }
 
         ActiveAdmin admin;
         synchronized (getLockObject()) {
-            admin = getProfileOwnerOrDeviceOwnerLocked(caller.getUserId());
+            if (Flags.multiUserManagementDeviceProvisioning()) {
+                admin = getActiveAdminUncheckedLocked(caller);
+            } else {
+                admin = getProfileOwnerOrDeviceOwnerLocked(caller.getUserId());
+            }
         }
 
         return admin.organizationName;

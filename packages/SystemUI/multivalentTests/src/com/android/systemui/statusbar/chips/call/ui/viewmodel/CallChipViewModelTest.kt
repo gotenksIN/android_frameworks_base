@@ -23,7 +23,6 @@ import android.content.Intent
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.FlagsParameterization
-import android.view.View
 import androidx.test.filters.SmallTest
 import com.android.internal.logging.InstanceId
 import com.android.systemui.SysuiTestCase
@@ -40,7 +39,6 @@ import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
-import com.android.systemui.plugins.activityStarter
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.chips.StatusBarChipsReturnAnimations
@@ -53,9 +51,6 @@ import com.android.systemui.statusbar.core.StatusBarRootModernization
 import com.android.systemui.statusbar.notification.data.repository.UnconfinedFakeHeadsUpRowRepository
 import com.android.systemui.statusbar.notification.headsup.PinnedStatus
 import com.android.systemui.statusbar.notification.stack.data.repository.headsUpNotificationRepository
-import com.android.systemui.statusbar.phone.ongoingcall.DisableChipsModernization
-import com.android.systemui.statusbar.phone.ongoingcall.EnableChipsModernization
-import com.android.systemui.statusbar.phone.ongoingcall.StatusBarChipsModernization
 import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallTestHelper
 import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallTestHelper.addOngoingCallState
 import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallTestHelper.callPromotedContentBuilder
@@ -69,7 +64,6 @@ import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import platform.test.runner.parameterized.ParameterizedAndroidJunit4
 import platform.test.runner.parameterized.Parameters
@@ -89,15 +83,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     private val chipBackgroundView = mock<ChipBackgroundContainer>()
-    private val chipView =
-        mock<View>().apply {
-            whenever(
-                    this.requireViewById<ChipBackgroundContainer>(
-                        R.id.ongoing_activity_chip_background
-                    )
-                )
-                .thenReturn(chipBackgroundView)
-        }
     private val mockExpandable: Expandable =
         mock<Expandable>().apply { whenever(dialogTransitionController(any())).thenReturn(mock()) }
 
@@ -286,7 +271,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @EnableChipsModernization
     fun chip_twoCallNotifs_earlierIsUsed() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -321,7 +305,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
     @Test
     @DisableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
     @EnableFlags(StatusBarCallChipUseIsHidden.FLAG_NAME)
-    @EnableChipsModernization
     fun chipLegacy_useIsHidden_inCallWithVisibleApp_zeroStartTime_isHiddenAsIconOnly() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -338,7 +321,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
-    @EnableChipsModernization
     fun chipWithReturnAnimation_inCallWithVisibleApp_zeroStartTime_isHiddenAsIconOnly() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -364,7 +346,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
-    @EnableChipsModernization
     fun chipWithReturnAnimation_inCallWithVisibleApp_negativeStartTime_isHiddenAsIconOnly() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -379,7 +360,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @EnableFlags(StatusBarCallChipUseIsHidden.FLAG_NAME)
-    @EnableChipsModernization
     @DisableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
     fun chipLegacy_useIsHidden_animationsDisabled_negativeStartTime_isHiddenAsIconOnly() =
         kosmos.runTest {
@@ -408,7 +388,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
-    @EnableChipsModernization
     fun chipWithReturnAnimation_inCallWithVisibleApp_positiveStartTime_isHiddenAsTimer() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -423,7 +402,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @EnableFlags(StatusBarCallChipUseIsHidden.FLAG_NAME)
-    @EnableChipsModernization
     @DisableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
     fun chipLegacy_useIsHidden_animationsDisabled_positiveStartTime_isHiddenAsTimer() =
         kosmos.runTest {
@@ -650,72 +628,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @DisableChipsModernization
-    fun chip_inCall_nullIntent_chipsModFlagOff_clickingChipNotifiesInteractor() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-            val latestChipTapKey by
-                collectLastValue(
-                    statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent
-                )
-
-            addOngoingCallState(key = "fakeCallKey", contentIntent = null)
-
-            val clickListener = (latest as OngoingActivityChipModel.Active).onClickListenerLegacy
-            assertThat(clickListener).isNotNull()
-
-            clickListener!!.onClick(chipView)
-
-            assertThat(latestChipTapKey).isEqualTo("fakeCallKey")
-        }
-
-    @Test
-    @DisableChipsModernization
-    fun chip_inCall_positiveStartTime_validIntent_chipsModFlagOff_clickingChipNotifiesInteractor() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-            val latestChipTapKey by
-                collectLastValue(
-                    statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent
-                )
-
-            val pendingIntent = mock<PendingIntent>()
-            addOngoingCallState(
-                key = "fakeCallKey",
-                startTimeMs = 1000,
-                contentIntent = pendingIntent,
-            )
-            val clickListener = (latest as OngoingActivityChipModel.Active).onClickListenerLegacy
-            assertThat(clickListener).isNotNull()
-
-            clickListener!!.onClick(chipView)
-
-            assertThat(latestChipTapKey).isEqualTo("fakeCallKey")
-        }
-
-    @Test
-    @DisableChipsModernization
-    fun chip_inCall_zeroStartTime_validIntent_chipsModFlagOff_clickingChipNotifiesInteractor() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-            val latestChipTapKey by
-                collectLastValue(
-                    statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent
-                )
-
-            val pendingIntent = mock<PendingIntent>()
-            addOngoingCallState(key = "fakeCallKey", startTimeMs = 0, contentIntent = pendingIntent)
-            val clickListener = (latest as OngoingActivityChipModel.Active).onClickListenerLegacy
-
-            assertThat(clickListener).isNotNull()
-
-            clickListener!!.onClick(chipView)
-
-            assertThat(latestChipTapKey).isEqualTo("fakeCallKey")
-        }
-
-    @Test
-    @EnableChipsModernization
     fun chip_inCall_nullIntent_chipsModFlagOn_clickingChipNotifiesInteractor() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -739,8 +651,7 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @EnableChipsModernization
-    fun chip_inCall_positiveStartTime_validIntent_chipsModFlagOn_clickingChipNotifiesInteractor() =
+    fun chip_inCall_positiveStartTime_validIntent_clickingChipNotifiesInteractor() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
             val latestChipTapKey by
@@ -767,8 +678,7 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @EnableChipsModernization
-    fun chip_inCall_zeroStartTime_validIntent_chipsModFlagOn_clickingChipNotifiesInteractor() =
+    fun chip_inCall_zeroStartTime_validIntent_clickingChipNotifiesInteractor() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
             val latestChipTapKey by
@@ -791,7 +701,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @EnableChipsModernization
     fun chip_inCall_noHun_clickBehaviorIsShowHun() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -807,7 +716,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @EnableChipsModernization
     fun chip_inCall_hunPinnedBySystem_clickBehaviorIsShowHun() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -828,7 +736,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @EnableChipsModernization
     fun chip_inCall_hunPinnedByUser_forDifferentChip_clickBehaviorIsShowHun() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -849,7 +756,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @EnableChipsModernization
     fun chip_inCall_hunPinnedByUser_forThisChip_clickBehaviorIsHideHun() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -872,7 +778,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
     // We don't have any custom launch animation, we only have the return animation.
     @Test
     @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
-    @EnableChipsModernization
     fun chipWithReturnAnimation_updatesCorrectly_withStateAndTransitionState() =
         kosmos.runTest {
             val pendingIntent = mock<PendingIntent>()
@@ -967,7 +872,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
-    @EnableChipsModernization
     fun chipWithReturnAnimation_updatesCorrectly_whenAppIsLaunchedAndClosedWithoutAnimation() =
         kosmos.runTest {
             val pendingIntent = mock<PendingIntent>()
@@ -1048,7 +952,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
-    @EnableChipsModernization
     fun chipWithReturnAnimation_chipDataChangesMidTransition() =
         kosmos.runTest {
             val pendingIntent = mock<PendingIntent>()
@@ -1132,7 +1035,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
 
     @Test
     @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
-    @EnableChipsModernization
     fun chipWithReturnAnimation_chipDisappearsMidTransition() =
         kosmos.runTest {
             val pendingIntent = mock<PendingIntent>()
@@ -1217,7 +1119,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
                     FlagsParameterization.allCombinationsOf(
                         StatusBarCallChipUseIsHidden.FLAG_NAME,
                         StatusBarRootModernization.FLAG_NAME,
-                        StatusBarChipsModernization.FLAG_NAME,
                         StatusBarChipsReturnAnimations.FLAG_NAME,
                     )
                 )

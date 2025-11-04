@@ -144,6 +144,7 @@ package android {
     field public static final String LAUNCH_MULTI_PANE_SETTINGS_DEEP_LINK = "android.permission.LAUNCH_MULTI_PANE_SETTINGS_DEEP_LINK";
     field public static final String LOADER_USAGE_STATS = "android.permission.LOADER_USAGE_STATS";
     field public static final String LOCATION_HARDWARE = "android.permission.LOCATION_HARDWARE";
+    field @FlaggedApi("android.security.app_lock_apis") public static final String LOCK_APPS = "android.permission.LOCK_APPS";
     field public static final String MANAGE_DEVICE_LOCK_STATE = "android.permission.MANAGE_DEVICE_LOCK_STATE";
     field public static final String MANAGE_DEVICE_POLICY_ACCESSIBILITY = "android.permission.MANAGE_DEVICE_POLICY_ACCESSIBILITY";
     field public static final String MANAGE_DEVICE_POLICY_ACCOUNT_MANAGEMENT = "android.permission.MANAGE_DEVICE_POLICY_ACCOUNT_MANAGEMENT";
@@ -350,6 +351,7 @@ package android {
     field @Deprecated public static final String USE_FINGERPRINT = "android.permission.USE_FINGERPRINT";
     field public static final String USE_FULL_SCREEN_INTENT = "android.permission.USE_FULL_SCREEN_INTENT";
     field public static final String USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER = "android.permission.USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER";
+    field @FlaggedApi("android.permission.flags.use_loopback_interface_permission_enabled") public static final String USE_LOOPBACK_INTERFACE = "android.permission.USE_LOOPBACK_INTERFACE";
     field @FlaggedApi("com.android.window.flags.enable_interactive_picture_in_picture") public static final String USE_PINNED_WINDOWING_LAYER = "android.permission.USE_PINNED_WINDOWING_LAYER";
     field public static final String USE_SIP = "android.permission.USE_SIP";
     field public static final String UWB_RANGING = "android.permission.UWB_RANGING";
@@ -4709,7 +4711,7 @@ package android.app {
     method public final void setFeatureDrawableResource(int, @DrawableRes int);
     method public final void setFeatureDrawableUri(int, android.net.Uri);
     method public void setFinishOnTouchOutside(boolean);
-    method @FlaggedApi("android.companion.task_continuity") public final void setHandoffEnabled(boolean);
+    method @FlaggedApi("android.companion.task_continuity") public final void setHandoffEnabled(boolean, @Nullable android.app.HandoffActivityParams);
     method public void setImmersive(boolean);
     method public void setInheritShowWhenLocked(boolean);
     method public void setIntent(android.content.Intent);
@@ -6226,6 +6228,19 @@ package android.app {
   @FlaggedApi("android.companion.task_continuity") public final class HandoffActivityDataRequestInfo {
     ctor public HandoffActivityDataRequestInfo(boolean);
     method public boolean isActiveRequest();
+  }
+
+  @FlaggedApi("android.companion.task_continuity") public final class HandoffActivityParams implements android.os.Parcelable {
+    method public int describeContents();
+    method public boolean isAllowHandoffWithoutPackageInstalled();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.HandoffActivityParams> CREATOR;
+  }
+
+  @FlaggedApi("android.companion.task_continuity") public static final class HandoffActivityParams.Builder {
+    ctor public HandoffActivityParams.Builder();
+    method @NonNull public android.app.HandoffActivityParams build();
+    method @NonNull public android.app.HandoffActivityParams.Builder setAllowHandoffWithoutPackageInstalled(boolean);
   }
 
   public class Instrumentation {
@@ -10118,6 +10133,14 @@ package android.app.usage {
 
 }
 
+package android.app.voiceinteraction {
+
+  @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") public class VoiceInteractionManager {
+    method @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") @NonNull public android.content.Intent createRequestAssistStructureIntent();
+  }
+
+}
+
 package android.app.wallpaper {
 
   public final class WallpaperDescription implements android.os.Parcelable {
@@ -11442,6 +11465,7 @@ package android.content {
     field public static final String NETWORK_STATS_SERVICE = "netstats";
     field public static final String NFC_SERVICE = "nfc";
     field public static final String NOTIFICATION_SERVICE = "notification";
+    field @FlaggedApi("com.android.npumanager.npumanager_enabled") public static final String NPU_SERVICE = "npu";
     field public static final String NSD_SERVICE = "servicediscovery";
     field public static final String OVERLAY_SERVICE = "overlay";
     field public static final String PEOPLE_SERVICE = "people";
@@ -12142,6 +12166,7 @@ package android.content {
     field public static final String EXTRA_USER = "android.intent.extra.USER";
     field public static final String EXTRA_USER_INITIATED = "android.intent.extra.USER_INITIATED";
     field public static final String EXTRA_USE_STYLUS_MODE = "android.intent.extra.USE_STYLUS_MODE";
+    field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String EXTRA_USE_SYSTEM_CONTACTS_PICKER = "android.intent.extra.USE_SYSTEM_CONTACTS_PICKER";
     field public static final int FILL_IN_ACTION = 1; // 0x1
     field public static final int FILL_IN_CATEGORIES = 4; // 0x4
     field public static final int FILL_IN_CLIP_DATA = 128; // 0x80
@@ -12949,6 +12974,8 @@ package android.content.pm {
     field public String deviceProtectedDataDir;
     field public boolean enabled;
     field public int flags;
+    field @FlaggedApi("android.security.app_lock_apis") public boolean isAppLockEnabled;
+    field @FlaggedApi("android.security.app_lock_apis") public boolean isAppLockSupported;
     field public int largestWidthLimitDp;
     field public String manageSpaceActivityName;
     field public int minSdkVersion;
@@ -13694,6 +13721,7 @@ package android.content.pm {
     method public abstract int getComponentEnabledSetting(@NonNull android.content.ComponentName);
     method @NonNull public abstract android.graphics.drawable.Drawable getDefaultActivityIcon();
     method @Nullable public abstract android.graphics.drawable.Drawable getDrawable(@NonNull String, @DrawableRes int, @Nullable android.content.pm.ApplicationInfo);
+    method @FlaggedApi("android.security.app_lock_apis") @Nullable @RequiresPermission(android.Manifest.permission.LOCK_APPS) public android.app.PendingIntent getEnableAppLockIntentForPackage(@NonNull String, boolean);
     method public void getGroupOfPlatformPermission(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.String>);
     method @NonNull public android.content.pm.InstallSourceInfo getInstallSourceInfo(@NonNull String) throws android.content.pm.PackageManager.NameNotFoundException;
     method @NonNull public abstract java.util.List<android.content.pm.ApplicationInfo> getInstalledApplications(int);
@@ -13984,6 +14012,7 @@ package android.content.pm {
     field public static final int FLAG_PERMISSION_WHITELIST_SYSTEM = 1; // 0x1
     field public static final int FLAG_PERMISSION_WHITELIST_UPGRADE = 4; // 0x4
     field public static final int GET_ACTIVITIES = 1; // 0x1
+    field @FlaggedApi("android.security.app_lock_apis") public static final long GET_APP_LOCK_INFO = 34359738368L; // 0x800000000L
     field @Deprecated public static final int GET_ATTRIBUTIONS = -2147483648; // 0x80000000
     field public static final long GET_ATTRIBUTIONS_LONG = 2147483648L; // 0x80000000L
     field public static final int GET_CONFIGURATIONS = 16384; // 0x4000
@@ -25554,7 +25583,7 @@ package android.media {
     method public final void notifySessionCreated(long, @NonNull android.media.RoutingSessionInfo);
     method public final void notifySessionReleased(@NonNull String);
     method public final void notifySessionUpdated(@NonNull android.media.RoutingSessionInfo);
-    method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") @Nullable @RequiresPermission("android.permission.MODIFY_AUDIO_ROUTING") public final android.media.MediaRoute2ProviderService.MediaStreams notifySystemRoutingSessionCreated(long, @NonNull android.media.RoutingSessionInfo, @NonNull android.media.MediaRoute2ProviderService.MediaStreamsFormats);
+    method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") @Nullable @RequiresPermission(allOf={"android.permission.MODIFY_AUDIO_ROUTING", "android.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED"}) public final android.media.MediaRoute2ProviderService.MediaStreams notifySystemRoutingSessionCreated(long, @NonNull android.media.RoutingSessionInfo, @NonNull android.media.MediaRoute2ProviderService.MediaStreamsFormats);
     method @CallSuper @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
     method public abstract void onCreateSession(long, @NonNull String, @NonNull String, @Nullable android.os.Bundle);
     method @FlaggedApi("com.android.media.flags.enable_mirroring_in_media_router_2") public void onCreateSystemRoutingSession(long, @NonNull String, @NonNull android.media.MediaRoute2ProviderService.SystemRoutingSessionParams);
@@ -38607,6 +38636,19 @@ package android.provider {
     field public static final android.net.Uri CONTENT_URI;
   }
 
+  @FlaggedApi("android.content.flags.enable_system_contacts_picker") public final class ContactsPickerSessionContract {
+    field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String ACTION_PICK_CONTACTS = "android.provider.action.PICK_CONTACTS";
+    field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String AUTHORITY = "com.android.contacts.picker.sessions";
+    field @FlaggedApi("android.content.flags.enable_system_contacts_picker") @NonNull public static final android.net.Uri AUTHORITY_URI;
+    field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String EXTRA_PICK_CONTACTS_REQUESTED_DATA_FIELDS = "android.provider.extra.PICK_CONTACTS_REQUESTED_DATA_FIELDS";
+    field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String EXTRA_PICK_CONTACTS_SELECTION_LIMIT = "android.provider.extra.PICK_CONTACTS_SELECTION_LIMIT";
+  }
+
+  @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final class ContactsPickerSessionContract.Session implements android.provider.BaseColumns {
+    field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String CONTENT_TYPE = "vnd.android.cursor.dir/data";
+    field @FlaggedApi("android.content.flags.enable_system_contacts_picker") @NonNull public static final android.net.Uri CONTENT_URI;
+  }
+
   public final class DocumentsContract {
     method public static android.net.Uri buildChildDocumentsUri(String, String);
     method public static android.net.Uri buildChildDocumentsUriUsingTree(android.net.Uri, String);
@@ -43160,15 +43202,10 @@ package android.service.personalcontext.hint {
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class BundleHint extends android.service.personalcontext.hint.ContextHint {
     ctor public BundleHint();
     method @NonNull public android.os.Bundle getDataBundle();
-    method public int getHintType();
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContextHint {
     method @NonNull public final java.util.UUID getHintId();
-    method public abstract int getHintType();
-    field public static final int HINT_TYPE_BUNDLE = 1; // 0x1
-    field public static final int HINT_TYPE_ERROR = -1; // 0xffffffff
-    field public static final int HINT_TYPE_NOTIFICATION = 2; // 0x2
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class NotificationEvent {
@@ -43195,7 +43232,6 @@ package android.service.personalcontext.hint {
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class NotificationHint extends android.service.personalcontext.hint.ContextHint {
-    method public int getHintType();
     method @NonNull public android.service.personalcontext.hint.NotificationEvent getNotificationEvent();
   }
 
@@ -43211,7 +43247,6 @@ package android.service.personalcontext.insight {
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ActionableInsight extends android.service.personalcontext.insight.ContextInsight {
     method @NonNull public android.content.Intent createActionIntent();
     method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails getDisplayDetails();
-    method public int getInsightType();
   }
 
   public static final class ActionableInsight.Builder {
@@ -43222,7 +43257,6 @@ package android.service.personalcontext.insight {
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class BundleInsight extends android.service.personalcontext.insight.ContextInsight {
     method @NonNull public android.os.Bundle getDataBundle();
-    method public int getInsightType();
   }
 
   public static final class BundleInsight.Builder {
@@ -43234,11 +43268,7 @@ package android.service.personalcontext.insight {
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContextInsight {
     method @NonNull public final java.util.UUID getInsightId();
-    method public abstract int getInsightType();
     method @NonNull public final java.util.List<android.service.personalcontext.hint.ContextHint> getOriginHints();
-    field public static final int INSIGHT_TYPE_ACTIONABLE = 2; // 0x2
-    field public static final int INSIGHT_TYPE_BUNDLE = 1; // 0x1
-    field public static final int INSIGHT_TYPE_ERROR = -1; // 0xffffffff
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class InsightDisplayDetails implements android.os.Parcelable {
@@ -47641,15 +47671,34 @@ package android.telephony.data {
 
   public final class TrafficDescriptor implements android.os.Parcelable {
     method public int describeContents();
+    method @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public int getConnectionCapability();
     method @Nullable public String getDataNetworkName();
     method @Nullable public byte[] getOsAppId();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_BACKGROUND = 168; // 0xa8
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_DOWNLINK_STREAMING = 163; // 0xa3
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_IMS = 1; // 0x1
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_INTERNET = 8; // 0x8
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_IOT_DELAY_TOLERANT = 161; // 0xa1
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_IOT_NON_DELAY_TOLERANT = 162; // 0xa2
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_LCS_USER_PLANE_POSITIONING = 16; // 0x10
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_LOW_LATENCY_LOSS_TOLERANT_UNACK = 171; // 0xab
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_MISSION_CRITICAL_COMMUNICATIONS = 169; // 0xa9
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_MMS = 2; // 0x2
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_REAL_TIME_INTERACTIVE = 166; // 0xa6
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_SUPL = 4; // 0x4
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_TIME_CRITICAL_COMMUNICATIONS = 170; // 0xaa
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_UNIFIED_COMMUNICATIONS = 167; // 0xa7
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_UNKNOWN = 0; // 0x0
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_UPLINK_STREAMING = 164; // 0xa4
+    field @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") public static final int CONNECTION_CAPABILITY_VEHICULAR_COMMUNICATIONS = 165; // 0xa5
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.data.TrafficDescriptor> CREATOR;
   }
 
   public static final class TrafficDescriptor.Builder {
     ctor public TrafficDescriptor.Builder();
     method @NonNull public android.telephony.data.TrafficDescriptor build();
+    method @FlaggedApi("com.android.internal.telephony.flags.enable_traffic_descriptor_connection_capability") @NonNull public android.telephony.data.TrafficDescriptor.Builder setConnectionCapability(int);
     method @NonNull public android.telephony.data.TrafficDescriptor.Builder setDataNetworkName(@NonNull String);
     method @NonNull public android.telephony.data.TrafficDescriptor.Builder setOsAppId(@NonNull byte[]);
   }
@@ -53295,7 +53344,7 @@ package android.view {
     field public static final int CHANGE_FRAME_RATE_ALWAYS = 1; // 0x1
     field public static final int CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS = 0; // 0x0
     field @NonNull public static final android.os.Parcelable.Creator<android.view.Surface> CREATOR;
-    field @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_gte_enum") public static final int FRAME_RATE_COMPATIBILITY_AT_LEAST = 2; // 0x2
+    field public static final int FRAME_RATE_COMPATIBILITY_AT_LEAST = 2; // 0x2
     field public static final int FRAME_RATE_COMPATIBILITY_DEFAULT = 0; // 0x0
     field public static final int FRAME_RATE_COMPATIBILITY_FIXED_SOURCE = 1; // 0x1
     field public static final int ROTATION_0 = 0; // 0x0
@@ -57608,9 +57657,9 @@ package android.view.inputmethod {
     method public void displayCompletions(android.view.View, android.view.inputmethod.CompletionInfo[]);
     method @Nullable public android.view.inputmethod.InputMethodInfo getCurrentInputMethodInfo();
     method @Nullable public android.view.inputmethod.InputMethodSubtype getCurrentInputMethodSubtype();
-    method @NonNull public java.util.List<android.view.inputmethod.InputMethodInfo> getEnabledInputMethodList();
-    method @NonNull public java.util.List<android.view.inputmethod.InputMethodSubtype> getEnabledInputMethodSubtypeList(@Nullable android.view.inputmethod.InputMethodInfo, boolean);
-    method @NonNull public java.util.List<android.view.inputmethod.InputMethodInfo> getInputMethodList();
+    method @FlaggedApi("android.view.inputmethod.guard_input_method_list_apis") @NonNull @RequiresPermission(value=android.Manifest.permission.QUERY_INPUT_METHOD, conditional=true) public java.util.List<android.view.inputmethod.InputMethodInfo> getEnabledInputMethodList();
+    method @FlaggedApi("android.view.inputmethod.guard_input_method_list_apis") @NonNull @RequiresPermission(value=android.Manifest.permission.QUERY_INPUT_METHOD, conditional=true) public java.util.List<android.view.inputmethod.InputMethodSubtype> getEnabledInputMethodSubtypeList(@Nullable android.view.inputmethod.InputMethodInfo, boolean);
+    method @FlaggedApi("android.view.inputmethod.guard_input_method_list_apis") @NonNull @RequiresPermission(value=android.Manifest.permission.QUERY_INPUT_METHOD, conditional=true) public java.util.List<android.view.inputmethod.InputMethodInfo> getInputMethodList();
     method @Nullable public android.view.inputmethod.InputMethodSubtype getLastInputMethodSubtype();
     method public java.util.Map<android.view.inputmethod.InputMethodInfo,java.util.List<android.view.inputmethod.InputMethodSubtype>> getShortcutInputMethodsAndSubtypes();
     method @Deprecated public void hideSoftInputFromInputMethod(android.os.IBinder, int);

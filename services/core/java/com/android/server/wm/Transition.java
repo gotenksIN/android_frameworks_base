@@ -210,6 +210,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     private @Nullable ActivityRecord mPipActivity;
     private @Nullable TransitionRequestInfo.RequestedLocation mRequestedLocation;
 
+    private final ArraySet<Integer> mDisconnectReparentDisplays = new ArraySet<>();
+
     /**
      * If this transition has a corresponding RemoteTransition, this tracks the process which will
      * play the animation.
@@ -699,6 +701,21 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
      */
     @Nullable TransitionRequestInfo.RequestedLocation getRequestedLocation() {
         return mRequestedLocation;
+    }
+
+    /**
+     * Set the target display to reparent to for a disconnect transition
+     * @param displayId Requested reparent display
+     */
+    void addDisconnectReparentDisplay(int displayId) {
+        mDisconnectReparentDisplays.add(displayId);
+    }
+
+    /**
+     * @return requested reparent display if this is a disconnect transition.
+     */
+    ArraySet<Integer> getDisconnectReparentDisplays() {
+        return mDisconnectReparentDisplays;
     }
 
     /**
@@ -3687,7 +3704,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             if (ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()
                     && displayChange.mExistenceChanged) {
                 // If this change is a display disconnection, we can skip it for now.
-                // It will be handled via applyDisplayRemovalIfNeeded below.
+                // It will be handled via applyDisplayContentClearIfNeeded below.
                 continue;
             }
             if (!displayChange.hasChanged()) continue;
@@ -3713,12 +3730,12 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     }
 
     /**
-     * If this transition involves display removal(s), remove the DisplayContent here. Separated
+     * If this transition involves clearing DisplayContent, apply that change here. Separated
      * from the above method since this method needs to occur after task changes to ensure
      * tasks do not have their hierarchy ops invalidated by being orphaned.
      * @return whether or not a DisplayContent was removed.
      */
-    boolean applyDisplayRemovalsIfNeeded() {
+    boolean applyDisplayContentClearIfNeeded() {
         if (!ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()) return false;
         boolean displayRemoved = false;
         for (int i = mParticipants.size() - 1; i >= 0; --i) {
@@ -3726,11 +3743,19 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final DisplayContent dc = wc.asDisplayContent();
             if (dc == null) continue;
             final ChangeInfo displayChange = mChanges.get(dc);
+            final int displayId = dc.mDisplayId;
             if (displayChange.mExistenceChanged) {
                 dc.remove();
-                mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(dc.mDisplayId);
+                mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(displayId);
+                displayRemoved = true;
+            } else if (dc.getDisplay() != null
+                    && mDisconnectReparentDisplays.contains(displayId)) {
+                dc.updateContentMode();
+                mWmService.mPossibleDisplayInfoMapper
+                    .removePossibleDisplayInfos(displayId);
                 displayRemoved = true;
             }
+            mDisconnectReparentDisplays.remove(displayId);
         }
         return displayRemoved;
     }

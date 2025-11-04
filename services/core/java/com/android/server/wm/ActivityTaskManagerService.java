@@ -158,6 +158,7 @@ import android.app.AppGlobals;
 import android.app.AppOpsManager;
 import android.app.Dialog;
 import android.app.HandoffActivityData;
+import android.app.HandoffActivityParams;
 import android.app.IActivityClientController;
 import android.app.IActivityController;
 import android.app.IActivityTaskManager;
@@ -715,7 +716,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      * Whether mSleeping can quickly toggled between true/false without the device actually
      * display changing states is undefined.
      */
-    private volatile boolean mSleeping = true;
+    private volatile boolean mSleeping;
 
     /**
      * The mActiveDreamComponent state is set by the {@link DreamManagerService} when it receives a
@@ -6755,6 +6756,22 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
 
         @Override
+        public HandoffActivityParams getHandoffActivityParamsForTask(int taskId) {
+            if (!android.companion.Flags.taskContinuity()) {
+                return null;
+            }
+            synchronized (mGlobalLock) {
+                final Task task = mRootWindowContainer.anyTaskForId(taskId);
+                if (task == null) {
+                    return null;
+                }
+
+                final ActivityRecord activity = task.getTopNonFinishingActivity();
+                return activity != null ? activity.getHandoffActivityParams() : null;
+            }
+        }
+
+        @Override
         public void registerHandoffEnablementListener(@NonNull HandoffEnablementListener listener) {
             if (!android.companion.Flags.taskContinuity()) {
                 return;
@@ -6991,11 +7008,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
 
         @Override
-        public boolean isRecentsComponentHomeActivity(int userId) {
-            return getRecentTasks().isRecentsComponentHomeActivity(userId);
-        }
-
-        @Override
         public boolean checkCanCloseSystemDialogs(int pid, int uid, @Nullable String packageName) {
             return ActivityTaskManagerService.this.checkCanCloseSystemDialogs(pid, uid,
                     packageName);
@@ -7103,6 +7115,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 if (proc == mHomeProcess) {
                     mHomeProcess = null;
                     mActivityStateUpdater.setHomeProcessAsync(null);
+                    mRecentTasks.invalidateIsHomeRecents();
                 }
                 if (proc == mPreviousProcess) {
                     mPreviousProcess = null;
@@ -7906,6 +7919,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public boolean switchUser(int userId, UserState userState) {
             synchronized (mGlobalLock) {
+                mRecentTasks.invalidateIsHomeRecents();
                 return mRootWindowContainer.switchUser(userId, userState);
             }
         }

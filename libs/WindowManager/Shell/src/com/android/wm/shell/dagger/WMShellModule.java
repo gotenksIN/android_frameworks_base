@@ -21,7 +21,6 @@ import static android.window.DesktopExperienceFlags.ENABLE_MULTI_DISPLAY_HOME_FO
 import static android.window.DesktopExperienceFlags.ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_SYSTEM_DIALOGS_TRANSITIONS;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS_BUGFIX;
-import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_TASK_LIMIT;
 
 import static com.android.systemui.Flags.enableViewCaptureTracing;
 
@@ -308,10 +307,11 @@ public abstract class WMShellModule {
             @NonNull TaskViewRepository repository,
             @NonNull BubbleData bubbleData,
             @NonNull @Bubbles TaskViewTransitions taskViewTransitions,
-            @NonNull BubbleAppInfoProvider appInfoProvider
+            @NonNull BubbleAppInfoProvider appInfoProvider,
+            @ShellBackgroundThread ShellExecutor bgExecutor
     ) {
         return new BubbleTransitions(context, transitions, organizer, repository,
-                bubbleData, taskViewTransitions, appInfoProvider);
+                bubbleData, taskViewTransitions, appInfoProvider, bgExecutor);
     }
 
     @WMSingleton
@@ -928,11 +928,9 @@ public abstract class WMShellModule {
             @NonNull ShellCommandHandler shellCommandHandler,
             @NonNull ShellTaskOrganizer shellTaskOrganizer,
             @NonNull LaunchAdjacentController launchAdjacentController,
-            @NonNull RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
-            @NonNull Optional<TaskChangeListener> taskChangeListener) {
+            @NonNull RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer) {
         return new RootTaskDesksOrganizer(shellInit, shellCommandHandler, shellTaskOrganizer,
-                launchAdjacentController, rootTaskDisplayAreaOrganizer,
-                taskChangeListener);
+                launchAdjacentController, rootTaskDisplayAreaOrganizer);
     }
 
     @WMSingleton
@@ -1104,11 +1102,18 @@ public abstract class WMShellModule {
     static Optional<TaskChangeListener> provideDesktopTaskChangeListener(
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             DesktopState desktopState,
-            ShellController shellController) {
+            ShellController shellController,
+            Optional<PinnedLayerController> pinnedLayerController,
+            DesksOrganizer desksOrganizer) {
         if (ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS.isTrue()
                 && desktopState.canEnterDesktopMode()) {
-            return Optional.of(new DesktopTaskChangeListener(
-                    desktopUserRepositories, desktopState, shellController));
+            return Optional.of(
+                    new DesktopTaskChangeListener(
+                            desktopUserRepositories,
+                            desktopState,
+                            shellController,
+                            pinnedLayerController.orElse(null),
+                            desksOrganizer));
         }
         return Optional.empty();
     }
@@ -1150,8 +1155,7 @@ public abstract class WMShellModule {
             DesktopConfig desktopConfig,
             DesktopState desktopState,
             Optional<DesktopMixedTransitionHandler> desktopMixedTransitionHandler) {
-        if (!desktopState.canEnterDesktopMode()
-                || !ENABLE_DESKTOP_WINDOWING_TASK_LIMIT.isTrue()) {
+        if (!desktopState.canEnterDesktopMode()) {
             return Optional.empty();
         }
         int maxTaskLimit = desktopConfig.getMaxTaskLimit();
@@ -1234,16 +1238,14 @@ public abstract class WMShellModule {
     @Provides
     static Optional<DisplayDisconnectTransitionHandler> provideDisplayDisconnectTransitionHandler(
             ShellInit shellInit, Transitions transitions,
-            Optional<DesktopTasksController> desktopTasksController,
-            DisplayController displayController,
-            RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer) {
+            Optional<SplitScreenController> splitScreenOptional,
+            Optional<DesktopTasksController> desktopTasksController) {
         if (!DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()) {
             return Optional.empty();
         } else {
             return Optional.of(
                     new DisplayDisconnectTransitionHandler(transitions, shellInit,
-                            desktopTasksController, displayController,
-                            rootTaskDisplayAreaOrganizer)
+                            splitScreenOptional, desktopTasksController)
             );
         }
     }
@@ -1597,6 +1599,7 @@ public abstract class WMShellModule {
             ShellTaskOrganizer shellTaskOrganizer,
             Optional<DesktopMixedTransitionHandler> desktopMixedTransitionHandler,
             DesktopWallpaperActivityTokenProvider desktopWallpaperActivityTokenProvider,
+            DisplayController displayController,
             DesktopState desktopState,
             ShellInit shellInit) {
         return desktopUserRepositories.flatMap(
@@ -1608,6 +1611,7 @@ public abstract class WMShellModule {
                                         shellTaskOrganizer,
                                         desktopMixedTransitionHandler.get(),
                                         desktopWallpaperActivityTokenProvider,
+                                        displayController,
                                         desktopState,
                                         shellInit)));
     }

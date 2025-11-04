@@ -127,6 +127,7 @@ import android.view.InputEvent;
 import android.view.InputMonitor;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.PointerIcon;
 import android.view.Surface;
 import android.view.SurfaceControl;
@@ -382,7 +383,7 @@ public class InputManagerService extends IInputManager.Stub
     // Manages Keyboard modifier keys remapping
     private final ModifierKeyRemapper mModifierKeyRemapper;
 
-    // Manages Controller remapping
+    // Manages remapping
     private final InputDeviceRemapper mInputDeviceRemapper;
 
     // Manages Keyboard glyphs for specific keyboards
@@ -2342,6 +2343,7 @@ public class InputManagerService extends IInputManager.Stub
         mKeyboardGlyphManager.dump(ipw);
         mKeyGestureController.dump(ipw);
         mVirtualInputDeviceController.dump(ipw);
+        mInputDeviceRemapper.dump(ipw);
     }
 
     private void dumpAssociations(IndentingPrintWriter pw) {
@@ -3168,14 +3170,12 @@ public class InputManagerService extends IInputManager.Stub
             @InputManager.ControllerButton int fromButton, int toKeyCode) {
         super.remapControllerButton_enforcePermission();
         if (!isControllerButton(fromButton)) {
-            throw new IllegalArgumentException(
-                    "Invalid controller fromButton provided for remapping: "
-                            + KeyEvent.keyCodeToString(fromButton));
+            throw new IllegalArgumentException("fromButton " + KeyEvent.keyCodeToString(fromButton)
+                    + " is not a valid controller button");
         }
         if (!KeyEvent.isGamepadButton(toKeyCode)) {
-            throw new IllegalArgumentException(
-                    "Invalid controller toKeyCode for remapping: " + KeyEvent.keyCodeToString(
-                            toKeyCode));
+            throw new IllegalArgumentException("toKeyCode " + KeyEvent.keyCodeToString(toKeyCode)
+                    + " is not a valid gamepad button");
         }
         mInputDeviceRemapper.remapKey(userId, identifier, fromButton, toKeyCode);
     }
@@ -3187,28 +3187,73 @@ public class InputManagerService extends IInputManager.Stub
             @InputManager.ControllerButton int fromButton) {
         super.removeControllerButtonRemapping_enforcePermission();
         if (!isControllerButton(fromButton)) {
-            throw new IllegalArgumentException(
-                    "Invalid controller fromButton provided for remapping: "
-                            + KeyEvent.keyCodeToString(fromButton));
+            throw new IllegalArgumentException("fromButton " + KeyEvent.keyCodeToString(fromButton)
+                    + " is not a valid controller button");
         }
         mInputDeviceRemapper.removeKeyRemapping(userId, identifier, fromButton);
     }
 
     @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
     @Override // Binder call
-    public void clearAllControllerButtonRemapping(@UserIdInt int userId,
+    public void clearAllControllerButtonRemappings(@UserIdInt int userId,
             @NonNull InputDeviceIdentifier identifier) {
-        super.clearAllControllerButtonRemapping_enforcePermission();
-        mInputDeviceRemapper.clearAllKeyRemapping(userId, identifier);
+        super.clearAllControllerButtonRemappings_enforcePermission();
+        mInputDeviceRemapper.clearAllKeyRemappings(userId, identifier);
     }
 
     @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
     @NonNull
     @Override // Binder call
-    public Map<Integer, Integer> getControllerButtonRemapping(@UserIdInt int userId,
+    public Map<Integer, Integer> getControllerButtonRemappings(@UserIdInt int userId,
             @NonNull InputDeviceIdentifier identifier) {
-        super.getControllerButtonRemapping_enforcePermission();
-        return mInputDeviceRemapper.getKeyRemapping(userId, identifier);
+        super.getControllerButtonRemappings_enforcePermission();
+        return mInputDeviceRemapper.getKeyRemappings(userId, identifier);
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @Override // Binder call
+    public void remapControllerAxis(@UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier, @MotionEvent.Axis int fromAxis,
+            @MotionEvent.Axis int toAxis) {
+        super.remapControllerAxis_enforcePermission();
+        if (!isControllerAxis(fromAxis)) {
+            throw new IllegalArgumentException("fromAxis " + MotionEvent.axisToString(fromAxis)
+                    + " is not a valid controller axis");
+        }
+        if (!isControllerAxis(toAxis)) {
+            throw new IllegalArgumentException("toAxis " + MotionEvent.axisToString(toAxis)
+                    + " is not a valid controller axis");
+        }
+        mInputDeviceRemapper.remapAxis(userId, identifier, fromAxis, toAxis);
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @Override // Binder call
+    public void removeControllerAxisRemapping(@UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier, @MotionEvent.Axis int fromAxis) {
+        super.removeControllerAxisRemapping_enforcePermission();
+        if (!isControllerAxis(fromAxis)) {
+            throw new IllegalArgumentException("fromAxis " + MotionEvent.axisToString(fromAxis)
+                    + " is not a valid controller axis");
+        }
+        mInputDeviceRemapper.removeAxisRemapping(userId, identifier, fromAxis);
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @Override // Binder call
+    public void clearAllControllerAxisRemappings(@UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier) {
+        super.clearAllControllerAxisRemappings_enforcePermission();
+        mInputDeviceRemapper.clearAllAxisRemappings(userId, identifier);
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @NonNull
+    @Override // Binder call
+    public Map<Integer, Integer> getControllerAxisRemappings(@UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier) {
+        super.getControllerAxisRemappings_enforcePermission();
+        return mInputDeviceRemapper.getAxisRemappings(userId, identifier);
     }
 
     // Native callback.
@@ -4339,6 +4384,27 @@ public class InputManagerService extends IInputManager.Stub
                  InputManager.ControllerButton.CONTROLLER_BUTTON_MODE,
                  InputManager.ControllerButton.CONTROLLER_BUTTON_THUMBSTICK_LEFT,
                  InputManager.ControllerButton.CONTROLLER_BUTTON_THUMBSTICK_RIGHT -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isControllerAxis(int axis) {
+        return switch (axis) {
+            case MotionEvent.AXIS_X,
+                 MotionEvent.AXIS_Y,
+                 MotionEvent.AXIS_Z,
+                 MotionEvent.AXIS_RZ,
+                 MotionEvent.AXIS_LTRIGGER,
+                 MotionEvent.AXIS_RTRIGGER,
+                 MotionEvent.AXIS_HAT_X,
+                 MotionEvent.AXIS_HAT_Y,
+                 MotionEvent.AXIS_GAS,
+                 MotionEvent.AXIS_BRAKE,
+                 MotionEvent.AXIS_RUDDER,
+                 MotionEvent.AXIS_THROTTLE,
+                 MotionEvent.AXIS_WHEEL,
+                 MotionEvent.AXIS_RX,
+                 MotionEvent.AXIS_RY -> true;
             default -> false;
         };
     }

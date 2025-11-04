@@ -19,6 +19,7 @@ package android.app;
 import static android.app.appfunctions.flags.Flags.enableAppFunctionManager;
 import static android.app.lskfreset.flags.Flags.enableLskfResetManager;
 import static android.hardware.serial.flags.Flags.enableWiredSerialApi;
+import static android.permission.flags.Flags.assistSettingsPrivacyImprovementsEnabled;
 import static android.provider.flags.Flags.newStoragePublicApi;
 import static android.server.Flags.removeGameManagerServiceFromWear;
 import static android.service.chooser.Flags.interactiveChooser;
@@ -69,6 +70,7 @@ import android.app.usage.IStorageStatsManager;
 import android.app.usage.IUsageStatsManager;
 import android.app.usage.StorageStatsManager;
 import android.app.usage.UsageStatsManager;
+import android.app.voiceinteraction.VoiceInteractionManager;
 import android.app.wallpapereffectsgeneration.IWallpaperEffectsGenerationManager;
 import android.app.wallpapereffectsgeneration.WallpaperEffectsGenerationManager;
 import android.app.wearable.IWearableSensingManager;
@@ -185,8 +187,8 @@ import android.net.wifi.WifiFrameworkInitializer;
 import android.net.wifi.nl80211.WifiNl80211Manager;
 import android.net.wifi.sharedconnectivity.app.SharedConnectivityManager;
 import android.nfc.NfcFrameworkInitializer;
+import android.npumanager.NpuManagerFrameworkInitializer;
 import android.ondevicepersonalization.OnDevicePersonalizationFrameworkInitializer;
-import android.os.AnomalyDetectorFrameworkInitializer;
 import android.os.BatteryManager;
 import android.os.BatteryStats;
 import android.os.BatteryStatsManager;
@@ -230,6 +232,7 @@ import android.os.image.DynamicSystemManager;
 import android.os.image.IDynamicSystemService;
 import android.os.incremental.IIncrementalService;
 import android.os.incremental.IncrementalManager;
+import android.os.profiling.anomaly.AnomalyDetectorFrameworkInitializer;
 import android.os.storage.StorageManager;
 import android.permission.LegacyPermissionManager;
 import android.permission.PermissionCheckerManager;
@@ -303,6 +306,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.app.IAppOpsService;
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.app.ISoundTriggerService;
+import com.android.internal.app.IVoiceInteractionManagerService;
 import com.android.internal.appwidget.IAppWidgetService;
 import com.android.internal.graphics.fonts.IFontManager;
 import com.android.internal.net.INetworkWatchlistManager;
@@ -634,9 +638,8 @@ public final class SystemServiceRegistry {
             @Override
             public TextServicesManager createService(ContextImpl ctx)
                     throws ServiceNotFoundException {
-                 if (ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)
-                        && ServiceManager.getService(Context.TEXT_SERVICES_MANAGER_SERVICE) == null
-                        && android.server.Flags.removeTextService()) {
+                if (ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH) &&
+                        ServiceManager.getService(Context.TEXT_SERVICES_MANAGER_SERVICE) == null) {
                     return null;
                 }
                 return TextServicesManager.createInstance(ctx);
@@ -885,6 +888,22 @@ public final class SystemServiceRegistry {
             public Vibrator createService(ContextImpl ctx) {
                 return new SystemVibrator(ctx);
             }});
+
+        if (assistSettingsPrivacyImprovementsEnabled()) {
+            registerService(Context.VOICE_INTERACTION_MANAGER_SERVICE,
+                    VoiceInteractionManager.class,
+                    new CachedServiceFetcher<>() {
+                        @Override
+                        public VoiceInteractionManager createService(ContextImpl ctx)
+                                throws ServiceNotFoundException {
+                            IVoiceInteractionManagerService service;
+                            service = IVoiceInteractionManagerService.Stub.asInterface(
+                                    ServiceManager.getServiceOrThrow(
+                                            Context.VOICE_INTERACTION_MANAGER_SERVICE));
+                            return new VoiceInteractionManager(service, ctx);
+                        }
+                    });
+        }
 
         registerService(Context.THEME_SERVICE, ThemeManager.class,
             new CachedServiceFetcher<ThemeManager>() {
@@ -2009,6 +2028,7 @@ public final class SystemServiceRegistry {
             OnDevicePersonalizationFrameworkInitializer.registerServiceWrappers();
             OnDeviceIntelligenceFrameworkInitializer.registerServiceWrappers();
             DeviceLockFrameworkInitializer.registerServiceWrappers();
+            NpuManagerFrameworkInitializer.registerServiceWrappers();
             VirtualizationFrameworkInitializer.registerServiceWrappers();
             ConnectivityFrameworkInitializerBaklava.registerServiceWrappers();
 
@@ -2129,8 +2149,7 @@ public final class SystemServiceRegistry {
                     }
                     break;
                 case Context.TEXT_SERVICES_MANAGER_SERVICE:
-                    if (android.server.Flags.removeTextService()
-                            && hasSystemFeatureOpportunistic(ctx, PackageManager.FEATURE_WATCH)) {
+                    if (hasSystemFeatureOpportunistic(ctx, PackageManager.FEATURE_WATCH)) {
                         return null;
                     }
                     break;
@@ -2236,7 +2255,6 @@ public final class SystemServiceRegistry {
      * @hide
      */
     @Nullable
-    @RavenwoodRedirect
     public static String getSystemServiceClassName(@NonNull String name) {
         return SYSTEM_SERVICE_CLASS_NAMES.get(name);
     }

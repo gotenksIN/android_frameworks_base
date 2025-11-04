@@ -2110,7 +2110,7 @@ public class AudioManager {
         Log.i(TAG, "In setSpeakerphoneOn(), on: " + on + ", calling application: "
                     + mApplicationContext.getOpPackageName());
         try {
-            service.setSpeakerphoneOn(mICallBack, on, getAttributionSource());
+            service.setSpeakerphoneOn(sLegacyRouteToken, on, getAttributionSource());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -3294,7 +3294,7 @@ public class AudioManager {
         Log.i(TAG, "In startbluetoothSco(), calling application: "
                      + mApplicationContext.getOpPackageName());
         try {
-            service.startBluetoothSco(mICallBack,
+            service.startBluetoothSco(sLegacyRouteToken,
                     getContext().getApplicationInfo().targetSdkVersion,
                     getAttributionSource());
         } catch (RemoteException e) {
@@ -3323,7 +3323,7 @@ public class AudioManager {
                     + mApplicationContext.getOpPackageName());
         final IAudioService service = getService();
         try {
-            service.startBluetoothScoVirtualCall(mICallBack, getAttributionSource());
+            service.startBluetoothScoVirtualCall(sLegacyRouteToken, getAttributionSource());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -3345,7 +3345,7 @@ public class AudioManager {
         Log.i(TAG, "In stopBluetoothSco(), calling application: "
                     + mApplicationContext.getOpPackageName());
         try {
-            service.stopBluetoothSco(mICallBack,  getAttributionSource());
+            service.stopBluetoothSco(sLegacyRouteToken,  getAttributionSource());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -3550,7 +3550,7 @@ public class AudioManager {
     public void setMode(@AudioMode int mode) {
         final IAudioService service = getService();
         try {
-            service.setMode(mode, mICallBack, mApplicationContext.getOpPackageName());
+            service.setMode(mode, sLegacyRouteToken, mApplicationContext.getOpPackageName());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -6370,6 +6370,15 @@ public class AudioManager {
       */
      private final IBinder mICallBack = new Binder();
 
+     /**
+      * Process-wide callback token for routing requests, for legacy APIs that don't explicitly
+      * return sessions. All APIs which update the routing preferences for a process which utilize
+      * this callback will override the existing preference for the process.
+      * @hide
+      */
+     private static final IBinder sLegacyRouteToken = new Binder();
+
+
     /**
      * Checks whether the phone is in silent mode, with or without vibrate.
      *
@@ -7559,7 +7568,7 @@ public class AudioManager {
     /**
      * @hide
      * Returns whether CSD is enabled and supported by the current active audio module HAL.
-     * This method will return {@code false) for setups in which CSD as a feature is available
+     * This method will return {@code false} for setups in which CSD as a feature is available
      * (see {@link AudioManager#isCsdAsAFeatureAvailable()}) and not enabled (see
      * {@link AudioManager#isCsdAsAFeatureEnabled()}).
      */
@@ -9435,7 +9444,7 @@ public class AudioManager {
                 Log.w(TAG, "setCommunicationDevice: device not found: " + device);
                 return false;
             }
-            return getService().setCommunicationDevice(mICallBack, device.getId(),
+            return getService().setCommunicationDevice(sLegacyRouteToken, device.getId(),
                     getAttributionSource());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
@@ -9448,7 +9457,7 @@ public class AudioManager {
      */
     public void clearCommunicationDevice() {
         try {
-            getService().setCommunicationDevice(mICallBack, 0, getAttributionSource());
+            getService().setCommunicationDevice(sLegacyRouteToken, 0, getAttributionSource());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

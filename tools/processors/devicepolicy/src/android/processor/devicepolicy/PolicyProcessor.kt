@@ -350,14 +350,7 @@ abstract class PolicyProcessor<T : Annotation>(protected val processingEnv: Proc
             printError(element, "allowedScopes must not be empty.")
         }
 
-        val duplicatedScopes = allowedScopes.groupingBy { it }.eachCount().filter { it.value > 1 }
-        if (!duplicatedScopes.isEmpty()) {
-            val scopesMessage = duplicatedScopes.map { it.key }.joinToString(separator = ",")
-            printError(
-                element,
-                "allowedScopes contains duplicated scopes [$scopesMessage]; Use a scope only once."
-            )
-        }
+        ensureNoDuplicates(element, allowedScopes, "allowedScopes", {v -> scopeToString(v) })
 
         return allowedScopes.mapNotNull { allowedScope ->
             PolicyMetadata.PolicyScope.forNumber(allowedScope)
@@ -394,7 +387,7 @@ abstract class PolicyProcessor<T : Annotation>(protected val processingEnv: Proc
             )
         }
         if (input.profileOwnerOnUser0 == AllowedDpcTypes.ALLOWED) {
-            result.add(PolicyMetadata.DpcType.DPC_TYPE_PROFILE_OWNER_ON_USER_0)
+            result.add(PolicyMetadata.DpcType.DPC_TYPE_PROFILE_OWNER_ON_USER0)
         }
         if (input.profileOwner == AllowedDpcTypes.ALLOWED) {
             result.add(PolicyMetadata.DpcType.DPC_TYPE_PROFILE_OWNER)
@@ -407,6 +400,22 @@ abstract class PolicyProcessor<T : Annotation>(protected val processingEnv: Proc
         }
 
         return result
+    }
+
+    /**
+     * Checks for duplicates in `values`, and prints an error if any are found.
+     * @param elementToString: Method used to format the values in the error message.
+     */
+    private fun ensureNoDuplicates(element: Element, values: List<Int>, listName: String,
+        elementToString: (Int) -> String) {
+        val duplicates = getDuplicates(values)
+        if (!duplicates.isEmpty()) {
+            val duplicateNames = duplicates.map(elementToString)
+            printError(
+                element,
+                "$listName contains duplicate values: ${duplicateNames.joinToString(",")}"
+            )
+        }
     }
 
     private fun scopeToString(value: Int): String {

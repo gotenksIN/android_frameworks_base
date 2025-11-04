@@ -89,12 +89,9 @@ public enum DesktopModeFlags {
     ENABLE_DESKTOP_WINDOWING_SIZE_CONSTRAINTS(Flags::enableDesktopWindowingSizeConstraints, true),
     ENABLE_DESKTOP_WINDOWING_TASKBAR_RUNNING_APPS(Flags::enableDesktopWindowingTaskbarRunningApps,
             true),
-    ENABLE_DESKTOP_WINDOWING_TASK_LIMIT(Flags::enableDesktopWindowingTaskLimit, true),
     ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY(Flags::enableDesktopWindowingWallpaperActivity,
             true),
     ENABLE_DRAG_RESIZE_SET_UP_IN_BG_THREAD(Flags::enableDragResizeSetUpInBgThread, true),
-    ENABLE_DRAG_TO_DESKTOP_INCOMING_TRANSITIONS_BUGFIX(
-            Flags::enableDragToDesktopIncomingTransitionsBugfix, true),
     ENABLE_FULLY_IMMERSIVE_IN_DESKTOP(Flags::enableFullyImmersiveInDesktop, true),
     ENABLE_HANDLE_INPUT_FIX(Flags::enableHandleInputFix, true),
     ENABLE_HOLD_TO_DRAG_APP_HANDLE(Flags::enableHoldToDragAppHandle, true),

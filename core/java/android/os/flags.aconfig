@@ -177,6 +177,13 @@ flag {
 }
 
 flag {
+    name: "binder_proxy_use_executor_map"
+    namespace: "system_performance"
+    description: "Whether to use mFrozenStateChangeCallbackExecutors in BinderProxy."
+    bug: "454431919"
+}
+
+flag {
     name: "bluetooth_bugreport_mode"
     is_exported: true
     namespace: "bluetooth"
@@ -464,6 +471,13 @@ flag {
     name: "native_looper_skip_epoll_wait_for_zero_timeout"
     description: "Skips epoll_wait if pollOnce is called with a timeout of 0."
     bug: "410218466"
+}
+
+flag {
+    namespace: "system_performance"
+    name: "native_looper_skip_epoll_wait_for_zero_timeout_holdback"
+    description: "Holdback for skipping epoll_wait if pollOnce is called with a timeout of 0."
+    bug: "448455908"
 }
 
 flag {

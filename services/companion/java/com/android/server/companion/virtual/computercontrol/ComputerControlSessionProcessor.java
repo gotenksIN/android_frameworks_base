@@ -34,7 +34,6 @@ import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.computercontrol.ComputerControlSession;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IComputerControlSessionCallback;
-import android.companion.virtualdevice.flags.Flags;
 import android.content.AttributionSource;
 import android.content.Context;
 import android.content.Intent;
@@ -79,6 +78,7 @@ public class ComputerControlSessionProcessor {
     private final DevicePolicyManagerInternal mDevicePolicyManagerInternal;
     private final VirtualDeviceFactory mVirtualDeviceFactory;
     private final PendingIntentFactory mPendingIntentFactory;
+    private final ComputerControlAllowlistController mAllowlistController;
 
     /** The binders of all currently active sessions. */
     private final ArraySet<ComputerControlSessionImpl> mSessions = new ArraySet<>();
@@ -90,13 +90,15 @@ public class ComputerControlSessionProcessor {
 
     public ComputerControlSessionProcessor(
             Context context, VirtualDeviceFactory virtualDeviceFactory) {
-        this(context, virtualDeviceFactory, ComputerControlSessionProcessor::createPendingIntent);
+        this(context, virtualDeviceFactory, ComputerControlSessionProcessor::createPendingIntent,
+                new ComputerControlAllowlistController(context));
     }
 
     @VisibleForTesting
     ComputerControlSessionProcessor(
             Context context, VirtualDeviceFactory virtualDeviceFactory,
-            PendingIntentFactory pendingIntentFactory) {
+            PendingIntentFactory pendingIntentFactory,
+            ComputerControlAllowlistController allowlistController) {
         mContext = context;
         mVirtualDeviceFactory = virtualDeviceFactory;
         mPendingIntentFactory = pendingIntentFactory;
@@ -104,6 +106,12 @@ public class ComputerControlSessionProcessor {
         mAppOpsManager = context.getSystemService(AppOpsManager.class);
         mPackageManager = context.getPackageManager();
         mDevicePolicyManagerInternal = LocalServices.getService(DevicePolicyManagerInternal.class);
+        mAllowlistController = allowlistController;
+    }
+
+    /** Perform initialization tasks (if any). */
+    public void initialize() {
+        mAllowlistController.initialize();
     }
 
     /**
@@ -120,16 +128,9 @@ public class ComputerControlSessionProcessor {
         validateParams(attributionSource, params);
         startHandlerThreadIfNeeded();
 
-        final boolean canCreateWithoutConsent;
-        if (Flags.computerControlConsent()) {
-            final int isOpAllowed = mAppOpsManager.noteOpNoThrow(
-                    AppOpsManager.OP_COMPUTER_CONTROL, attributionSource, "create session");
-            canCreateWithoutConsent = isOpAllowed == AppOpsManager.MODE_ALLOWED;
-        } else {
-            canCreateWithoutConsent = true;
-        }
-
-        if (canCreateWithoutConsent) {
+        final int isOpAllowed = mAppOpsManager.noteOpNoThrow(
+                AppOpsManager.OP_COMPUTER_CONTROL, attributionSource, "create session");
+        if (isOpAllowed == AppOpsManager.MODE_ALLOWED) {
             mHandler.post(() -> createSession(attributionSource, params, callback));
             return;
         }
@@ -158,16 +159,20 @@ public class ComputerControlSessionProcessor {
 
     private void validateParams(AttributionSource attributionSource,
             ComputerControlSessionParams params) {
-        if (Flags.computerControlUserRestriction()) {
-            // TODO: b/445856399 - Support managed profiles.
-            Binder.withCleanCallingIdentity(() -> {
-                if (mDevicePolicyManagerInternal.isUserOrganizationManaged(
-                        UserHandle.getUserId(attributionSource.getUid()))) {
-                    throw new SecurityException(
-                        "Managed profiles are not allowed to use Computer Control.");
-                }
-            });
+        // TODO: b/445856399 - Support managed profiles.
+        Binder.withCleanCallingIdentity(() -> {
+            if (mDevicePolicyManagerInternal.isUserOrganizationManaged(
+                    UserHandle.getUserId(attributionSource.getUid()))) {
+                throw new SecurityException(
+                    "Managed profiles are not allowed to use Computer Control.");
+            }
+        });
+
+        final String callerPackageName = attributionSource.getPackageName();
+        if (!mAllowlistController.isPackageAllowedToCreateSession(callerPackageName)) {
+            throw new SecurityException("Caller " + callerPackageName + " is not allowlisted");
         }
+
         synchronized (mSessions) {
             for (int i = 0; i < mSessions.size(); i++) {
                 ComputerControlSessionImpl session = mSessions.valueAt(i);
@@ -379,9 +384,6 @@ public class ComputerControlSessionProcessor {
      */
     public boolean isComputerControlNotification(int notificationId,
             @Nullable String notificationTag, @NonNull String packageName) {
-        if (!Flags.computerControlNonDismissibleNotifications()) {
-            return false;
-        }
         final ComputerControlSessionImpl.NotificationInfo notificationInfo =
                 new ComputerControlSessionImpl.NotificationInfo(notificationId, notificationTag);
         synchronized (mSessions) {

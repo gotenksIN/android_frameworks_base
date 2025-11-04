@@ -18,6 +18,7 @@ package android.view.inputmethod;
 
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.ViewProtoLogGroups.INPUT_METHOD_MANAGER_DEBUG;
+import static android.view.inputmethod.Flags.FLAG_GUARD_INPUT_METHOD_LIST_APIS;
 import static android.view.inputmethod.Flags.FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR;
 import static android.view.ViewProtoLogGroups.INPUT_METHOD_MANAGER_WITH_LOGCAT;
 import static android.view.inputmethod.Flags.initiationWithoutInputConnection;
@@ -128,6 +129,7 @@ import com.android.internal.inputmethod.StartInputReason;
 import com.android.internal.inputmethod.UnbindReason;
 import com.android.internal.os.SomeArgs;
 import com.android.internal.protolog.ProtoLog;
+import com.android.internal.protolog.common.LogLevel;
 import com.android.internal.view.IInputMethodManager;
 
 import java.io.FileDescriptor;
@@ -1774,9 +1776,14 @@ public final class InputMethodManager {
      *
      * <p>On multi user environment, this API returns a result for the calling process user.</p>
      *
+     * <p>Starting with targetSdkVersion 37, requires {@code android.permission.QUERY_INPUT_METHOD}
+     * to use this API.</p>
+     *
      * @return {@link List} of {@link InputMethodInfo}.
      */
     @NonNull
+    @FlaggedApi(FLAG_GUARD_INPUT_METHOD_LIST_APIS)
+    @RequiresPermission(value = Manifest.permission.QUERY_INPUT_METHOD, conditional = true)
     public List<InputMethodInfo> getInputMethodList() {
         // We intentionally do not use UserHandle.getCallingUserId() here because for system
         // services InputMethodManagerInternal.getInputMethodListAsUser() should be used
@@ -1933,9 +1940,14 @@ public final class InputMethodManager {
      *
      * <p>On multi user environment, this API returns a result for the calling process user.</p>
      *
+     * <p>Starting with targetSdkVersion 37, requires {@code android.permission.QUERY_INPUT_METHOD}
+     * to use this API.</p>
+     *
      * @return {@link List} of {@link InputMethodInfo}.
      */
     @NonNull
+    @FlaggedApi(FLAG_GUARD_INPUT_METHOD_LIST_APIS)
+    @RequiresPermission(value = Manifest.permission.QUERY_INPUT_METHOD, conditional = true)
     public List<InputMethodInfo> getEnabledInputMethodList() {
         // We intentionally do not use UserHandle.getCallingUserId() here because for system
         // services InputMethodManagerInternal.getEnabledInputMethodListAsUser() should be used
@@ -1967,6 +1979,9 @@ public final class InputMethodManager {
      *
      * <p>On multi user environment, this API returns a result for the calling process user.</p>
      *
+     * <p>Starting with targetSdkVersion 37, requires {@code android.permission.QUERY_INPUT_METHOD}
+     * to use this API.</p>
+     *
      * @param imi The {@link InputMethodInfo} whose subtypes list will be returned. If {@code null},
      * returns enabled subtypes for the currently selected {@link InputMethodInfo}.
      * @param allowsImplicitlyEnabledSubtypes A boolean flag to allow to return the implicitly
@@ -1974,6 +1989,8 @@ public final class InputMethodManager {
      * will implicitly enable subtypes according to the current system language.
      */
     @NonNull
+    @FlaggedApi(FLAG_GUARD_INPUT_METHOD_LIST_APIS)
+    @RequiresPermission(value = Manifest.permission.QUERY_INPUT_METHOD, conditional = true)
     public List<InputMethodSubtype> getEnabledInputMethodSubtypeList(@Nullable InputMethodInfo imi,
             boolean allowsImplicitlyEnabledSubtypes) {
         return IInputMethodManagerGlobalInvoker.getEnabledInputMethodSubtypeList(
@@ -2235,7 +2252,8 @@ public final class InputMethodManager {
             }
         }
         if (clearedView != null) {
-            if (android.tracing.Flags.imetrackerProtolog()) {
+            if (android.tracing.Flags.imetrackerProtolog()
+                        && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.VERBOSE)) {
                 ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG, "FINISH INPUT: mServedView=%s",
                         InputMethodDebug.dumpViewInfo(clearedView));
             } else if (DEBUG) {
@@ -3465,7 +3483,8 @@ public final class InputMethodManager {
             view = getServedViewLocked();
 
             // Make sure we have a window token for the served view.
-            if (android.tracing.Flags.imetrackerProtolog()) {
+            if (android.tracing.Flags.imetrackerProtolog()
+                        && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.VERBOSE)) {
                 ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG, "Starting input: view=%s reason=%s",
                         InputMethodDebug.dumpViewInfo(view),
                         InputMethodDebug.startInputReasonToString(startInputReason));
@@ -3545,7 +3564,8 @@ public final class InputMethodManager {
             final View servedView = getServedViewLocked();
             if (servedView != view || !mServedConnecting) {
                 // Something else happened, so abort.
-                if (android.tracing.Flags.imetrackerProtolog()) {
+                if (android.tracing.Flags.imetrackerProtolog()
+                        && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.VERBOSE)) {
                     ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG,
                             "Starting input: finished by someone else. view=%s servedView=%s "
                                     + "mServedConnecting=%s",
@@ -3616,7 +3636,8 @@ public final class InputMethodManager {
 
             imeRequestedVisible = hasViewImeRequestedVisible(servedView);
 
-            if (android.tracing.Flags.imetrackerProtolog()) {
+            if (android.tracing.Flags.imetrackerProtolog()
+                        && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.VERBOSE)) {
                 ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG,
                         "START INPUT: view=%s ic=%s editorInfo=%s startInputFlags=%s "
                                 + "imeRequestedVisible=%s",
@@ -3889,7 +3910,8 @@ public final class InputMethodManager {
             if (!view.hasImeFocus() || !view.hasWindowFocus()) {
                 return;
             }
-            if (android.tracing.Flags.imetrackerProtolog()) {
+            if (android.tracing.Flags.imetrackerProtolog()
+                        && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.DEBUG)) {
                 ProtoLog.d(INPUT_METHOD_MANAGER_DEBUG, "onViewFocusChangedInternal, view=%s",
                         InputMethodDebug.dumpViewInfo(view));
             } else if (DEBUG) {

@@ -32,6 +32,7 @@ import androidx.test.filters.SmallTest
 import com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn
 import com.android.window.flags.Flags.FLAG_FIX_BUBBLE_TRAMPOLINE_ANIMATION
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
+import com.android.wm.shell.MockToken
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.activityembedding.ActivityEmbeddingController
@@ -87,6 +88,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         mock(),
         mock(),
         mock(),
+        mock()
     ))
     private val pinnedLayerController = mock<PinnedLayerController>()
     private val pipScheduler = mock<PipScheduler>()
@@ -336,6 +338,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
     private fun createRunningTask(taskId: Int = 0): RunningTaskInfo {
         return RunningTaskInfo().apply {
             this.taskId = taskId
+            this.token = MockToken().token()
             this.configuration.windowConfiguration.activityType = ACTIVITY_TYPE_STANDARD
         }
     }

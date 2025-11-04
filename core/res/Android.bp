@@ -163,6 +163,7 @@ android_app {
         "android.app.flags-aconfig",
         "android.appwidget.flags-aconfig",
         "android.companion.virtualdevice.flags-aconfig",
+        "android.content.flags-aconfig",
         "android.content.pm.flags-aconfig",
         "android.hardware.serial.flags-aconfig",
         "android.location.flags-aconfig",
@@ -198,6 +199,7 @@ android_app {
         "display_flags",
         "android.os.profiling.anomaly.flags-aconfig",
         "com.android.media.flags.mediasession-aconfig",
+        "telecom_flags",
     ],
 }
 

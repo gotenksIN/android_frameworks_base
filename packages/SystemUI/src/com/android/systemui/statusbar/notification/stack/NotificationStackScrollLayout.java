@@ -4014,10 +4014,11 @@ public class NotificationStackScrollLayout
         if (!SceneContainerFlag.isEnabled()) {
             return false;
         }
-
-        return !mScrollViewFields.interactive
-                // NSSL refuse gesture if it started outside of the touchable bounds
-                || isOutBoundsDownEvent(ev);
+        // When the shade is closed but a HUN is visible (over home screen), we might need to handle
+        // this touch event as a HUN gesture even if this is outside interactive bounds
+        // or NSSL is not interactive.
+        final boolean acceptOutsideHun = !mAmbientState.isShadeExpanded() && mTopHeadsUpRow != null;
+        return !acceptOutsideHun && (!mScrollViewFields.interactive || isOutBoundsDownEvent(ev));
     }
 
     /**
@@ -5848,7 +5849,12 @@ public class NotificationStackScrollLayout
     @Override
     public void suppressHeightUpdates(boolean suppress) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
+        boolean forceUpdate = (!suppress && mSuppressHeightUpdates);
         mSuppressHeightUpdates = suppress;
+
+        if (forceUpdate) {
+            setExpandFraction(mAmbientState.getExpansionFraction());
+        }
     }
 
     public void setHeadsUpGoingAwayAnimationsAllowed(boolean headsUpGoingAwayAnimationsAllowed) {

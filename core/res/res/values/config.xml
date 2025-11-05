@@ -3355,7 +3355,7 @@
     <integer name="config_hsumBootStrategy">0</integer>
 
     <!-- List of activities (flattened component names) allowed to be launched when the current user is the Headless System User -->
-    <string-array name="config_hsu_allowlist_activitivies" translatable="false">
+    <string-array name="config_hsu_allowlist_activities" translatable="false">
        <!-- default empty (meaning all activities will be allowed) -->
     </string-array>
 
@@ -6326,6 +6326,9 @@
 
     <!-- Retention policy: number of records to kept for the historical exit info per package. -->
     <integer name="config_app_exit_info_history_list_size">16</integer>
+
+    <!-- Retention policy: number of records to kept for the historical start info per package. -->
+    <integer name="config_app_start_info_history_list_size">16</integer>
 
     <!-- Packages that can't be killed even if it's requested to be killed on imperceptible -->
     <string-array name="config_defaultImperceptibleKillingExemptionPkgs" translatable="false" />

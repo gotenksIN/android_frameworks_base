@@ -16,9 +16,6 @@
 
 package com.android.server.companion.virtual.computercontrol;
 
-import static android.os.UserManager.USER_TYPE_FULL_SECONDARY;
-import static android.os.UserManager.USER_TYPE_PROFILE_MANAGED;
-
 import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionProcessor.MAXIMUM_CONCURRENT_SESSIONS;
 
 import static org.junit.Assert.assertFalse;
@@ -26,7 +23,9 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -44,22 +43,16 @@ import android.companion.virtual.computercontrol.ComputerControlSession;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IComputerControlSession;
 import android.companion.virtual.computercontrol.IComputerControlSessionCallback;
-import android.companion.virtualdevice.flags.Flags;
 import android.content.AttributionSource;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.pm.UserInfo;
 import android.hardware.display.VirtualDisplay;
 import android.os.Binder;
 import android.os.ResultReceiver;
 import android.os.UserHandle;
-import android.os.UserManager;
-import android.platform.test.annotations.DisableFlags;
-import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
-import android.platform.test.flag.junit.SetFlagsRule;
 import android.view.Display;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -72,7 +65,6 @@ import com.android.server.wm.WindowManagerInternal;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -91,6 +83,7 @@ public class ComputerControlSessionProcessorTest {
     private static final String TARGET_PACKAGE = "com.android.foo";
     private static final int CALLING_USER_ID = UserHandle.USER_SYSTEM;
     private static final int VIRTUAL_DISPLAY_ID = 123;
+    private static final int DEVICE_ID = 42;
     private static final String OWNER_PACKAGE_NAME = "com.package";
     private static final AttributionSource ATTRIBUTION_SOURCE = new AttributionSource(
             UserHandle.getUid(CALLING_USER_ID, 0), OWNER_PACKAGE_NAME, "tag");
@@ -100,8 +93,6 @@ public class ComputerControlSessionProcessorTest {
                     .setTargetPackageNames(List.of(TARGET_PACKAGE))
                     .build();
 
-    @Rule
-    public SetFlagsRule mSetFlagsRule = new SetFlagsRule();
     @Mock
     private KeyguardManager mKeyguardManager;
     @Mock
@@ -134,13 +125,14 @@ public class ComputerControlSessionProcessorTest {
     private AudioCapture mAudioCapture;
     @Mock
     private IComputerControlSessionCallback mComputerControlSessionCallback;
+    @Mock
+    private ComputerControlAllowlistController mAllowlistController;
     @Captor
     private ArgumentCaptor<Intent> mIntentArgumentCaptor;
     @Captor
     private ArgumentCaptor<IComputerControlSession> mSessionArgumentCaptor;
 
     private ComputerControlSessionProcessor mProcessor;
-
     private AutoCloseable mMockitoSession;
 
     @Before
@@ -182,14 +174,19 @@ public class ComputerControlSessionProcessorTest {
         when(mVirtualDevice.createVirtualDisplay(any(), any(), any())).thenReturn(mVirtualDisplay);
         when(mVirtualDisplay.getDisplay()).thenReturn(mDisplay);
         when(mDisplay.getDisplayId()).thenReturn(VIRTUAL_DISPLAY_ID);
+        when(mVirtualDevice.getDeviceId()).thenReturn(DEVICE_ID);
 
         when(mVirtualDevice.createVirtualAudioDevice(any(), any(), any())).thenReturn(
                 mVirtualAudioDevice);
         when(mVirtualAudioDevice.startAudioCapture(any())).thenReturn(mAudioCapture);
         when(mVirtualAudioDevice.startAudioInjection(any())).thenReturn(mAudioInjection);
+
         when(mComputerControlSessionCallback.asBinder()).thenReturn(new Binder());
+
+        when(mAllowlistController.isPackageAllowedToCreateSession(anyString())).thenReturn(true);
+
         mProcessor = new ComputerControlSessionProcessor(
-                context, mVirtualDeviceFactory, mPendingIntentFactory);
+                context, mVirtualDeviceFactory, mPendingIntentFactory, mAllowlistController);
     }
 
     @After
@@ -205,6 +202,15 @@ public class ComputerControlSessionProcessorTest {
                 ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                 .onSessionCreationFailed(ComputerControlSession.ERROR_DEVICE_LOCKED);
+    }
+
+    @Test
+    public void callerNotAllowListed_throwsException() throws Exception {
+        when(mAllowlistController.isPackageAllowedToCreateSession(anyString())).thenReturn(false);
+
+        assertThrows(SecurityException.class,
+                () -> mProcessor.processNewSessionRequest(
+                        ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback));
     }
 
     @Test
@@ -239,7 +245,6 @@ public class ComputerControlSessionProcessorTest {
         }
     }
 
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_CONSENT)
     @Test
     public void onSessionPending_consentGranted_sessionCreated() throws Exception {
         when(mAppOpsManager.noteOpNoThrow(eq(AppOpsManager.OP_COMPUTER_CONTROL), any(), any()))
@@ -258,7 +263,6 @@ public class ComputerControlSessionProcessorTest {
         mSessionArgumentCaptor.getValue().close();
     }
 
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_CONSENT)
     @Test
     public void onSessionPending_consentDenied_sessionCreationFailed() throws Exception {
         when(mAppOpsManager.noteOpNoThrow(eq(AppOpsManager.OP_COMPUTER_CONTROL), any(), any()))
@@ -288,7 +292,6 @@ public class ComputerControlSessionProcessorTest {
         mSessionArgumentCaptor.getValue().close();
     }
 
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
     @Test
     public void validateParams_packageNamesAreValid() throws Exception {
         mProcessor.processNewSessionRequest(
@@ -299,7 +302,6 @@ public class ComputerControlSessionProcessorTest {
         mSessionArgumentCaptor.getValue().close();
     }
 
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
     @Test
     public void validateParams_invalidPackageNames_permissionController() {
         String packageName = PACKAGE_NAME_PERMISSION_CONTROLLER;
@@ -317,7 +319,6 @@ public class ComputerControlSessionProcessorTest {
         });
     }
 
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_ACTIVITY_POLICY_STRICT)
     @Test
     public void validateParams_invalidPackageNames_packageWithoutLauncherIntent() {
         String packageName = "package.name";
@@ -335,7 +336,6 @@ public class ComputerControlSessionProcessorTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_USER_RESTRICTION)
     public void validateParams_userManaged_throwsSecurityException() {
         when(mDevicePolicyManagerInternal.isUserOrganizationManaged(CALLING_USER_ID))
                 .thenReturn(true);
@@ -362,7 +362,6 @@ public class ComputerControlSessionProcessorTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_NON_DISMISSIBLE_NOTIFICATIONS)
     public void isComputerControlNotification_notificationInfoAttached_returnsTrue()
             throws Exception {
         final int notificationId = 5;
@@ -381,7 +380,6 @@ public class ComputerControlSessionProcessorTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_COMPUTER_CONTROL_NON_DISMISSIBLE_NOTIFICATIONS)
     public void isComputerControlNotification_notificationInfoNotAttached_returnsFalse()
             throws Exception {
         mProcessor.processNewSessionRequest(
@@ -394,21 +392,66 @@ public class ComputerControlSessionProcessorTest {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_COMPUTER_CONTROL_NON_DISMISSIBLE_NOTIFICATIONS)
-    public void isComputerControlNotification_notificationInfoAttached_returnsFalse()
-            throws Exception {
-        final int notificationId = 5;
-        final String notificationTag = "hello";
+    public void isComputerControlSession_returnsCorrectly() throws Exception {
+        // Pre-condition: No sessions exist.
+        assertFalse(mProcessor.isComputerControlSession(DEVICE_ID));
+
+        // Create a session.
         mProcessor.processNewSessionRequest(
                 ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
-        verify(mComputerControlSessionCallback,
-                timeout(CALLBACK_TIMEOUT_MS).times(1))
+        verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                 .onSessionCreated(anyInt(), mSessionArgumentCaptor.capture());
 
-        mSessionArgumentCaptor.getValue().attachNotificationInfo(notificationId, notificationTag);
+        // Assert session with correct device ID is found.
+        assertTrue(mProcessor.isComputerControlSession(DEVICE_ID));
+        // Assert session with incorrect device ID is not found.
+        assertFalse(mProcessor.isComputerControlSession(DEVICE_ID + 1));
 
-        assertFalse(mProcessor.isComputerControlNotification(notificationId, notificationTag,
-                OWNER_PACKAGE_NAME));
+        // Close the session.
+        mSessionArgumentCaptor.getValue().close();
+
+        // Assert session is no longer found after closing.
+        assertFalse(mProcessor.isComputerControlSession(DEVICE_ID));
+    }
+
+    @Test
+    public void closeSessionByUserIntent_sessionExists_closesSession() throws Exception {
+        // Create a session.
+        mProcessor.processNewSessionRequest(
+                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+        verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
+                .onSessionCreated(anyInt(), any());
+
+        // Verify session exists before closing.
+        assertTrue(mProcessor.isComputerControlSession(DEVICE_ID));
+
+        // Close the session via the processor's public API.
+        mProcessor.closeSessionByUserIntent(DEVICE_ID);
+
+        // Verify the session is closed and removed.
+        assertFalse(mProcessor.isComputerControlSession(DEVICE_ID));
+        // Also verify the underlying virtual device is closed.
+        verify(mVirtualDevice).close();
+    }
+
+    @Test
+    public void closeSessionByUserIntent_sessionDoesNotExist_doesNothing() throws Exception {
+        // Create a session.
+        mProcessor.processNewSessionRequest(
+                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+        verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
+                .onSessionCreated(anyInt(), any());
+
+        // Verify session exists before trying to close a different one.
+        assertTrue(mProcessor.isComputerControlSession(DEVICE_ID));
+
+        // Attempt to close a session with an unknown device ID.
+        mProcessor.closeSessionByUserIntent(DEVICE_ID + 1);
+
+        // Verify the existing session was not closed.
+        assertTrue(mProcessor.isComputerControlSession(DEVICE_ID));
+        // And the underlying virtual device was not closed.
+        verify(mVirtualDevice, never()).close();
     }
 
     private ComputerControlSessionParams validParams() {

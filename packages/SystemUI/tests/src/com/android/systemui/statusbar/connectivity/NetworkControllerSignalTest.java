@@ -45,6 +45,7 @@ import com.android.settingslib.net.DataUsageController;
 import com.android.systemui.res.R;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.log.LogBuffer;
+import com.android.systemui.shade.domain.interactor.ShadeModeInteractor;
 import com.android.systemui.statusbar.pipeline.StatusBarPipelineFlags;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.util.CarrierConfigTracker;
@@ -91,7 +92,8 @@ public class NetworkControllerSignalTest extends NetworkControllerBaseTest {
                 mWifiStatusTrackerFactory,
                 mMobileFactory,
                 mMainHandler,
-                mock(LogBuffer.class)
+                mock(LogBuffer.class),
+                mock(ShadeModeInteractor.class)
         );
         TestableLooper.get(this).processAllMessages();
 
@@ -128,7 +130,8 @@ public class NetworkControllerSignalTest extends NetworkControllerBaseTest {
                 mWifiStatusTrackerFactory,
                 mMobileFactory,
                 mMainHandler,
-                mock(LogBuffer.class));
+                mock(LogBuffer.class),
+                mock(ShadeModeInteractor.class));
         TestableLooper.get(this).processAllMessages();
 
         // THEN - NetworkController claims the user is not setup
@@ -163,7 +166,8 @@ public class NetworkControllerSignalTest extends NetworkControllerBaseTest {
                 mWifiStatusTrackerFactory,
                 mMobileFactory,
                 mMainHandler,
-                mock(LogBuffer.class));
+                mock(LogBuffer.class),
+                mock(ShadeModeInteractor.class));
         setupNetworkController();
 
         verifyLastMobileDataIndicators(false, -1, 0);
@@ -201,7 +205,8 @@ public class NetworkControllerSignalTest extends NetworkControllerBaseTest {
                 mWifiStatusTrackerFactory,
                 mMobileFactory,
                 mMainHandler,
-                mock(LogBuffer.class));
+                mock(LogBuffer.class),
+                mock(ShadeModeInteractor.class));
         mNetworkController.registerListeners();
 
         // Wait for the main looper to execute the previous command
@@ -287,7 +292,8 @@ public class NetworkControllerSignalTest extends NetworkControllerBaseTest {
                 mWifiStatusTrackerFactory,
                 mMobileFactory,
                 mMainHandler,
-                mock(LogBuffer.class));
+                mock(LogBuffer.class),
+                mock(ShadeModeInteractor.class));
         setupNetworkController();
 
         // No Subscriptions.

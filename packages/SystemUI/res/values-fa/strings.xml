@@ -88,11 +88,9 @@
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"برنامه یا سازمان شما اجازه نمی‌دهند نماگرفت بگیرید."</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"سرپرست فناوری اطلاعات گرفتن نماگرفت را مسدود کرده است"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"ویرایش"</string>
-    <!-- no translation found for screenshot_edit_description (7802378587672433507) -->
-    <skip />
+    <string name="screenshot_edit_description" msgid="7802378587672433507">"دکمه ویرایش نماگرفت"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"هم‌رسانی"</string>
-    <!-- no translation found for screenshot_share_description (2654362001720033972) -->
-    <skip />
+    <string name="screenshot_share_description" msgid="2654362001720033972">"دکمه هم‌رسانی نماگرفت"</string>
     <string name="screenshot_scroll_label" msgid="2930198809899329367">"ضبط محتوای بیشتر"</string>
     <string name="screenshot_dismiss_description" msgid="4702341245899508786">"رد کردن نماگرفت"</string>
     <string name="screenshot_dismiss_work_profile" msgid="3101530842987697045">"بستن پیام نمایه کاری"</string>
@@ -164,7 +162,7 @@
     <string name="screen_capture_blocked_by_admin" msgid="1751756953683506644">"سرپرست فناوری اطلاعاتتان ضبط صفحه‌نمایش را مسدود کرده است"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"گرفتن اسکرین شات از کل صفحه"</string>
     <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"ضبط کل صفحه‌نمایش"</string>
-    <string name="screen_capture_region_selection_button" msgid="515608875142444130">"گرفتن اسکرین شات از ناحیه انتخاب شده"</string>
+    <string name="screen_capture_region_selection_button" msgid="515608875142444130">"گرفتن نماگرفت از ناحیه انتخاب شده"</string>
     <string name="screen_capture_record_region_selection_button" msgid="3699353194755563053">"ثبت ساحه انتخاب شده"</string>
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"نماگرفت"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"ضبط کردن"</string>
@@ -177,7 +175,7 @@
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"پنجره ضبط"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"گرفتن نماگرفت از ناحیه انتخاب شده"</string>
     <string name="screen_capture_toolbar_region_button_record_a11y" msgid="6829009792885846867">"ضبط ناحیه انتخابی"</string>
-    <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"گرفتن اسکرین شات از کل صفحه"</string>
+    <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"گرفتن نماگرفت از کل صفحه"</string>
     <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"ضبط کل صفحه‌نمایش"</string>
     <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"تنظیمات ضبط صفحه"</string>
     <string name="screen_capture_show_clicks_and_keys" msgid="2151690554364148717">"نمایش کلیک‌ها و کلیدها"</string>
@@ -369,6 +367,7 @@
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"«حسگرها خاموش» فعال است"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"پاک کردن تمام اعلان‌ها"</string>
     <string name="accessibility_notification_bell" msgid="7149451526721220526">"اعلان‌ها"</string>
+    <string name="accessibility_status_bar_assistant_icon" msgid="1174898709836451013">"دستیار"</string>
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{# اعلان دیگر در گروه وجود دارد.}one{# اعلان دیگر در گروه وجود دارد.}other{# اعلان دیگر در گروه وجود دارد.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"صفحه اکنون در حالت افقی قفل است."</string>
@@ -562,7 +561,7 @@
     <string name="zen_mode_on" msgid="9085304934016242591">"روشن"</string>
     <string name="zen_mode_on_with_details" msgid="7416143430557895497">"روشن • <xliff:g id="TRIGGER_DESCRIPTION">%1$s</xliff:g>"</string>
     <string name="zen_mode_off" msgid="1736604456618147306">"خاموش"</string>
-    <string name="zen_mode_set_up" msgid="8231201163894922821">"تنظیم نشده است"</string>
+    <string name="zen_mode_set_up" msgid="8231201163894922821">"تنظیم نشده"</string>
     <string name="zen_mode_no_manual_invocation" msgid="1769975741344633672">"مدیریت در تنظیمات"</string>
     <string name="zen_mode_active_modes" msgid="1625850411578488856">"{count,plural, =0{حالت فعالی وجود ندارد}=1{‫{mode} فعال است}one{‫# حالت فعال است}other{‫# حالت فعال است}}"</string>
     <string name="zen_modes_multiple_on_title" msgid="4918235362988982304">"‫<xliff:g id="NUMBER">%d</xliff:g> حالت"</string>
@@ -710,8 +709,7 @@
     <string name="notification_section_header_gentle" msgid="6804099527336337197">"بی‌صدا"</string>
     <string name="notification_section_header_alerting" msgid="5581175033680477651">"اعلان‌ها"</string>
     <string name="notification_section_header_conversations" msgid="821834744538345661">"مکالمه‌ها"</string>
-    <!-- no translation found for notification_section_header_highlights (1671475076192152483) -->
-    <skip />
+    <string name="notification_section_header_highlights" msgid="1671475076192152483">"برگزیده‌ها"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"پاک کردن همه اعلان‌های بی‌صدا"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"باز کردن تنظیمات اعلان"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{اعلانی ندارید}=1{اعلان‌ها را «{mode}» موقتاً متوقف کرده است}=2{اعلان‌ها را «{mode}» و یک حالت دیگر موقتاً متوقف کرد‌اند}one{اعلان‌ها را «{mode}» و # حالت دیگر موقتاً متوقف کرده‌اند}other{اعلان‌ها را «{mode}» و # حالت دیگر موقتاً متوقف کرده‌اند}}"</string>
@@ -1026,8 +1024,7 @@
     <string name="group_system_access_all_apps_search" msgid="1553588630154197469">"باز کردن فهرست برنامه‌ها"</string>
     <string name="group_system_access_system_settings" msgid="8731721963449070017">"باز کردن تنظیمات"</string>
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"باز کردن دستیار دیجیتال"</string>
-    <!-- no translation found for group_system_access_contextual_search (525635757621336007) -->
-    <skip />
+    <string name="group_system_access_contextual_search" msgid="525635757621336007">"جستجوی بافتاری"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"قفل صفحه"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"یادداشت‌برداری"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"چندوظیفگی"</string>
@@ -1162,7 +1159,23 @@
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"خاموش کردن میان‌بر"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"روشن بماند"</string>
     <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003">"‏کنش "<annotation id="action_key_icon">"icon"</annotation>" و <xliff:g id="ID_1">^1</xliff:g> و <xliff:g id="ID_2">^2</xliff:g> میان‌بر صفحه‌کلید برای استفاده از <xliff:g id="ID_3">^3</xliff:g> است. ‫<xliff:g id="ID_4">^3</xliff:g> صفحه‌خوانی است که به شما امکان می‌دهد موارد روی صفحه را با صدای بلند بشنوید. این ویژگی برای افرادی که دیدن صفحه‌نمایش برایشان دشوار است می‌تواند مفید باشد. این ویژگی ممکن است نحوه عملکرد دستگاهتان را تغییر دهد."</string>
+    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_warning_heading (5958960812509429136) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_warning_message (2026368922103788492) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_heading (5346128898440400425) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_message (5810348116536082139) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_heading (6032379987970298008) -->
+    <skip />
+    <!-- no translation found for accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_message (4565304881759944542) -->
+    <skip />
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"عمل فشار دادن"<annotation id="action_key_icon">"نماد"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> یک ویژگی دسترس‌پذیری را<xliff:g id="ID_3">^3</xliff:g> روشن می کند. «» به شما امکان می‌دهد دستگاه تان را به‌صورت دست‌آزاد کنترل کنید."</string>
+    <!-- no translation found for accessibility_quick_access_dialog_title (8792322423145117379) -->
+    <skip />
+    <!-- no translation found for accessibility_quick_access_dialog_done_button_text (8013849920696848138) -->
+    <skip />
     <string name="tuner_lock_screen" msgid="2267383813241144544">"صفحه قفل"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"درحال خاموش شدن…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"دیدن اقدامات محافظتی"</string>
@@ -1336,7 +1349,7 @@
     <string name="controls_dialog_message" msgid="342066938390663844">"پیشنهاد <xliff:g id="APP">%s</xliff:g>"</string>
     <string name="controls_tile_locked" msgid="731547768182831938">"دستگاه قفل است"</string>
     <string name="controls_settings_show_controls_dialog_title" msgid="3357852503553809554">"امکان دیدن و کنترل دستگاه‌ها از صفحه قفل وجود داشته باشد؟"</string>
-    <string name="controls_settings_show_controls_dialog_message" msgid="7666211700524587969">"می‌توانید کنترل‌هایی برای دستگاه‌های خارجی به صفحه قفل اضافه کنید.\n\nبرنامه دستگاهتان ممکن است به شما اجازه دهد بعضی‌از دستگاه‌ها را بدون باز کردن قفل تلفن یا رایانه لوحی‌تان کنترل کنید.\n\nهرزمان بخواهید می‌توانید در «تنظیمات» تغییراتی اعمال کنید."</string>
+    <string name="controls_settings_show_controls_dialog_message" msgid="7666211700524587969">"می‌توانید کنترل‌هایی برای دستگاه‌های خارجی به صفحه قفل اضافه کنید.\n\nبرنامه دستگاهتان ممکن است به شما اجازه دهد بعضی‌از دستگاه‌ها را بدون باز کردن قفل تلفن یا رایانه لوحی‌تان کنترل کنید.\n\nهر زمان‌که بخواهید می‌توانید در «تنظیمات» تغییراتی اعمال کنید."</string>
     <string name="controls_settings_trivial_controls_dialog_title" msgid="7593188157655036677">"امکان کنترل دستگاه‌ها از صفحه قفل وجود داشته باشد؟"</string>
     <string name="controls_settings_trivial_controls_dialog_message" msgid="397178734990952575">"می‌توانید بعضی‌از دستگاه‌ها را بدون باز کردن قفل تلفن یا رایانه لوحی‌تان کنترل کنید. برنامه دستگاهتان تعیین می‌کند که کدام دستگاه‌ها را می‌توان با این روش کنترل کرد."</string>
     <string name="controls_settings_dialog_neutral_button" msgid="4514446354793124140">"نه متشکرم"</string>
@@ -1475,17 +1488,12 @@
     <string name="wifi_scan_notify_message" msgid="3753839537448621794">"‏برای بهبود تجربه استفاده از دستگاه، برنامه‌ها و سرویس‌ها همچنان می‌توانند در هر زمانی شبکه‌های Wi-Fi را اسکن کنند؛ حتی وقتی که Wi-Fi خاموش باشد. می‌توانید این مورد را در تنظیمات اسکن کردن Wi‑Fi تغییر دهید. "<annotation id="link">"تغییر"</annotation></string>
     <string name="turn_off_airplane_mode" msgid="8425587763226548579">"خاموش کردن حالت هواپیما"</string>
     <string name="qs_tile_request_dialog_text" msgid="3501359944139877694">"<xliff:g id="APPNAME">%1$s</xliff:g> می‌خواهد کاشی زیر را به «تنظیمات فوری» اضافه کند"</string>
-    <!-- no translation found for qs_tile_request_dialog_text_with_size (732578771040573291) -->
-    <skip />
+    <string name="qs_tile_request_dialog_text_with_size" msgid="732578771040573291">"‫<xliff:g id="APPNAME">%1$s</xliff:g> می‌خواهد کاشی‌ای به «تنظیمات فوری» اضافه کند. برای ادامه دادن، اندازه کاشی را انتخاب کنید."</string>
     <string name="qs_tile_request_dialog_add" msgid="4888460910694986304">"کاشی اضافه شود"</string>
-    <!-- no translation found for qs_tile_request_dialog_not_add (8375425041428574394) -->
-    <skip />
-    <!-- no translation found for qs_tile_request_dialog_title (5654666862347548966) -->
-    <skip />
-    <!-- no translation found for qs_tile_request_dialog_small_format_content_description (5429197059724172135) -->
-    <skip />
-    <!-- no translation found for qs_tile_request_dialog_large_format_content_description (67983044110405787) -->
-    <skip />
+    <string name="qs_tile_request_dialog_not_add" msgid="8375425041428574394">"کاشی اضافه نشود"</string>
+    <string name="qs_tile_request_dialog_title" msgid="5654666862347548966">"افزودن کاشی به تنظیمات فوری"</string>
+    <string name="qs_tile_request_dialog_small_format_content_description" msgid="5429197059724172135">"قالب کوچک"</string>
+    <string name="qs_tile_request_dialog_large_format_content_description" msgid="67983044110405787">"قالب بزرگ"</string>
     <string name="qs_user_switch_dialog_title" msgid="3045189293587781366">"انتخاب کاربر"</string>
     <string name="fgs_manager_footer_label" msgid="8276763570622288231">"{count,plural, =1{# برنامه فعال است}one{# برنامه فعال است}other{# برنامه فعال است}}"</string>
     <string name="fgs_dot_content_description" msgid="2865071539464777240">"اطلاعات جدید"</string>
@@ -1709,7 +1717,7 @@
     <string name="accessibility_deprecate_extra_dim_dialog_toast" msgid="165474092660941104">"میان‌برهای بسیار کم‌نور برداشته شدند"</string>
     <string name="qs_edit_mode_category_connectivity" msgid="4559726936546032672">"اتصال‌پذیری"</string>
     <string name="qs_edit_mode_category_accessibility" msgid="7969091385071475922">"دسترس‌پذیری"</string>
-    <string name="qs_edit_mode_category_utilities" msgid="8123080090108420095">"برنامه‌های کمکی"</string>
+    <string name="qs_edit_mode_category_utilities" msgid="8123080090108420095">"کاروری‌ها"</string>
     <string name="qs_edit_mode_category_privacy" msgid="6577774443194551775">"حریم خصوصی"</string>
     <string name="qs_edit_mode_category_providedBySystemApps" msgid="8010990312139645288">"از برنامه‌های سیستم"</string>
     <string name="qs_edit_mode_category_providedByApps" msgid="4736433865199049415">"از برنامه‌هایی که نصب کرده‌اید"</string>

@@ -15,16 +15,32 @@
  */
 package com.android.server.pm;
 
+import android.Manifest;
+import static android.content.pm.UserInfo.FLAG_ADMIN;
+import static android.content.pm.UserInfo.FLAG_FULL;
+
+import static com.android.server.pm.HsumBootUserInitializer.getFullAdminFilter;
+
 import android.annotation.UserIdInt;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.ContentResolver;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.ContentObserver;
 import android.os.Handler;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
 
+import androidx.annotation.RequiresPermission;
+
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.utils.Slogf;
 import com.android.server.utils.TimingsTraceAndSlog;
+
+import java.util.List;
 
 /**
  * Class responsible for device provisioning related activities for when the device boots in
@@ -36,11 +52,27 @@ final class HsuDeviceProvisioner extends ContentObserver {
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     private final ContentResolver mContentResolver;
+    private final PackageManager mPm;
+    private final UserManagerService mUms;
+
+    private @UserIdInt int mSettingsSourceUserId = UserHandle.USER_NULL;
     private @UserIdInt int mBootUserId = UserHandle.USER_NULL;
 
-    public HsuDeviceProvisioner(Handler handler, ContentResolver contentResolver) {
+    /**
+     * Constructs a new HsuDeviceProvisioner.
+     *
+     * <p>This code runs within the system_server process. The provided {@code context}
+     * is therefore associated with {@link UserHandle#USER_SYSTEM} (user 0).
+     *
+     * <p>Consequently, the {@link PackageManager} obtained via {@code context.getPackageManager()}
+     * will operate with the privileges and scope of the system user.
+     */
+    public HsuDeviceProvisioner(Context context, Handler handler, ContentResolver contentResolver,
+            UserManagerService ums) {
         super(handler);
         mContentResolver = contentResolver;
+        mPm = context.getPackageManager();
+        mUms = ums;
     }
 
     /**
@@ -50,6 +82,7 @@ final class HsuDeviceProvisioner extends ContentObserver {
      */
     public void init() {
         if (isDeviceProvisioned()) {
+            copySecureSettingFromFirstAdmin();
             return;
         }
 
@@ -65,11 +98,13 @@ final class HsuDeviceProvisioner extends ContentObserver {
         if (isDeviceProvisioned()) {
             // Set USER_SETUP_COMPLETE for the (headless) system user only when the device
             // has been set up at least once.
-            Slogf.i(TAG, "Marking USER_SETUP_COMPLETE for system user");
+            Slogf.i(TAG,
+                "Marking USER_SETUP_COMPLETE and disabling SUW home activity for system user");
             Settings.Secure.putInt(mContentResolver, Settings.Secure.USER_SETUP_COMPLETE, 1);
             mContentResolver.unregisterContentObserver(this);
+            disableSetupWizardHomeForSystemUser();
             // Copy settings from the Real user to the system user.
-            copySecureSettings();
+            copySecureSettingFromSourceUser();
         }
     }
 
@@ -87,40 +122,86 @@ final class HsuDeviceProvisioner extends ContentObserver {
         }
     }
 
-    private void copySecureSettings() {
-        copySecureSettingFromBootUser(Settings.Secure.BUGREPORT_IN_POWER_MENU,
+    @VisibleForTesting
+    void copySecureSettingFromSourceUser() {
+        copySecureSettingFromSourceUser(Settings.Secure.BUGREPORT_IN_POWER_MENU,
                 /* defaultValue= */ 0);
     }
 
-    private void copySecureSettingFromBootUser(String settingName, int defaultValue) {
-        if (mBootUserId == UserHandle.USER_NULL) {
-            Slogf.w(TAG, "copySecureSettingFromBootUser called before boot user was set");
+    private void copySecureSettingFromFirstAdmin() {
+        var filter = getFullAdminFilter();
+        var users = mUms.getUsers(filter);
+        if (users.isEmpty()) {
+            Slogf.wtf(TAG, "No users found matching filter %s", filter);
             return;
         }
-        if (mBootUserId == UserHandle.USER_SYSTEM) {
+        int firstUserId = users.get(0).id;
+        setSettingsSourceUser(firstUserId);
+        copySecureSettingFromSourceUser();
+    }
+
+    private void copySecureSettingFromSourceUser(String settingName, int defaultValue) {
+        if (mSettingsSourceUserId == UserHandle.USER_NULL) {
+            Slogf.w(TAG, "copySecureSettingFromSourceUser called before source user was set");
+            return;
+        }
+        if (mSettingsSourceUserId == UserHandle.USER_SYSTEM) {
             if (DEBUG) {
-                Slogf.d(TAG, "Skipping copySecureSettingFromBootUser for %s: "
-                        + "boot user is system user", settingName);
+                Slogf.d(TAG, "Skipping copySecureSettingFromSourceUser for %s: "
+                        + "source user is system user", settingName);
             }
             return;
         }
         int settingValue =
                 Settings.Secure.getIntForUser(
-                        mContentResolver, settingName, defaultValue, mBootUserId);
-        Slogf.i(TAG, "copySecureSettingFromBootUser (userId=%d): %s, value=%d", mBootUserId,
-                settingName, settingValue);
+                        mContentResolver, settingName, defaultValue, mSettingsSourceUserId);
+        Slogf.i(TAG, "copySecureSettingFromSourceUser (userId=%d): %s, value=%d",
+                mSettingsSourceUserId, settingName, settingValue);
         Settings.Secure.putIntForUser(
                 mContentResolver, settingName, settingValue, UserHandle.USER_SYSTEM);
     }
 
+    @RequiresPermission(Manifest.permission.CHANGE_COMPONENT_ENABLED_STATE)
+    @SuppressWarnings("AndroidFrameworkRequiresPermission")
+    private void disableSetupWizardHomeForSystemUser() {
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_SETUP_WIZARD);
+
+        int flags = PackageManager.MATCH_SYSTEM_ONLY | PackageManager.MATCH_DIRECT_BOOT_AWARE
+            | PackageManager.MATCH_DIRECT_BOOT_UNAWARE | PackageManager.MATCH_DISABLED_COMPONENTS;
+
+        List<ResolveInfo> matches = mPm.queryIntentActivities(intent, flags);
+
+        if (matches == null || matches.isEmpty()) {
+            Slogf.w(TAG, "Could not find Setup Wizard component for system user");
+            return;
+        }
+
+        ComponentName setupWizardHomeComponent =
+            matches.get(0).getComponentInfo().getComponentName();
+
+        if (setupWizardHomeComponent != null) {
+            Slogf.i(TAG, "Disabling Setup Wizard component for system user: %s",
+                setupWizardHomeComponent.flattenToString());
+
+            try {
+                mPm.setComponentEnabledSetting(setupWizardHomeComponent,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP);
+                Slogf.i(TAG, "Successfully disabled %s",
+                    setupWizardHomeComponent.flattenToString());
+            }  catch (Exception e) {
+                Slogf.e(TAG, e, "Exception disabling component: %s",
+                    setupWizardHomeComponent.flattenToString());
+            }
+        }
+    }
+
     /**
-     * Sets the user ID of the user that was booted. This is used to copy settings from the boot
-     * user to the system user.
-     *
-     * @param userId The user ID of the boot user.
+     * Sets the user ID of the user to copy settings from.
      */
-    void setBootUser(@UserIdInt int userId) {
-        mBootUserId = userId;
-        Slogf.i(TAG, "Boot User set %d", mBootUserId);
+    void setSettingsSourceUser(@UserIdInt int sourceUserId) {
+        mSettingsSourceUserId = sourceUserId;
+        Slogf.i(TAG, "Settings Source User set %d", mSettingsSourceUserId);
     }
 }

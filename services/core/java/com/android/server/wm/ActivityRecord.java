@@ -60,6 +60,7 @@ import static android.content.Intent.CATEGORY_LAUNCHER;
 import static android.content.Intent.CATEGORY_SECONDARY_HOME;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_NO_HISTORY;
+import static android.content.pm.ActivityInfo.CONFIG_ASSETS_PATHS;
 import static android.content.pm.ActivityInfo.CONFIG_ORIENTATION;
 import static android.content.pm.ActivityInfo.CONFIG_RESOURCES_UNUSED;
 import static android.content.pm.ActivityInfo.CONFIG_SCREEN_LAYOUT;
@@ -245,6 +246,7 @@ import android.app.Activity;
 import android.app.ActivityManager.TaskDescription;
 import android.app.ActivityOptions;
 import android.app.HandoffActivityData;
+import android.app.HandoffActivityParams;
 import android.app.IApplicationThread;
 import android.app.IScreenCaptureObserver;
 import android.app.PendingIntent;
@@ -516,9 +518,10 @@ public final class ActivityRecord extends WindowToken {
     private State mState;    // current state we are in
     private Bundle mIcicle;         // last saved activity state
     private HandoffActivityData mHandoffActivityData; // last saved handoff activity data
-    private boolean mHandoffEnabled = false; // if Handoff is enabled for this activity
-    private boolean mAllowFullTaskRecreation = false; // if the entire task stack can be recreated
-                                                      // during handoff of this activity.
+    private boolean mHandoffEnabled; // If Handoff is enabled for this activity.
+    private HandoffActivityParams mHandoffActivityParams = null; // Configuration params for
+                                                                 // Handoff. This will be null if
+                                                                 // Handoff is disabled.
     private PersistableBundle mPersistentState; // last persistently saved activity state
     private boolean mHaveState = true; // Indicates whether the last saved state of activity is
                                        // preserved. This starts out 'true', since the initial state
@@ -1301,12 +1304,21 @@ public final class ActivityRecord extends WindowToken {
     }
 
     /** Update if handoff is enabled for this activity. */
-    void setHandoffEnabled(boolean handoffEnabled, boolean allowFullTaskRecreation) {
-        final boolean didChange = mHandoffEnabled != handoffEnabled;
+    void setHandoffEnabled(
+        boolean handoffEnabled,
+        @Nullable HandoffActivityParams handoffActivityParams) {
+
+        final boolean didChange
+            = mHandoffEnabled != handoffEnabled || !Objects.equals(
+                    mHandoffActivityParams,
+                    handoffActivityParams);
+
         mHandoffEnabled = handoffEnabled;
-        mAllowFullTaskRecreation = allowFullTaskRecreation;
         if (!mHandoffEnabled) {
             mHandoffActivityData = null;
+            mHandoffActivityParams = null;
+        } else {
+            mHandoffActivityParams = handoffActivityParams;
         }
 
         if (didChange) {
@@ -1324,17 +1336,12 @@ public final class ActivityRecord extends WindowToken {
     }
 
     /**
-     * Get if the entire task will be recreated when handing off this activity.
-     * @see #setHandoffEnabled() to change this parameter. If Handoff is disabled for this
-     * activity, this will return false.
-     * @return if the entire task will be recreated when handing off this activity.
+     * Get configuration parameters for Handoff
+     * @return Handoff configuration parameters.
      */
-    boolean isHandoffFullTaskRecreationAllowed() {
-        if (!isHandoffEnabled()) {
-            return false;
-        }
-
-        return mAllowFullTaskRecreation;
+    @Nullable
+    HandoffActivityParams getHandoffActivityParams() {
+        return mHandoffActivityParams;
     }
 
     /**
@@ -1737,6 +1744,8 @@ public final class ActivityRecord extends WindowToken {
         }
 
         mDisplayContent.onRunningActivityChanged();
+        mAppCompatController.getResourceOverlayPolicy().setDisplayId(
+                mDisplayContent.getDisplayId());
 
         if (prevDc == null) {
             return;
@@ -3624,16 +3633,6 @@ public final class ActivityRecord extends WindowToken {
         }
 
         final Task rootTask = getRootTask();
-        final boolean mayAdjustTop = !Flags.polishCloseWallpaperIncludesOpenChange()
-                && (isState(RESUMED) || rootTask.getTopResumedActivity() == null)
-                && rootTask.isFocusedRootTaskOnDisplay()
-                // Do not adjust focus task because the task will be reused to launch new activity.
-                && !task.isClearingToReuseTask();
-        final boolean shouldAdjustGlobalFocus = mayAdjustTop
-                // It must be checked before {@link #makeFinishingLocked} is called, because a
-                // root task is not visible if it only contains finishing activities.
-                && mRootWindowContainer.isTopDisplayFocusedRootTask(rootTask);
-
         final ActionChain chain;
         final Transition sourceTransit = mTransitionController.getCollectingTransition();
         if (sourceTransit != null
@@ -3683,13 +3682,6 @@ public final class ActivityRecord extends WindowToken {
                 if (displayArea != null && rootTask == displayArea.mPreferredTopFocusableRootTask) {
                     displayArea.clearPreferredTopFocusableRootTask();
                 }
-            }
-            // We are finishing the top focused activity and its task has nothing to be focused so
-            // the next focusable task should be focused.
-            if (mayAdjustTop && task.topRunningActivity(true /* focusableOnly */)
-                    == null) {
-                task.adjustFocusToNextFocusableTask("finish-top", false /* allowFocusSelf */,
-                        shouldAdjustGlobalFocus);
             }
 
             finishActivityResults(resultCode, resultData, resultGrants);
@@ -8885,6 +8877,19 @@ public final class ActivityRecord extends WindowToken {
         // Some apps relaunch unexpectedly with display move and crash.
         configChanged |= mAppCompatController.getDisplayCompatModePolicy()
                 .getDisplayCompatModeConfigMask();
+
+        // For CONFIG_ASSETS_PATHS change, check the constraints for the resource overlays which
+        // have been added/removed, and figure out if they are going to affect this activity at all.
+        // If the activity already handles CONFIG_ASSETS_PATHS changes, then nothing needs to be
+        // done.
+        // TODO(b/454293961): Explore if display-specific configuration changes can be applied for
+        // RROs with constraints, and if so, then remove this temporary solution.
+        if ((configChanged & CONFIG_ASSETS_PATHS) == 0
+                && (changes & CONFIG_ASSETS_PATHS) != 0
+                && !mAppCompatController.getResourceOverlayPolicy()
+                .doResourceOverlayChangesAffectActivity()) {
+            configChanged |= CONFIG_ASSETS_PATHS;
+        }
 
         return (changes & (~configChanged)) != 0;
     }

@@ -467,8 +467,9 @@ private fun CutoutAwareShadeHeader(
         check(measurables[1].size == 1)
 
         val screenWidth = constraints.maxWidth
+        val width = max((screenWidth - cutoutWidth) / 2, 0)
         val height = max(cutoutHeight + (cutoutTop * 2), statusBarHeight.roundToPx())
-        val childConstraints = Constraints.fixed((screenWidth - cutoutWidth) / 2, height)
+        val childConstraints = Constraints.fixed(width, height)
 
         val startMeasurable = measurables[0][0]
         val endMeasurable = measurables[1][0]
@@ -587,6 +588,8 @@ private fun ShadeCarrierGroup(viewModel: ShadeHeaderViewModel, modifier: Modifie
         return
     }
 
+    val textColor = ShadeHeader.Colors.textColor
+    val inverseTextColor = ShadeHeader.Colors.inverseTextColor
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         for (subId in viewModel.mobileSubIds) {
             AndroidView(
@@ -602,7 +605,14 @@ private fun ShadeCarrierGroup(viewModel: ShadeHeaderViewModel, modifier: Modifie
                                 ) as ShadeCarrierGroupMobileIconViewModel),
                         )
                         .also { it.setOnClickListener { viewModel.onShadeCarrierGroupClicked() } }
-                }
+                },
+                update = { view ->
+                    view.setStyleAndTint(
+                        R.style.TextAppearance_QS_Status,
+                        textColor.toArgb(),
+                        inverseTextColor.toArgb(),
+                    )
+                },
             )
         }
     }
@@ -614,6 +624,8 @@ private fun ShadeCarrierGroupKairos(
     viewModel: ShadeHeaderViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val textColor = ShadeHeader.Colors.textColor
+    val inverseTextColor = ShadeHeader.Colors.inverseTextColor
     Row(modifier = modifier) {
         ActivatedKairosSpec(
             buildSpec = viewModel.mobileIconsViewModelKairos.get().composeWrapper(),
@@ -643,7 +655,14 @@ private fun ShadeCarrierGroupKairos(
                             .also {
                                 it.setOnClickListener { viewModel.onShadeCarrierGroupClicked() }
                             }
-                    }
+                    },
+                    update = { view ->
+                        view.setStyleAndTint(
+                            R.style.TextAppearance_QS_Status,
+                            textColor.toArgb(),
+                            inverseTextColor.toArgb(),
+                        )
+                    },
                 )
             }
         }

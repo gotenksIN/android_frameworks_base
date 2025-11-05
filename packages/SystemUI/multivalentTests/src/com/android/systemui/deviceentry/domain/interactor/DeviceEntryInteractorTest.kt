@@ -41,15 +41,20 @@ import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
 import com.android.systemui.keyguard.data.repository.fakeTrustRepository
 import com.android.systemui.keyguard.domain.interactor.biometricUnlockInteractor
+import com.android.systemui.keyguard.domain.interactor.keyguardDismissActionInteractor
 import com.android.systemui.keyguard.shared.model.BiometricUnlockSource
+import com.android.systemui.keyguard.shared.model.DismissAction
+import com.android.systemui.keyguard.shared.model.KeyguardDone
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.collectValues
+import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useStandardTestDispatcher
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
+import com.android.systemui.scene.data.model.SceneStack
 import com.android.systemui.scene.data.model.asIterable
 import com.android.systemui.scene.domain.interactor.sceneBackInteractor
 import com.android.systemui.scene.domain.interactor.sceneInteractor
@@ -233,12 +238,30 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
             assertThat(canSwipeToEnter).isFalse()
 
             kosmos.biometricUnlockInteractor.setBiometricUnlockState(
-                unlockStateInt = BiometricUnlockController.MODE_NONE,
+                unlockStateInt = BiometricUnlockController.MODE_NONE_UNLOCKED,
                 biometricUnlockSource = BiometricUnlockSource.FACE_SENSOR,
             )
             trustRepository.setCurrentUserTrusted(false)
 
             assertThat(canSwipeToEnter).isTrue()
+        }
+
+    @Test
+    fun canSwipeToEnter_whenNotAuthenticatedByFace_isFalse() =
+        kosmos.runTest {
+            val canSwipeToEnter by collectLastValue(underTest.canSwipeToEnter)
+            fakeAuthenticationRepository.setAuthenticationMethod(Password)
+            switchToScene(Scenes.Lockscreen)
+            assertThat(canSwipeToEnter).isFalse()
+
+            // MODE_ONLY_WAKE can occur if unlocking isn't allowed:
+            kosmos.biometricUnlockInteractor.setBiometricUnlockState(
+                unlockStateInt = BiometricUnlockController.MODE_ONLY_WAKE,
+                biometricUnlockSource = BiometricUnlockSource.FACE_SENSOR,
+            )
+            trustRepository.setCurrentUserTrusted(false)
+
+            assertThat(canSwipeToEnter).isFalse()
         }
 
     @Test
@@ -356,6 +379,38 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
         }
 
     @Test
+    fun showOrUnlockDevice_dismissActionAnimates_runsTransitionToGone() =
+        kosmos.runTest {
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val backStack by collectLastValue(sceneBackInteractor.backStack)
+            switchToScene(Scenes.Lockscreen)
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+            switchToScene(Scenes.Shade)
+            assertThat(currentScene).isEqualTo(Scenes.Shade)
+            assertThat(backStack!!.asIterable().toList()).isEqualTo(listOf(Scenes.Lockscreen))
+
+            // Since the dismiss action wants to animate over the lockscreen, attempting device
+            // entry should animate Lockscreen -> Gone instead of replacing Lockscreen in the back
+            // stack with no animation.
+            kosmos.keyguardDismissActionInteractor.setDismissAction(
+                DismissAction.RunAfterKeyguardGone(
+                    dismissAction = { KeyguardDone.LATER },
+                    onCancelAction = {},
+                    message = "",
+                    willAnimateOnLockscreen = true,
+                )
+            )
+            runCurrent()
+            fakeAuthenticationRepository.setAuthenticationMethod(None)
+
+            underTest.attemptDeviceEntry("test")
+            runCurrent()
+
+            assertThat(currentScene).isEqualTo(Scenes.Gone)
+            assertThat(backStack!!.asIterable().toList()).isEqualTo(emptyList<SceneStack>())
+        }
+
+    @Test
     fun showOrUnlockDevice_authMethodSwipe_switchesToGoneScene() =
         kosmos.runTest {
             val currentScene by collectLastValue(sceneInteractor.currentScene)
@@ -462,6 +517,33 @@ class DeviceEntryInteractorTest : SysuiTestCase() {
             authenticationInteractor.authenticate(FakeAuthenticationRepository.DEFAULT_PIN)
 
             assertThat(isDeviceEntered).isTrue()
+            assertThat(isDeviceEnteredDirectly).isFalse()
+        }
+
+    @Test
+    fun isDeviceEntered_goneToCommunal_emitsFalse() =
+        kosmos.runTest {
+            val isDeviceEntered by collectLastValue(underTest.isDeviceEntered)
+            val isDeviceEnteredDirectly by collectLastValue(underTest.isDeviceEnteredDirectly)
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            assertThat(isDeviceEntered).isFalse()
+            assertThat(isDeviceEnteredDirectly).isFalse()
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+
+            // Navigate to communal
+            switchToScene(Scenes.Communal)
+            assertThat(currentScene).isEqualTo(Scenes.Communal)
+
+            // Unlock and verify device entered
+            authenticationInteractor.authenticate(FakeAuthenticationRepository.DEFAULT_PIN)
+            switchToScene(Scenes.Gone)
+            assertThat(currentScene).isEqualTo(Scenes.Gone)
+            assertThat(isDeviceEntered).isTrue()
+            assertThat(isDeviceEnteredDirectly).isTrue()
+
+            // Return to communal and verify device not entered
+            switchToScene(Scenes.Communal)
+            assertThat(isDeviceEntered).isFalse()
             assertThat(isDeviceEnteredDirectly).isFalse()
         }
 

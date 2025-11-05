@@ -4185,7 +4185,8 @@ public class NotificationManagerService extends SystemService {
 
             // If the display cannot host tasks (such as a display used for mirroring), show the
             // toast on default display instead.
-            if (DesktopExperienceFlags.ENABLE_MIRROR_DISPLAY_NO_ACTIVITY.isTrue()) {
+            if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()
+                    && DesktopExperienceFlags.ENABLE_MIRROR_DISPLAY_NO_ACTIVITY.isTrue()) {
                 Display display = mDisplayManager.getDisplay(displayId);
                 if (display != null && !display.canHostTasks()) {
                     if (DBG) {
@@ -11601,7 +11602,9 @@ public class NotificationManagerService extends SystemService {
         // Group the adjustments by notification record.
         final ArrayMap<NotificationRecord, List<Adjustment>> adjustmentsByRecord = new ArrayMap<>();
         for (Adjustment adjustment : adjustments) {
-            final NotificationRecord r = mNotificationsByKey.get(adjustment.getKey());
+            // Search both enqueued and posted notifications, as the adjustment could have come in
+            // before the notification was posted.
+            final NotificationRecord r = findNotificationByKeyLocked(adjustment.getKey());
             if (r == null) {
                 Slog.w(
                         TAG,

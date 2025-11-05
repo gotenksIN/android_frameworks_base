@@ -134,6 +134,16 @@ flag {
 
 flag {
     namespace: "windowing_sdk"
+    name: "fix_bubble_back_gesture"
+    description: "Fix no responsive back gesture on some Bubbled apps"
+    bug: "416330151"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "windowing_sdk"
     name: "allow_multi_window_non_resizable_activities"
     description: "Allows non-resizable activities to be launched into WINDOWING_MODE_MULTI_WINDOW."
     bug: "419379112"
@@ -177,4 +187,14 @@ flag {
     name: "device_engagement_mode"
     description: "Track and report device engagement modes, indicating the device's current interaction capabilities (e.g. audio-only)."
     bug: "423990404"
+}
+
+flag {
+    name: "move_user_display_settings_to_de_storage"
+    namespace: "windowing_sdk"
+    description: "Moves non-system user display settings from CE to DE storage to resolve early user setup access issues."
+    bug: "442757820"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

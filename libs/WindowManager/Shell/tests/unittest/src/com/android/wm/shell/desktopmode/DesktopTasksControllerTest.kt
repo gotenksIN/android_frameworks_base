@@ -54,6 +54,7 @@ import android.content.res.Resources
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RectF
 import android.os.Binder
 import android.os.Bundle
 import android.os.Handler
@@ -112,7 +113,6 @@ import com.android.window.flags.Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP
 import com.android.window.flags.Flags.FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT
 import com.android.window.flags.Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND
 import com.android.window.flags.Flags.FLAG_ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY
-import com.android.window.flags.Flags.FLAG_MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE
 import com.android.wm.shell.MockToken
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
@@ -500,9 +500,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             DisplayDisconnectTransitionHandler(
                 transitions = transitions,
                 shellInit = shellInit,
+                splitScreenController = Optional.of(splitScreenController),
                 desktopTasksController = Optional.of(controller),
-                displayController = displayController,
-                rootTaskDisplayAreaOrganizer = rootTaskDisplayAreaOrganizer,
             )
 
         shellInit.init()
@@ -1607,6 +1606,24 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun handleRequest_newFreeformTaskLaunch_boundsSetFromOptions_cascadeNotApplied() {
+        setUpLandscapeDisplay()
+
+        setUpFreeformTask(bounds = DEFAULT_LANDSCAPE_BOUNDS)
+        val freeformTask =
+            setUpFreeformTask(bounds = DEFAULT_LANDSCAPE_BOUNDS, active = false).apply {
+                leafTaskBoundsFromOptions = true
+            }
+
+        val wct = controller.handleRequest(Binder(), createTransition(freeformTask))
+
+        assertNotNull(wct, "should handle request")
+        val finalBounds = findBoundsChange(wct, freeformTask)
+        assertThat(finalBounds).isEqualTo(DEFAULT_LANDSCAPE_BOUNDS)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun handleRequest_newFreeformTaskLaunch_newDesk_desksCascadeIndependently() {
         setUpLandscapeDisplay()
         val stableBounds =
@@ -1835,6 +1852,29 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         val finalBounds = findBoundsChange(wct, task)
         assertThat(stableBounds.getDesktopTaskPosition(finalBounds!!))
             .isEqualTo(DesktopTaskPosition.Center)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_REMEMBERED_BOUNDS)
+    fun getInitialBounds_withRememberedBounds_returnsCorrectBounds() {
+        setUpLandscapeDisplay()
+        val packageName = "com.test.app"
+        val task = setUpFreeformTask().apply { baseActivity = ComponentName(packageName, "") }
+        val boundsRatio = RectF(0.1f, 0.2f, 0.8f, 0.9f)
+        val stableBounds = Rect().also { displayLayout.getStableBoundsForDesktopMode(it) }
+
+        taskRepository.setRememberedBoundsRatio(packageName, boundsRatio)
+
+        val bounds = controller.getInitialBounds(displayLayout, task, 0)
+
+        val expectedBounds =
+            Rect(
+                (stableBounds.left + stableBounds.width() * boundsRatio.left).toInt(),
+                (stableBounds.top + stableBounds.height() * boundsRatio.top).toInt(),
+                (stableBounds.left + stableBounds.width() * boundsRatio.right).toInt(),
+                (stableBounds.top + stableBounds.height() * boundsRatio.bottom).toInt(),
+            )
+        assertThat(bounds).isEqualTo(expectedBounds)
     }
 
     @Test
@@ -3116,7 +3156,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @EnableFlags(
         Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
         com.android.launcher3.Flags.FLAG_ENABLE_ALT_TAB_KQS_FLATENNING,
-        FLAG_MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE,
     )
     fun moveToFullscreen_fullscreenNonRunningTask_deskActive_cleansUpSourceDisplay() {
         whenever(focusTransitionObserver.globallyFocusedDisplayId).thenReturn(SECOND_DISPLAY)
@@ -3137,7 +3176,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @EnableFlags(
         Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
         com.android.launcher3.Flags.FLAG_ENABLE_ALT_TAB_KQS_FLATENNING,
-        FLAG_MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE,
     )
     fun moveToFullscreen_fullscreenNonRunningTask_noDeskActive_cleansUpSourceDisplay() {
         whenever(focusTransitionObserver.globallyFocusedDisplayId).thenReturn(SECOND_DISPLAY)
@@ -4427,10 +4465,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT,
-        FLAG_MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE,
-    )
+    @EnableFlags(FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT)
     fun moveToNextDesktopDisplay_projectedMode_movesToFullscreenOnDefaultDisplay() {
         // Setup state where a desktop task is running on a secondary display while the device is in
         // projected mode
@@ -4466,10 +4501,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT,
-        FLAG_MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE,
-    )
+    @EnableFlags(FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT)
     fun moveToNextDesktopDisplay_projectedMode_cleansUpSourceDisplay() {
         // Setup state where a desktop task is running on a secondary display while the device is in
         // projected mode
@@ -4512,11 +4544,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT,
-        FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        FLAG_MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE,
-    )
+    @EnableFlags(FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT, FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun moveToNextDesktopDisplay_projectedMode_movesToDesktopOnConnectedDisplay() {
         // Setup state where a desktop task is running on a secondary display while the device is in
         // projected mode
@@ -4537,11 +4565,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT,
-        FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        FLAG_MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE,
-    )
+    @EnableFlags(FLAG_ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT, FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun moveToNextDesktopDisplay_projectedMode_movesToDesktopOnConnectedDisplay_skipTasksWithDisabledEntryPoints() {
         // Setup state where a desktop task is running on a secondary display while the device is in
         // projected mode
@@ -5581,6 +5605,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_CLOSE_SPLIT_TASK_INSTEAD_OF_MOVING_TO_BACK)
     fun closeTask_splitScreen_movesOtherToFullscreen() {
         val task = createSplitScreenTask()
         task.baseActivity = ComponentName("mypacakge", "mypacakge.MyActivity")
@@ -5594,7 +5619,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         val result = controller.closeTask(task)
 
-        assertThat(result).isEqualTo(DesktopTasksController.CloseTaskResult.CLOSED_SPLIT_SCREEN)
+        assertThat(result)
+            .isEqualTo(DesktopTasksController.CloseTaskResult.CLOSE_REQUESTED_SPLIT_SCREEN)
         verify(splitScreenController)
             .moveTaskToFullscreen(
                 eq(otherTask.taskId),
@@ -5602,8 +5628,28 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             )
     }
 
+    @EnableFlags(Flags.FLAG_CLOSE_SPLIT_TASK_INSTEAD_OF_MOVING_TO_BACK)
+    fun closeTask_splitScreen_requestsCloseTask() {
+        val task = createSplitScreenTask()
+        task.baseActivity = ComponentName("mypacakge", "mypacakge.MyActivity")
+        val otherTask = createSplitScreenTask()
+
+        whenever(splitScreenController.isTaskInSplitScreen(task.taskId)).thenReturn(true)
+        whenever(splitScreenController.getSplitPosition(task.taskId))
+            .thenReturn(SPLIT_POSITION_TOP_OR_LEFT)
+        whenever(splitScreenController.getTaskInfo(SPLIT_POSITION_BOTTOM_OR_RIGHT))
+            .thenReturn(otherTask)
+
+        val result = controller.closeTask(task)
+
+        assertThat(result)
+            .isEqualTo(DesktopTasksController.CloseTaskResult.CLOSE_REQUESTED_SPLIT_SCREEN)
+        verify(splitScreenController).closeTask(eq(otherTask.taskId))
+    }
+
     @Test
     @EnableFlags(FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT)
+    @DisableFlags(Flags.FLAG_CLOSE_SPLIT_TASK_INSTEAD_OF_MOVING_TO_BACK)
     fun closeTask_splitScreen_dividerFlinging_doNothing() {
         val task = createSplitScreenTask()
         task.baseActivity = ComponentName("mypacakge", "mypacakge.MyActivity")

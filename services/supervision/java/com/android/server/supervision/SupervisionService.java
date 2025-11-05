@@ -54,6 +54,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ResolveInfo;
@@ -92,6 +93,7 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -332,6 +334,20 @@ public class SupervisionService extends ISupervisionManager.Stub {
         }
     }
 
+    /**
+     * Returns true if the user has at least one supervision credential recovery method available.
+     */
+    @Override
+    public boolean canLaunchPinRecovery(int userId) {
+        if (!Flags.enableSupervisionSettingsUiUpdates()) {
+            return false;
+        }
+        List<ResolveInfo> activities = querySupervisionApprovalActivities(userId);
+        SupervisionRecoveryInfo recoveryInfo = getSupervisionRecoveryInfo();
+        return !activities.isEmpty()
+                || (recoveryInfo != null && !recoveryInfo.getAccountName().isEmpty());
+    }
+
     @Override
     public List<Policy> getPolicies(@UserIdInt int userId) {
         return (List<Policy>) mSupervisionSettings.getUserData(userId).policies.values();
@@ -351,12 +367,6 @@ public class SupervisionService extends ISupervisionManager.Stub {
                     dispatchSupervisionAppServiceEvent(
                             userId, listener -> listener.onPolicyChanged(policy));
                 });
-    }
-
-    @Override
-    public List<ResolveInfo> querySupervisionApprovalActivities(int userId) {
-        // TODO(b/444529979): Implement the querySupervisionApprovalActivities.
-        return List.of();
     }
 
     private void clearAllPolicies(@UserIdInt int userId) {
@@ -395,12 +405,86 @@ public class SupervisionService extends ISupervisionManager.Stub {
         }
     }
 
+    @Override
+    public List<ResolveInfo> querySupervisionApprovalActivities(int userId) {
+        if (UserHandle.getUserId(Binder.getCallingUid()) != userId) {
+            enforcePermission(INTERACT_ACROSS_USERS);
+        }
+
+        UserHandle userHandle = UserHandle.of(userId);
+
+        PackageManager packageManager =
+                mInjector
+                        .context
+                        .createContextAsUser(userHandle, /* flags= */ 0)
+                        .getPackageManager();
+        List<String> supervisionPackages =
+                mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, userHandle);
+
+        Intent intent = new Intent(SupervisionManager.ACTION_CONFIRM_SUPERVISION_APPROVAL);
+        List<ResolveInfo> availableMethods = new ArrayList<>();
+
+        for (String packageName : supervisionPackages) {
+            intent.setPackage(packageName);
+            List<ResolveInfo> resolvers =
+                    packageManager.queryIntentActivities(
+                            intent,
+                            PackageManager.MATCH_DISABLED_COMPONENTS
+                                    | PackageManager.MATCH_DEFAULT_ONLY);
+
+            for (ResolveInfo resolveInfo : resolvers) {
+                ActivityInfo activityInfo = resolveInfo.activityInfo;
+                ComponentName componentName =
+                        new ComponentName(activityInfo.packageName, activityInfo.name);
+                // Enable any approval activities that may be currently disabled to ensure that
+                // they can be launched.
+                if (!activityInfo.enabled) {
+                    Slogf.d(
+                            SupervisionLog.TAG,
+                            "Component "
+                                    + componentName
+                                    + " for user "
+                                    + userId
+                                    + " is disabled. Attempting to enable.");
+                    try {
+                        packageManager.setComponentEnabledSetting(
+                                componentName,
+                                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                                PackageManager.DONT_KILL_APP);
+                        Slogf.d(
+                                SupervisionLog.TAG,
+                                "Successfully enabled component "
+                                        + componentName
+                                        + " for user "
+                                        + userId);
+                    } catch (SecurityException se) {
+                        Slogf.d(
+                                SupervisionLog.TAG,
+                                "Lacking permissions to enable component "
+                                        + componentName
+                                        + " for user "
+                                        + userId,
+                                se);
+                        continue;
+                    }
+                }
+                availableMethods.add(resolveInfo);
+            }
+        }
+
+        // Sort alphabetically by label loaded using the user-specific package manager
+        availableMethods.sort(
+                Comparator.comparing(ri -> ri.loadLabel(packageManager), CharSequence::compare));
+
+        return availableMethods;
+    }
+
     private void setApplicationHiddenForUser(
             @UserIdInt int userId, String packageName, boolean hidden) {
         DevicePolicyManagerInternal dpmi = mInjector.getDpmInternal();
         if (dpmi != null) {
-            dpmi.setApplicationHiddenBySystem(SupervisionManager.SUPERVISION_SYSTEM_ENTITY,
-                    packageName, userId, hidden);
+            dpmi.setApplicationHiddenBySystem(
+                    SupervisionManager.SUPERVISION_SYSTEM_ENTITY, packageName, userId, hidden);
         }
     }
 

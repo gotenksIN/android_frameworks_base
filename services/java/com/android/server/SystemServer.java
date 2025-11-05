@@ -426,6 +426,8 @@ public final class SystemServer implements Dumpable {
                     + "OnDevicePersonalizationSystemService$Lifecycle";
     private static final String UPDATABLE_DEVICE_CONFIG_SERVICE_CLASS =
             "com.android.server.deviceconfig.DeviceConfigInit$Lifecycle";
+    private static final String NPU_MANAGER_SERVICE_CLASS =
+            "com.android.server.npumanager.NpuManagerService";
 
 
     /*
@@ -1673,6 +1675,13 @@ public final class SystemServer implements Dumpable {
             SQLiteCompatibilityWalFlags.reset();
             t.traceEnd();
 
+            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_NEURAL_PROCESSING_UNIT)
+                    && com.android.npumanager.Flags.npumanagerEnabled()) {
+                t.traceBegin("StartNpuManagerService");
+                mSystemServiceManager.startService(NPU_MANAGER_SERVICE_CLASS);
+                t.traceEnd();
+            }
+
             // Records errors and logs, for example wtf()
             // Currently this service indirectly depends on SettingsProvider so do this after
             // InstallSystemProviders.
@@ -2198,7 +2207,7 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(new FontManagerService.Lifecycle(context, safeMode));
             t.traceEnd();
 
-            if (!isWatch || !android.server.Flags.removeTextService()) {
+            if (!isWatch) {
                 t.traceBegin("StartTextServicesManager");
                 mSystemServiceManager.startService(TextServicesManagerService.Lifecycle.class);
                 t.traceEnd();

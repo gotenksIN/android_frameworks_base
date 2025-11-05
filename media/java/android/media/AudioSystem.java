@@ -248,6 +248,8 @@ public class AudioSystem
     /** @hide */
     public static final int AUDIO_FORMAT_LDAC           = 0x23000000;
     /** @hide */
+    public static final int AUDIO_FORMAT_LHDC           = 0x28000000;
+    /** @hide */
     public static final int AUDIO_FORMAT_LC3            = 0x2B000000;
     /** @hide */
     public static final int AUDIO_FORMAT_OPUS           = 0x08000000;
@@ -272,6 +274,7 @@ public class AudioSystem
             AUDIO_FORMAT_APTX,
             AUDIO_FORMAT_APTX_HD,
             AUDIO_FORMAT_LDAC,
+            AUDIO_FORMAT_LHDC,
             AUDIO_FORMAT_LC3,
             AUDIO_FORMAT_OPUS,
             AUDIO_FORMAT_OPUS_HI_RES,
@@ -301,6 +304,9 @@ public class AudioSystem
 
     //TODO b/396350294 : remove when BluetoothLeCodecConfig.SOURCE_CODEC_TYPE_OPUS_HI_RES is public
     private static final int BLUETOOTH_LE_AUDIO_CODEC_CONFIG_SOURCE_CODEC_TYPE_OPUS_HI_RES = 2;
+
+    //TODO b/415848542: replace with BluetoothCodecType.CODEC_ID_LHDC
+    private static final int BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC = 9;
     /**
      * @hide
      * Convert audio format enum values to Bluetooth codec values
@@ -313,6 +319,7 @@ public class AudioSystem
             case AUDIO_FORMAT_APTX: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX;
             case AUDIO_FORMAT_APTX_HD: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD;
             case AUDIO_FORMAT_LDAC: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC;
+            case AUDIO_FORMAT_LHDC: return BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC;
             case AUDIO_FORMAT_CELT: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_CELT;
             case AUDIO_FORMAT_APTX_ADAPTIVE:
                      return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE;
@@ -367,6 +374,8 @@ public class AudioSystem
                 return AudioSystem.AUDIO_FORMAT_APTX_HD;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC:
                 return AudioSystem.AUDIO_FORMAT_LDAC;
+            case BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC:
+                return AudioSystem.AUDIO_FORMAT_LHDC;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_CELT:
                 return AudioSystem.AUDIO_FORMAT_CELT;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE:

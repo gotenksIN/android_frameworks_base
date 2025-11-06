@@ -465,6 +465,9 @@ public final class WindowManagerGlobal {
                             for (int i = mRoots.size() - 1; i >= 0; --i) {
                                 mRoots.get(i).loadSystemProperties();
                             }
+                            for (int i = mWindowlessRoots.size() - 1; i >= 0; --i) {
+                                mWindowlessRoots.get(i).loadSystemProperties();
+                            }
                         }
                     }
                 };
@@ -674,7 +677,7 @@ public final class WindowManagerGlobal {
             }
 
 // QTI_END: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
-            allViewsRemoved = mRoots.isEmpty();
+            allViewsRemoved = mRoots.isEmpty() && mWindowlessRoots.isEmpty();
             mWindowViewsListenerGroup.accept(getWindowViews());
 
             // If we don't have any views anymore in our process, stop watching

@@ -19,7 +19,6 @@ package com.android.wm.shell.dagger;
 import static android.window.DesktopExperienceFlags.ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP;
 import static android.window.DesktopExperienceFlags.ENABLE_MULTI_DISPLAY_HOME_FOCUS_BUG_FIX;
 import static android.window.DesktopExperienceFlags.ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS;
-import static android.window.DesktopModeFlags.ENABLE_DESKTOP_SYSTEM_DIALOGS_TRANSITIONS;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS_BUGFIX;
 
 import static com.android.systemui.Flags.enableViewCaptureTracing;
@@ -72,6 +71,7 @@ import com.android.wm.shell.bubbles.BubblePositioner;
 import com.android.wm.shell.bubbles.BubbleResizabilityChecker;
 import com.android.wm.shell.bubbles.BubbleTaskUnfoldTransitionMerger;
 import com.android.wm.shell.bubbles.BubbleTransitions;
+import com.android.wm.shell.bubbles.BubbleViewInfoTask;
 import com.android.wm.shell.bubbles.appinfo.BubbleAppInfoProvider;
 import com.android.wm.shell.bubbles.appinfo.PackageManagerBubbleAppInfoProvider;
 import com.android.wm.shell.bubbles.bar.DragToBubbleController;
@@ -81,6 +81,8 @@ import com.android.wm.shell.bubbles.logging.BubbleLogger;
 import com.android.wm.shell.bubbles.logging.BubbleSessionTracker;
 import com.android.wm.shell.bubbles.logging.BubbleSessionTrackerImpl;
 import com.android.wm.shell.bubbles.storage.BubblePersistentRepository;
+import com.android.wm.shell.bubbles.user.data.BubbleUserResolver;
+import com.android.wm.shell.bubbles.user.data.UserManagerBubbleUserResolver;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayImeController;
 import com.android.wm.shell.common.DisplayInsetsController;
@@ -137,6 +139,7 @@ import com.android.wm.shell.desktopmode.DisplayFocusResolver;
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler;
 import com.android.wm.shell.desktopmode.EnterDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler;
+import com.android.wm.shell.desktopmode.NormalAppLayerHandler;
 import com.android.wm.shell.desktopmode.OverviewToDesktopTransitionObserver;
 import com.android.wm.shell.desktopmode.ReturnToDragStartAnimator;
 import com.android.wm.shell.desktopmode.ShellDesktopState;
@@ -176,6 +179,7 @@ import com.android.wm.shell.freeform.TaskChangeListener;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.onehanded.OneHandedController;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController;
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerFlags;
 import com.android.wm.shell.pip.PipTransitionController;
 import com.android.wm.shell.pip2.phone.PipScheduler;
 import com.android.wm.shell.pip2.phone.PipTransitionState;
@@ -307,11 +311,10 @@ public abstract class WMShellModule {
             @NonNull TaskViewRepository repository,
             @NonNull BubbleData bubbleData,
             @NonNull @Bubbles TaskViewTransitions taskViewTransitions,
-            @NonNull BubbleAppInfoProvider appInfoProvider,
-            @ShellBackgroundThread ShellExecutor bgExecutor
+            @NonNull BubbleViewInfoTask.Factory bubbleViewInfoTaskFactory
     ) {
         return new BubbleTransitions(context, transitions, organizer, repository,
-                bubbleData, taskViewTransitions, appInfoProvider, bgExecutor);
+                bubbleData, taskViewTransitions, bubbleViewInfoTaskFactory);
     }
 
     @WMSingleton
@@ -352,6 +355,9 @@ public abstract class WMShellModule {
     @Binds
     abstract BubbleSessionTracker bindBubbleSessionTracker(BubbleSessionTrackerImpl impl);
 
+    @Binds
+    abstract BubbleUserResolver bindUserResolver(UserManagerBubbleUserResolver impl);
+
     // Note: Handler needed for LauncherApps.register
     @WMSingleton
     @Provides
@@ -384,11 +390,11 @@ public abstract class WMShellModule {
             SyncTransactionQueue syncQueue,
             IWindowManager wmService,
             HomeIntentProvider homeIntentProvider,
-            BubbleAppInfoProvider appInfoProvider,
             Lazy<Optional<SplitScreenController>> splitScreenController,
             @NonNull Optional<ShellUnfoldProgressProvider> unfoldProgressProvider,
             BubblesFoldLockSettingsObserver foldLockSettingsObserver,
-            BubbleSessionTracker sessionTracker) {
+            BubbleSessionTracker sessionTracker,
+            BubbleViewInfoTask.Factory bubbleViewInfoTaskFactory) {
         final WindowManager wm = enableViewCaptureTracing()
                 ? ViewCaptureAwareWindowManagerFactory.getInstance(context)
                 : windowManager;
@@ -428,11 +434,11 @@ public abstract class WMShellModule {
                 wmService,
                 new BubbleResizabilityChecker(),
                 homeIntentProvider,
-                appInfoProvider,
                 splitScreenController,
                 unfoldProgressProvider,
                 foldLockSettingsObserver,
-                sessionTracker);
+                sessionTracker,
+                bubbleViewInfoTaskFactory);
     }
 
     //
@@ -1468,8 +1474,7 @@ public abstract class WMShellModule {
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             DesktopModeCompatPolicy desktopModeCompatPolicy,
             DesktopState desktopState) {
-        if (!desktopState.canEnterDesktopMode()
-                || !ENABLE_DESKTOP_SYSTEM_DIALOGS_TRANSITIONS.isTrue()) {
+        if (!desktopState.canEnterDesktopMode()) {
             return Optional.empty();
         }
         return Optional.of(
@@ -1632,11 +1637,11 @@ public abstract class WMShellModule {
                 && ENABLE_MULTI_DISPLAY_HOME_FOCUS_BUG_FIX.isTrue()) {
             return Optional.of(
                     new DisplayFocusResolver(
-                        transitions,
-                        shellTaskOrganizer,
-                        focusTransitionObserver,
-                        desktopUserRepositories.get(),
-                        desktopTasksController.get()));
+                            transitions,
+                            shellTaskOrganizer,
+                            focusTransitionObserver,
+                            desktopUserRepositories.get(),
+                            desktopTasksController.get()));
         }
         return Optional.empty();
     }
@@ -1670,7 +1675,6 @@ public abstract class WMShellModule {
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             @NonNull DesksOrganizer desksOrganizer,
             @NonNull Transitions transitions,
-            @NonNull ShellController shellController,
             @NonNull DesktopWallpaperActivityTokenProvider desktopWallpaperActivityTokenProvider,
             @NonNull @ShellMainThread CoroutineScope mainScope,
             DesktopState desktopState,
@@ -1679,8 +1683,8 @@ public abstract class WMShellModule {
         if (desktopState.canEnterDesktopModeOrShowAppHandle()) {
             return Optional.of(
                     new DesksTransitionObserver(desktopUserRepositories, desksOrganizer,
-                            transitions, shellController, desktopWallpaperActivityTokenProvider,
-                            mainScope, desktopModeEventLogger));
+                            transitions, desktopWallpaperActivityTokenProvider, mainScope,
+                            desktopModeEventLogger));
         }
         return Optional.empty();
     }
@@ -2038,6 +2042,20 @@ public abstract class WMShellModule {
             DisplayController displayController) {
         return new VisualIndicatorUpdateScheduler(shellInit, mainDispatcher, bgScope,
                 displayController);
+    }
+
+    @WMSingleton
+    @Provides
+    static Optional<NormalAppLayerHandler> provideNormalAppLayerHandler(
+            Optional<DesktopTasksController> desktopTasksControllerOptional,
+            Optional<DesktopUserRepositories> desktopUserRepositoriesOptional) {
+        if (PinnedLayerFlags.isPinnedLayerEnabled()) {
+            return Optional.of(
+                    new NormalAppLayerHandler(
+                            desktopUserRepositoriesOptional.get(),
+                            desktopTasksControllerOptional.get()));
+        }
+        return Optional.empty();
     }
 
     //

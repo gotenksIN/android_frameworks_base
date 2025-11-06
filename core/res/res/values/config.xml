@@ -4947,6 +4947,11 @@
         <item>android</item>
     </string-array>
 
+    <!-- An array of packages that can make sound on the ringer or notification stream
+     if listener hints are set -->
+    <string-array translatable="false" name="config_listenerHintsExemptPackages">
+    </string-array>
+
     <!-- The default value for transition animation scale found in developer settings.
          1.0 corresponds to 1x animator scale, 0 means that there will be no transition
          animations. Note that this is only a default and will be overridden by a
@@ -5211,6 +5216,13 @@
          Example: "com.android.contentprotection/.ContentProtectionService"
     -->
     <string name="config_defaultContentProtectionService" translatable="false"></string>
+
+    <!-- The package name for the system's consumer of dynamic instrumentation events.
+         This service must be trusted, as it can be activated without explicit consent of the user.
+         If no service with the specified name exists on the device, the data will be discarded.
+         Example: "com.android.instrumentation/.DynamicInstrumentationEventConsumer"
+    -->
+    <string name="config_dynamicInstrumentationEventConsumer" translatable="false"></string>
 
     <!-- The package name for the system's augmented autofill service.
          This service must be trusted, as it can be activated without explicit consent of the user.

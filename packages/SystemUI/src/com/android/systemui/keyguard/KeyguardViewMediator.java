@@ -4399,6 +4399,7 @@ public class KeyguardViewMediator implements CoreStartable,
                 IRemoteTransitionFinishedCallback finishedCallback) {
             Trace.beginSection("ExitTransition.startAnimation#startKeyguardExitAnimation");
             mHelper.setUpAnimation(token, info, transaction, finishedCallback);
+            transaction.apply();
             SurfaceTransition.Params params =
                     SurfaceTransition.Params.create(
                             0 /* startTime */, 0 /* fadeoutDuration */, token, info, transaction,

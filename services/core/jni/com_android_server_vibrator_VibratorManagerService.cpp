@@ -206,8 +206,10 @@ public:
         if (!status.isOk()) {
             ALOGE("%s: %s", logLabel, status.getDescription().c_str());
             if (status.getExceptionCode() == EX_TRANSACTION_FAILED) {
-                ALOGE("%s: Resetting vibrator manager provider", logLabel);
-                mManagerHalProvider->clear();
+                ALOGE("%s: Resetting vibrator manager", logLabel);
+                if (mManagerHalProvider) {
+                    mManagerHalProvider->clear();
+                }
             }
         }
     }
@@ -217,7 +219,10 @@ public:
         if (!status.isOk()) {
             ALOGE("%s: %s", logLabel, status.getDescription().c_str());
             if (status.getExceptionCode() == EX_TRANSACTION_FAILED) {
-                ALOGE("%s: Resetting vibrator %d provider", logLabel, vibratorId);
+                ALOGE("%s: Resetting vibrator manager and vibrator id %d", logLabel, vibratorId);
+                if (mManagerHalProvider) {
+                    mManagerHalProvider->clear();
+                }
                 if (mVibratorHalProviders[vibratorId]) {
                     mVibratorHalProviders[vibratorId]->clear();
                 }
@@ -724,19 +729,13 @@ static jboolean nativeStartHapticGeneratorSessionWithCallback(JNIEnv* env, jclas
         return JNI_FALSE;
     }
 
+    // Creating the session here, ensures the HAL session is automatically destroyed via
+    // the destructor if we return early on validation failure.
     auto session = std::make_shared<vibrator::HapticGeneratorSession>(std::move(halSession));
 
-    if (halSession.queues.size() != 1) {
-        ALOGE("%s: received %zu vibrator queues for vibrator %d, expected one", __func__,
-              halSession.queues.size(), static_cast<int32_t>(vibratorId));
-        return JNI_FALSE;
-    }
-
-    const auto& halQueues = halSession.queues[0];
-
-    if (halQueues.vibratorId != vibratorId) {
-        ALOGE("%s: received vibrator id %d for queues, expected id %d", __func__,
-              halQueues.vibratorId, static_cast<int32_t>(vibratorId));
+    if (!session->isValidForVibrators(ids)) {
+        ALOGE("%s: Haptic generator session validation failed for vibrator %d", __func__,
+              static_cast<int32_t>(vibratorId));
         return JNI_FALSE;
     }
 

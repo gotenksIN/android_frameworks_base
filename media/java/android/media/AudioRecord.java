@@ -1501,9 +1501,9 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
      */
     public void startRecording()
     throws IllegalStateException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(70);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (mState != STATE_INITIALIZED) {
             throw new IllegalStateException("startRecording() called on an "
                     + "uninitialized AudioRecord.");
@@ -1527,9 +1527,9 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
      */
     public void startRecording(MediaSyncEvent syncEvent)
     throws IllegalStateException {
-// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(70);
-// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         if (mState != STATE_INITIALIZED) {
             throw new IllegalStateException("startRecording() called on an "
                     + "uninitialized AudioRecord.");

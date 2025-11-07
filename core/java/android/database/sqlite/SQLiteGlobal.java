@@ -26,9 +26,7 @@ import android.content.res.Resources;
 import android.os.StatFs;
 import android.os.SystemProperties;
 
-/* QTI_BEGIN */
 import android.util.BoostFramework;
-/* QTI_END */
 
 /**
  * Provides access to SQLite functions that affect all database connection,
@@ -63,10 +61,8 @@ public final class SQLiteGlobal {
     /** @hide */
     public static volatile String sDefaultSyncMode;
 
-    /* QTI_BEGIN */
     private static final String UI_PERF_PROP = "debug.ui.perfmode.enable";
     private static final String UI_PERF_PROC_PROP = "debug.ui.perfmode.process";
-    /* QTI_END */
 
     private SQLiteGlobal() {
     }
@@ -99,11 +95,9 @@ public final class SQLiteGlobal {
      * Gets the default journal mode when WAL is not in use.
      */
     public static @SQLiteDatabase.JournalMode String getDefaultJournalMode() {
-        /* QTI_BEGIN */
         if (BoostFramework.shouldUseUiPerf()) {
             return SystemProperties.get("debug.sqlite.journalmode", "PERSIST");
         }
-        /* QTI_END */
         return SystemProperties.get("debug.sqlite.journalmode",
                 Resources.getSystem().getString(
                 com.android.internal.R.string.db_default_journal_mode));
@@ -127,11 +121,9 @@ public final class SQLiteGlobal {
         if (defaultMode != null) {
             return defaultMode;
         }
-        /* QTI_BEGIN */
         if (BoostFramework.shouldUseUiPerf()) {
             return SystemProperties.get("debug.sqlite.syncmode", "OFF");
         }
-        /* QTI_END */
         return SystemProperties.get("debug.sqlite.syncmode",
                 Resources.getSystem().getString(
                 com.android.internal.R.string.db_default_sync_mode));

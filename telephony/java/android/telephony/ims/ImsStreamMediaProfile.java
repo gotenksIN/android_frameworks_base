@@ -47,6 +47,7 @@ public final class ImsStreamMediaProfile implements Parcelable {
      * Audio information
      */
     public static final int AUDIO_QUALITY_NONE = 0;
+// QTI_BEGIN: 2014-11-11: Telephony: IMS: Peer capabilities support
     public static final int AUDIO_QUALITY_AMR = 1;
     public static final int AUDIO_QUALITY_AMR_WB = 2;
     public static final int AUDIO_QUALITY_QCELP13K = 3;
@@ -57,6 +58,8 @@ public final class ImsStreamMediaProfile implements Parcelable {
     public static final int AUDIO_QUALITY_GSM_EFR = 8;
     public static final int AUDIO_QUALITY_GSM_FR = 9;
     public static final int AUDIO_QUALITY_GSM_HR = 10;
+// QTI_END: 2014-11-11: Telephony: IMS: Peer capabilities support
+// QTI_BEGIN: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     public static final int AUDIO_QUALITY_G711U = 11;
     public static final int AUDIO_QUALITY_G723 = 12;
     public static final int AUDIO_QUALITY_G711A = 13;
@@ -67,8 +70,11 @@ public final class ImsStreamMediaProfile implements Parcelable {
     public static final int AUDIO_QUALITY_EVS_WB = 18;
     public static final int AUDIO_QUALITY_EVS_SWB = 19;
     public static final int AUDIO_QUALITY_EVS_FB = 20;
+// QTI_END: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
 
+// QTI_BEGIN: 2014-11-11: Telephony: IMS: Peer capabilities support
    /**
+// QTI_END: 2014-11-11: Telephony: IMS: Peer capabilities support
      * Video information
      */
     public static final int VIDEO_QUALITY_NONE = 0;
@@ -78,12 +84,14 @@ public final class ImsStreamMediaProfile implements Parcelable {
     public static final int VIDEO_QUALITY_VGA_LANDSCAPE = (1 << 3);
     public static final int VIDEO_QUALITY_VGA_PORTRAIT = (1 << 4);
 
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
     /**
      * RTT Modes
      */
     public static final int RTT_MODE_DISABLED = 0;
     public static final int RTT_MODE_FULL = 1;
 
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
     // Audio related information
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
@@ -100,9 +108,13 @@ public final class ImsStreamMediaProfile implements Parcelable {
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public int mVideoDirection;
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
     // Rtt related information
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
     /** @hide */
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
     public int mRttMode;
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
     // RTT Audio Speech Indicator
     /** @hide */
     public boolean mIsReceivingRttAudio = false;
@@ -171,11 +183,15 @@ public final class ImsStreamMediaProfile implements Parcelable {
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public ImsStreamMediaProfile() {
+// QTI_BEGIN: 2015-06-29: Telephony: IMS: Initialize audio quality with NONE instead of AMR_WB.
         mAudioQuality = AUDIO_QUALITY_NONE;
+// QTI_END: 2015-06-29: Telephony: IMS: Initialize audio quality with NONE instead of AMR_WB.
         mAudioDirection = DIRECTION_SEND_RECEIVE;
         mVideoQuality = VIDEO_QUALITY_NONE;
         mVideoDirection = DIRECTION_INVALID;
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
         mRttMode = RTT_MODE_DISABLED;
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
     }
 
     /** @hide */
@@ -188,17 +204,21 @@ public final class ImsStreamMediaProfile implements Parcelable {
     }
 
     /** @hide */
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
     public ImsStreamMediaProfile(int rttMode) {
         mRttMode = rttMode;
     }
 
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
     public void copyFrom(ImsStreamMediaProfile profile) {
         mAudioQuality = profile.mAudioQuality;
         mAudioDirection = profile.mAudioDirection;
         mAudioCodecAttributes = profile.mAudioCodecAttributes;
         mVideoQuality = profile.mVideoQuality;
         mVideoDirection = profile.mVideoDirection;
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
         mRttMode = profile.mRttMode;
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
     }
 
     @NonNull
@@ -225,7 +245,9 @@ public final class ImsStreamMediaProfile implements Parcelable {
         out.writeTypedObject(mAudioCodecAttributes, flags);
         out.writeInt(mVideoQuality);
         out.writeInt(mVideoDirection);
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
         out.writeInt(mRttMode);
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
         out.writeBoolean(mIsReceivingRttAudio);
     }
 
@@ -235,7 +257,9 @@ public final class ImsStreamMediaProfile implements Parcelable {
         mAudioCodecAttributes = in.readTypedObject(AudioCodecAttributes.CREATOR);
         mVideoQuality = in.readInt();
         mVideoDirection = in.readInt();
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
         mRttMode = in.readInt();
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
         mIsReceivingRttAudio = in.readBoolean();
     }
 
@@ -251,6 +275,7 @@ public final class ImsStreamMediaProfile implements Parcelable {
             return new ImsStreamMediaProfile[size];
         }
     };
+// QTI_BEGIN: 2017-03-07: Telephony: IMS: RTT interface changes
 
     /**
      * Determines if it's RTT call
@@ -267,6 +292,7 @@ public final class ImsStreamMediaProfile implements Parcelable {
         mRttMode = rttMode;
     }
 
+// QTI_END: 2017-03-07: Telephony: IMS: RTT interface changes
     /**
      * Sets whether the remote party is transmitting audio over the RTT call.
      * @param audioOn true if audio is being received, false otherwise.

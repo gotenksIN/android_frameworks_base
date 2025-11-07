@@ -160,7 +160,9 @@ public final class ImsSsInfo implements Parcelable {
     public int mStatus;
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     public String mIcbNum;
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     /** @hide */
     public int mProvisionStatus = SERVICE_PROVISIONING_UNKNOWN;
     private int mClirInterrogationStatus = CLIR_STATUS_UNKNOWN;
@@ -249,7 +251,9 @@ public final class ImsSsInfo implements Parcelable {
     @Override
     public void writeToParcel(Parcel out, int flags) {
         out.writeInt(mStatus);
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
         out.writeString(mIcbNum);
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
         out.writeInt(mProvisionStatus);
         out.writeInt(mClirInterrogationStatus);
         out.writeInt(mClirOutgoingState);
@@ -275,7 +279,9 @@ public final class ImsSsInfo implements Parcelable {
 
     private void readFromParcel(Parcel in) {
         mStatus = in.readInt();
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
         mIcbNum = in.readString();
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
         mProvisionStatus = in.readInt();
         mClirInterrogationStatus = in.readInt();
         mClirOutgoingState = in.readInt();

@@ -461,7 +461,6 @@ public final class PhoneAccount implements Parcelable {
 
     /* NEXT CAPABILITY: [0x100000, 0x200000, 0x400000] */
 
-// QTI_BEGIN: 2023-01-17: Telephony: IMS : Add RTT downgrade capability to phone account
     /**
      * Flag indicating that this {@link PhoneAccount} is capable of downgrading a call to voice
      * from an RTT (Real-time text) session.
@@ -472,7 +471,6 @@ public final class PhoneAccount implements Parcelable {
      */
     public static final int CAPABILITY_DOWNGRADE_RTT = 0x40000000;
 
-// QTI_END: 2023-01-17: Telephony: IMS : Add RTT downgrade capability to phone account
     /**
      * URI scheme for telephone number URIs.
      */

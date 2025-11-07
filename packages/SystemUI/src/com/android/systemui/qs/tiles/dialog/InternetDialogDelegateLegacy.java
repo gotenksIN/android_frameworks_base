@@ -16,15 +16,19 @@
 
 /* Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+// QTI_BEGIN: 2022-10-07: SystemUI: Merge "Show warning when user tries to turn off mobile data from quick tiles" into t-keystone-qcom-dev
  * SPDX-License-Identifier: BSD-3-Clause-Clear
+// QTI_END: 2022-10-07: SystemUI: Merge "Show warning when user tries to turn off mobile data from quick tiles" into t-keystone-qcom-dev
  */
 package com.android.systemui.qs.tiles.dialog;
 
 import static android.telephony.AccessNetworkConstants.TRANSPORT_TYPE_WWAN;
 import static android.telephony.NetworkRegistrationInfo.DOMAIN_PS;
+// QTI_BEGIN: 2022-10-07: SystemUI: Merge "Show warning when user tries to turn off mobile data from quick tiles" into t-keystone-qcom-dev
 import static android.telephony.ims.feature.ImsFeature.FEATURE_MMTEL;
 import static android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_CROSS_SIM;
 
+// QTI_END: 2022-10-07: SystemUI: Merge "Show warning when user tries to turn off mobile data from quick tiles" into t-keystone-qcom-dev
 import static com.android.settingslib.satellite.SatelliteDialogUtils.TYPE_IS_WIFI;
 import static com.android.systemui.Prefs.Key.QS_HAS_TURNED_OFF_MOBILE_DATA;
 import static com.android.systemui.qs.tiles.dialog.InternetDetailsContentController.MAX_WIFI_ENTRY_COUNT;
@@ -38,8 +42,10 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Bundle;
 import android.os.Handler;
+// QTI_BEGIN: 2022-10-07: SystemUI: Merge "Show warning when user tries to turn off mobile data from quick tiles" into t-keystone-qcom-dev
 import android.os.RemoteException;
 import android.telephony.ims.aidl.IImsRegistration;
+// QTI_END: 2022-10-07: SystemUI: Merge "Show warning when user tries to turn off mobile data from quick tiles" into t-keystone-qcom-dev
 import android.telephony.ims.ImsException;
 import android.telephony.ims.ImsManager;
 import android.telephony.ims.ImsMmTelManager;

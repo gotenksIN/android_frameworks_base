@@ -394,7 +394,9 @@ enum {
     MEMINFO_MAPPED,
     MEMINFO_VMALLOC_USED,
     MEMINFO_PAGE_TABLES,
+// QTI_BEGIN: 2025-06-26: Core: Account SecPageTables as kernel used
     MEMINFO_SEC_PAGE_TABLES,
+// QTI_END: 2025-06-26: Core: Account SecPageTables as kernel used
     MEMINFO_KERNEL_STACK,
     MEMINFO_KERNEL_RECLAIMABLE,
     MEMINFO_ACTIVE,

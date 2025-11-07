@@ -1,4 +1,6 @@
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
 /*
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
  * Copyright (C) 2018 The Android Open Source Project
 // QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
  *
@@ -14,7 +16,9 @@
  * See the License for the specific language governing permissions and
 // QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
  * limitations under the License
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
  */
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
 package android.telephony.ims;
 
 import android.annotation.IntDef;
@@ -34,7 +38,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
 /**
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
  * Provides STK Call Control Supplementary Service information.
 // QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
  *

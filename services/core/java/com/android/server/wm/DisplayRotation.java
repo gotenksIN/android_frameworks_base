@@ -43,23 +43,17 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
-// QTI_BEGIN: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
 import android.content.BroadcastReceiver;
-// QTI_END: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
-// QTI_BEGIN: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
 import android.content.IntentFilter;
-// QTI_END: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
 import android.content.pm.ActivityInfo;
 import android.content.pm.ActivityInfo.ScreenOrientation;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.database.ContentObserver;
-// QTI_BEGIN: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
 import android.hardware.display.DeviceProductInfo;
-// QTI_END: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -77,9 +71,7 @@ import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
 import android.view.DisplayAddress;
 import android.view.IWindowManager;
-// QTI_BEGIN: 2024-05-28: Display: wm: avoid invalid typecasting of network to physical display address.
 import android.view.Display;
-// QTI_END: 2024-05-28: Display: wm: avoid invalid typecasting of network to physical display address.
 import android.view.Surface;
 import android.window.TransitionRequestInfo;
 import android.window.WindowContainerTransaction;
@@ -120,12 +112,8 @@ public class DisplayRotation {
     private final DisplayWindowSettings mDisplayWindowSettings;
     private final Context mContext;
     private final Object mLock;
-// QTI_BEGIN: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
-    /* QTI_BEGIN */
     private final boolean overrideMirroring;
     private final boolean isBuiltin;
-    /* QTI_END */
-// QTI_END: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
     @Nullable
     private final DisplayRotationImmersiveAppCompatPolicy mCompatPolicyForImmersiveApps;
     @Nullable
@@ -243,7 +231,6 @@ public class DisplayRotation {
     private boolean mDemoHdmiRotationLock;
     private boolean mDemoRotationLock;
 
-// QTI_BEGIN: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
     /**
      * Broadcast Action: WiFi Display video is enabled or disabled
      *
@@ -256,8 +243,6 @@ public class DisplayRotation {
     private static final String ACTION_WIFI_DISPLAY_VIDEO =
                     "org.codeaurora.intent.action.WIFI_DISPLAY_VIDEO";
 
-// QTI_END: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
-// QTI_BEGIN: 2022-02-01: Video: display: check WFD broadcaster's permission
     /**
      * Broadcast Permission for Wifi Display
      */
@@ -265,15 +250,12 @@ public class DisplayRotation {
     private static final String WIFI_DISPLAY_PERMISSION =
                     "com.qualcomm.permission.wfd.QC_WFD";
 
-// QTI_END: 2022-02-01: Video: display: check WFD broadcaster's permission
-// QTI_BEGIN: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
     /**
      * Wifi Display specific variables
      */
     private boolean mWifiDisplayConnected = false;
     private int mWifiDisplayRotation = -1;
 
-// QTI_END: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
     DisplayRotation(WindowManagerService service, DisplayContent displayContent,
             DisplayAddress displayAddress, @NonNull DeviceStateController deviceStateController,
             @NonNull DisplayRotationCoordinator displayRotationCoordinator) {
@@ -311,21 +293,13 @@ public class DisplayRotation {
         mRotation = defaultRotation;
 
         mDisplayRotationCoordinator = displayRotationCoordinator;
-// QTI_BEGIN: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
 
-        /* QTI_BEGIN */
         overrideMirroring =
                 SystemProperties.getBoolean("vendor.display.override_mirroring_rotation", false);
 
-// QTI_END: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
-// QTI_BEGIN: 2024-05-28: Display: wm: avoid invalid typecasting of network to physical display address.
         isBuiltin = (displayContent.mDisplay.getType() == Display.TYPE_INTERNAL);
-// QTI_END: 2024-05-28: Display: wm: avoid invalid typecasting of network to physical display address.
-// QTI_BEGIN: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
-        /* QTI_END */
 
-        if (/* QTI_BEGIN */ (overrideMirroring && isBuiltin) || /* QTI_END */ isDefaultDisplay) {
-// QTI_END: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
+        if ( (overrideMirroring && isBuiltin) ||  isDefaultDisplay) {
             mDisplayRotationCoordinator.setDefaultDisplayDefaultRotation(mRotation);
         }
         mDefaultDisplayRotationChangedCallback = this::updateRotationAndSendNewConfigIfChanged;
@@ -337,9 +311,7 @@ public class DisplayRotation {
                     displayContent.getDisplayId(), mDefaultDisplayRotationChangedCallback);
         }
 
-// QTI_BEGIN: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
-        if (/* QTI_BEGIN */ (overrideMirroring && isBuiltin) || /* QTI_END */ isDefaultDisplay) {
-// QTI_END: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
+        if ( (overrideMirroring && isBuiltin) ||  isDefaultDisplay) {
             final Handler uiHandler = UiThread.getHandler();
             mOrientationListener =
                     new OrientationListener(mContext, uiHandler, defaultRotation);
@@ -351,7 +323,6 @@ public class DisplayRotation {
             } else {
                 mFoldController = null;
             }
-// QTI_BEGIN: 2019-11-19: Video: wm::DisplayRotation: Limit WFD UIBC rotation to primary displays
 
             /* Register for WIFI Display Intents in a separate thread
              * to avoid possible deadlock between ActivityManager and
@@ -387,29 +358,18 @@ public class DisplayRotation {
                                 }
                                 mService.updateRotation(true /* alwaysSendConfiguration */,
                                         false/* forceRelayout */);
-// QTI_END: 2019-11-19: Video: wm::DisplayRotation: Limit WFD UIBC rotation to primary displays
-// QTI_BEGIN: 2019-04-18: Video: wm: Use a different execution context to register WFD rotation receiver
                             }
                         }
-// QTI_END: 2019-04-18: Video: wm: Use a different execution context to register WFD rotation receiver
-// QTI_BEGIN: 2022-02-01: Video: display: check WFD broadcaster's permission
                     }, new IntentFilter(ACTION_WIFI_DISPLAY_VIDEO),
                         WIFI_DISPLAY_PERMISSION,
-// QTI_END: 2022-02-01: Video: display: check WFD broadcaster's permission
                         UiThread.getHandler()
                     , Context.RECEIVER_EXPORTED);
-// QTI_BEGIN: 2019-11-19: Video: wm::DisplayRotation: Limit WFD UIBC rotation to primary displays
                 }
             };
             t.start();
-// QTI_END: 2019-11-19: Video: wm::DisplayRotation: Limit WFD UIBC rotation to primary displays
         } else {
             mFoldController = null;
-// QTI_BEGIN: 2019-11-19: Video: wm::DisplayRotation: Limit WFD UIBC rotation to primary displays
         }
-// QTI_END: 2019-11-19: Video: wm::DisplayRotation: Limit WFD UIBC rotation to primary displays
-// QTI_BEGIN: 2019-04-18: Video: wm: Use a different execution context to register WFD rotation receiver
-// QTI_END: 2019-04-18: Video: wm: Use a different execution context to register WFD rotation receiver
         if (mFoldController != null && (Flags.enableDeviceStateAutoRotateSettingLogging()
                 || Flags.enableDeviceStateAutoRotateSettingRefactor())) {
             mDeviceStateAutoRotateSettingController =
@@ -1207,10 +1167,8 @@ public class DisplayRotation {
 
         @Surface.Rotation
         final int preferredRotation;
-// QTI_BEGIN: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
 
-        if (/* QTI_BEGIN */ !(overrideMirroring && isBuiltin) && /* QTI_END */ !isDefaultDisplay) {
-// QTI_END: 2024-05-10: Display: wm: Allow non-default displays to rotate with sensor
+        if ( !(overrideMirroring && isBuiltin) &&  !isDefaultDisplay) {
             // For secondary displays we ignore things like displays sensors, docking mode and
             // rotation lock, and always prefer user rotation.
             preferredRotation = mUserRotation;
@@ -1232,17 +1190,13 @@ public class DisplayRotation {
             // Ignore sensor when in desk dock unless explicitly enabled.
             // This case can enable 180 degree rotation while docked.
             preferredRotation = deskDockEnablesAccelerometer ? sensorRotation : mDeskDockRotation;
-// QTI_BEGIN: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
         } else if ((hdmiPlugged || mWifiDisplayConnected) && mDemoHdmiRotationLock) {
-// QTI_END: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
             // Ignore sensor when plugged into HDMI when demo HDMI rotation lock enabled.
             // Note that the dock orientation overrides the HDMI orientation.
             preferredRotation = mDemoHdmiRotation;
-// QTI_BEGIN: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
         } else if (mWifiDisplayConnected && (mWifiDisplayRotation > -1)) {
             // Ignore sensor when WFD is active and UIBC rotation is enabled
             preferredRotation = mWifiDisplayRotation;
-// QTI_END: 2019-02-10: Video: wm::DisplayRotation: Changes for WFD and UIBC.
         } else if (hdmiPlugged && dockMode == Intent.EXTRA_DOCK_STATE_UNDOCKED
                 && mUndockedHdmiRotation >= 0) {
             // Ignore sensor when plugged into HDMI and an undocked orientation has

@@ -130,7 +130,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+// QTI_BEGIN: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
 import java.util.Set;
+// QTI_END: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
 import java.util.function.BiFunction;
 
 class BroadcastController {
@@ -1926,8 +1928,10 @@ class BroadcastController {
             mBackgroundLaunchBroadcasts = SystemConfig.getInstance().getAllowImplicitBroadcasts();
         }
         return mBackgroundLaunchBroadcasts;
+// QTI_BEGIN: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
     }
 
+// QTI_END: 2025-03-13: Core: Enable configuration of whitelist packages for restricted implicit intents
     private boolean isInstantApp(ProcessRecord record, @Nullable String callerPackage, int uid) {
         if (UserHandle.getAppId(uid) < FIRST_APPLICATION_UID) {
             return false;

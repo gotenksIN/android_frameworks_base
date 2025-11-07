@@ -147,7 +147,9 @@ public final class ImsReasonInfo implements Parcelable {
     /**
      * Call was disconnected because a handover is not feasible due to network conditions.
      */
+// QTI_BEGIN: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     public static final int CODE_LOCAL_HO_NOT_FEASIBLE = 149;
+// QTI_END: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     /**
      * This device does not support IMS.
      * @hide
@@ -182,48 +184,68 @@ public final class ImsReasonInfo implements Parcelable {
     /**
      * The operation is restricted to fixed dialing numbers only.
      */
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     public static final int CODE_FDN_BLOCKED = 241;
 
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     /**
      * Network rejected the emergency call request because IMEI was used as identification
      * and this capability is not supported by the network.
      */
     public static final int CODE_IMEI_NOT_ACCEPTED = 243;
 
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     //STK CC errors
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified DIAL request to USSD request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_MODIFIED_TO_USSD = 244;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified DIAL request to SS request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_MODIFIED_TO_SS = 245;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified DIAL request to DIAL with modified data.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_MODIFIED_TO_DIAL = 246;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified DIAL request to Video DIAL request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_MODIFIED_TO_DIAL_VIDEO = 247;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified Video DIAL request to DIAL request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_VIDEO_MODIFIED_TO_DIAL = 248;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified Video DIAL request to Video DIAL request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_VIDEO_MODIFIED_TO_DIAL_VIDEO = 249;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified Video DIAL request to SS request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_VIDEO_MODIFIED_TO_SS = 250;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified Video DIAL request to USSD request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_VIDEO_MODIFIED_TO_USSD = 251;
 
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /*
      * STATUSCODE (SIP response code) (IMS -> Telephony)
      */
@@ -326,12 +348,16 @@ public final class ImsReasonInfo implements Parcelable {
      * Emergency call failed in the modem with a temporary fail cause and should be redialed on this
      * slot.
      */
+// QTI_BEGIN: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     public static final int CODE_EMERGENCY_TEMP_FAILURE = 363;
+// QTI_END: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     /**
      * Emergency call failed in the modem with a permanent fail cause and should not be redialed on
      * this slot. If there are any other slots available for emergency calling, try those.
      */
+// QTI_BEGIN: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     public static final int CODE_EMERGENCY_PERM_FAILURE = 364;
+// QTI_END: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
 
     /**
      * Call failure code during hangup/reject if user marked the call as unwanted.
@@ -458,11 +484,15 @@ public final class ImsReasonInfo implements Parcelable {
     /**
      * Device declined/ended a call due to a low battery condition.
      */
+// QTI_BEGIN: 2014-12-03: Telephony: IMS Call End Cause Additions
     public static final int CODE_LOW_BATTERY = 505;
+// QTI_END: 2014-12-03: Telephony: IMS Call End Cause Additions
     /**
      * Device declined a call due to a denylisted caller ID.
      */
+// QTI_BEGIN: 2014-12-03: Telephony: IMS Call End Cause Additions
     public static final int CODE_BLACKLISTED_CALL_ID = 506;
+// QTI_END: 2014-12-03: Telephony: IMS Call End Cause Additions
     // IMS -> Telephony
     /**
      * The call has been terminated by the network or remote user.
@@ -505,28 +535,40 @@ public final class ImsReasonInfo implements Parcelable {
     /**
      * The UT request resulted in a network error.
      */
+// QTI_BEGIN: 2014-08-04: Telephony: IMS Framework & AIDL Changes for Call Barring & String Error Codes.
     public static final int CODE_UT_NETWORK_ERROR = 804;
+// QTI_END: 2014-08-04: Telephony: IMS Framework & AIDL Changes for Call Barring & String Error Codes.
     /**
      * The password entered for UT operations does not match the stored password.
      */
     public static final int CODE_UT_CB_PASSWORD_MISMATCH = 821;
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     //STK CC errors
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Sim Toolkit Call Control modified the UT operation to a dial command.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_UT_SS_MODIFIED_TO_DIAL = 822;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Sim Toolkit Call Control modified the UT operation to a USSD command.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_UT_SS_MODIFIED_TO_USSD = 823;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Sim Toolkit Call Control modified the UT operation to another supplementary service command.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_UT_SS_MODIFIED_TO_SS = 824;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Sim Toolkit Call Control modified the UT operation to a video call dial command.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_UT_SS_MODIFIED_TO_DIAL_VIDEO = 825;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
 
     /**@hide*/
     @IntDef(value = {
@@ -543,41 +585,61 @@ public final class ImsReasonInfo implements Parcelable {
     @Retention(RetentionPolicy.SOURCE)
     public @interface UtReason {}
 
+// QTI_BEGIN: 2014-08-02: Telephony: Add ECBM functionality for IMS
     /**
+// QTI_END: 2014-08-02: Telephony: Add ECBM functionality for IMS
      * Emergency callback mode is not supported.
+// QTI_BEGIN: 2014-08-02: Telephony: Add ECBM functionality for IMS
      */
     public static final int CODE_ECBM_NOT_SUPPORTED = 901;
+// QTI_END: 2014-08-02: Telephony: Add ECBM functionality for IMS
 
     /**
      * Fail code used to indicate that Multi-endpoint is not supported by the IMS framework.
      */
     public static final int CODE_MULTIENDPOINT_NOT_SUPPORTED = 902;
 
+// QTI_BEGIN: 2015-03-06: Telephony: IMS: Support for IMS Registration error codes
     /**
+// QTI_END: 2015-03-06: Telephony: IMS: Support for IMS Registration error codes
      * IMS Registration error code
+// QTI_BEGIN: 2015-03-06: Telephony: IMS: Support for IMS Registration error codes
      */
     public static final int CODE_REGISTRATION_ERROR = 1000;
 
+// QTI_END: 2015-03-06: Telephony: IMS: Support for IMS Registration error codes
     /*
+// QTI_BEGIN: 2015-03-06: Telephony: IMS: Support for IMS Registration error codes
      * CALL DROP error codes (Call could drop because of many reasons like Network not available,
      *  handover, failed, etc)
      */
     /**
+// QTI_END: 2015-03-06: Telephony: IMS: Support for IMS Registration error codes
      * MT call has ended due to a release from the network because the call was answered elsewhere.
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
      */
     public static final int CODE_ANSWERED_ELSEWHERE = 1014;
 
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
+// QTI_BEGIN: 2016-02-25: Telephony: IMS: Reason Codes For Call Pull Scenarios
     /**
+// QTI_END: 2016-02-25: Telephony: IMS: Reason Codes For Call Pull Scenarios
      * For MultiEndpoint - Call Pull request has failed.
+// QTI_BEGIN: 2016-02-25: Telephony: IMS: Reason Codes For Call Pull Scenarios
      */
     public static final int CODE_CALL_PULL_OUT_OF_SYNC = 1015;
 
     /**
+// QTI_END: 2016-02-25: Telephony: IMS: Reason Codes For Call Pull Scenarios
      * For MultiEndpoint - Call has been pulled from primary to secondary.
+// QTI_BEGIN: 2016-02-25: Telephony: IMS: Reason Codes For Call Pull Scenarios
      */
     public static final int CODE_CALL_END_CAUSE_CALL_PULL = 1016;
 
+// QTI_END: 2016-02-25: Telephony: IMS: Reason Codes For Call Pull Scenarios
+// QTI_BEGIN: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     /**
+// QTI_END: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
      * CALL DROP error code for the case when a device is ePDG capable and when the user is on an
      * active wifi call and at the edge of coverage and there is no qualified LTE network available
      * to handover the call to. We get a handover NOT_TRIGERRED message from the modem. This error
@@ -597,17 +659,23 @@ public final class ImsReasonInfo implements Parcelable {
 
     /**
      * Supplementary Services (HOLD/RESUME) - the command failed.
+// QTI_BEGIN: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
      */
     public static final int CODE_SUPP_SVC_FAILED = 1201;
+// QTI_END: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     /**
      * Supplementary Services (HOLD/RESUME) - the command was cancelled.
      */
+// QTI_BEGIN: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     public static final int CODE_SUPP_SVC_CANCELLED = 1202;
+// QTI_END: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     /**
      * Supplementary Services (HOLD/RESUME) - the command resulted in a re-invite collision.
      */
+// QTI_BEGIN: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     public static final int CODE_SUPP_SVC_REINVITE_COLLISION = 1203;
 
+// QTI_END: 2016-02-03: Telephony: IMS: Constants For Audio Quality, Supp. Services
     /**
      * DPD Procedure received no response or send failed.
      */
@@ -656,12 +724,14 @@ public final class ImsReasonInfo implements Parcelable {
      */
     public static final int CODE_WIFI_LOST = 1407;
 
+// QTI_BEGIN: 2017-02-22: Telephony: Add a new ImsReasonInfo code
     /**
      * Indicates the registration attempt on IWLAN failed due to IKEv2 authetication failure
      * during tunnel establishment.
      */
     public static final int CODE_IKEV2_AUTH_FAILURE = 1408;
 
+// QTI_END: 2017-02-22: Telephony: Add a new ImsReasonInfo code
     /** The call cannot be established because RADIO is OFF */
     public static final int CODE_RADIO_OFF = 1500;
 
@@ -1310,11 +1380,15 @@ public final class ImsReasonInfo implements Parcelable {
         sImsCodeMap.put(CODE_OEM_CAUSE_15, "CODE_OEM_CAUSE_15");
     }
 
+// QTI_BEGIN: 2014-12-16: Telephony: IMS OMA-DM Intent and ImsReasonInfo Additions
     /**
      * Network string error messages.
      * mExtraMessage may have these values.
+// QTI_END: 2014-12-16: Telephony: IMS OMA-DM Intent and ImsReasonInfo Additions
      * @hide
+// QTI_BEGIN: 2014-12-16: Telephony: IMS OMA-DM Intent and ImsReasonInfo Additions
      */
+// QTI_END: 2014-12-16: Telephony: IMS OMA-DM Intent and ImsReasonInfo Additions
     @SystemApi
     public static final String EXTRA_MSG_SERVICE_NOT_AUTHORIZED =
             "Forbidden. Not Authorized for Service";

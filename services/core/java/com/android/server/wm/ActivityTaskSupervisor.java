@@ -149,9 +149,9 @@ import android.util.SparseIntArray;
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-06-26: Performance: Fix PreferredApps CTS issue.
+// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
 import com.android.internal.app.procstats.ProcessStats;
-// QTI_END: 2019-06-26: Performance: Fix PreferredApps CTS issue.
+// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
 import android.view.Display;
 import android.webkit.URLUtil;
 import android.window.ActivityWindowInfo;
@@ -173,9 +173,9 @@ import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 import com.android.server.pm.SaferIntentUtils;
 import com.android.server.utils.Slogf;
 import com.android.server.wm.ActivityMetricsLogger.LaunchingState;
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
 import com.android.server.am.ProcessFreezerManager;
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_END: 2024-05-22: Core: framework_base: Add process freezer to improve app launch latency
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -184,15 +184,15 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
 import java.util.Arrays;
 import android.os.AsyncTask;
 
-// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
 import vendor.qti.hardware.servicetracker.V1_2.IServicetracker;
 
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
 // TODO: This class has become a dumping ground. Let's
 // - Move things relating to the hierarchy to RootWindowContainer
 // - Move things relating to activity life cycles to maybe a new class called ActivityLifeCycler
@@ -221,12 +221,12 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     public static boolean mIsPerfBoostAcquired = false;
     public static int mPerfHandle = -1;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_BEGIN: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
     public BoostFramework mPerfBoost = new BoostFramework();
-// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
-// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_END: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
     public BoostFramework mUxPerf = new BoostFramework();
-// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
 
     /** How long we wait until giving up on the activity telling us it released the top state. */
     private static final int TOP_RESUMED_STATE_LOSS_TIMEOUT = 500;
@@ -324,10 +324,10 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     private AppOpsManager mAppOpsManager;
     private VirtualDeviceManagerInternal mVirtualDeviceManagerInternal;
 
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
     private IServicetracker mServicetracker;
 
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
     /** Common synchronization logic used to save things to disks. */
     PersisterQueue mPersisterQueue;
     LaunchParamsPersister mLaunchParamsPersister;
@@ -531,7 +531,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         mLaunchParamsPersister.onSystemReady();
     }
 
-// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
     public IServicetracker getServicetrackerInstance() {
         if (mServicetracker == null) {
             try {
@@ -554,7 +554,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         mServicetracker = null;
     }
 
-// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_END: 2020-06-27: Core: Passing every activity state change to Servicetracker HAL.
     void onUserUnlocked(int userId) {
         // Only start persisting when the first user is unlocked. The method call is
         // idempotent so there is no side effect to call it again when the second user is
@@ -1195,16 +1195,16 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         boolean knownToBeDead = false;
         if (wpc != null && wpc.hasThread()) {
             try {
-// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_BEGIN: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
                 if (mPerfBoost != null) {
                     Slog.i(TAG, "The Process " + r.processName + " Already Exists in BG. So sending its PID: " + wpc.getPid());
-// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
-// QTI_BEGIN: 2019-10-17: Performance: BoostFramework: New hintType for App Starting from BG.
+// QTI_END: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_BEGIN: 2019-10-17: Core: BoostFramework: New hintType for App Starting from BG.
                     mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.processName, wpc.getPid(), BoostFramework.Launch.TYPE_START_APP_FROM_BG);
-// QTI_END: 2019-10-17: Performance: BoostFramework: New hintType for App Starting from BG.
-// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_END: 2019-10-17: Core: BoostFramework: New hintType for App Starting from BG.
+// QTI_BEGIN: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
                 }
-// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_END: 2019-08-16: Core: BoostFramework: Q Upgrade - Add Kill, Update Hints.
                 realStartActivityLocked(r, wpc, andResume, checkConfig);
                 return;
             } catch (RemoteException e) {
@@ -1230,14 +1230,14 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         r.notifyUnknownVisibilityLaunchedForKeyguardTransition();
 
         final boolean isTop = andResume && r.isTopRunningActivity();
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
         if (isTop) {
             ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
             if (freezer != null && freezer.useFreezerManager()) {
                 freezer.startFreeze(r.processName, ProcessFreezerManager.COLD_LAUNCH_FREEZE);
             }
         }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_END: 2025-01-02: Core: app freezer: Uncomment app freezer by Google
         mService.startProcessAsync(r, knownToBeDead, isTop,
                 isTop ? HostingRecord.HOSTING_TYPE_TOP_ACTIVITY
                         : HostingRecord.HOSTING_TYPE_ACTIVITY);
@@ -2039,18 +2039,18 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 procsToKill);
         mService.mH.sendMessage(m);
 
-// QTI_BEGIN: 2020-04-14: Performance: IOP Preferred App Fix
+// QTI_BEGIN: 2020-04-14: Core: IOP Preferred App Fix
     }
-// QTI_END: 2020-04-14: Performance: IOP Preferred App Fix
+// QTI_END: 2020-04-14: Core: IOP Preferred App Fix
 
-// QTI_BEGIN: 2020-04-14: Performance: IOP Preferred App Fix
+// QTI_BEGIN: 2020-04-14: Core: IOP Preferred App Fix
     public void startPreferredApps() {
         try {
             new PreferredAppsTask().execute();
         } catch (Exception e) {
             Slog.v (TAG, "Exception while calling PreferredAppsTask: " + e);
         }
-// QTI_END: 2020-04-14: Performance: IOP Preferred App Fix
+// QTI_END: 2020-04-14: Core: IOP Preferred App Fix
     }
 
     /**
@@ -2210,35 +2210,39 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 // QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     void acquireAppLaunchPerfLock(ActivityRecord r) {
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-// QTI_BEGIN: 2019-05-29: Performance: IOP: Fix null object de-referencing.
+// QTI_BEGIN: 2019-05-29: Core: IOP: Fix null object de-referencing.
         /* Acquire perf lock during new app launch */
         if (mPerfBoost != null) {
-// QTI_END: 2019-05-29: Performance: IOP: Fix null object de-referencing.
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_END: 2019-05-29: Core: IOP: Fix null object de-referencing.
+// QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
 
             int pkgType = mPerfBoost.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                                                      r.packageName);
             int wpcPid = -1;
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2020-09-09: Performance: Do attach application boost when it have been auto started as favorite
+// QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2020-09-09: Core: Do attach application boost when it have been auto started as favorite
             if (mService != null && r != null && r.info != null && r.info.applicationInfo !=null) {
                 final WindowProcessController wpc =
                         mService.getProcessController(r.processName, r.info.applicationInfo.uid);
                 if (wpc != null && wpc.hasThread()) {
                    //If target process didn't start yet, this operation will be done when app call attach
-// QTI_END: 2020-09-09: Performance: Do attach application boost when it have been auto started as favorite
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_END: 2020-09-09: Core: Do attach application boost when it have been auto started as favorite
+// QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
                    wpcPid = wpc.getPid();
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2020-09-09: Performance: Do attach application boost when it have been auto started as favorite
+// QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2020-09-09: Core: Do attach application boost when it have been auto started as favorite
                 }
             }
-// QTI_END: 2020-09-09: Performance: Do attach application boost when it have been auto started as favorite
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_END: 2020-09-09: Core: Do attach application boost when it have been auto started as favorite
+// QTI_BEGIN: 2025-06-30: Core: Binder call reduction while launch
             if (mPerfBoost.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
                              mPerfBoost.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
                if (mPerfBoost.getPerfHalVersion() >= BoostFramework.PERF_HAL_V23) {
+// QTI_END: 2025-06-30: Core: Binder call reduction while launch
+// QTI_BEGIN: 2022-01-18: Core: Perf: Added support for app type in launch hint
                    mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
+// QTI_END: 2022-01-18: Core: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2025-06-30: Core: Binder call reduction while launch
                            r.packageName, -1, BoostFramework.Launch.BOOST_V1, 2, pkgType, wpcPid);
                    mPerfSendTapHint = true;
                    mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
@@ -2258,12 +2262,10 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                            mPerfBoost.perfHintAcqRel(-1, BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                                r.packageName, -1, BoostFramework.Launch.BOOST_V3, 2, pkgType, wpcPid);
                    }
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2019-05-29: Performance: IOP: Fix null object de-referencing.
+// QTI_END: 2025-06-30: Core: Binder call reduction while launch
 
+// QTI_BEGIN: 2025-06-30: Core: Binder call reduction while launch
                } else {
-// QTI_END: 2019-05-29: Performance: IOP: Fix null object de-referencing.
-// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
                                        -1, BoostFramework.Launch.BOOST_V1);
                    mPerfSendTapHint = true;
@@ -2282,8 +2284,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                        mPerfHandle = mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST,
                            r.packageName, -1, BoostFramework.Launch.BOOST_V3);
                    }
-// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
-// QTI_BEGIN: 2019-05-29: Performance: IOP: Fix null object de-referencing.
                }
        }
        else{
@@ -2295,28 +2295,30 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                   wpcPid, BoostFramework.Launch.BOOST_V1);
            }
        }
+// QTI_END: 2025-06-30: Core: Binder call reduction while launch
+// QTI_BEGIN: 2019-05-29: Core: IOP: Fix null object de-referencing.
             if (mPerfHandle > 0)
                 mIsPerfBoostAcquired = true;
             // Start IOP
-// QTI_END: 2019-05-29: Performance: IOP: Fix null object de-referencing.
+// QTI_END: 2019-05-29: Core: IOP: Fix null object de-referencing.
             if (r.info.applicationInfo != null && r.info.applicationInfo.sourceDir != null) {
                 if (mPerfBoost.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                     mPerfBoost.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                         mPerfBoost.perfIOPrefetchStart(-1,r.packageName,
                            r.info.applicationInfo.sourceDir.substring(0, r.info.applicationInfo.sourceDir.lastIndexOf('/')));
                 }
-// QTI_BEGIN: 2019-05-29: Performance: IOP: Fix null object de-referencing.
+// QTI_BEGIN: 2019-05-29: Core: IOP: Fix null object de-referencing.
             }
         }
     }
-// QTI_END: 2019-05-29: Performance: IOP: Fix null object de-referencing.
+// QTI_END: 2019-05-29: Core: IOP: Fix null object de-referencing.
 
-// QTI_BEGIN: 2020-06-03: Performance: perf: Refactor DSR
+// QTI_BEGIN: 2020-06-03: Core: perf: Refactor DSR
     public ActivityRecord getTopResumedActivity() {
         return mTopResumedActivity;
     }
 
-// QTI_END: 2020-06-03: Performance: perf: Refactor DSR
+// QTI_END: 2020-06-03: Core: perf: Refactor DSR
     void comeOutOfSleepIfNeededLocked() {
         removeSleepTimeouts();
         if (mGoingToSleepWakeLock.isHeld()) {
@@ -3333,15 +3335,15 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             mResult.dump(pw, prefix + "    ");
         }
     }
-// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
 
     class PreferredAppsTask extends AsyncTask<Void, Void, Void> {
         @Override
         protected Void doInBackground(Void... params) {
             String res = null;
             final Intent intent = new Intent(Intent.ACTION_MAIN);
-// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
-// QTI_BEGIN: 2019-06-26: Performance: Fix PreferredApps CTS issue.
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-06-26: Core: Fix PreferredApps CTS issue.
             int trimLevel = 0;
             try {
                 trimLevel = ActivityManager.getService().getMemoryTrimLevel();
@@ -3350,19 +3352,19 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             }
             if (mUxPerf != null
                    && trimLevel < ProcessStats.ADJ_MEM_FACTOR_CRITICAL) {
-// QTI_END: 2019-06-26: Performance: Fix PreferredApps CTS issue.
+// QTI_END: 2019-06-26: Core: Fix PreferredApps CTS issue.
                 if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                     mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                     res = mUxPerf.perfUXEngine_trigger(BoostFramework.UXE_TRIGGER);
                 } else {
                     res = mUxPerf.perfSyncRequest(BoostFramework.VENDOR_FEEDBACK_PA_FW);
                 }
-// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
                 if (res == null)
                     return null;
-// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
                 String[] p_apps = res.trim().split("/");
-// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
                 if (p_apps.length != 0) {
                     ArrayList<String> apps_l = new ArrayList(Arrays.asList(p_apps));
                     Bundle bParams = new Bundle();
@@ -3378,5 +3380,5 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         }
     }
 
-// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
 }

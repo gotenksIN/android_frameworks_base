@@ -14,14 +14,12 @@
  * limitations under the License.
  */
 
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 /**
  * Changes from Qualcomm Innovation Center are provided under the following license:
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 package com.android.keyguard;
 
 
@@ -76,9 +74,7 @@ import com.android.systemui.statusbar.pipeline.satellite.ui.viewmodel.FakeDevice
 import com.android.systemui.statusbar.pipeline.wifi.data.repository.FakeWifiRepository;
 import com.android.systemui.statusbar.pipeline.wifi.shared.model.WifiNetworkModel;
 import com.android.systemui.telephony.TelephonyListenerManager;
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import com.android.systemui.util.CarrierNameCustomization;
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import com.android.systemui.util.concurrency.FakeExecutor;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.time.FakeSystemClock;
@@ -139,10 +135,8 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     private SubscriptionManager mSubscriptionManager;
     private CarrierTextManager.CarrierTextCallbackInfo mCarrierTextCallbackInfo;
 
-// QTI_BEGIN: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
     @Mock
     private CarrierNameCustomization mCarrierNameCustomization;
-// QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
     private CarrierTextManager mCarrierTextManager;
 
     private CarrierTextManagerLogger mLogger =
@@ -698,8 +692,10 @@ public class CarrierTextManagerTest extends SysuiTestCase {
                         /* isValidated= */ false,
                         /* level= */ 0,
                         /* ssid= */ "",
+// QTI_BEGIN: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
                         /* hotspotDeviceType= */ WifiNetworkModel.HotspotDeviceType.NONE,
                         /* wifiStandard= */0));
+// QTI_END: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
         assertTrue(mWifiRepository.isWifiConnectedWithValidSsid());
 
         mKeyguardUpdateMonitor.mServiceStates = new HashMap<>();
@@ -738,8 +734,10 @@ public class CarrierTextManagerTest extends SysuiTestCase {
                         /* isValidated= */ false,
                         /* level= */ 0,
                         /* ssid= */ "",
+// QTI_BEGIN: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
                         /* hotspotDeviceType= */ WifiNetworkModel.HotspotDeviceType.NONE,
                         /* wifiStandard= */0));
+// QTI_END: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
         assertTrue(mWifiRepository.isWifiConnectedWithValidSsid());
 
         mKeyguardUpdateMonitor.mServiceStates = new HashMap<>();

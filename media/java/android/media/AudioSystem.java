@@ -370,9 +370,7 @@ public class AudioSystem
                 return AudioSystem.AUDIO_FORMAT_APTX_ADAPTIVE;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_TWSP:
                 return AudioSystem.AUDIO_FORMAT_APTX_TWSP;
-// QTI_BEGIN: 2020-10-01: Audio: Add support for lc3 codec.
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_LC3:
-// QTI_END: 2020-10-01: Audio: Add support for lc3 codec.
                 return AudioSystem.AUDIO_FORMAT_LC3;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS:
                 return AudioSystem.AUDIO_FORMAT_OPUS;

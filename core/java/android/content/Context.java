@@ -6814,7 +6814,6 @@ public abstract class Context {
      * @see #getSystemService(String)
      * @see android.security.advancedprotection.AdvancedProtectionManager
      */
-    @FlaggedApi(android.security.Flags.FLAG_AAPM_API)
     public static final String ADVANCED_PROTECTION_SERVICE = "advanced_protection";
 
     /**
@@ -7261,6 +7260,14 @@ public abstract class Context {
      * @hide
      */
     public static final String DYNAMIC_INSTRUMENTATION_SERVICE = "dynamic_instrumentation";
+
+    /**
+     * Bridge service used by uprobestats.
+     * @hide
+     */
+    @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
+    @FlaggedApi(android.security.Flags.FLAG_UPROBESTATS_BRIDGE_SERVICE)
+    public static final String UPROBESTATS_BRIDGE_SERVICE = "uprobestats_bridge";
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a

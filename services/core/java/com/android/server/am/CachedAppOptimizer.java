@@ -2361,6 +2361,10 @@ public class CachedAppOptimizer {
                 // We've given the app plenty of chances, assume broken. Time to die.
                 Slog.d(TAG_AM, "Kill app due to repeated failure to freeze binder: "
                         + proc.getPid() + " " + proc.processName);
+                // Access app fields here because mProcLock is held.
+                final int uid = proc.uid;
+                final String packageName = proc.info != null ? proc.info.packageName : null;
+
                 mAm.mHandler.post(() -> {
                     synchronized (mAm) {
                         // Crash regardless of procstate in case the app has found another way
@@ -2372,6 +2376,9 @@ public class CachedAppOptimizer {
                                 ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE,
                                 ApplicationExitInfo.SUBREASON_EXCESSIVE_CPU,
                                 true);
+                    }
+                    if (packageName != null) {
+                        mAm.sendKillExcessiveCpuProfilingTrigger(uid, packageName);
                     }
                 });
                 return;

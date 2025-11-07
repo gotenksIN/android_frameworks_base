@@ -21,13 +21,14 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.hardware.input.KeyGestureEvent
 import android.os.Handler
-import android.view.Display.DEFAULT_DISPLAY
 import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType
 import com.android.internal.accessibility.util.TtsPrompt
 import com.android.systemui.accessibility.keygesture.shared.model.KeyGestureConfirmInfo
 import com.android.systemui.accessibility.shortcutchooser.shared.model.AccessibilityTargetModel
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import org.mockito.Mockito.mock
 
 class FakeAccessibilityShortcutsRepository(
@@ -78,7 +79,7 @@ class FakeAccessibilityShortcutsRepository(
                     emptyList(),
                     targetName,
                     0,
-                    DEFAULT_DISPLAY,
+                    displayId,
                     ttsText,
                 )
             }
@@ -151,6 +152,12 @@ class FakeAccessibilityShortcutsRepository(
                 isToggleOn = false,
             ),
         )
+    }
+
+    override fun getAllAccessibilityTargets(
+        @UserShortcutType shortcutType: Int
+    ): Flow<List<AccessibilityTargetModel>> = flow {
+        emit(getAllAccessibilityTargetsInfo(shortcutType))
     }
 
     override fun getSelectedAccessibilityTargetsInfo(

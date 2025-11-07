@@ -3,16 +3,6 @@ container: "system"
 
 # go/keep-sorted start block=yes newline_separated=yes
 flag {
-    name: "apply_desk_activation_on_user_switch"
-    namespace: "lse_desktop_experience"
-    description: "Fixes desk activation when switching users"
-    bug: "430988310"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "close_fullscreen_and_splitscreen_keyboard_shortcut"
     namespace: "lse_desktop_experience"
     description: "Enable keyboard shortcut to close fullscreen and split screen tasks"
@@ -288,6 +278,16 @@ flag {
 }
 
 flag {
+    name: "enable_close_lid_wm_shell_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Enables Shell-side bugfixes for close lid feature."
+    bug: "382689704"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_compat_ui_desktop_mode_synchronization_bugfix"
     namespace: "lse_desktop_experience"
     description: "Enables synchronization logic so that app-compat UI is properly synchronized with desktop mode state"
@@ -504,6 +504,16 @@ flag {
 }
 
 flag {
+    name: "enable_desktop_first_sys_user_hsum_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fix the bug around desktop-first policy for system user in HSUM."
+    bug: "430154044"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_desktop_first_top_fullscreen_bugfix"
     namespace: "lse_desktop_experience"
     description: "Fix desktop-first policy for the case where any fullscreen app is focused."
@@ -578,16 +588,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables rounded corners bugfix for Recents transitions."
     bug: "383079261"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_desktop_system_dialogs_transitions"
-    namespace: "lse_desktop_experience"
-    description: "Enables custom transitions for system dialogs in Desktop Mode."
-    bug: "335638193"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -811,13 +811,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Whether to enable min/max window size constraints when resizing a window in desktop windowing mode"
     bug: "327589741"
-}
-
-flag {
-    name: "enable_desktop_windowing_taskbar_running_apps"
-    namespace: "lse_desktop_experience"
-    description: "Shows running apps in Desktop Mode Taskbar"
-    bug: "332504528"
 }
 
 flag {
@@ -1232,6 +1225,16 @@ flag {
 }
 
 flag {
+    name: "enable_prevent_desktop_in_locktaskmode_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fix the bug to unexpectedly enter desktop mode when in lock task mode."
+    bug: "448763429"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_projected_display_desktop_mode"
     namespace: "lse_desktop_experience"
     description: "Enable Desktop Mode on Projected Mode devices but constrained to the external display."
@@ -1444,30 +1447,10 @@ flag {
 }
 
 flag {
-    name: "enable_updated_display_connection_dialog"
-    namespace: "lse_desktop_experience"
-    description: "Enables new display connection dialog that allows selecting between desktop and mirroring. Requires ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT flag to work properly."
-    bug: "413620089"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_upscaling_size_compat_on_exiting_desktop_bugfix"
     namespace: "lse_desktop_experience"
     description: "Enables upscaling of size-compat apps in fullscreen after they exit desktop mode."
     bug: "432329483"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_visual_indicator_in_transition_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables bugfix to move visual drop-zone indicator to transition root, so it can't be shown after the transition."
-    bug: "392826275"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -1605,17 +1588,6 @@ flag {
     description: "Whether to include any top transparent fullscreen task launched in desktop /n"
                  "mode in the heuristic for if desktop windowing is showing or not."
     bug: "379543275"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "inherit_task_bounds_for_trampoline_task_launches"
-    namespace: "lse_desktop_experience"
-    description: "Forces trampoline task launches to inherit the bounds of the previous instance /n"
-                 "before is closes to prevent each task from cascading."
-    bug: "392815318"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

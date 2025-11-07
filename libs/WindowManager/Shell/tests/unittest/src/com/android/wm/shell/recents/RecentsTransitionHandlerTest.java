@@ -74,6 +74,7 @@ import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.internal.os.IResultReceiver;
+import com.android.internal.policy.DesktopModeCompatPolicy;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.ShellTestCase;
@@ -93,6 +94,7 @@ import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.HomeTransitionObserver;
 import com.android.wm.shell.transition.TransitionInfoBuilder;
+import com.android.wm.shell.transition.TransitionLeashManager;
 import com.android.wm.shell.transition.Transitions;
 import com.android.wm.shell.util.StubTransaction;
 
@@ -142,6 +144,8 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
     @Mock
     private Transitions mTransitions;
     @Mock
+    private TransitionLeashManager mTransitionLeashManager;
+    @Mock
     private UserManager mUserManager;
     @Mock
     private DesksOrganizer mDesksOrganizer;
@@ -151,7 +155,7 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
     @Mock private Context mConnectedDisplayContext;
     @Mock private Resources mConnectedDisplayResources;
     @Mock private BubbleController mBubbleController;
-
+    @Mock private DesktopModeCompatPolicy mDesktopModeCompatPolicy;
     private ShellTaskOrganizer mShellTaskOrganizer;
     private RecentTasksController mRecentTasksController;
     private RecentTasksController mRecentTasksControllerReal;
@@ -184,13 +188,14 @@ public class RecentsTransitionHandlerTest extends ShellTestCase {
                 R.dimen.desktop_windowing_freeform_rounded_corner_radius)
         ).thenReturn(FREEFORM_TASK_CORNER_RADIUS_ON_CD);
         when(mBubbleController.hasStableBubbleForTask(anyInt())).thenReturn(false);
+        when(mTransitions.getLeashManager()).thenReturn(mTransitionLeashManager);
         mShellInit = spy(new ShellInit(mMainExecutor));
         mShellController = spy(new ShellController(mContext, mShellInit, mShellCommandHandler,
                 mDisplayInsetsController, mUserManager, mMainExecutor));
         mRecentTasksControllerReal = new RecentTasksController(mContext, mShellInit,
                 mShellController, mShellCommandHandler, mTaskStackListener, mActivityTaskManager,
                 Optional.of(mDesktopUserRepositories), mTaskStackTransitionObserver,
-                mMainExecutor, desktopState);
+                mMainExecutor, desktopState, mDesktopModeCompatPolicy);
         mRecentTasksController = spy(mRecentTasksControllerReal);
         mShellTaskOrganizer = new ShellTaskOrganizer(mShellInit, mShellCommandHandler,
                 mRootTaskDisplayAreaOrganizer, null /* sizeCompatUI */, Optional.empty(),

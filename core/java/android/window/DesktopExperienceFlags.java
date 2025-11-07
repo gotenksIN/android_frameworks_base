@@ -74,9 +74,6 @@ public enum DesktopExperienceFlags {
     ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS(
             Flags::enableAddWindowDecorationToAllTasks, false,
             Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS),
-    ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH(
-            Flags::applyDeskActivationOnUserSwitch, false,
-            Flags.FLAG_APPLY_DESK_ACTIVATION_ON_USER_SWITCH),
     ENABLE_APP_HANDLE_POSITION_REPORTING(Flags::enableAppHandlePositionReporting, false,
             Flags.FLAG_ENABLE_APP_HANDLE_POSITION_REPORTING),
     ENABLE_APP_TO_WEB_EDUCATION_ANIMATION(Flags::enableAppToWebEducationAnimation, false,
@@ -288,8 +285,6 @@ public enum DesktopExperienceFlags {
     ENABLE_TASK_MOVE_ALLOWED_LISTENER_API(Flags::enableTaskMoveAllowedListenerApi, false,
             Flags.FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API),
     ENABLE_TILE_RESIZING(Flags::enableTileResizing, true, Flags.FLAG_ENABLE_TILE_RESIZING),
-    ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG(Flags::enableUpdatedDisplayConnectionDialog, false,
-            Flags.FLAG_ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG),
     ENABLE_UPSCALING_SIZE_COMPAT_ON_EXITING_DESKTOP_BUGFIX(
             Flags::enableUpscalingSizeCompatOnExitingDesktopBugfix, false,
             Flags.FLAG_ENABLE_UPSCALING_SIZE_COMPAT_ON_EXITING_DESKTOP_BUGFIX),

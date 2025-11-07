@@ -21,6 +21,7 @@ import android.view.Display
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
+import com.android.compose.animation.scene.TransitionKey
 import com.android.internal.logging.UiEventLogger
 import com.android.keyguard.AuthInteractionProperties
 import com.android.systemui.CoreStartable
@@ -72,6 +73,7 @@ import com.android.systemui.scene.shared.logger.SceneLogger
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.SceneFamilies
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.scene.shared.model.TransitionKeys.ToAlwaysOnDisplay
 import com.android.systemui.shade.domain.interactor.ShadeDisplaysInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
@@ -547,9 +549,10 @@ constructor(
                                             HideOverlayCommand.HideAll
                                         },
                                     loggingReason = loggingReason,
-                                    // Only snap instantly if we don't need to run the transition
-                                    // for the dismiss animation.
-                                    instantlySnapScenes = !willAnimateDismissAction,
+                                    // Only snap instantly if we're staying on shade. Otherwise, we
+                                    // want to run the unlock animation, which is tied to the
+                                    // transition.
+                                    instantlySnapScenes = leaveShadeOpen,
                                 )
                             } else if (targetScene == Scenes.Shade && willAnimateDismissAction) {
                                 SwitchSceneCommand.SwitchToScene(
@@ -665,8 +668,12 @@ constructor(
                     switchToScene(
                         targetSceneKey = Scenes.Lockscreen,
                         loggingReason = "device is starting to sleep",
+                        transitionKey =
+                            if (keyguardInteractor.isAodAvailable.value) ToAlwaysOnDisplay
+                            else null,
                         sceneState = keyguardInteractor.asleepKeyguardState.value,
-                        freezeAndAnimateToCurrentState = true,
+                        freezeAndAnimateToCurrentState = !keyguardInteractor.isAodAvailable.value,
+                        instantlySnapScenes = keyguardInteractor.isAodAvailable.value,
                     )
                 } else {
                     val canSwipeToEnter = deviceEntryInteractor.canSwipeToEnter.value
@@ -1110,6 +1117,7 @@ constructor(
     private fun switchToScene(
         targetSceneKey: SceneKey,
         loggingReason: String,
+        transitionKey: TransitionKey? = null,
         sceneState: Any? = null,
         freezeAndAnimateToCurrentState: Boolean = false,
         hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
@@ -1131,6 +1139,7 @@ constructor(
             sceneInteractor.changeScene(
                 toScene = targetSceneKey,
                 loggingReason = loggingReason,
+                transitionKey = transitionKey,
                 sceneState = sceneState,
                 forceSettleToTargetScene = freezeAndAnimateToCurrentState,
                 hideAllOverlays = hideOverlays == HideOverlayCommand.HideAll,

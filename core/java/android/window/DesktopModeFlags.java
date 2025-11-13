@@ -50,8 +50,6 @@ public enum DesktopModeFlags {
     ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION_ALWAYS(
             Flags::enableCaptionCompatInsetForceConsumptionAlways, true),
     ENABLE_DESKTOP_APP_HANDLE_ANIMATION(Flags::enableDesktopAppHandleAnimation, true),
-    ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS_BUGFIX(Flags::enableDesktopAppLaunchTransitionsBugfix,
-            true),
     ENABLE_DESKTOP_IMMERSIVE_DRAG_BUGFIX(Flags::enableDesktopImmersiveDragBugfix, true),
     ENABLE_DESKTOP_INDICATOR_IN_SEPARATE_THREAD_BUGFIX(
             Flags::enableDesktopIndicatorInSeparateThreadBugfix, true),
@@ -84,7 +82,6 @@ public enum DesktopModeFlags {
     ENABLE_HANDLE_INPUT_FIX(Flags::enableHandleInputFix, true),
     ENABLE_HOLD_TO_DRAG_APP_HANDLE(Flags::enableHoldToDragAppHandle, true),
     ENABLE_INPUT_LAYER_TRANSITION_FIX(Flags::enableInputLayerTransitionFix, true),
-    ENABLE_MINIMIZE_BUTTON(Flags::enableMinimizeButton, true),
     ENABLE_QUICKSWITCH_DESKTOP_SPLIT_BUGFIX(Flags::enableQuickswitchDesktopSplitBugfix, true),
     ENABLE_REQUEST_FULLSCREEN_BUGFIX(Flags::enableRequestFullscreenBugfix, true),
     ENABLE_RESIZING_METRICS(Flags::enableResizingMetrics, true),

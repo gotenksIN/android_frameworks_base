@@ -2566,6 +2566,7 @@ public final class ActivityRecord extends WindowToken {
                         + ActivityRecord.this + " state " + mTransferringSplashScreenState);
                 if (isTransferringSplashScreen()) {
                     mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
+                    cleanUpSplashScreen();
                     removeStartingWindow();
                 }
             }
@@ -2640,6 +2641,7 @@ public final class ActivityRecord extends WindowToken {
                 parcelable.clearIfNeeded();
             }
             mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
+            cleanUpSplashScreen();
             removeStartingWindow();
             return;
         }
@@ -2654,6 +2656,7 @@ public final class ActivityRecord extends WindowToken {
             mStartingWindow.cancelAnimation();
             parcelable.clearIfNeeded();
             mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
+            cleanUpSplashScreen();
         }
     }
 
@@ -2675,11 +2678,9 @@ public final class ActivityRecord extends WindowToken {
      * @see SplashScreenView#remove()
      */
     void cleanUpSplashScreen() {
-        // We only clean up the splash screen if we were supposed to handle it. If it was
-        // transferred to another activity, the next one will handle the clean up.
-        if (mHandleExitSplashScreen && !startingMoved
-                && (mTransferringSplashScreenState == TRANSFER_SPLASH_SCREEN_FINISH
-                || mTransferringSplashScreenState == TRANSFER_SPLASH_SCREEN_IDLE)) {
+        // Clean up the splash screen if client were supposed to handle it.
+        if (mHandleExitSplashScreen
+                && mTransferringSplashScreenState != TRANSFER_SPLASH_SCREEN_IDLE) {
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Cleaning splash screen token=%s", this);
             mAtmService.mTaskOrganizerController.onAppSplashScreenViewRemoved(getTask(),
                     mStartingSurface != null ? mStartingSurface.mTaskOrganizer : null);
@@ -2795,7 +2796,6 @@ public final class ActivityRecord extends WindowToken {
     }
 
     void removeStartingWindowAnimation(boolean prepareAnimation) {
-        mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_IDLE;
         if (mStartingData != null && task != null) {
             task.mSharedStartingData = null;
         }
@@ -2829,6 +2829,7 @@ public final class ActivityRecord extends WindowToken {
                     Debug.getCallers(5));
             surface = mStartingSurface;
             cleanUpStartingInfo();
+            mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_IDLE;
             if (surface == null) {
                 ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "startingWindow was set but "
                         + "startingSurface==null, couldn't remove");

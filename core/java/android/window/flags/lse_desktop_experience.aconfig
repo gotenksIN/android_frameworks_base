@@ -411,16 +411,6 @@ flag {
 }
 
 flag {
-    name: "enable_desktop_app_launch_transitions_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables custom transitions for app launches in Desktop Mode."
-    bug: "380224832"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_desktop_close_task_animation_in_dtc_bugfix"
     namespace: "lse_desktop_experience"
     description: "Enables bugfix to handle close task animation within DesktopTasksController."
@@ -928,16 +918,6 @@ flag {
 }
 
 flag {
-    name: "enable_full_screen_window_on_removing_split_screen_stage_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables clearing the windowing mode of a freeform window when removing the task from the split screen stage."
-    bug: "372791604"
-    metadata {
-       purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_fullscreen_window_controls"
     namespace: "lse_desktop_experience"
     description: "Enables fullscreen window app header."
@@ -1025,10 +1005,13 @@ flag {
 }
 
 flag {
-    name: "enable_minimize_button"
+    name: "enable_launcher_handle_go_home_keyboard_shortcut"
     namespace: "lse_desktop_experience"
-    description: "Adds a minimize button the the caption bar"
-    bug: "356843241"
+    description: "Enables handling the go home keyboard shortcut on the Launcher side."
+    bug: "427579352"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

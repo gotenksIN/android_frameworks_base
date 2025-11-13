@@ -13,29 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.systemui.shared.plugins
 
-import android.os.Build
+package com.android.systemui.screencapture.ui.viewmodel
 
-enum class BuildVariant {
-    Eng,
-    UserDebug,
-    User;
+import com.android.systemui.kosmos.Kosmos
 
-    companion object {
-        val CURRENT =
-            when {
-                Build.IS_ENG -> Eng
-                Build.IS_USERDEBUG -> UserDebug
-                else -> User
-            }
+val Kosmos.screenCaptureCameraViewModel by
+    Kosmos.Fixture { screenCaptureCameraViewModelFactory.create() }
+
+val Kosmos.screenCaptureCameraViewModelFactory by
+    Kosmos.Fixture {
+        object : ScreenCaptureCameraViewModel.Factory {
+
+            override fun create(): ScreenCaptureCameraViewModel = ScreenCaptureCameraViewModel()
+        }
     }
-}
-
-data class BuildInfo(val variant: BuildVariant, val isDebuggable: Boolean) {
-    val isEng = variant == BuildVariant.Eng
-
-    companion object {
-        val CURRENT = BuildInfo(BuildVariant.CURRENT, Build.IS_DEBUGGABLE)
-    }
-}

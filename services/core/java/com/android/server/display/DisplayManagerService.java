@@ -733,7 +733,7 @@ public final class DisplayManagerService extends SystemService {
         mDumpInProgress = false;
         mConfigParameterProvider = new DeviceConfigParameterProvider(DeviceConfigInterface.REAL);
         mExtraDisplayLoggingPackageName = DisplayProperties.debug_vri_package().orElse(null);
-        mExtraDisplayEventLogging = true; // see b/449949226
+        mExtraDisplayEventLogging = !TextUtils.isEmpty(mExtraDisplayLoggingPackageName);
         mExternalDisplayStatsService = new ExternalDisplayStatsService(mContext, mHandler,
                 () -> !shouldMirrorBuiltInDisplay());
         mDisplayNotificationManager = new DisplayNotificationManager(mContext,
@@ -1756,11 +1756,10 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
-    private WifiDisplayStatus getWifiDisplayStatusInternal(boolean hasLocationPermission) {
+    private WifiDisplayStatus getWifiDisplayStatusInternal(boolean isDeviceAddressVisible) {
         synchronized (mSyncRoot) {
             if (mWifiDisplayAdapter != null) {
-                // Device address is visible if the caller has location permission.
-                return mWifiDisplayAdapter.getWifiDisplayStatusLocked(hasLocationPermission);
+                return mWifiDisplayAdapter.getWifiDisplayStatusLocked(isDeviceAddressVisible);
             }
             return new WifiDisplayStatus();
         }
@@ -3893,7 +3892,7 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private boolean extraLogging(String packageName) {
-        return true; // See b/449949226
+        return mExtraDisplayEventLogging && mExtraDisplayLoggingPackageName.equals(packageName);
     }
 
     // Runs on Handler thread.
@@ -4884,29 +4883,18 @@ public final class DisplayManagerService extends SystemService {
 
             if (!shouldReceiveRefreshRateWithChangeUpdate(eventMask)) {
                 // The client is not visible to the user and is not a system service, so do nothing.
-                if (Flags.sendNonRrCallbacksWhenInBackground()) {
-
-                    // Remove the DisplayManagerGlobal.EVENT_DISPLAY_REFRESH_RATE_CHANGED from the
-                    // mask
-                    eventMask = eventMask
-                            & ~DisplayManagerGlobal.EVENT_DISPLAY_REFRESH_RATE_CHANGED;
-                    if (extraLogging(mPackageName)) {
-                        Slog.i(TAG,
-                                "Not sending refresh rate event because the pid is not in "
-                                        + "the foreground. New eventMask " + eventMask
-                                        + ", mInternalEventFlagsMask:" + mInternalEventFlagsMask
-                                        + " uid " + mUid + " pid " + mPid);
-                    }
-                    if (eventMask == 0) {
-                        return 0;
-                    }
-                } else {
-                    if (extraLogging(mPackageName)) {
-                        Slog.i(TAG,
-                                "Not sending displayEvent: " + eventsToString(eventMask)
-                                        + " due to mask:" + mInternalEventFlagsMask + " uid " + mUid
-                                        + " pid " + mPid + " is in the background");
-                    }
+                // Remove the DisplayManagerGlobal.EVENT_DISPLAY_REFRESH_RATE_CHANGED from the
+                // mask
+                eventMask = eventMask
+                        & ~DisplayManagerGlobal.EVENT_DISPLAY_REFRESH_RATE_CHANGED;
+                if (extraLogging(mPackageName)) {
+                    Slog.i(TAG,
+                            "Not sending refresh rate event because the pid is not in "
+                                    + "the foreground. New eventMask " + eventMask
+                                    + ", mInternalEventFlagsMask:" + mInternalEventFlagsMask
+                                    + " uid " + mUid + " pid " + mPid);
+                }
+                if (eventMask == 0) {
                     return 0;
                 }
             }
@@ -5208,16 +5196,12 @@ public final class DisplayManagerService extends SystemService {
                             }
 
                             if (!shouldReceiveRefreshRateWithChangeUpdate(eventMask)) {
-                                if (Flags.sendNonRrCallbacksWhenInBackground()) {
-                                    // Remove the DisplayManagerGlobal
-                                    // .EVENT_DISPLAY_REFRESH_RATE_CHANGED from the mask
-                                    eventMask = eventMask
-                                            & ~DisplayManagerGlobal
-                                            .EVENT_DISPLAY_REFRESH_RATE_CHANGED;
-                                    if (eventMask == 0) {
-                                        continue;
-                                    }
-                                } else {
+                                // Remove the DisplayManagerGlobal
+                                // .EVENT_DISPLAY_REFRESH_RATE_CHANGED from the mask
+                                eventMask = eventMask
+                                        & ~DisplayManagerGlobal
+                                        .EVENT_DISPLAY_REFRESH_RATE_CHANGED;
+                                if (eventMask == 0) {
                                     continue;
                                 }
                             }
@@ -5481,12 +5465,13 @@ public final class DisplayManagerService extends SystemService {
         public WifiDisplayStatus getWifiDisplayStatus() {
             // This request does not require special permissions.
             // Any app can get information about available wifi displays.
-            // Except for location permission, which is required to get the wifi display address.
-            final boolean hasLocationPermission = checkCallingPermission(
-                    android.Manifest.permission.ACCESS_FINE_LOCATION, "getWifiDisplayStatus()");
+            // Except for configure wifi display permission, which is required to get the wifi
+            // display address.
+            final boolean hasConfigureWifiDisplayPermission = checkCallingPermission(
+                    android.Manifest.permission.CONFIGURE_WIFI_DISPLAY, "getWifiDisplayStatus()");
             final long token = Binder.clearCallingIdentity();
             try {
-                return getWifiDisplayStatusInternal(hasLocationPermission);
+                return getWifiDisplayStatusInternal(hasConfigureWifiDisplayPermission);
             } finally {
                 Binder.restoreCallingIdentity(token);
             }

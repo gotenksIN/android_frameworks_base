@@ -33,8 +33,6 @@ import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.window.TransitionInfo.FLAG_IS_DISPLAY;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REORDER;
-
-import static com.android.window.flags.Flags.enableFullScreenWindowOnRemovingSplitScreenStageBugfix;
 import static com.android.window.flags.Flags.enableNonDefaultDisplaySplitBugfix;
 import static com.android.wm.shell.Flags.enableFlexibleSplit;
 import static com.android.wm.shell.Flags.enableFlexibleTwoAppSplit;
@@ -1052,8 +1050,7 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         }
         Bundle[] outOptions = new Bundle[]{options};
         RunningTaskInfo taskInfo = mTaskOrganizer.getRunningTaskInfo(taskId);
-        if (enableFullScreenWindowOnRemovingSplitScreenStageBugfix() && taskInfo != null
-                && taskInfo.getWindowingMode() == WINDOWING_MODE_FREEFORM) {
+        if (taskInfo != null && taskInfo.getWindowingMode() == WINDOWING_MODE_FREEFORM) {
             RunningTaskInfo task = mTaskOrganizer.getRunningTaskInfo(taskId);
             prepareTasksForSplitScreen(new int[]{taskId}, wct, outOptions);
             if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue()) {
@@ -4155,16 +4152,6 @@ public class StageCoordinator extends StageCoordinatorAbstract {
             return CloseTaskResult.NO_STAGE;
         }
 
-        final WindowContainerTransaction wct = new WindowContainerTransaction();
-        wct.removeTask(taskInfo.token);
-
-        if (stage.getChildCount() > 1) {
-            mTransitions.startTransition(TRANSIT_CLOSE, wct, null);
-            ProtoLog.i(WM_SHELL_SPLIT_SCREEN, "closeTask: taskId=%d: %s", taskId,
-                    CloseTaskResult.CLOSED_TASK_SPLIT_REMAINED);
-            return CloseTaskResult.CLOSED_TASK_SPLIT_REMAINED;
-        }
-
         final int closingStagePosition;
         if (mMainStage.containsTask(taskId)) {
             closingStagePosition = getMainStagePosition();
@@ -4174,6 +4161,16 @@ public class StageCoordinator extends StageCoordinatorAbstract {
             ProtoLog.w(WM_SHELL_SPLIT_SCREEN, "closeTask: taskId=%d: %s", taskId,
                     CloseTaskResult.STAGE_POSITION_UNKNOWN);
             return CloseTaskResult.STAGE_POSITION_UNKNOWN;
+        }
+
+        final WindowContainerTransaction wct = new WindowContainerTransaction();
+        wct.removeTask(taskInfo.token);
+        stage.markToBeVanished(taskId);
+        if (!stage.areAllTasksToBeVanished()) {
+            mTransitions.startTransition(TRANSIT_CLOSE, wct, null);
+            ProtoLog.i(WM_SHELL_SPLIT_SCREEN, "closeTask: taskId=%d: %s", taskId,
+                    CloseTaskResult.CLOSED_TASK_SPLIT_REMAINED);
+            return CloseTaskResult.CLOSED_TASK_SPLIT_REMAINED;
         }
 
         mSplitLayout.flingDividerToDismiss(

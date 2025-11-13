@@ -3654,17 +3654,29 @@ public class ActivityManagerService extends IActivityManager.Stub
             FrameworkStatsLog.write(FrameworkStatsLog.APP_DIED, SystemClock.elapsedRealtime());
         }
     }
-
     @Override
     public boolean clearApplicationUserData(final String packageName, boolean keepState,
             final IPackageDataObserver observer, @CanBeCURRENT @UserIdInt int userId) {
+        return clearApplicationUserData(packageName, keepState, observer, userId, true);
+    }
+
+    @Override
+    public boolean clearApplicationUserDataWithoutPermissionReset(final String packageName,
+            boolean keepState, final IPackageDataObserver observer,
+            @CanBeCURRENT @UserIdInt int userId) {
+        return clearApplicationUserData(packageName, keepState, observer, userId, false);
+    }
+
+    private boolean clearApplicationUserData(final String packageName, boolean keepState,
+            final IPackageDataObserver observer, @CanBeCURRENT @UserIdInt int userId,
+            boolean restorePregrantedPermissions) {
         return clearApplicationUserData(packageName, keepState, /*isRestore=*/ false, observer,
-                userId);
+                userId, restorePregrantedPermissions);
     }
 
     private boolean clearApplicationUserData(final String packageName, boolean keepState,
             boolean isRestore, final IPackageDataObserver observer,
-            @CanBeCURRENT @UserIdInt int userId) {
+            @CanBeCURRENT @UserIdInt int userId, boolean restorePregrantedPermissions) {
         enforceNotIsolatedCaller("clearApplicationUserData");
         int uid = Binder.getCallingUid();
         int pid = Binder.getCallingPid();
@@ -3700,7 +3712,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 } catch (RemoteException e) {
                     /* ignore */
                 }
-                permitted = (applicationInfo != null && applicationInfo.uid == uid) // own uid data
+                permitted = (applicationInfo != null && applicationInfo.uid == uid
+                        && !restorePregrantedPermissions) // own uid data, not changing pregrants
                         || (checkComponentPermission(permission.CLEAR_APP_USER_DATA,
                                 pid, uid, -1, true) == PackageManager.PERMISSION_GRANTED);
             }
@@ -3767,7 +3780,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             try {
                 // Clear application user data
-                pm.clearApplicationUserData(packageName, localObserver, resolvedUserId);
+                pm.clearApplicationUserData(packageName, localObserver, resolvedUserId,
+                        restorePregrantedPermissions);
 
                 if (appInfo != null) {
                     // Restore already established notification state and permission grants,
@@ -18569,7 +18583,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 boolean isRestore, final IPackageDataObserver observer,
                 @CanBeCURRENT @UserIdInt int userId) {
             return ActivityManagerService.this.clearApplicationUserData(packageName, keepState,
-                    isRestore, observer, userId);
+                    isRestore, observer, userId, /* restorePregrantedPermissions */ true);
         }
 
         @Override
@@ -19669,8 +19683,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             // TODO: b/441879937 - Pass useFreezer() information to OomAdjuster and move the trace
             // logging back to OomAdjuster.
             if (Flags.traceUpdateAppFreezeStateLsp()) {
-                final boolean oomAdjChanged = (app.getCurAdj() >= mConstants.FREEZER_CUTOFF_ADJ
-                        ^ oldOomAdj >= mConstants.FREEZER_CUTOFF_ADJ) || oldOomAdj == UNKNOWN_ADJ;
+                final boolean oomAdjChanged = (app.getCurAdj() >= mConstants.mFreezerCutoffAdj
+                        ^ oldOomAdj >= mConstants.mFreezerCutoffAdj) || oldOomAdj == UNKNOWN_ADJ;
                 final boolean hasCpuCapability =
                         (PROCESS_CAPABILITY_CPU_TIME & app.getCurCapability())
                                 == PROCESS_CAPABILITY_CPU_TIME;
@@ -19895,6 +19909,54 @@ public class ActivityManagerService extends IActivityManager.Stub
             mAppProfiler.updateLowMemStateLSP(numCached, numEmpty, now);
             mProcessStateController.setIsLastMemoryLevelNormal(
                     mAppProfiler.isLastMemoryLevelNormal());
+        }
+
+        @Override
+        public void onUpdateUidsStarted() {
+            if (mLocalPowerManager != null) {
+                mLocalPowerManager.startUidChanges();
+            }
+        }
+
+        @Override
+        public void onUpdateUidsFinished(ActiveUidsInternal activeUids, long nowElapsed,
+                ArrayList<UidRecordInternal> becameIdle) {
+            for (int i = activeUids.size() - 1; i >= 0; i--) {
+                mInternal.deletePendingTopUid(activeUids.valueAt(i).getUid(), nowElapsed);
+            }
+
+            if (mLocalPowerManager != null) {
+                mLocalPowerManager.finishUidChanges();
+            }
+
+            // If we have any new uids that became idle this time, we need to make sure
+            // they aren't left with running services.
+            for (int i = becameIdle.size() - 1; i >= 0; i--) {
+                mServices.stopInBackgroundLocked(becameIdle.get(i).getUid());
+            }
+        }
+
+        @Override
+        public void onUidUpdated(UidRecordInternal uidRec, int uidChange) {
+            if ((uidChange & UidRecord.CHANGE_PROCSTATE) != 0
+                    || (uidChange & UidRecord.CHANGE_CAPABILITY) != 0) {
+                mAtmInternal.onUidProcStateChanged(
+                        uidRec.getUid(), uidRec.getSetProcState());
+            }
+            if (uidChange != 0) {
+                enqueueUidChangeLocked((UidRecord) uidRec, -1, uidChange);
+            }
+            if ((uidChange & UidRecord.CHANGE_PROCSTATE) != 0
+                    || (uidChange & UidRecord.CHANGE_CAPABILITY) != 0) {
+                noteUidProcessStateAndCapability(uidRec.getUid(),
+                        uidRec.getCurProcState(), uidRec.getCurCapability());
+            }
+            if ((uidChange & UidRecord.CHANGE_PROCSTATE) != 0) {
+                noteUidProcessState(uidRec.getUid(), uidRec.getCurProcState());
+            }
+            if (uidRec.getHasForegroundServices()) {
+                mServices.foregroundServiceProcStateChangedLocked((UidRecord) uidRec);
+            }
         }
 
         @Override

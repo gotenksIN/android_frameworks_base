@@ -272,6 +272,7 @@ import android.service.persistentdata.IPersistentDataBlockService;
 import android.service.persistentdata.PersistentDataBlockManager;
 import android.service.personalcontext.IPersonalContextManager;
 import android.service.personalcontext.PersonalContextManager;
+import android.service.uprobestats.UprobestatsFrameworkInitializer;
 import android.service.vr.IVrManager;
 import android.system.virtualmachine.VirtualizationFrameworkInitializer;
 import android.telecom.TelecomManager;
@@ -2077,6 +2078,9 @@ public final class SystemServiceRegistry {
 
             // When RELEASE_ANOMALY_DETECTOR is "false", this call is a no-op.
             AnomalyDetectorFrameworkInitializer.registerServiceWrappers();
+            if (android.security.Flags.uprobestatsBridgeService()) {
+                UprobestatsFrameworkInitializer.registerServiceWrappers();
+            }
         } finally {
             // If any of the above code throws, we're in a pretty bad shape and the process
             // will likely crash, but we'll reset it just in case there's an exception handler...

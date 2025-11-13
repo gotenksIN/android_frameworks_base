@@ -3412,8 +3412,8 @@ public class UserManagerService extends IUserManager.Stub {
 
     @Override
     public boolean canAddPrivateProfile(@UserIdInt int userId) {
-        checkQueryOrCreateUsersPermission("canAddPrivateProfile");
         if (!android.multiuser.Flags.consistentMaxUsers()) {
+            checkQueryOrCreateUsersPermission("canAddPrivateProfile");
             UserInfo parentUserInfo = getUserInfo(userId);
             return isUserTypeEnabled(USER_TYPE_PROFILE_PRIVATE)
                     && canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE,
@@ -3422,10 +3422,8 @@ public class UserManagerService extends IUserManager.Stub {
                     && doSystemFeaturesSupportUserType(USER_TYPE_PROFILE_PRIVATE)
                     && !hasUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE, userId);
         }
-        // TODO(b/413464199): Ideally, this should be performed client-side and this method removed
-        //  entirely. Unfortunately, Tradefed currently needs it too, so we cannot.
-        return canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, userId, false)
-                && !hasUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE, userId);
+        // Remove this method entirely when cleaning up consistentMaxUsers.
+        throw new UnsupportedOperationException("This method is no longer necessary");
     }
 
     @Override
@@ -5304,6 +5302,7 @@ public class UserManagerService extends IUserManager.Stub {
                 updateUserIds();
                 upgradeIfNecessaryLP();
                 updateUsersWithFeatureFlags(guestRestrictionsArePresentOnUserListXml);
+                ensurePerfettoUserListExistsLP();
             } catch (Exception e) {
                 // Remove corrupted file and retry.
                 file.failRead(fin, e);
@@ -5732,6 +5731,33 @@ public class UserManagerService extends IUserManager.Stub {
         userInfo.profileBadge = getFreeProfileBadgeLU(userInfo.profileGroupId, userInfo.userType);
     }
 
+    /**
+     * Ensures the Perfetto user list file ({@code mPerfUserListFile}) exists.
+     *
+     * <p>If the file does not exist, this method creates it by calling
+     * {@link #writePerfettoUserListLP()}. This is necessary so Perfetto can read user types,
+     * for example, after a system upgrade when the file might not have been
+     * otherwise generated.
+     *
+     * <p>This method must be called while holding the {@code mPackagesLock}.
+     */
+    @GuardedBy({"mPackagesLock"})
+    private void ensurePerfettoUserListExistsLP() {
+        // force update if file does not exist and perfettoMultiuserTable Flag is on
+        // delete existing file if Flag is off
+        if (!mPerfUserListFile.exists()) {
+            writePerfettoUserListLP();
+        } else if (!android.multiuser.Flags.perfettoMultiuserTable()) {
+            try {
+                if (!mPerfUserListFile.delete()) {
+                    Slog.e(LOG_TAG, "Deleting the perfetto user list was unsuccessful");
+                }
+            } catch (SecurityException se) {
+                Slog.e(LOG_TAG, "Error deleting the perfetto user list", se);
+            }
+        }
+    }
+
     /** Returns the oldest Full Admin user, or null is if there none. */
     private @Nullable UserInfo getEarliestCreatedFullUser() {
         List<UserInfo> users;
@@ -6083,7 +6109,20 @@ public class UserManagerService extends IUserManager.Stub {
                 file.failWrite(fos);
             }
         }
+        writePerfettoUserListLP();
+    }
 
+    /*
+     * Writes the perfetto user list file in this format:
+     *
+     * user_type user_id
+     * android.os.usertype.system.HEADLESS 0
+     * android.os.usertype.full.SECONDARY 10
+     * android.os.usertype.full.GUEST 11
+     *
+     */
+    @GuardedBy({"mPackagesLock"})
+    private void writePerfettoUserListLP() {
         if (android.multiuser.Flags.perfettoMultiuserTable()) {
             try (ResilientAtomicFile file = getUserListFile(mPerfUserListFile)) {
                 FileOutputStream fos = null;
@@ -8499,8 +8538,10 @@ public class UserManagerService extends IUserManager.Stub {
         mUserVisibilityMediator.dump(pw, args);
         pw.println();
 
-        // TODO(b/413464199): This confusing line is, regrettably, currently required by Tradefed.
-        pw.println("Can add private profile: "+ canAddPrivateProfile(currentUserId));
+        if (!android.multiuser.Flags.consistentMaxUsers()) {
+            // Before the flag, this confusing line used to be required by Tradefed.
+            pw.println("Can add private profile: "+ canAddPrivateProfile(currentUserId));
+        }
 
         pw.println();
         pw.println("Number of listeners for");

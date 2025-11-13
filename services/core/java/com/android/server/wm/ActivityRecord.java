@@ -1117,7 +1117,6 @@ public final class ActivityRecord extends WindowToken {
         pw.print(prefix); pw.print("mHaveState="); pw.print(mHaveState);
                 pw.print(" mIcicle="); pw.println(mIcicle);
         pw.print(prefix); pw.print("state="); pw.print(mState);
-                pw.print(" delayedResume="); pw.print(delayedResume);
                 pw.print(" finishing="); pw.println(finishing);
         pw.print(prefix); pw.print("keysPaused="); pw.print(keysPaused);
                 pw.print(" inHistory="); pw.print(inHistory);
@@ -1992,7 +1991,6 @@ public final class ActivityRecord extends WindowToken {
         setState(INITIALIZING, "ActivityRecord ctor");
         callServiceTrackeronActivityStatechange(INITIALIZING, true);
         launchFailed = false;
-        delayedResume = false;
         finishing = false;
         keysPaused = false;
         inHistory = false;

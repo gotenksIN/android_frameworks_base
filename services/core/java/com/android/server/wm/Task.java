@@ -3169,16 +3169,8 @@ class Task extends TaskFragment {
         return activity != null ? activity.findMainWindow() : null;
     }
 
-    ActivityRecord topRunningNonDelayedActivityLocked(ActivityRecord notTop) {
-        final PooledPredicate p = PooledLambda.obtainPredicate(Task::isTopRunningNonDelayed
-                , PooledLambda.__(ActivityRecord.class), notTop);
-        final ActivityRecord r = getActivity(p);
-        p.recycle();
-        return r;
-    }
-
-    private static boolean isTopRunningNonDelayed(ActivityRecord r, ActivityRecord notTop) {
-        return !r.delayedResume && r != notTop && r.canBeTopRunning();
+    ActivityRecord topRunningActivity(ActivityRecord notTop) {
+        return getActivity(r -> r != notTop && r.canBeTopRunning());
     }
 
     /**
@@ -5482,7 +5474,7 @@ class Task extends TaskFragment {
             // reset, then do so.
             if ((r.intent.getFlags() & Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED) != 0) {
                 resetTaskIfNeeded(r, r);
-                doShow = topRunningNonDelayedActivityLocked(null) == r;
+                doShow = topRunningActivity(null) == r;
             }
         } else if (options != null && options.getAnimationType()
                 == ActivityOptions.ANIM_SCENE_TRANSITION) {

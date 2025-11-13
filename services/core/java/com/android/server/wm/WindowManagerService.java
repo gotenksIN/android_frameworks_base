@@ -3831,11 +3831,6 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @VisibleForTesting
     void setAnimationsDisabledForDisplay(int displayId, boolean disabled) {
-        if (!android.companion.virtualdevice.flags.Flags.enableAnimationsPerDisplay()) {
-            Slog.e(TAG, "Required feature flag is disabled");
-            return;
-        }
-
         synchronized (mGlobalLock) {
             DisplayContent displayContent = mRoot.getDisplayContentOrCreate(displayId);
             displayContent.setAnimationsDisabledLocked(disabled);

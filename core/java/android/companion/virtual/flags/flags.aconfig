@@ -238,40 +238,10 @@ flag {
 }
 
 flag {
-    name: "enable_animations_per_display"
-    namespace: "virtual_devices"
-    description: "Enable/disable window and transition animations per display"
-    bug: "427437362"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "automated_app_launch_interception"
     namespace: "virtual_devices"
     description: "Show a warning dialog when launching an automated app"
     bug: "442627126"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "computer_control_typing"
-    namespace: "virtual_devices"
-    description: "Support input connection based CC text manipulation APIs"
-    bug: "422134565"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "computer_control_config_change_override"
-    namespace: "virtual_devices"
-    description: "Overrides configuration changes for display moves from/to ComputerControl VirtualDisplays"
-    bug: "437848392"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

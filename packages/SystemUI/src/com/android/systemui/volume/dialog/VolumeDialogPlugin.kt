@@ -23,8 +23,8 @@ import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.plugins.VolumeDialog
 import com.android.systemui.volume.CsdWarningAction
-import com.android.systemui.volume.CsdWarningDialogDelegate
-import com.android.systemui.volume.SafetyWarningDialogDelegate
+import com.android.systemui.volume.CsdWarningDialog
+import com.android.systemui.volume.SafetyWarningDialog
 import com.android.systemui.volume.dialog.dagger.VolumeDialogPluginComponent
 import com.android.systemui.volume.dialog.dagger.factory.VolumeDialogPluginComponentFactory
 import com.android.systemui.volume.dialog.ui.viewmodel.VolumeDialogPluginViewModel
@@ -44,8 +44,7 @@ constructor(
     private val context: Context,
     private val audioManager: AudioManager,
     private val volumeDialogPluginComponentFactory: VolumeDialogPluginComponentFactory,
-    private val csdWarningDialogDelegateFactory: CsdWarningDialogDelegate.Factory,
-    private val safetyWarningDialogDelegateFactory: SafetyWarningDialogDelegate.Factory,
+    private val csdWarningDialogFactory: CsdWarningDialog.Factory,
 ) : VolumeDialog {
 
     private var job: Job? = null
@@ -95,15 +94,14 @@ constructor(
     private suspend fun showSafetyWarningVisibility(onDismissed: () -> Unit) =
         suspendCancellableCoroutine { continuation ->
             val dialog =
-                safetyWarningDialogDelegateFactory
-                    .create(
-                        /* cleanup = */ {
+                object : SafetyWarningDialog(context, audioManager) {
+                    override fun cleanUp() {
                         onDismissed()
                         if (!continuation.isCompleted) {
                             continuation.resume(Unit)
                         }
-                    })
-                    .createDialog()
+                    }
+                }
             dialog.show()
             continuation.invokeOnCancellation { dialog.dismiss() }
         }
@@ -113,8 +111,8 @@ constructor(
         actions: List<CsdWarningAction>,
         onDismissed: () -> Unit,
     ) = suspendCancellableCoroutine { continuation ->
-        val dialogDelegate =
-            csdWarningDialogDelegateFactory.create(
+        val dialog =
+            csdWarningDialogFactory.create(
                 warning,
                 {
                     onDismissed()
@@ -125,7 +123,6 @@ constructor(
                 Optional.of(actions),
             )
 
-        val dialog = dialogDelegate.createDialog()
         dialog.show()
         continuation.invokeOnCancellation { dialog.dismiss() }
     }

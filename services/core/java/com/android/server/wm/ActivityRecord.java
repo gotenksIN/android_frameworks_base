@@ -530,7 +530,6 @@ public final class ActivityRecord extends WindowToken {
                                        // dies. After an activity is launched it follows the value
                                        // of #mIcicle.
     boolean launchFailed;   // set if a launched failed, to abort on 2nd try
-    boolean delayedResume;  // not yet resumed because of stopped app switches?
     boolean finishing;      // activity in pending finish list?
     private boolean keysPaused;     // has key dispatching been paused for it?
     int launchMode;         // the launch mode activity attribute.
@@ -6545,12 +6544,6 @@ public final class ActivityRecord extends WindowToken {
 
         mAppStopped = true;
         firstWindowDrawn = false;
-        // This is to fix the edge case that auto-enter-pip is finished in Launcher but app calls
-        // setAutoEnterEnabled(false) and transitions to STOPPED state, see b/191930787.
-        // Clear any surface transactions and content overlay in this case.
-        if (task.mLastRecentsAnimationTransaction != null) {
-            task.clearLastRecentsAnimationTransaction(true /* forceRemoveOverlay */);
-        }
         if (isClientVisible()) {
             // Though this is usually unlikely to happen, still make sure the client is invisible.
             setClientVisible(false);

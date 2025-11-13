@@ -2155,9 +2155,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (singleActivity) {
                 rootTask = task;
 
-                // Apply the last recents animation leash transform to the task entering PIP
-                rootTask.maybeApplyLastRecentsAnimationTransaction();
-
                 if (rootTask.getParent() != taskDisplayArea) {
                     // root task is nested, but pinned tasks need to be direct children of their
                     // display area, so reparent.
@@ -2222,21 +2219,13 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 // automatically removed from the recents list.
                 rootTask.autoRemoveRecents = true;
 
-                // Move the last recents animation transaction from original task to the new one.
-                if (task.mLastRecentsAnimationTransaction != null) {
-                    rootTask.setLastRecentsAnimationTransaction(
-                            task.mLastRecentsAnimationTransaction,
-                            task.mLastRecentsAnimationOverlay);
-                    task.clearLastRecentsAnimationTransaction(false /* forceRemoveOverlay */);
-                } else {
-                    // Reset the original task surface
-                    // TODO (b/448208017): Investigate why this line isn't WAI in fullscreen case,
-                    // and find a different workaround for freeform case when this is fixed.
-                    if (!DesktopExperienceFlags
-                            .ENABLE_DESKTOP_WINDOWING_MULTI_ACTIVITY_PIP_KEEP_PARENT_OPEN
-                            .isTrue()) {
-                        task.resetSurfaceControlTransforms();
-                    }
+                // Reset the original task surface
+                // TODO (b/448208017): Investigate why this line isn't WAI in fullscreen case,
+                // and find a different workaround for freeform case when this is fixed.
+                if (!DesktopExperienceFlags
+                        .ENABLE_DESKTOP_WINDOWING_MULTI_ACTIVITY_PIP_KEEP_PARENT_OPEN
+                        .isTrue()) {
+                    task.resetSurfaceControlTransforms();
                 }
 
                 // The organized TaskFragment is becoming empty because this activity is reparented
@@ -2270,9 +2259,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 // up-to-dated root pinned task information on this newly created root task.
                 r.reparent(rootTask, MAX_VALUE, reason);
                 rootTask.setFocusable(true);
-
-                // Ensure the leash of new task is in sync with its current bounds after reparent.
-                rootTask.maybeApplyLastRecentsAnimationTransaction();
 
                 boolean isLastParentTransientHide = mTransitionController
                         .getTransientHideTransitionForContainer(task) != null;

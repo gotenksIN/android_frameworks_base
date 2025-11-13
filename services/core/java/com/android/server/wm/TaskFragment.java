@@ -2353,7 +2353,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
     @Override
     void addChild(WindowContainer child, int index) {
-        ActivityRecord r = topRunningActivity();
         mClearedTaskForReuse = false;
         mClearedTaskFragmentForPip = false;
         mClearedForReorderActivityToFront = false;

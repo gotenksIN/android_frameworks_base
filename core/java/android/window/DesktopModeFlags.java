@@ -61,8 +61,6 @@ public enum DesktopModeFlags {
     ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION(Flags::enableDesktopWindowingAppToWebEducation,
             true),
     ENABLE_DESKTOP_WINDOWING_BACK_NAVIGATION(Flags::enableDesktopWindowingBackNavigation, true),
-    ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS_BUGFIX(
-            Flags::enableDesktopWindowingEnterTransitionBugfix, true),
     ENABLE_DESKTOP_WINDOWING_EXIT_TRANSITIONS_BUGFIX(
             Flags::enableDesktopWindowingExitTransitionsBugfix, true),
     ENABLE_DESKTOP_WINDOWING_IMMERSIVE_HANDLE_HIDING(
@@ -71,7 +69,6 @@ public enum DesktopModeFlags {
     ENABLE_DESKTOP_WINDOWING_MULTI_INSTANCE_FEATURES(
             Flags::enableDesktopWindowingMultiInstanceFeatures, true),
     ENABLE_DESKTOP_WINDOWING_PERSISTENCE(Flags::enableDesktopWindowingPersistence, true),
-    ENABLE_DESKTOP_WINDOWING_QUICK_SWITCH(Flags::enableDesktopWindowingQuickSwitch, true),
     ENABLE_DESKTOP_WINDOWING_SCVH_CACHE(Flags::enableDesktopWindowingScvhCacheBugFix, true),
     ENABLE_DESKTOP_WINDOWING_SIZE_CONSTRAINTS(Flags::enableDesktopWindowingSizeConstraints, true),
     ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY(Flags::enableDesktopWindowingWallpaperActivity,

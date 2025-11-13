@@ -244,16 +244,6 @@ flag {
 }
 
 flag {
-    name: "enable_camera_compat_sandbox_display_rotation_on_external_displays_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Whether to use primary display rotation when sandboxing rotation for responsive camera apps."
-    bug: "395063101"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_camera_compat_track_task_and_app_bugfix"
     namespace: "lse_desktop_experience"
     description: "Whether to use taskId and app process to track camera apps, and notify the policies only on first camera open and final close"
@@ -435,6 +425,16 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables the drag-to-maximize capability triggered by desktop-first state."
     bug: "404626572"
+}
+
+flag {
+    name: "enable_desktop_first_exempted_source_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fixes desktop-first policy for the case where the source task is fullscreen but exempted from desktop."
+    bug: "443065273"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -692,13 +692,6 @@ flag {
 }
 
 flag {
-    name: "enable_desktop_windowing_hsum"
-    namespace: "lse_desktop_experience"
-    description: "Enables HSUM on desktop mode."
-    bug: "366397912"
-}
-
-flag {
     name: "enable_desktop_windowing_immersive_handle_hiding"
     namespace: "lse_desktop_experience"
     description: "Hides the App Handle when in fullscreen immersive mode"
@@ -912,9 +905,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables box shadows for freeform windows."
     bug: "367464660"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1142,16 +1132,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Add options to pin/unpin to taskbar to app context menus."
     bug: "375648361"
-}
-
-flag {
-    name: "enable_presentation_disallowed_on_unfocused_host_task"
-    namespace: "lse_desktop_experience"
-    description: "Disallows presentations from being shown on their unfocused host tasks."
-    bug: "435586251"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

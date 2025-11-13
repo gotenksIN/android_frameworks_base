@@ -2113,7 +2113,7 @@ public final class SystemServer implements Dumpable {
             startRotationResolverService(context, t);
             startSystemCaptionsManagerService(context, t);
             startTextToSpeechManagerService(context, t);
-            if (!isWatch || !android.server.Flags.removeWearableSensingServiceFromWear()) {
+            if (!isWatch) {
                 startWearableSensingService(t);
             } else {
                 Slog.d(TAG, "Not starting WearableSensingService");
@@ -2320,7 +2320,7 @@ public final class SystemServer implements Dumpable {
             }
             t.traceEnd();
 
-            if (!isWatch || !android.server.Flags.allowRemovingVpnService()) {
+            if (!isWatch) {
                 t.traceBegin("StartVpnManagerService");
                 try {
                     vpnManager = VpnManagerService.create(context);
@@ -3364,7 +3364,7 @@ public final class SystemServer implements Dumpable {
         }
         t.traceEnd();
 
-        if (!isWatch || !android.server.Flags.removeGameManagerServiceFromWear()) {
+        if (!isWatch) {
             t.traceBegin("GameManagerService");
             mSystemServiceManager.startService(GameManagerService.Lifecycle.class);
             t.traceEnd();

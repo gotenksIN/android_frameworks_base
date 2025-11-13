@@ -25,11 +25,11 @@ import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
 import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED;
 import static android.os.PowerExemptionManager.TEMPORARY_ALLOW_LIST_TYPE_FOREGROUND_SERVICE_NOT_ALLOWED;
 import static android.os.PowerExemptionManager.TEMPORARY_ALLOW_LIST_TYPE_NONE;
+import static android.provider.DeviceConfig.NAMESPACE_ACTIVITY_MANAGER_NATIVE_BOOT;
 
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_POWER_QUICK;
 import static com.android.server.am.BroadcastConstants.DEFER_BOOT_COMPLETED_BROADCAST_BACKGROUND_RESTRICTED_ONLY;
 import static com.android.server.am.BroadcastConstants.DEFER_BOOT_COMPLETED_BROADCAST_TARGET_T_ONLY;
-import static com.android.server.am.BroadcastConstants.getDeviceConfigBoolean;
 import static com.android.server.am.psc.Constants.CACHED_APP_MIN_ADJ;
 import static com.android.server.am.psc.Constants.HOME_APP_ADJ;
 
@@ -1584,6 +1584,28 @@ final class ActivityManagerConstants extends ContentObserver {
                         DeviceConfig.NAMESPACE_ACTIVITY_MANAGER_COMPONENT_ALIAS));
     }
 
+    /**
+     * Return the {@link SystemProperties} name for the given key in our
+     * {@link DeviceConfig} namespace.
+     */
+    private static @NonNull String propertyFor(@NonNull String key) {
+        return "persist.device_config." + NAMESPACE_ACTIVITY_MANAGER_NATIVE_BOOT + "." + key;
+    }
+
+    /**
+     * Return the {@link SystemProperties} name for the given key in our
+     * {@link DeviceConfig} namespace, but with a different prefix that can be
+     * used to locally override the {@link DeviceConfig} value.
+     */
+    private static @NonNull String propertyOverrideFor(@NonNull String key) {
+        return "persist.sys." + NAMESPACE_ACTIVITY_MANAGER_NATIVE_BOOT + "." + key;
+    }
+
+    private static boolean getDeviceConfigBoolean(@NonNull String key, boolean def) {
+        return SystemProperties.getBoolean(propertyOverrideFor(key),
+                SystemProperties.getBoolean(propertyFor(key), def));
+    }
+
     public static int computeTrimEmptyApps(int rawMaxEmptyProcesses) {
         if (USE_TRIM_SETTINGS && allowTrim()) {
             return rawMaxEmptyProcesses*TRIM_EMPTY_PERCENT/100;
@@ -1599,6 +1621,7 @@ final class ActivityManagerConstants extends ContentObserver {
             return (totalProcessLimit-rawMaxEmptyProcesses)/3;
         }
     }
+
     public void setOverrideMaxCachedProcesses(int value) {
         mOverrideMaxCachedProcesses = value;
         updateMaxCachedProcesses();

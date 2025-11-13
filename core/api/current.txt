@@ -9106,7 +9106,7 @@ package android.app.admin {
 
 package android.app.appfunctions {
 
-  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public interface AppFunction {
+  @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") public interface AppFunction {
     method public void onExecuteAppFunction(@NonNull android.app.appfunctions.ExecuteAppFunctionRequest, @NonNull android.os.CancellationSignal, @NonNull android.os.OutcomeReceiver<android.app.appfunctions.ExecuteAppFunctionResponse,android.app.appfunctions.AppFunctionException>);
   }
 
@@ -9161,7 +9161,7 @@ package android.app.appfunctions {
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public int getAccessRequestState(@NonNull String);
     method @RequiresPermission(value=android.Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional=true) public void isAppFunctionEnabled(@NonNull String, @NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
     method public void isAppFunctionEnabled(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
-    method @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") @NonNull public android.app.appfunctions.AppFunctionRegistration registerAppFunction(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.app.appfunctions.AppFunction);
+    method @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") @NonNull public android.app.appfunctions.AppFunctionRegistration registerAppFunction(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.app.appfunctions.AppFunction);
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public void revokeSelfAccess(@NonNull String);
     method public void setAppFunctionEnabled(@NonNull String, int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,java.lang.Exception>);
     field @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public static final int ACCESS_REQUEST_STATE_DENIED = 1; // 0x1
@@ -9175,7 +9175,7 @@ package android.app.appfunctions {
     field public static final int APP_FUNCTION_STATE_ENABLED = 1; // 0x1
   }
 
-  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public final class AppFunctionMetadata implements android.os.Parcelable {
+  @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") public final class AppFunctionMetadata implements android.os.Parcelable {
     method public int describeContents();
     method @NonNull public android.app.appsearch.GenericDocument getMetadataDocument();
     method @NonNull public android.app.appfunctions.AppFunctionName getName();
@@ -9191,7 +9191,7 @@ package android.app.appfunctions {
     field public static final String PROPERTY_SCHEMA_VERSION = "schemaVersion";
   }
 
-  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public final class AppFunctionName implements android.os.Parcelable {
+  @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") public final class AppFunctionName implements android.os.Parcelable {
     ctor public AppFunctionName(@NonNull String, @NonNull String);
     method public int describeContents();
     method @NonNull public String getFunctionId();
@@ -9200,7 +9200,7 @@ package android.app.appfunctions {
     field @NonNull public static final android.os.Parcelable.Creator<android.app.appfunctions.AppFunctionName> CREATOR;
   }
 
-  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public final class AppFunctionPackageMetadata implements android.os.Parcelable {
+  @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") public final class AppFunctionPackageMetadata implements android.os.Parcelable {
     method public int describeContents();
     method @NonNull public android.app.appsearch.GenericDocument getMetadataDocument();
     method @NonNull public String getPackageName();
@@ -9209,11 +9209,11 @@ package android.app.appfunctions {
     field public static final String PROPERTY_TOP_LEVEL_DOCUMENTS = "topLevelMetadataDocuments";
   }
 
-  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public interface AppFunctionRegistration {
+  @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") public interface AppFunctionRegistration {
     method public void unregister();
   }
 
-  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public final class AppFunctionSchemaMetadata implements android.os.Parcelable {
+  @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") public final class AppFunctionSchemaMetadata implements android.os.Parcelable {
     ctor public AppFunctionSchemaMetadata(@NonNull String, @NonNull String, long);
     method public int describeContents();
     method @NonNull public String getCategory();
@@ -10455,7 +10455,6 @@ package android.companion {
     method public int getId();
     method public int getSystemDataSyncFlags();
     method public boolean isSelfManaged();
-    method @FlaggedApi("android.companion.enable_data_sync") public boolean isTransportAttached();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.companion.AssociationInfo> CREATOR;
   }
@@ -10543,6 +10542,7 @@ package android.companion {
     method @NonNull public java.util.List<android.companion.AssociationInfo> getMyAssociations();
     method @Deprecated public boolean hasNotificationAccess(android.content.ComponentName);
     method @FlaggedApi("android.companion.perm_sync_user_consent") public boolean isPermissionTransferUserConsented(int);
+    method @FlaggedApi("android.companion.enable_data_sync") public boolean isSystemDataTransportAttached(int);
     method @FlaggedApi("android.companion.enable_data_sync") public void notifyActionResult(int, @NonNull android.companion.ActionResult);
     method @FlaggedApi("android.companion.unpair_associated_device") @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT) public boolean removeBond(int);
     method public void requestNotificationAccess(android.content.ComponentName);
@@ -38759,6 +38759,7 @@ package android.provider {
     field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String ACTION_PICK_CONTACTS = "android.provider.action.PICK_CONTACTS";
     field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String AUTHORITY = "com.android.contacts.picker.sessions";
     field @FlaggedApi("android.content.flags.enable_system_contacts_picker") @NonNull public static final android.net.Uri AUTHORITY_URI;
+    field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String EXTRA_PICK_CONTACTS_MATCH_ALL_DATA_FIELDS = "android.provider.extra.PICK_CONTACTS_MATCH_ALL_DATA_FIELDS";
     field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String EXTRA_PICK_CONTACTS_REQUESTED_DATA_FIELDS = "android.provider.extra.PICK_CONTACTS_REQUESTED_DATA_FIELDS";
     field @FlaggedApi("android.content.flags.enable_system_contacts_picker") public static final String EXTRA_PICK_CONTACTS_SELECTION_LIMIT = "android.provider.extra.PICK_CONTACTS_SELECTION_LIMIT";
   }

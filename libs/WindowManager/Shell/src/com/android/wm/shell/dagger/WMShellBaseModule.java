@@ -91,7 +91,8 @@ import com.android.wm.shell.compatui.api.CompatUIComponentIdGenerator;
 import com.android.wm.shell.compatui.api.CompatUIComponentRepository;
 import com.android.wm.shell.compatui.api.CompatUIHandler;
 import com.android.wm.shell.compatui.api.CompatUIRepository;
-import com.android.wm.shell.compatui.api.CompatUIState;
+import com.android.wm.shell.compatui.api.CompatUISharedRepositoryCleanUp;
+import com.android.wm.shell.compatui.api.CompatUISharedStateRepository;
 import com.android.wm.shell.compatui.components.RestartButtonSpecKt;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIComponentFactory;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIHandler;
@@ -325,7 +326,7 @@ public abstract class WMShellBaseModule {
             CompatUIRepository compatUIRepository,
             CompatUIComponentRepository compatUIComponentRepository,
             Optional<DesktopUserRepositories> desktopUserRepositories,
-            @NonNull CompatUIState compatUIState,
+            @NonNull CompatUISharedStateRepository sharedComponentRepository,
             @NonNull CompatUIComponentIdGenerator componentIdGenerator,
             @NonNull CompatUIComponentFactory compatUIComponentFactory,
             CompatUIStatusManager compatUIStatusManager,
@@ -338,8 +339,8 @@ public abstract class WMShellBaseModule {
         if (Flags.appCompatUiFramework()) {
             return Optional.of(
                     new DefaultCompatUIHandler(compatUIRepository, compatUIComponentRepository,
-                            compatUIState, componentIdGenerator, compatUIComponentFactory,
-                            mainExecutor));
+                            sharedComponentRepository, componentIdGenerator,
+                            compatUIComponentFactory, mainExecutor));
         }
         return Optional.of(
                 new CompatUIController(
@@ -375,19 +376,28 @@ public abstract class WMShellBaseModule {
 
     @WMSingleton
     @Provides
-    static CompatUIState provideCompatUIState() {
-        return new CompatUIState();
-    }
-
-    @WMSingleton
-    @Provides
     static CompatUIComponentFactory provideCompatUIComponentFactory(
             @NonNull Context context,
             @NonNull SyncTransactionQueue syncQueue,
             @NonNull CompatUIComponentRepository compatUIComponentRepository,
+            @NonNull CompatUISharedStateRepository sharedStateRepository,
             @NonNull DisplayController displayController) {
         return new DefaultCompatUIComponentFactory(context, syncQueue, displayController,
-                compatUIComponentRepository);
+                compatUIComponentRepository, sharedStateRepository);
+    }
+
+    @WMSingleton
+    @Provides
+    static Optional<CompatUISharedRepositoryCleanUp> provideCompatUISharedStateManager(
+            @NonNull ShellInit shellInit,
+            @NonNull ShellTaskOrganizer shellTaskOrganizer,
+            @NonNull CompatUISharedStateRepository sharedStateRepository
+    ) {
+        if (Flags.appCompatUiFramework()) {
+            return Optional.of(new CompatUISharedRepositoryCleanUp(shellInit, shellTaskOrganizer,
+                    sharedStateRepository));
+        }
+        return Optional.empty();
     }
 
     @WMSingleton

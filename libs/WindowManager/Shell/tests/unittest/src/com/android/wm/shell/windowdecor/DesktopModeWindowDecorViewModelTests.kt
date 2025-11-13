@@ -43,7 +43,9 @@ import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.testing.AndroidTestingRunner
 import android.testing.TestableLooper.RunWithLooper
+import android.view.Display
 import android.view.Display.DEFAULT_DISPLAY
+import android.view.DisplayInfo
 import android.view.ISystemGestureExclusionListener
 import android.view.InputDevice
 import android.view.InsetsSource
@@ -130,6 +132,20 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         desktopState.isFreeformEnabled = true
 
         setUpCommon()
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
+    fun createWindowDecoration_displayRetrievedFromDisplayManagerWhenUnavailableInDisplayController() {
+        val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
+        setUpMockDecorationForTask(task)
+        val display = Display(mock(), task.displayId, DisplayInfo(), context.resources)
+        whenever(mockDisplayController.getDisplayContext(task.displayId)).thenReturn(null)
+        whenever(mockDisplayController.getDisplay(task.displayId)).thenReturn(display)
+        val taskSurface = SurfaceControl()
+        onTaskOpening(task, taskSurface)
+        // Verify display was retrieved from the display manager
+        verify(spyContext).createDisplayContext(display)
     }
 
     @Test
@@ -289,16 +305,11 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 windowingMode = WINDOWING_MODE_FREEFORM,
                 onCaptionButtonClickListener = onClickListenerCaptor,
             )
-        val taskInfo = decor.taskInfo
+        whenever(mockPinnedLayerController.isPinned(decor.taskInfo.taskId)).thenReturn(true)
 
         val view = mock<View> { on { id } doReturn R.id.close_window }
-        whenever(mockDesktopTasksController.closeTask(taskInfo))
-            .thenReturn(DesktopTasksController.CloseTaskResult.NOT_CLOSED_UNKNOWN_TASK)
-        whenever(mockPinnedLayerController.closeTask(taskInfo)).thenReturn(true)
-
         onClickListenerCaptor.firstValue.onClick(view)
 
-        verify(mockDesktopTasksController).getTopTask(taskInfo.displayId, taskInfo.userId)
         verify(mockPinnedLayerController).closeTask(decor.taskInfo)
     }
 
@@ -1407,7 +1418,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             }
             mockDesktopTasksController.stub {
                 on {
-                    onDragPositioningEnd(any(), any(), any(), any(), any(), any(), any(), any())
+                    onDragPositioningEnd(any(), any(), any(), any(), any(), any(), any())
                 } doReturn false
             }
 
@@ -1451,7 +1462,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 .onDragPositioningEnd(
                     eq(taskInfo),
                     any<SurfaceControl>(),
-                    eq(SECOND_DISPLAY),
                     eq(PointF(20f, 20f)),
                     eq(BOUNDS_ON_DRAG_END_DESKTOP_ACCEPTED),
                     any<Rect>(),
@@ -1538,7 +1548,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             }
             mockDesktopTasksController.stub {
                 on {
-                    onDragPositioningEnd(any(), any(), any(), any(), any(), any(), any(), any())
+                    onDragPositioningEnd(any(), any(), any(), any(), any(), any(), any())
                 } doReturn true
             }
 
@@ -1616,7 +1626,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 .onDragPositioningEnd(
                     eq(taskInfo),
                     any<SurfaceControl>(),
-                    eq(SECOND_DISPLAY),
                     eq(PointF(30f, 30f)),
                     eq(BOUNDS_IGNORED_ON_NON_DESKTOP),
                     any<Rect>(),

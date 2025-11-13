@@ -1048,6 +1048,13 @@ flag {
 }
 
 flag {
+  name: "aosp_posture_detection"
+  namespace: "systemui"
+  description: "Enables an AOSP-based posture detection algorithm using device accelerometer data"
+  bug: "456482519"
+}
+
+flag {
   name: "app_clips_backlinks"
   namespace: "systemui"
   description: "Enables Backlinks improvement feature in App Clips"
@@ -1831,16 +1838,6 @@ flag {
     namespace: "systemui"
     description: "Enable glanceable hub by default (this flag is intended to enable GH for DF only)."
     bug: "428215526"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "reset_tiles_removes_custom_tiles"
-    namespace: "systemui"
-    description: "Fixes bug where calling Reset Tiles will not properly mark custom tiles as removed."
-    bug: "431235255"
     metadata {
       purpose: PURPOSE_BUGFIX
     }

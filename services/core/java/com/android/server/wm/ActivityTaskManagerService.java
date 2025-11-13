@@ -535,6 +535,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     private SparseArray<ActivityInterceptorCallback> mActivityInterceptorCallbacks =
             new SparseArray<>();
     PackageConfigPersister mPackageConfigPersister;
+    PackageUpdateManager mPackageUpdateManager;
 
     boolean mSuppressResizeConfigChanges;
 
@@ -1066,6 +1067,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         mVrController = new VrController(mGlobalLock);
         mKeyguardController = mTaskSupervisor.getKeyguardController();
         mPackageConfigPersister = new PackageConfigPersister(mTaskSupervisor.mPersisterQueue, this);
+        mPackageUpdateManager = new PackageUpdateManager(this);
     }
 
     public void onActivityManagerInternalAdded() {
@@ -5396,6 +5398,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             }
             for (int i = mRootWindowContainer.getChildCount() - 1; i >= 0; i--) {
                 final DisplayContent dc = mRootWindowContainer.getChildAt(i);
+                if (dc.getTopMostActivity() == null) {
+                    continue;
+                }
                 dc.collectDisplayChange(transition);
                 transition.setKnownConfigChanges(dc, changes);
             }

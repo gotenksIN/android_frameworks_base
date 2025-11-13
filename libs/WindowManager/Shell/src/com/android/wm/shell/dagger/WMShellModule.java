@@ -105,6 +105,7 @@ import com.android.wm.shell.common.TaskStackListenerImpl;
 import com.android.wm.shell.common.UserProfileContexts;
 import com.android.wm.shell.common.split.SplitState;
 import com.android.wm.shell.compatui.api.CompatUIHandler;
+import com.android.wm.shell.compatui.api.CompatUISharedRepositoryCleanUp;
 import com.android.wm.shell.compatui.letterbox.DelegateLetterboxTransitionObserver;
 import com.android.wm.shell.compatui.letterbox.LetterboxCommandHandler;
 import com.android.wm.shell.compatui.letterbox.config.DefaultLetterboxDependenciesHelper;
@@ -143,6 +144,7 @@ import com.android.wm.shell.desktopmode.DisplayFocusResolver;
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler;
 import com.android.wm.shell.desktopmode.EnterDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler;
+import com.android.wm.shell.desktopmode.NormalAppLayerController;
 import com.android.wm.shell.desktopmode.NormalAppLayerHandler;
 import com.android.wm.shell.desktopmode.OverviewToDesktopTransitionObserver;
 import com.android.wm.shell.desktopmode.ReturnToDragStartAnimator;
@@ -2089,13 +2091,31 @@ public abstract class WMShellModule {
     @WMSingleton
     @Provides
     static Optional<NormalAppLayerHandler> provideNormalAppLayerHandler(
-            Optional<DesktopTasksController> desktopTasksControllerOptional,
+            Optional<NormalAppLayerController> normalAppLayerController,
             Optional<DesktopUserRepositories> desktopUserRepositoriesOptional) {
         if (PinnedLayerFlags.isPinnedLayerEnabled()) {
             return Optional.of(
                     new NormalAppLayerHandler(
-                            desktopUserRepositoriesOptional.get(),
-                            desktopTasksControllerOptional.get()));
+                            normalAppLayerController.get(), desktopUserRepositoriesOptional.get()));
+        }
+        return Optional.empty();
+    }
+
+    @WMSingleton
+    @Provides
+    static Optional<NormalAppLayerController> provideNormalAppLayerController(
+            ShellInit shellInit,
+            Transitions transitions,
+            Optional<DesktopTasksController> desktopTasksController,
+            Optional<DesktopUserRepositories> desktopUserRepositoriesOptional,
+            Optional<PinnedLayerController> pinnedLayerController,
+            DesktopState desktopState) {
+        if (PinnedLayerFlags.isPinnedLayerEnabled()) {
+            return Optional.of(
+                    new NormalAppLayerController(
+                            shellInit, transitions, desktopUserRepositoriesOptional.get(),
+                            desktopTasksController.get(), pinnedLayerController.get(),
+                            desktopState));
         }
         return Optional.empty();
     }
@@ -2183,6 +2203,7 @@ public abstract class WMShellModule {
             @NonNull LetterboxCommandHandler letterboxCommandHandler,
             @NonNull LetterboxTaskListenerAdapter letterboxTaskListenerAdapter,
             @NonNull LetterboxCleanupAdapter letterboxCleanupAdapter,
+            @NonNull Optional<CompatUISharedRepositoryCleanUp> compatUISharedStateManager,
             Optional<DesktopTasksTransitionObserver> desktopTasksTransitionObserverOptional,
             Optional<DesktopDisplayEventHandler> desktopDisplayEventHandler,
             Optional<DesktopModeKeyGestureHandler> desktopModeKeyGestureHandler,

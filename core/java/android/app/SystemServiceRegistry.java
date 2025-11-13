@@ -22,7 +22,6 @@ import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.hardware.serial.flags.Flags.enableWiredSerialApi;
 import static android.permission.flags.Flags.assistSettingsPrivacyImprovementsEnabled;
 import static android.provider.flags.Flags.newStoragePublicApi;
-import static android.server.Flags.removeGameManagerServiceFromWear;
 import static android.service.chooser.Flags.interactiveChooser;
 
 import android.accounts.AccountManager;
@@ -541,9 +540,8 @@ public final class SystemServiceRegistry {
             public VpnManager createService(ContextImpl ctx) throws ServiceNotFoundException {
                 IBinder b = ServiceManager.getService(Context.VPN_MANAGEMENT_SERVICE);
                 IVpnManager service = IVpnManager.Stub.asInterface(b);
-                if (service == null
-                        && ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)
-                        && android.server.Flags.allowRemovingVpnService()) {
+                if (service == null &&
+                        ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)) {
                     return null;
                 }
                 return new VpnManager(ctx, service);
@@ -1797,13 +1795,12 @@ public final class SystemServiceRegistry {
                             throws ServiceNotFoundException {
                         final PackageManager pm = ctx.getPackageManager();
                         final boolean isWatch = pm.hasSystemFeature(PackageManager.FEATURE_WATCH);
-                        final IBinder binder =
-                                // Allow a potentially absent GameManagerService only for
-                                // Wear devices. For non-Wear devices, throw a
-                                // ServiceNotFoundException when the service is missing.
-                                (removeGameManagerServiceFromWear() && isWatch)
-                                        ? ServiceManager.getService(Context.GAME_SERVICE)
-                                        : ServiceManager.getServiceOrThrow(Context.GAME_SERVICE);
+                        // Allow a potentially absent GameManagerService only for
+                        // Wear devices. For non-Wear devices, throw a
+                        // ServiceNotFoundException when the service is missing.
+                        final IBinder binder = isWatch
+                                ? ServiceManager.getService(Context.GAME_SERVICE)
+                                : ServiceManager.getServiceOrThrow(Context.GAME_SERVICE);
 
                         if (binder == null
                                 && Compatibility.isChangeEnabled(NULL_GAME_MANAGER_IN_WEAR)) {
@@ -1864,8 +1861,8 @@ public final class SystemServiceRegistry {
                         }
                         // Wear intentionally removes the service, so do not throw a
                         // ServiceNotFoundException when the service is not absent.
-                        if (ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)
-                                && android.server.Flags.removeWearableSensingServiceFromWear()) {
+                        if (ctx.getPackageManager().hasSystemFeature(
+                                PackageManager.FEATURE_WATCH)) {
                             return null;
                         }
                         throw new ServiceNotFoundException(Context.WEARABLE_SENSING_SERVICE);

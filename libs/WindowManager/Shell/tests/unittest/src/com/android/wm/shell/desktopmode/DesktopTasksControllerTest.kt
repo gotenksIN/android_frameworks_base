@@ -621,6 +621,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         val task1 = setUpFreeformTask()
 
         val argumentCaptor = argumentCaptor<Boolean>()
+        val displayIdCaptor = argumentCaptor<Int>()
         controller.toggleDesktopTaskSize(
             task1,
             ToggleTaskSizeInteraction(
@@ -630,7 +631,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             ),
         )
 
-        verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(argumentCaptor.capture())
+        verify(taskbarDesktopTaskListener)
+            .onTaskbarCornerRoundingUpdate(argumentCaptor.capture(), displayIdCaptor.capture())
         verify(desktopModeEventLogger, times(1))
             .logTaskResizingEnded(
                 resizeTrigger = ResizeTrigger.MAXIMIZE_BUTTON,
@@ -642,6 +644,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 deskId = 0,
             )
         assertThat(argumentCaptor.firstValue).isTrue()
+        assertThat(displayIdCaptor.firstValue).isEqualTo(task1.displayId)
     }
 
     @Test
@@ -663,6 +666,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         val task1 = setUpFreeformTask(bounds = stableBounds, active = true)
 
         val argumentCaptor = argumentCaptor<Boolean>()
+        val displayIdCaptor = argumentCaptor<Int>()
         controller.toggleDesktopTaskSize(
             task1,
             ToggleTaskSizeInteraction(
@@ -672,7 +676,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             ),
         )
 
-        verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(argumentCaptor.capture())
+        verify(taskbarDesktopTaskListener)
+            .onTaskbarCornerRoundingUpdate(argumentCaptor.capture(), displayIdCaptor.capture())
         verify(desktopModeEventLogger, times(1))
             .logTaskResizingEnded(
                 eq(ResizeTrigger.MAXIMIZE_BUTTON),
@@ -684,6 +689,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 anyOrNull(),
             )
         assertThat(argumentCaptor.firstValue).isFalse()
+        assertThat(displayIdCaptor.firstValue).isEqualTo(task1.displayId)
     }
 
     @Test
@@ -4634,7 +4640,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         )
         controller.moveToNextDisplay(task.taskId, EnterReason.UNKNOWN_ENTER)
 
-        verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(anyBoolean())
+        verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(anyBoolean(), anyInt())
     }
 
     @Test
@@ -5318,7 +5324,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         minimizePipTask(task)
 
-        verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(anyBoolean())
+        verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(anyBoolean(), anyInt())
     }
 
     @Test
@@ -5702,7 +5708,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         controller.minimizeTask(task, MinimizeReason.MINIMIZE_BUTTON)
 
-        verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(anyBoolean())
+        verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(anyBoolean(), anyInt())
     }
 
     @Test
@@ -9328,7 +9334,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             spyController.onDragPositioningEnd(
                 task,
                 mockSurface,
-                DEFAULT_DISPLAY,
                 inputCoordinate = PointF(200f, -200f),
                 currentDragBounds = Rect(100, -100, 500, 1000),
                 validDragArea = Rect(0, 50, 2000, 2000),
@@ -9382,7 +9387,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             spyController.onDragPositioningEnd(
                 task,
                 mockSurface,
-                DEFAULT_DISPLAY,
                 inputCoordinate = PointF(200f, 300f),
                 currentDragBounds = currentDragBounds,
                 validDragArea = Rect(0, 50, 2000, 2000),
@@ -9436,7 +9440,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             spyController.onDragPositioningEnd(
                 task,
                 mockSurface,
-                DEFAULT_DISPLAY,
                 inputCoordinate = PointF(200f, 300f),
                 currentDragBounds,
                 validDragArea = Rect(0, 50, 2000, 2000),
@@ -9479,7 +9482,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             taskInfo = task,
             taskSurface = mockSurface,
-            displayId = SECONDARY_DISPLAY_ID,
             inputCoordinate = PointF(200f, 300f),
             currentDragBounds = currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -9535,7 +9537,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             spyController.onDragPositioningEnd(
                 task,
                 mockSurface,
-                DEFAULT_DISPLAY,
                 inputCoordinate = PointF(200f, 300f),
                 currentDragBounds = Rect(100, 50, 500, 1000),
                 validDragArea = Rect(0, 50, 2000, 2000),
@@ -9582,7 +9583,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            DEFAULT_DISPLAY,
             inputCoordinate = PointF(200f, 300f),
             currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -9648,7 +9648,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            DEFAULT_DISPLAY,
             inputCoordinate = PointF(200f, 300f),
             currentDragBounds = currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -9707,7 +9706,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            DEFAULT_DISPLAY,
             inputCoordinate = PointF(200f, 300f),
             currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -9773,7 +9771,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             task,
             mockSurface,
-            DEFAULT_DISPLAY,
             inputCoordinate = PointF(200f, 300f),
             currentDragBounds = currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -9818,7 +9815,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             taskInfo = task,
             taskSurface = mockSurface,
-            displayId = DEFAULT_DISPLAY,
             inputCoordinate = PointF(250f, 300f),
             currentDragBounds = currentDragBounds,
             validDragArea = Rect(0, 0, 2000, 2000),
@@ -9850,7 +9846,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             taskInfo = task,
             taskSurface = mockSurface,
-            displayId = DEFAULT_DISPLAY,
             inputCoordinate = PointF(250f, 300f),
             currentDragBounds = currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),
@@ -9901,7 +9896,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         spyController.onDragPositioningEnd(
             taskInfo = task,
             taskSurface = mockSurface,
-            displayId = DEFAULT_DISPLAY,
             inputCoordinate = PointF(510f, 210f),
             currentDragBounds = currentDragBounds,
             validDragArea = Rect(0, 50, 2000, 2000),

@@ -731,8 +731,8 @@ public class BubbleController implements ConfigurationChangeListener,
      */
     private void sendInitialListenerUpdate() {
         if (mBubbleStateListener != null) {
-            boolean isCurrentNavModeGestures = ContextUtils.isGestureNavigationMode(mContext);
-            if (mIsPrevNavModeGestures && !isCurrentNavModeGestures) {
+            boolean isCurrentNavModeGestures = isGestureNavigationMode();
+            if (mIsPrevNavModeGestures && !isGestureNavigationMode()) {
                 BubbleBarLocation bubbleBarLocation = ContextUtils.isRtl(mContext)
                         ? BubbleBarLocation.RIGHT : BubbleBarLocation.LEFT;
                 mBubblePositioner.setBubbleBarLocation(bubbleBarLocation);
@@ -741,6 +741,17 @@ public class BubbleController implements ConfigurationChangeListener,
             BubbleBarUpdate update = mBubbleData.getInitialStateForBubbleBar();
             mBubbleStateListener.onBubbleStateChange(update);
         }
+    }
+
+    /** Tells whether current active user using gesture navigation mode. */
+    public boolean isGestureNavigationMode() {
+        if (mCurrentProfiles == null || !mCurrentProfiles.contains(mCurrentUserId)) {
+            return mIsPrevNavModeGestures;
+        }
+        UserHandle currentUserHandle = mCurrentProfiles.get(mCurrentUserId).getUserHandle();
+        Context userContext = mContext.createContextAsUser(currentUserHandle,
+                Context.CONTEXT_RESTRICTED);
+        return ContextUtils.isGestureNavigationMode(userContext);
     }
 
     /**
@@ -2051,7 +2062,10 @@ public class BubbleController implements ConfigurationChangeListener,
         }
         mOverflowDataLoadNeeded = false;
         List<UserInfo> users = mUserManager.getAliveUsers();
-        List<Integer> userIds = users.stream().map(userInfo -> userInfo.id).toList();
+        List<Integer> userIds = users.stream()
+                .filter(userInfo -> !userInfo.isQuietModeEnabled())
+                .map(userInfo -> userInfo.id)
+                .toList();
         mDataRepository.loadBubbles(mCurrentUserId, userIds, (bubbles) -> {
             bubbles.forEach(bubble -> {
                 if (mBubbleData.hasAnyBubbleWithKey(bubble.getKey())) {

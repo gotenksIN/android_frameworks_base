@@ -121,6 +121,7 @@ import com.android.systemui.statusbar.notification.row.ActivatableNotificationVi
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.ExpandableView;
 import com.android.systemui.statusbar.notification.row.StackScrollerDecorView;
+import com.android.systemui.statusbar.notification.shared.NmContextualDisplay;
 import com.android.systemui.statusbar.notification.shared.NotificationBundleUi;
 import com.android.systemui.statusbar.notification.shared.NotificationHeadsUpCycling;
 import com.android.systemui.statusbar.notification.shared.NotificationMinimalism;
@@ -372,7 +373,6 @@ public class NotificationStackScrollLayout
             return true;
         }
     };
-    private final NotificationSection[] mSections;
     private final ArrayList<ExpandableView> mTmpSortedChildren = new ArrayList<>();
     private final ArrayList<ExpandableView> mTmpNonOverlapChildren = new ArrayList<>();
     private final ArrayDeque<ExpandableView> mTmpStack = new ArrayDeque<>();
@@ -691,7 +691,6 @@ public class NotificationStackScrollLayout
         mDebugRemoveAnimation = mFeatureFlags.isEnabled(Flags.NSSL_DEBUG_REMOVE_ANIMATION);
         mSectionsManager = Dependency.get(NotificationSectionsManager.class);
         mSectionsManager.initialize(this);
-        mSections = mSectionsManager.createSectionsForBuckets();
 
         mAmbientState = Dependency.get(AmbientState.class);
         int minHeight = res.getDimensionPixelSize(R.dimen.notification_min_height);
@@ -2092,7 +2091,8 @@ public class NotificationStackScrollLayout
     private float getAppearStartPosition() {
         SceneContainerFlag.assertInLegacyMode();
         if (isHeadsUpTransition()) {
-            final NotificationSection firstVisibleSection = getFirstVisibleSection();
+            final NotificationSection firstVisibleSection =
+                    mSectionsManager.getFirstVisibleSection();
             final int pinnedHeight = firstVisibleSection != null
                     ? firstVisibleSection.getFirstVisibleChild().getPinnedHeadsUpHeight()
                     : 0;
@@ -2980,25 +2980,6 @@ public class NotificationStackScrollLayout
         }
     }
 
-    private NotificationSection getFirstVisibleSection() {
-        for (NotificationSection section : mSections) {
-            if (section.getFirstVisibleChild() != null) {
-                return section;
-            }
-        }
-        return null;
-    }
-
-    private NotificationSection getLastVisibleSection() {
-        for (int i = mSections.length - 1; i >= 0; i--) {
-            NotificationSection section = mSections[i];
-            if (section.getLastVisibleChild() != null) {
-                return section;
-            }
-        }
-        return null;
-    }
-
     private ExpandableView getLastChildWithBackground() {
         int childCount = getChildCount();
         for (int i = childCount - 1; i >= 0; i--) {
@@ -3500,8 +3481,7 @@ public class NotificationStackScrollLayout
 
     private void updateFirstAndLastBackgroundViews() {
         ExpandableView lastChild = getLastChildWithBackground();
-        mSectionsManager.updateFirstAndLastViewsForAllSections(
-                mSections, getChildrenWithBackground());
+        mSectionsManager.updateFirstAndLastViewsForAllSections(getChildrenWithBackground());
 
         mAmbientState.setLastVisibleBackgroundChild(lastChild);
         invalidate();
@@ -3971,12 +3951,14 @@ public class NotificationStackScrollLayout
     }
 
     /**
-     * When an ACTION_DOWN event is outside of the NSSL's draw bounds, that means a gesture started
-     * outside of the NSSL's draw bounds. The NSSL will intercept the gesture from its children and
-     * refuse it by returning false in NSSL#onTouchEvent.
+     * When an ACTION_DOWN event is outside of the NSSL's scrim bounds, that means a gesture started
+     * outside of the NSSL's scrim bounds. The NSSL will intercept the gesture from its children and
+     * refuse it by returning false in NSSL#onTouchEvent to prevent any child or touch handler from
+     * processing it.
      *
      * @param ev A MotionEvent
-     * @return true when the event is an ACTION_DOWN event that's outside of the NSSL's draw bounds
+     * @return true when the event is an ACTION_DOWN or ACTION_POINTER_DOWN event that started
+     * outside of the NSSL's scrim bounds
      */
 
     private boolean isOutBoundsDownEvent(MotionEvent ev) {
@@ -3998,7 +3980,7 @@ public class NotificationStackScrollLayout
             final float x = ev.getX(pointerIndex);
             final float y = ev.getY(pointerIndex);
 
-            if (!isInDrawBounds(x, y)) {
+            if (outsideScrimBounds(x, y)) {
                 // onInterceptTouchEvent records the pointerId
                 mOutBoundsEventId = pointerId;
                 return true;
@@ -4024,27 +4006,33 @@ public class NotificationStackScrollLayout
         if (!SceneContainerFlag.isEnabled()) {
             return false;
         }
-        // When the shade is closed but a HUN is visible (over home screen), we might need to handle
-        // this touch event as a HUN gesture even if this is outside interactive bounds
-        // or NSSL is not interactive.
-        final boolean acceptOutsideHun = !mAmbientState.isShadeExpanded() && mTopHeadsUpRow != null;
-        return !acceptOutsideHun && (!mScrollViewFields.interactive || isOutBoundsDownEvent(ev));
+        return !mScrollViewFields.interactive || isOutBoundsDownEvent(ev);
     }
 
     /**
-     * Whether position [x, y] is within the draw bounds of the NSSL. Note that
-     * NSSL#setDrawBounds() should be called to set the draw bounds before calling this method.
+     * Whether position [x, y] is outside of the scrim bounds of the NSSL.
+     * Return false when the scrim bound is null.
      *
      * @param x x coordinate for the initial touch of the current gesture
      * @param y y coordinate for the initial touch of the current gesture
-     * @return Whether the position within the draw bounds of the NSSL.
+     * @return Whether the position is outside of the scrim bounds of the NSSL.
      */
-    private boolean isInDrawBounds(float x, float y) {
+    @VisibleForTesting
+    boolean outsideScrimBounds(float x, float y) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) {
             return false;
         }
-        RectF bounds = mAmbientState.getDrawBounds();
-        return bounds.contains(x, y);
+
+        ShadeScrimShape shape = mScrollViewFields.clippingShape;
+        if (shape == null) {
+            return false;
+        }
+        ShadeScrimBounds bounds = shape.getBounds();
+        Log.d("NSSL", "bounds=" + bounds.toString() + " x: " + x + " y: " + y);
+        return x < bounds.getLeft()
+                || x > bounds.getRight()
+                || y < bounds.getTop()
+                || y > bounds.getBottom();
     }
 
     /**
@@ -4900,7 +4888,7 @@ public class NotificationStackScrollLayout
         ExpandableNotificationRow row = view instanceof ExpandableNotificationRow
                 ? (ExpandableNotificationRow) view
                 : null;
-        NotificationSection firstSection = getFirstVisibleSection();
+        NotificationSection firstSection = mSectionsManager.getFirstVisibleSection();
         ExpandableView firstVisibleChild =
                 firstSection == null ? null : firstSection.getFirstVisibleChild();
         if (row != null) {
@@ -4945,7 +4933,7 @@ public class NotificationStackScrollLayout
                     endPosition += row.getNotificationParent().getTranslationY();
                 }
                 int layoutEnd = mMaxLayoutHeight + (int) getStackTranslation();
-                NotificationSection lastSection = getLastVisibleSection();
+                NotificationSection lastSection = mSectionsManager.getLastVisibleSection();
                 ExpandableView lastVisibleChild =
                         lastSection == null ? null : lastSection.getLastVisibleChild();
                 if (row != lastVisibleChild && mShelf.getVisibility() != GONE) {
@@ -6311,7 +6299,6 @@ public class NotificationStackScrollLayout
             return;
         }
         mSectionsManager.updateFirstAndLastViewsForAllSections(
-                mSections,
                 getChildrenWithBackground()
         );
 
@@ -6895,7 +6882,9 @@ public class NotificationStackScrollLayout
             case ROWS_HIGH_PRIORITY:
                 return bucket < BUCKET_SILENT;
             case ROWS_GENTLE:
-                if (NotificationBundleUi.isEnabled()) {
+                if (NmContextualDisplay.isEnabled()) {
+                    return row.getEntryAdapter().isBundled() || row.getEntryAdapter().isBundle();
+                } else if (NotificationBundleUi.isEnabled()) {
                     return bucket == BUCKET_SILENT
                             || bucket == BUCKET_PROMO
                             || bucket == BUCKET_RECS

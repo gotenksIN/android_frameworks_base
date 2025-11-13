@@ -343,6 +343,7 @@ package android.app {
 
   public final class NotificationChannel implements android.os.Parcelable {
     method @NonNull public android.app.NotificationChannel copy();
+    method @FlaggedApi("android.app.nm_contextual_display") public boolean isBundleChannel();
     method public boolean isImportanceLockedByCriticalDeviceFunction();
     method public void lockFields(int);
     method public void setDeleted(boolean);
@@ -961,7 +962,12 @@ package android.companion.virtual {
   }
 
   public final class VirtualDeviceParams implements android.os.Parcelable {
+    method public boolean isLocalDeviceOnly();
     field public static final int DEVICE_POLICY_INVALID = -1; // 0xffffffff
+  }
+
+  public static final class VirtualDeviceParams.Builder {
+    method @NonNull public android.companion.virtual.VirtualDeviceParams.Builder setLocalDeviceOnly(boolean);
   }
 
 }
@@ -1283,7 +1289,7 @@ package android.content.pm {
   }
 
   @FlaggedApi("android.permission.flags.ppd_manifest_enabled") public final class UsesPermissionPurposeInfo implements android.os.Parcelable {
-    ctor @FlaggedApi("android.permission.flags.ppd_manifest_enabled") public UsesPermissionPurposeInfo(@NonNull String, @NonNull java.util.Set<java.lang.String>);
+    ctor @FlaggedApi("android.permission.flags.ppd_manifest_enabled") public UsesPermissionPurposeInfo(@NonNull String, @NonNull java.util.Set<java.lang.String>, @StringRes int);
   }
 
   @FlaggedApi("android.permission.flags.ppd_manifest_enabled") public final class ValidGeneralPurposeInfo implements android.os.Parcelable {
@@ -3439,6 +3445,20 @@ package android.service.personalcontext.hint {
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContextHint {
     method @NonNull public static android.service.personalcontext.hint.ContextHint createHintFromBundle(@Nullable android.os.Bundle);
     method @NonNull public android.os.Bundle toBundle();
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ContextHintWithSignature implements android.os.Parcelable {
+    method public boolean isSignatureValid(@NonNull javax.crypto.spec.SecretKeySpec) throws java.security.GeneralSecurityException;
+    field public static final String HMAC_ALGORITHM = "HmacSHA256";
+  }
+
+  public static final class ContextHintWithSignature.Builder {
+    ctor public ContextHintWithSignature.Builder(@NonNull android.service.personalcontext.hint.ContextHint, @NonNull javax.crypto.spec.SecretKeySpec);
+    method @NonNull public android.service.personalcontext.hint.ContextHintWithSignature.Builder addAttributionHint(@NonNull android.service.personalcontext.hint.ContextHintWithSignature);
+    method @NonNull public android.service.personalcontext.hint.ContextHintWithSignature.Builder addAttributionHints(@NonNull java.util.Collection<android.service.personalcontext.hint.ContextHintWithSignature>);
+    method @NonNull public android.service.personalcontext.hint.ContextHintWithSignature build() throws java.security.GeneralSecurityException;
+    method @NonNull public android.service.personalcontext.hint.ContextHintWithSignature.Builder setOriginatingComponent(@Nullable android.content.ComponentName);
+    method @NonNull public android.service.personalcontext.hint.ContextHintWithSignature.Builder setRenderToken(@Nullable android.service.personalcontext.RenderToken);
   }
 
 }

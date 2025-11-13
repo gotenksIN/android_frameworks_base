@@ -49,6 +49,7 @@ import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.Trace;
@@ -65,6 +66,7 @@ import android.view.Surface;
 import android.window.DesktopExperienceFlags;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.server.LocalServices;
 import com.android.server.display.feature.flags.Flags;
 
 import java.lang.annotation.Retention;
@@ -170,6 +172,7 @@ public final class DisplayManagerGlobal {
 
     @UnsupportedAppUsage
     private final IDisplayManager mDm;
+    private final @Nullable DisplayManagerInternal mDmInternal;
 
     private DisplayManagerCallback mCallback;
     private @InternalEventFlag long mRegisteredInternalEventFlag = 0;
@@ -200,6 +203,11 @@ public final class DisplayManagerGlobal {
     public DisplayManagerGlobal(IDisplayManager dm) {
         mDisplayIdsCache = Flags.displayListenerSnapshot() ? new DisplayIdsCache() : null;
         mDm = dm;
+        if (Flags.displayInfoCopyOnWriteCacheEnabled() && Process.myUid() == Process.SYSTEM_UID) {
+            mDmInternal = LocalServices.getService(DisplayManagerInternal.class);
+        } else {
+            mDmInternal = null;
+        }
         initExtraLogging();
 
         try {
@@ -259,22 +267,37 @@ public final class DisplayManagerGlobal {
      * This object belongs to an internal cache and should be treated as if it were immutable.
      */
     @UnsupportedAppUsage
+    @Nullable
     public DisplayInfo getDisplayInfo(int displayId) {
-        synchronized (mLock) {
-            return getDisplayInfoLocked(displayId);
+        if (mDmInternal != null) {
+            if (DEBUG) {
+                Log.d(TAG, "getDisplayInfo: displayId=" + displayId + ", using internal service");
+            }
+            return mDmInternal.getDisplayInfo(displayId);
+        }
+        if (Flags.getDisplayInfoOutsideLock()) {
+            return getDisplayInfoInternal(displayId);
+        } else {
+            synchronized (mLock) {
+                return getDisplayInfoInternal(displayId);
+            }
         }
     }
 
     /**
      * Gets information about a particular logical display
-     * See {@link getDisplayInfo}, but assumes that {@link mLock} is held
+     * See {@link getDisplayInfo}
      */
-    private @Nullable DisplayInfo getDisplayInfoLocked(int displayId) {
+    private @Nullable DisplayInfo getDisplayInfoInternal(int displayId) {
         DisplayInfo info = null;
         if (mDisplayCache != null) {
             info = mDisplayCache.query(displayId);
         } else {
             try {
+                if (DEBUG) {
+                    Log.d(TAG, "getDisplayInfo: displayId=" + displayId
+                            + ", package=" + ActivityThread.currentPackageName());
+                }
                 info = mDm.getDisplayInfo(displayId);
             } catch (RemoteException ex) {
                 ex.rethrowFromSystemServer();
@@ -284,7 +307,9 @@ public final class DisplayManagerGlobal {
             return null;
         }
 
-        registerCallbackIfNeededLocked();
+        synchronized (mLock) {
+            registerCallbackIfNeededLocked();
+        }
 
         if (DEBUG_2) {
             Log.d(TAG, "getDisplayInfo: displayId=" + displayId + ", info=" + info);
@@ -676,7 +701,7 @@ public final class DisplayManagerGlobal {
         final DisplayInfo info;
         boolean shouldNotifyNativeListeners  = false;
         synchronized (mLock) {
-            info = getDisplayInfoLocked(displayId);
+            info = getDisplayInfoInternal(displayId);
             if ((((eventMask & EVENT_DISPLAY_BASIC_CHANGED) != 0)
                     || (eventMask & EVENT_DISPLAY_REFRESH_RATE_CHANGED) != 0)
                     && mDispatchNativeCallbacks) {
@@ -692,7 +717,7 @@ public final class DisplayManagerGlobal {
                     } else {
                         // We can likely save a binder hop if we attach the refresh rate onto the
                         // listener.
-                        DisplayInfo display = getDisplayInfoLocked(displayId);
+                        DisplayInfo display = getDisplayInfoInternal(displayId);
                         if (display != null
                                 && mNativeCallbackReportedRefreshRate != display.getRefreshRate()) {
                             mNativeCallbackReportedRefreshRate = display.getRefreshRate();
@@ -2091,7 +2116,7 @@ public final class DisplayManagerGlobal {
             }
             registerCallbackIfNeededLocked();
             updateCallbackIfNeededLocked();
-            DisplayInfo display = getDisplayInfoLocked(Display.DEFAULT_DISPLAY);
+            DisplayInfo display = getDisplayInfoInternal(Display.DEFAULT_DISPLAY);
             if (display != null) {
                 // We need to tell AChoreographer instances the current refresh rate so that apps
                 // can get it for free once a callback first registers.

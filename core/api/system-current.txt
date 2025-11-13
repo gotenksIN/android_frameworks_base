@@ -315,6 +315,7 @@ package android {
     field public static final String PERFORM_CDMA_PROVISIONING = "android.permission.PERFORM_CDMA_PROVISIONING";
     field public static final String PERFORM_IMS_SINGLE_REGISTRATION = "android.permission.PERFORM_IMS_SINGLE_REGISTRATION";
     field public static final String PERFORM_SIM_ACTIVATION = "android.permission.PERFORM_SIM_ACTIVATION";
+    field @FlaggedApi("android.app.bridged_notifications_api") public static final String POST_BRIDGED_NOTIFICATIONS = "android.permission.POST_BRIDGED_NOTIFICATIONS";
     field public static final String POWER_SAVER = "android.permission.POWER_SAVER";
     field @FlaggedApi("android.permission.flags.factory_reset_prep_permission_apis") public static final String PREPARE_FACTORY_RESET = "android.permission.PREPARE_FACTORY_RESET";
     field public static final String PROVIDE_DEFAULT_ENABLED_CREDENTIAL_SERVICE = "android.permission.PROVIDE_DEFAULT_ENABLED_CREDENTIAL_SERVICE";
@@ -730,6 +731,7 @@ package android.app {
     field public static final String OPSTR_BIND_ACCESSIBILITY_SERVICE = "android:bind_accessibility_service";
     field public static final String OPSTR_CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD = "android:capture_consentless_bugreport_on_userdebug_build";
     field public static final String OPSTR_CHANGE_WIFI_STATE = "android:change_wifi_state";
+    field @FlaggedApi("android.companion.task_continuity") public static final String OPSTR_CONTINUE_ACROSS_DEVICES = "android:continue_across_devices";
     field @FlaggedApi("android.view.contentprotection.flags.create_accessibility_overlay_app_op_enabled") public static final String OPSTR_CREATE_ACCESSIBILITY_OVERLAY = "android:create_accessibility_overlay";
     field @FlaggedApi("android.location.flags.location_bypass") public static final String OPSTR_EMERGENCY_LOCATION = "android:emergency_location";
     field @FlaggedApi("android.permission.flags.op_enable_mobile_data_by_user") public static final String OPSTR_ENABLE_MOBILE_DATA_BY_USER = "android:enable_mobile_data_by_user";
@@ -1103,6 +1105,10 @@ package android.app {
     field @FlaggedApi("android.app.notification_is_animated_action_api") public static final String EXTRA_IS_ANIMATED = "android.extra.IS_ANIMATED";
     field public static final int SEMANTIC_ACTION_CONVERSATION_IS_PHISHING = 12; // 0xc
     field public static final int SEMANTIC_ACTION_MARK_CONVERSATION_AS_PRIORITY = 11; // 0xb
+  }
+
+  public static class Notification.Builder {
+    method @FlaggedApi("android.app.bridged_notifications_api") @NonNull @RequiresPermission("android.Manifest.permission.POST_BRIDGED_NOTIFICATIONS") public android.app.Notification.Builder setBridgedNotificationMetadata(@Nullable android.app.Notification.BridgedNotificationMetadata);
   }
 
   @FlaggedApi("android.app.api_tvextender") public static final class Notification.TvExtender implements android.app.Notification.Extender {
@@ -3589,26 +3595,29 @@ package android.companion.datatransfer.continuity {
 
   @FlaggedApi("android.companion.task_continuity") public final class RemoteTask implements android.os.Parcelable {
     method public int describeContents();
-    method public int getDeviceId();
+    method @Nullable public String getAssociationDisplayName();
+    method public int getCompanionDeviceAssociationId();
     method @Nullable public android.graphics.drawable.Icon getIcon();
-    method public int getId();
-    method @NonNull public String getLabel();
+    method @Nullable public String getLabel();
     method public long getLastUsedTimestampMillis();
-    method @NonNull public String getSourceDeviceName();
+    method @Nullable public String getPackageName();
+    method public int getTaskId();
     method public boolean isHandoffEnabled();
+    method public boolean isTaskInForeground();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.companion.datatransfer.continuity.RemoteTask> CREATOR;
   }
 
   public static final class RemoteTask.Builder {
-    ctor public RemoteTask.Builder(int);
+    ctor public RemoteTask.Builder(int, int);
     method @NonNull public android.companion.datatransfer.continuity.RemoteTask build();
-    method @NonNull public android.companion.datatransfer.continuity.RemoteTask.Builder setDeviceId(int);
+    method @NonNull public android.companion.datatransfer.continuity.RemoteTask.Builder setAssociationDisplayName(@Nullable String);
     method @NonNull public android.companion.datatransfer.continuity.RemoteTask.Builder setHandoffEnabled(boolean);
     method @NonNull public android.companion.datatransfer.continuity.RemoteTask.Builder setIcon(@Nullable android.graphics.drawable.Icon);
-    method @NonNull public android.companion.datatransfer.continuity.RemoteTask.Builder setLabel(@NonNull String);
+    method @NonNull public android.companion.datatransfer.continuity.RemoteTask.Builder setLabel(@Nullable String);
     method @NonNull public android.companion.datatransfer.continuity.RemoteTask.Builder setLastUsedTimestampMillis(long);
-    method @NonNull public android.companion.datatransfer.continuity.RemoteTask.Builder setSourceDeviceName(@NonNull String);
+    method @NonNull public android.companion.datatransfer.continuity.RemoteTask.Builder setPackageName(@Nullable String);
+    method @NonNull public android.companion.datatransfer.continuity.RemoteTask.Builder setTaskInForeground(boolean);
   }
 
   @FlaggedApi("android.companion.task_continuity") public class TaskContinuityManager {
@@ -4781,6 +4790,7 @@ package android.content.pm {
     field @NonNull public java.util.Set<java.lang.String> knownCerts;
     field @StringRes public int requestRes;
     field @FlaggedApi("android.permission.flags.ppd_manifest_enabled") public int requiresGeneralPurposeTargetSdkVersion;
+    field @FlaggedApi("android.permission.flags.ppd_manifest_enabled") public int requiresPurposeStringTargetSdkVersion;
     field @FlaggedApi("android.permission.flags.ppd_manifest_enabled") @NonNull public java.util.Map<java.lang.String,android.content.pm.ValidGeneralPurposeInfo> validGeneralPurposes;
   }
 
@@ -4852,6 +4862,7 @@ package android.content.pm {
     method public int describeContents();
     method @NonNull public java.util.Set<java.lang.String> getGeneralPurposes();
     method @NonNull public String getPermissionName();
+    method @StringRes public int getPurposeStringResource();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.content.pm.UsesPermissionPurposeInfo> CREATOR;
   }
@@ -14080,9 +14091,9 @@ package android.service.notification {
     ctor public NotificationAssistantService();
     method public final void adjustNotification(@NonNull android.service.notification.Adjustment);
     method public final void adjustNotifications(@NonNull java.util.List<android.service.notification.Adjustment>);
-    method @FlaggedApi("android.app.nm_contextual_display") public final void createDynamicBundle(@IntRange(from=100, to=200) int, @NonNull CharSequence);
-    method @FlaggedApi("android.app.nm_contextual_display") public final void deleteDynamicBundle(@IntRange(from=100, to=200) int);
-    method @FlaggedApi("android.app.nm_contextual_display") @NonNull public java.util.Set<android.service.notification.DynamicBundle> getDynamicBundles();
+    method @FlaggedApi("android.app.nm_contextual_display") public final void createDynamicBundle(@IntRange(from=0x64, to=0xc8) int, @NonNull CharSequence);
+    method @FlaggedApi("android.app.nm_contextual_display") public final void deleteDynamicBundle(@IntRange(from=0x64, to=0xc8) int);
+    method @FlaggedApi("android.app.nm_contextual_display") @NonNull public final java.util.Set<android.service.notification.DynamicBundle> getDynamicBundles();
     method public void onActionInvoked(@NonNull String, @NonNull android.app.Notification.Action, int);
     method public void onAllowedAdjustmentsChanged();
     method @NonNull public final android.os.IBinder onBind(@Nullable android.content.Intent);
@@ -14255,22 +14266,6 @@ package android.service.personalcontext.embedded {
 
 }
 
-package android.service.personalcontext.hint {
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ContextHintWithSignature implements android.os.Parcelable {
-    method public int describeContents();
-    method @NonNull public java.util.List<android.service.personalcontext.hint.ContextHintWithSignature> getAttributionHints();
-    method @NonNull public android.service.personalcontext.hint.ContextHint getContextHint();
-    method @Nullable public String getOriginatingPackage();
-    method @Nullable public android.service.personalcontext.RenderToken getRenderToken();
-    method @NonNull public static <T extends java.util.Collection<android.service.personalcontext.hint.ContextHint>> T unwrapInto(@NonNull java.util.Collection<android.service.personalcontext.hint.ContextHintWithSignature>, @NonNull T);
-    method @NonNull public static java.util.List<android.service.personalcontext.hint.ContextHint> unwrapList(@NonNull java.util.Collection<android.service.personalcontext.hint.ContextHintWithSignature>);
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.hint.ContextHintWithSignature> CREATOR;
-  }
-
-}
-
 package android.service.personalcontext.refiner {
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class HintRefinerService extends android.app.Service {
@@ -14318,7 +14313,7 @@ package android.service.personalcontext.understander {
     ctor public ContextUnderstanderService();
     method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
     method public void onConnected();
-    method public abstract void onUnderstand(@NonNull java.util.List<android.service.personalcontext.hint.ContextHint>);
+    method public abstract void onUnderstand(@NonNull java.util.List<android.service.personalcontext.hint.ContextHintWithSignature>);
     method public final void understood(@NonNull java.util.List<android.service.personalcontext.insight.ContextInsight>);
   }
 

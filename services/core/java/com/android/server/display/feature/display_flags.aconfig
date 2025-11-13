@@ -427,6 +427,16 @@ flag {
 }
 
 flag {
+    name: "get_display_info_outside_lock"
+    namespace: "display_manager"
+    description: "Makes DisplayManagerGlobal call DisplayManagerService.getDisplayInfo() outside the lock"
+    bug: "342607960"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_display_event_merging"
     namespace: "display_manager"
     description: "Enable merging of display events"
@@ -438,6 +448,16 @@ flag {
     namespace: "display_manager"
     description: "Continue sending non refresh rate events callbacks when the corresponding pid is not in the foreground"
     bug: "449949226"
+    metadata {
+          purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "display_info_copy_on_write_cache_enabled"
+    namespace: "display_manager"
+    description: "Enable copy on write cache for display info"
+    bug: "430010606"
     metadata {
           purpose: PURPOSE_BUGFIX
     }

@@ -624,6 +624,7 @@ applications that come with the platform
         <!-- Permission required for CTS test CtsNotificationTestCases -->
         <permission name="android.permission.CONTROL_DISPLAY_COLOR_TRANSFORMS" />
         <permission name="android.permission.HIDE_STATUS_BAR_NOTIFICATION" />
+        <permission name="android.permission.POST_BRIDGED_NOTIFICATIONS" />
         <!-- Permission required for BinaryTransparencyService shell API and host test -->
         <permission name="android.permission.GET_BACKGROUND_INSTALLED_PACKAGES" />
         <permission name="android.permission.READ_SYSTEM_GRAMMATICAL_GENDER"/>
@@ -679,6 +680,8 @@ applications that come with the platform
         <permission name="android.permission.CONFIGURE_ANOMALY_DETECTOR"/>
         <!-- Permission required for CTS test - CtsNpuManagerTestCases -->
         <permission name="android.permission.ACCESS_NPU_MODEL_MANAGER_API"/>
+        <!-- Permission required for CTS test - CtsProviderUiTestCases -->
+        <permission name="android.permission.MANAGE_DOCUMENTS"/>
     </privapp-permissions>
 
     <privapp-permissions package="com.android.soundpicker">

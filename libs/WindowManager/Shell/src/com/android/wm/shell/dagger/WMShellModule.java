@@ -999,7 +999,8 @@ public abstract class WMShellModule {
             TaskSnapshotManager taskSnapshotManager,
             TransactionPool transactionPool,
             PipTransitionState pipTransitionState,
-            LockTaskChangeListener lockTaskChangeListener) {
+            LockTaskChangeListener lockTaskChangeListener,
+            LauncherApps launcherApps) {
         return new DesktopTasksController(
                 context,
                 shellInit,
@@ -1054,7 +1055,8 @@ public abstract class WMShellModule {
                 transactionPool,
                 PipFlags.isPip2ExperimentEnabled() ? Optional.of(pipTransitionState)
                         : Optional.empty(),
-                lockTaskChangeListener);
+                lockTaskChangeListener,
+                launcherApps);
     }
 
     @WMSingleton
@@ -1606,6 +1608,7 @@ public abstract class WMShellModule {
             Optional<DesktopMixedTransitionHandler> desktopMixedTransitionHandler,
             DesktopWallpaperActivityTokenProvider desktopWallpaperActivityTokenProvider,
             DisplayController displayController,
+            Optional<DesktopImmersiveController> desktopImmersiveController,
             DesktopState desktopState,
             ShellInit shellInit) {
         return desktopUserRepositories.flatMap(
@@ -1618,6 +1621,7 @@ public abstract class WMShellModule {
                                         desktopMixedTransitionHandler.get(),
                                         desktopWallpaperActivityTokenProvider,
                                         displayController,
+                                        desktopImmersiveController.get(),
                                         desktopState,
                                         shellInit)));
     }

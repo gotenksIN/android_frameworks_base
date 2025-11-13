@@ -223,6 +223,16 @@ class TransitionController {
     final SparseArray<ArrayList<Task>> mLatestOnTopTasksReported = new SparseArray<>();
 
     /**
+     * The most recently reported focused display.
+     */
+    int mLatestFocusedDisplayId = Integer.MIN_VALUE;
+
+    /**
+     * The most recently reported globally focused task.
+     */
+    Task mLatestFocusedTask = null;
+
+    /**
      * `true` when building surface layer order for the start/finish transaction. We want to prevent
      * wm from touching z-order of surfaces during transitions, but we still need to be able to
      * calculate the layers. So, when assigning layers into the start/finish transaction, set this
@@ -1273,13 +1283,13 @@ class TransitionController {
 
     /**
      * Removes transitions with {@link WindowManager.TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION} flag
-     * from the queue
+     * from the queue that are not disconnect transitions.
      */
     void removeDisplayChangesFromQueue() {
         for (int i = mQueuedTransitions.size() - 1; i >= 0; i--) {
             final Transition t = mQueuedTransitions.get(i).mTransition;
-            if (t != null &&
-                    (t.getFlags() & WindowManager.TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION) != 0) {
+            if (t != null && t.getDisconnectReparentDisplays().isEmpty()
+                    && (t.getFlags() & WindowManager.TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION) != 0) {
                 mQueuedTransitions.remove(i);
             }
         }

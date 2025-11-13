@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.HorizontalRuler
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.dimensionResource
@@ -107,13 +108,16 @@ import kotlinx.coroutines.flow.Flow
 
 object Shade {
     object Elements {
-        val ShadeElement = ElementKey("ShadeElement")
         val BackgroundScrim =
             ElementKey("ShadeBackgroundScrim", contentPicker = LowestZIndexContentPicker)
     }
 
     object Dimensions {
         val HorizontalPadding = 16.dp
+    }
+
+    object Rulers {
+        val SingleShadeNestedScrollLayoutBottom = HorizontalRuler()
     }
 }
 
@@ -158,7 +162,6 @@ constructor(
             }
         val isShadeBlurred = viewModel.isShadeBlurred
         val shadeBlurRadius = with(LocalDensity.current) { viewModel.shadeBlurRadius.toDp() }
-        modifier.element(Shade.Elements.ShadeElement)
         ShadeScene(
             notificationStackScrollView.get(),
             viewModel = viewModel,

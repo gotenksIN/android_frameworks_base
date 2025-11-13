@@ -75,7 +75,6 @@ class BackgroundLaunchProcessController {
     /** If enabled the callback is a noop and it is safe to skip calling it. */
     @ChangeId
     @EnabledSince(targetSdkVersion = Build.VERSION_CODES.TIRAMISU)
-    @Overridable
     private static final long CALLBACK_IS_NOOP = 447255745;
 
     /** It is {@link ActivityTaskManagerService#hasActiveVisibleWindow(int)}. */

@@ -37,6 +37,7 @@ import android.app.WindowConfiguration.WindowingMode
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Point
@@ -216,7 +217,9 @@ import kotlinx.coroutines.runBlocking
  * started outside of their control, and each of them wants to track the transition lifecycle
  * independently by cross-referencing the transition token with future ready-transitions.
  */
-typealias RunOnTransitStart = (IBinder) -> Unit
+fun interface RunOnTransitStart {
+    operator fun invoke(binder: IBinder)
+}
 
 /** Handles moving tasks in and out of desktop */
 class DesktopTasksController(
@@ -273,6 +276,7 @@ class DesktopTasksController(
     private val transactionPool: TransactionPool,
     private val pipTransitionState: Optional<PipTransitionState>,
     private val lockTaskChangeListener: LockTaskChangeListener,
+    private val launcherApps: LauncherApps,
 ) :
     RemoteCallable<DesktopTasksController>,
     TransitionHandler,
@@ -304,6 +308,37 @@ class DesktopTasksController(
 
             private fun removeVisualIndicator() {
                 visualIndicator?.fadeOutIndicator { releaseVisualIndicator() }
+            }
+        }
+    private val launcherAppsCallback =
+        object : LauncherApps.Callback() {
+            override fun onPackageRemoved(packageName: String, user: UserHandle) {
+                val repository = userRepositories.getProfile(user.identifier)
+                repository.clearRememberedBoundsRatio(packageName)
+            }
+
+            override fun onPackageAdded(packageName: String, user: UserHandle) {}
+
+            override fun onPackageChanged(packageName: String, user: UserHandle) {}
+
+            override fun onPackagesAvailable(
+                packageNames: Array<out String>,
+                user: UserHandle,
+                replacing: Boolean,
+            ) {}
+
+            override fun onPackagesUnavailable(
+                packageNames: Array<out String>,
+                user: UserHandle,
+                replacing: Boolean,
+            ) {
+                if (replacing) {
+                    return
+                }
+                val repository = userRepositories.getProfile(user.identifier)
+                packageNames.forEach { packageName ->
+                    repository.clearRememberedBoundsRatio(packageName)
+                }
             }
         }
 
@@ -352,6 +387,9 @@ class DesktopTasksController(
 
     private fun onInit() {
         logD("onInit")
+        if (Flags.enableRememberedBounds()) {
+            launcherApps.registerCallback(launcherAppsCallback)
+        }
         shellCommandHandler.addDumpCallback(this::dump, this)
         shellCommandHandler.addCommandCallback("desktopmode", desktopModeShellCommandHandler, this)
         shellController.addExternalInterface(
@@ -884,7 +922,7 @@ class DesktopTasksController(
                 )
             }
         }
-        return { transition ->
+        return RunOnTransitStart { transition ->
             for (runOnTransitStart in runOnTransitStartList) {
                 runOnTransitStart(transition)
             }
@@ -1226,7 +1264,7 @@ class DesktopTasksController(
         desksOrganizer.moveTaskToDesk(wct, deskId, task, minimized = minimized)
         taskBounds?.let { wct.setBounds(task.token, it) }
 
-        return { transition ->
+        return RunOnTransitStart { transition ->
             desksTransitionObserver.addPendingTransition(
                 DeskTransition.AddTaskToDesk(
                     token = transition,
@@ -1961,7 +1999,7 @@ class DesktopTasksController(
         } else {
             wct.reorder(task.token, /* onTop= */ false)
         }
-        return { transition ->
+        return RunOnTransitStart { transition ->
             desktopTasksLimiter.ifPresent {
                 it.addPendingMinimizeChange(
                     transition = transition,
@@ -4576,7 +4614,7 @@ class DesktopTasksController(
                         wct.reorder(task.token, true)
                         activationRunnable
                     } else {
-                        { transition: IBinder ->
+                        RunOnTransitStart { transition: IBinder ->
                             // The desk was already showing and we're launching a new Task - we
                             // might need to minimize another Task.
                             // TODO: b/32994943 - remove dead code when cleaning up
@@ -5189,7 +5227,7 @@ class DesktopTasksController(
             } else {
                 null
             }
-        return { transition ->
+        return RunOnTransitStart { transition ->
             deskCleanUpRunOnTransit?.invoke(transition)
             if (exitReason == ExitReason.CLIENT_REQUEST_ENTER_FULLSCREEN) {
                 addPendingClientEnterFullscreenFromDesktopTransition(
@@ -5460,7 +5498,7 @@ class DesktopTasksController(
         )
         if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             val taskIdToMinimize = bringDesktopAppsToFront(displayId, userId, wct, newTask?.taskId)
-            return { transition ->
+            return RunOnTransitStart { transition ->
                 // TODO: b/32994943 - remove dead code when cleaning up
                 //  task_limit_separate_transition flag
                 taskIdToMinimize?.let { minimizingTaskId ->
@@ -5537,7 +5575,7 @@ class DesktopTasksController(
                 switchingUser = switchingUser,
                 ExitReason.RETURN_HOME_OR_OVERVIEW,
             )
-        return { transition ->
+        return RunOnTransitStart { transition ->
             val activateDeskTransition =
                 if (newTaskIdInFront != null) {
                     DeskTransition.ActivateDeskWithTask(
@@ -5835,7 +5873,7 @@ class DesktopTasksController(
         }
         if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             desksOrganizer.removeDesk(wct, deskId, userId)
-            return { transition ->
+            return RunOnTransitStart { transition ->
                 desksTransitionObserver.addPendingTransition(
                     DeskTransition.RemoveDesk(
                         token = transition,
@@ -5867,7 +5905,7 @@ class DesktopTasksController(
         if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) return null
         if (deskId == null) return null
         desksOrganizer.deactivateDesk(wct, deskId)
-        return { transition ->
+        return RunOnTransitStart { transition ->
             desksTransitionObserver.addPendingTransition(
                 DeskTransition.DeactivateDesk(
                     token = transition,

@@ -21,6 +21,7 @@ import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_AUDIO;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_BLOCKED_ACTIVITY;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_DEFAULT_DEVICE_CAMERA_ACCESS;
 import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_CALLER_INITIATED;
+import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_SESSION_EMPTY;
 import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_SESSION_TIMED_OUT;
 
 import android.annotation.IntRange;
@@ -29,6 +30,7 @@ import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityOptions;
+import android.app.PendingIntent;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager.VirtualDevice;
 import android.companion.virtual.VirtualDeviceParams;
@@ -38,7 +40,6 @@ import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IComputerControlLifecycleCallback;
 import android.companion.virtual.computercontrol.IComputerControlSession;
 import android.companion.virtual.computercontrol.IInteractiveMirror;
-import android.companion.virtual.computercontrol.InteractiveMirror;
 import android.companion.virtual.computercontrol.LifecycleState;
 import android.content.AttributionSource;
 import android.content.ComponentName;
@@ -84,6 +85,7 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -112,10 +114,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             CUSTOM_BLOCKED_APP_PACKAGE,
             CUSTOM_BLOCKED_APP_PACKAGE + ".NotifyComputerControlBlockedActivity");
 
-    // The virtual display's refresh rate, which also limits how fast the client Surface can consume
-    // frames from the display.
-    private static final float VIRTUAL_DISPLAY_REQUESTED_REFRESH_RATE = 10f;
-
     // Input device names are limited to 80 bytes, so keep the prefix shorter than that.
     private static final int MAX_INPUT_DEVICE_NAME_PREFIX_LENGTH = 70;
 
@@ -132,6 +130,12 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     static final float LONG_PRESS_TIMEOUT_MULTIPLIER = 1.5f;
     @VisibleForTesting
     static final long KEY_EVENT_DELAY_MS = 10L;
+    // The session will be closed whenever the display remains empty for this timeout period.
+    // This timeout is used to avoid closing the session immediately upon the display being empty
+    // to allow for transient cases of emptiness, like when an Activity is launched in a new task
+    // while the current task is finished.
+    @VisibleForTesting
+    static final long CLOSE_ON_DISPLAY_EMPTY_TIMEOUT_MS = 100L;
 
     // Vendor and Product IDs for Computer Control virtual input devices.
     // These values are likely unique within the VIRTUAL bus type, but they are not
@@ -214,10 +218,17 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final Object mNotificationLock = new Object();
     @GuardedBy("mNotificationLock")
     private NotificationInfo mNotificationInfo = null;
+    private final Object mPreviewIntentLock = new Object();
+    @GuardedBy("mPreviewIntentLock")
+    private PendingIntent mPreviewIntent = null;
+
+    @GuardedBy("mInteractiveMirrors")
+    private final List<InteractiveMirrorImpl> mInteractiveMirrors = new ArrayList<>();
 
     private ScheduledFuture<?> mSwipeFuture;
     private ScheduledFuture<?> mInsertTextFuture;
     private ScheduledFuture<?> mCloseSessionFuture;
+    private ScheduledFuture<?> mDisplayEmptyScheduledAction;
     @Nullable
     private Surface mClientSurface;
 
@@ -247,6 +258,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mAppToken = appToken;
         mParams = params;
         mAllowlistController = allowlistController;
+        mPreviewIntent = params.getPreviewIntent();
 
         mOwnerUser = UserHandle.getUserHandleForUid(attributionSource.getUid());
         mOwnerContext = context.createContextAsUser(mOwnerUser, /* flags = */ 0);
@@ -276,6 +288,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         final VirtualDeviceParams.Builder virtualDeviceParamsBuilder =
                 new VirtualDeviceParams.Builder()
                     .setName(mParams.getName())
+                    .setLocalDeviceOnly(true)
                     .setDevicePolicy(POLICY_TYPE_BLOCKED_ACTIVITY, DEVICE_POLICY_CUSTOM)
                     .setDevicePolicy(POLICY_TYPE_DEFAULT_DEVICE_CAMERA_ACCESS,
                             DEVICE_POLICY_CUSTOM)
@@ -293,7 +306,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 mParams.getName() + "-display", displayWidth, displayHeight,
                 mainDisplayInfo.logicalDensityDpi)
                 .setFlags(displayFlags)
-                .setRequestedRefreshRate(VIRTUAL_DISPLAY_REQUESTED_REFRESH_RATE)
                 .build();
 
         mBlockedStateImageReader = ImageReader.newInstance(displayWidth, displayHeight,
@@ -428,6 +440,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     public void handOverApplications() {
         Binder.withCleanCallingIdentity(
                 () -> moveAllTasks(mVirtualDisplayId, mMainDisplayId));
+        close(CLOSE_REASON_SESSION_EMPTY);
     }
 
     @Override
@@ -487,19 +500,36 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     @Override
     @Nullable
-    public IInteractiveMirror createInteractiveMirror(SurfaceControl outMirrorSurface)
-            throws RemoteException {
+    public IInteractiveMirror createInteractiveMirror(SurfaceControl outMirrorSurface) {
+        final var mirror = createInteractiveMirrorImpl();
+        if (mirror == null) {
+            return null;
+        }
+        synchronized (mInteractiveMirrors) {
+            mInteractiveMirrors.add(mirror);
+        }
+        outMirrorSurface.copyFrom(mirror.getMirrorLeash(),
+                "ComputerControlSessionImpl#createInteractiveMirrorDisplay");
+        return mirror;
+    }
+
+    @Nullable
+    private InteractiveMirrorImpl createInteractiveMirrorImpl() {
+        // NOTE: The mirror surface must not be leaked to the client app!
         final var mirrorSurface =
                 mWindowManagerInternal.createMirrorForDisplayContent(mVirtualDisplayId);
         if (mirrorSurface == null) {
             return null;
         }
-        outMirrorSurface.copyFrom(mirrorSurface,
-                "ComputerControlSessionImpl#createInteractiveMirrorDisplay");
-        final var mirror = new InteractiveMirrorImpl(mirrorSurface, mTransactionSupplier,
-                mDisplayManagerGlobal.getDisplayInfo(mVirtualDisplayId), mInputManagerInternal);
-        mirror.setInteractive(InteractiveMirror.DEFAULT_INTERACTIVE);
-        return mirror;
+        return new InteractiveMirrorImpl(mirrorSurface, mTransactionSupplier,
+                mDisplayManagerGlobal.getDisplayInfo(mVirtualDisplayId), mInputManagerInternal,
+                this::onInteractiveMirrorClosed);
+    }
+
+    private void onInteractiveMirrorClosed(InteractiveMirrorImpl interactiveMirror) {
+        synchronized (mInteractiveMirrors) {
+            mInteractiveMirrors.remove(interactiveMirror);
+        }
     }
 
     @SuppressLint("WrongConstant")
@@ -551,6 +581,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     }
 
     @Override
+    public void setPreviewIntent(@Nullable PendingIntent previewIntent) {
+        synchronized (mPreviewIntentLock) {
+            mPreviewIntent = previewIntent;
+        }
+    }
+
+    @Override
     public void close() throws RemoteException {
         close(CLOSE_REASON_CALLER_INITIATED);
     }
@@ -581,9 +618,22 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mAudioCapture.stopAudioCapture();
         mVirtualDevice.close(); // closes also the VirtualAudioDevice
         mAppToken.unlinkToDeath(this, 0);
+        closeInteractiveMirrors();
         mOnClosedListener.accept(this);
     }
 
+    private void closeInteractiveMirrors() {
+        synchronized (mInteractiveMirrors) {
+            try (var transaction = mTransactionSupplier.get()) {
+                // Closing a mirror modifies mInteractiveMirrors, so make a copy of the list.
+                final var mirrorsCopy = new ArrayList<>(mInteractiveMirrors);
+                for (int i = 0; i < mirrorsCopy.size(); i++) {
+                    mirrorsCopy.get(i).closeWithTransaction(transaction);
+                }
+                transaction.apply();
+            }
+        }
+    }
 
     private void performSwipeStep(int fromX, int fromY, int toX, int toY, int step, int stepCount) {
         final double fraction = ((double) step) / stepCount;
@@ -713,6 +763,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 .build();
     }
 
+    private void cancelDisplayEmptyScheduledAction() {
+        final var action = mDisplayEmptyScheduledAction;
+        if (action != null) {
+            action.cancel(false);
+        }
+    }
+
     private class ComputerControlActivityListener implements VirtualDeviceManager.ActivityListener {
         @Override
         public void onTopActivityChanged(int displayId, @NonNull ComponentName topActivity) {}
@@ -721,6 +778,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         public void onTopActivityChanged(int displayId, @NonNull ComponentName topActivity,
                 @UserIdInt int userId) {
             Slog.v(TAG, "Top activity changed to " + topActivity + " for user " + userId);
+            cancelDisplayEmptyScheduledAction();
 
             if (topActivity.getPackageName().equals(CUSTOM_BLOCKED_APP_PACKAGE)) {
                 return;
@@ -742,6 +800,12 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 config.mBlockingActivityPackage = null;
                 config.mSecureWindowPackage = null;
             });
+            cancelDisplayEmptyScheduledAction();
+            // Close the session if the display remains empty after the timeout.
+            mDisplayEmptyScheduledAction = mScheduler.schedule(
+                    () -> close(CLOSE_REASON_SESSION_EMPTY),
+                    CLOSE_ON_DISPLAY_EMPTY_TIMEOUT_MS,
+                    TimeUnit.MILLISECONDS);
         }
 
         @Override

@@ -14,13 +14,16 @@
  * limitations under the License.
  */
 
-package com.android.systemui.accessibility.shortcutchooser.domain
+package com.android.systemui.globalactions.ui.viewmodel
 
-import com.android.systemui.accessibility.data.repository.accessibilityShortcutsRepository
-import com.android.systemui.broadcast.broadcastDispatcher
-import com.android.systemui.kosmos.Kosmos
-import com.android.systemui.kosmos.Kosmos.Fixture
+import com.android.systemui.globalactions.shared.model.GlobalActionType
+import com.android.systemui.lifecycle.HydratedActivatable
 
-val Kosmos.shortcutChooserDialogInteractor by Fixture {
-    ShortcutChooserDialogInteractor(accessibilityShortcutsRepository, broadcastDispatcher)
+/** Base class for a single Global Action item. */
+abstract class GlobalActionViewModel : HydratedActivatable() {
+    /** Unique identifier for this action type. */
+    abstract val key: GlobalActionType
+
+    /** The current UI state of this action. */
+    abstract val state: GlobalActionUiState
 }

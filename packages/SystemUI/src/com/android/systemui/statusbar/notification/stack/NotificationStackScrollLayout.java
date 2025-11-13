@@ -130,6 +130,7 @@ import com.android.systemui.statusbar.notification.stack.shared.model.Accessibil
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimBounds;
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimShape;
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrollState;
+import com.android.systemui.statusbar.notification.stack.ui.YSpace;
 import com.android.systemui.statusbar.notification.stack.ui.view.NotificationScrollView;
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationScrollViewModel.HeightSuppressionState;
 import com.android.systemui.statusbar.phone.HeadsUpAppearanceController;
@@ -865,8 +866,8 @@ public class NotificationStackScrollLayout
         drawDebugInfo(canvas, y, Color.RED, /* label= */ "y = " + y);
 
         if (SceneContainerFlag.isEnabled()) {
-            y = (int) mAmbientState.getStackTop();
-            drawDebugInfo(canvas, y, Color.RED, /* label= */ "getStackTop() = " + y);
+            y = (int) mAmbientState.getStackScrollTop();
+            drawDebugInfo(canvas, y, Color.RED, /* label= */ "getStackScrollTop() = " + y);
 
             y = (int) mAmbientState.getStackCutoff();
             drawDebugInfo(canvas, y, Color.MAGENTA, /* label= */ "getStackCutoff() = " + y);
@@ -874,11 +875,15 @@ public class NotificationStackScrollLayout
             y = (int) mAmbientState.getHeadsUpTop();
             drawDebugInfo(canvas, y, Color.GREEN, /* label= */ "getHeadsUpTop() = " + y);
 
-            y = (int) (mAmbientState.getStackTop() + mScrollViewFields.intrinsicStackHeight);
+            y = (int) (mAmbientState.getStackScrollTop() + mScrollViewFields.intrinsicStackHeight);
             drawDebugInfo(canvas, y, Color.BLUE,
                     /* label= */ "getStackTop() + getIntrinsicStackHeight() = " + y);
 
-            drawDebugInfo(canvas, mAmbientState.getDrawBounds(), Color.YELLOW, "drawBounds");
+            y = (int) (mAmbientState.getStackBounds().top);
+            drawDebugInfo(canvas, y, Color.YELLOW, /* label= */ "stackBounds.top = " + y);
+
+            y = (int) (mAmbientState.getStackBounds().bottom);
+            drawDebugInfo(canvas, y, Color.YELLOW, /* label= */ "stackBounds.bottom = " + y);
 
             return; // the rest of the fields are not important in Flexiglass
         }
@@ -1354,20 +1359,17 @@ public class NotificationStackScrollLayout
     @Override
     public void setStackTop(float stackTop) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
-        if (mAmbientState.getStackTop() != stackTop) {
-            mAmbientState.setStackTop(stackTop);
+        if (mAmbientState.getStackScrollTop() != stackTop) {
+            mAmbientState.setStackScrollTop(stackTop);
             onTopPaddingChanged(/* animate = */ isAddOrRemoveAnimationPending());
         }
     }
 
     @Override
-    public void updateDrawBounds(@NonNull RectF drawBounds) {
+    public void updateStackBounds(@NonNull YSpace stackBounds) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
-        // The received drawBounds are relative to the Window, but NSSL  expects a rect relative to
-        // its own position, so we need to offset it in case the NSSL has some horizontal margins.
-        drawBounds.offset(-getX(), -getY());
-        if (mAmbientState.getDrawBounds() != drawBounds) {
-            mAmbientState.setDrawBounds(drawBounds);
+        if (!mAmbientState.getStackBounds().equals(stackBounds)) {
+            mAmbientState.setStackBounds(stackBounds);
             updateStackEndHeightAndStackHeight(mAmbientState.getExpansionFraction());
             requestChildrenUpdate();
         }
@@ -1860,7 +1862,8 @@ public class NotificationStackScrollLayout
             // in the max number of notifications (e.g. as in keyguard).
             height = mScrollViewFields.intrinsicStackHeight;
         } else {
-            height = Math.max(0f, mAmbientState.getStackCutoff() - mAmbientState.getStackTop());
+            height = Math.max(0f,
+                    mAmbientState.getStackCutoff() - mAmbientState.getStackScrollTop());
         }
         mAmbientState.setStackEndHeight(height);
         return height;

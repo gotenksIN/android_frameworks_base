@@ -1541,6 +1541,15 @@ public final class AutofillManager {
     }
 
     /**
+     * Get next autofill view id from context of AutofillManager
+     *
+     * @hide
+     */
+    public int getNextAutofillViewId() {
+        return mContext.getNextAutofillId();
+    }
+
+    /**
      * Explicitly cancels the current session and requests a new autofill context.
      *
      * <p>Normally, the autofill context is automatically started if necessary when

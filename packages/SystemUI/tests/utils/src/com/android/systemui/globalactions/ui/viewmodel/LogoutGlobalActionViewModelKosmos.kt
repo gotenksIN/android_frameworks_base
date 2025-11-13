@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.android.internal.telecom;
+package com.android.systemui.globalactions.ui.viewmodel
 
-import com.android.internal.telecom.IDeviceIdleControllerAdapter;
+import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.user.domain.interactor.userLogoutInteractor
 
-/*
- * Interface used to retrieve services that are only accessible via LocalService in the SYSTEM
- * process.
- * @hide
- */
-interface IInternalServiceRetriever {
-    IDeviceIdleControllerAdapter getDeviceIdleController();
-}
+val Kosmos.logoutGlobalActionViewModelFactory by
+    Kosmos.Fixture {
+        object : LogoutGlobalActionViewModel.Factory {
+            override fun create() =
+                LogoutGlobalActionViewModel(userLogoutInteractor = userLogoutInteractor)
+        }
+    }

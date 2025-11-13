@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.android.systemui.statusbar.notification.shared
 
-package com.android.systemui.statusbar.core
-
-import com.android.systemui.Flags
+import android.app.Flags
 import com.android.systemui.flags.FlagToken
 import com.android.systemui.flags.RefactorFlagUtils
 
-/** Helper for reading and using the status bar simple fragment flag state */
-object StatusBarRootModernization {
-    /** Aconfig flag for removing the fragment */
-    const val FLAG_NAME = Flags.FLAG_STATUS_BAR_ROOT_MODERNIZATION
+/** Helper for reading or using the notification bundle ui flag state. */
+@Suppress("NOTHING_TO_INLINE")
+object NmContextualDisplay {
+    /** The aconfig flag name */
+    const val FLAG_NAME = Flags.FLAG_NM_CONTEXTUAL_DISPLAY
 
     /** A token used for dependency declaration */
     val token: FlagToken
@@ -32,7 +32,7 @@ object StatusBarRootModernization {
     /** Is the refactor enabled */
     @JvmStatic
     inline val isEnabled
-        get() = Flags.statusBarRootModernization()
+        get() = Flags.nmContextualDisplay()
 
     /**
      * Called to ensure code is only run when the flag is enabled. This protects users from the
@@ -44,7 +44,7 @@ object StatusBarRootModernization {
         RefactorFlagUtils.isUnexpectedlyInLegacyMode(isEnabled, FLAG_NAME)
 
     /**
-     * Called to ensure code is only run when the flag is disabled. This will throw an exception if
+     * Called to ensure code is only run when the flag is enabled. This will throw an exception if
      * the flag is not enabled to ensure that the refactor author catches issues in testing.
      * Caution!! Using this check incorrectly will cause crashes in nextfood builds!
      */

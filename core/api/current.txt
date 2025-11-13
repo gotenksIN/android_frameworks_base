@@ -256,6 +256,7 @@ package android {
     field @FlaggedApi("android.app.api_rich_ongoing_permission") public static final String POST_PROMOTED_NOTIFICATIONS = "android.permission.POST_PROMOTED_NOTIFICATIONS";
     field @Deprecated public static final String PROCESS_OUTGOING_CALLS = "android.permission.PROCESS_OUTGOING_CALLS";
     field public static final String PROVIDE_OWN_AUTOFILL_SUGGESTIONS = "android.permission.PROVIDE_OWN_AUTOFILL_SUGGESTIONS";
+    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final String PROVIDE_PRIVATE_COMPUTE_SERVICES = "android.permission.PROVIDE_PRIVATE_COMPUTE_SERVICES";
     field public static final String PROVIDE_REMOTE_CREDENTIALS = "android.permission.PROVIDE_REMOTE_CREDENTIALS";
     field public static final String QUERY_ADVANCED_PROTECTION_MODE = "android.permission.QUERY_ADVANCED_PROTECTION_MODE";
     field public static final String QUERY_ALL_PACKAGES = "android.permission.QUERY_ALL_PACKAGES";
@@ -9846,6 +9847,14 @@ package android.app.people {
 
 }
 
+package android.app.privatecompute {
+
+  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class PccSandboxManager {
+    method public boolean isPrivateComputeServicesUid(int);
+  }
+
+}
+
 package android.app.slice {
 
   @Deprecated public final class Slice implements android.os.Parcelable {
@@ -11422,6 +11431,7 @@ package android.content {
     field public static final String APP_OPS_SERVICE = "appops";
     field public static final String APP_SEARCH_SERVICE = "app_search";
     field public static final String AUDIO_SERVICE = "audio";
+    field @FlaggedApi("android.service.autofill.public_autofill_service_name") public static final String AUTOFILL_SERVICE = "autofill";
     field public static final String BATTERY_SERVICE = "batterymanager";
     field public static final int BIND_ABOVE_CLIENT = 8; // 0x8
     field public static final int BIND_ADJUST_WITH_ACTIVITY = 128; // 0x80
@@ -11503,6 +11513,7 @@ package android.content {
     field @FlaggedApi("com.android.npumanager.npumanager_enabled") public static final String NPU_SERVICE = "npu";
     field public static final String NSD_SERVICE = "servicediscovery";
     field public static final String OVERLAY_SERVICE = "overlay";
+    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final String PCC_SANDBOX_SERVICE = "pcc_sandbox";
     field public static final String PEOPLE_SERVICE = "people";
     field public static final String PERFORMANCE_HINT_SERVICE = "performance_hint";
     field public static final String PERSISTENT_DATA_BLOCK_SERVICE = "persistent_data_block";
@@ -21309,6 +21320,7 @@ package android.hardware.display {
 
   public static interface DisplayManager.DisplayListener {
     method public void onDisplayAdded(int);
+    method @FlaggedApi("com.android.server.display.feature.flags.display_listener_snapshot") public default void onDisplayAddedSnapshot(@NonNull int[]);
     method public void onDisplayChanged(int);
     method public void onDisplayRemoved(int);
   }

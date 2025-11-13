@@ -116,6 +116,13 @@ flag {
 }
 
 flag {
+    name: "enable_app_restart_after_update"
+    namespace: "lse_desktop_experience"
+    description: "Enables the app restart after update feature."
+    bug: "448577499"
+}
+
+flag {
     name: "enable_app_to_web_education_animation"
     namespace: "lse_desktop_experience"
     description: "Show the App-to-web education animation."
@@ -380,16 +387,6 @@ flag {
 }
 
 flag {
-    name: "enable_desktop_app_launch_alttab_transitions_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables custom transitions for alt-tab app launches in Desktop Mode."
-    bug: "380225486"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_desktop_app_launch_bugfix"
     namespace: "lse_desktop_experience"
     description: "Enabling an umbrella flag for various bugfixes related to app launch transitions."
@@ -584,16 +581,6 @@ flag {
 }
 
 flag {
-    name: "enable_desktop_recents_transitions_corners_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables rounded corners bugfix for Recents transitions."
-    bug: "383079261"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_desktop_tab_tearing_launch_animation"
     namespace: "lse_desktop_experience"
     description: "Enables the animation that occurs when a new window is opened via tab tearing."
@@ -628,16 +615,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Forces pinned taskbar with desktop tasks on freeform displays"
     bug: "390665752"
-}
-
-flag {
-    name: "enable_desktop_trampoline_close_animation_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables a close animation when the app trampolines (a second window is opened, and the first is closed)."
-    bug: "391548553"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

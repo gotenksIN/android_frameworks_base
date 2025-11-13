@@ -1101,26 +1101,16 @@ public class BtHelper {
         return btHeadsetDeviceToAudioDevice(mBluetoothHeadsetDummyDevice);
     }
 
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
     private static AudioDeviceAttributes btHeadsetDeviceToAudioDevice(BluetoothDevice btDevice) {
         if (btDevice == null) {
             return new AudioDeviceAttributes(AudioSystem.DEVICE_OUT_BLUETOOTH_SCO, "");
         }
         String address = btDevice.getAddress();
-// QTI_BEGIN: 2023-06-09: Bluetooth: Avoid fetching BT device name for dummy device
-        String dummyAddress = "00:00:00:00:00:00";
-        String name = "";
-        if (!address.equals(dummyAddress)) {
-            name = getName(btDevice);
-        }
-// QTI_END: 2023-06-09: Bluetooth: Avoid fetching BT device name for dummy device
+        String name = getName(btDevice);
         if (!BluetoothAdapter.checkBluetoothAddress(address)) {
             address = "";
         }
-// QTI_BEGIN: 2020-01-15: Bluetooth: Fix: dummy deviceKey is not correct if real device with dummy addr exist
-        BluetoothClass btClass = dummyAddress.equals(address) ? null :
-                                 btDevice.getBluetoothClass();
-// QTI_END: 2020-01-15: Bluetooth: Fix: dummy deviceKey is not correct if real device with dummy addr exist
+        BluetoothClass btClass = btDevice.getBluetoothClass();
         int nativeType = AudioSystem.DEVICE_OUT_BLUETOOTH_SCO;
         if (btClass != null) {
             switch (btClass.getDeviceClass()) {
@@ -1147,12 +1137,9 @@ public class BtHelper {
         if (btDevice == null) {
             return true;
         }
-        String address = btDevice.getAddress();
-        String dummyAddress = "00:00:00:00:00:00";
-        BluetoothClass btClass = dummyAddress.equals(address) ? null :
-                                 btDevice.getBluetoothClass();
         boolean result = false;
         AudioDeviceAttributes audioDevice = null; // Only used if isActive is true
+        String address = btDevice.getAddress();
         String name = getName(btDevice);
         // Handle output device
         if (isActive) {
@@ -1208,48 +1195,21 @@ public class BtHelper {
         if (Objects.equals(btDevice, previousActiveDevice)) {
             return;
         }
-// QTI_BEGIN: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-        String DummyAddress = "00:00:00:00:00:00";
-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-        if (adapter == null) {
-            Log.i(TAG, "adapter is null, returning from setBtScoActiveDevice");
-            return;
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-// QTI_BEGIN: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
+        if (!handleBtScoActiveDeviceChange(previousActiveDevice, false, deviceSwitch)) {
+            Log.w(TAG, "onSetBtScoActiveDevice() failed to remove previous device "
+                        + getAnonymizedAddress(previousActiveDevice));
         }
-// QTI_END: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
-// QTI_BEGIN: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-        mBluetoothHeadsetDummyDevice = adapter.getRemoteDevice(DummyAddress);
-        if (mBluetoothHeadsetDevice == null && btDevice != null) {
-            //SCO device entry is added to mConnectedDevices hash map only when active
-            //device connects for the first time.
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-            if (!handleBtScoActiveDeviceChange(mBluetoothHeadsetDummyDevice, true, false /*deviceSwitch*/)) {
-                Log.e(TAG, "onSetBtScoActiveDevice() failed to add new device " + btDevice);
-// QTI_BEGIN: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-                // set mBluetoothHeadsetDevice to null when failing to add new device
-                btDevice = null;
-            }
-        }
-        if (mBluetoothHeadsetDevice != null && btDevice == null) {
-            //SCO device entry is removed from mConnectedDevices hash map only when active
-            //device is disconnected.
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-            if (!handleBtScoActiveDeviceChange(mBluetoothHeadsetDummyDevice, false, false /*deviceSwitch*/)) {
-                Log.w(TAG, "onSetBtScoActiveDevice() failed to remove previous device "
-// QTI_BEGIN: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-                        + previousActiveDevice);
-            }
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-        }
+        // mBluetoothHeadsetDevice must correspond to previous device until now and new device from
+        // now on for SCO activation/deactivation requests made by
+        // AudioDeviceBroker.onUpdateCommunicationRouteClient() to succeed.
         mBluetoothHeadsetDevice = btDevice;
+        if (!handleBtScoActiveDeviceChange(btDevice, true, false /*deviceSwitch*/)) {
+            Log.e(TAG, "onSetBtScoActiveDevice() failed to add new device "
+                        + getAnonymizedAddress(btDevice));
+            // set mBluetoothHeadsetDevice to null when failing to add new devicei
+            mBluetoothHeadsetDevice = null;
+        }
         if (mBluetoothHeadsetDevice == null) {
-// QTI_BEGIN: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-            mBluetoothHeadsetDummyDevice = null;
-// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
-// QTI_BEGIN: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
-            Log.i(TAG, "In setBtScoActiveDevice(), calling resetBluetoothSco()");
-// QTI_END: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
             resetBluetoothSco();
         }
     }

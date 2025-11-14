@@ -120,6 +120,7 @@ public class BroadcastSkipPolicy {
         final ComponentName component = new ComponentName(
                 info.activityInfo.applicationInfo.packageName,
                 info.activityInfo.name);
+        final int receiverUid = info.activityInfo.getUid();
 
         if (brOptions != null &&
                 (info.activityInfo.applicationInfo.targetSdkVersion
@@ -134,29 +135,28 @@ public class BroadcastSkipPolicy {
                     + "] broadcasting " + broadcastDescription(r, component);
         }
         if (brOptions != null &&
-                !brOptions.testRequireCompatChange(info.activityInfo.applicationInfo.uid)) {
+                !brOptions.testRequireCompatChange(receiverUid)) {
             return "Compat change filtered: broadcasting " + broadcastDescription(r, component)
-                    + " to uid " + info.activityInfo.applicationInfo.uid + " due to compat change "
+                    + " to uid " + receiverUid + " due to compat change "
                     + r.options.getRequireCompatChangeId();
         }
         if (!mService.validateAssociationAllowedLocked(r.callerPackage, r.callingUid,
-                component.getPackageName(), info.activityInfo.applicationInfo.uid)) {
+                component.getPackageName(), receiverUid)) {
             return "Association not allowed: broadcasting "
                     + broadcastDescription(r, component);
         }
         if (!mService.mIntentFirewall.checkBroadcast(r.intent, r.callingUid,
-                r.callingPid, r.resolvedType, info.activityInfo.applicationInfo.uid)) {
+                r.callingPid, r.resolvedType, receiverUid)) {
             return "Firewall blocked: broadcasting "
                     + broadcastDescription(r, component);
         }
         int perm = checkComponentPermission(info.activityInfo.permission,
-                r.callingPid, r.callingUid, info.activityInfo.applicationInfo.uid,
-                info.activityInfo.exported);
+                r.callingPid, r.callingUid, receiverUid, info.activityInfo.exported);
         if (perm != PackageManager.PERMISSION_GRANTED) {
             if (!info.activityInfo.exported) {
                 return "Permission Denial: broadcasting "
                         + broadcastDescription(r, component)
-                        + " is not exported from uid " + info.activityInfo.applicationInfo.uid;
+                        + " is not exported from uid " + receiverUid;
             } else {
                 return "Permission Denial: broadcasting "
                         + broadcastDescription(r, component)
@@ -185,16 +185,14 @@ public class BroadcastSkipPolicy {
 
         if ((info.activityInfo.flags&ActivityInfo.FLAG_SINGLE_USER) != 0) {
             if (ActivityManager.checkUidPermission(
-                    android.Manifest.permission.INTERACT_ACROSS_USERS,
-                    info.activityInfo.applicationInfo.uid)
+                    android.Manifest.permission.INTERACT_ACROSS_USERS, receiverUid)
                             != PackageManager.PERMISSION_GRANTED) {
                 return "Permission Denial: Receiver " + component.flattenToShortString()
                         + " requests FLAG_SINGLE_USER, but app does not hold "
                         + android.Manifest.permission.INTERACT_ACROSS_USERS;
             }
         }
-        if (info.activityInfo.applicationInfo.isInstantApp()
-                && r.callingUid != info.activityInfo.applicationInfo.uid) {
+        if (info.activityInfo.applicationInfo.isInstantApp() && r.callingUid != receiverUid) {
             return "Instant App Denial: receiving "
                     + r.intent
                     + " to " + component.flattenToShortString()
@@ -204,7 +202,7 @@ public class BroadcastSkipPolicy {
         }
         if (r.callerInstantApp
                 && (info.activityInfo.flags & ActivityInfo.FLAG_VISIBLE_TO_INSTANT_APP) == 0
-                && r.callingUid != info.activityInfo.applicationInfo.uid) {
+                && r.callingUid != receiverUid) {
             return "Instant App Denial: receiving "
                     + r.intent
                     + " to " + component.flattenToShortString()
@@ -222,7 +220,7 @@ public class BroadcastSkipPolicy {
         try {
             isAvailable = AppGlobals.getPackageManager().isPackageAvailable(
                     info.activityInfo.packageName,
-                    UserHandle.getUserId(info.activityInfo.applicationInfo.uid));
+                    UserHandle.getUserId(receiverUid));
         } catch (Exception e) {
             // all such failures mean we skip this receiver
             return "Exception getting recipient info for "
@@ -230,8 +228,7 @@ public class BroadcastSkipPolicy {
         }
         if (!isAvailable) {
             return "Skipping delivery to " + info.activityInfo.packageName + " / "
-                    + info.activityInfo.applicationInfo.uid
-                    + " : package no longer available";
+                    + receiverUid + " : package no longer available";
         }
 
         // If permissions need a review before any of the app components can run, we drop
@@ -239,14 +236,13 @@ public class BroadcastSkipPolicy {
         // explicit we launch the review UI passing it a pending intent to send the skipped
         // broadcast.
         if (!requestStartTargetPermissionsReviewIfNeededLocked(r,
-                info.activityInfo.packageName, UserHandle.getUserId(
-                        info.activityInfo.applicationInfo.uid))) {
+                info.activityInfo.packageName, UserHandle.getUserId(receiverUid))) {
             return "Skipping delivery: permission review required for "
                             + broadcastDescription(r, component);
         }
 
         final int allowed = mService.getAppStartModeLOSP(
-                info.activityInfo.applicationInfo.uid, info.activityInfo.packageName,
+                receiverUid, info.activityInfo.packageName,
                 info.activityInfo.applicationInfo.targetSdkVersion, -1, true, false, false);
         if (allowed != ActivityManager.APP_START_MODE_NORMAL) {
             // Allow this broadcast receiver to be launched only if the intent action is
@@ -294,10 +290,10 @@ public class BroadcastSkipPolicy {
 
         if (!Intent.ACTION_SHUTDOWN.equals(r.intent.getAction())
                 && !mService.mUserController
-                .isUserRunning(UserHandle.getUserId(info.activityInfo.applicationInfo.uid),
+                .isUserRunning(UserHandle.getUserId(receiverUid),
                         0 /* flags */)) {
             return "Skipping delivery to " + info.activityInfo.packageName + " / "
-                            + info.activityInfo.applicationInfo.uid + " : user is not running";
+                            + receiverUid + " : user is not running";
         }
 
         if (r.excludedPermissions != null && r.excludedPermissions.length > 0) {
@@ -307,8 +303,7 @@ public class BroadcastSkipPolicy {
                     perm = AppGlobals.getPackageManager()
                         .checkPermission(excludedPermission,
                                 info.activityInfo.applicationInfo.packageName,
-                                UserHandle
-                                .getUserId(info.activityInfo.applicationInfo.uid));
+                                UserHandle.getUserId(receiverUid));
                 } catch (RemoteException e) {
                     perm = PackageManager.PERMISSION_DENIED;
                 }
@@ -319,8 +314,7 @@ public class BroadcastSkipPolicy {
                     // skip when both the permission and the app op are
                     // granted.
                     if ((perm == PackageManager.PERMISSION_GRANTED) && (
-                                mService.getAppOpsManager().checkOpNoThrow(appOp,
-                                info.activityInfo.applicationInfo.uid,
+                                mService.getAppOpsManager().checkOpNoThrow(appOp, receiverUid,
                                 info.activityInfo.packageName)
                                         == AppOpsManager.MODE_ALLOWED)) {
                         return "Skipping delivery to " + info.activityInfo.packageName
@@ -349,7 +343,7 @@ public class BroadcastSkipPolicy {
             }
         }
 
-        if (info.activityInfo.applicationInfo.uid != Process.SYSTEM_UID &&
+        if (receiverUid != Process.SYSTEM_UID &&
                 r.requiredPermissions != null && r.requiredPermissions.length > 0) {
             final AttributionSource[] attributionSources =
                     createAttributionSourcesForResolveInfo(info);
@@ -673,7 +667,7 @@ public class BroadcastSkipPolicy {
     private boolean noteOpForManifestReceiverInner(int opCode, String appOp, BroadcastRecord r,
             ResolveInfo info, ComponentName component, String tag) {
         if (mService.getAppOpsManager().noteOpNoThrow(appOp,
-                    info.activityInfo.applicationInfo.uid,
+                    info.activityInfo.getUid(),
                     info.activityInfo.packageName,
                     tag,
                     "Broadcast delivered to " + info.activityInfo.name)
@@ -706,7 +700,7 @@ public class BroadcastSkipPolicy {
 
     private boolean checkOpForManifestReceiverInner(int opCode, String appOp, BroadcastRecord r,
             ResolveInfo info, ComponentName component, String tag) {
-        if (mService.getAppOpsManager().checkOpNoThrow(appOp, info.activityInfo.applicationInfo.uid,
+        if (mService.getAppOpsManager().checkOpNoThrow(appOp, info.activityInfo.getUid(),
                 info.activityInfo.packageName, tag) != AppOpsManager.MODE_ALLOWED) {
             Slog.w(TAG, "Appop Denial: receiving "
                     + r.intent + " to "
@@ -838,7 +832,7 @@ public class BroadcastSkipPolicy {
         final String[] attributionTags = info.activityInfo.attributionTags;
         if (ArrayUtils.isEmpty(attributionTags)) {
             return new AttributionSource[] {
-                    new AttributionSource.Builder(info.activityInfo.applicationInfo.uid)
+                    new AttributionSource.Builder(info.activityInfo.getUid())
                             .setPackageName(info.activityInfo.packageName)
                             .build()
             };
@@ -848,7 +842,7 @@ public class BroadcastSkipPolicy {
                 new AttributionSource[attributionTags.length];
         for (int i = 0; i < attributionTags.length; i++) {
             attributionSources[i] =
-                    new AttributionSource.Builder(info.activityInfo.applicationInfo.uid)
+                    new AttributionSource.Builder(info.activityInfo.getUid())
                             .setPackageName(info.activityInfo.packageName)
                             .setAttributionTag(attributionTags[i])
                             .build();

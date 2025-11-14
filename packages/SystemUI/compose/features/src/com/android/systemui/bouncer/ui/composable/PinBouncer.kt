@@ -46,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
@@ -141,7 +142,7 @@ fun PinPad(viewModel: PinBouncerViewModel, verticalSpacing: Dp, modifier: Modifi
             onPointerDown = viewModel::onBackspaceButtonPressed,
             onLongPressed = viewModel::onBackspaceButtonLongPressed,
             onLongClickLabel =
-                stringResource(R.string.keyguard_accessibility_pin_delete_long_click_partial),
+                stringResource(R.string.keyguard_accessibility_pin_delete_long_click),
             appearance = backspaceButtonAppearance,
             scaling = buttonScaleAnimatables[9]::value,
             elementId = "delete_button",
@@ -165,7 +166,9 @@ fun PinPad(viewModel: PinBouncerViewModel, verticalSpacing: Dp, modifier: Modifi
                 ),
             isInputEnabled = isInputEnabled,
             onClicked = viewModel::onAuthenticateButtonClicked,
-            onPointerDown = { viewModel.onDown() },
+            onPointerDown = {
+                viewModel.onDown()
+            },
             appearance = confirmButtonAppearance,
             scaling = buttonScaleAnimatables[11]::value,
             elementId = "key_enter",

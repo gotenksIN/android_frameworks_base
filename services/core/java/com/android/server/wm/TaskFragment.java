@@ -1567,8 +1567,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return false;
         }
 
-        next.delayedResume = false;
-
         if (!skipPause && !mRootWindowContainer.allPausedActivitiesComplete()) {
             // If we aren't skipping pause, then we have to wait for currently pausing activities.
             ProtoLog.v(WM_DEBUG_STATES, "resumeTopActivity: Skip resume: some activity pausing.");
@@ -2355,7 +2353,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
     @Override
     void addChild(WindowContainer child, int index) {
-        ActivityRecord r = topRunningActivity();
         mClearedTaskForReuse = false;
         mClearedTaskFragmentForPip = false;
         mClearedForReorderActivityToFront = false;
@@ -3403,13 +3400,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
     @Override
     boolean fillsParent() {
-        if (!com.android.window.flags.Flags.refactorMatchParentBounds()) {
-            // From the perspective of policy, we still want to report that this task fills parent
-            // in fullscreen windowing mode even it doesn't match parent bounds because there
-            // will be letterbox around its real content.
-            return getWindowingMode() == WINDOWING_MODE_FULLSCREEN || matchParentBounds();
-        }
-
         return matchParentBounds();
     }
 

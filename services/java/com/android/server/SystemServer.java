@@ -204,6 +204,7 @@ import com.android.server.media.metrics.MediaMetricsManagerService;
 import com.android.server.media.projection.MediaProjectionManagerService;
 import com.android.server.media.quality.MediaQualityService;
 import com.android.server.midi.MidiService;
+import com.android.server.modes.ContextualModeManagerService;
 import com.android.server.musicrecognition.MusicRecognitionManagerService;
 import com.android.server.net.NetworkManagementService;
 import com.android.server.net.NetworkPolicyManagerService;
@@ -2112,7 +2113,7 @@ public final class SystemServer implements Dumpable {
             startRotationResolverService(context, t);
             startSystemCaptionsManagerService(context, t);
             startTextToSpeechManagerService(context, t);
-            if (!isWatch || !android.server.Flags.removeWearableSensingServiceFromWear()) {
+            if (!isWatch) {
                 startWearableSensingService(t);
             } else {
                 Slog.d(TAG, "Not starting WearableSensingService");
@@ -2319,7 +2320,7 @@ public final class SystemServer implements Dumpable {
             }
             t.traceEnd();
 
-            if (!isWatch || !android.server.Flags.allowRemovingVpnService()) {
+            if (!isWatch) {
                 t.traceBegin("StartVpnManagerService");
                 try {
                     vpnManager = VpnManagerService.create(context);
@@ -2383,6 +2384,12 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("StartBitmapOffloadService");
             mSystemServiceManager.startService(BitmapOffloadService.class);
             t.traceEnd();
+
+            if (android.service.notification.Flags.enableDndSync()) {
+                t.traceBegin("StartCtxModeManagerService");
+                mSystemServiceManager.startService(ContextualModeManagerService.class);
+                t.traceEnd();
+            }
 
             t.traceBegin("StartNotificationManager");
             mSystemServiceManager.startService(NotificationManagerService.class);
@@ -3357,7 +3364,7 @@ public final class SystemServer implements Dumpable {
         }
         t.traceEnd();
 
-        if (!isWatch || !android.server.Flags.removeGameManagerServiceFromWear()) {
+        if (!isWatch) {
             t.traceBegin("GameManagerService");
             mSystemServiceManager.startService(GameManagerService.Lifecycle.class);
             t.traceEnd();

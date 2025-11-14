@@ -111,7 +111,6 @@ import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.L
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.LID_OPEN;
 import static com.android.server.power.feature.flags.Flags.interactiveDozeExperience;
 import static com.android.systemui.shared.Flags.enableLppAssistInvocationEffect;
-import static com.android.systemui.shared.Flags.enableLppAssistInvocationHapticEffect;
 
 import android.accessibilityservice.AccessibilityService;
 import android.annotation.NonNull;
@@ -1419,7 +1418,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case MULTI_PRESS_POWER_BRIGHTNESS_BOOST:
                 Slog.i(TAG, "Starting brightness boost.");
                 if (!interactive) {
-                    wakeUpFromWakeKey(displayId, eventTime, KEYCODE_POWER, /* isDown= */ false);
+                    wakeUpFromWakeKey(
+                            displayId,
+                            eventTime,
+                            KEYCODE_POWER,
+                            /* isDown= */ false,
+                            /* keyEventFlags= */ 0);
                 }
                 mPowerManager.boostScreenBrightness(eventTime);
                 break;
@@ -2623,13 +2627,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (getResolvedLongPressOnPowerBehavior() == LONG_PRESS_POWER_ASSISTANT) {
                     handleSingleKeyGestureInKeyGestureController(
                             KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_ASSISTANT, event);
-                    if (!enableLppAssistInvocationHapticEffect()
-                            && event.getAction() == ACTION_COMPLETE) {
-                        // The invocation effect will not play haptics so we must play the
-                        // assistant effect here
-                        performHapticFeedback(HapticFeedbackConstants.ASSISTANT_BUTTON,
-                                "Power - Long Press - Go To Assistant");
-                    }
                     return;
                 }
             }
@@ -5584,13 +5581,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 event.getDisplayId(),
                 event.getEventTime(),
                 event.getKeyCode(),
-                event.getAction() == KeyEvent.ACTION_DOWN);
+                event.getAction() == KeyEvent.ACTION_DOWN,
+                event.getFlags());
     }
 
     private void wakeUpFromWakeKey(
-            int eventDisplayId, long eventTime, int keyCode, boolean isDown) {
+            int eventDisplayId, long eventTime, int keyCode, boolean isDown, int keyEventFlags) {
         final int displayId = useEventDisplayIdForKeyWakeup() ? eventDisplayId : DEFAULT_DISPLAY;
-        if (mWindowWakeUpPolicy.wakeUpFromKey(displayId, eventTime, keyCode, isDown)) {
+        if (mWindowWakeUpPolicy.wakeUpFromKey(
+                displayId, eventTime, keyCode, isDown, keyEventFlags)) {
             final boolean keyCanLaunchHome = keyCode == KEYCODE_HOME || keyCode == KEYCODE_POWER;
             // Start HOME with "reason" extra if sleeping for more than mWakeUpToLastStateTimeout
             if (shouldWakeUpWithHomeIntent() &&  keyCanLaunchHome) {

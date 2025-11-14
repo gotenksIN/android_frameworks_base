@@ -36,7 +36,6 @@ import com.android.systemui.flags.Flags.FILTER_PROVISIONING_NETWORK_SUBSCRIPTION
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.statusbar.core.NewStatusBarIcons
-import com.android.systemui.statusbar.core.StatusBarRootModernization
 import com.android.systemui.statusbar.pipeline.dagger.MobileSummaryLog
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionRepository
@@ -316,7 +315,7 @@ constructor(
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
     override val isStackable =
-        if (NewStatusBarIcons.isEnabled && StatusBarRootModernization.isEnabled) {
+        if (NewStatusBarIcons.isEnabled) {
             icons.flatMapLatest { icons ->
                 if (icons.isEmpty()) {
                     flowOf(false)

@@ -334,6 +334,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * The implementation of the audio service for volume, audio focus, device management...
@@ -5493,8 +5494,12 @@ public class AudioService extends IAudioService.Stub
         // and request an audio mode update after a grace period.
         updateAudioModeHandlers(
                 configs /* playbackConfigs */, null /* recordConfigs */);
-        mDeviceBroker.updateCommunicationRouteClientsActivity(
-                configs /* playbackConfigs */, null /* recordConfigs */);
+
+        var combinedActive =
+                IntStream.concat(Arrays.stream(mPlaybackMonitor.getPlaybackActiveUids()),
+                        Arrays.stream(mRecordMonitor.getRecordingActiveUids()));
+
+        mDeviceBroker.postUpdateActiveUids(combinedActive.sorted().distinct().toArray());
     }
 
     void updateAudioModeHandlers(List<AudioPlaybackConfiguration> playbackConfigs,
@@ -5598,8 +5603,12 @@ public class AudioService extends IAudioService.Stub
         // and request an audio mode update after a grace period.
         updateAudioModeHandlers(
                 null /* playbackConfigs */, configs /* recordConfigs */);
-        mDeviceBroker.updateCommunicationRouteClientsActivity(
-                null /* playbackConfigs */, configs /* recordConfigs */);
+
+        var combinedActive =
+                IntStream.concat(Arrays.stream(mPlaybackMonitor.getPlaybackActiveUids()),
+                        Arrays.stream(mRecordMonitor.getRecordingActiveUids()));
+
+        mDeviceBroker.postUpdateActiveUids(combinedActive.sorted().distinct().toArray());
     }
 
     private void dumpFlags(PrintWriter pw) {
@@ -16693,5 +16702,17 @@ public class AudioService extends IAudioService.Stub
         }
     }
 
-
+    static @Nullable String anonymizeBluetoothAddress(@Nullable AudioDeviceAttributes ada) {
+        if (ada == null) {
+            return null;
+        }
+        if (!AudioSystem.isBluetoothDevice(ada.getInternalType()) || ada.getAddress() == null) {
+            return ada.getAddress();
+        }
+        var address = ada.getAddress();
+        if (address.length() != "AA:BB:CC:DD:EE:FF".length()) {
+            return address;
+        }
+        return "XX:XX:XX:XX" + address.substring("XX:XX:XX:XX".length());
+    }
 }

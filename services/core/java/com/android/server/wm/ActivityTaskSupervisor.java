@@ -136,6 +136,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.os.PersistableBundle;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.SystemClock;
@@ -243,9 +244,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     private static final int REPORT_PIP_MODE_CHANGED_MSG = FIRST_SUPERVISOR_TASK_MSG + 15;
     private static final int START_HOME_MSG = FIRST_SUPERVISOR_TASK_MSG + 16;
     private static final int TOP_RESUMED_STATE_LOSS_TIMEOUT_MSG = FIRST_SUPERVISOR_TASK_MSG + 17;
-
-    // Used to indicate that windows of activities should be preserved during the resize.
-    static final boolean PRESERVE_WINDOWS = true;
 
     // Used to indicate if an object (e.g. task) should be moved/created
     // at the top of its container (e.g. root task).
@@ -1090,11 +1088,14 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         final boolean isTransitionForward = r.isTransitionForward();
         final IBinder fragmentToken = r.getTaskFragment().getFragmentToken();
         final int deviceId = getDeviceIdForDisplayId(r.getDisplayId());
+        final PersistableBundle persistentState =
+                r.getPersistentSavedState() != null ? r.getPersistentSavedState()
+                        : mService.mPackageUpdateManager.getPersistentStateForTask(task);
         final LaunchActivityItem launchActivityItem = new LaunchActivityItem(r.token,
                 r.intent, System.identityHashCode(r), r.info,
                 procConfig, overrideConfig, deviceId,
                 r.getFilteredReferrer(r.launchedFromPackage), task.voiceInteractor,
-                proc.getReportedProcState(), r.getSavedState(), r.getPersistentSavedState(),
+                proc.getReportedProcState(), r.getSavedState(), persistentState,
                 results, newIntents, r.takeSceneTransitionInfo(), isTransitionForward,
                 proc.createProfilerInfoIfNeeded(), r.assistToken, activityClientController,
                 r.shareableActivityToken, r.getLaunchedFromBubble(), fragmentToken,
@@ -1190,7 +1191,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         }
     }
 
-    void scheduleStartHome(String reason) {
+    private void scheduleStartHome(String reason) {
         if (!mHandler.hasMessages(START_HOME_MSG)) {
             mHandler.obtainMessage(START_HOME_MSG, reason).sendToTarget();
         }
@@ -3055,8 +3056,10 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                     mHandler.removeMessages(START_HOME_MSG);
 
                     if (com.android.window.flags.Flags.homeActivityAlwaysPresent()) {
-                        // Start home activities on displays with no home.
-                        mRootWindowContainer.startHomeOnDisplaysWithNoHome((String) msg.obj);
+                        // Start home activities on displays with no home or a different home
+                        // package.
+                        mRootWindowContainer.startHomeOnDisplaysIfNeeded(
+                                (String) msg.obj);
                     } else {
                         // Start home activities on displays with no activities.
                         mRootWindowContainer.startHomeOnEmptyDisplays((String) msg.obj);
@@ -3116,10 +3119,27 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             }
 
             boolean shouldStartActivity = false;
+            final Task attachedTask =
+                    mRootWindowContainer.anyTaskForId(taskId, MATCH_ATTACHED_TASK_OR_RECENT_TASKS);
+            // TODO(b/456665032): more cleanly hook into ActivityStartInterceptor.
+            boolean shouldIntercept =
+                    android.companion.virtualdevice.flags.Flags.computerControlAccess()
+                    && attachedTask != null
+                    && ActivityStartInterceptor.shouldInterceptStartActivityFromRecents(
+                            this,
+                            attachedTask.getTaskInfo(),
+                            attachedTask.mCallingPackage,
+                            activityOptions);
             mService.deferWindowLayout();
             try {
-                task = mRootWindowContainer.anyTaskForId(taskId,
+                if (shouldIntercept) {
+                    // anyTaskForId with activityOptions might move the task to a different display.
+                    // If we already know we'll intercept, prevent the task move / restore here.
+                    task = attachedTask;
+                } else {
+                    task = mRootWindowContainer.anyTaskForId(taskId,
                         MATCH_ATTACHED_TASK_OR_RECENT_TASKS_AND_RESTORE, activityOptions, ON_TOP);
+                }
                 if (task == null) {
                     mWindowManager.executeAppTransition();
                     throw new IllegalArgumentException(
@@ -3142,10 +3162,13 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 }
 
                 // If the user must confirm credentials (e.g. when first launching a work
-                // app and the Work Challenge is present) let startActivityInPackage handle
-                // the intercepting.
+                // app and the Work Challenge is present), or we know ActivityStartInterceptor will
+                // intercept the launch, let startActivityInPackage handle the intercepting.
+                // TODO(b/456665032): Make this generic to all ActivityStartInterceptor
+                // interceptions, and optimize so we don't have to run the interception again.
                 if (!mService.mAmInternal.shouldConfirmCredentials(task.mUserId)
-                        && task.getRootActivity() != null) {
+                        && task.getRootActivity() != null
+                        && !shouldIntercept) {
                     final ActivityRecord targetActivity = task.getTopNonFinishingActivity();
 
                     mRootWindowContainer.startPowerModeLaunchIfNeeded(
@@ -3376,7 +3399,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                     && mInfo.capturedLink == null) {
                 setCapturedLink(r);
             }
-            if (r.mLaunchCookie != null && (!com.android.window.flags.Flags.rootTaskForBubble()
+            if (r.mLaunchCookie != null && (!com.android.window.flags.Flags.enableBubbleRootTask()
                     || !mCreatedByOrganizer)) {
                 mInfo.addLaunchCookie(r.mLaunchCookie);
             }

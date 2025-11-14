@@ -644,7 +644,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      */
     private PowerManager.WakeLock mDrawLock;
 
-    private final Rect mTmpRect = new Rect();
     private final Point mTmpPoint = new Point();
     private final Region mTmpRegion = new Region();
 
@@ -1161,6 +1160,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // All apps should be considered as occluding when computing TrustedPresentation Thresholds.
         final boolean canOccludePresentation = !mSession.mCanAddInternalSystemWindow;
         getPendingTransaction().setCanOccludePresentation(mSurfaceControl, canOccludePresentation);
+    }
+
+    @Override
+    boolean showSurfaceOnCreation() {
+        // The visibility of WindowState's surface will be set by WindowStateAnimator if the client
+        // owns its surface.
+        return !WindowManager.useClientSurface();
     }
 
     void updateTrustedOverlay() {
@@ -3252,7 +3258,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         try {
             if (DEBUG_VISIBILITY) Slog.v(TAG,
                     "Setting visibility of " + this + ": " + clientVisible);
-            final int seqId = clientVisible ? incrementSeqForRelayout() : -1;
+            final int seqId = clientVisible
+                    && (!mLastConfigReportedToClient || !WindowManager.useClientSurface())
+                    ? incrementSeqForRelayout() : -1;
             if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
                 Trace.instant(TRACE_TAG_WINDOW_MANAGER, "wm.sendAppVis_" + getWindowTag()
                         + " id=" + seqId + " vis=" + clientVisible + " surf=" + mHasSurface);
@@ -3279,6 +3287,33 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // Make sure the app can report drawn if it becomes visible again.
             forceReportingResized();
         }
+    }
+
+    void setClientSurface(@NonNull SurfaceControl surface) {
+        if (mWinAnimator.mSurfaceControl == surface) {
+            return;
+        }
+        if (mWinAnimator.mSurfaceControl != null
+                && mWinAnimator.mSurfaceControl.isSameSurface(surface)) {
+            if (!isClientLocal()) {
+                // Release the instance of the same surface from parcel.
+                surface.release();
+            }
+            return;
+        }
+        Slog.d(TAG, "setClientSurface " + surface + " for " + mName);
+        if (!surface.isValid()) {
+            return;
+        }
+        if (mWinAnimator.mSurfaceControl != null) {
+            getPendingTransaction().remove(mWinAnimator.mSurfaceControl);
+        }
+        mWinAnimator.mSurfaceControl = isClientLocal()
+                ? new SurfaceControl(surface, "setClientSurface") : surface;
+        getPendingTransaction().reparent(surface, mSurfaceControl);
+        mWinAnimator.resetDrawState();
+        setHasSurface(true);
+        mInputWindowHandle.forceChange();
     }
 
     boolean destroySurface(boolean cleanupOnResume, boolean appStopped) {

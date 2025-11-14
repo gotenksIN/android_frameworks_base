@@ -1590,6 +1590,12 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     /** @hide */
     public String zygotePreloadName;
 
+    /** @hide */
+    public String zygotePreloadNativeLib;
+
+    /** @hide */
+    public String zygotePreloadNativeFunc;
+
     /**
      * Default (unspecified) setting of GWP-ASan.
      */
@@ -2188,6 +2194,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         mHiddenApiPolicy = orig.mHiddenApiPolicy;
         hiddenUntilInstalled = orig.hiddenUntilInstalled;
         zygotePreloadName = orig.zygotePreloadName;
+        zygotePreloadNativeLib = orig.zygotePreloadNativeLib;
+        zygotePreloadNativeFunc = orig.zygotePreloadNativeFunc;
         gwpAsanMode = orig.gwpAsanMode;
         memtagMode = orig.memtagMode;
         nativeHeapZeroInitialized = orig.nativeHeapZeroInitialized;
@@ -2291,6 +2299,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(mHiddenApiPolicy);
         dest.writeInt(hiddenUntilInstalled ? 1 : 0);
         dest.writeString8(zygotePreloadName);
+        dest.writeString8(zygotePreloadNativeLib);
+        dest.writeString8(zygotePreloadNativeFunc);
         dest.writeInt(gwpAsanMode);
         dest.writeInt(memtagMode);
         dest.writeInt(nativeHeapZeroInitialized);
@@ -2403,6 +2413,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         mHiddenApiPolicy = source.readInt();
         hiddenUntilInstalled = source.readInt() != 0;
         zygotePreloadName = source.readString8();
+        zygotePreloadNativeLib = source.readString8();
+        zygotePreloadNativeFunc = source.readString8();
         gwpAsanMode = source.readInt();
         memtagMode = source.readInt();
         nativeHeapZeroInitialized = source.readInt();

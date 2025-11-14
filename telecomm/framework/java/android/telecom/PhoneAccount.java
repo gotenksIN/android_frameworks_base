@@ -548,7 +548,15 @@ public final class PhoneAccount implements Parcelable {
      */
     public static final int CAPABILITY_SUPPORTS_CALL_STREAMING = 0x80000;
 
-    /* NEXT CAPABILITY: [0x100000, 0x200000, 0x400000] */
+    /**
+     * Flag indicating that this {@link PhoneAccount} is capable of changing an RTT (Real-time text)
+     * call to a voice call.
+     * When set, The in-call app will display the change to voice option.
+     * User can chose to change the call to only voice from the in-call app.
+     * Only applicable for a phone account with {@link #CAPABILITY_RTT}.
+     */
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_CHANGE_RTT_TO_AUDIO)
+    public static final int CAPABILITY_CHANGE_RTT_CALL_TO_AUDIO_CALL = 0x100000;
 
 // QTI_BEGIN: 2023-01-17: Telephony: IMS : Add RTT downgrade capability to phone account
     /**
@@ -937,7 +945,6 @@ public final class PhoneAccount implements Parcelable {
          * {@link PhoneAccount}s registered by this package.
          * @return The Builder used to set up the new PhoneAccount.
          */
-        @FlaggedApi(Flags.FLAG_SIMULTANEOUS_CALLING_INDICATIONS)
         public @NonNull Builder setSimultaneousCallingRestriction(
                 @NonNull Set<PhoneAccountHandle> handles) {
             if (handles == null) {
@@ -956,7 +963,6 @@ public final class PhoneAccount implements Parcelable {
          * @return The Builder used to set up the new PhoneAccount.
          * @see #setSimultaneousCallingRestriction(Set)
          */
-        @FlaggedApi(Flags.FLAG_SIMULTANEOUS_CALLING_INDICATIONS)
         public @NonNull Builder clearSimultaneousCallingRestriction() {
             mSimultaneousCallingRestriction = null;
             return this;
@@ -1249,7 +1255,6 @@ public final class PhoneAccount implements Parcelable {
      * and this method is called. Whether or not there is a restriction can be checked using
      * {@link #hasSimultaneousCallingRestriction()}.
      */
-    @FlaggedApi(Flags.FLAG_SIMULTANEOUS_CALLING_INDICATIONS)
     public @NonNull Set<PhoneAccountHandle> getSimultaneousCallingRestriction() {
         if (mSimultaneousCallingRestriction == null) {
             throw new IllegalStateException("This method can not be called if there is no "
@@ -1267,7 +1272,6 @@ public final class PhoneAccount implements Parcelable {
      * @see #getSimultaneousCallingRestriction() for more information on how the sinultaneous
      * calling restriction works.
      */
-    @FlaggedApi(Flags.FLAG_SIMULTANEOUS_CALLING_INDICATIONS)
     public boolean hasSimultaneousCallingRestriction() {
         return mSimultaneousCallingRestriction != null;
     }
@@ -1478,6 +1482,9 @@ public final class PhoneAccount implements Parcelable {
         }
         if (hasCapabilities(CAPABILITY_SUPPORTS_CALL_STREAMING)) {
             sb.append("Stream ");
+        }
+        if (hasCapabilities(CAPABILITY_CHANGE_RTT_CALL_TO_AUDIO_CALL)) {
+            sb.append("RttToAudio ");
         }
         return sb.toString();
     }

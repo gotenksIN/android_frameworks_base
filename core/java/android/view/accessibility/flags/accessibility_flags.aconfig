@@ -20,6 +20,14 @@ flag {
 }
 
 flag {
+    name: "a11y_extra_rendering_info_color_additions"
+    namespace: "accessibility"
+    is_exported: true
+    description: "Adds a public Builder API for AccessibilityNodeInfo.ExtraRenderingInfo and adds color properties"
+    bug: "452371989"
+}
+
+flag {
     name: "a11y_is_required_api"
     namespace: "accessibility"
     description: "Adds an API to indicate whether a form field (or similar element) is required."
@@ -32,6 +40,14 @@ flag {
     namespace: "accessibility"
     description: "Adds an API to indicate whether a URL has been visited or not."
     bug: "391469786"
+    is_exported: true
+}
+
+flag {
+    name: "a11y_layout_based_actions_api"
+    namespace: "accessibility"
+    description: "Enables new extra data key for an AccessibilityService to request layout-based actions."
+    bug: "455070192"
     is_exported: true
 }
 
@@ -215,6 +231,16 @@ flag {
 }
 
 flag {
+    name: "prevent_a11y_event_null_record"
+    namespace: "accessibility"
+    description: "Prevent apps adding null record via accessibilityEvent#appendRecord"
+    bug: "454269244"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "prevent_leaking_viewrootimpl"
     namespace: "accessibility"
     description: "Clear pending messages and callbacks of the handler in AccessibilityInteractionController when the ViewRootImpl is detached from Window to prevent leaking ViewRootImpl"
@@ -256,10 +282,10 @@ flag {
 }
 
 flag {
-    name: "request_rectangle_deprecate_legacy_apis"
+    name: "request_rectangle_migrate_legacy_apis"
     namespace: "accessibility"
-    description: "Deprecate legacy requestRectangleOnScreen APIs that do not pass the source parameter"
-    bug: "455950272"
+    description: "Update calls to legacy requestRectangleOnScreen APIs to use the new API and pass a source parameter"
+    bug: "456809623"
 }
 
 flag {

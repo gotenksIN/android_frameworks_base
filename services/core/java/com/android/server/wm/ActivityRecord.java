@@ -530,7 +530,6 @@ public final class ActivityRecord extends WindowToken {
                                        // dies. After an activity is launched it follows the value
                                        // of #mIcicle.
     boolean launchFailed;   // set if a launched failed, to abort on 2nd try
-    boolean delayedResume;  // not yet resumed because of stopped app switches?
     boolean finishing;      // activity in pending finish list?
     private boolean keysPaused;     // has key dispatching been paused for it?
     int launchMode;         // the launch mode activity attribute.
@@ -1117,7 +1116,6 @@ public final class ActivityRecord extends WindowToken {
         pw.print(prefix); pw.print("mHaveState="); pw.print(mHaveState);
                 pw.print(" mIcicle="); pw.println(mIcicle);
         pw.print(prefix); pw.print("state="); pw.print(mState);
-                pw.print(" delayedResume="); pw.print(delayedResume);
                 pw.print(" finishing="); pw.println(finishing);
         pw.print(prefix); pw.print("keysPaused="); pw.print(keysPaused);
                 pw.print(" inHistory="); pw.print(inHistory);
@@ -1992,7 +1990,6 @@ public final class ActivityRecord extends WindowToken {
         setState(INITIALIZING, "ActivityRecord ctor");
         callServiceTrackeronActivityStatechange(INITIALIZING, true);
         launchFailed = false;
-        delayedResume = false;
         finishing = false;
         keysPaused = false;
         inHistory = false;
@@ -2568,6 +2565,7 @@ public final class ActivityRecord extends WindowToken {
                         + ActivityRecord.this + " state " + mTransferringSplashScreenState);
                 if (isTransferringSplashScreen()) {
                     mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
+                    cleanUpSplashScreen();
                     removeStartingWindow();
                 }
             }
@@ -2642,6 +2640,7 @@ public final class ActivityRecord extends WindowToken {
                 parcelable.clearIfNeeded();
             }
             mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
+            cleanUpSplashScreen();
             removeStartingWindow();
             return;
         }
@@ -2656,6 +2655,7 @@ public final class ActivityRecord extends WindowToken {
             mStartingWindow.cancelAnimation();
             parcelable.clearIfNeeded();
             mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
+            cleanUpSplashScreen();
         }
     }
 
@@ -2677,11 +2677,9 @@ public final class ActivityRecord extends WindowToken {
      * @see SplashScreenView#remove()
      */
     void cleanUpSplashScreen() {
-        // We only clean up the splash screen if we were supposed to handle it. If it was
-        // transferred to another activity, the next one will handle the clean up.
-        if (mHandleExitSplashScreen && !startingMoved
-                && (mTransferringSplashScreenState == TRANSFER_SPLASH_SCREEN_FINISH
-                || mTransferringSplashScreenState == TRANSFER_SPLASH_SCREEN_IDLE)) {
+        // Clean up the splash screen if client were supposed to handle it.
+        if (mHandleExitSplashScreen
+                && mTransferringSplashScreenState != TRANSFER_SPLASH_SCREEN_IDLE) {
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Cleaning splash screen token=%s", this);
             mAtmService.mTaskOrganizerController.onAppSplashScreenViewRemoved(getTask(),
                     mStartingSurface != null ? mStartingSurface.mTaskOrganizer : null);
@@ -2797,7 +2795,6 @@ public final class ActivityRecord extends WindowToken {
     }
 
     void removeStartingWindowAnimation(boolean prepareAnimation) {
-        mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_IDLE;
         if (mStartingData != null && task != null) {
             task.mSharedStartingData = null;
         }
@@ -2831,6 +2828,7 @@ public final class ActivityRecord extends WindowToken {
                     Debug.getCallers(5));
             surface = mStartingSurface;
             cleanUpStartingInfo();
+            mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_IDLE;
             if (surface == null) {
                 ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "startingWindow was set but "
                         + "startingSurface==null, couldn't remove");
@@ -6108,6 +6106,21 @@ public final class ActivityRecord extends WindowToken {
 
             switch (mState) {
                 case RESUMED:
+                    if (com.android.window.flags.Flags.pauseInvisibleActivity()) {
+                        // Do nothing if currently in the process of resuming the activity.
+                        if (task.mInResumeTopActivity
+                                && task.topRunningActivity(true /* focusableOnly */) == this) {
+                            break;
+                        }
+                        // Otherwise, starting to pause it since it is not visible.
+                        final TaskFragment taskFragment = getTaskFragment();
+                        if (taskFragment != null && taskFragment.startPausing(
+                                mTaskSupervisor.mUserLeaving, false /* uiSleeping */,
+                                null /* resuming */, "makeInvisible")) {
+                            break;
+                        }
+                    }
+                    // fall through
                 case INITIALIZING:
                 case PAUSING:
                 case PAUSED:
@@ -6115,7 +6128,6 @@ public final class ActivityRecord extends WindowToken {
                     addToStopping(true /* scheduleIdle */,
                             canEnterPictureInPicture /* idleDelayed */, "makeInvisible");
                     break;
-
                 default:
                     break;
             }
@@ -6500,6 +6512,13 @@ public final class ActivityRecord extends WindowToken {
             return;
         }
         if (newPersistentState != null) {
+            if (Flags.enableAppRestartAfterUpdate() && isRootOfTask()
+                    && info.persistableMode == PERSIST_ACROSS_REBOOTS) {
+                // Only supporting for the root activity initially as supporting multiple activities
+                // makes the work more complex and there is no use case for it.
+                mAtmService.mPackageUpdateManager.addPersistentTaskForPackage(packageName,
+                        task.mTaskId, newPersistentState);
+            }
             mPersistentState = newPersistentState;
             mAtmService.notifyTaskPersisterLocked(task, false);
         }
@@ -6525,12 +6544,6 @@ public final class ActivityRecord extends WindowToken {
 
         mAppStopped = true;
         firstWindowDrawn = false;
-        // This is to fix the edge case that auto-enter-pip is finished in Launcher but app calls
-        // setAutoEnterEnabled(false) and transitions to STOPPED state, see b/191930787.
-        // Clear any surface transactions and content overlay in this case.
-        if (task.mLastRecentsAnimationTransaction != null) {
-            task.clearLastRecentsAnimationTransaction(true /* forceRemoveOverlay */);
-        }
         if (isClientVisible()) {
             // Though this is usually unlikely to happen, still make sure the client is invisible.
             setClientVisible(false);
@@ -8976,9 +8989,7 @@ public final class ActivityRecord extends WindowToken {
         // Notify that the activity is already relaunching, therefore there's no need to refresh
         // the activity if it was requested. Activity refresher will track activity lifecycle
         // if needed.
-        if (Flags.enableCameraCompatSandboxDisplayRotationOnExternalDisplaysBugfix()) {
-            AppCompatCameraPolicy.onActivityRelaunching(this);
-        }
+        AppCompatCameraPolicy.onActivityRelaunching(this);
 
         if (!preserveWindow) {
             // If the activity is the IME input target, ensure storing the last IME shown state

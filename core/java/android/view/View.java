@@ -23,6 +23,7 @@ import static android.os.VibrationAttributes.USAGE_CLASS_MASK;
 import static android.os.Trace.TRACE_TAG_APP;
 import static android.os.Trace.TRACE_TAG_VIEW;
 import static android.service.autofill.Flags.FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION;
+import static android.service.autofill.Flags.getAutofillViewIdFromAutofillManager;
 import static android.view.ContentInfo.SOURCE_DRAG_AND_DROP;
 import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH;
 import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH_HINT;
@@ -8633,6 +8634,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param rectangle The rectangle in the View's content coordinate space
      * @return Whether any parent scrolled.
      * @see AccessibilityAction#ACTION_SHOW_ON_SCREEN
+     * @see #requestRectangleOnScreen(Rect, boolean, int)
+     * <p><b>WARNING:</b> Use of this API is discouraged because it does not support
+     * user-configurable options related to display magnification behaviors. Instead, use
+     * {@link #requestRectangleOnScreen(Rect, boolean, int)} to include a request source. A request
+     * source of {@link #RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED} will be inferred from
+     * invocations of this original API.
      */
     public boolean requestRectangleOnScreen(Rect rectangle) {
         return requestRectangleOnScreen(rectangle, false);
@@ -8654,6 +8661,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param rectangle The rectangle in the View's content coordinate space
      * @param immediate True to forbid animated scrolling, false otherwise
      * @return Whether any parent scrolled.
+     * @see #requestRectangleOnScreen(Rect, boolean, int)
+     * <p><b>WARNING:</b> Use of this API is discouraged because it does not support
+     * user-configurable options related to display magnification behaviors. Instead, use
+     * {@link #requestRectangleOnScreen(Rect, boolean, int)} to include a request source. A request
+     * source of {@link #RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED} will be inferred from
+     * invocations of this original API.
      */
     public boolean requestRectangleOnScreen(Rect rectangle, boolean immediate) {
         return requestRectangleOnScreen(rectangle, immediate,
@@ -12027,6 +12040,24 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (mAutofillViewId == NO_ID) {
             mAutofillViewId = mContext.getNextAutofillId();
         }
+
+        // There is a chance AutofillManager is created with activity context, in which case
+        // autofill could still work.
+        if (getAutofillViewIdFromAutofillManager()
+                && mAutofillViewId <= LAST_APP_AUTOFILL_ID) {
+            AutofillManager afm = getAutofillManager();
+            if (afm != null) {
+                int autofillViewId = afm.getNextAutofillViewId();
+                if (autofillViewId > LAST_APP_AUTOFILL_ID) {
+                    if (DBG) {
+                        Log.d(AUTOFILL_LOG_TAG, "getAutofillViewId(): Using autofill view id "
+                                + "created from autofill manager");
+                    }
+                    mAutofillViewId = autofillViewId;
+                }
+            }
+        }
+
         return mAutofillViewId;
     }
 
@@ -16411,7 +16442,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 if (mAttachInfo != null) {
                     final Rect r = mAttachInfo.mTmpInvalRect;
                     getDrawingRect(r);
-                    return requestRectangleOnScreen(r, true);
+                    return requestRectangleOnScreen(r,
+                            true,
+                            RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED);
                 }
             } break;
             case R.id.accessibilityActionContextClick: {
@@ -29673,8 +29706,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         Point shadowTouchPoint = new Point();
         shadowBuilder.onProvideShadowMetrics(shadowSize, shadowTouchPoint);
 
-        if ((shadowSize.x < 0) || (shadowSize.y < 0)
-                || (shadowTouchPoint.x < 0) || (shadowTouchPoint.y < 0)) {
+        if ((shadowSize.x < 0) || (shadowSize.y < 0)) {
             throw new IllegalStateException("Drag shadow dimensions must not be negative");
         }
         final float overrideInvScale = CompatibilityInfo.getOverrideInvertedScale();

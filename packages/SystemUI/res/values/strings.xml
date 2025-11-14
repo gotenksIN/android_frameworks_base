@@ -365,6 +365,10 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_failed_title">Couldn\'t save screenshot</string>
+    <!-- Title label indicating the folder where the screenshot will be saved. [CHAR LIMIT=30] -->
+    <string name="screenshot_save_to">Save to</string>
+    <!-- Menu item text to open a file picker to select a custom folder for saving screenshots. [CHAR LIMIT=30] -->
+    <string name="screenshot_select_folder">Select folder</string>
     <!-- Appended to the notification content when a screenshot failure happens on an external display. [CHAR LIMIT=50] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -737,10 +741,14 @@
     <string name="screen_share_app_window_sharing_title">Share app window</string>
     <!-- Text for tab sharing title [CHAR LIMIT=35] -->
     <string name="screen_share_tab_sharing_title">Share tab</string>
-    <!-- Text diclaimer that tells a user that they're currently sharing screen [CHAR LIMIT=100] -->
+    <!-- Title for the screen prompting the user to begin sharing their entire screen [CHAR LIMIT=NONE]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="screen_share_disclaimer">When sharing, the contents of your screen are visible</string>
+    <string name="screen_share_entire_screen_sharing_title">Share entire screen</string>
+    <!-- Text disclaimer that tells a user that they're currently sharing an app [CHAR LIMIT=100] -->
+    <string name="screen_share_disclaimer_app_sharing">When you’re sharing an app, anything shown or played in that app is visible to [APP NAME]. So be careful with things like passwords, payment details, messages, photos and audio &amp; video.</string>
+    <!-- Disclaimer text for full screen sharing. [CHAR LIMIT=NONE] -->
+    <string name="screen_share_disclaimer_full_screen_sharing">When you’re sharing your entire screen, anything on your screen is visible to [APP NAME]. So be careful with things like passwords, payment details, messages, photos, and audio &amp; video.</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "screenshot". [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -3264,7 +3272,10 @@
     <!-- Disclosure at the bottom of Quick Settings that indicates that parental controls are enabled. [CHAR LIMIT=100] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="quick_settings_disclosure_parental_controls">This device is managed by your parent</string>
+    <string name="quick_settings_disclosure_parental_controls">Some settings are managed by your parent</string>
+
+    <!-- Disclosure at the bottom of Quick Settings that indicates that parental controls are enabled. [CHAR LIMIT=100] -->
+    <string name="quick_settings_disclosure_parental_controls_legacy">This device is managed by your parent</string>
 
     <!-- Disclosure at the bottom of Quick Settings that indicates that some of the settings changes are protected by a PIN. [CHAR LIMIT=100] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4302,6 +4313,10 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_delegate_header">Proxied notification</string>
+
+
+    <!-- Notification: Control panel: text that appears when the posting app has provided the summarization text for the notification -->
+    <string name="notification_summarization_header">Summarized by <xliff:g id="app_name" example="YouTube">%1$s</xliff:g></string>
 
     <!-- [CHAR LIMIT=40 Notification: Label for the inline channel blocking view -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -7149,4 +7164,10 @@
 
     <!-- Description for the Ambient Cue accessibility action label for expanding. [CHAR LIMIT=NONE] -->
     <string name="ambient_cue_expand_action">expand</string>
+
+    <!-- Location button text -->
+    <string name="location_button_text_share_precise_location">Share precise location</string>
+    <string name="location_button_text_use_precise_location">Use precise location</string>
+    <string name="location_button_text_near_precise_location">Near precise location</string>
+    <string name="location_button_text_precise_location">Precise location</string>
 </resources>

@@ -1,7 +1,6 @@
 package com.android.systemui.scene
 
 import android.content.res.mainResources
-import android.view.View
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.systemui.classifier.domain.interactor.falsingInteractor
 import com.android.systemui.communal.domain.interactor.communalSettingsInteractor
@@ -27,8 +26,10 @@ import com.android.systemui.scene.shared.model.SceneContainerConfig
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.FakeOverlay
 import com.android.systemui.scene.ui.composable.ConstantSceneContainerTransitionsBuilder
+import com.android.systemui.scene.ui.composable.SceneContainerTransitions
 import com.android.systemui.scene.ui.composable.SceneNavigationDistances
 import com.android.systemui.scene.ui.viewmodel.SceneContainerHapticsViewModel
+import com.android.systemui.scene.ui.viewmodel.SceneContainerToastDisplayer
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.scene.ui.viewmodel.SceneTransitionBlurViewModel
 import com.android.systemui.scene.ui.viewmodel.dualShadeEducationalTooltipsViewModelFactory
@@ -69,6 +70,7 @@ val Kosmos.fakeOverlays by Fixture { fakeOverlaysByKeys.values.toSet() }
 val Kosmos.overlays by Fixture { fakeOverlays }
 
 val Kosmos.sceneTransitionsBuilder by Fixture { ConstantSceneContainerTransitionsBuilder() }
+val Kosmos.sceneContainerTransitions by Fixture { SceneContainerTransitions() }
 
 var Kosmos.sceneContainerConfig by Fixture {
     SceneContainerConfig(
@@ -87,9 +89,7 @@ val Kosmos.transitionState by Fixture {
 }
 
 val Kosmos.sceneContainerViewModel by Fixture {
-    sceneContainerViewModelFactory
-        .create(mock<View>()) {}
-        .apply { setTransitionState(transitionState) }
+    sceneContainerViewModelFactory.create {}.apply { setTransitionState(transitionState) }
 }
 
 val Kosmos.fakeBlurChoreographer by Fixture { FakeBlurChoreographer() }
@@ -118,8 +118,7 @@ val Kosmos.sceneTransitionBlurViewModelFactory by Fixture {
 val Kosmos.sceneContainerViewModelFactory by Fixture {
     object : SceneContainerViewModel.Factory {
         override fun create(
-            view: View,
-            motionEventHandlerReceiver: (SceneContainerViewModel.MotionEventHandler?) -> Unit,
+            motionEventHandlerReceiver: (SceneContainerViewModel.MotionEventHandler?) -> Unit
         ): SceneContainerViewModel =
             SceneContainerViewModel(
                 resources = mainResources,
@@ -132,7 +131,6 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
                 remoteInputInteractor = remoteInputInteractor,
                 logger = sceneLogger,
                 hapticsViewModelFactory = sceneContainerHapticsViewModelFactory,
-                view = view,
                 motionEventHandlerReceiver = motionEventHandlerReceiver,
                 lightRevealScrim = lightRevealScrimViewModel,
                 wallpaperViewModel = wallpaperViewModel,
@@ -145,15 +143,15 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
                     dualShadeEducationalTooltipsViewModelFactory,
                 animateQsTilesViewModelFactory = animateQsTilesViewModelFactory,
                 sceneTransitionBlurViewModelFactory = sceneTransitionBlurViewModelFactory,
+                toastDisplayer = { sceneContainerToastDisplayer },
             )
     }
 }
 
 val Kosmos.sceneContainerHapticsViewModelFactory by Fixture {
     object : SceneContainerHapticsViewModel.Factory {
-        override fun create(view: View): SceneContainerHapticsViewModel {
+        override fun create(): SceneContainerHapticsViewModel {
             return SceneContainerHapticsViewModel(
-                view = view,
                 sceneInteractor = sceneInteractor,
                 shadeInteractor = shadeInteractor,
                 msdlPlayer = msdlPlayer,
@@ -161,3 +159,5 @@ val Kosmos.sceneContainerHapticsViewModelFactory by Fixture {
         }
     }
 }
+
+private val Kosmos.sceneContainerToastDisplayer by Fixture { mock<SceneContainerToastDisplayer>() }

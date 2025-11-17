@@ -876,10 +876,8 @@ public class WindowManagerService extends IWindowManager.Stub
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(mDisableSecureWindowsUri, false, this,
                     UserHandle.USER_ALL);
-            if (com.android.server.accessibility.Flags.enableMagnificationMagnifyNavBarAndIme()) {
-                resolver.registerContentObserver(mMagnifyImeEnabledUri, false, this,
-                        UserHandle.USER_ALL);
-            }
+            resolver.registerContentObserver(mMagnifyImeEnabledUri, false, this,
+                    UserHandle.USER_ALL);
             resolver.registerContentObserver(mPolicyControlUri, false, this, UserHandle.USER_ALL);
             if (DesktopModeHelper.isDesktopExperienceDevOptionSupported(mContext)) {
                 disableForceDesktopModeOnExternalDisplays();
@@ -1080,11 +1078,6 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         void updateMagnifyIme() {
-            if (!com.android.server.accessibility.Flags.enableMagnificationMagnifyNavBarAndIme()) {
-                mMagnifyIme = false;
-                return;
-            }
-
             boolean enabledMagnifyIme = Settings.Secure.getIntForUser(
                     mContext.getContentResolver(),
                     Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MAGNIFY_NAV_AND_IME,
@@ -4534,10 +4527,15 @@ public class WindowManagerService extends IWindowManager.Stub
             if (displayContent == null) {
                 if (DEBUG_SCREENSHOT) {
                     Slog.i(TAG_WM, "Screenshot returning null. No Display for displayId="
-                            + DEFAULT_DISPLAY);
+                            + displayId);
                 }
                 captureArgs = null;
             } else {
+                if (DEBUG_SCREENSHOT) {
+                    Slog.i(TAG_WM, "Taking assist screenshot for displayId=" + displayId
+                            + " display state="
+                            + Display.stateToString(displayContent.getDisplayInfo().state));
+                }
                 captureArgs = displayContent.getLayerCaptureArgs(predicate,
                         /*useWindowingLayerAsScreenshotRoot*/ enableLppAssistInvocationEffect());
             }
@@ -4556,7 +4554,7 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         if (screenshotBuffer == null) {
-            Slog.w(TAG_WM, "Failed to take screenshot");
+            Slog.w(TAG_WM, "Failed to take screenshot for displayId=" + displayId);
         }
 
         return screenshotBuffer;
@@ -8671,6 +8669,15 @@ public class WindowManagerService extends IWindowManager.Stub
         public Context getDisplayUiContext(int displayId) {
             synchronized (mGlobalLock) {
                 return mRoot.getDisplayUiContext(displayId);
+            }
+        }
+
+        @Override
+        @Nullable
+        public DisplayPolicy getDisplayPolicy(int displayId) {
+            synchronized (mGlobalLock) {
+                final DisplayContent dc = mRoot.getDisplayContent(displayId);
+                return dc == null ? null : dc.getDisplayPolicy();
             }
         }
 

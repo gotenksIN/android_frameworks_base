@@ -50,6 +50,7 @@ import static android.view.WindowManager.transitTypeToString;
 import static android.window.DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS;
+import static android.window.DesktopExperienceFlags.ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX;
 import static android.window.TaskFragmentAnimationParams.DEFAULT_ANIMATION_BACKGROUND_COLOR;
 import static android.window.TransitionInfo.AnimationOptions;
 import static android.window.TransitionInfo.FLAGS_IS_OCCLUDED_NO_ANIMATION;
@@ -133,6 +134,7 @@ import com.android.internal.protolog.WmProtoLogGroups;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.statusbar.StatusBarManagerInternal;
+import com.android.window.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -2100,7 +2102,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         buildFinishTransaction(mFinishTransaction, info, participantDisplays);
         mCleanupTransaction = mWmService.mTransactionFactory.get();
         buildCleanupTransaction(mCleanupTransaction, info);
-        if (mController.getTransitionPlayer() != null && mIsPlayerEnabled) {
+        if (!mController.isFlushing() && mIsPlayerEnabled) {
             mController.dispatchLegacyAppTransitionStarting(participantDisplays,
                     mStatusBarTransitionDelay);
             try {
@@ -2128,12 +2130,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             }
         } else {
             // No player registered or it's not enabled, so just finish/apply immediately
-            if (!mIsPlayerEnabled) {
-                mLogger.mSendTimeNs = SystemClock.elapsedRealtimeNanos();
-                ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS,
-                        "Apply and finish immediately because player is disabled "
-                                + "for transition #%d .", mSyncId);
-            }
+            mLogger.mSendTimeNs = SystemClock.elapsedRealtimeNanos();
+            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS,
+                    "Apply and finish immediately because player is disabled "
+                            + "for transition #%d .", mSyncId);
             postCleanupOnFailure();
         }
         mOverrideOptions = null;
@@ -2448,12 +2448,17 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             mController.mLatestOnTopTasksReported.put(displayId, onTopTasksEnd);
             onTopTasksEnd = reportedOnTop != null ? reportedOnTop : new ArrayList<>();
             onTopTasksEnd.clear();
-
-            if (ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()
+            if (!ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX.isTrue()
+                    && ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()
                     && mOnTopDisplayStart != onTopDisplayEnd
                     && displayId == onTopDisplayEnd.mDisplayId) {
                 addToTopChange(onTopDisplayEnd);
             }
+        }
+        if (ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX.isTrue()
+                && ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()
+                && mOnTopDisplayStart != onTopDisplayEnd) {
+            addToTopChange(onTopDisplayEnd);
         }
     }
 
@@ -4079,6 +4084,13 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         if (mState < STATE_STARTED && this == mController.getCollectingTransition()) {
             applyDisplayChangeIfNeeded(new ArraySet<>());
         }
+    }
+
+    /**
+     * @return true if the provided container is allowed to be a part of a transition if invisible
+     */
+    public static boolean allowsInvisibleExistenceChange(@NonNull WindowContainer wc) {
+        return Flags.transitInvisibleExistenceChange() || wc.inPinnedWindowingMode();
     }
 
     @NonNull

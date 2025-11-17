@@ -60,6 +60,7 @@ import com.android.wm.shell.desktopmode.DesktopModeEventLogger
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.desktopmode.DesktopConfig
@@ -75,6 +76,7 @@ import com.android.wm.shell.windowdecor.DragResizeWindowGeometry.getResizeEdgeHa
 import com.android.wm.shell.windowdecor.DragResizeWindowGeometry.getResizeHandleEdgeInset
 import com.android.wm.shell.windowdecor.caption.AppHandleController
 import com.android.wm.shell.windowdecor.caption.AppHeaderController
+import com.android.wm.shell.windowdecor.caption.AppPinnedController
 import com.android.wm.shell.windowdecor.caption.CaptionController
 import com.android.wm.shell.windowdecor.common.DecorThemeUtil
 import com.android.wm.shell.windowdecor.common.ExclusionRegionListener
@@ -85,6 +87,7 @@ import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHostSuppl
 import com.android.wm.shell.windowdecor.extension.getDimensionPixelSize
 import com.android.wm.shell.windowdecor.extension.isDragResizable
 import com.android.wm.shell.windowdecor.extension.isTransparentCaptionBarAppearance
+import com.android.wm.shell.windowdecor.viewholder.AppHeaderViewHolder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainCoroutineDispatcher
 
@@ -136,6 +139,9 @@ constructor(
     },
     surfaceControlSupplier: () -> SurfaceControl = { SurfaceControl() },
     private val lockTaskChangeListener: LockTaskChangeListener,
+    private val appHeaderViewHolderFactory: AppHeaderViewHolder.Factory =
+        AppHeaderViewHolder.DefaultFactory(),
+    val pinnedLayerController: PinnedLayerController?,
 ) :
     WindowDecoration2<WindowDecorLinearLayout>(
         taskInfo,
@@ -407,8 +413,11 @@ constructor(
         desktopConfig: DesktopConfig,
         inSyncWithTransition: Boolean,
     ): RelayoutParams {
+        val isPinnedLayer = pinnedLayerController?.isPinned(taskInfo.taskId) ?: false
         val captionType =
-            if (taskInfo.isFreeform) {
+            if (isPinnedLayer) {
+                CaptionController.CaptionType.APP_PINNED
+            } else if (taskInfo.isFreeform) {
                 CaptionController.CaptionType.APP_HEADER
             } else {
                 CaptionController.CaptionType.APP_HANDLE
@@ -425,11 +434,11 @@ constructor(
             !splitScreenController.isLeftRightSplit &&
                 (splitScreenController.getSplitPosition(taskInfo.taskId) ==
                     SPLIT_POSITION_BOTTOM_OR_RIGHT)
-        val isInsetSource = (isAppHeader && !inFullImmersive) || isBottomSplit
+        val isInsetSource = (isAppHeader && !inFullImmersive) || isPinnedLayer || isBottomSplit
         var inputFeatures = 0
         var insetSourceFlags = 0
         var shouldSetAppBounds = false
-        if (isAppHeader) {
+        if (isAppHeader || isPinnedLayer) {
             if (taskInfo.isTransparentCaptionBarAppearance) {
                 // The app is requesting to customize the caption bar, which means input on
                 // customizable/exclusion regions must go to the app instead of to the system.
@@ -534,7 +543,7 @@ constructor(
     ): IntArray? =
         if (
             !DesktopExperienceFlags.ENABLE_FREEFORM_BOX_SHADOWS.isTrue ||
-                captionType != CaptionController.CaptionType.APP_HEADER ||
+                !shouldDecorateBorders(captionType) ||
                 !desktopConfig.useWindowShadow(isFocusedWindow = hasGlobalFocus)
         ) {
             null
@@ -551,7 +560,7 @@ constructor(
     ): Int =
         if (
             !DesktopExperienceFlags.ENABLE_FREEFORM_BOX_SHADOWS.isTrue ||
-                captionType != CaptionController.CaptionType.APP_HEADER ||
+                !shouldDecorateBorders(captionType) ||
                 !desktopConfig.useWindowShadow(isFocusedWindow = hasGlobalFocus)
         ) {
             ID_NULL
@@ -574,7 +583,7 @@ constructor(
             ID_NULL
         } else if (
             !DesktopExperienceFlags.ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX.isTrue ||
-                captionType != CaptionController.CaptionType.APP_HEADER ||
+                !shouldDecorateBorders(captionType) ||
                 !desktopConfig.useWindowShadow(isFocusedWindow = hasGlobalFocus)
         ) {
             ID_NULL
@@ -593,7 +602,7 @@ constructor(
             INVALID_SHADOW_RADIUS
         } else if (
             DesktopExperienceFlags.ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX.isTrue ||
-                captionType != CaptionController.CaptionType.APP_HEADER ||
+                !shouldDecorateBorders(captionType) ||
                 !desktopConfig.useWindowShadow(isFocusedWindow = hasGlobalFocus)
         ) {
             INVALID_SHADOW_RADIUS
@@ -611,7 +620,7 @@ constructor(
         shouldIgnoreCornerRadius: Boolean,
     ): Int =
         if (
-            captionType != CaptionController.CaptionType.APP_HEADER ||
+            !shouldDecorateBorders(captionType) ||
                 DesktopExperienceFlags.ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX.isTrue ||
                 !desktopConfig.useRoundedCorners ||
                 shouldIgnoreCornerRadius
@@ -628,7 +637,7 @@ constructor(
         shouldIgnoreCornerRadius: Boolean,
     ): Int =
         if (
-            captionType != CaptionController.CaptionType.APP_HEADER ||
+            !shouldDecorateBorders(captionType) ||
                 !DesktopExperienceFlags.ENABLE_DYNAMIC_RADIUS_COMPUTATION_BUGFIX.isTrue ||
                 !desktopConfig.useRoundedCorners ||
                 shouldIgnoreCornerRadius
@@ -636,6 +645,13 @@ constructor(
             ID_NULL
         } else {
             com.android.wm.shell.shared.R.dimen.desktop_windowing_freeform_rounded_corner_radius
+        }
+
+    private fun shouldDecorateBorders(captionType: CaptionController.CaptionType) =
+        when (captionType) {
+            CaptionController.CaptionType.APP_HEADER,
+            CaptionController.CaptionType.APP_PINNED -> true
+            else -> false
         }
 
     private fun shouldShowCaption(taskInfo: RunningTaskInfo, isTaskLocked: Boolean): Boolean {
@@ -914,38 +930,40 @@ constructor(
         when (captionType) {
             CaptionController.CaptionType.APP_HEADER -> {
                 AppHeaderController(
-                    taskInfo,
-                    windowDecorViewHostSupplier,
-                    context,
-                    userContext,
-                    displayController,
-                    taskResourceLoader,
-                    splitScreenController,
-                    desktopUserRepositories,
-                    transitions,
-                    taskSurface,
-                    checkNotNull(decorationContainerSurface) {
-                        "Expected non-null decoration container surface"
-                    },
-                    handler,
-                    mainExecutor,
-                    mainDispatcher,
-                    mainScope,
-                    bgExecutor,
-                    syncQueue,
-                    rootTaskDisplayAreaOrganizer,
-                    windowManagerWrapper,
-                    multiInstanceHelper,
-                    windowDecorCaptionRepository,
-                    desktopModeUiEventLogger,
-                    desktopState,
-                    windowDecorationActions,
-                    decorWindowContext,
-                    onTouchListener,
-                    onClickListener,
-                    onLongClickListener,
-                    onGenericMotionListener,
-                    appToWebRepository,
+                    taskInfo = taskInfo,
+                    windowDecorViewHostSupplier = windowDecorViewHostSupplier,
+                    context = context,
+                    userContext = userContext,
+                    displayController = displayController,
+                    taskResourceLoader = taskResourceLoader,
+                    splitScreenController = splitScreenController,
+                    desktopUserRepositories = desktopUserRepositories,
+                    transitions = transitions,
+                    taskSurface = taskSurface,
+                    decorationSurface =
+                        checkNotNull(decorationContainerSurface) {
+                            "Expected non-null decoration container surface"
+                        },
+                    mainHandler = handler,
+                    mainExecutor = mainExecutor,
+                    mainDispatcher = mainDispatcher,
+                    mainScope = mainScope,
+                    bgExecutor = bgExecutor,
+                    syncQueue = syncQueue,
+                    rootTaskDisplayAreaOrganizer = rootTaskDisplayAreaOrganizer,
+                    windowManagerWrapper = windowManagerWrapper,
+                    multiInstanceHelper = multiInstanceHelper,
+                    windowDecorCaptionRepository = windowDecorCaptionRepository,
+                    desktopModeUiEventLogger = desktopModeUiEventLogger,
+                    desktopState = desktopState,
+                    windowDecorationActions = windowDecorationActions,
+                    decorWindowContext = decorWindowContext,
+                    onCaptionTouchListener = onTouchListener,
+                    onCaptionButtonClickListener = onClickListener,
+                    onLongClickListener = onLongClickListener,
+                    onCaptionGenericMotionListener = onGenericMotionListener,
+                    appToWebRepository = appToWebRepository,
+                    appHeaderViewHolderFactory = appHeaderViewHolderFactory,
                 )
             }
 
@@ -978,6 +996,19 @@ constructor(
                     onTouchListener,
                     onClickListener,
                     appToWebRepository,
+                )
+            }
+
+            CaptionController.CaptionType.APP_PINNED -> {
+                AppPinnedController(
+                    taskInfo,
+                    windowDecorViewHostSupplier,
+                    context,
+                    decorWindowContext,
+                    displayController,
+                    onTouchListener = onTouchListener,
+                    onGenericMotionEventListener = onGenericMotionListener,
+                    windowDecorationActions,
                 )
             }
 

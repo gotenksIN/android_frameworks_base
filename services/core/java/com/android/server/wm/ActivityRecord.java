@@ -212,6 +212,7 @@ import static com.android.server.wm.ActivityTaskManagerService.RELAUNCH_REASON_N
 import static com.android.server.wm.ActivityTaskManagerService.RELAUNCH_REASON_WINDOWING_MODE_RESIZE;
 import static com.android.server.wm.ActivityTaskManagerService.getInputDispatchingTimeoutMillisLocked;
 import static com.android.server.wm.ActivityTaskManagerService.isPip2ExperimentEnabled;
+import static com.android.server.wm.AppCompatSandboxingPolicy.ConfigOverrideHint;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_COPY_TO_CLIENT;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_IDLE;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_REMOVE_DIRECTLY;
@@ -619,7 +620,7 @@ public final class ActivityRecord extends WindowToken {
     private SizeConfigurationBuckets mSizeConfigurations;
 
     @VisibleForTesting
-    final TaskFragment.ConfigOverrideHint mResolveConfigHint;
+    final ConfigOverrideHint mResolveConfigHint;
 
     final boolean mOptOutEdgeToEdge;
 
@@ -1903,7 +1904,7 @@ public final class ActivityRecord extends WindowToken {
         // Don't move below setOrientation(info.screenOrientation) since it triggers
         // getOverrideOrientation that requires having mAppCompatController initialised.
         mAppCompatController = new AppCompatController(mWmService, this);
-        mResolveConfigHint = new TaskFragment.ConfigOverrideHint();
+        mResolveConfigHint = new ConfigOverrideHint();
         // When the stable configuration is the default behavior, override for the legacy apps
         // without forward override flag.
         mResolveConfigHint.mUseOverrideInsetsForConfig =
@@ -4670,7 +4671,7 @@ public final class ActivityRecord extends WindowToken {
                     // the token we transfer the animation over. Thus, set this flag to indicate
                     // we've transferred the animation.
                     mTransitionChangeFlags |= FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
-                } else if (mTransitionController.getTransitionPlayer() != null) {
+                } else if (!mTransitionController.isFlushing()) {
                     // In the new transit system, just set this every time we transfer the window
                     mTransitionChangeFlags |= FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
                 }
@@ -6613,6 +6614,17 @@ public final class ActivityRecord extends WindowToken {
             EventLogTags.writeWmAddToStopping(mUserId, System.identityHashCode(this),
                     shortComponentName, reason);
             mTaskSupervisor.mStoppingActivities.add(this);
+        }
+
+        if (com.android.window.flags.Flags.reduceUnnecessaryScheduleIdleMsg()) {
+            // Schedule idle to process the stopping activities if there won't be further events to
+            // handle them.
+            if (scheduleIdle && (isSleeping() || (!mTransitionController.inTransition()
+                    && !mTransitionController.inFinishingTransition(this)))) {
+                ProtoLog.v(WM_DEBUG_STATES, "Scheduling idle now");
+                mTaskSupervisor.scheduleIdle();
+            }
+            return;
         }
 
         final Task rootTask = getRootTask();

@@ -88,6 +88,7 @@ import com.android.wm.shell.common.DisplayInsetsController;
 import com.android.wm.shell.common.ExternalInterfaceBinder;
 import com.android.wm.shell.common.RemoteCallable;
 import com.android.wm.shell.common.ShellExecutor;
+import com.android.wm.shell.dagger.UsedDownstream;
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes;
 import com.android.wm.shell.desktopmode.DesktopWallpaperActivity;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
@@ -491,6 +492,7 @@ public class Transitions implements RemoteCallable<Transitions>,
      * @param info the TransitionInfo to check with the RemoteTransitionHandler.
      * @return true if the info matches with a registered TransitionFilter, otherwise false.
      */
+    @UsedDownstream(product="wear")
     public boolean matchesRemoteFilter(TransitionInfo info) {
         for (Pair<TransitionFilter, RemoteTransition> filterPair
                 : mRemoteTransitionHandler.mFilters) {
@@ -1255,6 +1257,10 @@ public class Transitions implements RemoteCallable<Transitions>,
             @Nullable TransitionRequestInfo request) {
         ProtoLog.v(WM_SHELL_TRANSITIONS, "Transition requested (#%d): %s %s",
                 request.getDebugId(), transitionToken, request);
+        if (transitionToken == null) {
+            throw new IllegalArgumentException("Null transitionToken specified for request="
+                    + request);
+        }
         if (mKnownTransitions.containsKey(transitionToken)) {
             throw new RuntimeException("Transition already started " + transitionToken);
         }
@@ -1323,6 +1329,12 @@ public class Transitions implements RemoteCallable<Transitions>,
      */
     public IBinder startTransition(@WindowManager.TransitionType int type,
             @NonNull WindowContainerTransaction wct, @Nullable TransitionHandler handler) {
+        mMainExecutor.assertCurrentThread();
+        if (type < 0) {
+            throw new IllegalArgumentException("Invalid transition type provided (" + type
+                    + "), type must be > 0");
+        }
+
         ProtoLog.v(WM_SHELL_TRANSITIONS, "Directly starting a new transition "
                 + "type=%s wct=%s handler=%s", transitTypeToString(type), wct, handler);
         if (DEBUG_START_TRANSITION) {
@@ -1781,11 +1793,11 @@ public class Transitions implements RemoteCallable<Transitions>,
         }
 
         @Override
-        public void setHomeTransitionListener(IHomeTransitionListener listener) {
+        public void setHomeTransitionListener(IHomeTransitionListener listener, int userId) {
             executeRemoteCallWithTaskPermission(mTransitions, "setHomeTransitionListener",
                     (transitions) -> {
                         transitions.mHomeTransitionObserver.setHomeTransitionListener(transitions,
-                                listener);
+                                listener, userId);
                     });
         }
 

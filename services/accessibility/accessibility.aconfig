@@ -67,13 +67,6 @@ flag {
 }
 
 flag {
-    name: "enable_magnification_magnify_nav_bar_and_ime"
-    namespace: "accessibility"
-    description: "Whether to enable magnify navigation bar and ime on full screen"
-    bug: "342509709"
-}
-
-flag {
     name: "enable_magnification_multiple_finger_multiple_tap_gesture"
     namespace: "accessibility"
     description: "Whether to enable multi-finger-multi-tap gesture for magnification"
@@ -112,6 +105,16 @@ flag {
 }
 
 flag {
+    name: "magnification_connection_approves_system_user"
+    namespace: "accessibility"
+    description: "Adds special case to automatically approve the system user when requesting connection"
+    bug: "402109095"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "manager_lifecycle_user_change"
     namespace: "accessibility"
     description: "Use A11yManagerService's Lifecycle to change users, instead of listening for user changed events."
@@ -132,6 +135,16 @@ flag {
 }
 
 flag {
+    name: "remove_all_shortcuts_when_force_stop_always_on_service"
+    namespace: "accessibility"
+    description: "Remove all a11y shortcuts when always-on a11y services are force stop."
+    bug: "364691067"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "send_a11y_events_based_on_state"
     namespace: "accessibility"
     description: "Sends accessibility events in TouchExplorer#onAccessibilityEvent based on internal state to keep it consistent. This reduces test flakiness."
@@ -143,16 +156,6 @@ flag {
     namespace: "accessibility"
     description: "Throttles motion events for requesting the System UI to update magnification UIs."
     bug: "435498747"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "touch_explorer_a11y_events_include_display_id"
-    namespace: "accessibility"
-    description: "When sending an A11y event, TouchExplorer will include its displayId"
-    bug: "431092453"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

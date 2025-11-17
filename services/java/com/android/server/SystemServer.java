@@ -121,7 +121,6 @@ import com.android.internal.util.ConcurrentUtils;
 import com.android.internal.util.EmergencyAffordanceManager;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.widget.ILockSettings;
-import com.android.modules.utils.build.SdkLevel;
 import com.android.server.accessibility.AccessibilityManagerService;
 import com.android.server.accounts.AccountManagerService;
 import com.android.server.adb.AdbService;
@@ -276,6 +275,7 @@ import com.android.server.smartspace.SmartspaceManagerService;
 import com.android.server.soundtrigger.SoundTriggerService;
 import com.android.server.soundtrigger_middleware.SoundTriggerMiddlewareService;
 import com.android.server.speech.SpeechRecognitionManagerService;
+import com.android.server.stats.binder.BinderStatsConsumerService;
 import com.android.server.stats.bootstrap.StatsBootstrapAtomService;
 import com.android.server.stats.pull.StatsPullAtomService;
 import com.android.server.statusbar.StatusBarManagerService;
@@ -306,7 +306,6 @@ import com.android.server.usage.StorageStatsService;
 import com.android.server.usage.UsageStatsService;
 import com.android.server.usb.UsbService;
 import com.android.server.utils.TimingsTraceAndSlog;
-import com.android.server.vcn.VcnLocation;
 import com.android.server.vibrator.VibratorManagerService;
 import com.android.server.voiceinteraction.VoiceInteractionManagerService;
 import com.android.server.wallpaper.WallpaperManagerService;
@@ -475,7 +474,7 @@ public final class SystemServer implements Dumpable {
     private static final String ANOMALY_DETECTOR_SERVICE_CLASS =
             "com.android.os.profiling.anomaly.AnomalyDetectorService";
     private static final String SIGNAL_COLLECTOR_SERVICE_CLASS =
-            "com.android.server.signalcollector";
+            "com.android.server.signalcollector.SignalCollectorService";
     private static final String UPROBESTATS_SERVICE_JAR_PATH =
             "/apex/com.android.uprobestats/javalib/service-uprobestats.jar";
     private static final String UPROBESTATS_SERVICE_CLASS =
@@ -1501,6 +1500,7 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startService(CachedDeviceStateService.class);
         t.traceEnd();
 
+        // TODO(b/407694522): Disable service after native binder stats are rolled out.
         // Tracks cpu time spent in binder calls
         t.traceBegin("StartBinderCallsStatsService");
         mSystemServiceManager.startService(BinderCallsStatsService.LifeCycle.class);
@@ -2059,12 +2059,13 @@ public final class SystemServer implements Dumpable {
             dpms = mSystemServiceManager.startService(DevicePolicyManagerService.Lifecycle.class);
             t.traceEnd();
 
-            // If this flag is disabled, this service is started later.
-            if (android.server.Flags.voiceinteractionmanagerserviceGetResourcesInInitThread()) {
-                t.traceBegin("StartVoiceRecognitionManager");
-                mSystemServiceManager.startService(VoiceInteractionManagerService.class);
-                t.traceEnd();
-            }
+            // We need to always start this service, regardless of whether the
+            // FEATURE_VOICE_RECOGNIZERS feature is set, because it needs to take care
+            // of initializing various settings.  It will internally modify its behavior
+            // based on that feature.
+            t.traceBegin("StartVoiceRecognitionManager");
+            mSystemServiceManager.startService(VoiceInteractionManagerService.class);
+            t.traceEnd();
 
             t.traceBegin("StartStatusBarManagerService");
             try {
@@ -2314,28 +2315,6 @@ public final class SystemServer implements Dumpable {
                 Slog.i(TAG, "Not starting VpnManagerService");
             }
 
-            // TODO: b/374174952 In the end state, VCN registration will be moved to Tethering
-            // module. Thus the following code block should be removed after Baklava is released
-            if (!VcnLocation.IS_VCN_IN_MAINLINE || !SdkLevel.isAtLeastB()) {
-                t.traceBegin("StartVcnManagementService");
-
-                try {
-                    if (!VcnLocation.IS_VCN_IN_MAINLINE) {
-                        mSystemServiceManager.startService(
-                                CONNECTIVITY_SERVICE_INITIALIZER_B_CLASS);
-                    } else {
-                        // When VCN is in mainline but the SDK level is B-, start the service with
-                        // the apex path. This path can only be hit on an unfinalized B platform
-                        mSystemServiceManager.startServiceFromJar(
-                                CONNECTIVITY_SERVICE_INITIALIZER_B_CLASS,
-                                CONNECTIVITY_SERVICE_APEX_PATH);
-                    }
-                } catch (Throwable e) {
-                    reportWtf("starting VCN Management Service", e);
-                }
-                t.traceEnd();
-            }
-
             if (enableWigig) {
                 try {
                     Slog.i(TAG, "Wigig Service");
@@ -2363,7 +2342,6 @@ public final class SystemServer implements Dumpable {
                     reportWtf("starting WigigService", e);
                 }
             }
-
             t.traceBegin("StartSystemUpdateManagerService");
             try {
                 ServiceManager.addService(Context.SYSTEM_UPDATE_SERVICE,
@@ -2619,18 +2597,6 @@ public final class SystemServer implements Dumpable {
                     || context.getResources().getBoolean(R.bool.config_enableAppWidgetService)) {
                 t.traceBegin("StartAppWidgetService");
                 mSystemServiceManager.startService(AppWidgetService.class);
-                t.traceEnd();
-            }
-
-            // We need to always start this service, regardless of whether the
-            // FEATURE_VOICE_RECOGNIZERS feature is set, because it needs to take care
-            // of initializing various settings.  It will internally modify its behavior
-            // based on that feature.
-            //
-            // If this flag is enabled, this service will have begun initializing earlier.
-            if (!android.server.Flags.voiceinteractionmanagerserviceGetResourcesInInitThread()) {
-                t.traceBegin("StartVoiceRecognitionManager");
-                mSystemServiceManager.startService(VoiceInteractionManagerService.class);
                 t.traceEnd();
             }
 
@@ -3054,6 +3020,13 @@ public final class SystemServer implements Dumpable {
         t.traceBegin("StatsBootstrapAtomService");
         mSystemServiceManager.startService(StatsBootstrapAtomService.Lifecycle.class);
         t.traceEnd();
+
+        // Log atoms to statsd from binder services.
+        if (BinderObserverConfig.ENABLED) {
+            t.traceBegin("BinderStatsConsumerService");
+            mSystemServiceManager.startService(BinderStatsConsumerService.Lifecycle.class);
+            t.traceEnd();
+        }
 
         // Incidentd and dumpstated helper
         t.traceBegin("StartIncidentCompanionService");

@@ -70,6 +70,7 @@ import com.android.server.am.OomAdjusterImpl.ProcessRecordNode;
 import com.android.server.am.ProcessCachedOptimizerRecord.ShouldNotFreezeReason;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
 import com.android.server.am.psc.ProcessRecordInternal;
+import com.android.server.am.psc.ProcessServiceRecordInternal;
 import com.android.server.wm.WindowProcessController;
 import com.android.server.wm.WindowProcessListener;
 
@@ -83,7 +84,8 @@ import java.util.function.Consumer;
  * Full information about a particular process that
  * is currently running.
  */
-class ProcessRecord extends ProcessRecordInternal implements WindowProcessListener {
+class ProcessRecord extends ProcessRecordInternal implements WindowProcessListener,
+        ProcessServiceRecordInternal.Observer {
     static final String TAG = TAG_WITH_CLASS_NAME ? "ProcessRecord" : TAG_AM;
 
     final ActivityManagerService mService; // where we came from
@@ -573,7 +575,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         mErrorState = new ProcessErrorStateRecord(this);
         mWindowProcessController = new WindowProcessController(
                 mService.mActivityTaskManager, info, processName, uid, userId, this, this);
-
 
         mOptRecord = new ProcessCachedOptimizerRecord(this);
         final long now = SystemClock.uptimeMillis();
@@ -1841,5 +1842,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
             ProcessRecord provider = cpc.provider.proc;
             consumer.accept(provider);
         }
+    }
+
+    @Override
+    public void onHasClientActivitiesChanged(boolean hasClientActivities) {
+        mWindowProcessController.setHasClientActivities(hasClientActivities);
     }
 }

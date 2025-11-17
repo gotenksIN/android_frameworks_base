@@ -162,7 +162,7 @@ public final class WindowManagerImpl implements WindowManager {
 
     @Override
     public void addView(@NonNull View view, @NonNull ViewGroup.LayoutParams params) {
-        applyWindowTypeOverrideIfNeeded(params, view);
+        fallbackWindowTypeIfNeeded(params, view);
 
 // QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_vg_layout(383,params);
@@ -174,7 +174,7 @@ public final class WindowManagerImpl implements WindowManager {
 
     @Override
     public void updateViewLayout(@NonNull View view, @NonNull ViewGroup.LayoutParams params) {
-        applyWindowTypeOverrideIfNeeded(params, view);
+        fallbackWindowTypeIfNeeded(params, view);
 
 // QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_vg_layout(384,params);
@@ -199,7 +199,7 @@ public final class WindowManagerImpl implements WindowManager {
         if (!(mContext instanceof WindowProvider windowProvider)) {
             return;
         }
-        if (windowProvider.isValidWindowType(windowType)) {
+        if (windowProvider.isSelfOrSubWindowType(windowType)) {
             return;
         }
         IllegalArgumentException exception = new IllegalArgumentException("Window type mismatch."
@@ -217,7 +217,14 @@ public final class WindowManagerImpl implements WindowManager {
                 + " match type in WindowManager.LayoutParams", exception);
     }
 
-    private void applyWindowTypeOverrideIfNeeded(
+    /**
+     * Fallbacks to {@link WindowContext#getFallbackWindowType()} if the type of the window context
+     * associated window is not {@link WindowContext#isSelfOrSubWindowType}.
+     *
+     * @param params the passed {@link android.view.WindowManager.LayoutParams}
+     * @param view   the window that are going to be attached or relayout
+     */
+    private void fallbackWindowTypeIfNeeded(
             @NonNull ViewGroup.LayoutParams params,
             @NonNull View view) {
         if (!(params instanceof WindowManager.LayoutParams wparams)) {
@@ -226,11 +233,15 @@ public final class WindowManagerImpl implements WindowManager {
         if (!(mContext instanceof WindowProvider windowProvider)) {
             return;
         }
-        final int windowTypeOverride = windowProvider.getWindowTypeOverride();
+        final int windowTypeOverride = windowProvider.getFallbackWindowType();
         if (windowTypeOverride == INVALID_WINDOW_TYPE) {
             return;
         }
-        if (!mGlobal.canApplyWindowTypeOverride(windowTypeOverride, view)) {
+        if (windowProvider.isSelfOrSubWindowType(wparams.type)) {
+            // Don't need to override the type if the type is valid for this WindowContext.
+            return;
+        }
+        if (!mGlobal.canApplyFallbackWindowType(windowTypeOverride, view)) {
             return;
         }
         if (isSubWindowType(windowTypeOverride) && mParentWindow == null) {

@@ -162,6 +162,7 @@ import com.android.wm.shell.recents.RecentsTransitionStateListener
 import com.android.wm.shell.recents.RecentsTransitionStateListener.TRANSITION_STATE_ANIMATING
 import com.android.wm.shell.recents.RecentsTransitionStateListener.TRANSITION_STATE_REQUESTED
 import com.android.wm.shell.shared.R as SharedR
+import com.android.wm.shell.shared.TransactionPool
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource.ADB_COMMAND
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource.APP_HANDLE_MENU_BUTTON
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource.KEYBOARD_SHORTCUT
@@ -304,6 +305,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @Mock private lateinit var visualIndicatorUpdateScheduler: VisualIndicatorUpdateScheduler
     @Mock private lateinit var desktopFirstListenerManager: DesktopFirstListenerManager
     @Mock private lateinit var taskSnapshotManager: TaskSnapshotManager
+    @Mock private lateinit var transactionPool: TransactionPool
+    @Mock private lateinit var surfaceControlTransaction: SurfaceControl.Transaction
 
     private lateinit var controller: DesktopTasksController
     private lateinit var shellInit: ShellInit
@@ -315,6 +318,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     private lateinit var spyContext: TestableContext
     private lateinit var homeIntentProvider: HomeIntentProvider
     private lateinit var desktopState: FakeDesktopState
+    private lateinit var shellDesktopState: FakeShellDesktopState
     private lateinit var desktopConfig: FakeDesktopConfig
 
     private val shellExecutor = TestShellExecutor()
@@ -355,6 +359,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 .startMocking()
 
         desktopState = FakeDesktopState()
+        shellDesktopState = FakeShellDesktopState(desktopState)
         desktopConfig = FakeDesktopConfig()
         desktopState.canEnterDesktopMode = true
 
@@ -466,6 +471,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         whenever(freeformTaskTransitionStarter.startPipTransition(any())).thenReturn(Binder())
         whenever(rootTaskDisplayAreaOrganizer.displayIds)
             .thenReturn(intArrayOf(DEFAULT_DISPLAY, SECONDARY_DISPLAY_ID))
+        whenever(transactionPool.acquire()).thenReturn(surfaceControlTransaction)
 
         controller = createController()
         controller.setSplitScreenController(splitScreenController)
@@ -484,6 +490,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         taskRepository = userRepositories.current
         taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = DEFAULT_DISPLAY)
         taskRepository.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = DEFAULT_DISPLAY)
+        shellDesktopState.canBeWindowDropTarget = true
 
         doReturn(HOME_LAUNCHER_PACKAGE_NAME)
             .whenever(desktopModeCompatPolicy)
@@ -536,11 +543,12 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             deskSwitchTransitionHandler,
             moveToDisplayTransitionHandler,
             homeIntentProvider,
-            desktopState,
+            shellDesktopState,
             desktopConfig,
             visualIndicatorUpdateScheduler,
             Optional.of(desktopFirstListenerManager),
             taskSnapshotManager,
+            transactionPool,
         )
 
     @After
@@ -9370,6 +9378,39 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_ENABLE_WINDOW_DROP_SMOOTH_TRANSITION)
+    fun onDesktopDragEnd_noIndicator_dropOnInEligibleDisplay_updateSurfacePosition_noWct() {
+        val task = setUpFreeformTask(bounds = STABLE_BOUNDS)
+        val spyController = spy(controller)
+        val mockSurface = mock(SurfaceControl::class.java)
+        whenever(spyController.getVisualIndicator()).thenReturn(desktopModeVisualIndicator)
+        whenever(desktopModeVisualIndicator.updateIndicatorType(any(), anyOrNull()))
+            .thenReturn(DesktopModeVisualIndicator.IndicatorType.NO_INDICATOR)
+        whenever(motionEvent.displayId).thenReturn(DEFAULT_DISPLAY)
+        shellDesktopState.canBeWindowDropTarget = false
+
+        val startBounds = Rect(0, 50, 500, 550)
+        val currentDragBounds = Rect(100, 100, 600, 600)
+
+        spyController.onDragPositioningEnd(
+            taskInfo = task,
+            taskSurface = mockSurface,
+            displayId = DEFAULT_DISPLAY,
+            inputCoordinate = PointF(250f, 300f),
+            currentDragBounds = currentDragBounds,
+            validDragArea = Rect(0, 0, 2000, 2000),
+            dragStartBounds = startBounds,
+            motionEvent = motionEvent,
+        )
+
+        // Verify task surface is moved back to start position.
+        verify(surfaceControlTransaction)
+            .setPosition(mockSurface, startBounds.left.toFloat(), startBounds.top.toFloat())
+        // Verify no WCT is started.
+        verify(transitions, never()).startTransition(any(), any(), any())
+    }
+
+    @Test
     fun onDesktopDragEnd_noIndicator_noBoundsMovement_outOfValidArea_startsReturnToStartAnimation_noWct() {
         val task = setUpFreeformTask(bounds = STABLE_BOUNDS)
         val spyController = spy(controller)
@@ -10539,44 +10580,52 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @EnableFlags(
         Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_MINIMIZE_ANIMATION_BUGFIX,
         Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION,
+        Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS,
     )
     fun onUnhandledDrag_newFreeformIntent_tabTearingAnimationBugfixFlagEnabled_tabTearingLaunchAnimationFlagEnabled() {
         testOnUnhandledDrag(
             DesktopModeVisualIndicator.IndicatorType.TO_DESKTOP_INDICATOR,
             PointF(1200f, 700f),
-            Rect(279, 700, 2122, 1852),
+            Rect(1100, 700, 1300, 900),
             tabTearingMinimizeAnimationFlagEnabled = true,
             tabTearingLaunchAnimationFlagEnabled = true,
         )
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_MINIMIZE_ANIMATION_BUGFIX)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_MINIMIZE_ANIMATION_BUGFIX,
+        Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS,
+        )
     @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION)
     fun onUnhandledDrag_newFreeformIntent_tabTearingAnimationBugfixFlagEnabled_tabTearingLaunchAnimationFlagDisabled() {
         testOnUnhandledDrag(
             DesktopModeVisualIndicator.IndicatorType.TO_DESKTOP_INDICATOR,
             PointF(1200f, 700f),
-            Rect(279, 700, 2122, 1852),
+            Rect(1100, 700, 1300, 900),
             tabTearingMinimizeAnimationFlagEnabled = true,
             tabTearingLaunchAnimationFlagEnabled = false,
         )
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION)
+    @EnableFlags(
+        Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION,
+        Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS,
+        )
     @DisableFlags(Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_MINIMIZE_ANIMATION_BUGFIX)
     fun onUnhandledDrag_newFreeformIntent_tabTearingAnimationBugfixFlagDisabled_tabTearingLaunchAnimationFlagEnabled() {
         testOnUnhandledDrag(
             DesktopModeVisualIndicator.IndicatorType.TO_DESKTOP_INDICATOR,
             PointF(1200f, 700f),
-            Rect(279, 700, 2122, 1852),
+            Rect(1100, 700, 1300, 900),
             tabTearingMinimizeAnimationFlagEnabled = false,
             tabTearingLaunchAnimationFlagEnabled = true,
         )
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS)
     @DisableFlags(
         Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_MINIMIZE_ANIMATION_BUGFIX,
         Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION,
@@ -10585,7 +10634,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         testOnUnhandledDrag(
             DesktopModeVisualIndicator.IndicatorType.TO_DESKTOP_INDICATOR,
             PointF(1200f, 700f),
-            Rect(279, 700, 2122, 1852),
+            Rect(1100, 700, 1300, 900),
             tabTearingMinimizeAnimationFlagEnabled = false,
             tabTearingLaunchAnimationFlagEnabled = false,
         )
@@ -10764,6 +10813,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_MINIMIZE_ANIMATION_BUGFIX,
         Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION,
         Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS,
     )
     fun onUnhandledDrag_crossDisplayDrag_succeedsOnFocusedFreeformTask() {
         taskRepository.addDesk(displayId = SECOND_DISPLAY, deskId = SECOND_DISPLAY)
@@ -10772,7 +10822,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         testOnUnhandledDrag(
             DesktopModeVisualIndicator.IndicatorType.NO_INDICATOR,
             PointF(1200f, 700f),
-            Rect(279, 700, 2122, 1852),
+            Rect(1100, 700, 1300, 900),
             tabTearingMinimizeAnimationFlagEnabled = true,
             tabTearingLaunchAnimationFlagEnabled = true,
             destinationDisplayId = SECOND_DISPLAY,
@@ -10785,6 +10835,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION,
         Flags.FLAG_EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS,
         Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS,
     )
     fun onUnhandledDrag_crossDisplayDrag_succeedsOnFocusedDeskRoot() {
         val task = createFreeformTask(displayId = SECOND_DISPLAY).apply { isFocused = true }
@@ -10795,7 +10846,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         testOnUnhandledDrag(
             DesktopModeVisualIndicator.IndicatorType.NO_INDICATOR,
             PointF(1200f, 700f),
-            Rect(279, 700, 2122, 1852),
+            Rect(1100, 700, 1300, 900),
             tabTearingMinimizeAnimationFlagEnabled = true,
             tabTearingLaunchAnimationFlagEnabled = true,
             destinationDisplayId = SECOND_DISPLAY,
@@ -12362,6 +12413,81 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @Test
     fun isDesktopModeEnabledOnDisplay_displayIsDesktop_isTrue() {
         assertThat(controller.asDesktopMode().isDisplayInDesktopMode(DEFAULT_DISPLAY)).isTrue()
+    }
+
+    @Test
+    fun isDesktopTask_desktopTask_isTrue() {
+        assertThat(controller.isDesktopTask(setUpFreeformTask())).isTrue()
+    }
+
+    @Test
+    fun isDesktopTask_desktopTask_isFalse() {
+        assertThat(controller.isDesktopTask(setUpFullscreenTask())).isFalse()
+    }
+
+    @Test
+    @EnableFlags(
+        FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
+        com.android.launcher3.Flags.FLAG_ENABLE_ALT_TAB_KQS_FLATENNING,
+    )
+    @DisableFlags(Flags.FLAG_ROOT_TASK_FOR_BUBBLE)
+    fun addMoveToBubbleFromDesktopChange_disableRootTaskForBubble_reparentToTda() {
+        val task = setUpFreeformTask()
+        val tda = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)!!
+        val wct = WindowContainerTransaction()
+
+        controller.addMoveToBubbleFromDesktopChange(
+            wct,
+            task,
+            transition = mock<IBinder>(IBinder::class.java),
+        )
+
+        wct.assertHop(ReparentPredicate(token = task.token, parentToken = tda.token, toTop = true))
+        verify(desksOrganizer).removeDesk(wct, deskId = 0, task.userId)
+    }
+
+    @Test
+    @EnableFlags(
+        FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
+        Flags.FLAG_ROOT_TASK_FOR_BUBBLE,
+        com.android.launcher3.Flags.FLAG_ENABLE_ALT_TAB_KQS_FLATENNING,
+    )
+    fun addMoveToBubbleFromDesktopChange_enableAllFlags_reorder() {
+        val task = setUpFreeformTask()
+        val wct = WindowContainerTransaction()
+
+        controller.addMoveToBubbleFromDesktopChange(
+            wct,
+            task,
+            transition = mock(IBinder::class.java),
+        )
+
+        wct.assertHop(ReorderPredicate(token = task.token, toTop = true))
+        verify(desksOrganizer).removeDesk(wct, deskId = 0, task.userId)
+    }
+
+    @Test
+    @EnableFlags(
+        FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
+        Flags.FLAG_ROOT_TASK_FOR_BUBBLE,
+    )
+    fun addMoveToBubbleFromDesktopChange_multiTasks_notExitDesktop() {
+        val task = setUpFreeformTask()
+        setUpFreeformTask()
+        val wct = WindowContainerTransaction()
+        rootTaskDisplayAreaOrganizer.setTouchFirst(DEFAULT_DISPLAY)
+
+        controller.addMoveToBubbleFromDesktopChange(
+            wct,
+            task,
+            transition = mock(IBinder::class.java),
+        )
+
+        wct.assertHop(ReorderPredicate(token = task.token, toTop = true))
+        verify(desksOrganizer, never()).removeDesk(wct, deskId = 0, task.userId)
     }
 
     private class RunOnStartTransitionCallback : ((IBinder) -> Unit) {

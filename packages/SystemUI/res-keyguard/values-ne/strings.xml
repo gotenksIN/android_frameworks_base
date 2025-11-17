@@ -68,7 +68,7 @@
     <string name="kg_unlock_with_pin_or_fp" msgid="5635161174698729890">"PIN वा फिंगरप्रिन्ट प्रयोग गरी अनलक गर्नुहोस्"</string>
     <string name="kg_unlock_with_password_or_fp" msgid="2251295907826814237">"पासवर्ड वा फिंगरप्रिन्ट प्रयोग गरी अनलक गर्नुहोस्"</string>
     <string name="kg_unlock_with_pattern_or_fp" msgid="2391870539909135046">"प्याटर्न वा फिंगरप्रिन्ट प्रयोग गरी अनलक गर्नुहोस्"</string>
-    <string name="kg_prompt_after_dpm_lock" msgid="6002804765868345917">"थप सुरक्षाका लागि कामसम्बन्धी नीतिका अनुसार डिभाइस लक गरियो"</string>
+    <string name="kg_prompt_after_dpm_lock" msgid="6002804765868345917">"थप सुरक्षाका लागि कार्यालयको नीतिअनुसार डिभाइस लक गरिएको छ"</string>
     <string name="kg_prompt_title_after_secure_lock_device" msgid="2646423690908627259">"२ चरण प्रमाणीकरण"</string>
     <string name="kg_prompt_subtitle_for_secure_lock_device_biometric_auth_fingerprint" msgid="6596633555720510932">"फिंगरप्रिन्ट अनलक प्रयोग गर्नुहोस्"</string>
     <string name="kg_prompt_subtitle_for_secure_lock_device_biometric_auth_face" msgid="4550701327607935441">"फेस अनलक प्रयोग गर्नुहोस्"</string>
@@ -87,6 +87,12 @@
     <string name="kg_primary_auth_locked_out_pin" msgid="5492230176361601475">"अत्यन्तै धेरै पटक गलत PIN हालियो"</string>
     <string name="kg_primary_auth_locked_out_pattern" msgid="8266214607346180952">"अत्यन्तै धेरै पटक गलत प्याटर्न कोरियो"</string>
     <string name="kg_primary_auth_locked_out_password" msgid="6170245108400198659">"अत्यन्तै धेरै पटक गलत पासवर्ड हालियो"</string>
+    <!-- no translation found for kg_primary_auth_locked_out_pin_shortlink (6337373088574808830) -->
+    <skip />
+    <!-- no translation found for kg_primary_auth_locked_out_pattern_shortlink (4178881609951888747) -->
+    <skip />
+    <!-- no translation found for kg_primary_auth_locked_out_password_shortlink (7931086124151522515) -->
+    <skip />
     <string name="kg_too_many_failed_attempts_countdown" msgid="2038195171919795529">"{count,plural, =1{# सेकेन्डपछि फेरि प्रयास गर्नुहोस्।}other{# सेकेन्डपछि फेरि प्रयास गर्नुहोस्।}}"</string>
     <string name="kg_sim_pin_instructions" msgid="1942424305184242951">"SIM को PIN हाल्नुहोस्।"</string>
     <string name="kg_sim_pin_instructions_multi" msgid="3639863309953109649">"\"<xliff:g id="CARRIER">%1$s</xliff:g>\" को SIM को PIN हाल्नुहोस्।"</string>

@@ -722,6 +722,16 @@
             android:visibleToInstantApps="true"/>
 
         <activity
+            android:name=".mediaprojection.permission.ShareScreenActivity"
+            android:showForAllUsers="true"
+            android:exported="true"
+            android:theme="@style/Theme.SystemUI.MediaProjectionAlertDialog"
+            android:finishOnCloseSystemDialogs="true"
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true"
+            android:visibleToInstantApps="true"/>
+
+        <activity
             android:name=".mediaprojection.appselector.MediaProjectionAppSelectorActivity"
             android:theme="@style/Theme.SystemUI.MediaProjectionAppSelector"
             android:showForAllUsers="true"
@@ -1112,7 +1122,6 @@
 
         <receiver android:name=".user.UserDialogReceiver"
             android:exported="true"
-            android:featureFlag="com.android.systemui.multiuser_open_user_switcher_dialog"
             android:permission="android.permission.CREATE_USERS">
             <intent-filter>
                 <action android:name="com.android.systemui.action.LAUNCH_USER_SWITCHER_DIALOG" />

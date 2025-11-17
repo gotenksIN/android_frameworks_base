@@ -82,6 +82,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_APP_TO_WEB_EDUCATION_ANIMATION),
     ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE(Flags::enableAutoRestartOnDisplayMove, false,
             Flags.FLAG_ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE),
+    ENABLE_AUTO_ROTATE_ON_SLATE_STATE(Flags::enableAutoRotateOnSlateState, false,
+            Flags.FLAG_ENABLE_AUTO_ROTATE_ON_SLATE_STATE),
     ENABLE_BACKUP_AND_RESTORE_DISPLAY_WINDOW_SETTINGS(
             Flags::enableBackupAndRestoreDisplayWindowSettings, false,
             Flags.FLAG_ENABLE_BACKUP_AND_RESTORE_DISPLAY_WINDOW_SETTINGS),
@@ -115,6 +117,9 @@ public enum DesktopExperienceFlags {
     ENABLE_DEFAULT_DISPLAY_IN_TOPOLOGY_SWITCH(
             com.android.server.display.feature.flags.Flags::enableDefaultDisplayInTopologySwitch,
             true, FLAG_ENABLE_DEFAULT_DISPLAY_IN_TOPOLOGY_SWITCH),
+    ENABLE_DENSITY_RESET_ON_CROSS_DISPLAYS_PIP_LAUNCH(
+            Flags::enableDensityResetOnCrossDisplaysPipLaunch, false,
+            Flags.FLAG_ENABLE_DENSITY_RESET_ON_CROSS_DISPLAYS_PIP_LAUNCH),
     ENABLE_DESKTOP_APP_HEADER_STATE_CHANGE_ANNOUNCEMENTS(
             Flags::enableDesktopAppHeaderStateChangeAnnouncements, false,
             Flags.FLAG_ENABLE_DESKTOP_APP_HEADER_STATE_CHANGE_ANNOUNCEMENTS),
@@ -196,6 +201,8 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_EMPTY_DESK_ON_MINIMIZE),
     ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX(Flags::enableExternalDisplayPersistenceBugfix, false,
             Flags.FLAG_ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX),
+    ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX(Flags::enableFilterRemovingDisplayBugfix, false,
+            Flags.FLAG_ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX),
     ENABLE_FIX_LEAKING_VISUAL_INDICATOR(Flags::fixLeakingVisualIndicator, false,
             Flags.FLAG_FIX_LEAKING_VISUAL_INDICATOR),
     ENABLE_FREEFORM_BOX_SHADOWS(Flags::enableFreeformBoxShadows, false,

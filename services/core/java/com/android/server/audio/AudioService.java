@@ -79,6 +79,7 @@ import static com.android.internal.annotations.VisibleForTesting.Visibility.PACK
 import static com.android.media.audio.Flags.absVolumePrioritizesAbsDevice;
 import static com.android.media.audio.Flags.alarmMinVolumeZero;
 import static com.android.media.audio.Flags.asDeviceConnectionFailure;
+import static com.android.media.audio.Flags.audioStreamBtScoCleanup;
 import static com.android.media.audio.Flags.deferWearPermissionUpdates;
 import static com.android.media.audio.Flags.disablePrescaleAbsoluteVolume;
 import static com.android.media.audio.Flags.equalScoHaVcIndexRange;
@@ -86,6 +87,7 @@ import static com.android.media.audio.Flags.equalScoLeaVcIndexRange;
 import static com.android.media.audio.Flags.optimizeBtDeviceSwitch;
 import static com.android.media.audio.Flags.ringMyCar;
 import static com.android.media.audio.Flags.ringerModeAffectsAlarm;
+import static com.android.media.audio.Flags.streamAssistantNotAliasedToMusic;
 import static com.android.media.audio.Flags.updatePreferredDevicesForStrategy;
 import static com.android.media.flags.Flags.enableAudioInputDeviceRoutingAndVolumeControl;
 import static com.android.server.audio.SoundDoseHelper.ACTION_CHECK_MUSIC_ACTIVE;
@@ -2952,9 +2954,12 @@ public class AudioService extends IAudioService.Stub
         int dtmfStreamAlias;
         final int a11yStreamAlias = sIndependentA11yVolume ?
                 AudioSystem.STREAM_ACCESSIBILITY : AudioSystem.STREAM_MUSIC;
-        final int assistantStreamAlias = mContext.getResources().getBoolean(
+        int assistantStreamAlias = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_useAssistantVolume) ?
                 AudioSystem.STREAM_ASSISTANT : AudioSystem.STREAM_MUSIC;
+        if (streamAssistantNotAliasedToMusic()) {
+            assistantStreamAlias = AudioSystem.STREAM_ASSISTANT;
+        }
 
         if (mIsSingleVolume) {
             if (isPlatformPc()) {
@@ -4415,7 +4420,8 @@ public class AudioService extends IAudioService.Stub
                             && isFullVolumeDevice(deviceType);
                     boolean tvConditions = mHdmiTvClient != null
                             && mHdmiSystemAudioSupported
-                            && !isAbsoluteVolumeDevice(deviceType);
+                            && !isAbsoluteVolumeDevice(deviceType)
+                            && deviceType == getDeviceForStream(streamType);
 
                     if ((playbackDeviceConditions || tvConditions)
                             && mHdmiCecVolumeControlEnabled
@@ -5537,6 +5543,8 @@ public class AudioService extends IAudioService.Stub
         pw.println("\tcom.android.media.audio.absVolumeIndexFix - EOL");
         pw.println("\tcom.android.media.audio.absVolumePrioritizesAbsDevice:"
                 + absVolumePrioritizesAbsDevice());
+        pw.println("\tcom.android.media.audio.audioStreamBtScoCleanup:"
+                + audioStreamBtScoCleanup());
         pw.println("\tcom.android.media.audio.vgsVssSyncMuteOrder - EOL");
         pw.println("\tcom.android.media.audio.replaceStreamBtSco - EOL");
         pw.println("\tcom.android.media.audio.equalScoHaVcIndexRange:"
@@ -5545,6 +5553,8 @@ public class AudioService extends IAudioService.Stub
                 + equalScoLeaVcIndexRange());
         pw.println("\tcom.android.media.audio.ringMyCar:"
                 + ringMyCar());
+        pw.println("\tcom.android.media.audio.streamAssistantNotAliasedToMusic:"
+                + streamAssistantNotAliasedToMusic());
         pw.println("\tandroid.media.audio.Flags.concurrentAudioRecordBypassPermission:"
                 + concurrentAudioRecordBypassPermission());
         pw.println("\tandroid.media.audio.Flags.cacheGetStreamMinMaxVolume - EOL");
@@ -9330,36 +9340,53 @@ public class AudioService extends IAudioService.Stub
     private static final SparseArray<VolumeGroupState> sVolumeGroupStates = new SparseArray<>();
 
     private void initVolumeGroupStates() {
-        int btScoGroupId = -1;
-        VolumeGroupState voiceCallGroup = null;
-        for (final AudioVolumeGroup avg : getAudioVolumeGroups()) {
-            try {
-                if (ensureValidVolumeGroup(avg)) {
-                    final VolumeGroupState vgs = new VolumeGroupState(avg);
-                    sVolumeGroupStates.append(avg.getId(), vgs);
-                    if (vgs.isVoiceCall()) {
-                        voiceCallGroup = vgs;
-                    }
-                } else {
-                    // invalid volume group will be reported for bt sco group with no other
-                    // legacy stream type, we try to replace it in sVolumeGroupStates with the
-                    // voice call volume group
-                    // TODO(b/441152611): remove this when deprecating BT SCO groups in native
-                    btScoGroupId = avg.getId();
+        if (audioStreamBtScoCleanup()) {
+            for (final AudioVolumeGroup avg : getAudioVolumeGroups()) {
+                boolean hasAtLeastOneValidAudioAttributes = avg.getAudioAttributes().stream()
+                        .anyMatch(aa -> !aa.equals(AudioProductStrategy.getDefaultAttributes()));
+                if (!hasAtLeastOneValidAudioAttributes) {
+                    // Volume Groups without attributes are not controllable through set/get volume
+                    // using attributes. Do not append them.
+                    Slog.d(TAG, "volume group " + avg.name()
+                            + " for internal policy needs,  has no valid audio attributes");
+                    continue;
                 }
-            } catch (IllegalArgumentException e) {
-                // Volume Groups without attributes are not controllable through set/get volume
-                // using attributes. Do not append them.
-                if (DEBUG_VOL) {
-                    Log.d(TAG, "volume group " + avg.name() + " for internal policy needs");
+
+                final VolumeGroupState vgs = new VolumeGroupState(avg);
+                sVolumeGroupStates.append(avg.getId(), vgs);
+            }
+        } else {
+            int btScoGroupId = -1;
+            VolumeGroupState voiceCallGroup = null;
+            for (final AudioVolumeGroup avg : getAudioVolumeGroups()) {
+                try {
+                    if (ensureValidVolumeGroup(avg)) {
+                        final VolumeGroupState vgs = new VolumeGroupState(avg);
+                        sVolumeGroupStates.append(avg.getId(), vgs);
+                        if (vgs.isVoiceCall()) {
+                            voiceCallGroup = vgs;
+                        }
+                    } else {
+                        // invalid volume group will be reported for bt sco group with no other
+                        // legacy stream type, we try to replace it in sVolumeGroupStates with the
+                        // voice call volume group
+                        // TODO(b/441152611): remove this when deprecating BT SCO groups in native
+                        btScoGroupId = avg.getId();
+                    }
+                } catch (IllegalArgumentException e) {
+                    // Volume Groups without attributes are not controllable through set/get volume
+                    // using attributes. Do not append them.
+                    if (DEBUG_VOL) {
+                        Log.d(TAG, "volume group " + avg.name() + " for internal policy needs");
+                    }
                 }
             }
-        }
 
-        if (btScoGroupId >= 0 && voiceCallGroup != null) {
-            // the bt sco group is deprecated, storing the voice call group instead
-            // to keep the code backwards compatible when calling the volume group APIs
-            sVolumeGroupStates.append(btScoGroupId, voiceCallGroup);
+            if (btScoGroupId >= 0 && voiceCallGroup != null) {
+                // the bt sco group is deprecated, storing the voice call group instead
+                // to keep the code backwards compatible when calling the volume group APIs
+                sVolumeGroupStates.append(btScoGroupId, voiceCallGroup);
+            }
         }
 
         // need mSettingsLock for vgs.applyAllVolumes -> vss.setIndex which grabs this lock after

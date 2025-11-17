@@ -21,10 +21,8 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="app_label" msgid="4811759950673118541">"സിസ്റ്റം UI"</string>
     <string name="battery_low_title" msgid="5319680173344341779">"ബാറ്ററി സേവർ ഓണാക്കണോ?"</string>
-    <!-- no translation found for battery_low_description (7848989602036547056) -->
-    <skip />
-    <!-- no translation found for battery_low_intro (8033783734931200690) -->
-    <skip />
+    <string name="battery_low_description" msgid="7848989602036547056">"നിങ്ങളുടെ ബാറ്ററിയിൽ <xliff:g id="PERCENTAGE">%s</xliff:g> ചാർജ് ശേഷിക്കുന്നു. ബാറ്ററി സേവർ, ഡാർക്ക് തീം ഓണാക്കുകയും പശ്ചാത്തല ആക്‌റ്റിവിറ്റി നിയന്ത്രിക്കുകയും അറിയിപ്പുകൾ വെെകിപ്പിക്കുകയും ചെയ്യുന്നു."</string>
+    <string name="battery_low_intro" msgid="8033783734931200690">"ബാറ്ററി സേവർ, ഡാർക്ക് തീം ഓണാക്കുകയും പശ്ചാത്തല ആക്‌റ്റിവിറ്റി നിയന്ത്രിക്കുകയും അറിയിപ്പുകൾ വെെകിപ്പിക്കുകയും ചെയ്യുന്നു."</string>
     <string name="battery_low_percent_format" msgid="4276661262843170964">"<xliff:g id="PERCENTAGE">%s</xliff:g> ശേഷിക്കുന്നു"</string>
     <string name="invalid_charger_title" msgid="938685362320735167">"USB വഴി ചാർജ് ചെയ്യാനാകില്ല"</string>
     <string name="invalid_charger_text" msgid="2339310107232691577">"ഉപകരണത്തിനൊപ്പം ലഭിച്ച ചാർജർ ഉപയോഗിക്കുക"</string>
@@ -182,8 +180,7 @@
     <string name="screen_capture_microphone_audio" msgid="1698835678818747741">"മൈക്രോഫോൺ"</string>
     <string name="screen_capture_front_camera" msgid="1214647538302639358">"മുൻ ക്യാമറ"</string>
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> x <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
-    <!-- no translation found for screen_share_privacy_indicator_stop_sharing (2297045039651417274) -->
-    <skip />
+    <string name="screen_share_privacy_indicator_stop_sharing" msgid="2297045039651417274">"പങ്കിടൽ നിർത്തുക"</string>
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"സ്‌ക്രീൻ പങ്കിടുന്നു"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"ഉള്ളടക്കം പങ്കിടൽ"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"സ്‌ക്രീൻ പങ്കിടുന്നത് നിർത്തണോ?"</string>
@@ -319,8 +316,6 @@
     <string name="accessibility_cast_name" msgid="7344437925388773685">"<xliff:g id="CAST">%s</xliff:g> എന്നതിലേക്ക് കണക്റ്റുചെയ്തു."</string>
     <string name="accessibility_expand_group" msgid="521237935987978624">"ഗ്രൂപ്പ് വികസിപ്പിക്കുക."</string>
     <string name="accessibility_collapse_group" msgid="1842704016768329517">"ഗ്രൂപ്പ് ചുരുക്കുക."</string>
-    <string name="accessibility_add_device_to_group" msgid="5446422960697860806">"ഉപകരണം ഗ്രൂപ്പിലേക്ക് ചേർക്കുക."</string>
-    <string name="accessibility_remove_device_from_group" msgid="3114694270949142228">"ഉപകരണം ഗ്രൂപ്പിൽ നിന്ന് നീക്കം ചെയ്യുക."</string>
     <string name="accessibility_add_device_to_group_with_name" msgid="1042306202917036858">"<xliff:g id="DEVICE_NAME">%s</xliff:g> ഗ്രൂപ്പിലേക്ക് ചേർക്കുക."</string>
     <string name="accessibility_remove_device_from_group_with_name" msgid="5582015497111561027">"<xliff:g id="DEVICE_NAME">%s</xliff:g> ഗ്രൂപ്പിൽ നിന്ന് നീക്കം ചെയ്യുക."</string>
     <string name="accessibility_open_application" msgid="1749126077501259712">"ആപ്പ് തുറക്കുക."</string>
@@ -428,6 +423,8 @@
     <string name="quick_settings_cast_detail_empty_text" msgid="2846282280014617785">"ഉപകരണങ്ങളൊന്നും ലഭ്യമല്ല"</string>
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"വൈഫൈ അല്ലെങ്കിൽ ഇതർനെറ്റ് കണക്ഷൻ ഇല്ല"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"വിച്ഛേദിക്കുക"</string>
+    <!-- no translation found for quick_settings_audio_current_input (8219735427828862612) -->
+    <skip />
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"തെളിച്ചം"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"നിറം വിപരീതമാക്കൽ"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"നിറം ശരിയാക്കൽ"</string>
@@ -497,10 +494,8 @@
     <string name="accessibility_hearing_device_pair_new_device" msgid="8440082580186130090">"പുതിയ ഉപകരണം ജോടിയാക്കാൻ ക്ലിക്ക് ചെയ്യുക"</string>
     <string name="hearing_devices_presets_error" msgid="350363093458408536">"പ്രീസെറ്റ് അപ്ഡേറ്റ് ചെയ്യാനായില്ല"</string>
     <string name="hearing_devices_preset_label" msgid="7878267405046232358">"പ്രീസെറ്റ്"</string>
-    <!-- no translation found for hearing_devices_preset_label_left (7427947566560179945) -->
-    <skip />
-    <!-- no translation found for hearing_devices_preset_label_right (1847206329436268522) -->
-    <skip />
+    <string name="hearing_devices_preset_label_left" msgid="7427947566560179945">"ഇടത് പ്രീസെറ്റ്"</string>
+    <string name="hearing_devices_preset_label_right" msgid="1847206329436268522">"വലത് പ്രീസെറ്റ്"</string>
     <string name="hearing_devices_input_routing_label" msgid="730396728151232306">"കോളുകൾക്കുള്ള ഡിഫോൾട്ട് മൈക്രോഫോൺ"</string>
   <string-array name="hearing_device_input_routing_options">
     <item msgid="4582190415045337003">"ശ്രവണ സഹായി മൈക്രോഫോൺ"</item>
@@ -1389,7 +1384,6 @@
     <string name="media_output_dialog_multiple_devices" msgid="1093771040315422350">"<xliff:g id="COUNT">%1$d</xliff:g> ഉപകരണങ്ങൾ തിരഞ്ഞെടുത്തു"</string>
     <string name="media_output_item_connected_state" msgid="297439499870755458">"കണക്‌റ്റ് ചെയ്‌തു"</string>
     <string name="media_output_dialog_connect_failed" msgid="3080972621975339387">"മാറാനാകുന്നില്ല. വീണ്ടും ശ്രമിക്കാൻ ടാപ്പ് ചെയ്യുക."</string>
-    <string name="media_output_dialog_pairing_new" msgid="5098212763195577270">"ഒരു ഉപകരണം കണക്റ്റ് ചെയ്യുക"</string>
     <string name="media_output_dialog_button_connect_device" msgid="2819038239946643550">"ഉപകരണം കണക്‌റ്റ് ചെയ്യുക"</string>
     <string name="media_output_dialog_unknown_launch_app_name" msgid="1084899329829371336">"അജ്ഞാതമായ ആപ്പ്"</string>
     <string name="media_output_dialog_button_stop_casting" msgid="6581379537930199189">"കാസ്റ്റ് ചെയ്യുന്നത് നിർത്തുക"</string>
@@ -1399,7 +1393,6 @@
     <string name="media_output_group_title_connected_speakers" msgid="3413876972919684479">"കണക്റ്റ് ചെയ്ത സ്‌പീക്കറുകൾ"</string>
     <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"സ്‌പീക്കറുകളും ഡിസ്പ്ലേകളും"</string>
     <string name="media_output_group_title_suggested" msgid="5097061363820410332">"നിർദ്ദേശിക്കുന്നത്"</string>
-    <string name="media_output_group_title_suggested_device" msgid="4157186235837903826">"നിർദ്ദേശിച്ച ഉപകരണങ്ങൾ"</string>
     <string name="media_input_group_title" msgid="2057057473860783021">"ഇൻപുട്ട്"</string>
     <string name="media_output_group_title" msgid="6789001895863332576">"ഔട്ട്പുട്ട്"</string>
     <string name="media_output_end_session_dialog_summary" msgid="5954520685989877347">"മീഡിയയെ മറ്റൊരു ഉപകരണത്തിലേക്ക് നീക്കുന്നതിന് നിങ്ങളുടെ പങ്കിട്ട സെഷൻ നിർത്തുക"</string>

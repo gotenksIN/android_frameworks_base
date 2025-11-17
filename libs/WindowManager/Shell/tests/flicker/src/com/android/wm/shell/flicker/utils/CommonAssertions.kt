@@ -141,6 +141,16 @@ fun FlickerTest.layerBecomesVisible(component: IComponentMatcher) {
     assertLayers { this.isInvisible(component).then().isVisible(component) }
 }
 
+fun FlickerTest.layerBecomesVisibleThenInvisible(component: IComponentMatcher) {
+    assertLayers {
+        this.isInvisible(component)
+            .then()
+            .isVisible(component)
+            .then()
+            .isInvisible(component)
+    }
+}
+
 fun FlickerTest.layerBecomesInvisible(component: IComponentMatcher) {
     assertLayers { this.isVisible(component).then().isInvisible(component) }
 }
@@ -159,12 +169,6 @@ fun FlickerTest.layerIsVisibleAtEnd(component: IComponentMatcher) {
 
 fun FlickerTest.layerKeepVisible(component: IComponentMatcher) {
     assertLayers { this.isVisible(component) }
-}
-
-fun FlickerTest.layerKeepVisibleOrOccluded(component: IComponentMatcher) {
-    assertLayers { this.isVisible(component)
-        .then().isOccluded(component)
-        .then().isVisible(component) }
 }
 
 fun FlickerTest.splitAppLayerBoundsBecomesVisible(

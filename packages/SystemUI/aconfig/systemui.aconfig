@@ -26,16 +26,6 @@ flag {
 }
 
 flag {
-   name: "multiuser_open_user_switcher_dialog"
-   namespace: "systemui"
-   description: "Enable multiuser widget to open user switcher dialog"
-   bug: "409328841"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "user_encrypted_source"
    namespace: "systemui"
    description: "Get rid of the local cache and rely on UserManager.isUserUnlocked directly to determine whether user CE storage is encrypted."
@@ -50,13 +40,6 @@ flag {
    namespace: "systemui"
    description: "Add pagination to the Modes dialog in quick settings."
    bug: "376450983"
-}
-
-flag {
-  name: "notifications_redesign_footer_view"
-  namespace: "systemui"
-  description: "Notifications Redesign: Update the look of the notifications footer."
-  bug: "375010573"
 }
 
 flag {
@@ -219,26 +202,6 @@ flag {
 }
 
 flag {
-    name: "unfold_animation_background_progress"
-    namespace: "systemui"
-    description: "Moves unfold animation progress calculation to a background thread"
-    bug: "277879146"
-}
-
-flag {
-    name: "enable_background_keyguard_ondrawn_callback"
-    namespace: "systemui"
-    description: "Calls the onDrawn keyguard in the background, without being blocked by main"
-        "thread work. This results in the screen to turn on earlier when the main thread is stuck. "
-        "Note that, even after this callback is called, we're waiting for all windows to finish "
-        " drawing."
-    bug: "295873557"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
    name: "no_expansion_on_overscroll"
    namespace: "systemui"
    description: "Enable the fix where QS Expansion is set to zero on overscroll. This should"
@@ -270,6 +233,13 @@ flag {
    namespace: "systemui"
    description: "Use the new tiles in the Quick Settings that are still under development. This flag will not be used to gate release but to prevent tiles under development from reaching teamfood."
    bug: "311147395"
+}
+
+flag {
+    name: "qs_tiles_reveal_animation"
+    namespace: "systemui"
+    description: "Enables a new reveal animation for Quick Settings tiles."
+    bug: "435138055"
 }
 
 flag {
@@ -401,26 +371,20 @@ flag {
 }
 
 flag {
-    name: "status_bar_no_hun_behavior"
-    namespace: "systemui"
-    description: "When there's a HUN, don't show the HUN text or icon in the status bar. Instead, "
-       "continue showing the usual status bar."
-    bug: "385740230"
-}
-
-flag {
-  name: "status_bar_font_updates"
-  namespace: "systemui"
-  description: "Read only flag for using a new font in the status bar"
-  bug: "393609116"
-  is_fixed_read_only: true
-}
-
-flag {
     name: "status_bar_chip_to_hun_animation"
     namespace: "systemui"
     description: "Implement a bespoke tap-chip-to-show-HUN animation for SB notification chips"
     bug: "393369891"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "status_bar_hun_animation_call"
+    namespace: "systemui"
+    description: "Fix the HUN animation when tapping on a status bar call chip"
+    bug: "444551887"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -702,26 +666,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Fix system icon size in shade header on connected displays"
     bug: "412409667"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "clipboard_use_description_mimetype"
-    namespace: "systemui"
-    description: "Read item mimetype from description rather than checking URI"
-    bug: "357197236"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "screenshot_announce_live_region"
-    namespace: "systemui"
-    description: "Use live region for screenshot saving announcement"
-    bug: "383642111"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -1508,17 +1452,6 @@ flag {
   namespace: "systemui"
   description: "Expands the shade on long press of any status bar"
   bug: "371224114"
-}
-
-flag {
-  name: "shade_header_blur_font_color"
-  namespace: "systemui"
-  description: "Updates the font colors of the shade header for blur"
-  bug: "393609960"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {

@@ -21,10 +21,8 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="app_label" msgid="4811759950673118541">"UI sustava"</string>
     <string name="battery_low_title" msgid="5319680173344341779">"Želite li uključiti štednju baterije?"</string>
-    <!-- no translation found for battery_low_description (7848989602036547056) -->
-    <skip />
-    <!-- no translation found for battery_low_intro (8033783734931200690) -->
-    <skip />
+    <string name="battery_low_description" msgid="7848989602036547056">"Imate još <xliff:g id="PERCENTAGE">%s</xliff:g> baterije. Štednja baterije uključuje tamnu temu, ograničava aktivnosti u pozadini i odgađa obavijesti."</string>
+    <string name="battery_low_intro" msgid="8033783734931200690">"Štednja baterije uključuje tamnu temu, ograničava aktivnosti u pozadini i odgađa obavijesti."</string>
     <string name="battery_low_percent_format" msgid="4276661262843170964">"Preostalo <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
     <string name="invalid_charger_title" msgid="938685362320735167">"Punjenje putem USB-a nije moguće"</string>
     <string name="invalid_charger_text" msgid="2339310107232691577">"Koristite punjač koji ste dobili s uređajem"</string>
@@ -150,16 +148,13 @@
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"Prikaži dodire"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"Odaberite aplikaciju za snimanje"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"Videozapis je spremljen"</string>
-    <!-- no translation found for screen_record_video_deleted (30786214839944540) -->
-    <skip />
+    <string name="screen_record_video_deleted" msgid="30786214839944540">"Videozapis je izbrisan"</string>
     <string name="screen_record_undo" msgid="7942716736019800870">"Poništi"</string>
     <string name="screen_record_retake" msgid="3846643688365398450">"Snimi ponovno"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"Uredi"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"Izbriši"</string>
-    <!-- no translation found for screen_record_delete_dialog_title (5868561491974057044) -->
-    <skip />
-    <!-- no translation found for screen_record_delete_dialog_content (2610040845214024496) -->
-    <skip />
+    <string name="screen_record_delete_dialog_title" msgid="5868561491974057044">"Želite li izbrisati tu snimku?"</string>
+    <string name="screen_record_delete_dialog_content" msgid="2610040845214024496">"Brisanjem ove snimke trajno će se izbrisati videodatoteka s vašeg uređaja."</string>
     <string name="screen_record_play" msgid="4732544724679889445">"Reproduciraj"</string>
     <string name="screen_record_pause" msgid="1715012292444967776">"Pauziraj"</string>
     <string name="screen_record_mute" msgid="8111682249858638168">"Isključi zvuk"</string>
@@ -180,17 +175,12 @@
     <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"Snimi cijeli zaslon"</string>
     <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"Snimi cijeli zaslon"</string>
     <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"Postavke snimanja zaslona"</string>
-    <!-- no translation found for screen_capture_show_clicks_and_keys (2151690554364148717) -->
-    <skip />
-    <!-- no translation found for screen_capture_device_audio (1537290197773737349) -->
-    <skip />
-    <!-- no translation found for screen_capture_microphone_audio (1698835678818747741) -->
-    <skip />
-    <!-- no translation found for screen_capture_front_camera (1214647538302639358) -->
-    <skip />
+    <string name="screen_capture_show_clicks_and_keys" msgid="2151690554364148717">"Prikaži klikove i tipke"</string>
+    <string name="screen_capture_device_audio" msgid="1537290197773737349">"Zvuk na uređaju"</string>
+    <string name="screen_capture_microphone_audio" msgid="1698835678818747741">"Mikrofon"</string>
+    <string name="screen_capture_front_camera" msgid="1214647538302639358">"Prednja kamera"</string>
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> x <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
-    <!-- no translation found for screen_share_privacy_indicator_stop_sharing (2297045039651417274) -->
-    <skip />
+    <string name="screen_share_privacy_indicator_stop_sharing" msgid="2297045039651417274">"Zaustavi dijeljenje"</string>
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"Dijeljenje zaslona"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"Dijeljenje sadržaja"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"Želite li zaustaviti dijeljenje zaslona?"</string>
@@ -326,8 +316,6 @@
     <string name="accessibility_cast_name" msgid="7344437925388773685">"Povezani ste sa sljedećim uređajem: <xliff:g id="CAST">%s</xliff:g>."</string>
     <string name="accessibility_expand_group" msgid="521237935987978624">"Proširite grupu."</string>
     <string name="accessibility_collapse_group" msgid="1842704016768329517">"Sažmite grupu."</string>
-    <string name="accessibility_add_device_to_group" msgid="5446422960697860806">"Dodajte uređaj u grupu."</string>
-    <string name="accessibility_remove_device_from_group" msgid="3114694270949142228">"Uklonite uređaj iz grupe."</string>
     <string name="accessibility_add_device_to_group_with_name" msgid="1042306202917036858">"Dodajte uređaj <xliff:g id="DEVICE_NAME">%s</xliff:g> u grupu."</string>
     <string name="accessibility_remove_device_from_group_with_name" msgid="5582015497111561027">"Uklonite uređaj <xliff:g id="DEVICE_NAME">%s</xliff:g> iz grupe."</string>
     <string name="accessibility_open_application" msgid="1749126077501259712">"Otvorite aplikaciju."</string>
@@ -435,6 +423,8 @@
     <string name="quick_settings_cast_detail_empty_text" msgid="2846282280014617785">"Nema dostupnih uređaja"</string>
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Nema Wi‑Fi ili ethernet veze"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"Prekini vezu"</string>
+    <!-- no translation found for quick_settings_audio_current_input (8219735427828862612) -->
+    <skip />
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"Svjetlina"</string>
     <string name="quick_settings_inversion_label" msgid="3501527749494755688">"Inverzija boja"</string>
     <string name="quick_settings_color_correction_label" msgid="5636617913560474664">"Korekcija boja"</string>
@@ -504,10 +494,8 @@
     <string name="accessibility_hearing_device_pair_new_device" msgid="8440082580186130090">"Kliknite da biste uparili novi uređaj"</string>
     <string name="hearing_devices_presets_error" msgid="350363093458408536">"Ažuriranje unaprijed definiranih postavki nije uspjelo"</string>
     <string name="hearing_devices_preset_label" msgid="7878267405046232358">"Unaprijed definirana postavka"</string>
-    <!-- no translation found for hearing_devices_preset_label_left (7427947566560179945) -->
-    <skip />
-    <!-- no translation found for hearing_devices_preset_label_right (1847206329436268522) -->
-    <skip />
+    <string name="hearing_devices_preset_label_left" msgid="7427947566560179945">"Definirane postavke za lijevu stranu"</string>
+    <string name="hearing_devices_preset_label_right" msgid="1847206329436268522">"Definirane postavke za desnu stranu"</string>
     <string name="hearing_devices_input_routing_label" msgid="730396728151232306">"Zadani mikrofon za pozive"</string>
   <string-array name="hearing_device_input_routing_options">
     <item msgid="4582190415045337003">"Mikrofon slušnog pomagala"</item>
@@ -908,8 +896,7 @@
     <string name="notification_guts_news_summary" msgid="638697931043407835">"Najčitanije vijesti, urednički sadržaj i drugo"</string>
     <string name="notification_guts_social_summary" msgid="3749147631983977040">"Sviđanja, postovi i drugo"</string>
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"Bilteni, preporučeni mediji i drugo"</string>
-    <!-- no translation found for notification_onboarding_summaries_turn_on (3831339570984683297) -->
-    <skip />
+    <string name="notification_onboarding_summaries_turn_on" msgid="3831339570984683297">"Uključite u Postavkama"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"Vaši se dulji razgovori sada mogu sažeti kako biste dobili kratke sažetke"</string>
     <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"Organizator obavijesti grupira i isključuje zvuk obavijesti nižeg prioriteta. Dodajte više kategorija u postavkama."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# obavijest}one{# obavijest}few{# obavijesti}other{# obavijesti}}"</string>
@@ -1397,7 +1384,6 @@
     <string name="media_output_dialog_multiple_devices" msgid="1093771040315422350">"Odabrano uređaja: <xliff:g id="COUNT">%1$d</xliff:g>"</string>
     <string name="media_output_item_connected_state" msgid="297439499870755458">"Povezano"</string>
     <string name="media_output_dialog_connect_failed" msgid="3080972621975339387">"Nije prebačeno. Dodirnite da biste pokušali ponovo."</string>
-    <string name="media_output_dialog_pairing_new" msgid="5098212763195577270">"Povežite uređaj"</string>
     <string name="media_output_dialog_button_connect_device" msgid="2819038239946643550">"Povežite uređaj"</string>
     <string name="media_output_dialog_unknown_launch_app_name" msgid="1084899329829371336">"Nepoznata aplikacija"</string>
     <string name="media_output_dialog_button_stop_casting" msgid="6581379537930199189">"Zaustavi emitiranje"</string>
@@ -1407,7 +1393,6 @@
     <string name="media_output_group_title_connected_speakers" msgid="3413876972919684479">"Povezani zvučnici"</string>
     <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"Zvučnici i zasloni"</string>
     <string name="media_output_group_title_suggested" msgid="5097061363820410332">"Predloženo"</string>
-    <string name="media_output_group_title_suggested_device" msgid="4157186235837903826">"Predloženi uređaji"</string>
     <string name="media_input_group_title" msgid="2057057473860783021">"Ulaz"</string>
     <string name="media_output_group_title" msgid="6789001895863332576">"Izlaz"</string>
     <string name="media_output_end_session_dialog_summary" msgid="5954520685989877347">"Zaustavite dijeljenu sesiju da biste premjestili medij na drugi uređaj"</string>

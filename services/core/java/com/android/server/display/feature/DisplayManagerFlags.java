@@ -120,11 +120,6 @@ public class DisplayManagerFlags {
             Flags::enablePeakRefreshRatePhysicalLimit
     );
 
-    private final FlagState mIgnoreAppPreferredRefreshRate = new FlagState(
-            Flags.FLAG_IGNORE_APP_PREFERRED_REFRESH_RATE_REQUEST,
-            Flags::ignoreAppPreferredRefreshRateRequest
-    );
-
     private final FlagState mSynthetic60hzModes = new FlagState(
             Flags.FLAG_ENABLE_SYNTHETIC_60HZ_MODES,
             Flags::enableSynthetic60hzModes
@@ -360,13 +355,6 @@ public class DisplayManagerFlags {
         return mOffloadSessionCancelBlockScreenOn.isEnabled();
     }
 
-    /**
-     * @return Whether to ignore preferredRefreshRate app request conversion to display mode or not
-     */
-    public boolean ignoreAppPreferredRefreshRateRequest() {
-        return mIgnoreAppPreferredRefreshRate.isEnabled();
-    }
-
     public boolean isSynthetic60HzModesEnabled() {
         return mSynthetic60hzModes.isEnabled();
     }
@@ -560,7 +548,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mResolutionBackupRestore);
         pw.println(" " + mUseFusionProxSensor);
         pw.println(" " + mPeakRefreshRatePhysicalLimit);
-        pw.println(" " + mIgnoreAppPreferredRefreshRate);
         pw.println(" " + mSynthetic60hzModes);
         pw.println(" " + mOffloadSessionCancelBlockScreenOn);
         pw.println(" " + mNormalBrightnessForDozeParameter);
@@ -637,13 +624,14 @@ public class DisplayManagerFlags {
 
         @Override
         public String toString() {
-            // remove com.android.server.display.feature.flags. from the beginning of the name.
+            // remove "com.android.server.display.feature.flags." from the beginning of the name.
+            String shortName = TextUtils.substring(mName, 41, mName.length());
+
             // align all isEnabled() values.
-            // Adjust lengths if we end up with longer names
-            final int nameLength = mName.length();
-            return TextUtils.substring(mName,  41, nameLength) + ": "
-                    + TextUtils.formatSimple("%" + (93 - nameLength) + "s%s", " " , isEnabled())
-                    + " (def:" + mFlagFunction.get() + ")";
+            return String.format("%-53s %b (def:%b)",
+                    shortName + ":",
+                    isEnabled(),
+                    mFlagFunction.get());
         }
     }
 }

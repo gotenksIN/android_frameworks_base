@@ -22,6 +22,7 @@ import android.annotation.IntRange;
 import android.app.ActivityOptions;
 import android.companion.virtual.computercontrol.ComputerControlSession.Action;
 import android.companion.virtual.computercontrol.InteractiveMirrorDisplay;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.display.VirtualDisplay;
@@ -45,7 +46,6 @@ import com.android.extensions.computercontrol.input.KeyEvent;
 import com.android.extensions.computercontrol.input.TouchEvent;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
@@ -109,6 +109,17 @@ public final class ComputerControlSession implements AutoCloseable {
      */
     public void launchApplication(@NonNull String packageName) {
         mSession.launchApplication(Objects.requireNonNull(packageName));
+        mAccessibilityProxy.resetStabilityState();
+    }
+
+    /**
+     * Launches an application's launcher activity in the computer control session.
+     *
+     * @throws IllegalArgumentException if the component is not a launcher activity.
+     * @see Params#getTargetPackageNames()
+     */
+    public void launchApplication(@NonNull ComponentName component) {
+        mSession.launchApplication(Objects.requireNonNull(component));
         mAccessibilityProxy.resetStabilityState();
     }
 
@@ -238,14 +249,10 @@ public final class ComputerControlSession implements AutoCloseable {
 
     /**
      * Returns all windows on the display associated with the {@link ComputerControlSession}.
-     *
-     * @deprecated This method is no longer in use and will be removed in a future release.
      */
-    // TODO: b/437852886 - Remove this method when moving to v1 of the API.
-    @Deprecated
     @NonNull
     public List<AccessibilityWindowInfo> getAccessibilityWindows() {
-        return Collections.emptyList();
+        return mAccessibilityProxy.getWindows();
     }
 
     /**

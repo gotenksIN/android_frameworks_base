@@ -27,7 +27,22 @@
 
     <!--
     Whether notifications shade should be in the top end position (e.g. the right side of the screen
-    in an LTR locale) on wide screens. Ignored when `config_isFullWidth` is `true`.
+    in an LTR locale) on wide screens.
+    Only used in Dual Shade mode, when `config_isFullWidthShade` is `false`. Ignored in all other
+    cases.
     -->
     <bool name="config_notificationShadeOnTopEnd">false</bool>
+
+    <!--
+    Whether Dual Shade should be enabled in the absence of an explicit preference set by the user.
+    -->
+    <bool name="config_dualShadeEnabledByDefault">false</bool>
+
+    <!--
+    Whether to allow the user to choose between Single and Dual Shade modes via the Settings app.
+    When `false`, the preference and associated Settings Page are absent from the Settings app
+    (including any shortcuts to them), the user preference value is ignored, and
+    `config_dualShadeEnabledByDefault` is used.
+    -->
+    <bool name="config_useDualShadeSetting">true</bool>
 </resources>

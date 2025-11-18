@@ -206,27 +206,26 @@ class InstallRepository(private val context: Context) {
         val isInstallPkgPermissionGranted = callingUid != Process.INVALID_UID &&
                 isPermissionGranted(context, Manifest.permission.INSTALL_PACKAGES, callingUid)
 
-        isTrustedSource = isPrivilegedAndKnown || isInstallPkgPermissionGranted
+        // Bypass the unknown source user restrictions check when either of the following
+        // two conditions is met:
+        // 1. An installer with the INSTALL_PACKAGES permission initiated the
+        // installation via the PackageInstaller APIs and not via an
+        // ACTION_VIEW or ACTION_INSTALL_PACKAGE intent.
+        // 2. An installer is a privileged app and it has set the
+        // EXTRA_NOT_UNKNOWN_SOURCE flag to be true in the intent.
+        val isIntentInstall =
+            Intent.ACTION_VIEW == intent.action
+                    || Intent.ACTION_INSTALL_PACKAGE == intent.action
+
+        isTrustedSource =
+            (!isIntentInstall && isInstallPkgPermissionGranted) || isPrivilegedAndKnown
 
         if (callingUid != Process.INVALID_UID
             && !isInstallPermissionGrantedOrRequested(context, callingUid, isTrustedSource)) {
             return InstallAborted(ABORT_REASON_INTERNAL_ERROR)
         }
 
-        // Bypass the unknown source user restrictions check when either of the following
-        // two conditions is met:
-        // 1. An installer with the INSTALL_PACKAGES permission initiated the
-        // installation via the PackageInstaller APIs and not via an
-        // ACTION_VIEW or ACTION_INSTALL_PACKAGE intent.
-        // 2. An installer is a privileged app and initiated the installer via
-        // the ACTION_INSTALL_PACKAGE or ACTION_VIEW intent, but it has set the
-        // EXTRA_NOT_UNKNOWN_SOURCE flag to be true in the intent.
-        val isIntentInstall =
-            Intent.ACTION_VIEW == intent.action
-                    || Intent.ACTION_INSTALL_PACKAGE == intent.action
-        val bypassUnknownSourceRestrictions =
-            (!isIntentInstall && isInstallPkgPermissionGranted) || isPrivilegedAndKnown
-        val restriction = getDevicePolicyRestrictions(bypassUnknownSourceRestrictions)
+        val restriction = getDevicePolicyRestrictions(isTrustedSource)
         if (restriction != null) {
             val adminSupportDetailsIntent =
                 devicePolicyManager!!.createAdminSupportIntent(restriction)
@@ -252,8 +251,8 @@ class InstallRepository(private val context: Context) {
         }
     }
 
-    private fun getDevicePolicyRestrictions(bypassUnknownSourceRestrictions: Boolean): String? {
-        val restrictions: Array<String> = if (bypassUnknownSourceRestrictions) {
+    private fun getDevicePolicyRestrictions(isTrustedSource: Boolean): String? {
+        val restrictions: Array<String> = if (isTrustedSource) {
             arrayOf(UserManager.DISALLOW_INSTALL_APPS)
         } else {
             arrayOf(

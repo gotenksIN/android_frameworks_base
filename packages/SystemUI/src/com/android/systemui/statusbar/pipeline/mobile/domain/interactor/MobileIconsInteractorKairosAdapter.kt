@@ -21,7 +21,6 @@ import com.android.systemui.KairosActivatable
 import com.android.systemui.KairosBuilder
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
-import com.android.systemui.kairos.ExperimentalKairosApi
 import com.android.systemui.kairos.KairosNetwork
 import com.android.systemui.kairos.buildSpec
 import com.android.systemui.kairos.combine
@@ -61,7 +60,6 @@ import kotlinx.coroutines.flow.stateIn
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import kotlinx.coroutines.flow.MutableStateFlow
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
-@ExperimentalKairosApi
 @SysUISingleton
 class MobileIconsInteractorKairosAdapter
 @Inject

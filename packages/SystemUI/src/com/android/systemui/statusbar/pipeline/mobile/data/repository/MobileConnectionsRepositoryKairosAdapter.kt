@@ -23,7 +23,6 @@ import com.android.systemui.KairosActivatable
 import com.android.systemui.KairosBuilder
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
-import com.android.systemui.kairos.ExperimentalKairosApi
 import com.android.systemui.kairos.Incremental
 import com.android.systemui.kairos.KairosNetwork
 import com.android.systemui.kairos.buildSpec
@@ -48,7 +47,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import com.android.systemui.kairos.*
 
-@ExperimentalKairosApi
 @SysUISingleton
 class MobileConnectionsRepositoryKairosAdapter
 @Inject

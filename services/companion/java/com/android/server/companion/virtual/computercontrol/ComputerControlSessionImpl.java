@@ -108,12 +108,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private static final long DEFAULT_GLOBAL_SESSION_TIMEOUT_DURATION_MS =
             TimeUnit.MILLISECONDS.convert(360, TimeUnit.MINUTES);
 
-    private static final String CUSTOM_BLOCKED_APP_PACKAGE = "com.android.virtualdevicemanager";
-
-    private static final ComponentName CUSTOM_BLOCKED_APP_ACTIVITY = new ComponentName(
-            CUSTOM_BLOCKED_APP_PACKAGE,
-            CUSTOM_BLOCKED_APP_PACKAGE + ".NotifyComputerControlBlockedActivity");
-
     // Input device names are limited to 80 bytes, so keep the prefix shorter than that.
     private static final int MAX_INPUT_DEVICE_NAME_PREFIX_LENGTH = 70;
 
@@ -145,8 +139,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private static final int VENDOR_ID = 0x0000;
     @VisibleForTesting
     static final int PRODUCT_ID_DPAD = 0xCC01;
-    @VisibleForTesting
-    static final int PRODUCT_ID_KEYBOARD = 0xCC02;
     @VisibleForTesting
     static final int PRODUCT_ID_TOUCHSCREEN = 0xCC03;
 
@@ -283,7 +275,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         // launch. This is validated in {@link ComputerControlSessionProcessor} prior to
         // creating the session.
         mAllowlistedPackages.addAll(mParams.getTargetPackageNames());
-        mAllowlistedPackages.add(CUSTOM_BLOCKED_APP_PACKAGE);
 
         final VirtualDeviceParams.Builder virtualDeviceParamsBuilder =
                 new VirtualDeviceParams.Builder()
@@ -435,7 +426,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             throw new IllegalArgumentException(
                     "Could not find launcher activity for " + packageName + "/" + className);
         }
-        if (!mAllowlistController.isPackageAutomatable(packageName)) {
+        if (!mAllowlistController.isPackageAutomatable(packageName, mOwnerPackageName)) {
             throw new IllegalArgumentException(
                     "Trying to launch " + packageName + " which is not allowlisted");
         }
@@ -537,20 +528,41 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     @Nullable
     private InteractiveMirrorImpl createInteractiveMirrorImpl() {
-        // NOTE: The mirror surface must not be leaked to the client app!
-        final var mirrorSurface =
+        final var mirror =
                 mWindowManagerInternal.createMirrorForDisplayContent(mVirtualDisplayId);
-        if (mirrorSurface == null) {
+        if (mirror == null) {
+            Slog.w(TAG, "Failed to create DisplayMirror from WM for display: " + mVirtualDisplayId);
             return null;
         }
-        return new InteractiveMirrorImpl(mirrorSurface, mTransactionSupplier,
+        return new InteractiveMirrorImpl(mirror, mTransactionSupplier,
                 mDisplayManagerGlobal.getDisplayInfo(mVirtualDisplayId), mInputManagerInternal,
-                this::onInteractiveMirrorClosed);
+                this::removeInteractiveMirror);
     }
 
-    private void onInteractiveMirrorClosed(InteractiveMirrorImpl interactiveMirror) {
+    private void removeInteractiveMirror(InteractiveMirrorImpl interactiveMirror) {
         synchronized (mInteractiveMirrors) {
-            mInteractiveMirrors.remove(interactiveMirror);
+            if (!mInteractiveMirrors.remove(interactiveMirror)) {
+                return;
+            }
+        }
+        try (var transaction = mTransactionSupplier.get()) {
+            interactiveMirror.closeWithTransaction(transaction);
+            transaction.apply();
+        }
+    }
+
+    private void removeAllInteractiveMirrors() {
+        synchronized (mInteractiveMirrors) {
+            if (mInteractiveMirrors.isEmpty()) {
+                return;
+            }
+            try (var transaction = mTransactionSupplier.get()) {
+                for (int i = 0; i < mInteractiveMirrors.size(); i++) {
+                    mInteractiveMirrors.get(i).closeWithTransaction(transaction);
+                }
+                transaction.apply();
+            }
+            mInteractiveMirrors.clear();
         }
     }
 
@@ -640,21 +652,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mAudioCapture.stopAudioCapture();
         mVirtualDevice.close(); // closes also the VirtualAudioDevice
         mAppToken.unlinkToDeath(this, 0);
-        closeInteractiveMirrors();
+        removeAllInteractiveMirrors();
         mOnClosedListener.accept(this);
-    }
-
-    private void closeInteractiveMirrors() {
-        synchronized (mInteractiveMirrors) {
-            try (var transaction = mTransactionSupplier.get()) {
-                // Closing a mirror modifies mInteractiveMirrors, so make a copy of the list.
-                final var mirrorsCopy = new ArrayList<>(mInteractiveMirrors);
-                for (int i = 0; i < mirrorsCopy.size(); i++) {
-                    mirrorsCopy.get(i).closeWithTransaction(transaction);
-                }
-                transaction.apply();
-            }
-        }
     }
 
     private void performSwipeStep(int fromX, int fromY, int toX, int toY, int step, int stepCount) {
@@ -801,10 +800,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 @UserIdInt int userId) {
             Slog.v(TAG, "Top activity changed to " + topActivity + " for user " + userId);
             cancelDisplayEmptyScheduledAction();
-
-            if (topActivity.getPackageName().equals(CUSTOM_BLOCKED_APP_PACKAGE)) {
-                return;
-            }
 
             // If we have a new top activity which is allowed, then attempt a transition to the
             // active state.

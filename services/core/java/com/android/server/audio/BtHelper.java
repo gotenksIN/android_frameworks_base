@@ -78,11 +78,9 @@ public class BtHelper {
     private static final String TAG = "AS.BtHelper";
 
     private final @NonNull AudioDeviceBroker mDeviceBroker;
-    private final @NonNull Context mContext;
 
-    BtHelper(@NonNull AudioDeviceBroker broker, Context context) {
+    BtHelper(@NonNull AudioDeviceBroker broker) {
         mDeviceBroker = broker;
-        mContext = context;
     }
 
     // BluetoothHeadset API to control SCO connection
@@ -708,7 +706,7 @@ public class BtHelper {
         broadcastScoConnectionState(AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
 
         TelecomManager telecomManager =
-                (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
+                (TelecomManager) mDeviceBroker.getContext().getSystemService(Context.TELECOM_SERVICE);
         if (telecomManager == null || !telecomManager.isInCall()) {
             mDeviceBroker.clearA2dpSuspended(false /* internalOnly */);
         }
@@ -826,7 +824,7 @@ public class BtHelper {
                 mLeAudioCallback = new MyLeAudioCallback();
                 try{
                     mLeAudio.registerCallback(
-                                mContext.getMainExecutor(), mLeAudioCallback);
+                            mDeviceBroker.getContext().getMainExecutor(), mLeAudioCallback);
                 } catch (Exception e) {
                     mLeAudioCallback = null;
                     Log.e(TAG, "Exception while registering callback for LE audio", e);

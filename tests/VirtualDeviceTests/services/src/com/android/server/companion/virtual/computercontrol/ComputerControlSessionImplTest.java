@@ -304,7 +304,7 @@ public class ComputerControlSessionImplTest {
                 mVirtualAudioDevice);
         when(mVirtualAudioDevice.startAudioCapture(any())).thenReturn(mAudioCapture);
         when(mVirtualAudioDevice.startAudioInjection(any())).thenReturn(mAudioInjection);
-        when(mAllowlistController.isPackageAutomatable(anyString())).thenReturn(true);
+        when(mAllowlistController.isPackageAutomatable(anyString(), anyString())).thenReturn(true);
     }
 
     @After
@@ -515,7 +515,7 @@ public class ComputerControlSessionImplTest {
         createComputerControlSession(mDefaultParams);
         when(mOwnerPackageManager.queryIntentActivities(any(), any()))
                 .thenReturn(List.of(new ResolveInfo()));
-        when(mAllowlistController.isPackageAutomatable(anyString())).thenReturn(false);
+        when(mAllowlistController.isPackageAutomatable(anyString(), anyString())).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class,
                 () -> mSession.launchApplication(TARGET_PACKAGE_1, TARGET_CLASS));
@@ -642,13 +642,14 @@ public class ComputerControlSessionImplTest {
     public void createInteractiveMirror_successfullyReturnsInitializedMirror()
             throws Exception {
         createComputerControlSession(mDefaultParams);
-        final var mirrorSurface = new SurfaceControl();
+        final var displayMirror = mockDisplayMirror();
         when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
-                .thenReturn(mirrorSurface);
+                .thenReturn(displayMirror);
 
         final var returnedMirrorSurface = Mockito.mock(SurfaceControl.class);
         IInteractiveMirror mirror = mSession.createInteractiveMirror(returnedMirrorSurface);
 
+        final var mirrorSurface = displayMirror.getMirrorSurfaceControl();
         verify(mWindowManagerInternal).createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID);
         assertThat(mirror).isNotNull();
         verify(mTransaction).reparent(eq(mirrorSurface), mSurfaceControlArgumentCaptor.capture());
@@ -673,40 +674,61 @@ public class ComputerControlSessionImplTest {
     @Test
     public void closeInteractiveMirror_removesMirrorSurface() throws Exception {
         createComputerControlSession(mDefaultParams);
-        final var mirrorSurface = new SurfaceControl();
+        final var displayMirror = mockDisplayMirror();
         when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
-                .thenReturn(mirrorSurface);
-        final var returnedMirrorSurface = new SurfaceControl();
+                .thenReturn(displayMirror);
+        final var returnedMirrorSurface = Mockito.mock(SurfaceControl.class);
         IInteractiveMirror mirror = mSession.createInteractiveMirror(returnedMirrorSurface);
         assertThat(mirror).isNotNull();
         verify(mWindowManagerInternal).createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID);
-        Mockito.reset(mTransaction);
+        verify(returnedMirrorSurface).copyFrom(mSurfaceControlArgumentCaptor.capture(), any());
+        clearInvocations(mTransaction);
 
         mirror.close();
 
-        verify(mTransaction).reparent(eq(mirrorSurface), eq(null));
+        verify(displayMirror).close();
+        verify(mTransaction).remove(mSurfaceControlArgumentCaptor.getValue());
     }
 
     @Test
     public void closeSession_removesAllInteractiveMirrors() throws Exception {
         createComputerControlSession(mDefaultParams);
-        final var mirrorSurface1 = new SurfaceControl();
+        final var displayMirror1 = mockDisplayMirror();
         when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
-                .thenReturn(mirrorSurface1);
+                .thenReturn(displayMirror1);
         IInteractiveMirror mirror1 = mSession.createInteractiveMirror(new SurfaceControl());
         assertThat(mirror1).isNotNull();
-        final var mirrorSurface2 = new SurfaceControl();
+        final var displayMirror2 = mockDisplayMirror();
         when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
-                .thenReturn(mirrorSurface2);
+                .thenReturn(displayMirror2);
         IInteractiveMirror mirror2 = mSession.createInteractiveMirror(new SurfaceControl());
         assertThat(mirror2).isNotNull();
         verify(mWindowManagerInternal, times(2)).createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID);
-        Mockito.reset(mTransaction);
+        clearInvocations(mTransaction);
 
         mSession.close();
 
-        verify(mTransaction).reparent(eq(mirrorSurface1), eq(null));
-        verify(mTransaction).reparent(eq(mirrorSurface2), eq(null));
+        verify(displayMirror1).close();
+        verify(displayMirror2).close();
+    }
+
+    @Test
+    public void duplicateCloseInteractiveMirrorCall_doesNothing() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        final var displayMirror = mockDisplayMirror();
+        when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
+                .thenReturn(displayMirror);
+        final var returnedMirrorSurface = Mockito.mock(SurfaceControl.class);
+        IInteractiveMirror mirror = mSession.createInteractiveMirror(returnedMirrorSurface);
+        assertThat(mirror).isNotNull();
+        mirror.close();
+        clearInvocations(mTransaction, displayMirror);
+
+        mirror.close();
+        mirror.close();
+        mSession.close();
+
+        verifyNoInteractions(displayMirror, mTransaction);
     }
 
     @Test
@@ -1133,5 +1155,11 @@ public class ComputerControlSessionImplTest {
         public boolean matches(KeyEvent event) {
             return mKeyCode == event.getKeyCode() && mAction == event.getAction();
         }
+    }
+
+    private static WindowManagerInternal.DisplayMirror mockDisplayMirror() {
+        final var mirror = Mockito.mock(WindowManagerInternal.DisplayMirror.class);
+        when(mirror.getMirrorSurfaceControl()).thenReturn(new SurfaceControl());
+        return mirror;
     }
 }

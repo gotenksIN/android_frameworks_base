@@ -19862,14 +19862,6 @@ public final class Settings {
         public static final String CELL_ON = "cell_on";
 
 // QTI_BEGIN: 2020-05-11: Core: Add vibrating for outgoing call accepted support
-        /**
-         * Whether to vibrate while outgoing call is accepted
-         * The value 1 - vibrate, 0 - not
-         * @hide
-         */
-        public static final String VIBRATING_FOR_OUTGOING_CALL_ACCEPTED =
-                "vibrating_for_outgoing_call_accepted";
-
 // QTI_END: 2020-05-11: Core: Add vibrating for outgoing call accepted support
         /**
          * Global settings which can be accessed by instant apps.

@@ -150,7 +150,6 @@ import static android.view.WindowManager.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENAB
 import static android.view.WindowManager.PROPERTY_ALLOW_UNTRUSTED_ACTIVITY_EMBEDDING_STATE_SHARING;
 import static android.view.WindowManager.TRANSIT_RELAUNCH;
 import static android.view.WindowManager.hasWindowExtensionsEnabled;
-import static android.window.DesktopExperienceFlags.ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE;
 import static android.window.DesktopExperienceFlags.ENABLE_DENSITY_RESET_ON_CROSS_DISPLAYS_PIP_LAUNCH;
 import static android.window.DesktopExperienceFlags.ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS;
 import static android.window.DesktopExperienceFlags.ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS;
@@ -4136,8 +4135,6 @@ public final class ActivityRecord extends WindowToken {
         if (mDisplayContent != null) {
             mDisplayContent.mUnknownAppVisibilityController.appRemovedOrHidden(this);
         }
-
-        mAppCompatController.getDisplayCompatModePolicy().onActivityFinishing();
     }
 
     /**
@@ -4161,8 +4158,6 @@ public final class ActivityRecord extends WindowToken {
         }
 
         mRootWindowContainer.resumeFocusedTasksTopActivities();
-
-        mAppCompatController.getDisplayCompatModePolicy().onActivityDestroyed();
     }
 
     /**
@@ -8859,13 +8854,11 @@ public final class ActivityRecord extends WindowToken {
      */
     private boolean shouldRelaunchLocked(int changes, Configuration changesConfig) {
         int configChanged = info.getRealConfigChanged();
-        if (android.content.res.Flags.handleAllConfigChanges()) {
-            if ((configChanged & CONFIG_RESOURCES_UNUSED) != 0) {
-                // Don't relaunch any activities that claim they do not use resources at all.
-                // If they still do, the onConfigurationChanged() callback will get called to
-                // let them know anyway.
-                return false;
-            }
+        if ((configChanged & CONFIG_RESOURCES_UNUSED) != 0) {
+            // Don't relaunch any activities that claim they do not use resources at all.
+            // If they still do, the onConfigurationChanged() callback will get called to
+            // let them know anyway.
+            return false;
         }
 
         boolean onlyVrUiModeChanged = onlyVrUiModeChanged(changes, changesConfig);
@@ -9045,6 +9038,8 @@ public final class ActivityRecord extends WindowToken {
             // Note: don't need to call pauseIfSleepingLocked() here, because the caller will only
             // request resume if this activity is currently resumed, which implies we aren't
             // sleeping.
+            mAppCompatController.getDisplayCompatModePolicy()
+                    .onActivityRelaunching(configChangeFlags);
         }
 
         if (andResume) {
@@ -9086,20 +9081,10 @@ public final class ActivityRecord extends WindowToken {
         setState(RESTARTING_PROCESS, "restartActivityProcess");
 
         if (mTransitionController.isShellTransitionsEnabled()) {
-            if (!ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue()
-                    && killInvisibleProcessOrPrepareForRestart()) {
-                return;
-            }
             final Transition transition = new Transition(TRANSIT_RELAUNCH, 0 /* flags */,
                     mTransitionController, mWmService.mSyncEngine);
             mTransitionController.startCollectOrQueue(transition, (deferred) -> {
-                if (ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue()
-                        && killInvisibleProcessOrPrepareForRestart()) {
-                    transition.abort();
-                    return;
-                }
-                if (!ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue()
-                        && mState != RESTARTING_PROCESS) {
+                if (killInvisibleProcessOrPrepareForRestart()) {
                     transition.abort();
                     return;
                 }
@@ -9130,7 +9115,7 @@ public final class ActivityRecord extends WindowToken {
      * preparation to restart the process.
      */
     private boolean killInvisibleProcessOrPrepareForRestart() {
-        if (!mVisibleRequested || (!ENABLE_AUTO_RESTART_ON_DISPLAY_MOVE.isTrue() && mHaveState)) {
+        if (!mVisibleRequested) {
             // Kill its process immediately because the activity should be in background.
             // The activity state will be update to {@link #DESTROYED} in
             // {@link ActivityStack#cleanUp} when handling process died.

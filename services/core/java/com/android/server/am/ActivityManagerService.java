@@ -1150,12 +1150,20 @@ public class ActivityManagerService extends IActivityManager.Stub
         public void onActivityLaunched(long id, ComponentName name, int temperature,
                 String processName, int uid) {
             mAppProfiler.onActivityLaunched();
+
+            final String packageName = name.getPackageName();
             synchronized (ActivityManagerService.this) {
                 String processRecordName = Flags.appStartInfoProcessNameFix()
-                        ? processName : name.getPackageName();
+                        ? processName : packageName;
                 ProcessRecord record = getProcessRecordLocked(processRecordName, uid);
                 mProcessList.getAppStartInfoTracker().onActivityLaunched(id, name, temperature,
                         record);
+            }
+
+            if (android.os.profiling.Flags.profilingTriggerColdStart()
+                    && temperature == ApplicationStartInfo.START_TYPE_COLD
+                    && packageName != null) {
+                sendProfilingTrigger(uid, packageName, ProfilingTrigger.TRIGGER_TYPE_COLD_START);
             }
         }
 
@@ -1625,7 +1633,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     static final int BIND_APPLICATION_TIMEOUT_HARD_MSG = 83;
     static final int SERVICE_FGS_TIMEOUT_MSG = 84;
     static final int SERVICE_FGS_CRASH_TIMEOUT_MSG = 85;
-    static final int FOLLOW_UP_OOMADJUSTER_UPDATE_MSG = 86;
 
     static final int FIRST_BROADCAST_QUEUE_MSG = 200;
 
@@ -1983,9 +1990,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 } break;
                 case SERVICE_FGS_CRASH_TIMEOUT_MSG: {
                     mServices.onFgsCrashTimeout((ServiceRecord) msg.obj);
-                } break;
-                case FOLLOW_UP_OOMADJUSTER_UPDATE_MSG: {
-                    handleFollowUpOomAdjusterUpdate();
                 } break;
             }
         }
@@ -5273,15 +5277,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         mAnrHelper.appNotResponding(app, TimeoutRecord.forAppStart(anrMessage));
-    }
-
-    private void handleFollowUpOomAdjusterUpdate() {
-        // Remove any existing duplicate messages on the handler here while no lock is being held.
-        // If another follow up update is needed, it will be scheduled by OomAdjuster.
-        mHandler.removeMessages(FOLLOW_UP_OOMADJUSTER_UPDATE_MSG);
-        synchronized (this) {
-            mProcessStateController.runFollowUpUpdate();
-        }
     }
 
     /**
@@ -9150,8 +9145,12 @@ public class ActivityManagerService extends IActivityManager.Stub
             final int backgroundUserConsideredDispensableTimeSecs = res.getInteger(
                     com.android.internal.R.integer
                             .config_backgroundUserConsideredDispensableTimeSecs);
+            final boolean skipKeyguardWhenSwitchingToUnlockedUsers = res.getBoolean(
+                    com.android.internal.R.bool
+                            .config_multiuserSkipKeyguardWhenSwitchingToUnlockedUsers);
             mUserController.setInitialConfig(userSwitchUiEnabled, maxRunningUsers,
-                    delayUserDataLocking, backgroundUserConsideredDispensableTimeSecs);
+                    delayUserDataLocking, backgroundUserConsideredDispensableTimeSecs,
+                    skipKeyguardWhenSwitchingToUnlockedUsers);
         }
         mAppErrors.loadAppsNotReportingCrashesFromConfig(res.getString(
                 com.android.internal.R.string.config_appsNotReportingCrashes));
@@ -14904,8 +14903,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                     app = getProcessRecordLocked(ai.processName, uid);
                 } else {
                     // Instrumentation can kill and relaunch even persistent processes
-                    forceStopPackageLocked(ii.targetPackage, -1, true, false, true, true, false,
-                            false, userId, "start instr");
+                    final int appIdToKill = runInPccSandbox ? UserHandle.getAppId(uid) : -1;
+                    forceStopPackageLocked(ii.targetPackage, appIdToKill, true, false, true, true,
+                            false, false, userId, "start instr");
                     // Inform usage stats to make the target package active
                     if (mUsageStatsService != null) {
                         mUsageStatsService.reportEvent(ii.targetPackage, userId,
@@ -14917,7 +14917,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     app.mProfile.addHostingComponentType(HOSTING_COMPONENT_TYPE_INSTRUMENTATION);
                 }
 
-                mProcessStateController.setActiveInstrumentation(app, activeInstr);
+                app.setActiveInstrumentation(activeInstr);
                 activeInstr.mFinished = false;
                 activeInstr.mSourceUid = callingUid;
                 activeInstr.mRunningProcesses.add(app);
@@ -15064,7 +15064,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         abiOverride,
                         ZYGOTE_POLICY_FLAG_EMPTY);
 
-                mProcessStateController.setActiveInstrumentation(app, activeInstr);
+                app.setActiveInstrumentation(activeInstr);
                 activeInstr.mFinished = false;
                 activeInstr.mSourceUid = callingUid;
                 activeInstr.mRunningProcesses.add(app);
@@ -15202,7 +15202,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
 
                 instr.removeProcess(app);
-                mProcessStateController.setActiveInstrumentation(app, null);
+                app.setActiveInstrumentation(null);
             }
             app.mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_INSTRUMENTATION);
 
@@ -15219,8 +15219,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                             Process.getAppUidForSdkSandboxUid(app.uid));
                 }
             } else if (!instr.mNoRestart) {
-                forceStopPackageLocked(app.info.packageName, -1, false, false, true, true, false,
-                        false, app.userId, "finished inst");
+                final int appIdToKill =
+                        Process.isPccUid(app.uid) ? UserHandle.getAppId(app.uid) : -1;
+                forceStopPackageLocked(app.info.packageName, appIdToKill, false, false, true, true,
+                        false, false, app.userId, "finished inst");
             }
         } finally {
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
@@ -15781,12 +15783,12 @@ public class ActivityManagerService extends IActivityManager.Stub
         return (ProcessRecord) wpc.mOwner;
     }
 
-    void updateTopAppListeners(ProcessRecord r) {
+    void updateTopAppListeners(ProcessRecordInternal r) {
         String pkg;
         int uid;
         if (r != null) {
             pkg = r.processName;
-            uid = r.info.uid;
+            uid = r.getApplicationUid();
         } else {
             pkg = null;
             uid = -1;
@@ -19989,6 +19991,28 @@ public class ActivityManagerService extends IActivityManager.Stub
         public void onReportOomAdjMessage(String msg) {
             reportOomAdjMessageLocked(msg);
         }
+
+        @Override
+        @GuardedBy("ActivityManagerService.this")
+        public void enqueuePendingTopAppIfNecessaryLocked() {
+            mPendingStartActivityUids.enqueuePendingTopAppIfNecessaryLocked(
+                    ActivityManagerService.this);
+        }
+
+        @Override
+        public void setFifoPriority(@NonNull ProcessRecordInternal app, boolean enable) {
+            ActivityManagerService.setFifoPriority(app, enable);
+        }
+
+        @Override
+        public boolean scheduleAsFifoPriority(int tid, boolean suppressLogs) {
+            return ActivityManagerService.scheduleAsFifoPriority(tid, suppressLogs);
+        }
+
+        @Override
+        public double getFreeSwapPercent() {
+            return CachedAppOptimizer.getFreeSwapPercent();
+        }
     }
 
     @VisibleForTesting
@@ -20267,11 +20291,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             app = mPidsSelfLocked.get(debugPid);
         }
         mCachedAppOptimizer.binderError(debugPid, app, code, flags, err);
-    }
-
-    @GuardedBy("this")
-    void enqueuePendingTopAppIfNecessaryLocked() {
-        mPendingStartActivityUids.enqueuePendingTopAppIfNecessaryLocked(this);
     }
 
     @GuardedBy("this")

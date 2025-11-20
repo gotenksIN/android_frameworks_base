@@ -888,7 +888,7 @@ public class TelecomManager {
      * @hide
      */
     @Deprecated
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_OFF = 0;
 
@@ -900,7 +900,7 @@ public class TelecomManager {
      * @hide
      */
     @Deprecated
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_FULL = 1;
 
@@ -913,7 +913,7 @@ public class TelecomManager {
      * @hide
      */
     @Deprecated
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_HCO = 2;
 
@@ -926,7 +926,7 @@ public class TelecomManager {
      * @hide
      */
     @Deprecated
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_VCO = 3;
 
@@ -2385,9 +2385,9 @@ public class TelecomManager {
     @SystemApi
     @Deprecated
     @RequiresPermission(READ_PRIVILEGED_PHONE_STATE)
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     public @TtyMode int getCurrentTtyMode() {
-        if (Flags.moveGetTtyModeToTelephonyManager()) {
+        if (android.telecom.flags.Flags.moveGetTtyModeToTelephonyManager()) {
             TelephonyManager tm = mContext.getSystemService(TelephonyManager.class);
             if (tm != null) {
                 return tm.getCurrentTtyMode();

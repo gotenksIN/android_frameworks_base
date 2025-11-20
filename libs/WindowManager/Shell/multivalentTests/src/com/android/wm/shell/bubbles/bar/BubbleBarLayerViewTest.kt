@@ -76,6 +76,7 @@ import com.android.wm.shell.shared.TransactionPool
 import com.android.wm.shell.shared.animation.PhysicsAnimatorTestUtils
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.bubbles.BubbleBarUpdate
+import com.android.wm.shell.shared.bubbles.BubbleConstants.BUBBLE_BAR_EXPANDED_SCRIM_ALPHA
 import com.android.wm.shell.shared.bubbles.DeviceConfig
 import com.android.wm.shell.shared.bubbles.DragZone
 import com.android.wm.shell.shared.bubbles.DragZoneFactory
@@ -480,9 +481,10 @@ class BubbleBarLayerViewTest {
         val handleView = bubbleBarLayerView.findViewById<View>(R.id.bubble_bar_handle_view)
         assertThat(handleView).isNotNull()
 
-        val dragZones = dragZoneFactory.createSortedDragZones(
-            DraggedObject.ExpandedView(BubbleBarLocation.LEFT)
-        )
+        val dragZones =
+            dragZoneFactory.createSortedDragZones(
+                DraggedObject.ExpandedView(BubbleBarLocation.LEFT)
+            )
         val rightDragZone = dragZones.filterIsInstance<DragZone.Bubble.Right>().first().bounds.rect
         val rightPoint = PointF(rightDragZone.exactCenterX(), rightDragZone.exactCenterY())
         val leftDragZone = dragZones.filterIsInstance<DragZone.Bubble.Left>().first().bounds.rect
@@ -637,6 +639,44 @@ class BubbleBarLayerViewTest {
         assertThat(bubbleBarLayerView.isAnimatingBubbleTracked(bubble)).isFalse()
 
         assertThat(bubbleBarLayerView.children.count { it is BubbleBarExpandedView }).isEqualTo(1)
+    }
+
+    @Test
+    fun showAndCollapse_updatesScrimAlpha() {
+        val bubble = createBubble("first")
+        // Scrim is the first child added.
+        val scrimView = bubbleBarLayerView.getChildAt(0)
+        assertThat(scrimView.alpha).isEqualTo(0f)
+
+        // Show expanded view
+        getInstrumentation().runOnMainSync { bubbleBarLayerView.showExpandedView(bubble) }
+        waitForExpandedViewAnimation()
+
+        // Verify scrim is visible with the correct alpha
+        assertThat(scrimView.alpha).isEqualTo(BUBBLE_BAR_EXPANDED_SCRIM_ALPHA)
+
+        // Collapse the view
+        getInstrumentation().runOnMainSync { bubbleBarLayerView.collapse() }
+        waitForCollapseViewAnimation()
+
+        // Verify scrim is hidden
+        assertThat(scrimView.alpha).isEqualTo(0f)
+    }
+
+    @Test
+    fun testRemoveBubbleCleansUpBubbleViews() {
+        val bubble = createBubble("first")
+        getInstrumentation().runOnMainSync { bubbleBarLayerView.showExpandedView(bubble) }
+        waitForExpandedViewAnimation()
+
+        assertThat(bubble.bubbleBarExpandedView).isNotNull()
+        assertThat(bubble.icon).isNotNull()
+
+        val endAction = Runnable {}
+        getInstrumentation().runOnMainSync { bubbleBarLayerView.removeBubble(bubble, endAction) }
+        waitForCollapseViewAnimation()
+        assertThat(bubble.bubbleBarExpandedView).isNull()
+        assertThat(bubble.getIconView()).isNull()
     }
 
     private fun createBubble(key: String): Bubble {

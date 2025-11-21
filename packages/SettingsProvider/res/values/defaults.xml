@@ -440,10 +440,8 @@
     <bool name="def_sound_effects_enabled">true</bool>
 <!-- QTI_BEGIN: 2020-05-15: Telephony: FR30706: Add a playing tone setting.-->
 <!-- QTI_END: 2020-05-15: Telephony: FR30706: Add a playing tone setting.-->
-    <!-- Default for connected mo call tones enabled -->
 <!-- QTI_BEGIN: 2020-02-02: Android_UI: SettingsProvider: add time format default value settings-->
 <!-- QTI_END: 2020-02-02: Android_UI: SettingsProvider: add time format default value settings-->
-    <bool name="def_call_connected_tones_enabled">false</bool>
 
     <!-- Development settings -->
 <!-- QTI_BEGIN: 2020-02-02: Android_UI: SettingsProvider: add time format default value settings-->

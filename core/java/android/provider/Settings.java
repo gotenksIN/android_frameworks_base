@@ -5405,13 +5405,6 @@ public final class Settings {
                 "display_color_mode_vendor_hint";
 
 // QTI_BEGIN: 2020-05-15: Core: FR30706: Add a playing tone setting.
-        /**
-         * Whether to play tone while outgoing call is accepted.
-         * The value 1 - vibrate, 0 - not
-         * @hide
-         */
-        public static final String CALL_CONNECTED_TONE_ENABLED = "call_connected_tone_enabled";
-
 // QTI_END: 2020-05-15: Core: FR30706: Add a playing tone setting.
         /**
          * The user selected min refresh rate in frames per second. If infinite, the user wants
@@ -6923,7 +6916,6 @@ public final class Settings {
             PRIVATE_SETTINGS.add(PREFERRED_REGION);
             PRIVATE_SETTINGS.add(MOUSE_SCROLLING_ACCELERATION);
 // QTI_BEGIN: 2020-05-15: Core: FR30706: Add a playing tone setting.
-            PRIVATE_SETTINGS.add(CALL_CONNECTED_TONE_ENABLED);
 // QTI_END: 2020-05-15: Core: FR30706: Add a playing tone setting.
             PRIVATE_SETTINGS.add(MOUSE_SCROLLING_SPEED);
         }
@@ -19862,14 +19854,6 @@ public final class Settings {
         public static final String CELL_ON = "cell_on";
 
 // QTI_BEGIN: 2020-05-11: Core: Add vibrating for outgoing call accepted support
-        /**
-         * Whether to vibrate while outgoing call is accepted
-         * The value 1 - vibrate, 0 - not
-         * @hide
-         */
-        public static final String VIBRATING_FOR_OUTGOING_CALL_ACCEPTED =
-                "vibrating_for_outgoing_call_accepted";
-
 // QTI_END: 2020-05-11: Core: Add vibrating for outgoing call accepted support
         /**
          * Global settings which can be accessed by instant apps.

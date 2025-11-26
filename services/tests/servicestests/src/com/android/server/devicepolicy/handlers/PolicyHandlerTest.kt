@@ -84,8 +84,8 @@ open class PolicyHandlerTest {
                 key,
                 /*allowedScopes=*/ setOf(POLICY_SCOPE_USER, POLICY_SCOPE_DEVICE),
                 /*affectedResource=*/ RESOURCE_PER_USER,
-                /*requiredPermission=*/ null,
-                /*requiredCrossUserPermission=*/ null,
+                /*requiredPermission=*/ "testPermission",
+                /*requiredCrossUserPermission=*/ "testCrossUserPermission",
                 /*allowedDpcTypes=*/ setOf(),
                 /*allowedValues=*/ setOf(VALUE_1),
             )
@@ -140,10 +140,7 @@ open class PolicyHandlerTest {
         val handler =
             object :
                 PolicyHandler<Int>(Policy.key, Policy.metadata, Policy.definition, mockDelegate) {
-                override fun convertValue(
-                    caller: CallerIdentity,
-                    transportValue: PolicyValueTransport?,
-                ): Int? {
+                override fun convertValue(transportValue: PolicyValueTransport?): Int? {
                     methodCalls.add("convertValue")
                     return 5
                 }
@@ -352,10 +349,7 @@ open class PolicyHandlerTest {
         val handler =
             object :
                 PolicyHandler<Int>(Policy.key, Policy.metadata, Policy.definition, mockDelegate) {
-                override fun convertValue(
-                    caller: CallerIdentity,
-                    transportValue: PolicyValueTransport?,
-                ): Int? {
+                override fun convertValue(transportValue: PolicyValueTransport?): Int? {
                     methodCalls.add("convertValue")
                     return 5
                 }
@@ -518,6 +512,51 @@ open class PolicyHandlerTest {
         verify(mockPermissionChecker, never())
             .enforce(eq("thePermissionThatShallNotBeChecked"), any())
         verify(mockPermissionChecker).enforce(eq("theCrossUserPermissionThatShallBeChecked"), any())
+        verifyNoMoreInteractions(mockPermissionChecker)
+    }
+
+    @Test
+    fun checkPermissions_missingRequiredPermission_throwsException() {
+        val metadata = EnumPolicyMetadata(
+            Policy.key,
+            /* allowedScopes= */ setOf(POLICY_SCOPE_USER),
+            /* affectedResource= */ RESOURCE_PER_USER,
+            /* requiredPermission= */ null,
+            /* requiredCrossUserPermission= */ "testCrossUserPermission",
+            /* allowedDpcTypes= */ setOf(),
+            /* allowedValues= */ setOf(Policy.VALUE_1),
+        )
+
+        val handler = createHandler(metadata = metadata)
+        val theCaller = anyCaller
+
+        val error = assertFailsWith<IllegalStateException> {
+            handler.checkPermissions(theCaller, POLICY_SCOPE_USER)
+        }
+
+        assertThat(error).hasMessageThat().contains("no requiredPermission")
+        verifyNoMoreInteractions(mockPermissionChecker)
+    }
+
+    @Test
+    fun checkPermissions_missingRequiredCrossUserPermission_throwsException() {
+        val metadata =
+            EnumPolicyMetadata(
+                Policy.key,
+                /* allowedScopes= */ setOf(POLICY_SCOPE_DEVICE),
+                /* affectedResource= */ RESOURCE_PER_USER,
+                /* requiredPermission= */ "thePermission",
+                /* requiredCrossUserPermission= */ null,
+                /* allowedDpcTypes= */ setOf(),
+                /* allowedValues= */ setOf(Policy.VALUE_1),
+            )
+
+        val handler = createHandler(metadata = metadata)
+        val theCaller = anyCaller
+
+        handler.checkPermissions(theCaller, POLICY_SCOPE_DEVICE)
+
+        verify(mockPermissionChecker).enforce("thePermission", theCaller)
         verifyNoMoreInteractions(mockPermissionChecker)
     }
 

@@ -245,6 +245,17 @@ flag {
 }
 
 flag {
+    name: "qs_power_icon_refresh"
+    namespace: "systemui"
+    description: "Replaces the footer power icon with a heavier weight"
+    bug: "452644748"
+    is_fixed_read_only: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
    name: "global_actions_emphasized_font"
    namespace: "systemui"
    description: "Use emphasized font for global actions."
@@ -1388,6 +1399,13 @@ flag {
     namespace: "systemui"
     description: "Larger privacy indicators on large screen"
     bug: "381864715"
+}
+
+flag {
+    name: "grouped_privacy_chip"
+    namespace: "systemui"
+    description: "New UI for privacy chips with grouped indicator and caret"
+    bug: "446923994"
 }
 
 flag {

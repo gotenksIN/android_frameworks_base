@@ -21,7 +21,6 @@ import android.app.ActivityManager
 import android.app.ActivityManager.RecentTaskInfo
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions
-import android.app.ActivityTaskManager
 import android.app.ActivityTaskManager.INVALID_TASK_ID
 import android.app.AppOpsManager
 import android.app.KeyguardManager
@@ -849,11 +848,7 @@ class DesktopTasksController(
         try {
             userRepositories.current.getExpandedTasksOrdered(disconnectedDisplayId).forEach {
                 logD("addOnDisplayDisconnect: taking a snapshot of=$it before disconnect")
-                if (Flags.reduceTaskSnapshotMemoryUsage()) {
-                    taskSnapshotManager.takeTaskSnapshot(it, true)
-                } else {
-                    ActivityTaskManager.getService().getTaskSnapshot(it, false)
-                }
+                taskSnapshotManager.takeTaskSnapshot(it, true)
             }
         } catch (e: RemoteException) {
             logE("addOnDisplayDisconnect: failed to take task snapshot", e)
@@ -6510,13 +6505,9 @@ class DesktopTasksController(
         }
         // A freeform drag-move ended, remove the indicator immediately.
         releaseVisualIndicator()
-        taskbarDesktopTaskListener?.onTaskbarCornerRoundingUpdate(
-            doesAnyTaskRequireTaskbarRounding(
-                displayId = taskInfo.displayId,
-                userId = taskInfo.userId,
-            ),
-            taskInfo.displayId,
-        )
+
+        // We don't update the taskbar corner rounding of the new display as it's done each resize
+        // operation method (e.g., [toggleDesktopTaskSize]) accordingly.
         if (taskInfo.displayId != motionEvent.displayId) {
             // The window has moved to a new display, both of the display needs to receive the
             // callback.

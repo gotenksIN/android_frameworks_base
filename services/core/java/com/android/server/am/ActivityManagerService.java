@@ -173,6 +173,7 @@ import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_UID_OBSER
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.am.CachedAppOptimizer.getUnfreezeReasonCodeFromOomAdjReason;
+import static com.android.server.am.Flags.FLAG_ENABLE_GET_PACKAGE_NAMES_FOR_PID;
 import static com.android.server.am.LogcatFetcher.LOGCAT_TIMEOUT_SEC;
 import static com.android.server.am.LogcatFetcher.RESERVED_BYTES_PER_LOGCAT_LINE;
 import static com.android.server.am.MemoryStatUtil.hasMemcg;
@@ -224,6 +225,7 @@ import static com.android.systemui.shared.Flags.enableHomeDelay;
 import android.Manifest;
 import android.Manifest.permission;
 import android.annotation.EnforcePermission;
+import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.PermissionMethod;
@@ -491,6 +493,8 @@ import com.android.server.UiThread;
 import com.android.server.Watchdog;
 import com.android.server.am.LowMemDetector.MemFactor;
 import com.android.server.am.psc.ActiveUidsInternal;
+import com.android.server.am.psc.OomAdjuster;
+import com.android.server.am.psc.OomAdjusterDebugLogger;
 import com.android.server.am.psc.ProcessListInternal.ProcessChangeItem;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.am.psc.UidRecordInternal;
@@ -583,19 +587,19 @@ public class ActivityManagerService extends IActivityManager.Stub
             "persist.sys.device_provisioned";
 
     static final String TAG = TAG_WITH_CLASS_NAME ? "ActivityManagerService" : TAG_AM;
-    static final String TAG_BACKUP = TAG + POSTFIX_BACKUP;
+    public static final String TAG_BACKUP = TAG + POSTFIX_BACKUP;
     private static final String TAG_CLEANUP = TAG + POSTFIX_CLEANUP;
     private static final String TAG_CONFIGURATION = TAG + POSTFIX_CONFIGURATION;
     private static final String TAG_LOCKTASK = TAG + POSTFIX_LOCKTASK;
-    static final String TAG_LRU = TAG + POSTFIX_LRU;
+    public static final String TAG_LRU = TAG + POSTFIX_LRU;
     static final String TAG_MU = TAG + POSTFIX_MU;
     static final String TAG_NETWORK = TAG + POSTFIX_NETWORK;
-    static final String TAG_OOM_ADJ = TAG + POSTFIX_OOM_ADJ;
+    public static final String TAG_OOM_ADJ = TAG + POSTFIX_OOM_ADJ;
     private static final String TAG_POWER = TAG + POSTFIX_POWER;
     static final String TAG_PROCESSES = TAG + POSTFIX_PROCESSES;
     private static final String TAG_SERVICE = TAG + POSTFIX_SERVICE;
     private static final String TAG_SWITCH = TAG + POSTFIX_SWITCH;
-    static final String TAG_UID_OBSERVERS = TAG + POSTFIX_UID_OBSERVERS;
+    public static final String TAG_UID_OBSERVERS = TAG + POSTFIX_UID_OBSERVERS;
 
     // Mock "pretend we're idle now" broadcast action to the job scheduler; declared
     // here so that while the job scheduler can depend on AMS, the other way around
@@ -8246,8 +8250,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                         for (int provi = ppr.numberOfProviders() - 1; provi >= 0; provi--) {
                             ContentProviderRecord cpr = ppr.getProviderAt(provi);
 
-                            for (int i = cpr.connections.size() - 1; i >= 0; i--) {
-                                ContentProviderConnection conn = cpr.connections.get(i);
+                            for (int i = cpr.mConnections.size() - 1; i >= 0; i--) {
+                                ContentProviderConnection conn = cpr.mConnections.get(i);
                                 ProcessRecord client = conn.client;
                                 if (client.uid == clientUid) {
                                     return Boolean.TRUE;
@@ -14888,7 +14892,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             final boolean runInPccSandbox = (flags & ActivityManager.INSTR_FLAG_RUN_IN_PCC) != 0;
             final int uid = runInPccSandbox ? ai.pccUid : ai.uid;
-            if (runInPccSandbox && !Process.isPccUid(uid)) {
+            if (runInPccSandbox && !Process.isPrivateComputeCoreUid(uid)) {
                 reportStartInstrumentationFailureLocked(watcher, className,
                         "Instrumentation target " + ii.targetPackage
                                 + " does not have a valid PCC uid.");
@@ -15220,7 +15224,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
             } else if (!instr.mNoRestart) {
                 final int appIdToKill =
-                        Process.isPccUid(app.uid) ? UserHandle.getAppId(app.uid) : -1;
+                        Process.isPrivateComputeCoreUid(app.uid)
+                            ? UserHandle.getAppId(app.uid) : -1;
                 forceStopPackageLocked(app.info.packageName, appIdToKill, false, false, true, true,
                         false, false, app.userId, "finished inst");
             }
@@ -17057,6 +17062,23 @@ public class ActivityManagerService extends IActivityManager.Stub
                 String processName, BindServiceFlags flags) throws RemoteException {
             return bindSdkSandboxServiceInternal(service, conn, clientAppUid,
                     clientApplicationThread, clientAppPackage, processName, flags.getValue());
+        }
+
+        @Override
+        @FlaggedApi(FLAG_ENABLE_GET_PACKAGE_NAMES_FOR_PID)
+        @NonNull
+        public String[] getPackageNamesForPid(int pid, int uid) {
+            synchronized (mPidsSelfLocked) {
+                ProcessRecord proc = mPidsSelfLocked.get(pid);
+                if (proc == null || proc.uid != uid) {
+                    return new String[0];
+                }
+                String[] packageNames = proc.getProcessPackageNames();
+                if (packageNames == null || packageNames.length == 0) {
+                    return new String[0];
+                }
+                return Arrays.copyOf(packageNames, packageNames.length);
+            }
         }
 
         private boolean bindSdkSandboxServiceInternal(Intent service, ServiceConnection conn,

@@ -128,10 +128,16 @@ public class ComputerControlSessionProcessor {
         validateParams(attributionSource, params);
         startHandlerThreadIfNeeded();
 
-        final int isOpAllowed = mAppOpsManager.noteOpNoThrow(
+        final int opResult = mAppOpsManager.noteOpNoThrow(
                 AppOpsManager.OP_COMPUTER_CONTROL, attributionSource, "create session");
-        if (isOpAllowed == AppOpsManager.MODE_ALLOWED) {
+        if (opResult == AppOpsManager.MODE_ALLOWED) {
             mHandler.post(() -> createSession(attributionSource, params, callback));
+            return;
+        } else if (opResult == AppOpsManager.MODE_IGNORED
+                || opResult == AppOpsManager.MODE_ERRORED) {
+            Slog.w(TAG, "No permission to request computer control session: " + params.getName());
+            dispatchSessionCreationFailed(callback, params,
+                    ComputerControlSession.ERROR_PERMISSION_DENIED);
             return;
         }
 
@@ -169,7 +175,8 @@ public class ComputerControlSessionProcessor {
         });
 
         final String callerPackageName = attributionSource.getPackageName();
-        if (!mAllowlistController.isPackageAllowedToCreateSession(callerPackageName)) {
+        if (!mAllowlistController.isPackageAllowedToCreateSession(callerPackageName,
+                mPackageManager)) {
             throw new SecurityException("Caller " + callerPackageName + " is not allowlisted");
         }
 
@@ -185,19 +192,11 @@ public class ComputerControlSessionProcessor {
         }
 
         Binder.withCleanCallingIdentity(() -> {
-            // Ensure all packages the ComputerControl session should be able to launch are:
-            // 1) Applications with a valid launcher Intent
-            // 2) NOT PermissionController
-            // 3) Allowlisted in DeviceConfig
             for (int i = 0; i < params.getTargetPackageNames().size(); i++) {
                 final String packageName = params.getTargetPackageNames().get(i);
 
-                if (packageName == null
-                        || packageName.isEmpty()
-                        || mPackageManager.getPermissionControllerPackageName().equals(packageName)
-                        || mPackageManager.getLaunchIntentForPackage(packageName) == null
-                        || !mAllowlistController.isPackageAutomatable(
-                                packageName, callerPackageName)) {
+                if (!mAllowlistController.isPackageAutomatable(
+                        packageName, callerPackageName, mPackageManager)) {
                     throw new IllegalArgumentException(
                             "Invalid target package for ComputerControl: " + packageName);
                 }

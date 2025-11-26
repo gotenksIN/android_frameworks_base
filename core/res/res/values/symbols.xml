@@ -386,7 +386,7 @@
   <java-symbol type="bool" name="config_isMainUserPermanentAdmin"/>
   <java-symbol type="bool" name="config_disallowRemovingLastAdminUser"/>
   <java-symbol type="bool" name="config_supportProfilesOnNonMainUser"/>
-  <java-symbol type="bool" name="config_createInitialUser"/>
+  <java-symbol type="bool" name="config_createInitialAdminUserOnHsum"/>
   <java-symbol type="bool" name="config_designateMainUser"/>
   <java-symbol type="bool" name="config_canSwitchToHeadlessSystemUser"/>
   <java-symbol type="bool" name="config_enableMultiUserUI"/>
@@ -5075,6 +5075,8 @@
 
   <java-symbol type="dimen" name="default_background_blur_radius" />
   <java-symbol type="array" name="config_keep_warming_services" />
+  <java-symbol type="string" name="config_virtual_gamepad_package_name" />
+  <java-symbol type="string" name="config_virtual_gamepad_activity_name" />
   <java-symbol type="string" name="config_display_features" />
   <java-symbol type="array" name="config_device_state_postures" />
   <java-symbol type="array" name="config_deviceTabletopRotations" />
@@ -6504,4 +6506,7 @@
 
   <!-- Whether user information setup is enabled in SuW. -->
   <java-symbol type="bool" name="config_enableUserInfoSetupInSuw" />
+
+  <!-- Whether to keep the task on back pressed. -->
+  <java-symbol type="bool" name="config_alwaysMoveTaskToBackOnBackPressed" />
 </resources>

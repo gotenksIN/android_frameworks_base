@@ -1935,10 +1935,12 @@ public abstract class WMShellModule {
     static AppToWebEducationFilter provideAppToWebEducationFilter(
             Context context,
             AppToWebEducationDatastoreRepository appToWebEducationDatastoreRepository,
-            AppToWebRepository appToWebRepository
+            AppToWebRepository appToWebRepository,
+            FocusTransitionObserver focusTransitionObserver
     ) {
         return new AppToWebEducationFilter(
-                context, appToWebEducationDatastoreRepository, appToWebRepository);
+                context, appToWebEducationDatastoreRepository, appToWebRepository,
+                focusTransitionObserver);
     }
 
     @OptIn(markerClass = ExperimentalCoroutinesApi.class)
@@ -2087,7 +2089,7 @@ public abstract class WMShellModule {
         if (PinnedLayerFlags.isPinnedLayerEnabled()) {
             return Optional.of(
                     new NormalAppLayerController(
-                            shellInit, transitions, desktopUserRepositoriesOptional.get(),
+                            shellInit, transitions, desktopUserRepositoriesOptional.orElse(null),
                             desktopTasksController.orElse(null), pinnedLayerController.get(),
                             desktopState));
         }

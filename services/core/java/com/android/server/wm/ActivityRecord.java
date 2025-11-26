@@ -437,7 +437,7 @@ public final class ActivityRecord extends WindowToken {
     // crashes if the UI thread was hung. We put this timeout one second behind
     // the ANR timeout so these situations will generate ANR instead of
     // Surface lost or other errors.
-    private static final int STOP_TIMEOUT = 11 * 1000;
+    static final int STOP_TIMEOUT = 11 * 1000;
 
     // How long we wait until giving up on an activity telling us it has
     // finished destroying itself.
@@ -6547,6 +6547,7 @@ public final class ActivityRecord extends WindowToken {
             Slog.i(TAG, "Clear pending relaunch count on stopped " + this);
             clearRelaunching();
         }
+        app.onActivityStopped(this);
 
         if (finishing) {
             abortAndClearOptionsAnimation();
@@ -6599,7 +6600,6 @@ public final class ActivityRecord extends WindowToken {
         // stop tracking
         mSplashScreenStyleSolidColor = true;
 
-        mAtmService.mBackNavigationController.removePredictiveSurfaceIfNeeded(this);
         if (mStartingWindow != null) {
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Finish starting %s"
                     + ": first real window is shown, no animation", win.mToken);

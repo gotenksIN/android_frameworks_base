@@ -36,7 +36,6 @@ import static android.media.AudioSystem.isBluetoothOutDevice;
 import static android.media.AudioSystem.isBluetoothScoOutDevice;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
-import static com.android.media.audio.Flags.asDeviceConnectionFailure;
 import static com.android.media.audio.Flags.stereoSpatializationBinauralTransaural;
 import static com.android.media.audio.Flags.updatePreferredDevicesForStrategy;
 
@@ -2354,15 +2353,7 @@ public class AudioDeviceInventory {
                     "APM failed to make available A2DP device addr="
                             + Utils.anonymizeBluetoothAddress(address)
                             + " error=" + res).printSlog(EventLogger.Event.ALOGE, TAG));
-            // If error is audioserver died,add device to the list,so that during restart AS will
-            // restore by triggering onRestoreDevices to add A2DP device to APM by calling
-            // setDeviceConnection
-            if (res != AudioSystem.AUDIO_STATUS_SERVER_DIED) {
-                return;
-            }
-            if (asDeviceConnectionFailure()) {
-                return;
-            }
+            return;
         } else {
             final DeviceInfo di = new DeviceInfo(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP, name,
                     address, btInfo.mDevice.getIdentityAddress(), codec);
@@ -2663,9 +2654,7 @@ public class AudioDeviceInventory {
                     "APM failed to make available A2DP source device addr="
                             + Utils.anonymizeBluetoothAddress(address)
                             + " error=" + res).printSlog(EventLogger.Event.ALOGE, TAG));
-            if (asDeviceConnectionFailure()) {
-                return;
-            }
+            return;
         } else {
             final DeviceInfo di = new DeviceInfo(AudioSystem.DEVICE_IN_BLUETOOTH_A2DP, "", address);
             String message = "A2DP source device addr=" + Utils.anonymizeBluetoothAddress(address);
@@ -2708,11 +2697,8 @@ public class AudioDeviceInventory {
         if (res == AudioSystem.AUDIO_STATUS_ERROR) {
             AudioService.sDeviceLogger.enqueueAndSlog(
                     "APM failed to make available HearingAid addr=" + address
-                            + " error=" + res,
-                    EventLogger.Event.ALOGE, TAG);
-            if (asDeviceConnectionFailure()) {
-                return;
-            }
+                            + " error=" + res, EventLogger.Event.ALOGE, TAG);
+            return;
         } else {
             final DeviceInfo di = new DeviceInfo(DEVICE_OUT_HEARING_AID, name, address);
             final String mssgPrefix = "HearingAid addr=" + address;
@@ -2857,9 +2843,7 @@ public class AudioDeviceInventory {
                 AudioService.sDeviceLogger.enqueueAndSlog(
                         "APM failed to make available LE Audio device addr=" + address
                                 + " error=" + res, EventLogger.Event.ALOGE, TAG);
-                if (asDeviceConnectionFailure()) {
-                    return;
-                }
+                return;
             } else {
                 final DeviceInfo di = new DeviceInfo(
                         device, name, address,

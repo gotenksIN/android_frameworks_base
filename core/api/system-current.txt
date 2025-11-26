@@ -97,6 +97,7 @@ package android {
     field public static final String BIND_RUNTIME_PERMISSION_PRESENTER_SERVICE = "android.permission.BIND_RUNTIME_PERMISSION_PRESENTER_SERVICE";
     field @FlaggedApi("android.app.contentsafety.flags.enable_contentsafety") public static final String BIND_SANDBOXED_CONTENT_SAFETY_SERVICE = "android.permission.BIND_SANDBOXED_CONTENT_SAFETY_SERVICE";
     field public static final String BIND_SATELLITE_SERVICE = "android.permission.BIND_SATELLITE_SERVICE";
+    field @FlaggedApi("android.app.contentsafety.flags.enable_contentsafety") public static final String BIND_SETTINGS_CONTENT_SAFETY_SERVICE = "android.permission.BIND_SETTINGS_CONTENT_SAFETY_SERVICE";
     field public static final String BIND_SETTINGS_SUGGESTIONS_SERVICE = "android.permission.BIND_SETTINGS_SUGGESTIONS_SERVICE";
     field public static final String BIND_SOUND_TRIGGER_DETECTION_SERVICE = "android.permission.BIND_SOUND_TRIGGER_DETECTION_SERVICE";
     field @FlaggedApi("android.permission.flags.supervision_role_enabled") public static final String BIND_SUPERVISION_APP_SERVICE = "android.permission.BIND_SUPERVISION_APP_SERVICE";
@@ -319,7 +320,7 @@ package android {
     field @FlaggedApi("com.android.nfc.module.flags.tap_to_x") public static final String PERFORM_GESTURE_EXCHANGE = "android.permission.PERFORM_GESTURE_EXCHANGE";
     field public static final String PERFORM_IMS_SINGLE_REGISTRATION = "android.permission.PERFORM_IMS_SINGLE_REGISTRATION";
     field public static final String PERFORM_SIM_ACTIVATION = "android.permission.PERFORM_SIM_ACTIVATION";
-    field @FlaggedApi("android.app.bridged_notifications_api") public static final String POST_BRIDGED_NOTIFICATIONS = "android.permission.POST_BRIDGED_NOTIFICATIONS";
+    field @FlaggedApi("android.app.bridged_notifications") public static final String POST_BRIDGED_NOTIFICATIONS = "android.permission.POST_BRIDGED_NOTIFICATIONS";
     field public static final String POWER_SAVER = "android.permission.POWER_SAVER";
     field @FlaggedApi("android.permission.flags.factory_reset_prep_permission_apis") public static final String PREPARE_FACTORY_RESET = "android.permission.PREPARE_FACTORY_RESET";
     field public static final String PROVIDE_DEFAULT_ENABLED_CREDENTIAL_SERVICE = "android.permission.PROVIDE_DEFAULT_ENABLED_CREDENTIAL_SERVICE";
@@ -351,6 +352,7 @@ package android {
     field public static final String READ_INSTALL_SESSIONS = "android.permission.READ_INSTALL_SESSIONS";
     field @FlaggedApi("android.security.afl_api") public static final String READ_INTRUSION_DETECTION_STATE = "android.permission.READ_INTRUSION_DETECTION_STATE";
     field @FlaggedApi("android.location.flags.change_get_adas_allowlist_from_hidden_to_system") public static final String READ_LOCATION_BYPASS_ALLOWLIST = "android.permission.READ_LOCATION_BYPASS_ALLOWLIST";
+    field @FlaggedApi("android.permission.flags.read_media_documents_permission_enabled") public static final String READ_MEDIA_DOCUMENTS = "android.permission.READ_MEDIA_DOCUMENTS";
     field public static final String READ_NETWORK_USAGE_HISTORY = "android.permission.READ_NETWORK_USAGE_HISTORY";
     field public static final String READ_OEM_UNLOCK_STATE = "android.permission.READ_OEM_UNLOCK_STATE";
     field public static final String READ_PEOPLE_DATA = "android.permission.READ_PEOPLE_DATA";
@@ -1114,7 +1116,7 @@ package android.app {
   }
 
   public static class Notification.Builder {
-    method @FlaggedApi("android.app.bridged_notifications_api") @NonNull @RequiresPermission("android.Manifest.permission.POST_BRIDGED_NOTIFICATIONS") public android.app.Notification.Builder setBridgedNotificationMetadata(@Nullable android.app.Notification.BridgedNotificationMetadata);
+    method @FlaggedApi("android.app.bridged_notifications") @NonNull @RequiresPermission("android.Manifest.permission.POST_BRIDGED_NOTIFICATIONS") public android.app.Notification.Builder setBridgedNotificationMetadata(@Nullable android.app.Notification.BridgedNotificationMetadata);
   }
 
   @FlaggedApi("android.app.api_tvextender") public static final class Notification.TvExtender implements android.app.Notification.Extender {
@@ -7918,6 +7920,8 @@ package android.media {
     field @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public static final int USAGE_ANNOUNCEMENT = 1003; // 0x3eb
     field @RequiresPermission(allOf={android.Manifest.permission.MODIFY_PHONE_STATE, android.Manifest.permission.MODIFY_AUDIO_ROUTING}) public static final int USAGE_CALL_ASSISTANT = 17; // 0x11
     field @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public static final int USAGE_EMERGENCY = 1000; // 0x3e8
+    field @FlaggedApi("android.media.audio.vibration_sound_usage") @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public static final int USAGE_NOTIFICATION_VIBRATION = 1005; // 0x3ed
+    field @FlaggedApi("android.media.audio.vibration_sound_usage") @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public static final int USAGE_RINGTONE_VIBRATION = 1006; // 0x3ee
     field @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public static final int USAGE_SAFETY = 1001; // 0x3e9
     field @FlaggedApi("android.media.audio.speaker_cleanup_usage") @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public static final int USAGE_SPEAKER_CLEANUP = 1004; // 0x3ec
     field @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public static final int USAGE_VEHICLE_STATUS = 1002; // 0x3ea
@@ -8037,7 +8041,7 @@ package android.media {
     method public boolean isHdmiSystemAudioSupported();
     method @RequiresPermission(android.Manifest.permission.CAPTURE_AUDIO_HOTWORD) public boolean isHotwordStreamSupported(boolean);
     method @RequiresPermission(android.Manifest.permission.CALL_AUDIO_INTERCEPTION) public boolean isPstnCallAudioInterceptable();
-    method @FlaggedApi("android.media.audio.sco_managed_by_audio") public boolean isScoManagedByAudio();
+    method @FlaggedApi("android.media.audio.amsco_available_api") public boolean isScoManagedByAudio();
     method @RequiresPermission(android.Manifest.permission.ACCESS_ULTRASOUND) public boolean isUltrasoundSupported();
     method @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public void muteAwaitConnection(@NonNull int[], @NonNull android.media.AudioDeviceAttributes, long, @NonNull java.util.concurrent.TimeUnit) throws java.lang.IllegalStateException;
     method @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public int registerAudioPolicy(@NonNull android.media.audiopolicy.AudioPolicy);

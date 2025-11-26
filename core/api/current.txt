@@ -278,7 +278,6 @@ package android {
     field @Deprecated public static final String READ_INPUT_STATE = "android.permission.READ_INPUT_STATE";
     field public static final String READ_LOGS = "android.permission.READ_LOGS";
     field public static final String READ_MEDIA_AUDIO = "android.permission.READ_MEDIA_AUDIO";
-    field @FlaggedApi("android.permission.flags.read_media_documents_permission_enabled") public static final String READ_MEDIA_DOCUMENTS = "android.permission.READ_MEDIA_DOCUMENTS";
     field public static final String READ_MEDIA_IMAGES = "android.permission.READ_MEDIA_IMAGES";
     field public static final String READ_MEDIA_VIDEO = "android.permission.READ_MEDIA_VIDEO";
     field public static final String READ_MEDIA_VISUAL_USER_SELECTED = "android.permission.READ_MEDIA_VISUAL_USER_SELECTED";
@@ -1060,7 +1059,7 @@ package android {
     field public static final int isAlwaysSyncable = 16843571; // 0x1010333
     field public static final int isAsciiCapable = 16843753; // 0x10103e9
     field public static final int isAuxiliary = 16843647; // 0x101037f
-    field public static final int isCredential = 16844417; // 0x1010681
+    field @Deprecated public static final int isCredential = 16844417; // 0x1010681
     field public static final int isDefault = 16843297; // 0x1010221
     field public static final int isFeatureSplit = 16844123; // 0x101055b
     field public static final int isGame = 16843764; // 0x10103f4
@@ -6587,7 +6586,7 @@ package android.app {
     method @Nullable public android.util.Pair<android.app.RemoteInput,android.app.Notification.Action> findRemoteInputActionPair(boolean);
     method public boolean getAllowSystemGeneratedContextualActions();
     method public int getBadgeIconType();
-    method @FlaggedApi("android.app.bridged_notifications_api") @Nullable public android.app.Notification.BridgedNotificationMetadata getBridgedNotificationMetadata();
+    method @FlaggedApi("android.app.bridged_notifications") @Nullable public android.app.Notification.BridgedNotificationMetadata getBridgedNotificationMetadata();
     method @Nullable public android.app.Notification.BubbleMetadata getBubbleMetadata();
     method public String getChannelId();
     method @NonNull public java.util.List<android.app.Notification.Action> getContextualActions();
@@ -6866,7 +6865,7 @@ package android.app {
     method public android.app.Notification.BigTextStyle setSummaryText(CharSequence);
   }
 
-  @FlaggedApi("android.app.bridged_notifications_api") public static final class Notification.BridgedNotificationMetadata implements android.os.Parcelable {
+  @FlaggedApi("android.app.bridged_notifications") public static final class Notification.BridgedNotificationMetadata implements android.os.Parcelable {
     ctor public Notification.BridgedNotificationMetadata(int, @NonNull String, @NonNull android.graphics.drawable.Icon);
     method public int describeContents();
     method @NonNull public android.graphics.drawable.Icon getIcon();
@@ -9990,6 +9989,7 @@ package android.app.privatecompute {
 
   @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class PccSandboxManager {
     method public boolean isPrivateComputeServicesUid(int);
+    method public void writeToAuditLog(@NonNull android.os.PersistableBundle);
   }
 
 }
@@ -54604,7 +54604,7 @@ package android.view {
     method public boolean isClickable();
     method @FlaggedApi("android.view.flags.sensitive_content_app_protection_api") public final boolean isContentSensitive();
     method public boolean isContextClickable();
-    method public boolean isCredential();
+    method @Deprecated @FlaggedApi("android.view.flags.deprecate_is_credential_api") public boolean isCredential();
     method public boolean isDirty();
     method @Deprecated public boolean isDrawingCacheEnabled();
     method public boolean isDuplicateParentStateEnabled();
@@ -54848,7 +54848,7 @@ package android.view {
     method public void setImportantForAccessibility(int);
     method public void setImportantForAutofill(int);
     method public void setImportantForContentCapture(int);
-    method public void setIsCredential(boolean);
+    method @Deprecated @FlaggedApi("android.view.flags.deprecate_is_credential_api") public void setIsCredential(boolean);
     method public void setIsHandwritingDelegate(boolean);
     method public void setKeepScreenOn(boolean);
     method public void setKeyboardNavigationCluster(boolean);

@@ -563,7 +563,13 @@
             android:showForAllUsers="true"
             android:theme="@style/Theme.Transparent" />
 
-        <service android:name=".screenrecord.service.ScreenRecordingService" />
+        <receiver
+            android:name=".screenrecord.service.ActivityStartingReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".screenrecord.service.ScreenRecordingService"
+            android:exported="false" />
 
         <service android:name=".screenrecord.RecordingService"
                  android:foregroundServiceType="systemExempted"/>
@@ -842,7 +848,7 @@
             android:exported="true"
             android:permission="android.permission.GET_PEOPLE_TILE_PREVIEW">
         </provider>
-
+        
         <service android:name=".people.PeopleBackupFollowUpJob"
             android:permission="android.permission.BIND_JOB_SERVICE"/>
 
@@ -1247,6 +1253,7 @@
         <service
             android:name="com.android.systemui.locationbutton.LocationButtonRenderService"
             android:permission="android.permission.USE_LOCATION_BUTTON"
+            android:singleUser="true"
             android:exported="true"
            />
 

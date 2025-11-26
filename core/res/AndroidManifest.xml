@@ -1350,7 +1350,9 @@
 
    <!-- Allows an application to read document files from external storage.
          <p>Protection level: signature|privileged
-         @FlaggedApi(android.permission.flags.Flags.FLAG_READ_MEDIA_DOCUMENTS_PERMISSION_ENABLED) -->
+         @FlaggedApi(android.permission.flags.Flags.FLAG_READ_MEDIA_DOCUMENTS_PERMISSION_ENABLED)
+         @SystemApi
+         @hide -->
     <permission android:name="android.permission.READ_MEDIA_DOCUMENTS"
                 android:label="@string/permlab_readMediaDocuments"
                 android:description="@string/permdesc_readMediaDocuments"
@@ -7832,10 +7834,10 @@
     <!-- @hide @SystemApi Allows an application to mark notifications as originating from
     another device and provide metadata for displaying the notification to the user.
     <p>Not for use by third-party applications.
-    @FlaggedApi(android.app.Flags.FLAG_BRIDGED_NOTIFICATIONS_API)-->
+    @FlaggedApi(android.app.Flags.FLAG_BRIDGED_NOTIFICATIONS)-->
     <permission android:name="android.permission.POST_BRIDGED_NOTIFICATIONS"
         android:protectionLevel="signature|privileged"
-        android:featureFlag="android.app.bridged_notifications_api"/>
+        android:featureFlag="android.app.bridged_notifications"/>
 
     <!-- Allows access to keyguard secure storage.  Only allowed for system processes.
         @hide -->
@@ -9230,33 +9232,46 @@
     <permission android:name="android.permission.MANAGE_WEARABLE_SENSING_SERVICE"
                 android:protectionLevel="signature|privileged" />
 
-    <!-- @SystemApi Allows an app to call APIs provided by the content safety service.
+    <!-- Allows an app to call APIs provided by the content safety service.
              <p>Protection level: signature|privileged
              @SystemApi
              @hide
              @FlaggedApi(android.app.contentsafety.flags.Flags.FLAG_ENABLE_CONTENTSAFETY)
         -->
     <permission android:name="android.permission.CHECK_CONTENT_SAFETY"
-        android:protectionLevel="signature|privileged" />
+        android:protectionLevel="signature|privileged"
+        android:featureFlag="android.app.contentsafety.flags.enable_contentsafety"/>
 
 
-    <!-- @SystemApi Allows an app to bind to the content safety service.
+    <!-- Ensures only the platform can bind to the content safety service.
              <p>Protection level: signature
              @SystemApi
              @hide
              @FlaggedApi(android.app.contentsafety.flags.Flags.FLAG_ENABLE_CONTENTSAFETY)
         -->
     <permission android:name="android.permission.BIND_CONTENT_SAFETY_SERVICE"
-        android:protectionLevel="signature" />
+        android:protectionLevel="signature"
+        android:featureFlag="android.app.contentsafety.flags.enable_contentsafety"/>
 
-    <!-- @SystemApi Allows an app to bind to the sandboxed content safety service.
+    <!-- Ensures only the platform can bind to the sandboxed content safety service.
              <p>Protection level: signature
              @SystemApi
              @hide
              @FlaggedApi(android.app.contentsafety.flags.Flags.FLAG_ENABLE_CONTENTSAFETY)
         -->
     <permission android:name="android.permission.BIND_SANDBOXED_CONTENT_SAFETY_SERVICE"
-        android:protectionLevel="signature" />
+        android:protectionLevel="signature"
+        android:featureFlag="android.app.contentsafety.flags.enable_contentsafety"/>
+
+    <!-- Ensures only the platform can bind to the content safety settings service.
+             <p>Protection level: signature
+             @SystemApi
+             @hide
+             @FlaggedApi(android.app.contentsafety.flags.Flags.FLAG_ENABLE_CONTENTSAFETY)
+        -->
+    <permission android:name="android.permission.BIND_SETTINGS_CONTENT_SAFETY_SERVICE"
+        android:protectionLevel="signature"
+        android:featureFlag="android.app.contentsafety.flags.enable_contentsafety"/>
 
     <!-- @SystemApi Allows an app to use the on-device intelligence service.
              <p>Protection level: signature|privileged
@@ -9272,7 +9287,6 @@
         -->
     <permission android:name="android.permission.BIND_ON_DEVICE_INTELLIGENCE_SERVICE"
         android:protectionLevel="signature|privileged" />
-
 
     <!-- @SystemApi Allows an app to bind the on-device sandboxed service.
              <p>Protection level: signature|privileged
@@ -9918,6 +9932,17 @@
         android:name="android.permission.BIND_MOTION_CUES_SERVICE"
         android:protectionLevel="signature|privileged"
         android:featureFlag="android.app.enable_motion_cues" />
+
+    <!-- @FlaggedApi(android.service.notification.Flags.FLAG_ENABLE_DND_SYNC)
+            Must be required to read/write mode states from
+            {@link android.app.modes.ContextualModeManager}.
+            <p> Protection level: signature
+            @hide
+    -->
+    <permission android:name="android.permission.MANAGE_CONTEXTUAL_MODES"
+            android:protectionLevel="signature"
+            android:featureFlag="android.service.notification.enable_dnd_sync">
+    </permission>
 
     <!-- Attribution for Geofencing service. -->
     <attribution android:tag="GeofencingService" android:label="@string/geofencing_service"/>

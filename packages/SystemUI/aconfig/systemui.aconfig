@@ -169,16 +169,6 @@ flag {
 }
 
 flag {
-    name: "notification_fix_hun_shadows"
-    namespace: "systemui"
-    description: "Fix HUN shadows when the shade is collapsed."
-    bug: "440572084"
-    metadata {
-       purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "scene_container"
     namespace: "systemui"
     description: "Enables the scene container framework go/flexiglass."
@@ -231,6 +221,15 @@ flag {
     namespace: "systemui"
     description: "Enables a new reveal animation for Quick Settings tiles."
     bug: "435138055"
+}
+
+flag {
+    name: "global_actions_feedback_action"
+    namespace: "systemui"
+    description: "When enabled at build-time, the feedback global action will be available on "
+        "builds, provided a feedback handler application is installed."
+    bug: "449911065"
+    is_fixed_read_only: true
 }
 
 flag {
@@ -1718,16 +1717,6 @@ flag {
 }
 
 flag {
-   name: "allow_doze_touches_for_lock_icon"
-   namespace: "systemui"
-   description: "Allow touches for device entry lock icon during aod deferment."
-   bug: "433400058"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "per_display_ongoing_call_status_bar_visibility"
    namespace: "systemui"
    description: "Adds per display implementation for the logic of whether the status bar should be visible for ongoing calls."
@@ -2019,6 +2008,16 @@ flag {
     namespace: "systemui"
     description: "Fix the crash when launching details view with INTERNET_CONNECTIVITY"
     bug: "425987324"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_canceled_notification_launch_animation"
+    namespace: "systemui"
+    description: "Fix an issue where the Shade ends up in the wrong state if a launch animation controller receives the intent started callback after the animation is cancelled."
+    bug: "461158751"
     metadata {
        purpose: PURPOSE_BUGFIX
     }

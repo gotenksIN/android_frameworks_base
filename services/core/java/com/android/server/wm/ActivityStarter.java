@@ -362,7 +362,12 @@ class ActivityStarter {
                 if (mService.mRootWindowContainer == null) {
                     throw new IllegalStateException("Too early to start activity.");
                 }
-                starter = new ActivityStarter(mController, mService, mSupervisor, mInterceptor);
+                UserHelper userHelper = android.multiuser.Flags.hsuAllowlistActivities()
+                        ? new UserHelper(mService.getUserManagerInternal())
+                        : null;
+
+                starter = new ActivityStarter(mController, mService, mSupervisor, mInterceptor,
+                        userHelper);
             }
 
             return starter;
@@ -716,15 +721,15 @@ class ActivityStarter {
     }
 
     ActivityStarter(ActivityStartController controller, ActivityTaskManagerService service,
-            ActivityTaskSupervisor supervisor, ActivityStartInterceptor interceptor) {
+            ActivityTaskSupervisor supervisor, ActivityStartInterceptor interceptor,
+            // TODO(b/412177078): remove @Nullable below Flags.hsuAllowlistActivities() is gone
+            @Nullable UserHelper userHelper) {
         mController = controller;
         mService = service;
         mRootWindowContainer = service.mRootWindowContainer;
         mSupervisor = supervisor;
         mInterceptor = interceptor;
-        mUserHelper = android.multiuser.Flags.hsuAllowlistActivities()
-                ? new UserHelper(service.getUserManagerInternal())
-                : null;
+        mUserHelper = userHelper;
         reset(true);
     }
 

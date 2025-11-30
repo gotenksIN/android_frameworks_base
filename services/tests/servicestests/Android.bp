@@ -43,6 +43,7 @@ android_test {
         "a11ychecker",
         "aatf",
         "accessibility_protos_lite",
+        "android.credentials.flags-aconfig-java",
         "androidx.test.core",
         "androidx.test.ext.junit",
         "androidx.test.ext.truth",
@@ -1134,4 +1135,15 @@ test_module_config {
         "device-tests",
     ],
     include_filters: ["com.android.server.companion.virtual"],
+}
+
+test_module_config {
+    name: "FrameworksServicesTests_contextual_mode",
+    base: "FrameworksServicesTests",
+    team: "trendy_team_notifications",
+    test_suites: [
+        "automotive-tests",
+        "device-tests",
+    ],
+    include_filters: ["com.android.server.modes"],
 }

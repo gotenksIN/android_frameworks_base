@@ -361,6 +361,13 @@ class Task extends TaskFragment {
     boolean isPersistable = false;
     int maxRecents;
 
+    /**
+     * Whether the package update for this task is handled outside of the system. When a package
+     * update is initiated system can either let the task to be handled by Shell or handle it.
+     * By default it is set to false and the task is handled by the system during the process.
+     */
+    boolean mHandlePackageUpdate = false;
+
     /** Only used for persistable tasks, otherwise 0. The last time this task was moved. Used for
      *  determining the order when restoring. */
     long mLastTimeMoved;
@@ -3206,23 +3213,13 @@ class Task extends TaskFragment {
     }
 
     void onSnapshotChanged(TaskSnapshot snapshot) {
-        if (Flags.reduceTaskSnapshotMemoryUsage()) {
-            // No local listener.
-            mWmService.mSnapshotController.notifySnapshotChanged(mTaskId, snapshot);
-        } else {
-            mAtmService.getTaskChangeNotificationController().notifyTaskSnapshotChanged(
-                    mTaskId, snapshot);
-        }
+        // No local listener.
+        mWmService.mSnapshotController.notifySnapshotChanged(mTaskId, snapshot);
     }
 
     void onSnapshotInvalidated() {
-        if (Flags.reduceTaskSnapshotMemoryUsage()) {
-            // No local listener.
-            mWmService.mSnapshotController.notifySnapshotInvalidate(mTaskId);
-        } else {
-            mAtmService.getTaskChangeNotificationController()
-                    .notifyTaskSnapshotInvalidated(mTaskId);
-        }
+        // No local listener.
+        mWmService.mSnapshotController.notifySnapshotInvalidate(mTaskId);
     }
 
 
@@ -4885,12 +4882,7 @@ class Task extends TaskFragment {
                     if (!isPip2ExperimentEnabled) {
                         final ActivityRecord ar = mAtmService.mLastResumedActivity;
                         if (ar != null && ar.getTask() != null) {
-                            if (com.android.window.flags.Flags.reduceTaskSnapshotMemoryUsage()) {
-                                mWmService.mTaskSnapshotController.recordSnapshot(ar.getTask());
-                            } else {
-                                mAtmService.takeTaskSnapshot(ar.getTask().mTaskId,
-                                        true /* updateCache */);
-                            }
+                            mWmService.mTaskSnapshotController.recordSnapshot(ar.getTask());
                         }
                     }
                 }

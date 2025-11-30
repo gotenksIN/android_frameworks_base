@@ -52,6 +52,7 @@ import static android.window.TaskFragmentOperation.OP_TYPE_UNKNOWN;
 import static android.window.TaskFragmentOperation.PRIVILEGED_OP_START;
 import static android.window.WindowContainerTransaction.Change.CHANGE_FOCUSABLE;
 import static android.window.WindowContainerTransaction.Change.CHANGE_FORCE_TRANSLUCENT;
+import static android.window.WindowContainerTransaction.Change.CHANGE_HANDLE_PACKAGE_UPDATE;
 import static android.window.WindowContainerTransaction.Change.CHANGE_HIDDEN;
 import static android.window.WindowContainerTransaction.Change.CHANGE_INTERCEPT_BACK_PRESSED;
 import static android.window.WindowContainerTransaction.Change.CHANGE_LAUNCH_NEXT_TO_BUBBLE;
@@ -1046,6 +1047,10 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
         if ((c.getChangeMask() & CHANGE_INTERCEPT_BACK_PRESSED) != 0) {
             mTaskOrganizerController.setInterceptBackPressedOnTaskRoot(tr.mTaskId,
                     c.getInterceptBackPressed());
+        }
+
+        if ((c.getChangeMask() & CHANGE_HANDLE_PACKAGE_UPDATE) != 0) {
+            tr.mHandlePackageUpdate = c.gethandlePackageUpdate();
         }
 
         return effects;
@@ -2238,12 +2243,9 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                                 + " taskDisplayArea, but not " + newParent);
                     }
                 } else {
-                    final Task rootTask = (Task) (
-                            (newParent != null && !(newParent instanceof TaskDisplayArea))
-                                    ? newParent : task.getRootTask());
-                    as.getDisplayArea().positionChildAt(
-                            hop.getToTop() ? POSITION_TOP : POSITION_BOTTOM, rootTask,
-                            false /* includingParents */);
+                    // Parents are the same, so just apply the requested reordering
+                    newParent.positionChildAt(hop.getToTop() ? POSITION_TOP : POSITION_BOTTOM,
+                            task, false /* includingParents */);
                 }
             } else {
                 throw new RuntimeException("Reparenting leaf Tasks is not supported now. " + task);

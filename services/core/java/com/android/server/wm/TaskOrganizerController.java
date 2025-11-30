@@ -784,7 +784,7 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
         return task.mTaskId;
     }
 
-    void removeWindowlessStartingSurface(int taskId, boolean immediately) {
+    void removeWindowlessStartingSurface(int taskId, boolean immediately, boolean hasImeSurface) {
         final ITaskOrganizer lastOrganizer = mTaskOrganizers.peekLast();
         if (lastOrganizer == null || taskId == 0) {
             return;
@@ -793,7 +793,7 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
         removalInfo.taskId = taskId;
         removalInfo.windowlessSurface = true;
         removalInfo.removeImmediately = immediately;
-        removalInfo.deferRemoveMode = DEFER_MODE_NONE;
+        removalInfo.deferRemoveMode = hasImeSurface ? DEFER_MODE_NORMAL : DEFER_MODE_NONE;
         try {
             lastOrganizer.removeStartingWindow(removalInfo);
         } catch (RemoteException e) {
@@ -884,10 +884,11 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
                 organizerState.mOrganizer.mTaskOrganizer, PendingTaskEvent.EVENT_VANISHED));
     }
 
+    @Nullable
     @Override
-    public void createRootTask(int displayId, int windowingMode, @Nullable IBinder launchCookie,
-            boolean removeWithTaskOrganizer, boolean reparentOnDisplayRemoval,
-            @Nullable String name) {
+    public WindowContainerToken createRootTask(int displayId, int windowingMode,
+            @Nullable IBinder launchCookie, boolean removeWithTaskOrganizer,
+            boolean reparentOnDisplayRemoval, @Nullable String name) {
         enforceTaskPermission("createRootTask()");
         final long origId = Binder.clearCallingIdentity();
         try {
@@ -896,11 +897,12 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
                 if (display == null) {
                     ProtoLog.e(WM_DEBUG_WINDOW_ORGANIZER,
                             "createRootTask unknown displayId=%d", displayId);
-                    return;
+                    return null;
                 }
 
-                createRootTask(display, windowingMode, launchCookie, removeWithTaskOrganizer,
-                        reparentOnDisplayRemoval, name);
+                final Task task = createRootTask(display, windowingMode, launchCookie,
+                        removeWithTaskOrganizer, reparentOnDisplayRemoval, name);
+                return task.mRemoteToken.toWindowContainerToken();
             }
         } finally {
             Binder.restoreCallingIdentity(origId);

@@ -30,9 +30,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -178,6 +181,7 @@ fun SceneContainer(
             mutableStateMapOf()
         }
     val windowInsetsController = view.windowInsetsController
+    var lastNavigationBarVisibleRequest: Boolean? by remember { mutableStateOf(null) }
     LaunchedEffect(actionableContentKey) {
         try {
             val actionableContent: ActionableContent =
@@ -192,10 +196,13 @@ fun SceneContainer(
 
                 val isNavigationBarVisible =
                     userActions.containsKey(Back) || actionableContentKey == Scenes.Gone
-                if (isNavigationBarVisible) {
-                    windowInsetsController?.show(WindowInsetsCompat.Type.navigationBars())
-                } else {
-                    windowInsetsController?.hide(WindowInsetsCompat.Type.navigationBars())
+                if (isNavigationBarVisible != lastNavigationBarVisibleRequest) {
+                    lastNavigationBarVisibleRequest = isNavigationBarVisible
+                    if (isNavigationBarVisible) {
+                        windowInsetsController?.show(WindowInsetsCompat.Type.navigationBars())
+                    } else {
+                        windowInsetsController?.hide(WindowInsetsCompat.Type.navigationBars())
+                    }
                 }
             }
         } finally {

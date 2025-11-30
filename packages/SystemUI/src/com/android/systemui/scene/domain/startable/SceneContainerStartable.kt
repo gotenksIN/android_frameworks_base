@@ -67,6 +67,7 @@ import com.android.systemui.scene.domain.SceneFrameworkTableLog
 import com.android.systemui.scene.domain.interactor.DisabledContentInteractor
 import com.android.systemui.scene.domain.interactor.SceneBackInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
+import com.android.systemui.scene.domain.startable.SceneContainerStartable.HideOverlayCommand.HideSome
 import com.android.systemui.scene.session.shared.SessionStorage
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.logger.SceneLogger
@@ -410,6 +411,14 @@ constructor(
                         switchToScene(
                             targetSceneKey = Scenes.Lockscreen,
                             loggingReason = "SIM unlock required",
+                            hideOverlays =
+                                HideSome(
+                                    overlays =
+                                        listOf(
+                                            Overlays.NotificationsShade,
+                                            Overlays.QuickSettingsShade,
+                                        )
+                                ),
                         )
                         sceneInteractor.showOverlay(
                             overlay = Overlays.Bouncer,
@@ -466,6 +475,7 @@ constructor(
                         }
                     val isOnLockscreen = renderedScenes.contains(Scenes.Lockscreen)
                     val isOnShade = renderedScenes.contains(Scenes.Shade)
+                    val isOnCommunal = renderedScenes.contains(Scenes.Communal)
                     val isAlternateBouncerVisible = alternateBouncerInteractor.isVisibleState()
                     val isOnPrimaryBouncer = Overlays.Bouncer in renderedOverlays
                     if (!deviceUnlockStatus.isUnlocked) {
@@ -503,7 +513,7 @@ constructor(
                             alternateBouncerInteractor.hide()
 
                             // ... and go to Gone or stay on the current scene
-                            if (isOnLockscreen || !leaveShadeOpen) {
+                            if (isOnCommunal || isOnLockscreen || !leaveShadeOpen) {
                                 SwitchSceneCommand.SwitchToScene(
                                     targetSceneKey = Scenes.Gone,
                                     loggingReason =
@@ -520,7 +530,7 @@ constructor(
                             // Gone or remain in the current scene. If transition is a scene change,
                             // take the destination scene.
                             val targetScene = renderedScenes.last()
-                            if (targetScene == Scenes.Lockscreen || !leaveShadeOpen) {
+                            if (targetScene == Scenes.Lockscreen || targetScene == Scenes.Communal || !leaveShadeOpen) {
                                 val loggingReason = buildString {
                                     append(
                                         "device was unlocked while the primary bouncer was showing"
@@ -538,7 +548,7 @@ constructor(
                                             // Only hide the bouncer overlay, leaving any other
                                             // overlay (right now the only other overlays are
                                             // shades) visible.
-                                            HideOverlayCommand.HideSome(Overlays.Bouncer)
+                                            HideSome(Overlays.Bouncer)
                                         } else {
                                             HideOverlayCommand.HideAll
                                         },
@@ -570,7 +580,7 @@ constructor(
                                 )
                             }
                         }
-                        isOnLockscreen ->
+                        isOnLockscreen || isOnCommunal ->
                             // The lockscreen should be dismissed automatically in 2 scenarios:
                             // 1. When face auth bypass is enabled and authentication happens while
                             //    the user is on the lockscreen.
@@ -721,32 +731,22 @@ constructor(
 
     private fun handleDreamState() {
         applicationScope.launch {
-            keyguardInteractor.isAbleToDream
-                .sample(sceneInteractor.transitionState, ::Pair)
-                .collect { (isAbleToDream, transitionState) ->
-                    if (transitionState.isIdle(Scenes.Communal)) {
-                        // The dream is automatically started underneath the hub, don't transition
-                        // to dream when this is happening as communal is still visible on top.
-                        return@collect
-                    }
-                    if (isAbleToDream) {
-                        switchToScene(
-                            targetSceneKey = Scenes.Dream,
-                            loggingReason = "dream started",
-                        )
-                    } else {
-                        switchToScene(
-                            targetSceneKey = SceneFamilies.Home,
-                            loggingReason = "dream stopped",
-                            hideOverlays =
-                                if (deviceUnlockedInteractor.isUnlocked) {
-                                    HideOverlayCommand.HideAll
-                                } else {
-                                    HideOverlayCommand.HideNone
-                                },
-                        )
-                    }
+            keyguardInteractor.isAbleToDream.collect { isAbleToDream ->
+                if (isAbleToDream) {
+                    switchToScene(targetSceneKey = Scenes.Dream, loggingReason = "dream started")
+                } else {
+                    switchToScene(
+                        targetSceneKey = SceneFamilies.Home,
+                        loggingReason = "dream stopped",
+                        hideOverlays =
+                            if (deviceUnlockedInteractor.isUnlocked) {
+                                HideOverlayCommand.HideAll
+                            } else {
+                                HideOverlayCommand.HideNone
+                            },
+                    )
                 }
+            }
         }
     }
 
@@ -1140,7 +1140,7 @@ constructor(
         hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
         instantlySnapScenes: Boolean = false,
     ) {
-        if (hideOverlays is HideOverlayCommand.HideSome) {
+        if (hideOverlays is HideSome) {
             hideOverlays.overlays.fastForEach { overlay ->
                 sceneInteractor.hideOverlay(overlay, loggingReason)
             }

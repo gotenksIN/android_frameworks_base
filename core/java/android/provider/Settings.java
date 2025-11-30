@@ -12256,6 +12256,63 @@ public final class Settings {
                 "on_device_inference_unbind_timeout_ms";
 
         /**
+         * Timeout to be used for unbinding to the configured remote
+         * {@link android.service.contentsafety.ContentSafetyService} if there are no
+         * requests in the queue. A value of -1 represents to never unbind.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_UNBIND_TIMEOUT_MS =
+                "content_safety_unbind_timeout_ms";
+
+
+        /**
+         * Timeout that represents maximum idle time before which a callback should be populated.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_IDLE_TIMEOUT_MS =
+                "content_safety_idle_timeout_ms";
+
+
+        /**
+         * Timeout that represents maximum idle time before which a callback should be populated.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_SETTINGS_IDLE_TIMEOUT_MS =
+                "content_safety_settings_idle_timeout_ms";
+
+
+        /**
+         * Timeout that represents maximum idle time before which a callback should be populated.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_SANDBOXED_IDLE_TIMEOUT_MS =
+                "content_safety_sandboxed_idle_timeout_ms";
+
+        /**
+         * Timeout to be used for unbinding to the configured remote
+         * {@link android.service.contentsafety.ContentSafetySandboxedService} if there
+         * are no requests in the queue. A value of -1 represents to never unbind.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_SANDBOXED_UNBIND_TIMEOUT_MS =
+                "content_safety_sandboxed_unbind_timeout_ms";
+
+        /**
+         * Timeout to be used for unbinding to the configured remote
+         * {@link android.service.contentsafety.ContentSafetySettingsService} if there
+         * are no requests in the queue. A value of -1 represents to never unbind.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_SETTINGS_UNBIND_TIMEOUT_MS =
+                "content_safety_settings_unbind_timeout_ms";
+
+        /**
          * Control whether Night display is currently activated.
          * @hide
          */
@@ -22589,6 +22646,19 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT =
             "android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT";
+
+    /**
+     * Broadcast Action: A request to have the system feedback handler app collect and send
+     * feedback. This is a protected intent that can only be sent by the system.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_REQUEST_FEEDBACK =
+            "com.android.internal.intent.action.REQUEST_FEEDBACK";
 
     /**
      * Activity Action: For system or preinstalled apps to show their {@link Activity} embedded

@@ -198,6 +198,16 @@ flag {
 }
 
 flag {
+    name: "remove_set_wake_ready_immediately"
+    namespace: "windowing_frontend"
+    description: "Remove a potentially obsolete Transition.setReady() when waking up"
+    bug: "429140578"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "predictive_back_priority_system_navigation_observer"
     namespace: "systemui"
     description: "PRIORITY_SYSTEM_NAVIGATION_OBSERVER predictive back API extension"
@@ -287,6 +297,16 @@ flag {
     namespace: "windowing_frontend"
     description: "Port window-resize animation from legacy to shell"
     bug: "384976265"
+}
+
+flag {
+    name: "exit_split_on_display_move_bugfix"
+    namespace: "windowing_frontend"
+    description: "Exit split to remaining task when one task moves to another display"
+    bug: "460447267"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -387,16 +407,6 @@ flag {
     namespace: "input_method"
     description: "Prevents custom ime back callbacks from remaining registered in app process after IME hide"
     bug: "420870283"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "predictive_back_stop_keycode_back_forwarding"
-    namespace: "windowing_frontend"
-    description: "No longer forward KEYCODE_BACK events when app has enableOnBackInvokedCallback=true"
-    bug: "436871339"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

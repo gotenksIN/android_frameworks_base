@@ -40,8 +40,8 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
         processingEnv.elementUtils.getTypeElement("android.content.Context").asType()
     }
 
-    private val keyParametersType: TypeMirror by lazy {
-        processingEnv.elementUtils.getTypeElement("com.android.settingslib.metadata.KeyParameters").asType()
+    private val validatedKeyParametersType: TypeMirror by lazy {
+        processingEnv.elementUtils.getTypeElement("com.android.settingslib.metadata.ValidatedKeyParameters").asType()
     }
 
     private var options: Map<String, Any?>? = null
@@ -96,7 +96,7 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
                 "Error processing constructors for $qualifiedName: $msg\n" +
                         "Allowed public constructors: constructor(), constructor(Context), " +
                         "constructor(Bundle), constructor(Context, Bundle), " +
-                        "constructor(KeyParameters), or constructor(Context, KeyParameters)",
+                        "constructor(ValidatedKeyParameters), or constructor(Context, ValidatedKeyParameters)",
                 this,
             )
 
@@ -121,7 +121,7 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
                         ctorSimple = constructor
                         constructorHasContextParameter = true
                     } else if (constructor.hasParameter(0, bundleType)) ctorWithBundle = constructor
-                    else if (constructor.hasParameter(0, keyParametersType)) ctorWithKeyParams = constructor
+                    else if (constructor.hasParameter(0, validatedKeyParametersType)) ctorWithKeyParams = constructor
                     else {
                         reportConstructorError("Invalid single argument constructor.")
                         return
@@ -133,7 +133,7 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
                         return
                     }
                     if (constructor.hasParameter(1, bundleType)) ctorWithBundle = constructor
-                    else if (constructor.hasParameter(1, keyParametersType)) ctorWithKeyParams = constructor
+                    else if (constructor.hasParameter(1, validatedKeyParametersType)) ctorWithKeyParams = constructor
                     else {
                         reportConstructorError("Invalid second argument in constructor.")
                         return
@@ -152,8 +152,6 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
         val parameterized = annotation.fieldValue<Boolean>("parameterized") == true
         var parametersHasContextParameter = false
         var keyParametersHasContextParameter = false
-        var hasKeyParametersMethod = false
-        var hasGetParametersSchemaMethod = false
 
         if (parameterized) {
             val parametersMethod = findParameters() // This finds the static parameters() method
@@ -164,10 +162,7 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
             parametersHasContextParameter = parametersMethod
 
             val keyParametersMethod = findKeyParametersMethod()
-            hasKeyParametersMethod = keyParametersMethod != null
             keyParametersHasContextParameter = keyParametersMethod == true
-
-            hasGetParametersSchemaMethod = findGetParametersSchemaMethod()
 
             if (ctorWithBundle == null && ctorWithKeyParams == null) {
                 reportConstructorError("Parameterized screen must have a constructor accepting Bundle or KeyParameters.")
@@ -194,9 +189,7 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
                 ctorWithBundle != null,
                 ctorWithKeyParams != null,
                 parametersHasContextParameter,
-                hasKeyParametersMethod,
                 keyParametersHasContextParameter,
-                hasGetParametersSchemaMethod,
             )
         )
     }
@@ -223,7 +216,7 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
             it.write("import android.os.Bundle;\n")
             it.write("import $PACKAGE.FixedArrayMap;\n")
             it.write("import $PACKAGE.FixedArrayMap.OrderedInitializer;\n")
-            it.write("import $PACKAGE.KeyParameters;\n")
+            it.write("import $PACKAGE.ValidatedKeyParameters;\n")
             it.write("import $PACKAGE.KeyParametersSchema;\n")
             it.write("import $PACKAGE.$PREFERENCE_SCREEN_METADATA;\n")
             it.write("import $PACKAGE.$FACTORY;\n")
@@ -256,14 +249,14 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
 
                     // KeyParameters create method
                     it.write(" @Override public PreferenceScreenMetadata createWithKeyParameters")
-                    it.write("(Context context, KeyParameters args) {\n")
+                    it.write("(Context context, ValidatedKeyParameters keyParameters) {\n")
                     if (constructorHasKeyParametersParameter) {
                         it.write(" return new $klass(")
                         if (constructorHasContextParameter) it.write("context, ")
-                        it.write("args);\n")
+                        it.write("keyParameters);\n")
                     } else {
                         it.write(" // Constructor with KeyParameters not found, potentially delegate\n")
-                        it.write(" return create(context, args.toBundle());\n")
+                        it.write(" return create(context, keyParameters.toBundle());\n")
                     }
                     it.write(" }\n\n")
 
@@ -276,24 +269,14 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
 
                     // KeyParameters keyParameters method
                     it.write(" @Override public Flow keyParameters(Context context) {\n")
-                    // TODO (b/457182494): This check should be removed once all the parameterized screen have been migrated.
-                    if (hasKeyParametersMethod) {
-                        it.write(" return $klass.keyParameters(")
-                        if (keyParametersHasContextParameter) it.write("context")
-                        it.write(");\n")
-                    } else {
-                        it.write(" return FlowKt.emptyFlow();\n")
-                    }
+                    it.write(" return $klass.keyParameters(")
+                    if (keyParametersHasContextParameter) it.write("context")
+                    it.write(");\n")
                     it.write(" }\n")
 
                     // KeyParametersSchema getParametersSchema method
                     it.write(" @Override public KeyParametersSchema getParametersSchema() {\n")
-                    // TODO (b/457182494): This check should be removed once all the parameterized screen have been migrated.
-                    if (hasGetParametersSchemaMethod) {
-                        it.write("   return $klass.getParametersSchema();\n")
-                    } else {
-                        it.write("   return KeyParametersSchema.Companion.getEMPTY();\n")
-                    }
+                    it.write("   return $klass.getParametersSchema();\n")
                     it.write(" }\n\n")
 
                     if (parameterizedMigration) {
@@ -434,16 +417,6 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
         return foundMatch
     }
 
-    private fun TypeElement.findGetParametersSchemaMethod(): Boolean {
-        return enclosedElements.any {
-            it.kind == ElementKind.METHOD &&
-                    it.modifiers.contains(Modifier.PUBLIC) &&
-                    it.modifiers.contains(Modifier.STATIC) &&
-                    it.simpleName.contentEquals("getParametersSchema") &&
-                    (it as ExecutableElement).parameters.isEmpty()
-        }
-    }
-
     private fun ExecutableElement.hasParameter(index: Int, typeMirror: TypeMirror) =
         index < parameters.size && parameters[index].asType().isSameType(typeMirror)
 
@@ -466,9 +439,7 @@ class PreferenceScreenAnnotationProcessor : AbstractProcessor() {
         val constructorHasBundleParameter: Boolean,
         val constructorHasKeyParametersParameter: Boolean,
         val parametersHasContextParameter: Boolean,
-        val hasKeyParametersMethod: Boolean,
         val keyParametersHasContextParameter: Boolean,
-        val hasGetParametersSchemaMethod: Boolean,
     ) : Comparable<Screen> {
         override fun compareTo(other: Screen): Int {
             val diff = key.compareTo(other.key)

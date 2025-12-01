@@ -1634,7 +1634,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                                                    next.occludesParent());
         }
 
-        mTaskSupervisor.setLaunchSource(next.info.applicationInfo.uid);
+        mTaskSupervisor.setLaunchSource(next.getUid());
 
         ActivityRecord lastResumed = null;
         final Task lastFocusedRootTask = taskDisplayArea.getLastFocusedRootTask();

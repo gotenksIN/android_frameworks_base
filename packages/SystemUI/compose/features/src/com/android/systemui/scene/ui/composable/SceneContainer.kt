@@ -29,7 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -51,13 +51,13 @@ import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.PassthroughSwipeDetector
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.SceneTransitionLayout
-import com.android.compose.animation.scene.SceneTransitionLayoutState
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.animation.scene.observableTransitionState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffectFactory
+import com.android.compose.snapshot.ObserveReads
 import com.android.systemui.keyguard.ui.composable.modifier.burnInAware
 import com.android.systemui.keyguard.ui.composable.rememberBurnIn
 import com.android.systemui.lifecycle.rememberActivated
@@ -67,7 +67,6 @@ import com.android.systemui.scene.shared.model.SceneDataSourceDelegator
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.view.SceneJankMonitor
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
-import com.android.systemui.scene.ui.viewmodel.SceneTransitionBlurViewModel
 import com.android.systemui.shade.ui.composable.OverlayShade
 import com.android.systemui.shade.ui.composable.isFullWidthShade
 
@@ -117,12 +116,15 @@ fun SceneContainer(
         rememberViewModel(traceName = "SceneContainer.animateQsTilesViewModel") {
             viewModel.animateQsTilesViewModelFactory.create()
         }
+
+    val resources = LocalResources.current
     val sceneTransitions =
-        remember(hapticFeedback, shadeExpansionMotion, animateQsTilesViewModel) {
+        remember(hapticFeedback, shadeExpansionMotion, animateQsTilesViewModel, resources) {
             transitionsBuilder.build(
                 shadeExpansionMotion,
                 viewModel.hapticsViewModel.getRevealHaptics(hapticFeedback),
                 animateQsTilesViewModel,
+                resources,
             )
         }
 
@@ -170,9 +172,13 @@ fun SceneContainer(
         onDispose { viewModel.setTransitionState(null) }
     }
 
-    // Relying on compose to skip recomposing this method unless there is a change in
-    // [transitionState] or [transitionProgress]
-    WindowBackgroundBlur(viewModel.blurViewModel, state)
+    ObserveReads {
+        val transitionState = state.transitionState
+        viewModel.blurViewModel.requestWindowBackgroundBlur(
+            transitionState,
+            (transitionState as? TransitionState.Transition)?.progress ?: 1f,
+        )
+    }
 
     val actionableContentKey =
         viewModel.getActionableContentKey(state.currentScene, state.currentOverlays, overlayByKey)
@@ -286,16 +292,6 @@ fun SceneContainer(
             )
         }
     }
-}
-
-@Composable
-private fun WindowBackgroundBlur(
-    viewModel: SceneTransitionBlurViewModel,
-    state: SceneTransitionLayoutState,
-) {
-    val transitionState = state.transitionState
-    val progress = (state.transitionState as? TransitionState.Transition)?.progress ?: 1.0f
-    SideEffect { viewModel.requestWindowBackgroundBlur(transitionState, progress) }
 }
 
 object SceneContainerDefaults {

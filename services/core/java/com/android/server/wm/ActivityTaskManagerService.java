@@ -31,6 +31,7 @@ import static android.Manifest.permission.READ_FRAME_BUFFER;
 import static android.Manifest.permission.REMOVE_TASKS;
 import static android.Manifest.permission.START_TASKS_FROM_RECENTS;
 import static android.Manifest.permission.STOP_APP_SWITCHES;
+import static android.app.ActivityManager.ASSIST_CONTEXT_SKIP_SCREEN_CONTENT;
 import static android.app.ActivityManager.DROP_CLOSE_SYSTEM_DIALOGS;
 import static android.app.ActivityManager.LOCK_DOWN_CLOSE_SYSTEM_DIALOGS;
 import static android.app.ActivityManager.LOCK_TASK_MODE_NONE;
@@ -1396,7 +1397,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             // effectively saying that app switches are allowed at this point.
             final Task topFocusedRootTask = getTopDisplayFocusedRootTask();
             if (topFocusedRootTask != null && topFocusedRootTask.getTopResumedActivity() != null
-                    && topFocusedRootTask.getTopResumedActivity().info.applicationInfo.uid
+                    && topFocusedRootTask.getTopResumedActivity().getUid()
                     == Binder.getCallingUid()) {
                 mAppSwitchesState = APP_SWITCH_ALLOW;
             }
@@ -3280,9 +3281,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 }
                 final ActivityInfo ainfo = AppGlobals.getPackageManager().getActivityInfo(comp,
                         STOCK_PM_FLAGS, UserHandle.getUserId(callingUid));
-                if (ainfo == null || ainfo.applicationInfo.uid != callingUid) {
+                if (ainfo == null || ainfo.getUid() != callingUid) {
                     Slog.e(TAG, "Can't add task for another application: target uid="
-                            + (ainfo == null ? Process.INVALID_UID : ainfo.applicationInfo.uid)
+                            + (ainfo == null ? Process.INVALID_UID : ainfo.getUid())
                             + ", calling uid=" + callingUid);
                     return INVALID_TASK_ID;
                 }
@@ -3605,9 +3606,16 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     public boolean requestAssistContextExtras(int requestType, IAssistDataReceiver receiver,
             Bundle receiverExtras, IBinder activityToken, boolean checkActivityIsTop,
             boolean newSessionId) {
+
+        int flags = 0;
+        if (android.service.voice.flags.Flags.enableAssistResourceAttributes()
+                && requestType == ASSIST_CONTEXT_SKIP_SCREEN_CONTENT) {
+            flags |= AssistStructure.FLAG_OMIT_SCREEN_CONTENT;
+        }
+
         return enqueueAssistContext(requestType, null, null, receiver, receiverExtras,
                 activityToken, checkActivityIsTop, newSessionId, UserHandle.getCallingUserId(),
-                null, PENDING_ASSIST_EXTRAS_LONG_TIMEOUT, 0) != null;
+                null, PENDING_ASSIST_EXTRAS_LONG_TIMEOUT, flags) != null;
     }
 
     /**
@@ -3650,10 +3658,19 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
         List<IBinder> topActivityToken = new ArrayList<>();
         topActivityToken.add(tokens.getActivityToken());
-        requester.requestAssistData(topActivityToken, true /* fetchData */,
-                false /* fetchScreenshot */, fetchStructure, true /* allowFetchData */,
-                false /* allowFetchScreenshot*/, true /* ignoreFocusCheck */,
-                Binder.getCallingUid(), callingPackageName, callingAttributionTag);
+        requester.requestAssistData(
+                topActivityToken,
+                true /* fetchData */,
+                false /* fetchScreenshot */,
+                fetchStructure,
+                true /* fetchAssistStructureScreenContent */,
+                true /* allowFetchData */,
+                false /* allowFetchScreenshot*/,
+                true /* allowFetchAssistStructureScreenContent */,
+                true /* ignoreFocusCheck */,
+                Binder.getCallingUid(),
+                callingPackageName,
+                callingAttributionTag);
 
         return true;
     }
@@ -4239,7 +4256,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     voiceInteractor);
             final long token = Binder.clearCallingIdentity();
             try {
-                startRunningVoiceLocked(voiceSession, activityToCallback.info.applicationInfo.uid);
+                startRunningVoiceLocked(voiceSession, activityToCallback.getUid());
             } finally {
                 Binder.restoreCallingIdentity(token);
             }
@@ -4351,11 +4368,15 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         synchronized (mGlobalLock) {
             final Task task = mRootWindowContainer.anyTaskForId(taskId,
                     MATCH_ATTACHED_TASK_ONLY);
+            boolean handled = false;
             if (task != null) {
                 final ActivityRecord r = task.getTopWaitSplashScreenActivity();
                 if (r != null) {
-                    r.onCopySplashScreenFinish(parcelable);
+                    handled = r.onCopySplashScreenFinish(parcelable);
                 }
+            }
+            if (!handled && parcelable != null) {
+                parcelable.clearIfNeeded();
             }
         }
     }
@@ -5817,7 +5838,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         // TODO: Probably not, because we don't want to resume voice on switching
         // back to this activity
         if (task.voiceInteractor != null) {
-            startRunningVoiceLocked(task.voiceSession, r.info.applicationInfo.uid);
+            startRunningVoiceLocked(task.voiceSession, r.getUid());
         } else {
             finishRunningVoiceLocked();
 
@@ -5995,7 +6016,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 // Exclude recents that should be bound-foreground-service state.
                 && !mRecentTasks.isRecentsComponent(
                         stoppedActivity.mActivityComponent,
-                        stoppedActivity.info.applicationInfo.uid)) {
+                        stoppedActivity.getUid())) {
             final WindowProcessController previousProcess = stoppedActivity.app;
             mPreviousProcess = previousProcess;
             mPreviousProcessVisibleTime = stoppedActivity.lastVisibleTime;
@@ -6030,7 +6051,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 mStartingProcessActivities.sort(null /* by WindowContainer#compareTo */);
             }
         } else if (mProcessNames.get(
-                activity.processName, activity.info.applicationInfo.uid) != null) {
+                activity.processName, activity.getUid()) != null) {
             // The process is already starting. Wait for it to attach.
             return;
         }
@@ -6043,7 +6064,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             // ATMS lock held.
             final Message m = PooledLambda.obtainMessage(ActivityManagerInternal::startProcess,
                     mAmInternal, activity.processName, activity.info.applicationInfo, knownToBeDead,
-                    isTop, hostingType, activity.intent.getComponent());
+                    isTop, hostingType, activity.intent.getComponent(),
+                    activity.info.shouldRunInPccSandbox());
             mH.sendMessage(m);
         } finally {
             Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
@@ -7132,7 +7154,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                             new ArrayList<>(mStartingProcessActivities);
                     for (int i = activities.size() - 1; i >= 0; i--) {
                         final ActivityRecord r = activities.get(i);
-                        if (uid == r.info.applicationInfo.uid && name.equals(r.processName)) {
+                        if (uid == r.getUid() && name.equals(r.processName)) {
                             Slog.w(TAG, proc + " is removed with pending start " + r);
                             mStartingProcessActivities.remove(r);
                             // If visible, finish it to avoid getting stuck on screen.
@@ -7692,7 +7714,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 // Let the application initialize with consistent configuration as its activity.
                 for (int i = mStartingProcessActivities.size() - 1; i >= 0; i--) {
                     final ActivityRecord r = mStartingProcessActivities.get(i);
-                    if (wpc.mUid == r.info.applicationInfo.uid && wpc.mName.equals(r.processName)) {
+                    if (wpc.mUid == r.getUid() && wpc.mName.equals(r.processName)) {
                         wpc.registerActivityConfigurationListener(r);
                         break;
                     }

@@ -333,7 +333,7 @@
   <java-symbol type="bool" name="config_enableBurnInProtection" />
   <java-symbol type="bool" name="config_hotswapCapable" />
   <java-symbol type="integer" name="config_hsumBootStrategy" />
-  <java-symbol type="array" name="config_hsu_allowlist_activities" />
+  <java-symbol type="array" name="hsu_allowlist_activities" />
   <java-symbol type="bool" name="config_mms_content_disposition_support" />
   <java-symbol type="bool" name="config_networkSamplingWakesDevice" />
   <java-symbol type="bool" name="config_showMenuShortcutsWhenKeyboardPresent" />
@@ -4071,16 +4071,24 @@
   <java-symbol type="string" name="autofill" />
   <java-symbol type="string" name="autofill_picker_accessibility_title " />
   <java-symbol type="string" name="autofill_update_title" />
+  <java-symbol type="string" name="autofill_update_title_expressive" />
   <java-symbol type="string" name="autofill_update_title_with_type" />
+  <java-symbol type="string" name="autofill_update_title_with_type_expressive" />
   <java-symbol type="string" name="autofill_update_title_with_2types" />
+  <java-symbol type="string" name="autofill_update_title_with_2types_expressive" />
   <java-symbol type="string" name="autofill_update_title_with_3types" />
+  <java-symbol type="string" name="autofill_update_title_with_3types_expressive" />
   <java-symbol type="string" name="autofill_update_yes" />
   <java-symbol type="string" name="autofill_continue_yes" />
   <java-symbol type="string" name="autofill_save_accessibility_title " />
   <java-symbol type="string" name="autofill_save_title" />
+  <java-symbol type="string" name="autofill_save_title_expressive" />
   <java-symbol type="string" name="autofill_save_title_with_type" />
+  <java-symbol type="string" name="autofill_save_title_with_type_expressive" />
   <java-symbol type="string" name="autofill_save_title_with_2types" />
+  <java-symbol type="string" name="autofill_save_title_with_2types_expressive" />
   <java-symbol type="string" name="autofill_save_title_with_3types" />
+  <java-symbol type="string" name="autofill_save_title_with_3types_expressive" />
   <java-symbol type="string" name="autofill_save_yes" />
   <java-symbol type="string" name="autofill_save_no" />
   <java-symbol type="string" name="autofill_save_notnow" />
@@ -6523,4 +6531,10 @@
 
   <!-- Whether to keep the task on back pressed. -->
   <java-symbol type="bool" name="config_alwaysMoveTaskToBackOnBackPressed" />
+
+  <!-- Whether to override wfc roaming mode while using ntn. -->
+  <java-symbol type="bool" name="config_override_wfc_roaming_mode_while_using_ntn" />
+
+  <!-- How long to wait from eligible to freeze to freezing an app (milliseconds) -->
+  <java-symbol type="integer" name="config_defaultFreezerDebounceTimeout" />
 </resources>

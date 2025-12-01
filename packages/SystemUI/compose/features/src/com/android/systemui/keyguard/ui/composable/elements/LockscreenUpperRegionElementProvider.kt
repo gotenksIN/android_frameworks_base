@@ -137,11 +137,18 @@ constructor(
             }
         }
 
-        protected fun TransitionBuilder.configureClockTransition(
+        protected fun TransitionBuilder.configureClockCenteringTransition() {
+            val duration =
+                if (viewModel.shouldSkipTransition) 1 else CLOCK_CENTERING_DURATION_MILLIS
+            spec = tween(duration, easing = Easings.Emphasized)
+        }
+
+        protected fun TransitionBuilder.configureClockSwitchTransition(
             enter: PropertyTransformationBuilder.() -> Unit,
             exit: PropertyTransformationBuilder.() -> Unit,
         ) {
-            spec = tween(300, easing = Easings.Emphasized)
+            val duration = if (viewModel.shouldSkipTransition) 1 else 300
+            spec = tween(duration, easing = Easings.Emphasized)
 
             // Since Smartspace cards are guaranteed to be shared between the small and large clock
             // regions, it's convenient to anchor the movement of the small clock elements to it.
@@ -149,8 +156,10 @@ constructor(
             anchoredTranslate(Smartspace.DWA.SmallClock.Row, anchor = Smartspace.Cards)
             anchoredTranslate(Smartspace.DWA.SmallClock.Column, anchor = Smartspace.Cards)
 
-            timestampRange(endMillis = 133) { exit() }
-            timestampRange(startMillis = 133, endMillis = 300) { enter() }
+            if (!viewModel.shouldSkipTransition) {
+                timestampRange(endMillis = 133) { exit() }
+                timestampRange(startMillis = 133, endMillis = 300) { enter() }
+            }
         }
 
         protected fun PropertyTransformationBuilder.fadeLargeClock() {
@@ -187,13 +196,13 @@ constructor(
                     },
                 transitions = {
                     from(from = NarrowScenes.SmallClock, to = NarrowScenes.LargeClock) {
-                        configureClockTransition(
+                        configureClockSwitchTransition(
                             enter = { fadeLargeClock() },
                             exit = { fadeSmallClock() },
                         )
                     }
                     from(from = NarrowScenes.LargeClock, to = NarrowScenes.SmallClock) {
-                        configureClockTransition(
+                        configureClockSwitchTransition(
                             enter = { fadeSmallClock() },
                             exit = { fadeLargeClock() },
                         )
@@ -244,19 +253,19 @@ constructor(
                     },
                 transitions = {
                     from(from = WideScenes.CenteredClock, to = WideScenes.TwoColumn.LargeClock) {
-                        spec = tween(CLOCK_CENTERING_DURATION_MILLIS, easing = Easings.Emphasized)
+                        configureClockCenteringTransition()
                     }
                     from(from = WideScenes.TwoColumn.LargeClock, to = WideScenes.CenteredClock) {
-                        spec = tween(CLOCK_CENTERING_DURATION_MILLIS, easing = Easings.Emphasized)
+                        configureClockCenteringTransition()
                     }
                     from(from = WideScenes.CenteredClock, to = WideScenes.TwoColumn.SmallClock) {
-                        configureClockTransition(
+                        configureClockSwitchTransition(
                             enter = { fadeSmallClock() },
                             exit = { fadeLargeClock() },
                         )
                     }
                     from(from = WideScenes.TwoColumn.SmallClock, to = WideScenes.CenteredClock) {
-                        configureClockTransition(
+                        configureClockSwitchTransition(
                             enter = { fadeLargeClock() },
                             exit = { fadeSmallClock() },
                         )
@@ -265,7 +274,7 @@ constructor(
                         from = WideScenes.TwoColumn.LargeClock,
                         to = WideScenes.TwoColumn.SmallClock,
                     ) {
-                        configureClockTransition(
+                        configureClockSwitchTransition(
                             enter = { fadeSmallClock() },
                             exit = { fadeLargeClock() },
                         )
@@ -274,7 +283,7 @@ constructor(
                         from = WideScenes.TwoColumn.SmallClock,
                         to = WideScenes.TwoColumn.LargeClock,
                     ) {
-                        configureClockTransition(
+                        configureClockSwitchTransition(
                             enter = { fadeLargeClock() },
                             exit = { fadeSmallClock() },
                         )

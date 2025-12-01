@@ -73,7 +73,7 @@ open class PreferenceScreenCoordinate : Parcelable {
     val screenKey: String
 
     /** Arguments to create parameterized preference screen. */
-    @Deprecated("Use keyParameters instead")
+    @Deprecated("Use mapParameters instead")
     val args: Bundle?
 
     /** Arguments to create parameterized preference screen. */
@@ -92,36 +92,31 @@ open class PreferenceScreenCoordinate : Parcelable {
         this.keyParameters = null
     }
 
-    constructor(screenKey: String, keyArguments: KeyParameters?) {
+    constructor(screenKey: String, keyParameters: KeyParameters?) {
         this.screenKey = screenKey
-        this.keyParameters = keyArguments
+        this.keyParameters = keyParameters
         this.args = null
     }
 
     constructor(parcel: Parcel) {
         screenKey = parcel.readString()!!
-        args = parcel.readBundle(javaClass.classLoader)
 
         if (CatalystFlags.catalystUseKeyParameters()) {
-            if (args != null) {
-                val parametersSchema = PreferenceScreenRegistry.getScreenParametersSchema(screenKey)
-                // TODO (b/452555836): create the keyParameters from the parcel string, not from the args bundle. Right now we create them from bundle because Devtool uses an older version of the SettingsLib.
-                keyParameters = parametersSchema?.prepare(args)
-            } else {
-                keyParameters = null
-            }
+            keyParameters = parcel.readString()?.let { KeyParameters(it.deserializeToMap()) }
+            args = null
         } else {
+            args = parcel.readBundle(javaClass.classLoader)
             keyParameters = null
         }
     }
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
         parcel.writeString(screenKey)
-        parcel.writeBundle(args)
 
         if (CatalystFlags.catalystUseKeyParameters()) {
-            // TODO (b/452555836): Write the keyParameters to parcel. Right now we create them from bundle because Devtool uses an older version of the SettingsLib.
-            // parcel.writeString(keyParameters?.toParametersString() ?: "")
+            parcel.writeString(keyParameters?.toParametersString())
+        } else {
+            parcel.writeBundle(args)
         }
     }
 

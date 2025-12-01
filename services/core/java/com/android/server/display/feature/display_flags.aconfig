@@ -397,6 +397,20 @@ flag {
 }
 
 flag {
+    name: "display_ids_cache"
+    namespace: "display_manager"
+    description: "Feature flag for cache of display ids in DisplayManagerGlobal"
+    bug: "461159073"
+}
+
+flag {
+    name: "display_ids_cache_validation"
+    namespace: "display_manager"
+    description: "Feature flag for validation cache of display ids in DisplayManagerGlobal"
+    bug: "461159073"
+}
+
+flag {
     name: "force_color_fade"
     namespace: "wear_systems"
     description: "Force Color Fade."
@@ -448,4 +462,11 @@ flag {
     metadata {
           purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "frame_rate_mapping_api"
+    namespace: "core_graphics"
+    description: "Adds new api to query the frame rate / velocity mapping values"
+    bug: "453060939"
 }

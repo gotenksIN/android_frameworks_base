@@ -2582,7 +2582,6 @@ public abstract class ConnectionService extends Service {
         findConnectionForAction(callId, "abort").onAbort();
     }
 
-    /** {@hide} */
     protected void answerVideo(String callId, int videoState) {
         Log.i(this, "answerVideo %s", callId);
         if (mConnectionById.containsKey(callId)) {
@@ -2592,7 +2591,6 @@ public abstract class ConnectionService extends Service {
         }
     }
 
-    /** {@hide} */
     protected void answer(String callId) {
         Log.i(this, "answer %s", callId);
         if (mConnectionById.containsKey(callId)) {
@@ -3151,8 +3149,8 @@ public abstract class ConnectionService extends Service {
         mAdapter.addConferenceCallFromConnection(id, parcelableConference);
         // In some instances a conference can start its life as a standalone call with just a
         // single participant; ensure we signal to Telecom in this case.
-        if (!conference.isMultiparty()) {
-            mAdapter.setConferenceState(id, conference.isMultiparty());
+        if (!conference.isConferenceState()) {
+            mAdapter.setConferenceState(id, conference.isConferenceState());
         }
 
         // Go through any child calls and set the parent.
@@ -3210,8 +3208,8 @@ public abstract class ConnectionService extends Service {
             mAdapter.setVideoState(id, conference.getVideoState());
             // In some instances a conference can start its life as a standalone call with just a
             // single participant; ensure we signal to Telecom in this case.
-            if (!conference.isMultiparty()) {
-                mAdapter.setConferenceState(id, conference.isMultiparty());
+            if (!conference.isConferenceState()) {
+                mAdapter.setConferenceState(id, conference.isConferenceState());
             }
 
             // Go through any child calls and set the parent.

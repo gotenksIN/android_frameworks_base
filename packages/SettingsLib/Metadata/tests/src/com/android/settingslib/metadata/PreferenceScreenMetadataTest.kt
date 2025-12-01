@@ -137,14 +137,14 @@ class PreferenceScreenMetadataTest {
                 it.put(
                     screen.key,
                     object : TestParameterizedFactory {
-                        override fun createWithKeyParameters(context: Context, keyParameters: KeyParameters) = screen
+                        override fun createWithKeyParameters(context: Context, keyParameters: ValidatedKeyParameters) = screen
                         override val parametersSchema = schema
                     },
                 )
                 it.put(
                     innerScreen.key,
                     object : TestParameterizedFactory {
-                        override fun createWithKeyParameters(context: Context, keyParameters: KeyParameters) = innerScreen
+                        override fun createWithKeyParameters(context: Context, keyParameters: ValidatedKeyParameters) = innerScreen
                         override val parametersSchema = schema
                     },
                 )
@@ -164,6 +164,8 @@ class PreferenceScreenMetadataTest {
     open class Screen(override val key: String, override val arguments: Bundle? = null) :
         PreferenceScreenCreator, PreferenceLifecycleProvider {
 
+        override val purpose: Int = 0
+
         lateinit var preferenceLifecycleContext: PreferenceLifecycleContext
 
         override fun fragmentClass() = PreferenceFragment::class.java
@@ -176,8 +178,10 @@ class PreferenceScreenMetadataTest {
             preferenceHierarchy(context) {}
     }
 
-    open class ScreenWithKeyParams(override val key: String, override val keyParameters: KeyParameters? = null) :
+    open class ScreenWithKeyParams(override val key: String, override val keyParameters: ValidatedKeyParameters? = null) :
         PreferenceScreenCreator, PreferenceLifecycleProvider {
+
+        override val purpose: Int = 0
 
         lateinit var preferenceLifecycleContext: PreferenceLifecycleContext
 
@@ -194,8 +198,8 @@ class PreferenceScreenMetadataTest {
     interface TestParameterizedFactory : PreferenceScreenMetadataParameterizedFactory {
         override fun create(context: Context, args: Bundle): PreferenceScreenMetadata = TODO("Not yet implemented")
         override fun parameters(context: Context): Flow<Bundle> = flowOf(0.toArgument())
-        override fun createWithKeyParameters(context: Context, keyParameters: KeyParameters): PreferenceScreenMetadata = TODO("Not yet implemented")
-        override fun keyParameters(context: Context): Flow<KeyParameters> = parameters(context).map { parametersSchema.prepare(it) }
+        override fun createWithKeyParameters(context: Context, keyParameters: ValidatedKeyParameters): PreferenceScreenMetadata = TODO("Not yet implemented")
+        override fun keyParameters(context: Context): Flow<ValidatedKeyParameters> = parameters(context).map { parametersSchema.prepare(it) }
         override val parametersSchema: KeyParametersSchema get() = KeyParametersSchema {}
     }
 }

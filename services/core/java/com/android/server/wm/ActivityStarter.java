@@ -1225,7 +1225,7 @@ class ActivityStarter {
                         + "%d",  displayId, userId);
             }
 
-            err = mUserHelper.checkRequest(request, displayId);
+            err = mUserHelper.checkRequest(request);
         }
 
         final Task resultRootTask = resultRecord == null

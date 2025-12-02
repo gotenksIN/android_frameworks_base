@@ -43,7 +43,9 @@ import com.android.systemui.res.R
 import com.android.systemui.statusbar.StatusBarIconView
 import com.android.systemui.statusbar.chips.StatusBarChipsReturnAnimations
 import com.android.systemui.statusbar.chips.notification.domain.interactor.statusBarNotificationChipsInteractor
+import com.android.systemui.statusbar.chips.ui.model.Chronometer
 import com.android.systemui.statusbar.chips.ui.model.ColorsModel
+import com.android.systemui.statusbar.chips.ui.model.EventTime
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.view.ChipBackgroundContainer
 import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
@@ -433,9 +435,9 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
             assertThat(
                     ((latest as OngoingActivityChipModel.Active).content
                             as OngoingActivityChipModel.Content.Timer)
-                        .startTimeMs
+                        .value
                 )
-                .isEqualTo(398_000)
+                .isEqualTo(Chronometer.Running(EventTime.ElapsedRealtime(398_000)))
         }
 
     @Test
@@ -603,9 +605,9 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
             assertThat(
                     ((latest as OngoingActivityChipModel.Active).content
                             as OngoingActivityChipModel.Content.Timer)
-                        .startTimeMs
+                        .value
                 )
-                .isEqualTo(398_000)
+                .isEqualTo(Chronometer.Running(EventTime.ElapsedRealtime(398_000)))
 
             // End the call
             removeOngoingCallState(key = "testKey")
@@ -621,9 +623,9 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
             assertThat(
                     ((latest as OngoingActivityChipModel.Active).content
                             as OngoingActivityChipModel.Content.Timer)
-                        .startTimeMs
+                        .value
                 )
-                .isEqualTo(499_000)
+                .isEqualTo(Chronometer.Running(EventTime.ElapsedRealtime(499_000)))
         }
 
     @Test

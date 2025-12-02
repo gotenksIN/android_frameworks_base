@@ -37,7 +37,6 @@ import android.view.IWindowManager;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.window.DesktopExperienceFlags;
-import android.window.DesktopModeFlags;
 import android.window.TaskSnapshotManager;
 
 import androidx.annotation.OptIn;
@@ -1338,9 +1337,7 @@ public abstract class WMShellModule {
             @ShellMainThread ShellExecutor mainExecutor,
             DisplayController displayController,
             DesktopState desktopState) {
-        if (desktopState.canEnterDesktopMode()
-                && (DesktopExperienceFlags.ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT.isTrue()
-                || DesktopModeFlags.ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS.isTrue())) {
+        if (desktopState.canEnterDesktopMode()) {
             return Optional.of(new DesktopModeKeyGestureHandler(context,
                     desktopModeWindowDecorViewModel, desktopTasksController,
                     desktopUserRepositories,

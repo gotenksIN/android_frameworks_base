@@ -237,6 +237,7 @@ import static org.xmlpull.v1.XmlPullParser.END_TAG;
 import static org.xmlpull.v1.XmlPullParser.START_TAG;
 
 import android.Manifest;
+import android.annotation.CallSuper;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -5393,6 +5394,11 @@ public final class ActivityRecord extends WindowToken {
     }
 
     @Override
+    boolean shouldCheckTokenVisibleRequested() {
+        return true;
+    }
+
+    @Override
     protected boolean onChildVisibleRequestedChanged(@Nullable WindowContainer child) {
         // Activity manages visibleRequested directly (it's not determined by children)
         return false;
@@ -7588,6 +7594,9 @@ public final class ActivityRecord extends WindowToken {
      * orientation is updated before the app becomes visible.
      */
     void reportDescendantOrientationChangeIfNeeded() {
+        if (com.android.window.flags.Flags.removeLegacyOrientationReport()) {
+            return;
+        }
         // Orientation request is exposed only when we're visible. Therefore visibility change
         // will change requested orientation. Notify upward the hierarchy ladder to adjust
         // configuration. This is important to cases where activities with incompatible
@@ -9469,11 +9478,21 @@ public final class ActivityRecord extends WindowToken {
         return stringName;
     }
 
-    /**
-     * Write all fields to an {@code ActivityRecordProto}. This assumes the
-     * {@code ActivityRecordProto} is the outer-most proto data.
-     */
-    void dumpDebug(ProtoOutputStream proto, @WindowTracingLogLevel int logLevel) {
+    @Override
+    long getProtoFieldId() {
+        return ACTIVITY;
+    }
+
+    @CallSuper
+    @Override
+    public void dumpDebug(ProtoOutputStream proto, long fieldId,
+            @WindowTracingLogLevel int logLevel) {
+        // Critical log level logs only visible elements to mitigate performance overheard
+        if (logLevel == WindowTracingLogLevel.CRITICAL && !isVisible()) {
+            return;
+        }
+
+        final long token = proto.start(fieldId);
         writeNameToProto(proto, NAME);
         super.dumpDebug(proto, WINDOW_TOKEN, logLevel);
         proto.write(IS_ANIMATING, isAnimating(PARENTS | CHILDREN,
@@ -9513,23 +9532,6 @@ public final class ActivityRecord extends WindowToken {
                 mRequestOpenInBrowserEducationTimestamp);
 
         mAppCompatController.dumpDebug(proto);
-    }
-
-    @Override
-    long getProtoFieldId() {
-        return ACTIVITY;
-    }
-
-    @Override
-    public void dumpDebug(ProtoOutputStream proto, long fieldId,
-            @WindowTracingLogLevel int logLevel) {
-        // Critical log level logs only visible elements to mitigate performance overheard
-        if (logLevel == WindowTracingLogLevel.CRITICAL && !isVisible()) {
-            return;
-        }
-
-        final long token = proto.start(fieldId);
-        dumpDebug(proto, logLevel);
         proto.end(token);
     }
 

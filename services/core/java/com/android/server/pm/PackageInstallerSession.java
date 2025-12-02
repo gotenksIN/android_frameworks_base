@@ -144,6 +144,7 @@ import android.content.pm.parsing.ApkLiteParseUtils;
 import android.content.pm.parsing.PackageLite;
 import android.content.pm.parsing.result.ParseResult;
 import android.content.pm.parsing.result.ParseTypeImpl;
+import android.content.pm.verify.developer.DeveloperVerificationSession;
 import android.content.pm.verify.developer.DeveloperVerificationStatus;
 import android.content.pm.verify.domain.DomainSet;
 import android.content.res.ApkAssets;
@@ -3088,7 +3089,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             // The system doesn't have a verifier specified.
             return false;
         }
-        if ((params.installFlags & PackageManager.INSTALL_FROM_ADB) != 0) {
+        // TODO(b/460818215): Remove this once adb check is handled by the verifier module.
+        if (isAdbInstall()) {
             // adb installs are exempted from verification unless explicitly requested
             if (!params.forceVerification) {
                 synchronized (mMetrics) {
@@ -3325,13 +3327,20 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             declaredLibraries =
                     mPackageLite == null ? null : mPackageLite.getDeclaredLibraries();
         }
+        int verificationFlags = 0;
+        if (Flags.verificationServiceAdb() && isAdbInstall()) {
+            verificationFlags |= DeveloperVerificationSession.FLAG_VERIFICATION_IS_ADB;
+            if (params.forceVerification) {
+                verificationFlags |= DeveloperVerificationSession.FLAG_VERIFICATION_FORCED_ON_ADB;
+            }
+        }
         if (!mDeveloperVerifierController.startVerificationSession(
                 mPm::snapshotComputer, userId, sessionId, packageName,
                 Uri.fromFile(stageDir), signingInfo,
                 declaredLibraries, mCurrentVerificationPolicy.get(),
                 /* extensionParams= */ params.extensionParams,
                 callback, this::onConnectionEstablished,
-                /* retry= */ retry)) {
+                /* retry= */ retry, verificationFlags)) {
             // A verifier is installed but cannot be connected. Maybe notify user.
             callback.onConnectionInfeasible();
         } else {
@@ -4340,8 +4349,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         // anywhere; app stores already have a record of the installation and that's why reporting
         // it here is fine
         final String packageName = getPackageName();
-        final String packageNameToLog =
-                (params.installFlags & PackageManager.INSTALL_FROM_ADB) == 0 ? packageName : "";
+        final String packageNameToLog = isAdbInstall() ? "" : packageName;
         final long currentTimestamp = System.currentTimeMillis();
         final int packageUid;
         if (returnCode != INSTALL_SUCCEEDED) {
@@ -7012,6 +7020,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 || (isReady && !isApplied && !isFailed)
                 || (!isReady && isApplied && !isFailed)
                 || (!isReady && !isApplied && isFailed);
+    }
+
+    private boolean isAdbInstall() {
+        return (params.installFlags & PackageManager.INSTALL_FROM_ADB) != 0;
     }
 
     /**

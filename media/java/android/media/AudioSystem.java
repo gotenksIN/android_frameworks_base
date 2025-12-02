@@ -37,13 +37,14 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Vibrator;
+import android.ravenwood.annotation.RavenwoodKeepPartialClass;
+import android.ravenwood.annotation.RavenwoodKeepStaticInitializer;
+import android.ravenwood.annotation.RavenwoodReplace;
 import android.telephony.TelephonyManager;
 import android.util.IntArray;
 import android.util.Log;
 import android.util.Pair;
-import android.ravenwood.annotation.RavenwoodKeepPartialClass;
-import android.ravenwood.annotation.RavenwoodKeepStaticInitializer;
-import android.ravenwood.annotation.RavenwoodReplace;
+
 
 import com.android.internal.annotations.GuardedBy;
 
@@ -321,7 +322,8 @@ public class AudioSystem
     @IntDef(flag = false, prefix = "DEVICE_", value = {
             DEVICE_OUT_BLUETOOTH_A2DP,
             DEVICE_OUT_BLE_HEADSET,
-            DEVICE_OUT_BLE_BROADCAST}
+            DEVICE_OUT_BLE_BROADCAST,
+            DEVICE_OUT_BLE_HEARING_AID}
     )
     @Retention(RetentionPolicy.SOURCE)
     public @interface BtOffloadDeviceType {}
@@ -1241,6 +1243,8 @@ public class AudioSystem
     public static final int DEVICE_OUT_BLE_SPEAKER = 0x20000001;
     /** @hide */
     public static final int DEVICE_OUT_BLE_BROADCAST = 0x20000002;
+    /** @hide */
+    public static final int DEVICE_OUT_BLE_HEARING_AID = 0x20000004;
 
     /** @hide */
     public static final int DEVICE_OUT_DEFAULT = DEVICE_BIT_DEFAULT;
@@ -1279,7 +1283,8 @@ public class AudioSystem
     /** @hide */
     @android.ravenwood.annotation.RavenwoodKeep
     public static final Set<Integer> DEVICE_OUT_ALL_BLE_SET =
-            Set.of(DEVICE_OUT_BLE_HEADSET, DEVICE_OUT_BLE_SPEAKER, DEVICE_OUT_BLE_BROADCAST);
+            Set.of(DEVICE_OUT_BLE_HEADSET, DEVICE_OUT_BLE_SPEAKER, DEVICE_OUT_BLE_BROADCAST,
+                    DEVICE_OUT_BLE_HEARING_AID);
 
     /** @hide */
     public static final Set<Integer> DEVICE_OUT_PICK_FOR_VOLUME_SET;
@@ -1322,6 +1327,7 @@ public class AudioSystem
         DEVICE_OUT_ALL_SET.add(DEVICE_OUT_BLE_HEADSET);
         DEVICE_OUT_ALL_SET.add(DEVICE_OUT_BLE_SPEAKER);
         DEVICE_OUT_ALL_SET.add(DEVICE_OUT_BLE_BROADCAST);
+        DEVICE_OUT_ALL_SET.add(DEVICE_OUT_BLE_HEARING_AID);
         DEVICE_OUT_ALL_SET.add(DEVICE_OUT_DEFAULT);
 
         DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO_SET = new HashSet<>();
@@ -1337,6 +1343,7 @@ public class AudioSystem
         DEVICE_OUT_ALL_BLE_UNICAST_SET = new HashSet<>();
         DEVICE_OUT_ALL_BLE_UNICAST_SET.add(DEVICE_OUT_BLE_HEADSET);
         DEVICE_OUT_ALL_BLE_UNICAST_SET.add(DEVICE_OUT_BLE_SPEAKER);
+        DEVICE_OUT_ALL_BLE_UNICAST_SET.add(DEVICE_OUT_BLE_HEARING_AID);
 
         DEVICE_OUT_PICK_FOR_VOLUME_SET = new HashSet<>();
         DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_WIRED_HEADSET);
@@ -1353,6 +1360,7 @@ public class AudioSystem
         DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_BLE_HEADSET);
         DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_BLE_SPEAKER);
         DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_BLE_BROADCAST);
+        DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_BLE_HEARING_AID);
     }
 
     // input devices
@@ -1431,6 +1439,8 @@ public class AudioSystem
     /** @hide */
     public static final int DEVICE_IN_BLE_HEADSET = DEVICE_BIT_IN | 0x20000000;
     /** @hide */
+    public static final int DEVICE_IN_BLE_HEARING_AID = DEVICE_BIT_IN | 0x20000001;
+    /** @hide */
     @UnsupportedAppUsage
     public static final int DEVICE_IN_DEFAULT = DEVICE_BIT_IN | DEVICE_BIT_DEFAULT;
 
@@ -1447,7 +1457,8 @@ public class AudioSystem
 
     /** @hide */
     @android.ravenwood.annotation.RavenwoodKeep
-    public static final Set<Integer> DEVICE_IN_ALL_BLE_SET = Set.of(DEVICE_IN_BLE_HEADSET);
+    public static final Set<Integer> DEVICE_IN_ALL_BLE_SET = Set.of(DEVICE_IN_BLE_HEADSET,
+            DEVICE_IN_BLE_HEARING_AID);
 
     static {
         DEVICE_IN_ALL_SET = new HashSet<>();
@@ -1479,6 +1490,7 @@ public class AudioSystem
         DEVICE_IN_ALL_SET.add(DEVICE_IN_HDMI_EARC);
         DEVICE_IN_ALL_SET.add(DEVICE_IN_ECHO_REFERENCE);
         DEVICE_IN_ALL_SET.add(DEVICE_IN_BLE_HEADSET);
+        DEVICE_IN_ALL_SET.add(DEVICE_IN_BLE_HEARING_AID);
         DEVICE_IN_ALL_SET.add(DEVICE_IN_DEFAULT);
     }
 
@@ -1613,6 +1625,7 @@ public class AudioSystem
     /** @hide */ public static final String DEVICE_OUT_BLE_HEADSET_NAME = "ble_headset";
     /** @hide */ public static final String DEVICE_OUT_BLE_SPEAKER_NAME = "ble_speaker";
     /** @hide */ public static final String DEVICE_OUT_BLE_BROADCAST_NAME = "ble_broadcast";
+    /** @hide */ public static final String DEVICE_OUT_BLE_HEARING_AID_NAME = "ble_hearing_aid";
 
     /** @hide */ public static final String DEVICE_IN_COMMUNICATION_NAME = "communication";
     /** @hide */ public static final String DEVICE_IN_AMBIENT_NAME = "ambient";
@@ -1642,6 +1655,7 @@ public class AudioSystem
     /** @hide */ public static final String DEVICE_IN_HDMI_ARC_NAME = "hdmi_arc";
     /** @hide */ public static final String DEVICE_IN_HDMI_EARC_NAME = "hdmi_earc";
     /** @hide */ public static final String DEVICE_IN_BLE_HEADSET_NAME = "ble_headset";
+    /** @hide */ public static final String DEVICE_IN_BLE_HEARING_AID_NAME = "ble_hearing_aid";
 
     /** @hide */
     @UnsupportedAppUsage
@@ -1717,6 +1731,8 @@ public class AudioSystem
             return DEVICE_OUT_BLE_SPEAKER_NAME;
         case DEVICE_OUT_BLE_BROADCAST:
             return DEVICE_OUT_BLE_BROADCAST_NAME;
+        case DEVICE_OUT_BLE_HEARING_AID:
+            return DEVICE_OUT_BLE_HEARING_AID_NAME;
         case DEVICE_OUT_DEFAULT:
         default:
             return "0x" + Integer.toHexString(device);
@@ -1784,6 +1800,8 @@ public class AudioSystem
             return DEVICE_IN_HDMI_EARC_NAME;
         case DEVICE_IN_BLE_HEADSET:
             return DEVICE_IN_BLE_HEADSET_NAME;
+        case DEVICE_IN_BLE_HEARING_AID:
+            return DEVICE_IN_BLE_HEARING_AID_NAME;
         case DEVICE_IN_DEFAULT:
         default:
             return Integer.toString(device);
@@ -2853,14 +2871,6 @@ public class AudioSystem
      */
     public static boolean isSingleAudioDeviceType(@NonNull Set<Integer> types, int type) {
         return types.size() == 1 && types.contains(type);
-    }
-
-    /**
-     * @hide
-     * Return true if the audio device type is a Bluetooth LE Audio device.
-     */
-    public static boolean isLeAudioDeviceType(int type) {
-        return DEVICE_OUT_ALL_BLE_SET.contains(type);
     }
 
     /** @hide */

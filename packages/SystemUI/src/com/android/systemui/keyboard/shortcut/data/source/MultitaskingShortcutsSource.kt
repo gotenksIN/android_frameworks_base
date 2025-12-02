@@ -32,7 +32,6 @@ import android.view.KeyEvent.META_CTRL_ON
 import android.view.KeyEvent.META_META_ON
 import android.view.KeyboardShortcutGroup
 import android.window.DesktopExperienceFlags
-import android.window.DesktopModeFlags
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyboard.shortcut.data.model.shortcutInfo
@@ -86,56 +85,51 @@ constructor(
                     command(META_META_ON or META_CTRL_ON, KEYCODE_DPAD_DOWN)
                 }
             )
-
-            if (DesktopExperienceFlags.ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT.isTrue()) {
-                // Move a window to the next display:
-                //  - Meta + Ctrl + D
-                add(
-                    shortcutInfo(
-                        resources.getString(R.string.system_multitasking_move_to_next_display)
-                    ) {
-                        command(META_META_ON or META_CTRL_ON, KEYCODE_D)
-                    }
-                )
-            }
-            if (DesktopModeFlags.ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS.isTrue) {
-                // Snap a freeform window to the left
-                //  - Meta + Left bracket
-                add(
-                    shortcutInfo(
-                        resources.getString(R.string.system_desktop_mode_snap_left_window)
-                    ) {
-                        command(META_META_ON, KEYCODE_LEFT_BRACKET)
-                    }
-                )
-                // Snap a freeform window to the right
-                //  - Meta + Right bracket
-                add(
-                    shortcutInfo(
-                        resources.getString(R.string.system_desktop_mode_snap_right_window)
-                    ) {
-                        command(META_META_ON, KEYCODE_RIGHT_BRACKET)
-                    }
-                )
-                // Toggle maximize a freeform window
-                //  - Meta + Equals
-                add(
-                    shortcutInfo(
-                        resources.getString(R.string.system_desktop_mode_toggle_maximize_window)
-                    ) {
-                        command(META_META_ON, KEYCODE_EQUALS)
-                    }
-                )
-                // Minimize a freeform window
-                //  - Meta + Minus
-                add(
-                    shortcutInfo(
-                        resources.getString(R.string.system_desktop_mode_minimize_window)
-                    ) {
-                        command(META_META_ON, KEYCODE_MINUS)
-                    }
-                )
-            }
+            // Move a window to the next display:
+            //  - Meta + Ctrl + D
+            add(
+                shortcutInfo(
+                    resources.getString(R.string.system_multitasking_move_to_next_display)
+                ) {
+                    command(META_META_ON or META_CTRL_ON, KEYCODE_D)
+                }
+            )
+            // Snap a freeform window to the left
+            //  - Meta + Left bracket
+            add(
+                shortcutInfo(
+                    resources.getString(R.string.system_desktop_mode_snap_left_window)
+                ) {
+                    command(META_META_ON, KEYCODE_LEFT_BRACKET)
+                }
+            )
+            // Snap a freeform window to the right
+            //  - Meta + Right bracket
+            add(
+                shortcutInfo(
+                    resources.getString(R.string.system_desktop_mode_snap_right_window)
+                ) {
+                    command(META_META_ON, KEYCODE_RIGHT_BRACKET)
+                }
+            )
+            // Toggle maximize a freeform window
+            //  - Meta + Equals
+            add(
+                shortcutInfo(
+                    resources.getString(R.string.system_desktop_mode_toggle_maximize_window)
+                ) {
+                    command(META_META_ON, KEYCODE_EQUALS)
+                }
+            )
+            // Minimize a freeform window
+            //  - Meta + Minus
+            add(
+                shortcutInfo(
+                    resources.getString(R.string.system_desktop_mode_minimize_window)
+                ) {
+                    command(META_META_ON, KEYCODE_MINUS)
+                }
+            )
             // Close focused task:
             //  - Meta + Ctrl + W
             add(

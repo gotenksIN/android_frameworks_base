@@ -69,6 +69,7 @@ import static com.android.server.wm.ActivityTaskManagerService.checkPermission;
 import static com.android.server.wm.ActivityTaskSupervisor.printThisActivity;
 import static com.android.server.wm.AppCompatSandboxingPolicy.ConfigOverrideHint;
 
+import android.annotation.CallSuper;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -3549,9 +3550,11 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         return TASK_FRAGMENT;
     }
 
+    @CallSuper
     @Override
     public void dumpDebug(ProtoOutputStream proto, long fieldId,
             @WindowTracingLogLevel int logLevel) {
+        // Critical log level logs only visible elements to mitigate performance overheard
         if (logLevel == WindowTracingLogLevel.CRITICAL && !isVisible()) {
             return;
         }

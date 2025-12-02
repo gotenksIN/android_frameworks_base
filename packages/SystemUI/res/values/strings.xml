@@ -3749,6 +3749,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="volume_panel_noise_control_title">Noise Control</string>
+    <!-- Label for button to enabled/disable mic noise cancellation [CHAR_LIMIT=30] -->
+    <string name="volume_panel_mic_noise_cancellation_title">Mic Noise Cancellation</string>
     <!-- Label for button to enabled/disable spatial audio [CHAR_LIMIT=30] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

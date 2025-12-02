@@ -51,7 +51,6 @@ import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.util.Spline;
 import android.view.Display;
@@ -243,7 +242,6 @@ public class LocalDisplayAdapterTest {
                         new float[]{100, 0, 0, 0}));
         when(mMockDisplayDeviceConfig.isEvenDimmerAvailable()).thenReturn(true);
 
-        doReturn(true).when(mFlags).isDisplayOffloadEnabled();
         doReturn(true).when(mFlags).isDisplayContentModeManagementEnabled();
         initDisplayOffloadSession();
     }
@@ -1735,7 +1733,6 @@ public class LocalDisplayAdapterTest {
     @Test
     public void testDefaultDisplayMode_withSyntheticModes_defaultModeDoesNotChange()
             throws Exception {
-        doReturn(true).when(mFlags).isSyntheticModesV2Enabled();
         SurfaceControl.DisplayMode displayMode1 = createFakeDisplayMode(0, 1920, 1080, 100f, 60f);
         // system preferred mode
         SurfaceControl.DisplayMode displayMode2 = createFakeDisplayMode(1, 3840, 2160, 100f, 60f);

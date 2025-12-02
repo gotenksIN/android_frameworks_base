@@ -113,6 +113,7 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 
 import static java.lang.Integer.MAX_VALUE;
 
+import android.annotation.CallSuper;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -650,6 +651,8 @@ class Task extends TaskFragment {
     /** @see #isDisablePip() */
     private boolean mDisablePip;
 
+    private final boolean mIsForceOpaque;
+
     private Task(ActivityTaskManagerService atmService, int _taskId, Intent _intent,
             Intent _affinityIntent, String _affinity, String _rootAffinity,
             ComponentName _realActivity, ComponentName _origActivity, boolean _rootWasReset,
@@ -661,7 +664,8 @@ class Task extends TaskFragment {
             boolean _realActivitySuspended, boolean userSetupComplete, int minWidth, int minHeight,
             @Nullable ActivityInfo info, @Nullable IVoiceInteractionSession _voiceSession,
             IVoiceInteractor _voiceInteractor, boolean _createdByOrganizer, IBinder _launchCookie,
-            boolean _deferTaskAppear, boolean _removeWithTaskOrganizer) {
+            boolean _deferTaskAppear, boolean _removeWithTaskOrganizer,
+            boolean isForceOpaque) {
         super(atmService, null /* fragmentToken */, _createdByOrganizer, false /* isEmbedded */);
 
         mTaskId = _taskId;
@@ -709,6 +713,7 @@ class Task extends TaskFragment {
         mDeferTaskAppear = _deferTaskAppear;
         mRemoveWithTaskOrganizer = _removeWithTaskOrganizer;
         mIsTrimmableFromRecents = true;
+        mIsForceOpaque = isForceOpaque;
         EventLogTags.writeWmTaskCreated(mTaskId);
     }
 
@@ -2964,6 +2969,9 @@ class Task extends TaskFragment {
 
     @Override
     public boolean onDescendantOrientationChanged(WindowContainer requestingContainer) {
+        if (com.android.window.flags.Flags.removeLegacyOrientationReport()) {
+            return super.onDescendantOrientationChanged(requestingContainer);
+        }
         if (super.onDescendantOrientationChanged(requestingContainer)) {
             return true;
         }
@@ -6062,6 +6070,19 @@ class Task extends TaskFragment {
         }
     }
 
+    void continuePackageUpdate() {
+        // If the task is not marked to be handled, do nothing.
+        if (Flags.enableAppRestartAfterUpdate() && !mHandlePackageUpdate) {
+            return;
+        }
+
+        final ActivityRecord rootActivity = getRootActivity();
+        if (rootActivity == null) {
+            return;
+        }
+        rootActivity.app.onTaskPackageUpdateHandled(this);
+    }
+
     boolean dump(FileDescriptor fd, PrintWriter pw, boolean dumpAll, boolean dumpClient,
             String dumpPackage, final boolean needSep) {
         return dump("  ", fd, pw, dumpAll, dumpClient, dumpPackage, needSep, null /* header */);
@@ -6488,9 +6509,11 @@ class Task extends TaskFragment {
         return boundsChange[0];
     }
 
+    @CallSuper
     @Override
     public void dumpDebug(ProtoOutputStream proto, long fieldId,
             @WindowTracingLogLevel int logLevel) {
+        // Critical log level logs only visible elements to mitigate performance overheard
         if (logLevel == WindowTracingLogLevel.CRITICAL && !isVisible()) {
             return;
         }
@@ -6532,6 +6555,28 @@ class Task extends TaskFragment {
         super.dumpDebug(proto, TASK_FRAGMENT, logLevel);
 
         proto.end(token);
+    }
+
+    /**
+     * Indicates whether this task should be force opaque when it contains any running activities.
+     *
+     * @see #getVisibility(ActivityRecord)
+     * @see #hasFillingContent()
+     * @see ActivityTaskSupervisor.OpaqueContainerHelper#isOpaque
+     */
+    boolean isForceOpaque() {
+        return mIsForceOpaque && mCreatedByOrganizer
+                && getTopNonFinishingActivity() != null;
+    }
+
+    // TODO(b/448600132): Consolidate the usage to
+    //  ActivityTaskSupervisor.OpaqueContainerHelper#isOpaque.
+    @Override
+    public boolean hasFillingContent() {
+        if (isForceOpaque()) {
+            return true;
+        }
+        return super.hasFillingContent();
     }
 
     static class Builder {
@@ -6579,6 +6624,8 @@ class Task extends TaskFragment {
         private boolean mReparentOnDisplayRemoval;
         @Nullable
         private String mName;
+
+        private boolean mIsForceOpaque;
 
         /**
          * Records the source task that requesting to build a new task, used to determine which of
@@ -6709,6 +6756,15 @@ class Task extends TaskFragment {
 
         Builder setReparentOnDisplayRemoval(boolean reparentOnDisplayRemoval) {
             mReparentOnDisplayRemoval = reparentOnDisplayRemoval;
+            return this;
+        }
+
+        /**
+         * Sets whether to force opaque.
+         * @see Task#isForceOpaque()
+         */
+        Builder setForceOpaque(boolean forceOpaque) {
+            mIsForceOpaque = forceOpaque;
             return this;
         }
 
@@ -6947,7 +7003,8 @@ class Task extends TaskFragment {
                     mCallingPackage, mCallingFeatureId, mResizeMode, mSupportsPictureInPicture,
                     mRealActivitySuspended, mUserSetupComplete, mMinWidth, mMinHeight,
                     mActivityInfo, mVoiceSession, mVoiceInteractor, mCreatedByOrganizer,
-                    mLaunchCookie, mDeferTaskAppear, mRemoveWithTaskOrganizer);
+                    mLaunchCookie, mDeferTaskAppear, mRemoveWithTaskOrganizer,
+                    mIsForceOpaque);
         }
     }
 

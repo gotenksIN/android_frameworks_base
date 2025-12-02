@@ -18,7 +18,6 @@ package com.android.wm.shell.desktopmode.multidesks
 import android.app.ActivityManager
 import android.app.ActivityOptions
 import android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED
-import android.platform.test.annotations.EnableFlags
 import android.testing.AndroidTestingRunner
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.SurfaceControl
@@ -277,24 +276,6 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
         val desk = createDeskSuspending()
         assertThat(organizer.childLeashes.contains(desk.deskRoot.taskInfo.taskId)).isFalse()
         assertThat(organizer.childLeashes.contains(desk.minimizationRoot.taskInfo.taskId)).isFalse()
-    }
-
-    @Test
-    @EnableFlags(com.android.window.flags.Flags.FLAG_ENABLE_BACK_NAVIGATION_DESKTOP_APP_NO_MINIMIZE)
-    fun testCreateDeskRoot_interceptsBack() = runTest {
-        val desk = createDeskSuspending()
-
-        verify(mockShellTaskOrganizer)
-            .applyTransaction(
-                argThat { wct ->
-                    wct.changes.any { change ->
-                        change.key == desk.deskRoot.token.asBinder() &&
-                            (change.value.changeMask and Change.CHANGE_INTERCEPT_BACK_PRESSED !=
-                                0) &&
-                            change.value.interceptBackPressed
-                    }
-                }
-            )
     }
 
     @Test
@@ -1189,12 +1170,10 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
             .thenAnswer { invocation ->
                 val listener = (invocation.arguments[1] as TaskListener)
                 listener.onTaskAppeared(freeformRootTask, SurfaceControl())
-                freeformRootTask.token
             }
             .thenAnswer { invocation ->
                 val listener = (invocation.arguments[1] as TaskListener)
                 listener.onTaskAppeared(minimizationRootTask, SurfaceControl())
-                minimizationRootTask.token
             }
         val deskId = organizer.createDeskSuspending(displayId, userId)
         val deskRoot = assertNotNull(organizer.deskRootsByDeskId.get(deskId))
@@ -1218,12 +1197,10 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
             .thenAnswer { invocation ->
                 val listener = (invocation.arguments[1] as TaskListener)
                 listener.onTaskAppeared(freeformRootTask, SurfaceControl())
-                freeformRootTask.token
             }
             .thenAnswer { invocation ->
                 val listener = (invocation.arguments[1] as TaskListener)
                 listener.onTaskAppeared(minimizationRootTask, SurfaceControl())
-                minimizationRootTask.token
             }
         organizer.warmUpDefaultDesk(displayId, userId)
     }

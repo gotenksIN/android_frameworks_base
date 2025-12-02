@@ -1886,7 +1886,7 @@ public final class ActivityRecord extends WindowToken {
         mAtmService = _service;
         ((Token) token).mActivityRef = new WeakReference<>(this);
         info = aInfo;
-        mUserId = UserHandle.getUserId(info.applicationInfo.uid);
+        mUserId = UserHandle.getUserId(info.getUid());
         packageName = info.applicationInfo.packageName;
         intent = _intent;
 
@@ -2000,9 +2000,9 @@ public final class ActivityRecord extends WindowToken {
         translucentWindowLaunch = false;
         mTaskSupervisor = supervisor;
 
-        info.taskAffinity = computeTaskAffinity(info.taskAffinity, info.applicationInfo.uid);
+        info.taskAffinity = computeTaskAffinity(info.taskAffinity, info.getUid());
         taskAffinity = info.taskAffinity;
-        final String uid = Integer.toString(info.applicationInfo.uid);
+        final String uid = Integer.toString(info.getUid());
         if (info.windowLayout != null && info.windowLayout.windowLayoutAffinity != null
                 && !info.windowLayout.windowLayoutAffinity.startsWith(uid)) {
             info.windowLayout.windowLayoutAffinity =
@@ -2015,8 +2015,8 @@ public final class ActivityRecord extends WindowToken {
         stateNotNeeded = (aInfo.flags & FLAG_STATE_NOT_NEEDED) != 0;
         theme = aInfo.getThemeResource();
         if ((aInfo.flags & FLAG_MULTIPROCESS) != 0 && _caller != null
-                && (aInfo.applicationInfo.uid == SYSTEM_UID
-                    || aInfo.applicationInfo.uid == _caller.mInfo.uid)) {
+                && (aInfo.getUid() == SYSTEM_UID
+                    || aInfo.getUid() == _caller.mUid)) {
             processName = _caller.mName;
         } else {
             processName = aInfo.processName;
@@ -2557,7 +2557,6 @@ public final class ActivityRecord extends WindowToken {
                 Slog.w(TAG, "Activity transferring splash screen timeout for "
                         + ActivityRecord.this + " state " + mTransferringSplashScreenState);
                 if (isTransferringSplashScreen()) {
-                    mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
                     cleanUpSplashScreen();
                     removeStartingWindow();
                 }
@@ -2619,7 +2618,7 @@ public final class ActivityRecord extends WindowToken {
      * Receive the splash screen data from shell, sending to client.
      * @param parcelable The data to reconstruct the splash screen view, null mean unable to copy.
      */
-    void onCopySplashScreenFinish(@Nullable SplashScreenViewParcelable parcelable) {
+    boolean onCopySplashScreenFinish(@Nullable SplashScreenViewParcelable parcelable) {
         removeTransferSplashScreenTimeout();
         final SurfaceControl windowAnimationLeash = (parcelable == null
                 || mTransferringSplashScreenState != TRANSFER_SPLASH_SCREEN_COPYING
@@ -2629,13 +2628,9 @@ public final class ActivityRecord extends WindowToken {
         if (windowAnimationLeash == null) {
             // Unable to copy from shell, maybe it's not a splash screen, or something went wrong.
             // Either way, abort and reset the sequence.
-            if (parcelable != null) {
-                parcelable.clearIfNeeded();
-            }
-            mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
             cleanUpSplashScreen();
             removeStartingWindow();
-            return;
+            return false;
         }
         mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_ATTACH_TO_CLIENT;
         final TransferSplashScreenViewStateItem item =
@@ -2646,10 +2641,9 @@ public final class ActivityRecord extends WindowToken {
             scheduleTransferSplashScreenTimeout();
         } else {
             mStartingWindow.cancelAnimation();
-            parcelable.clearIfNeeded();
-            mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
             cleanUpSplashScreen();
         }
+        return isSuccessful;
     }
 
     private void onSplashScreenAttachComplete() {
@@ -2671,9 +2665,12 @@ public final class ActivityRecord extends WindowToken {
      */
     void cleanUpSplashScreen() {
         // Clean up the splash screen if client were supposed to handle it.
-        if (mHandleExitSplashScreen
+        if (mHandleExitSplashScreen && isAttached()
                 && mTransferringSplashScreenState != TRANSFER_SPLASH_SCREEN_IDLE) {
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Cleaning splash screen token=%s", this);
+            removeTransferSplashScreenTimeout();
+            mHandleExitSplashScreen = false;
+            mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
             mAtmService.mTaskOrganizerController.onAppSplashScreenViewRemoved(getTask(),
                     mStartingSurface != null ? mStartingSurface.mTaskOrganizer : null);
         }
@@ -2933,8 +2930,7 @@ public final class ActivityRecord extends WindowToken {
                 // We only allow home activities to be resizeable if they explicitly requested it.
                 info.resizeMode = RESIZE_MODE_UNRESIZEABLE;
             }
-        } else if (mAtmService.getRecentTasks().isRecentsComponent(mActivityComponent,
-                info.applicationInfo.uid)) {
+        } else if (mAtmService.getRecentTasks().isRecentsComponent(mActivityComponent, getUid())) {
             activityType = ACTIVITY_TYPE_RECENTS;
         } else if (options != null && options.getLaunchActivityType() == ACTIVITY_TYPE_ASSISTANT
                 && canLaunchAssistActivity(launchedFromPackage)) {
@@ -3401,7 +3397,7 @@ public final class ActivityRecord extends WindowToken {
      */
     boolean checkEnterPictureInPictureAppOpsState() {
         return mAtmService.getAppOpsManager().checkOpNoThrow(
-                OP_PICTURE_IN_PICTURE, info.applicationInfo.uid, packageName) == MODE_ALLOWED;
+                OP_PICTURE_IN_PICTURE, getUid(), packageName) == MODE_ALLOWED;
     }
 
     private boolean isAlwaysFocusable() {
@@ -3526,7 +3522,7 @@ public final class ActivityRecord extends WindowToken {
                     resultData.prepareToLeaveUser(mUserId);
                 }
             }
-            if (info.applicationInfo.uid > 0) {
+            if (this.getUid() > 0) {
                 mAtmService.mUgmInternal.grantUriPermissionUncheckedFromIntent(resultGrants,
                         resultTo.getUriPermissionsLocked());
             }
@@ -4429,6 +4425,9 @@ public final class ActivityRecord extends WindowToken {
                 + " delayed=%b Callers=%s", this, delayed, Debug.getCallers(4));
 
         if (mStartingData != null) {
+            if (isTransferringSplashScreen()) {
+                cleanUpSplashScreen();
+            }
             removeStartingWindow();
         }
 
@@ -7139,11 +7138,11 @@ public final class ActivityRecord extends WindowToken {
             return null;
         }
         final WindowProcessController myProcess = app != null
-                ? app : mAtmService.mProcessNames.get(processName, info.applicationInfo.uid);
+                ? app : mAtmService.mProcessNames.get(processName, getUid());
         final WindowProcessController candidateProcess = below.app != null
                         ? below.app
                         : mAtmService.mProcessNames.get(below.processName,
-                                below.info.applicationInfo.uid);
+                                below.getUid());
         // same process or same package
         if (candidateProcess == myProcess
                 || mActivityComponent.getPackageName()
@@ -9154,7 +9153,7 @@ public final class ActivityRecord extends WindowToken {
     boolean isProcessRunning() {
         WindowProcessController proc = app;
         if (proc == null) {
-            proc = mAtmService.mProcessNames.get(processName, info.applicationInfo.uid);
+            proc = mAtmService.mProcessNames.get(processName, getUid());
         }
         return proc != null && proc.hasThread();
     }
@@ -9316,11 +9315,11 @@ public final class ActivityRecord extends WindowToken {
     }
 
     int getUid() {
-        return info.applicationInfo.uid;
+        return info.getUid();
     }
 
     boolean isUid(int uid) {
-        return info.applicationInfo.uid == uid;
+        return info.getUid() == uid;
     }
 
     int getPid() {
@@ -9342,7 +9341,7 @@ public final class ActivityRecord extends WindowToken {
     String getFilteredReferrer(String referrerPackage) {
         if (referrerPackage == null || (!referrerPackage.equals(packageName)
                 && mWmService.mPmInternal.filterAppAccess(
-                        referrerPackage, info.applicationInfo.uid, mUserId))) {
+                        referrerPackage, getUid(), mUserId))) {
             return null;
         }
         return referrerPackage;

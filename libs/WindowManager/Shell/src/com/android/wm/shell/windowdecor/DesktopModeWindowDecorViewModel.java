@@ -1782,6 +1782,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                     mWindowDecorationActions,
                     mAppToWebRepository,
                     mCaptionVisibilityHelper,
+                    mFocusTransitionObserver,
                     mLockTaskChangeListener,
                     mPinnedLayerController);
             windowDecoration =
@@ -1821,7 +1822,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                             mShellDesktopState,
                             mDesktopConfig,
                             mWindowDecorationActions,
-                            mLockTaskChangeListener);
+                            mLockTaskChangeListener,
+                            mFocusTransitionObserver);
             windowDecoration = mWindowDecoratioWrapperFactory
                     .fromDesktopDecoration(desktopModeWindowDecoration);
         }
@@ -2191,6 +2193,12 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         @Override
         public void onOpenInBrowser(int taskId, @NonNull Intent intent) {
             mViewModel.openInBrowser(taskId, intent);
+        }
+
+        @Override
+        public void onSwitchToBrowser(@NonNull RunningTaskInfo taskInfo, @NonNull Intent intent) {
+            onOpenInBrowser(taskInfo.taskId, intent);
+            onClose(taskInfo);
         }
 
         @Override

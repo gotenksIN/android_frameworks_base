@@ -1500,8 +1500,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     private void updateAlpha() {
         if (mView != null) {
             float newAlpha = Math.min(mMaxAlphaForRebind,
-                    Math.min(Math.min(mMaxAlphaFromView,
-                                    mView.onKeyguard() ? mMaxAlphaForKeyguard : 1f),
+                    Math.min(Math.min(mMaxAlphaFromView, mMaxAlphaForKeyguard),
                             Math.min(mMaxAlphaForUnhide, mMaxAlphaForGlanceableHub)));
             mView.setAlpha(newAlpha);
         }
@@ -2245,6 +2244,9 @@ public class NotificationStackScrollLayoutController implements Dumpable {
             boolean lockscreenExpandWantsIt = false;
             if (shouldLockscreenExpandHandleTouch()) {
                 lockscreenExpandWantsIt = getLockscreenExpandTouchHelper().onTouchEvent(ev);
+                if (lockscreenExpandWantsIt) {
+                    mView.startDraggingOnLockscreen();
+                }
             }
             boolean horizontalSwipeWantsIt = false;
             boolean scrollerWantsIt = false;

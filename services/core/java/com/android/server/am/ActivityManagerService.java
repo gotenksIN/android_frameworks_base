@@ -133,6 +133,7 @@ import static android.os.Process.setThreadScheduler;
 import static android.provider.Settings.Global.ALWAYS_FINISH_ACTIVITIES;
 import static android.provider.Settings.Global.DEBUG_APP;
 import static android.provider.Settings.Global.WAIT_FOR_DEBUGGER;
+import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.security.Flags.preventIntentRedirect;
 import static android.security.Flags.preventIntentRedirectCollectNestedKeysOnServerIfNotCollected;
 import static android.security.Flags.preventIntentRedirectShowToastIfNestedKeysNotCollectedRW;
@@ -516,6 +517,7 @@ import com.android.server.pm.permission.PermissionManagerServiceInternal;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.SELinuxUtil;
 import com.android.server.power.stats.BatteryStatsImpl;
+import com.android.server.privatecompute.PccSandboxManagerInternal;
 import com.android.server.sdksandbox.SdkSandboxManagerLocal;
 import com.android.server.stats.pull.StatsPullAtomService;
 import com.android.server.stats.pull.StatsPullAtomServiceInternal;
@@ -2699,6 +2701,16 @@ public class ActivityManagerService extends IActivityManager.Stub
      * association is implicitly allowed.
      */
     boolean validateAssociationAllowedLocked(String pkg1, int uid1, String pkg2, int uid2) {
+        boolean callerOrTargetIsPcc = false;
+        if (enablePccFrameworkSupport()) {
+            callerOrTargetIsPcc =
+                    Process.isPrivateComputeCoreUid(uid1) || Process.isPrivateComputeCoreUid(uid2);
+            if (callerOrTargetIsPcc && validateAssociationAllowedForPccLocked(
+                    uid1, pkg1, uid2, pkg2)) {
+                return true;
+            }
+        }
+
         ensureAllowedAssociations();
         // Interactions with the system uid are always allowed, since that is the core system
         // that everyone needs to be able to interact with. Also allow reflexive associations
@@ -2717,9 +2729,31 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (pai != null && !pai.isPackageAssociationAllowed(pkg1)) {
             return false;
         }
-        // If no explicit associations are provided in the manifest, then assume the app is
-        // allowed associations with any package.
+
+        if (enablePccFrameworkSupport() && callerOrTargetIsPcc) {
+            // No generalized rules applicable, and no OEM defined associations.
+            return false;
+        }
+
+        // If no explicit associations are provided in the manifest at this
+        // stage, then the app is allowed associations with any package.
         return true;
+    }
+
+    /**
+     * Returns true if the package {@code callerPackage} running under user
+     * handle {@code callerUid} is allowed association with the package
+     * {@code targetPackage} running under user handle {@code targetUid}.
+     */
+    boolean validateAssociationAllowedForPccLocked(
+            int callerUid, String callerPackage, int targetUid, String targetPackage) {
+        final PccSandboxManagerInternal pccSandboxManagerInternal =
+                LocalServices.getService(PccSandboxManagerInternal.class);
+        if (pccSandboxManagerInternal == null) {
+            return false;
+        }
+        return pccSandboxManagerInternal.validateAssociationAllowed(
+                callerUid, callerPackage, targetUid, targetPackage);
     }
 
     /**
@@ -18037,7 +18071,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         @Override
         public void startProcess(String processName, ApplicationInfo info, boolean knownToBeDead,
-                boolean isTop, String hostingType, ComponentName hostingName) {
+                boolean isTop, String hostingType, ComponentName hostingName, boolean isPcc) {
             try {
                 if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                     Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "startProcess:"
@@ -18048,8 +18082,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     // started, the top priority can be applied immediately to avoid cpu being
                     // preempted by other processes before attaching the process of top app.
                     HostingRecord hostingRecord =
-                            new HostingRecord(hostingType, hostingName, isTop);
-                    ProcessRecord rec = getProcessRecordLocked(processName, info.uid);
+                            new HostingRecord(hostingType, hostingName, isTop, isPcc);
                     ProcessRecord app = startProcessLocked(processName, info, knownToBeDead,
                             0 /* intentFlags */, hostingRecord,
                             ZYGOTE_POLICY_FLAG_LATENCY_SENSITIVE, false /* allowWhileBooting */,

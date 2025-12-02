@@ -101,6 +101,7 @@ import android.telephony.Annotation.TtyMode;
 import android.telephony.Annotation.UiccAppType;
 import android.telephony.Annotation.UiccAppTypeExt;
 import android.telephony.CallForwardingInfo.CallForwardingReason;
+import android.telephony.NetworkSecurityEvent.AlertCategory;
 import android.telephony.VisualVoicemailService.VisualVoicemailTask;
 import android.telephony.data.ApnSetting;
 import android.telephony.data.ApnSetting.MvnoType;
@@ -218,6 +219,14 @@ public class TelephonyManager {
      * @hide
      */
     public static final String PHONE_PROCESS_NAME = "com.android.phone";
+
+    /**
+     * The AOSP activity responsible for placing emergency calls from, for example, a locked
+     * keyguard.
+     * @hide
+     */
+    public static final ComponentName EMERGENCY_DIALER_COMPONENT =
+            ComponentName.createRelative(PHONE_PROCESS_NAME, ".EmergencyDialer");
 
     /**
      * The allowed states of Wi-Fi calling.
@@ -434,6 +443,16 @@ public class TelephonyManager {
     @ChangeId
     @EnabledSince(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     public static final long ENABLE_FEATURE_MAPPING = 297989574L;
+
+    /**
+     * Enable READ_PHONE_STATE protection on APIs querying and notifying call state, such as
+     * {@code TelecomManager#getCallState}, {@link TelephonyManager#getCallStateForSubscription()},
+     * and {@link android.telephony.TelephonyCallback.CallStateListener}.
+     * @hide
+     */
+    // this magic number is a bug ID
+    // if removing this ChangeId, remove this constant in TelecomManager as well
+    public static final long ENABLE_GET_CALL_STATE_PERMISSION_PROTECTION = 157233955L;
 
     private final Context mContext;
     private final int mSubId;
@@ -1914,6 +1933,22 @@ public class TelephonyManager {
      */
     public static final String EXTRA_SIM_COMBINATION_NAMES =
             "android.telephony.extra.SIM_COMBINATION_NAMES";
+
+    /**
+     * A string value for {@link TelecomManager#EXTRA_CALL_DISCONNECT_MESSAGE}, indicates the call
+     * was dropped by lower layers
+     * @hide
+     */
+    public static final String CALL_AUTO_DISCONNECT_MESSAGE_STRING =
+            "Call dropped by lower layers";
+
+    /**
+     * Optional extra for incoming and outgoing calls containing a long which specifies the Epoch
+     * time the call was created.
+     * @hide
+     */
+    public static final String EXTRA_CALL_CREATED_EPOCH_TIME_MILLIS =
+            "android.telephony.extra.CALL_CREATED_EPOCH_TIME_MILLIS";
 
     /**
      * <p>Broadcast Action: The emergency callback mode is changed.
@@ -18657,7 +18692,7 @@ public class TelephonyManager {
      * identity. If the device goes out of service the previous cell identity is cached and
      * will be returned. If the cache age of the Cell identity is more than 24 hours
      * it will be cleared and null will be returned.
-     * @return last known cell identity {@CellIdentity}.
+     * @return last known cell identity {@link CellIdentity}.
      * @hide
      */
     @SystemApi
@@ -19164,6 +19199,34 @@ public class TelephonyManager {
         return false;
     }
 
+    /**
+     * Get the supported network alert categories for the modem.
+     *
+     * @throws IllegalStateException if the Telephony process is not currently available
+     * @throws SecurityException if the caller does not have the required privileges
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_NETWORK_SECURITY_EVENT_INDICATIONS)
+    @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
+    @SystemApi
+    public @NonNull @AlertCategory int[] getSupportedNetworkAlertCategories() {
+        try {
+            ITelephony telephony = getITelephony();
+            if (telephony != null) {
+                return telephony.getSupportedNetworkAlertCategories();
+            } else {
+                throw new IllegalStateException("telephony service is null.");
+            }
+        } catch (UnsupportedOperationException ex) {
+            Rlog.e(TAG, "getSupportedNetworkAlertCategories UnsupportedOperationException", ex);
+            return new int[0];
+        }
+         catch (RemoteException ex) {
+            Rlog.e(TAG, "getSupportedNetworkAlertCategories RemoteException", ex);
+            ex.rethrowFromSystemServer();
+        }
+        return new int[0];
+    }
 
     /**
      * Get current cell broadcast message identifier ranges.

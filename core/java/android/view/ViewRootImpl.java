@@ -140,7 +140,6 @@ import static com.android.window.flags.Flags.alwaysSeqIdLayout;
 import static com.android.window.flags.Flags.alwaysSeqIdLayoutWear;
 import static com.android.window.flags.Flags.enableWindowContextResourcesUpdateOnConfigChange;
 import static com.android.window.flags.Flags.predictiveBackFixImeEventsSkipBackDispatcher;
-import static com.android.window.flags.Flags.predictiveBackStopKeycodeBackForwarding;
 import static com.android.window.flags.Flags.reduceChangedExclusionRectsMsgs;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
 
@@ -7212,7 +7211,7 @@ public final class ViewRootImpl implements ViewParent,
                         event = KeyEvent.changeFlags(event,
                                 event.getFlags() & ~KeyEvent.FLAG_FROM_SYSTEM);
                     }
-                    enqueueInputEvent(event, null, QueuedInputEvent.FLAG_DELIVER_POST_IME, true);
+                    enqueueInputEvent(event, null, QueuedInputEvent.FLAG_SKIP_IME, true);
                 } break;
                 case MSG_DISPATCH_KEY_FROM_AUTOFILL: {
                     if (LOCAL_LOGV) {
@@ -7921,27 +7920,14 @@ public final class ViewRootImpl implements ViewParent,
                             dispatcher.onBackCancelled(topCallback);
                         } else {
                             dispatcher.onBackInvoked(topCallback);
-                            if (predictiveBackStopKeycodeBackForwarding()) {
-                                return FINISH_HANDLED;
-                            }
+                            return FINISH_HANDLED;
                         }
                         break;
                 }
             } else {
-                if (predictiveBackStopKeycodeBackForwarding()) {
-                    return FORWARD;
-                }
-            }
-            if (predictiveBackStopKeycodeBackForwarding()) {
-                return FINISH_NOT_HANDLED;
-            } else {
-                // Do not cancel the keyEvent if no callback can handle the back event.
-                if (topCallback != null && keyEvent.getAction() == KeyEvent.ACTION_UP) {
-                    // forward a cancelled event so that following stages cancel their back logic
-                    keyEvent.cancel();
-                }
                 return FORWARD;
             }
+            return FINISH_NOT_HANDLED;
         }
 
         @Override
@@ -9720,6 +9706,15 @@ public final class ViewRootImpl implements ViewParent,
         return mAccessibilityInteractionController;
     }
 
+    @Nullable
+    private SurfaceControl getSurfaceControlForRelayout(int viewVisibility) {
+        if (mWindowLayout.isLocallyManaged()) {
+            return mSurfaceControl;
+        }
+        // WindowManagerService only attaches visible surface of regular window to WindowState.
+        return viewVisibility == View.VISIBLE && mSurfaceControl.isValid() ? mSurfaceControl : null;
+    }
+
     @NonNull
     private SurfaceControl createSurfaceControl() {
         // The surface is visible by default (replace default HIDDEN flag).
@@ -9757,7 +9752,7 @@ public final class ViewRootImpl implements ViewParent,
     private int relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,
             boolean insetsPending) throws RemoteException {
         int relayoutResult = 0;
-        if (WindowManager.useClientSurface()) {
+        if (WindowManager.useClientSurface() && !mWindowLayout.isLocallyManaged()) {
             relayoutResult = updateSurfaceControl(viewVisibility);
         }
 
@@ -9846,8 +9841,7 @@ public final class ViewRootImpl implements ViewParent,
         final int seqId = NoPreloadHolder.sAlwaysSeqId ? mSeqId : mLastSyncSeqId;
         if (relayoutAsync) {
             if (WindowManager.useClientSurface()) {
-                final SurfaceControl surfaceControl = viewVisibility == View.VISIBLE
-                        && mSurfaceControl.isValid() ? mSurfaceControl : null;
+                final SurfaceControl surfaceControl = getSurfaceControlForRelayout(viewVisibility);
                 mWindowSession.relayoutAsync2(mWindow, params,
                         requestedWidth, requestedHeight, viewVisibility,
                         insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0,
@@ -9863,8 +9857,7 @@ public final class ViewRootImpl implements ViewParent,
             }
         } else {
             if (WindowManager.useClientSurface()) {
-                final SurfaceControl surfaceControl = viewVisibility == View.VISIBLE
-                        && mSurfaceControl.isValid() ? mSurfaceControl : null;
+                final SurfaceControl surfaceControl = getSurfaceControlForRelayout(viewVisibility);
                 relayoutResult |= mWindowSession.relayout2(mWindow, params,
                         requestedWidth, requestedHeight, viewVisibility,
                         insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0,
@@ -10648,7 +10641,7 @@ public final class ViewRootImpl implements ViewParent,
      * needing a queue on the application's side.
      */
     private static final class QueuedInputEvent {
-        public static final int FLAG_DELIVER_POST_IME = 1 << 0;
+        public static final int FLAG_SKIP_IME = 1 << 0;
         public static final int FLAG_DEFERRED = 1 << 1;
         public static final int FLAG_FINISHED = 1 << 2;
         public static final int FLAG_FINISHED_HANDLED = 1 << 3;
@@ -10671,7 +10664,7 @@ public final class ViewRootImpl implements ViewParent,
         }
 
         public boolean shouldSkipIme() {
-            if ((mFlags & FLAG_DELIVER_POST_IME) != 0) {
+            if ((mFlags & FLAG_SKIP_IME) != 0) {
                 return true;
             }
             return mEvent instanceof MotionEvent
@@ -10690,7 +10683,7 @@ public final class ViewRootImpl implements ViewParent,
         public String toString() {
             StringBuilder sb = new StringBuilder("QueuedInputEvent{flags=");
             boolean hasPrevious = false;
-            hasPrevious = flagToString("DELIVER_POST_IME", FLAG_DELIVER_POST_IME, hasPrevious, sb);
+            hasPrevious = flagToString("SKIP_IME", FLAG_SKIP_IME, hasPrevious, sb);
             hasPrevious = flagToString("DEFERRED", FLAG_DEFERRED, hasPrevious, sb);
             hasPrevious = flagToString("FINISHED", FLAG_FINISHED, hasPrevious, sb);
             hasPrevious = flagToString("FINISHED_HANDLED", FLAG_FINISHED_HANDLED, hasPrevious, sb);
@@ -10865,7 +10858,14 @@ public final class ViewRootImpl implements ViewParent,
                 stage = mSyntheticInputStage;
             } else {
                 if (predictiveBackFixImeEventsSkipBackDispatcher()) {
-                    stage = mFirstInputStage;
+                    // Optimization: Skip to Post-IME stage for pointer events (touch), unless the
+                    // SKIP_IME flag is set.
+                    // Why? The flag implies we need to handle Pre-IME logic (for KEYCODE_BACK
+                    // interception) which lives in the NativePreImeStage, so we can't take the
+                    // shortcut.
+                    boolean canSkipToPostIme = q.shouldSkipIme()
+                            && (q.mFlags & QueuedInputEvent.FLAG_SKIP_IME) == 0;
+                    stage = canSkipToPostIme ? mFirstPostImeInputStage : mFirstInputStage;
                 } else {
                     stage = q.shouldSkipIme() ? mFirstPostImeInputStage : mFirstInputStage;
                 }

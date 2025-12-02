@@ -481,6 +481,12 @@ class Task extends TaskFragment {
     boolean mReparentLeafTaskIfRelaunch;
 
     /**
+     * When set, disassociate the leaf task if relaunched from home and reparented it to TDA as
+     * root task if possible.
+     */
+    boolean mReparentLeafTaskIfRelaunchFromHome;
+
+    /**
      * Set to affect whether recents should be able to trim this task or not. It's set to true by
      * default.
      */
@@ -3877,6 +3883,9 @@ class Task extends TaskFragment {
         if (mReparentLeafTaskIfRelaunch) {
             pw.println(prefix + "mReparentLeafTaskIfRelaunch=true");
         }
+        if (mReparentLeafTaskIfRelaunchFromHome) {
+            pw.println(prefix + "mReparentLeafTaskIfRelaunchFromHome=true");
+        }
         pw.println(prefix + "mSelfMovable=" + mSelfMovable);
     }
 
@@ -6430,6 +6439,12 @@ class Task extends TaskFragment {
     void setReparentLeafTaskIfRelaunch(boolean reparentLeafTaskIfRelaunch) {
         if (isOrganized()) {
             mReparentLeafTaskIfRelaunch = reparentLeafTaskIfRelaunch;
+        }
+    }
+
+    void setReparentLeafTaskIfRelaunchFromHome(boolean reparentLeafTaskIfRelaunchFromHome) {
+        if (isOrganized()) {
+            mReparentLeafTaskIfRelaunchFromHome = reparentLeafTaskIfRelaunchFromHome;
         }
     }
 

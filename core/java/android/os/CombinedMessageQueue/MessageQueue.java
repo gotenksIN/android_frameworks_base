@@ -23,11 +23,15 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.TestApi;
+import android.app.compat.CompatChanges;
 import android.app.ActivityThread;
+import android.app.Instrumentation;
+import android.compat.annotation.ChangeId;
+import android.compat.annotation.Disabled;
+import android.compat.annotation.EnabledAfter;
+import android.compat.annotation.Overridable;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
-import android.ravenwood.annotation.RavenwoodRedirect;
-import android.ravenwood.annotation.RavenwoodRedirectionClass;
 import android.ravenwood.annotation.RavenwoodThrow;
 import android.util.Log;
 import android.util.Printer;
@@ -60,12 +64,20 @@ import java.util.concurrent.locks.ReentrantLock;
  * {@link Looper#myQueue() Looper.myQueue()}.
  */
 @RavenwoodKeepWholeClass
-@RavenwoodRedirectionClass("MessageQueue_ravenwood")
 public final class MessageQueue {
     private static final String TAG = "MessageQueue";
     private static final String TAG_L = "LegacyMessageQueue";
     private static final String TAG_C = "ConcurrentMessageQueue";
     private static final boolean DEBUG = false;
+
+    /**
+     * Enables concurrent message queue implementation in all applications.
+     *
+     * @hide
+     */
+    @ChangeId
+    @EnabledAfter(targetSdkVersion = android.os.Build.VERSION_CODES.BAKLAVA)
+    public static final long USE_NEW_MESSAGEQUEUE = 421623328L;
 
     // True if the message queue can be quit.
     @UnsupportedAppUsage
@@ -133,21 +145,14 @@ public final class MessageQueue {
      */
     private static Boolean sIsProcessAllowedToUseConcurrent = null;
 
-    @RavenwoodRedirect
     private native static long nativeInit();
-    @RavenwoodRedirect
     private native static void nativeDestroy(long ptr);
     @UnsupportedAppUsage
-    @RavenwoodRedirect
     private native void nativePollOnce(long ptr, int timeoutMillis); /*non-static for callbacks*/
 
-    @RavenwoodRedirect
     private native static void nativeWake(long ptr);
-    @RavenwoodRedirect
     private native static boolean nativeIsPolling(long ptr);
-    @RavenwoodRedirect
     private native static void nativeSetFileDescriptorEvents(long ptr, int fd, int events);
-    @RavenwoodRedirect
     private native static void nativeSetSkipEpollWaitForZeroTimeout(long ptr);
 
     MessageQueue(boolean quitAllowed) {
@@ -173,8 +178,16 @@ public final class MessageQueue {
     }
 
     private static boolean computeUseConcurrent() {
-        if (Flags.useConcurrentMessageQueueInApps()) {
-            return true;
+        if (CompatChanges.isChangeEnabled(USE_NEW_MESSAGEQUEUE)
+                || Flags.useConcurrentMessageQueueInApps()) {
+            // b/447778739: Some Robolectric tests still use legacy LooperMode.
+            try {
+                Class.forName("org.robolectric.Robolectric");
+                // This is a Robolectric test. Concurrent MessageQueue is not supported yet.
+                return false;
+            } catch (ClassNotFoundException e) {
+                return true;
+            }
         }
 
         final String processName = Process.myProcessName();
@@ -187,13 +200,7 @@ public final class MessageQueue {
         // used by tests.
         // For now, we limit it to system processes to avoid breaking apps and their tests.
         if (UserHandle.isCore(Process.myUid())) {
-            // Some platform tests run in core UIDs.
-            // Use this awful heuristic to detect them.
-            if (processName.contains("test") || processName.contains("Test")) {
-                return false;
-            } else {
-                return true;
-            }
+            return true;
         }
 
         // We can lift these restrictions in the future after we've made it possible for test

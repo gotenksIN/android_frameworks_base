@@ -17,6 +17,7 @@
 package com.android.server;
 
 import static android.app.lskfreset.flags.Flags.enableLskfResetManager;
+import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.media.tv.flags.Flags.mediaQualityFw;
 import static android.net.NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
@@ -217,6 +218,7 @@ import com.android.server.os.instrumentation.DynamicInstrumentationManagerServic
 import com.android.server.pdb.PersistentDataBlockService;
 import com.android.server.people.PeopleService;
 import com.android.server.permission.access.AccessCheckingService;
+import com.android.server.personalcontext.PersonalContextManagerService;
 import com.android.server.pinner.PinnerService;
 import com.android.server.pm.ApexManager;
 import com.android.server.pm.ApexSystemServiceInfo;
@@ -245,6 +247,7 @@ import com.android.server.power.hint.HintManagerService;
 import com.android.server.power.thermal.ThermalManagerService;
 import com.android.server.powerstats.PowerStatsService;
 import com.android.server.print.PrintManagerService;
+import com.android.server.privatecompute.PccSandboxManagerService;
 import com.android.server.profcollect.ProfcollectForwardingService;
 import com.android.server.recoverysystem.RecoverySystemService;
 import com.android.server.resources.ResourcesManagerService;
@@ -475,10 +478,10 @@ public final class SystemServer implements Dumpable {
             "com.android.os.profiling.anomaly.AnomalyDetectorService";
     private static final String SIGNAL_COLLECTOR_SERVICE_CLASS =
             "com.android.server.signalcollector.SignalCollectorService";
-    private static final String UPROBESTATS_SERVICE_JAR_PATH =
-            "/apex/com.android.uprobestats/javalib/service-uprobestats.jar";
-    private static final String UPROBESTATS_SERVICE_CLASS =
-            "com.android.os.uprobestats.UprobeStatsService";
+    private static final String UPROBESTATS_BRIDGE_SERVICE_JAR_PATH =
+            "/apex/com.android.uprobestats/javalib/service-uprobestats-bridge.jar";
+    private static final String UPROBESTATS_BRIDGE_SERVICE_CLASS =
+            "com.android.uprobestats.UprobeStatsBridgeService";
 
     private static final String RANGING_APEX_SERVICE_JAR_PATH =
             "/apex/com.android.uwb/javalib/service-ranging.jar";
@@ -967,6 +970,12 @@ public final class SystemServer implements Dumpable {
             // This call may not return.
             performPendingShutdown();
 
+            // Initialize the application shared memory region.
+            // This needs to happen before any system services are started,
+            // as they may rely on the shared memory region having been initialized.
+            ApplicationSharedMemory instance = ApplicationSharedMemory.create();
+            ApplicationSharedMemory.setInstance(instance);
+
             // Initialize the system context.
             createSystemContext();
 
@@ -1017,12 +1026,6 @@ public final class SystemServer implements Dumpable {
 
         // Setup the default WTF handler
         RuntimeInit.setDefaultApplicationWtfHandler(SystemServer::handleEarlySystemWtf);
-
-        // Initialize the application shared memory region.
-        // This needs to happen before any system services are started,
-        // as they may rely on the shared memory region having been initialized.
-        ApplicationSharedMemory instance = ApplicationSharedMemory.create();
-        ApplicationSharedMemory.setInstance(instance);
 
         // Start services.
         try {
@@ -1693,12 +1696,9 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(ROLE_SERVICE_CLASS);
             t.traceEnd();
 
-            if (android.app.supervision.flags.Flags.supervisionApi()
-                    && (!isWatch || android.app.supervision.flags.Flags.supervisionApiOnWear())) {
-                t.traceBegin("StartSupervisionService");
-                mSystemServiceManager.startService(SupervisionService.Lifecycle.class);
-                t.traceEnd();
-            }
+            t.traceBegin("StartSupervisionService");
+            mSystemServiceManager.startService(SupervisionService.Lifecycle.class);
+            t.traceEnd();
 
             if (!isTv) {
                 t.traceBegin("StartVibratorManagerService");
@@ -1839,6 +1839,12 @@ public final class SystemServer implements Dumpable {
             if (AppFunctionManagerConfiguration.isSupported(context)) {
                 t.traceBegin("StartAppFunctionManager");
                 mSystemServiceManager.startService(AppFunctionManagerService.class);
+                t.traceEnd();
+            }
+
+            if (enablePccFrameworkSupport()) {
+                t.traceBegin("StartPccSandboxManagerService");
+                mSystemServiceManager.startService(PccSandboxManagerService.class);
                 t.traceEnd();
             }
 
@@ -2670,6 +2676,12 @@ public final class SystemServer implements Dumpable {
                     new GraphicsStatsService(context));
             t.traceEnd();
 
+            if (android.service.personalcontext.Flags.enablePersonalContextService()) {
+                t.traceBegin("StartPersonalContextService");
+                mSystemServiceManager.startService(PersonalContextManagerService.class);
+                t.traceEnd();
+            }
+
             if (CoverageService.ENABLED) {
                 t.traceBegin("AddCoverageService");
                 ServiceManager.addService(CoverageService.COVERAGE_SERVICE, new CoverageService());
@@ -3067,28 +3079,36 @@ public final class SystemServer implements Dumpable {
 
         // Anomaly Detector
         if (android.os.profiling.anomaly.flags.Flags.anomalyDetectorCore()) {
+            // Both AnomalyDetectorService and SignalCollectorService are build flagged
+            // behind RELEASE_ANOMALY_DETECTOR, beside being behind the above flag.
+            // Avoid crashing the system if the aconfig flag is enabled but the build flag is
+            // disabled (the services classes are not present in that case).
             t.traceBegin("StartAnomalyDetectorService");
-            mSystemServiceManager.startService(ANOMALY_DETECTOR_SERVICE_CLASS);
+            try {
+                mSystemServiceManager.startService(ANOMALY_DETECTOR_SERVICE_CLASS);
+            } catch (Throwable e) {
+                Slog.e(TAG, "Failed to start AnomalyDetectorService", e);
+            }
             t.traceEnd();
 
             t.traceBegin("StartSignalCollectorService");
             try {
                 mSystemServiceManager.startService(SIGNAL_COLLECTOR_SERVICE_CLASS);
             } catch (Throwable e) {
-                reportWtf("starting SignalCollectorService", e);
+                Slog.e(TAG, "Failed to start SignalCollectorService", e);
             }
             t.traceEnd();
         }
 
         // UprobeStats
-        if (android.security.Flags.serviceUprobestats()) {
+        if (android.security.Flags.uprobestatsBridgeService()) {
             t.traceBegin("StartUprobeStatsService");
             // The service class is defined in a mainline module, and is not providing any
             // core, user facing functionality. It is only used for collecting telemetry
             // and anti-abuse. Thus, catch any startup exceptions and report them as WTFs.
             try {
                 mSystemServiceManager.startServiceFromJar(
-                        UPROBESTATS_SERVICE_CLASS, UPROBESTATS_SERVICE_JAR_PATH);
+                        UPROBESTATS_BRIDGE_SERVICE_CLASS, UPROBESTATS_BRIDGE_SERVICE_JAR_PATH);
             } catch (Throwable e) {
                 reportWtf("StartUprobeStatsService", e);
             }
@@ -3157,12 +3177,9 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startService(TracingServiceProxy.class);
         t.traceEnd();
 
-        // UprobeStats DynamicInstrumentationManager
-        if (android.uprobestats.flags.Flags.executableMethodFileOffsets()) {
-            t.traceBegin("StartDynamicInstrumentationManager");
-            mSystemServiceManager.startService(DynamicInstrumentationManagerService.class);
-            t.traceEnd();
-        }
+        t.traceBegin("StartDynamicInstrumentationManager");
+        mSystemServiceManager.startService(DynamicInstrumentationManagerService.class);
+        t.traceEnd();
 
         // It is now time to start up the app processes...
 
@@ -3185,7 +3202,10 @@ public final class SystemServer implements Dumpable {
         // on it in their setup, but likely needs to be done after LockSettingsService is ready.
         final HsumBootUserInitializer hsumBootUserInitializer =
                 HsumBootUserInitializer.createInstance(mUserManagerService, mActivityManagerService,
-                        mPackageManagerService, mContentResolver, mSystemContext);
+                        // NOTE: there is no need to pass the whole dpms because it just need to
+                        // to check if the device is managed (at boot time).
+                        mPackageManagerService, dpms.isDeviceManaged(), mContentResolver,
+                        mSystemContext);
         if (hsumBootUserInitializer != null) {
             t.traceBegin("HsumBootUserInitializer.init");
             hsumBootUserInitializer.init(t);
@@ -3478,7 +3498,11 @@ public final class SystemServer implements Dumpable {
                         Intent intent = new Intent();
                         intent.setComponent(wearServiceComponentName);
                         intent.addFlags(Intent.FLAG_DIRECT_BOOT_AUTO);
-                        context.startServiceAsUser(intent, UserHandle.SYSTEM);
+                        try {
+                            context.startServiceAsUser(intent, UserHandle.SYSTEM);
+                        } catch (Throwable e) {
+                            reportWtf("Starting WearServices: ", e);
+                        }
                     } else {
                         Slog.d(TAG, "Null wear service component name.");
                     }
@@ -3506,7 +3530,7 @@ public final class SystemServer implements Dumpable {
                     networkManagementF.systemReady();
                 }
             } catch (Throwable e) {
-                reportWtf("making Network Managment Service ready", e);
+                reportWtf("making Network Management Service ready", e);
             }
             CountDownLatch networkPolicyInitReadySignal = null;
             if (networkPolicyF != null) {

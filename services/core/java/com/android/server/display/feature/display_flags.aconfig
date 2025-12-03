@@ -53,26 +53,20 @@ flag {
 }
 
 flag {
+    name: "fix_set_display_state_after_device_change"
+    namespace: "display_manager"
+    description: "Fix the display state code so that the state is set correctly after the underlying display device changes."
+    bug: "442587030"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_display_offload"
     namespace: "display_manager"
     description: "Feature flag for DisplayOffload"
     bug: "299521647"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "enable_connected_display_error_handling"
-    namespace: "display_manager"
-    description: "Feature flag for connected display error handling"
-    bug: "283461472"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "back_up_smooth_display_and_force_peak_refresh_rate"
-    namespace: "display_manager"
-    description: "Feature flag for backing up Smooth Display and Force Peak Refresh Rate"
-    bug: "299552529"
     is_fixed_read_only: true
 }
 
@@ -92,22 +86,6 @@ flag {
 }
 
 flag {
-    name: "brightness_wear_bedtime_mode_clamper"
-    namespace: "display_manager"
-    description: "Feature flag for the Wear Bedtime mode brightness clamper"
-    bug: "293613040"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "auto_brightness_modes"
-    namespace: "display_manager"
-    description: "Feature flag for generic auto-brightness modes"
-    bug: "293613040"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "fast_hdr_transitions"
     namespace: "display_manager"
     description: "Feature flag for fast transitions into/out of HDR"
@@ -120,14 +98,6 @@ flag {
     namespace: "display_manager"
     description: "Feature flag for enabling brightness throttling using sensor from config."
     bug: "294900859"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "refactor_display_power_controller"
-    namespace: "display_manager"
-    description: "Feature flag for refactoring   the DisplayPowerController and associated components"
-    bug: "294444204"
     is_fixed_read_only: true
 }
 
@@ -153,36 +123,6 @@ flag {
     namespace: "wear_frameworks"
     description: "Feature flag for the parameter specifying whether brightness should be adjusted while dozing."
     bug: "343283838"
-    is_fixed_read_only: true
-}
-
-flag {
-    name: "enable_peak_refresh_rate_physical_limit"
-    namespace: "display_manager"
-    description: "Flag for adding physical refresh rate limit if smooth display setting is on "
-    bug: "332413475"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_synthetic_60hz_modes"
-    namespace: "display_manager"
-    description: "Feature flag for DisplayManager to enable synthetic 60Hz modes for vrr displays"
-    bug: "338183249"
-    is_fixed_read_only: true
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "offload_session_cancel_block_screen_on"
-    namespace: "wear_frameworks"
-    description: "Flag for DisplayPowerController to start notifying DisplayOffloadSession about cancelling screen on blocker."
-    bug: "331725519"
     is_fixed_read_only: true
 }
 
@@ -475,4 +415,31 @@ flag {
     namespace: "display_manager"
     description: "Enables app dynamic resolution change configuration"
     bug: "414654227"
+}
+
+flag {
+    name: "force_color_fade"
+    namespace: "wear_systems"
+    description: "Force Color Fade."
+    bug: "420507333"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "native_rr_callbacks_outside_lock"
+    namespace: "display_manager"
+    description: "Makes the native refresh rate changed callbacks outside the lock"
+    bug: "342607960"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_display_event_merging"
+    namespace: "display_manager"
+    description: "Enable merging of display events"
+    bug: "378668902"
 }

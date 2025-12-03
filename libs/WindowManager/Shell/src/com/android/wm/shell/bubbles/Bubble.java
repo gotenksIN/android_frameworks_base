@@ -35,7 +35,6 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ShortcutInfo;
 import android.content.res.Resources;
-import android.graphics.Bitmap;
 import android.graphics.Path;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
@@ -55,6 +54,7 @@ import com.android.launcher3.icons.BubbleIconFactory;
 import com.android.wm.shell.bubbles.appinfo.BubbleAppInfoProvider;
 import com.android.wm.shell.bubbles.bar.BubbleBarExpandedView;
 import com.android.wm.shell.bubbles.bar.BubbleBarLayerView;
+import com.android.wm.shell.bubbles.model.BubbleIcon;
 import com.android.wm.shell.common.ComponentUtils;
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
@@ -154,8 +154,7 @@ public class Bubble implements BubbleViewProvider {
     }
 
     private FlyoutMessage mFlyoutMessage;
-    // The developer provided image for the bubble
-    private Bitmap mBubbleBitmap;
+    private BubbleIcon mBubbleIcon;
     // The app badge for the bubble
     private BitmapInfo mBadgeBitmap;
     // App badge without any markings for important conversations
@@ -230,6 +229,9 @@ public class Bubble implements BubbleViewProvider {
      */
     @Nullable
     private BubbleTransitions.BubbleTransition mCurrentTransition;
+
+    /** Sets to true in case we remove the icon review before Bubble removal. */
+    private boolean mIsPendingRemoval;
 
     /**
      * Create a bubble with limited information based on given {@link ShortcutInfo}.
@@ -400,6 +402,18 @@ public class Bubble implements BubbleViewProvider {
         return b;
     }
 
+    /** Creates an app bubble with a pending intent that can be controlled by a client. */
+    public static Bubble createClientControlledAppBubble(PendingIntent pendingIntent,
+            UserHandle user, @Nullable Icon icon, IBinder clientToken,
+            @ShellMainThread Executor mainExecutor, @ShellBackgroundThread Executor bgExecutor) {
+        Bubble b = new Bubble(pendingIntent, user,
+                getAppBubbleKeyForApp(ComponentUtils.getPackageName(pendingIntent), user),
+                mainExecutor, bgExecutor);
+        b.mIcon = icon;
+        b.mClientToken = clientToken;
+        return b;
+    }
+
     /** Creates a task bubble. */
     public static Bubble createTaskBubble(TaskInfo info, UserHandle user, @Nullable Icon icon,
             @ShellMainThread Executor mainExecutor, @ShellBackgroundThread Executor bgExecutor) {
@@ -492,8 +506,8 @@ public class Bubble implements BubbleViewProvider {
                 getTitle(),
                 getAppName(),
                 isImportantConversation(),
-                showAppBadge(),
-                getParcelableFlyoutMessage());
+                getParcelableFlyoutMessage(),
+                isApp());
     }
 
     /** Creates a parcelable flyout message to send to launcher. */
@@ -542,8 +556,8 @@ public class Bubble implements BubbleViewProvider {
     }
 
     @Override
-    public Bitmap getBubbleIcon() {
-        return mBubbleBitmap;
+    public BubbleIcon getBubbleIcon() {
+        return mBubbleIcon;
     }
 
     @Override
@@ -796,9 +810,9 @@ public class Bubble implements BubbleViewProvider {
         if (!isInflated()) {
             mIconView = info.imageView;
             mExpandedView = info.expandedView;
-            BubbleLog.d("Bubble.setViewInfo() key=%s setting expanded view info to %s",
-                    mKey, info.bubbleBarExpandedView);
             mBubbleBarExpandedView = info.bubbleBarExpandedView;
+            BubbleLog.d("Bubble.setViewInfo() key=%s setting expanded view info to %s",
+                    mKey, mExpandedView != null ? mExpandedView : mBubbleBarExpandedView);
         }
 
         mShortcutInfo = info.shortcutInfo;
@@ -810,7 +824,7 @@ public class Bubble implements BubbleViewProvider {
 
         mBadgeBitmap = info.badgeBitmap;
         mRawBadgeBitmap = info.rawBadgeBitmap;
-        mBubbleBitmap = info.bubbleBitmap;
+        mBubbleIcon = info.bubbleIcon;
 
         mDotColor = info.dotColor;
 
@@ -996,6 +1010,15 @@ public class Bubble implements BubbleViewProvider {
         return (mFlags & Notification.BubbleMetadata.FLAG_SUPPRESSABLE_BUBBLE) != 0;
     }
 
+    /** Marks as pending removal in case we remove the icon review before Bubble removal. */
+    void markAsPendingRemoval() {
+        mIsPendingRemoval = true;
+    }
+
+    boolean isPendingRemoval() {
+        return mIsPendingRemoval;
+    }
+
     /**
      * Whether this notification conversation is important.
      */
@@ -1139,7 +1162,7 @@ public class Bubble implements BubbleViewProvider {
      * Whether an app badge should be shown for this bubble.
      */
     public boolean showAppBadge() {
-        return isChat() || isShortcut() || isNote();
+        return !isApp();
     }
 
     /**

@@ -101,16 +101,6 @@ flag {
 }
 
 flag {
-  name: "app_compat_refactoring_set_appbounds_to_null_when_empty"
-  namespace: "large_screen_experiences_app_compat"
-  description: "When enabled empty appBounds are set as null."
-  bug: "438406944"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "app_compat_refactoring_force_change_for_letterbox_transitions"
   namespace: "large_screen_experiences_app_compat"
   description: "Whether a Change should always sent for Letterbox transition."
@@ -151,16 +141,6 @@ flag {
 }
 
 flag {
-  name: "enable_transition_on_activity_set_requested_orientation"
-  namespace: "large_screen_experiences_app_compat"
-  description: "Whether a Transition should be created after setRequestedOrientation"
-  bug: "409043134"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "letterbox_background_wallpaper"
   namespace: "large_screen_experiences_app_compat"
   description: "Whether the blurred letterbox wallpaper background is enabled by default"
@@ -186,6 +166,16 @@ flag {
 }
 
 flag {
+  name: "app_compat_ui_restart_on_full_transparency"
+  namespace: "large_screen_experiences_app_compat"
+  description: "Whether restart button should be hidden for completely transparent activities."
+  bug: "444422899"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
   name: "vdm_force_app_universal_resizable_api"
   namespace: "large_screen_experiences_app_compat"
   description: "Whether the API for forcing apps to be universal resizable on virtual display is available"
@@ -194,19 +184,21 @@ flag {
 }
 
 flag {
-  name: "backup_and_restore_for_user_aspect_ratio_settings"
-  namespace: "large_screen_experiences_app_compat"
-  description: "Whether B&R for user aspect ratio settings is enabled"
-  bug: "396650383"
-  is_fixed_read_only: true
-}
-
-flag {
   name: "restore_user_aspect_ratio_settings_using_service"
   namespace: "large_screen_experiences_app_compat"
   description: "Whether a system service should handle setting restored user aspect ratio settings for apps that install after SUW is complete."
   bug: "413014252"
   is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "add_surface_insets_for_crop"
+  namespace: "large_screen_experiences_app_compat"
+  description: "Accounts for surface insets when applying window crop for rounded corners."
+  bug: "425184002"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

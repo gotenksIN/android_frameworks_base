@@ -75,6 +75,7 @@ aconfig_declarations_group {
         "android.service.controls.flags-aconfig-java",
         "android.service.dreams.flags-aconfig-java",
         "android.service.notification.flags-aconfig-java",
+        "android.service.personalcontext.flags-aconfig-java",
         "android.service.quicksettings.flags-aconfig-java",
         "android.service.quickaccesswallet.flags-aconfig-java",
         "android.service.selinux.flags-aconfig-java",
@@ -100,7 +101,6 @@ aconfig_declarations_group {
         "com.android.input.flags-aconfig-java",
         "com.android.internal.compat.flags-aconfig-java",
         "com.android.internal.content.storage.flags-aconfig-java",
-        "com.android.internal.foldables.flags-aconfig-java",
         "com.android.internal.os.flags-aconfig-java",
         "com.android.internal.pm.pkg.component.flags-aconfig-java",
         "com.android.internal.widget.flags-aconfig-java",
@@ -133,10 +133,12 @@ aconfig_declarations_group {
         "libgui_flags_java_lib",
         "mediaprovider_exported_aconfig_flag_lib",
         "networksecurity_exported_aconfig_flags_lib",
+        "npumanager_flags_lib",
         "power_flags_lib",
         "sdk_sandbox_exported_flags_lib",
         "surfaceflinger_flags_java_lib",
         "telecom_flags_core_java_lib",
+        "telecom_module_flags-export-java",
         "telephony_flags_core_java_lib",
         "timezone_flags_core_java_lib",
         // !!! KEEP THIS LIST ALPHABETICAL !!!
@@ -252,6 +254,7 @@ java_aconfig_library {
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
     apex_available: [
         "com.android.permission",
+        "com.android.telephonycore",
     ],
 }
 
@@ -271,6 +274,7 @@ java_aconfig_library {
         "//apex_available:platform",
         "com.android.wifi",
         "com.android.extservices",
+        "com.android.telephonycore",
     ],
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
@@ -477,7 +481,17 @@ aconfig_declarations {
     package: "android.security",
     exportable: true,
     container: "system",
-    srcs: ["core/java/android/security/*.aconfig"],
+    srcs: [
+        "core/java/android/security/flags.aconfig",
+        "core/java/android/security/responsible_apis_flags.aconfig",
+    ] + select(release_flag("RELEASE_CONSCRYPT_NSC"), {
+        true: [
+            "core/java/android/security/conscrypt_nsc_on.aconfig",
+        ],
+        default: [
+            "core/java/android/security/conscrypt_nsc_off.aconfig",
+        ],
+    }),
 }
 
 java_aconfig_library {
@@ -500,6 +514,7 @@ java_aconfig_library {
     min_sdk_version: "30",
     apex_available: [
         "//apex_available:platform",
+        "com.android.conscrypt",
         "com.android.tethering",
         "com.android.wifi",
     ],
@@ -782,6 +797,10 @@ rust_aconfig_library {
     name: "libandroid_security_flags_rust",
     crate_name: "android_security_flags",
     aconfig_declarations: "android.security.flags-aconfig",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.virt",
+    ],
 }
 
 // Package Manager
@@ -1087,12 +1106,6 @@ java_aconfig_library {
 cc_aconfig_library {
     name: "android.server.display.flags-aconfig-cc",
     aconfig_declarations: "display_flags",
-}
-
-java_aconfig_library {
-    name: "com.android.internal.foldables.flags-aconfig-java",
-    aconfig_declarations: "fold_lock_setting_flags",
-    defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
 // Platform Compat
@@ -1592,6 +1605,20 @@ java_aconfig_library {
     ],
 }
 
+// Personal Context
+aconfig_declarations {
+    name: "android.service.personalcontext.flags-aconfig",
+    package: "android.service.personalcontext",
+    container: "system",
+    srcs: ["core/java/android/service/personalcontext/flags.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.service.personalcontext.flags-aconfig-java",
+    aconfig_declarations: "android.service.personalcontext.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
 // Quick Settings
 aconfig_declarations {
     name: "android.service.quicksettings.flags-aconfig",
@@ -1733,6 +1760,12 @@ java_aconfig_library {
     aconfig_declarations: "android.hardware.usb.flags-aconfig",
     host_supported: true,
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+cc_aconfig_library {
+    name: "android.hardware.usb.flags-aconfig-cc-lib",
+    aconfig_declarations: "android.hardware.usb.flags-aconfig",
+    vendor_available: true,
 }
 
 // WindowingTools

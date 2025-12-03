@@ -4668,6 +4668,7 @@ public abstract class Context {
                 MEDIA_QUALITY_SERVICE,
                 ADVANCED_PROTECTION_SERVICE,
                 ANOMALY_DETECTOR_SERVICE,
+                TASK_CONTINUITY_SERVICE,
             })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ServiceName {}
@@ -6832,6 +6833,13 @@ public abstract class Context {
     public static final String REMOTE_PROVISIONING_SERVICE = "remote_provisioning";
 
     /**
+     * Binder service for {@link com.android.server.privatecompute.PccSandboxManagerService}.
+     *
+     * @hide
+     */
+    public static final String PCC_SANDBOX_SERVICE = "pcc_sandbox";
+
+    /**
      * Use with {@link #getSystemService(String)} to retrieve a
      * {@link android.hardware.lights.LightsManager} for controlling device lights.
      *
@@ -6871,6 +6879,17 @@ public abstract class Context {
      */
     @TestApi
     public static final String DREAM_SERVICE = "dream";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.service.personalcontext.PersonalContextManager} for controlling
+     * PersonalContext.
+     *
+     * @see #getSystemService(String)
+
+     * @hide
+     */
+    public static final String PERSONAL_CONTEXT_SERVICE = "personal_context";
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a

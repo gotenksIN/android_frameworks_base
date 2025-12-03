@@ -89,6 +89,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Singleton;
 import android.util.Size;
+import android.view.Display;
 import android.view.WindowInsetsController.Appearance;
 
 import com.android.internal.annotations.GuardedBy;
@@ -115,6 +116,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
@@ -545,6 +547,14 @@ public class ActivityManager {
      * @hide
      */
     public static final int START_ASSISTANT_NOT_ACTIVE_SESSION = FIRST_START_FATAL_ERROR_CODE + 11;
+
+    /**
+     * Result for IActivityManager.startAssistantActivity: activity is not allowed to be launched in
+     * the {@link android.os.UserManager#isHeadlessSystemUserMode() Headless System User}.
+     * @hide
+     */
+    public static final int START_NOT_ALLOWED_FOR_HEADLESS_SYSTEM_USER =
+            FIRST_START_FATAL_ERROR_CODE + 12;
 
     /**
      * Result for IActivityManager.startActivity: the activity was started
@@ -1805,12 +1815,14 @@ public class ActivityManager {
      * something with 1GB or less of RAM.  This is mostly intended to be used by apps
      * to determine whether they should turn off certain features that require more RAM.
      */
+    @android.ravenwood.annotation.RavenwoodKeep
     public boolean isLowRamDevice() {
         return isLowRamDeviceStatic();
     }
 
     /** @hide */
     @UnsupportedAppUsage
+    @android.ravenwood.annotation.RavenwoodIgnore
     public static boolean isLowRamDeviceStatic() {
         return RoSystemProperties.CONFIG_LOW_RAM ||
                 (Build.IS_DEBUGGABLE && DEVELOPMENT_FORCE_LOW_RAM);
@@ -3252,6 +3264,103 @@ public class ActivityManager {
             return getTaskService().isTaskMoveAllowedOnDisplay(displayId);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    private final Map<Consumer<List<TaskDisplayPolicyState>>, Executor>
+            mDisplayPolicyStateListeners = new ArrayMap<>();
+
+    private final ITaskMoveAllowedListener mTaskMoveAllowedDispatchListener =
+            new ITaskMoveAllowedListener.Stub() {
+                @Override
+                public void onTaskMoveAllowedChanged(int[] keys, boolean[] values) {
+                    dispatchDisplayPolicyChanges(keys, values);
+                }
+            };
+
+    private void dispatchDisplayPolicyChanges(
+            int[] displayIds, boolean[] taskMoveAllowedPerDisplay) {
+        final List<TaskDisplayPolicyState> displayPolicyStates = new ArrayList<>();
+        for (int i = 0; i < displayIds.length; i++) {
+            final int taskMoveAllowedState =
+                    taskMoveAllowedPerDisplay[i]
+                        ? TaskDisplayPolicyState.TASK_MOVE_ALLOWED
+                        : TaskDisplayPolicyState.TASK_MOVE_DISALLOWED;
+            final TaskDisplayPolicyState displayPolicyState =
+                    new TaskDisplayPolicyState(displayIds[i], taskMoveAllowedState);
+            displayPolicyStates.add(displayPolicyState);
+        }
+
+        synchronized (mDisplayPolicyStateListeners) {
+            mDisplayPolicyStateListeners.forEach(
+                    (listener, executor) -> {
+                        executor.execute(() -> listener.accept(displayPolicyStates));
+                    }
+            );
+        }
+    }
+
+    /**
+     * Registers a listener for changes to task display policy states across all displays.
+     *
+     * <p>The listener receives {@link TaskDisplayPolicyState} objects representing the state of
+     * properties that are controlled by policies, e.g. {@link #isTaskMoveAllowedOnDisplay(int)},
+     * for all displays. It is invoked whenever this state changes, including when a display is
+     * connected (its ID is added as a key) or disconnected (its key is removed).
+     *
+     * <p>The listener is also notified of current states upon registration.
+     *
+     * @param executor The {@link Executor} on which the listener callback will be invoked.
+     * @param listener A {@link Consumer} that receives the updated state.
+     * @see #isTaskMoveAllowedOnDisplay
+     */
+    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API)
+    public void registerTaskDisplayPolicyStateListener(
+            @NonNull final @CallbackExecutor Executor executor,
+            @NonNull final Consumer<List<TaskDisplayPolicyState>> listener) {
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(listener);
+
+        synchronized (mDisplayPolicyStateListeners) {
+            if (mDisplayPolicyStateListeners.containsKey(listener)) {
+                return;
+            }
+
+            mDisplayPolicyStateListeners.put(listener, executor);
+
+            if (mDisplayPolicyStateListeners.size() > 1) {
+                return;
+            }
+
+            try {
+                getTaskService().registerTaskMoveAllowedListener(mTaskMoveAllowedDispatchListener);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * Unregisters a task display policy state listener.
+     *
+     * @see #registerTaskDisplayPolicyStateListener(Executor, Consumer)
+     */
+    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API)
+    public void unregisterTaskDisplayPolicyStateListener(
+            @NonNull Consumer<List<TaskDisplayPolicyState>> listener) {
+        synchronized (mDisplayPolicyStateListeners) {
+            mDisplayPolicyStateListeners.remove(listener);
+
+            if (!mDisplayPolicyStateListeners.isEmpty()) {
+                return;
+            }
+
+            try {
+                getTaskService()
+                        .unregisterTaskMoveAllowedListener(mTaskMoveAllowedDispatchListener);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
         }
     }
 

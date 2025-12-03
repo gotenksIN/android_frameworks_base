@@ -140,7 +140,6 @@ class DesktopModeTouchEventListenerTest : ShellTestCase() {
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_WINDOW_DECORATION_REFACTOR,
-        Flags.FLAG_FIX_LEAKING_VISUAL_INDICATOR,
     )
     fun testAppHeaderClick_closesTask() =
         testScope.runTest {
@@ -177,13 +176,12 @@ class DesktopModeTouchEventListenerTest : ShellTestCase() {
             flushAll()
 
             verify(mockWindowDecorationActions)
-                .onClose(taskId = decor.defaultWindowDecoration.taskInfo.taskId)
+                .onClose(taskInfo = decor.defaultWindowDecoration.taskInfo)
         }
 
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_WINDOW_DECORATION_REFACTOR,
-        Flags.FLAG_FIX_LEAKING_VISUAL_INDICATOR,
     )
     fun testAppHeaderClick_withActionMoveButNoBoundsChange_closesTask() =
         testScope.runTest {
@@ -232,13 +230,12 @@ class DesktopModeTouchEventListenerTest : ShellTestCase() {
             flushAll()
 
             verify(mockWindowDecorationActions)
-                .onClose(taskId = decor.defaultWindowDecoration.taskInfo.taskId)
+                .onClose(taskInfo = decor.defaultWindowDecoration.taskInfo)
         }
 
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_WINDOW_DECORATION_REFACTOR,
-        Flags.FLAG_FIX_LEAKING_VISUAL_INDICATOR,
     )
     fun testAppHeaderClick_withActionMoveButNoBoundsChange_invokesDragPositioningEndCallback() =
         testScope.runTest {
@@ -305,7 +302,6 @@ class DesktopModeTouchEventListenerTest : ShellTestCase() {
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_WINDOW_DECORATION_REFACTOR,
-        Flags.FLAG_FIX_LEAKING_VISUAL_INDICATOR,
     )
     fun testCustomAppHeaderClick_inCustomizedRegion_doesNotPilfer() =
         testScope.runTest {
@@ -353,7 +349,6 @@ class DesktopModeTouchEventListenerTest : ShellTestCase() {
     @Test
     @EnableFlags(
         Flags.FLAG_ENABLE_WINDOW_DECORATION_REFACTOR,
-        Flags.FLAG_FIX_LEAKING_VISUAL_INDICATOR,
     )
     fun testCustomAppHeaderClick_inSystemRegion_pilfers() =
         testScope.runTest {

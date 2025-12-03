@@ -60,6 +60,9 @@ import javax.inject.Provider;
 
 /**
  * Manages Keyguard Presentations for non-primary display(s).
+ *
+ * Note that after [Flag.enableConnectedDisplaysWallpaperPresentations] is enabled, the presentation
+ * is set from [WallpaperPresentationManager].
  */
 @SysUISingleton
 public class KeyguardDisplayManager {
@@ -136,7 +139,7 @@ public class KeyguardDisplayManager {
         mIsCentralizedWallpaperPresentationEnabled = isCentralizedWallpaperPresentationEnabled;
         mDisplayRepository = displayRepository;
         if (ShadeWindowGoesAround.isEnabled()) {
-            collectFlow(appScope, shadePositionRepositoryProvider.get().getDisplayId(),
+            collectFlow(appScope, shadePositionRepositoryProvider.get().getPendingDisplayId(),
                     (id) -> onShadeWindowMovedToDisplayId(id));
         }
     }
@@ -151,13 +154,12 @@ public class KeyguardDisplayManager {
     /**
      * Returns `true` if the keyguard can be shown for a given {@code display}. Otherwise, `false`.
      */
-    public boolean isKeyguardShowable(Display display) {
+    public boolean isKeyguardShowable(Display display, int shadeDisplayId) {
         if (display == null) {
             Log.i(TAG, "Cannot show Keyguard on null display");
             return false;
         }
         if (ShadeWindowGoesAround.isEnabled()) {
-            int shadeDisplayId = mShadePositionRepositoryProvider.get().getDisplayId().getValue();
             if (display.getDisplayId() == shadeDisplayId) {
                 Log.i(
                     TAG,
@@ -197,6 +199,16 @@ public class KeyguardDisplayManager {
 
         return true;
     }
+
+    private int getShadeDisplayId() {
+        if (ShadeWindowGoesAround.isEnabled()) {
+            return mShadePositionRepositoryProvider
+                .get().getPendingDisplayId().getValue();
+        } else {
+            return Display.DEFAULT_DISPLAY;
+        }
+    }
+
     /**
      * @param display The display to show the presentation on.
      * @return {@code true} if a presentation was added.
@@ -208,7 +220,7 @@ public class KeyguardDisplayManager {
             // Handled in WallpaperPresentationManager.
             return false;
         }
-        if (!isKeyguardShowable(display)) return false;
+        if (!isKeyguardShowable(display, getShadeDisplayId())) return false;
         Log.i(TAG, "Keyguard enabled on display: " + display);
         final int displayId = display.getDisplayId();
         Presentation presentation = mPresentations.get(displayId);

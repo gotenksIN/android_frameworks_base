@@ -26,6 +26,7 @@ import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_CHILDREN_TASKS_REPARENT;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REORDER;
+import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_ANIMATION_DELEGATE;
 
 import static com.android.wm.shell.common.split.SplitScreenUtils.getNewParentTokenForStage;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_2_10_90;
@@ -56,6 +57,7 @@ import static org.mockito.Mockito.when;
 import android.annotation.NonNull;
 import android.app.ActivityManager;
 import android.app.IActivityTaskManager;
+import android.app.IApplicationThread;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -148,6 +150,7 @@ public class SplitTransitionTests extends ShellTestCase {
     private SplitScreenTransitions mSplitScreenTransitions;
     private final DisplayAreaInfo mDisplayAreaInfo = new DisplayAreaInfo(new MockToken().token(),
             DEFAULT_DISPLAY, 0);
+    private WindowContainerTransaction mLastStartedTransitionWCT = null;
 
     private ActivityManager.RunningTaskInfo mMainChild;
     private ActivityManager.RunningTaskInfo mSideChild;
@@ -186,8 +189,10 @@ public class SplitTransitionTests extends ShellTestCase {
 
         mStageCoordinator.setMixedHandler(mMixedHandler);
         mSplitScreenTransitions = mStageCoordinator.getSplitTransitions();
-        doAnswer((Answer<IBinder>) invocation -> mock(IBinder.class))
-                .when(mTransitions).startTransition(anyInt(), any(), any());
+        doAnswer((Answer<IBinder>) invocation -> {
+            mLastStartedTransitionWCT = invocation.getArgument(1);
+            return mock(IBinder.class);
+        }).when(mTransitions).startTransition(anyInt(), any(), any());
 
         mMainChild = new TestRunningTaskInfoBuilder()
                 .setTaskId(MAIN_TASK_ID)
@@ -259,6 +264,20 @@ public class SplitTransitionTests extends ShellTestCase {
         // Make sure split-screen is now visible
         assertTrue(mStageCoordinator.isSplitScreenVisible());
         assertTrue(testRemote.isCalled());
+    }
+
+    @Test
+    @UiThreadTest
+    public void testRemoteDelegate() {
+        TestRemoteTransition testRemote = new TestRemoteTransition();
+        IApplicationThread stubThread = mock(IApplicationThread.class);
+
+        mSplitScreenTransitions.startEnterTransition(
+                TRANSIT_OPEN, new WindowContainerTransaction(),
+                new RemoteTransition(testRemote, stubThread, "Test"), mStageCoordinator,
+                TRANSIT_SPLIT_SCREEN_PAIR_OPEN, false, SNAP_TO_2_50_50);
+        assertTrue(mLastStartedTransitionWCT.getHierarchyOps().stream().anyMatch(
+                hop -> hop.getType() == HIERARCHY_OP_TYPE_SET_ANIMATION_DELEGATE));
     }
 
     @Test
@@ -373,7 +392,7 @@ public class SplitTransitionTests extends ShellTestCase {
 
         // Create a request to bring home forward
         TransitionRequestInfo request = new TransitionRequestInfo(TRANSIT_TO_FRONT, homeTask,
-                mock(RemoteTransition.class));
+                mock(TransitionRequestInfo.RemoteTransitionInfo.class));
         IBinder transition = mock(IBinder.class);
         WindowContainerTransaction result = mStageCoordinator.handleRequest(transition, request);
         // Don't handle recents opening
@@ -398,7 +417,8 @@ public class SplitTransitionTests extends ShellTestCase {
     @Test
     @UiThreadTest
     public void testRemotePassThroughInvoked() throws RemoteException {
-        RemoteTransition remoteWrapper = mock(RemoteTransition.class);
+        TransitionRequestInfo.RemoteTransitionInfo remoteWrapper =
+                mock(TransitionRequestInfo.RemoteTransitionInfo.class);
         IRemoteTransition remoteTransition = mock(IRemoteTransition.class);
         IBinder remoteBinder = mock(IBinder.class);
         doReturn(remoteBinder).when(remoteTransition).asBinder();
@@ -433,7 +453,7 @@ public class SplitTransitionTests extends ShellTestCase {
 
         // Create a request to bring home forward
         TransitionRequestInfo request = new TransitionRequestInfo(TRANSIT_TO_FRONT, homeTask,
-                mock(RemoteTransition.class));
+                mock(TransitionRequestInfo.RemoteTransitionInfo.class));
         IBinder transition = mock(IBinder.class);
         WindowContainerTransaction result = mStageCoordinator.handleRequest(transition, request);
         // Don't handle recents opening
@@ -602,8 +622,7 @@ public class SplitTransitionTests extends ShellTestCase {
         for (int i = 0; i < wct.getHierarchyOps().size(); ++i) {
             WindowContainerTransaction.HierarchyOp op = wct.getHierarchyOps().get(i);
             if (op.getType() == HIERARCHY_OP_TYPE_REORDER
-                    && op.getContainer() == mStageCoordinator.getSplitMultiDisplayHelper()
-                    .getDisplayRootTaskInfo(DEFAULT_DISPLAY).token.asBinder()) {
+                    && op.getContainer() == mStageCoordinator.mSplitRootTaskInfo.token.asBinder()) {
                 return true;
             }
         }

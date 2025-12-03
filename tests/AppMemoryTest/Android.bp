@@ -31,9 +31,13 @@ android_test {
         "platform-test-annotations",
         "flag-junit",
         "androidx.test.uiautomator_uiautomator",
+        "collector-device-lib",
     ],
     device_common_data: [
         ":AppMemoryTest_Helper",
+    ],
+    data: [
+        "perfetto.textproto",
     ],
     platform_apis: true,
     test_suites: ["general-tests"],
@@ -86,4 +90,9 @@ android_test_helper_app {
     // This is the common behavior in apps in the market today, so we would like
     // to simulate it in our test load.
     min_sdk_version: "34",
+}
+
+filegroup {
+    name: "appmemorytest_perfetto_config",
+    srcs: ["perfetto.textproto"],
 }

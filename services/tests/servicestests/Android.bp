@@ -155,6 +155,7 @@ android_test {
         ":SuspendTestApp",
         ":TopologyTestApp",
         "data/broken_shortcut.xml",
+        "data/test_supplemental_security_patches.xml",
     ],
 
     java_resources: [
@@ -219,7 +220,7 @@ android_ravenwood_test {
     ],
     srcs: [
         "src/com/android/server/am/psc/**/*.java",
-        "src/com/android/server/am/BoundServiceSessionTests.java",
+        "src/com/android/server/am/BinderSessionTests.java",
     ],
 }
 
@@ -274,6 +275,8 @@ java_library {
     static_libs: [
         "junit",
         "mockito-target-minus-junit4",
+        "androidx.annotation_annotation",
+        "services.core",
     ],
     libs: [
         "android.test.runner.stubs.system",
@@ -287,8 +290,12 @@ java_library {
         "utils/**/*.java",
         "utils/**/*.kt",
     ],
+    static_libs: [
+        "services.core.ravenwood",
+    ],
     libs: [
         "android.test.runner.stubs.system",
+        "androidx.annotation_annotation",
         "junit",
         "mockito-ravenwood-prebuilt",
     ],
@@ -314,6 +321,8 @@ java_library {
     static_libs: [
         "junit",
         "mockito-target-extended-minus-junit4",
+        "androidx.annotation_annotation",
+        "services.core",
     ],
     libs: [
         "android.test.runner.stubs.system",
@@ -1109,4 +1118,24 @@ test_module_config {
         "device-tests",
     ],
     include_filters: ["com.android.server.incident"],
+}
+
+test_module_config {
+    name: "FrameworksServicesTests_adb",
+    base: "FrameworksServicesTests",
+    test_suites: [
+        "automotive-tests",
+        "device-tests",
+    ],
+    include_filters: ["com.android.server.adb"],
+}
+
+test_module_config {
+    name: "FrameworksServicesTests_companion_virtual",
+    base: "FrameworksServicesTests",
+    test_suites: [
+        "automotive-tests",
+        "device-tests",
+    ],
+    include_filters: ["com.android.server.companion.virtual"],
 }

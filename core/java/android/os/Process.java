@@ -319,6 +319,23 @@ public class Process {
     public static final int LAST_SDK_SANDBOX_UID = 29999;
 
     /**
+     * Defines the start of a range of UIDs going from this number to
+     * {@link #LAST_PCC_UID} that are reserved for assigning to
+     * processes that need to run in a PCC sandbox.
+     *
+     * Note that there are no GIDs associated with these processes; storage
+     * attribution for them will be done using project IDs.
+     * @hide
+     */
+    public static final int FIRST_PCC_UID = 30000;
+
+    /**
+     * Last UID that is used for PCC processes.
+     * @hide
+     */
+    public static final int LAST_PCC_UID = 39999;
+
+    /**
      * First uid used for fully isolated sandboxed processes spawned from an app zygote
      * @hide
      */
@@ -685,6 +702,12 @@ public class Process {
     public static final ZygoteProcess ZYGOTE_PROCESS = new ZygoteProcess();
 
     /**
+     * State associated with the native zygote process.
+     * @hide
+     */
+    public static final NativeZygoteProcess NATIVE_ZYGOTE_PROCESS = new NativeZygoteProcess();
+
+    /**
      * The process name set via {@link #setArgV0(String)}.
      */
     private static String sArgV0;
@@ -762,7 +785,10 @@ public class Process {
                                            boolean bindMountSystemOverrides,
                                            long startSeq,
                                            @Nullable String[] zygoteArgs) {
-        return ZYGOTE_PROCESS.start(processClass, niceName, uid, gid, gids,
+        boolean isNative = android.os.Flags.nativeFrameworkPrototype()
+                && (zygotePolicyFlags & ZYGOTE_POLICY_FLAG_NATIVE_PROCESS) != 0;
+        IZygoteProcess process = isNative ? NATIVE_ZYGOTE_PROCESS : ZYGOTE_PROCESS;
+        return process.start(processClass, niceName, uid, gid, gids,
                     runtimeFlags, mountExternal, targetSdkVersion, seInfo,
                     abi, instructionSet, appDataDir, invokeWith, packageName,
                     zygotePolicyFlags, isTopApp, disabledCompatChanges,
@@ -1032,6 +1058,18 @@ public class Process {
     @RavenwoodKeep
     public static final boolean isSdkSandbox() {
         return isSdkSandboxUid(myUid());
+    }
+
+    /**
+     * Returns whether the provided UID belongs to components running in a PCC
+     * sandbox process.
+     *
+     */
+    @FlaggedApi(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    @RavenwoodKeep
+    public static final boolean isPccUid(int uid) {
+        uid = UserHandle.getAppId(uid);
+        return uid >= FIRST_PCC_UID && uid <= LAST_PCC_UID;
     }
 
     /**

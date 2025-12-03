@@ -1054,6 +1054,8 @@
     <string name="lockscreen_pattern_correct" msgid="8050630103651508582">"Correct!"</string>
     <string name="lockscreen_pattern_wrong" msgid="2940138714468358458">"Try again"</string>
     <string name="lockscreen_password_wrong" msgid="8605355913868947490">"Try again"</string>
+    <string name="lockscreen_click_to_unlock_hint" msgid="6056691847669178119">"Click to unlock"</string>
+    <string name="lockscreen_key_to_unlock_hint" msgid="9042402393653798264">"Press any key to unlock"</string>
     <string name="lockscreen_storage_locked" msgid="634993789186443380">"Unlock for all features and data"</string>
     <string name="faceunlock_multiple_failures" msgid="681991538434031708">"Maximum Face Unlock attempts exceeded"</string>
     <string name="lockscreen_missing_sim_message_short" msgid="1229301273156907613">"No SIM"</string>
@@ -1796,8 +1798,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"Holding down both volume keys for a few seconds turns on <xliff:g id="SERVICE">%1$s</xliff:g>, an accessibility feature. This may change how your device works.\n\nYou can change this shortcut to another feature in Settings &gt; Accessibility."</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"Turn on"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"Don’t turn on"</string>
-    <string name="accessibility_shortcut_menu_item_status_on" msgid="6608392117189732543">"ON"</string>
-    <string name="accessibility_shortcut_menu_item_status_off" msgid="5531598275559472393">"OFF"</string>
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"On"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"Off"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"Allow <xliff:g id="SERVICE">%1$s</xliff:g> to have full control of your device?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"Full control is appropriate for apps that help you with accessibility needs, but not for most apps."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"View and control screen"</string>
@@ -1811,6 +1813,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"Tap a feature to start using it:"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"Choose features to use with the accessibility button"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"Choose features to use with the volume keys shortcut"</string>
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"accessibility button"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"volume keys"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"gesture"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"quick settings"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"triple tap"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> has been turned off"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Edit shortcuts"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Done"</string>
@@ -2365,8 +2372,8 @@
     <string name="PERSOSUBSTATE_SIM_IMPI_ENTRY" msgid="7043865376145617024">"IMPI unlock PIN"</string>
     <string name="PERSOSUBSTATE_SIM_NS_SP_ENTRY" msgid="6144227308185112176">"Network subset service provider unlock PIN"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_IN_PROGRESS" msgid="4233355366318061180">"Requesting SIM network unlock…"</string>
-    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_IN_PROGRESS" msgid="6742563947637715645">"Requesting SIM network subset unlock …"</string>
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_IN_PROGRESS" msgid="2033399698172403560">"Requesting SIM service provider un lock…"</string>
+    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_IN_PROGRESS" msgid="2917242135129860371">"Requesting SIM network subset unlock…"</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_IN_PROGRESS" msgid="4435641041692795695">"Requesting SIM service provider unlock…"</string>
     <string name="PERSOSUBSTATE_SIM_CORPORATE_IN_PROGRESS" msgid="4795977251920732254">"Requesting SIM corporate unlock…"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_PUK_IN_PROGRESS" msgid="1090425878157254446">"Requesting PUK unlock…"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK_IN_PROGRESS" msgid="6476898876518094438">"Requesting PUK unlock…"</string>
@@ -2392,15 +2399,15 @@
     <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_PUK_IN_PROGRESS" msgid="2695678959963807782">"Requesting PUK unlock…"</string>
     <string name="PERSOSUBSTATE_RUIM_RUIM_PUK_IN_PROGRESS" msgid="1230605365926493599">"Requesting PUK unlock…"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_ERROR" msgid="1924844017037151535">"SIM Network unlock request unsuccessful."</string>
-    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_ERROR" msgid="3372797822292089708">"SIM Network Subset unlock request unsucces sful."</string>
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_ERROR" msgid="1878443146720411381">"SIM Service Provider unlock request unsu ccessful."</string>
+    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_ERROR" msgid="7136658591279283417">"SIM Network Subset unlock request unsuccessful."</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_ERROR" msgid="8344463467085504202">"SIM Service Provider unlock request unsuccessful."</string>
     <string name="PERSOSUBSTATE_SIM_CORPORATE_ERROR" msgid="7664778312218023192">"SIM Corporate unlock request unsuccessful."</string>
     <string name="PERSOSUBSTATE_SIM_SIM_ERROR" msgid="2472944311643350302">"SIM unlock request unsuccessful."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK1_ERROR" msgid="828089694480999120">"RUIM Network1 unlock request unsuccessful."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK2_ERROR" msgid="17619001007092511">"RUIM Network2 unlock request unsuccessful."</string>
     <string name="PERSOSUBSTATE_RUIM_HRPD_ERROR" msgid="807214229604353614">"RUIM Hrpd unlock request unsuccessful."</string>
     <string name="PERSOSUBSTATE_RUIM_CORPORATE_ERROR" msgid="8644184447744175747">"RUIM Corporate unlock request unsuccessful."</string>
-    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_ERROR" msgid="3801002648649640407">"RUIM Service Provider unlock request un successful."</string>
+    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_ERROR" msgid="1882547895012628428">"RUIM Service Provider unlock request unsuccessful."</string>
     <string name="PERSOSUBSTATE_RUIM_RUIM_ERROR" msgid="707397021218680753">"RUIM unlock request unsuccessful."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_PUK_ERROR" msgid="894358680773257820">"PUK unlock unsuccessful."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK_ERROR" msgid="352466878146726991">"PUK unlock unsuccessful."</string>
@@ -2420,13 +2427,13 @@
     <string name="PERSOSUBSTATE_SIM_NS_SP_ERROR" msgid="1890493954453456758">"Network subset service provider unlock request unsuccessful."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUCCESS" msgid="4886243367747126325">"SIM Network unlock successful."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_SUCCESS" msgid="4053809277733513987">"SIM Network Subset unlock successful."</string>
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_SUCCESS" msgid="8249342930499801740">"SIM Service Provider unlock successful ."</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_SUCCESS" msgid="6233653087159353652">"SIM Service Provider unlock successful."</string>
     <string name="PERSOSUBSTATE_SIM_CORPORATE_SUCCESS" msgid="2339794542560381270">"SIM Corporate unlock successful."</string>
     <string name="PERSOSUBSTATE_SIM_SIM_SUCCESS" msgid="6975608174152828954">"SIM unlock successful."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK1_SUCCESS" msgid="2846699261330463192">"RUIM Network1 unlock successful."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK2_SUCCESS" msgid="5335414726057102801">"RUIM Network2 unlock successful."</string>
     <string name="PERSOSUBSTATE_RUIM_HRPD_SUCCESS" msgid="8868100318474971969">"RUIM Hrpd unlock successful."</string>
-    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_SUCCESS" msgid="6020936629725666932">"RUIM Service Provider unlock successf ul."</string>
+    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_SUCCESS" msgid="6724555357287036238">"RUIM Service Provider unlock successful."</string>
     <string name="PERSOSUBSTATE_RUIM_CORPORATE_SUCCESS" msgid="6944873647584595489">"RUIM Corporate unlock successful."</string>
     <string name="PERSOSUBSTATE_RUIM_RUIM_SUCCESS" msgid="2526483514124121988">"RUIM unlock successful."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_PUK_SUCCESS" msgid="7662200333621664621">"PUK unlock successful."</string>

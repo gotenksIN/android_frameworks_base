@@ -56,34 +56,34 @@ import static com.android.server.am.OomAdjuster.CPU_TIME_REASON_TRANSMITTED_LEGA
 import static com.android.server.am.OomAdjuster.IMPLICIT_CPU_TIME_REASON_OTHER;
 import static com.android.server.am.OomAdjuster.IMPLICIT_CPU_TIME_REASON_TRANSMITTED;
 import static com.android.server.am.OomAdjuster.IMPLICIT_CPU_TIME_REASON_TRANSMITTED_LEGACY;
-import static com.android.server.am.ProcessList.BACKUP_APP_ADJ;
-import static com.android.server.am.ProcessList.CACHED_APP_IMPORTANCE_LEVELS;
-import static com.android.server.am.ProcessList.CACHED_APP_MAX_ADJ;
-import static com.android.server.am.ProcessList.CACHED_APP_MIN_ADJ;
-import static com.android.server.am.ProcessList.FOREGROUND_APP_ADJ;
-import static com.android.server.am.ProcessList.HEAVY_WEIGHT_APP_ADJ;
-import static com.android.server.am.ProcessList.HOME_APP_ADJ;
-import static com.android.server.am.ProcessList.INVALID_ADJ;
-import static com.android.server.am.ProcessList.PERCEPTIBLE_APP_ADJ;
-import static com.android.server.am.ProcessList.PERCEPTIBLE_LOW_APP_ADJ;
-import static com.android.server.am.ProcessList.PERCEPTIBLE_MEDIUM_APP_ADJ;
-import static com.android.server.am.ProcessList.PERCEPTIBLE_RECENT_FOREGROUND_APP_ADJ;
-import static com.android.server.am.ProcessList.PERSISTENT_PROC_ADJ;
-import static com.android.server.am.ProcessList.PERSISTENT_SERVICE_ADJ;
-import static com.android.server.am.ProcessList.PREVIOUS_APP_ADJ;
-import static com.android.server.am.ProcessList.PREVIOUS_APP_MAX_ADJ;
-import static com.android.server.am.ProcessList.SCHED_GROUP_BACKGROUND;
-import static com.android.server.am.ProcessList.SCHED_GROUP_DEFAULT;
-import static com.android.server.am.ProcessList.SCHED_GROUP_FOREGROUND_WINDOW;
-import static com.android.server.am.ProcessList.SCHED_GROUP_RESTRICTED;
-import static com.android.server.am.ProcessList.SCHED_GROUP_TOP_APP;
-import static com.android.server.am.ProcessList.SCHED_GROUP_TOP_APP_BOUND;
-import static com.android.server.am.ProcessList.SERVICE_ADJ;
-import static com.android.server.am.ProcessList.SERVICE_B_ADJ;
-import static com.android.server.am.ProcessList.SYSTEM_ADJ;
-import static com.android.server.am.ProcessList.UNKNOWN_ADJ;
-import static com.android.server.am.ProcessList.VISIBLE_APP_ADJ;
-import static com.android.server.am.ProcessList.VISIBLE_APP_MAX_ADJ;
+import static com.android.server.am.psc.Constants.BACKUP_APP_ADJ;
+import static com.android.server.am.psc.Constants.CACHED_APP_IMPORTANCE_LEVELS;
+import static com.android.server.am.psc.Constants.CACHED_APP_MAX_ADJ;
+import static com.android.server.am.psc.Constants.CACHED_APP_MIN_ADJ;
+import static com.android.server.am.psc.Constants.FOREGROUND_APP_ADJ;
+import static com.android.server.am.psc.Constants.HEAVY_WEIGHT_APP_ADJ;
+import static com.android.server.am.psc.Constants.HOME_APP_ADJ;
+import static com.android.server.am.psc.Constants.INVALID_ADJ;
+import static com.android.server.am.psc.Constants.PERCEPTIBLE_APP_ADJ;
+import static com.android.server.am.psc.Constants.PERCEPTIBLE_LOW_APP_ADJ;
+import static com.android.server.am.psc.Constants.PERCEPTIBLE_MEDIUM_APP_ADJ;
+import static com.android.server.am.psc.Constants.PERCEPTIBLE_RECENT_FOREGROUND_APP_ADJ;
+import static com.android.server.am.psc.Constants.PERSISTENT_PROC_ADJ;
+import static com.android.server.am.psc.Constants.PERSISTENT_SERVICE_ADJ;
+import static com.android.server.am.psc.Constants.PREVIOUS_APP_ADJ;
+import static com.android.server.am.psc.Constants.PREVIOUS_APP_MAX_ADJ;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_BACKGROUND;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_DEFAULT;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_FOREGROUND_WINDOW;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_RESTRICTED;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_TOP_APP;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_TOP_APP_BOUND;
+import static com.android.server.am.psc.Constants.SERVICE_ADJ;
+import static com.android.server.am.psc.Constants.SERVICE_B_ADJ;
+import static com.android.server.am.psc.Constants.SYSTEM_ADJ;
+import static com.android.server.am.psc.Constants.UNKNOWN_ADJ;
+import static com.android.server.am.psc.Constants.VISIBLE_APP_ADJ;
+import static com.android.server.am.psc.Constants.VISIBLE_APP_MAX_ADJ;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_PAUSING_OR_PAUSED;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_STOPPING;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_STOPPING_FINISHING;
@@ -197,10 +197,10 @@ public class MockingOomAdjusterTests {
 
     private static final long HANDLER_THREAD_TIMEOUT_MILLIS = 1_000L;
 
-    private static int sFirstCachedAdj = ProcessList.CACHED_APP_MIN_ADJ
-            + ProcessList.CACHED_APP_IMPORTANCE_LEVELS;
+    private static int sFirstCachedAdj = CACHED_APP_MIN_ADJ + CACHED_APP_IMPORTANCE_LEVELS;
 
     private Context mContext;
+    private OomAdjuster.Constants mOomConstants;
     private ProcessStateController mProcessStateController;
     private ProcessStateController.ActivityStateAsyncUpdater mActivityStateAsyncUpdater;
     private ActiveUids mActiveUids;
@@ -304,10 +304,12 @@ public class MockingOomAdjusterTests {
 
         mCallback = spy(mService.new OomAdjusterCallback());
         mProcessStateController = new ProcessStateController.Builder(mService,
-                mService.mProcessList, mActiveUids, mCallback)
+                mService.mProcessList, mActiveUids, mService.mConstants.createOomConstants(),
+                mCallback)
                 .setProcessLruUpdater(lruUpdater)
                 .setOomAdjusterInjector(mInjector)
                 .build();
+        mOomConstants = mProcessStateController.getOomConstants();
         mActivityStateAsyncUpdater = mProcessStateController.createActivityStateAsyncUpdater(
                 mActivityStateHandlerThread.getLooper());
         mService.mProcessStateController = mProcessStateController;
@@ -549,12 +551,6 @@ public class MockingOomAdjusterTests {
         setTopProcessState(PROCESS_STATE_TOP_SLEEPING);
         setWakefulness(PowerManagerInternal.WAKEFULNESS_AWAKE);
         mProcessStateController.setRunningRemoteAnimation(app, true);
-
-        if (Flags.autoTriggerOomadjUpdates()) {
-            // Do not manually run the update.
-        } else {
-            updateOomAdj(app);
-        }
 
         assertProcStates(app, PROCESS_STATE_TOP_SLEEPING, VISIBLE_APP_ADJ, SCHED_GROUP_TOP_APP);
         assertThatProcess(app).hasImplicitCpuTimeCapability();
@@ -801,7 +797,7 @@ public class MockingOomAdjusterTests {
     @Test
     public void testUpdateOomAdj_DoOne_FgService_ShortFgs() {
         mService.mConstants.TOP_TO_FGS_GRACE_DURATION = 100_000;
-        mService.mConstants.mShortFgsProcStateExtraWaitDuration = 200_000;
+        mOomConstants.mShortFgsProcStateExtraWaitDuration = 200_000;
 
         ServiceRecord s = ServiceRecord.newEmptyInstanceForTest(mService);
         s.appInfo = new ApplicationInfo();
@@ -855,8 +851,8 @@ public class MockingOomAdjusterTests {
         s.setIsForeground(true);
         s.setForegroundServiceType(FOREGROUND_SERVICE_TYPE_SHORT_SERVICE);
         mProcessStateController.setShortFgsInfo(s, SystemClock.uptimeMillis()
-                - mService.mConstants.mShortFgsTimeoutDuration
-                - mService.mConstants.mShortFgsProcStateExtraWaitDuration);
+                - mOomConstants.mShortFgsTimeoutDuration
+                - mOomConstants.mShortFgsProcStateExtraWaitDuration);
         {
             ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID,
                     MOCKAPP_PROCESSNAME, MOCKAPP_PACKAGENAME, true);
@@ -4292,7 +4288,6 @@ public class MockingOomAdjusterTests {
 
     @SuppressWarnings("GuardedBy")
     @Test
-    @EnableFlags(Flags.FLAG_PUSH_ACTIVITY_STATE_TO_OOMADJUSTER)
     public void testUpdateOomAdj_DoOne_TopApp_Unlocking() {
         ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, true);
@@ -4314,7 +4309,6 @@ public class MockingOomAdjusterTests {
 
     @SuppressWarnings("GuardedBy")
     @Test
-    @EnableFlags(Flags.FLAG_PUSH_ACTIVITY_STATE_TO_OOMADJUSTER)
     public void testUpdateOomAdj_DoOne_TopApp_ExpandedNotificationShade() {
         ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, true);
@@ -4337,7 +4331,6 @@ public class MockingOomAdjusterTests {
 
     @SuppressWarnings("GuardedBy")
     @Test
-    @EnableFlags(Flags.FLAG_PUSH_ACTIVITY_STATE_TO_OOMADJUSTER)
     public void testUpdateOomAdj_DoOne_PersistentTopApp_VisibleDozeUi() {
         ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, true);
@@ -4360,7 +4353,6 @@ public class MockingOomAdjusterTests {
 
     @SuppressWarnings("GuardedBy")
     @Test
-    @EnableFlags(Flags.FLAG_PUSH_ACTIVITY_STATE_TO_OOMADJUSTER)
     public void testUpdateOomAdj_DoOne_Persistent_TopUi_VisibleDozeUi() {
         ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, true);
@@ -4490,7 +4482,6 @@ public class MockingOomAdjusterTests {
 
     @SuppressWarnings("GuardedBy")
     @Test
-    @EnableFlags(Flags.FLAG_PSC_BATCH_UPDATE)
     public void testBatchSession() {
         ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, true);
@@ -4507,7 +4498,6 @@ public class MockingOomAdjusterTests {
 
     @SuppressWarnings("GuardedBy")
     @Test
-    @EnableFlags(Flags.FLAG_PSC_BATCH_UPDATE)
     public void testBatchSession_nested() {
         ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
                 MOCKAPP_PACKAGENAME, true);
@@ -4646,12 +4636,8 @@ public class MockingOomAdjusterTests {
     }
 
     private void setTopProcessState(int procState) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            mActivityStateAsyncUpdater.setTopProcessStateAsync(procState);
-            flushActivityStateHandler();
-        } else {
-            doReturn(procState).when(mService.mAtmInternal).getTopProcessState();
-        }
+        mActivityStateAsyncUpdater.setTopProcessStateAsync(procState);
+        flushActivityStateHandler();
     }
 
     private void setDeviceUnlocking(boolean unlocking) {
@@ -4664,46 +4650,24 @@ public class MockingOomAdjusterTests {
     }
 
     private void setTopProcess(ProcessRecord proc) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            final WindowProcessController wpc =
-                    proc == null ? null : proc.getWindowProcessController();
-            mActivityStateAsyncUpdater.setTopProcessAsync(wpc, false,
-                    false);
-            flushActivityStateHandler();
-        } else {
-            if (proc == null) return;
-            doReturn(proc).when(mService).getTopApp();
-        }
+        final WindowProcessController wpc = proc == null ? null : proc.getWindowProcessController();
+        mActivityStateAsyncUpdater.setTopProcessAsync(wpc, false, false);
+        flushActivityStateHandler();
     }
 
     private void setPreviousProcess(WindowProcessController wpc) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            mActivityStateAsyncUpdater.setPreviousProcessAsync(wpc);
-            flushActivityStateHandler();
-        } else {
-            if (wpc == null) return;
-            doReturn(true).when(wpc).isPreviousProcess();
-        }
+        mActivityStateAsyncUpdater.setPreviousProcessAsync(wpc);
+        flushActivityStateHandler();
     }
 
     private void setHomeProcess(WindowProcessController wpc) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            mActivityStateAsyncUpdater.setHomeProcessAsync(wpc);
-            flushActivityStateHandler();
-        } else {
-            if (wpc == null) return;
-            doReturn(true).when(wpc).isHomeProcess();
-        }
+        mActivityStateAsyncUpdater.setHomeProcessAsync(wpc);
+        flushActivityStateHandler();
     }
 
     private void setHeavyWeightProcess(WindowProcessController wpc) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            mActivityStateAsyncUpdater.setHeavyWeightProcessAsync(wpc);
-            flushActivityStateHandler();
-        } else {
-            if (wpc == null) return;
-            doReturn(true).when(wpc).isHeavyWeightProcess();
-        }
+        mActivityStateAsyncUpdater.setHeavyWeightProcessAsync(wpc);
+        flushActivityStateHandler();
     }
 
     private void setVisibleDozeUiProcess(WindowProcessController wpc) {
@@ -4740,62 +4704,35 @@ public class MockingOomAdjusterTests {
     }
 
     private void setHasActivity(WindowProcessController wpc, boolean hasActivity) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            mActivityStateAsyncUpdater.setHasActivityAsync(wpc, hasActivity);
-            flushActivityStateHandler();
-        } else {
-            if (wpc == null) return;
-            doReturn(hasActivity).when(wpc).hasActivities();
-        }
+        mActivityStateAsyncUpdater.setHasActivityAsync(wpc, hasActivity);
+        flushActivityStateHandler();
     }
 
     private void setActivityStateFlags(WindowProcessController wpc, int flags) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            mActivityStateAsyncUpdater.setActivityStateAsync(wpc, flags, Long.MIN_VALUE);
-            flushActivityStateHandler();
-        } else {
-            if (wpc == null) return;
-            doReturn(flags).when(wpc).getActivityStateFlags();
-        }
+        mActivityStateAsyncUpdater.setActivityStateAsync(wpc, flags, Long.MIN_VALUE);
+        flushActivityStateHandler();
     }
 
     private void setActivityState(WindowProcessController wpc, int flags,
             long perceptibleStopTimeMs) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            mActivityStateAsyncUpdater.setActivityStateAsync(wpc, flags, perceptibleStopTimeMs);
-            flushActivityStateHandler();
-        } else {
-            if (wpc == null) return;
-            doReturn(flags).when(wpc).getActivityStateFlags();
-            doReturn(perceptibleStopTimeMs).when(wpc).getPerceptibleTaskStoppedTimeMillis();
-        }
+        mActivityStateAsyncUpdater.setActivityStateAsync(wpc, flags, perceptibleStopTimeMs);
+        flushActivityStateHandler();
     }
 
     private void setHasRecentTasks(WindowProcessController wpc, boolean hasRecentTasks) {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            mActivityStateAsyncUpdater.setHasRecentTasksAsync(wpc, hasRecentTasks);
-            flushActivityStateHandler();
-        } else {
-            if (wpc == null) return;
-            doReturn(hasRecentTasks).when(wpc).hasRecentTasks();
-        }
+        mActivityStateAsyncUpdater.setHasRecentTasksAsync(wpc, hasRecentTasks);
+        flushActivityStateHandler();
     }
 
     @SuppressWarnings("GuardedBy")
     private void setIsReceivingBroadcast(ProcessRecord app, boolean isReceivingBroadcast,
             int schedGroup) {
-        if (Flags.pushBroadcastStateToOomadjuster()) {
-            if (isReceivingBroadcast) {
-                mProcessStateController.noteBroadcastDeliveryStarted(app, schedGroup);
-            } else {
-                mProcessStateController.noteBroadcastDeliveryEnded(app);
-            }
+        if (isReceivingBroadcast) {
+            mProcessStateController.noteBroadcastDeliveryStarted(app, schedGroup);
         } else {
-            doReturn(isReceivingBroadcast).when(mService).isReceivingBroadcastLocked(
-                    any(ProcessRecord.class), any(int[].class));
+            mProcessStateController.noteBroadcastDeliveryEnded(app);
         }
     }
-
 
     private ContentProviderRecord createContentProviderRecord(ProcessRecord publisher, String name,
             boolean hasExternalProviders) {

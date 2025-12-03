@@ -22,11 +22,13 @@ import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.content.res.Resources
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.Icon
 import android.os.UserHandle
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.SetFlagsRule
+import android.view.SurfaceControl
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -67,7 +69,12 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 
-/** Unit tests for [BubbleStackView]. */
+/**
+ * Unit tests for [BubbleStackView].
+ *
+ * Build/Install/Run:
+ *  atest WMShellMultivalentTestsOnDevice:BubbleStackViewTest (on device)
+ */
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class BubbleStackViewTest {
@@ -328,6 +335,7 @@ class BubbleStackViewTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             // simulate a request from the bubble data listener to expand the stack
+            bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
         }
 
@@ -346,6 +354,7 @@ class BubbleStackViewTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             // simulate a request from the bubble data listener to collapse the stack
+            bubbleData.isExpanded = false
             bubbleStackView.isExpanded = false
         }
 
@@ -377,6 +386,7 @@ class BubbleStackViewTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             // simulate a request from the bubble data listener to expand the stack
+            bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
         }
 
@@ -394,6 +404,7 @@ class BubbleStackViewTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             // simulate a request from the bubble data listener to collapse the stack
+            bubbleData.isExpanded = false
             bubbleStackView.isExpanded = false
         }
 
@@ -453,6 +464,7 @@ class BubbleStackViewTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             // simulate a request from the bubble data listener to expand the stack
+            bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
             verify(sysuiProxy).onStackExpandChanged(true)
             shellExecutor.flushAll()
@@ -465,6 +477,7 @@ class BubbleStackViewTest {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             // simulate a request from the bubble data listener to collapse the stack
+            bubbleData.isExpanded = false
             bubbleStackView.isExpanded = false
             verify(sysuiProxy).onStackExpandChanged(false)
             shellExecutor.flushAll()
@@ -832,6 +845,7 @@ class BubbleStackViewTest {
             bubbleStackView.addBubble(bubble)
             bubbleStackView.setSelectedBubble(bubble)
             bubbleStackView.animateExpand(null, runnable)
+            bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
             shellExecutor.flushAll()
         }
@@ -861,6 +875,7 @@ class BubbleStackViewTest {
             bubbleStackView.addBubble(bubble)
             bubbleStackView.addBubble(bubble2)
             bubbleStackView.setSelectedBubble(bubble)
+            bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
             shellExecutor.flushAll()
         }
@@ -906,6 +921,7 @@ class BubbleStackViewTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             bubbleStackView.addBubble(bubble)
             bubbleStackView.setSelectedBubble(bubble)
+            bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
             shellExecutor.flushAll()
         }
@@ -926,6 +942,7 @@ class BubbleStackViewTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             bubbleStackView.addBubble(bubble)
             bubbleStackView.setSelectedBubble(bubble)
+            bubbleData.isExpanded = true
             bubbleStackView.snapToExpanded()
             bubbleStackView.isExpanded = true
             shellExecutor.flushAll()
@@ -1041,6 +1058,7 @@ class BubbleStackViewTest {
             bubbleStackView.addBubble(bubble1)
             bubbleStackView.addBubble(bubble2)
             bubbleStackView.setSelectedBubble(bubble2)
+            bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
             shellExecutor.flushAll()
         }
@@ -1083,7 +1101,8 @@ class BubbleStackViewTest {
             bubbleStackView.addBubble(bubble1)
             bubbleStackView.addBubble(bubble2)
             bubbleStackView.setSelectedBubble(bubble2)
-            bubbleStackView.setExpanded(true)
+            bubbleData.isExpanded = true
+            bubbleStackView.isExpanded = true
             shellExecutor.flushAll()
         }
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
@@ -1122,6 +1141,7 @@ class BubbleStackViewTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             bubbleStackView.addBubble(bubble)
             bubbleStackView.setSelectedBubble(bubble)
+            bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
             shellExecutor.flushAll()
         }
@@ -1158,6 +1178,7 @@ class BubbleStackViewTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             bubbleStackView.addBubble(bubble)
             bubbleStackView.setSelectedBubble(bubble)
+            bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
             shellExecutor.flushAll()
         }
@@ -1197,6 +1218,52 @@ class BubbleStackViewTest {
         assertThat(bubbleStackView.bubbleCount).isEqualTo(1)
     }
 
+    @EnableFlags(com.android.window.flags.Flags.FLAG_FIX_BUBBLE_TRAMPOLINE_ANIMATION)
+    @Test
+    fun removeJumpcutSwitchClosingBubble() {
+        val closingBubble = createAndInflateBubble()
+        val openingBubble = createAndInflateBubble()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(closingBubble)
+            bubbleStackView.addBubble(openingBubble)
+            bubbleStackView.setSelectedBubble(openingBubble)
+            bubbleStackView.hideJumpcutClosingBubble(closingBubble)
+            bubbleData.isExpanded = true
+            bubbleStackView.isExpanded = true
+            shellExecutor.flushAll()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        assertThat(bubbleStackView.isExpanded).isTrue()
+        assertThat(bubbleStackView.bubbleCount).isEqualTo(1)
+        assertThat(closingBubble.expandedView).isNotNull()
+        assertThat(closingBubble.iconView).isNotNull()
+        assertThat(bubbleStackView.getBubbleIndex(closingBubble)).isEqualTo(-1)
+        assertThat(openingBubble.expandedView).isNotNull()
+        assertThat(openingBubble.iconView).isNotNull()
+        assertThat(bubbleStackView.getBubbleIndex(openingBubble)).isEqualTo(0)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            // remove it from the data + stack
+            bubbleData.dismissBubbleWithKey(closingBubble.key, Bubbles.DISMISS_USER_GESTURE)
+            bubbleStackView.removeBubble(closingBubble)
+            // Start the scrim animation
+            animatorTestRule.advanceTimeBy(100)
+            shellExecutor.flushAll()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        // Check that proper changes to removed bubble happened
+        assertThat(bubbleStackView.isExpanded).isTrue()
+        assertThat(bubbleStackView.bubbleCount).isEqualTo(1)
+        assertThat(closingBubble.expandedView).isNull()
+        assertThat(closingBubble.iconView).isNull()
+        assertThat(bubbleStackView.getBubbleIndex(closingBubble)).isEqualTo(-1)
+        assertThat(openingBubble.expandedView).isNotNull()
+        assertThat(openingBubble.iconView).isNotNull()
+        assertThat(bubbleStackView.getBubbleIndex(openingBubble)).isEqualTo(0)
+    }
+
     @Test
     fun sessionEventsLogged() {
         val bubble1 = createAndInflateChatBubble("key1")
@@ -1205,6 +1272,7 @@ class BubbleStackViewTest {
             bubbleStackView.addBubble(bubble1)
             bubbleStackView.addBubble(bubble2)
             bubbleStackView.setSelectedBubble(bubble2)
+            bubbleData.isExpanded = true
             bubbleStackView.isExpanded = true
             shellExecutor.flushAll()
         }
@@ -1228,6 +1296,7 @@ class BubbleStackViewTest {
         }
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleData.isExpanded = false
             bubbleStackView.isExpanded = false
             shellExecutor.flushAll()
         }
@@ -1245,6 +1314,57 @@ class BubbleStackViewTest {
                 sessionEndEvent.instanceId
             )
         assertThat(sessionInstanceIds).hasSize(1)
+    }
+
+    @Test
+    fun animateConvert_expandAnimationRunning_cancelExpand() {
+        bubbleStackView = spy(bubbleStackView)
+        val bubble = createAndInflateBubble()
+
+        assertThat(bubble.expandedView).isNotNull()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble)
+            bubbleStackView.setSelectedBubble(bubble)
+            bubbleData.isExpanded = true
+            bubbleStackView.isExpanded = true
+            shellExecutor.flushAll()
+            animatorTestRule.advanceTimeBy(100)
+        }
+
+        assertThat(bubbleStackView.isExpansionAnimating).isTrue()
+
+        var finishCalled = false
+        val finishRunnable = Runnable {
+            finishCalled = true
+        }
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val startT = SurfaceControl.Transaction()
+            val startBounds = Rect(0, 0, 100, 100)
+            val snapshot = SurfaceControl.Builder().setName("snapshot").build()
+            val taskLeash = SurfaceControl.Builder().setName("taskLeash").build()
+            bubbleStackView.animateConvert(
+                startT,
+                startBounds,
+                1f /* startScale */,
+                snapshot,
+                taskLeash,
+                finishRunnable
+            )
+        }
+
+        assertThat(bubbleStackView.isExpansionAnimating).isFalse()
+        assertThat(bubbleStackView.isSwitchAnimating).isTrue()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animatorTestRule.advanceTimeBy(400)
+        }
+
+        assertThat(bubbleStackView.isSwitchAnimating).isFalse()
+
+        assertThat(bubbleStackView.isExpanded).isTrue()
+        assertThat(finishCalled).isTrue()
     }
 
     private fun createAndInflateChatBubble(key: String): Bubble {

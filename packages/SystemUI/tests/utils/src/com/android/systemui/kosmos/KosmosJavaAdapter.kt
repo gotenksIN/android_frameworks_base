@@ -54,6 +54,7 @@ import com.android.systemui.keyguard.domain.interactor.fromPrimaryBouncerTransit
 import com.android.systemui.keyguard.domain.interactor.keyguardClockInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardOcclusionInteractor
+import com.android.systemui.keyguard.domain.interactor.keyguardSurfaceBehindInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.pulseExpansionInteractor
 import com.android.systemui.keyguard.ui.viewmodel.glanceableHubToLockscreenTransitionViewModel
@@ -75,10 +76,12 @@ import com.android.systemui.settings.displayTracker
 import com.android.systemui.shade.data.repository.fakeFocusedDisplayRepository
 import com.android.systemui.shade.data.repository.fakeShadeDisplaysRepository
 import com.android.systemui.shade.data.repository.shadeConfigRepository
+import com.android.systemui.shade.data.repository.shadeDialogContextInteractor
 import com.android.systemui.shade.data.repository.shadeRepository
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.domain.interactor.shadeLayoutParams
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
+import com.android.systemui.shade.domain.interactor.shadeStatusBarComponentsInteractor
 import com.android.systemui.shade.shadeController
 import com.android.systemui.shade.ui.viewmodel.notificationShadeWindowModel
 import com.android.systemui.statusbar.data.repository.fakeStatusBarModePerDisplayRepository
@@ -241,6 +244,7 @@ class KosmosJavaAdapter() {
     val mockNotificationDismissibilityProvider by lazy {
         kosmos.mockNotificationDismissibilityProvider
     }
+    val shadeDialogContextInteractor by lazy { kosmos.shadeDialogContextInteractor }
     val mockNotifCollection by lazy { kosmos.mockNotifCollection }
     val expandableNotificationRowLogger by lazy { kosmos.expandableNotificationRowLogger }
     val mockHeadsUpManager by lazy { kosmos.mockHeadsUpManager }
@@ -254,6 +258,8 @@ class KosmosJavaAdapter() {
     val secureLockDeviceInteractor by lazy { kosmos.secureLockDeviceInteractor }
     val systemUIDialogManager by lazy { kosmos.systemUIDialogManager }
     val displayRepository by lazy { kosmos.displayRepository }
+    val shadeStatusBarComponentsInteractor by lazy { kosmos.shadeStatusBarComponentsInteractor }
+    val keyguardSurfaceBehindInteractor by lazy { kosmos.keyguardSurfaceBehindInteractor }
 
     /** Use if you need a unique or mutate-able row */
     fun createRow(): ExpandableNotificationRow {

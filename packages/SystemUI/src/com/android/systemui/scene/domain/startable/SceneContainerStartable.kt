@@ -307,13 +307,13 @@ constructor(
                                 val visibilityForTransitionState =
                                     when (transitionState) {
                                         is ObservableTransitionState.Idle -> {
-                                            if (transitionState.currentScene == Scenes.Dream) {
-                                                false to "dream is showing"
-                                            } else if (
+                                            if (
                                                 transitionState.currentScene != Scenes.Gone &&
-                                                    transitionState.currentScene != Scenes.Occluded
+                                                    transitionState.currentScene !=
+                                                        Scenes.Occluded &&
+                                                    transitionState.currentScene != Scenes.Dream
                                             ) {
-                                                true to "scene is not Gone and not Occluded"
+                                                true to "scene is not Gone, Occluded, or Dream"
                                             } else if (
                                                 transitionState.currentOverlays.isNotEmpty()
                                             ) {
@@ -615,17 +615,28 @@ constructor(
                 if (wakefulness.lastSleepReason != WakeSleepReason.POWER_BUTTON) return@collect
 
                 // If we're mid-transition from Gone to Lockscreen due to the first power button
-                // press, then return to Gone.
-                val transition: ObservableTransitionState.Transition =
+                // press, then unlock the device if needed and return to Gone.
+                val transition: ObservableTransitionState.Transition? =
                     sceneInteractor.transitionState.value as? ObservableTransitionState.Transition
-                        ?: return@collect
+
                 if (
-                    transition.fromContent == Scenes.Gone &&
+                    transition != null &&
+                        transition.fromContent == Scenes.Gone &&
                         transition.toContent == Scenes.Lockscreen
                 ) {
+                    // Immediately re-unlock the device - this is the first authoritative signal
+                    // that we've decided this is a power button launch gesture from Gone.
+                    deviceUnlockedInteractor.unlockNowForPowerButtonGesture(
+                        "double-tap power gesture while coming from gone"
+                    )
                     switchToScene(
                         targetSceneKey = Scenes.Gone,
                         loggingReason = "double-tap power gesture",
+                    )
+                } else if (occlusionInteractor.shouldTransitionFromPowerButtonGesture()) {
+                    switchToScene(
+                        Scenes.Occluded,
+                        "double tap power while not doing gone -> lockscreen",
                     )
                 }
             }
@@ -851,9 +862,16 @@ constructor(
         }
 
         applicationScope.launch {
-            deviceEntryInteractor.isDeviceEntered.collect { isDeviceEntered ->
-                windowController.setKeyguardShowing(!isDeviceEntered)
-            }
+            combine(deviceEntryInteractor.isDeviceEntered, sceneInteractor.transitionState, ::Pair)
+                .map { (isDeviceEntered, transitionState) ->
+                    !isDeviceEntered ||
+                        transitionState.isTransitioningSets(
+                            from = setOf(Scenes.Lockscreen, Scenes.Occluded, Overlays.Bouncer),
+                            to = setOf(Scenes.Gone),
+                        )
+                }
+                .distinctUntilChanged()
+                .collect { windowController.setKeyguardShowing(it) }
         }
 
         applicationScope.launch {
@@ -991,19 +1009,41 @@ constructor(
 
     private fun handleOcclusion() {
         applicationScope.launch {
-            occlusionInteractor.isKeyguardOccluded.collect { occluded ->
-                // This does not use the scene family to resolve, as there is a race condition when
-                // they both update state based off of the isKeyguardOccluded value.
-                if (occluded) {
-                    switchToScene(Scenes.Occluded, "isKeyguardOccluded == true")
-                } else if (sceneInteractor.currentScene.value == Scenes.Occluded) {
-                    if (deviceEntryInteractor.isDeviceEntered.value) {
-                        switchToScene(Scenes.Gone, "unoccluded and device entered")
-                    } else {
-                        switchToScene(Scenes.Lockscreen, "unoccluded and device not entered")
+            occlusionInteractor.isKeyguardOccluded
+                .sample(sceneBackInteractor.backScene, ::Pair)
+                .collect { (occluded, backScene) ->
+                    // This does not use the scene family to resolve, as there is a race condition
+                    // when they both update state based off of the isKeyguardOccluded value.
+                    if (occluded) {
+                        switchToScene(Scenes.Occluded, "isKeyguardOccluded == true")
+                    } else if (sceneInteractor.currentScene.value == Scenes.Occluded) {
+                        if (backScene == Scenes.Communal) {
+                            switchToScene(Scenes.Communal, "unoccluded and previously on communal")
+                        } else if (deviceEntryInteractor.isDeviceEntered.value) {
+                            switchToScene(Scenes.Gone, "unoccluded and device entered")
+                        } else if (
+                            sceneInteractor.currentOverlays.value.contains(Overlays.Bouncer)
+                        ) {
+                            // We've unoccluded while the bouncer was showing over an occluding
+                            // activity. This can happen if the occluding activity crashed or
+                            // finished itself behind the bouncer. It can also happen if a CTS
+                            // test/very adversarial user launched a non-SHOW_WHEN_LOCKED activity
+                            // with FLAG_DISMISS_KEYGUARD over a SHOW_WHEN_LOCKED activity. In that
+                            // case, FLAG_DISMISS_KEYGUARD will cause the bouncer to show, but then
+                            // the lack of SHOW_WHEN_LOCKED will cause WM to kill the activity. CTS
+                            // tests expect to be able to enter the PIN and unlock the device in
+                            // this case, so leave the bouncer visible.
+                            switchToScene(
+                                Scenes.Lockscreen,
+                                "unoccluded and device not entered, " +
+                                    "bouncer was showing; leaving it up",
+                                hideOverlays = HideOverlayCommand.HideNone,
+                            )
+                        } else {
+                            switchToScene(Scenes.Lockscreen, "unoccluded and device not entered")
+                        }
                     }
                 }
-            }
         }
     }
 

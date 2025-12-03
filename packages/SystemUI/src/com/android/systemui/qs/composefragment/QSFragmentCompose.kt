@@ -156,10 +156,7 @@ import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener
 import com.android.systemui.util.LifecycleFragment
-import com.android.systemui.util.animation.MeasurementInput
-import com.android.systemui.util.animation.UniqueObjectHostView
 import com.android.systemui.util.asIndenting
-import com.android.systemui.util.children
 import com.android.systemui.util.kotlin.pairwise
 import com.android.systemui.util.printSection
 import com.android.systemui.util.println
@@ -526,28 +523,12 @@ constructor(
         viewModel.proposedTranslation = headerTranslation
     }
 
-    override fun setHeaderListening(listening: Boolean) {
-        // Not needed, header will start listening as soon as it's composed
-    }
-
-    override fun notifyCustomizeChanged() {
-        // Not needed, only called from inside customizer
-    }
-
     override fun setContainerController(controller: QSContainerController?) {
         qsContainerController.value = controller
     }
 
     override fun setCollapseExpandAction(action: Runnable?) {
         viewModel.collapseExpandAccessibilityAction = action
-    }
-
-    override fun getHeightDiff(): Int {
-        return viewModel.heightDiff
-    }
-
-    override fun getHeader(): View? {
-        return null
     }
 
     override fun setShouldUpdateSquishinessOnMedia(shouldUpdate: Boolean) {
@@ -927,7 +908,6 @@ constructor(
                                         mediaPresentationStyle = MediaPresentationStyle.Default,
                                         onSwipeToDismiss = viewModel::onMediaSwipeToDismiss,
                                         behavior = viewModel.qsMediaUiBehavior,
-                                        update = { translationY = viewModel.qsMediaTranslationY },
                                     )
                                 }
                             }
@@ -936,7 +916,7 @@ constructor(
                                 Modifier.fillMaxWidth()
                                     .sysuiResTag(ResIdTags.quickSettingsPanel)
                                     .padding(
-                                        top = QuickSettingsShade.Dimensions.Padding,
+                                        top = QuickSettingsShade.Dimensions.VerticalPadding,
                                         start = qsHorizontalMargin(),
                                         end = qsHorizontalMargin(),
                                     )
@@ -971,12 +951,13 @@ constructor(
     @Composable
     private fun EditModeElement(modifier: Modifier = Modifier) {
         // No need for top padding, the Scaffold inside takes care of the correct insets
+        val horizontalPadding = QuickSettingsShade.Dimensions.HorizontalPadding
         EditMode(
             viewModel = viewModel.containerViewModel.editModeViewModel,
             modifier =
                 modifier
                     .fillMaxWidth()
-                    .padding(horizontal = { QuickSettingsShade.Dimensions.Padding.roundToPx() })
+                    .padding(horizontal = { horizontalPadding.roundToPx() })
                     .padding(top = { viewModel.qqsHeaderHeight }),
         )
     }
@@ -1399,7 +1380,6 @@ private fun ContentScope.MediaObject(
     mediaPresentationStyle: MediaPresentationStyle,
     onSwipeToDismiss: () -> Unit,
     behavior: MediaUiBehavior,
-    update: UniqueObjectHostView.() -> Unit = {},
 ) {
     if (MediaControlsInComposeFlag.isEnabled) {
         Element(key = Media.Elements.mediaCarousel, modifier = modifier) {
@@ -1422,30 +1402,6 @@ private fun ContentScope.MediaObject(
                                 FrameLayout.LayoutParams.MATCH_PARENT,
                                 FrameLayout.LayoutParams.WRAP_CONTENT,
                             )
-                    }
-                },
-                update = { view ->
-                    view.update()
-                    if (!Flags.mediaFrameDimensionsFix()) {
-                        // Update layout params if host view bounds are higher than its child.
-                        val height = mediaHost.hostView.height
-                        val width = mediaHost.hostView.width
-                        var measure = false
-                        mediaHost.hostView.children.forEach { child ->
-                            if (
-                                child is FrameLayout &&
-                                    (height > child.height || width > child.width)
-                            ) {
-                                measure = true
-                                child.layoutParams = FrameLayout.LayoutParams(width, height)
-                            }
-                        }
-                        if (measure) {
-                            mediaHost.hostView.measurementManager.onMeasure(
-                                MeasurementInput(width, height)
-                            )
-                            mediaLogger.logMediaSize("update size in compose", width, height)
-                        }
                     }
                 },
                 onReset = {},
@@ -1488,12 +1444,12 @@ fun QuickSettingsLayout(
 ) {
     if (mediaInRow) {
         Column(
-            verticalArrangement = spacedBy(QuickSettingsShade.Dimensions.Padding),
+            verticalArrangement = spacedBy(QuickSettingsShade.Dimensions.VerticalPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             brightness()
             Row(
-                horizontalArrangement = spacedBy(QuickSettingsShade.Dimensions.Padding),
+                horizontalArrangement = spacedBy(QuickSettingsShade.Dimensions.HorizontalPadding),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(modifier = Modifier.weight(1f)) { tiles() }
@@ -1502,7 +1458,7 @@ fun QuickSettingsLayout(
         }
     } else {
         Column(
-            verticalArrangement = spacedBy(QuickSettingsShade.Dimensions.Padding),
+            verticalArrangement = spacedBy(QuickSettingsShade.Dimensions.VerticalPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             brightness()

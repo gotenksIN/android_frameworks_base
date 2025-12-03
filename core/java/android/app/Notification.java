@@ -23,6 +23,7 @@ import static android.app.Flags.FLAG_NM_SUMMARIZATION_ALL;
 import static android.app.Flags.FLAG_NOTIFICATION_IS_ANIMATED_ACTION_API;
 import static android.app.Flags.apiMetricStyle;
 import static android.app.Flags.notificationsRedesignTemplates;
+import static android.app.Flags.richOngoingImprovements;
 import static android.app.admin.DevicePolicyResources.Drawables.Source.NOTIFICATION;
 import static android.app.admin.DevicePolicyResources.Drawables.Style.SOLID_COLORED;
 import static android.app.admin.DevicePolicyResources.Drawables.WORK_PROFILE_ICON;
@@ -59,7 +60,6 @@ import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.app.admin.DevicePolicyManager;
 import android.app.compat.CompatChanges;
-import android.app.SetNotificationBackgroundColorRefactor;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
 import android.compat.annotation.UnsupportedAppUsage;
@@ -99,6 +99,7 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
+import android.text.Annotation;
 import android.text.BidiFormatter;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
@@ -794,7 +795,6 @@ public class Notification implements Parcelable
      * <p>Applications cannot set this flag directly, but the posting app and
      * {@link android.service.notification.NotificationListenerService} can read it.
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public static final int FLAG_PROMOTED_ONGOING = 0x00040000;
 
     private static final Set<Class<? extends Style>> PLATFORM_STYLE_CLASSES = Set.of(
@@ -961,6 +961,84 @@ public class Notification implements Parcelable
     @Priority
     @Deprecated
     public int priority;
+
+    /**
+     * This is the default value for semantic style, signaling no particular semantics. An
+     * {@link Annotation} with this style has no effect.
+     */
+    @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+    public static final int SEMANTIC_STYLE_UNSPECIFIED = 0;
+
+    /**
+     * This value is used to annotate an element as indicating information that should stand out
+     * from other content, but which doesn’t fall on a scale or hierarchy. This can be thought of
+     * as a more neutral value that may be used in cases where the element is intended to stand
+     * out against elements with the other semantic styles -- for example if a {@link ProgressStyle}
+     * bar uses semantic style to color segments, this style would be appropriate for segments where
+     * the semantic hierarchy is unhelpful to the user.
+     *
+     * <p>Info is generally represented to users by styling the element with a color (like blue)
+     * that is clearly distinct from the colors used for other styles.
+     */
+    @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+    public static final int SEMANTIC_STYLE_INFO = 1;
+
+    /**
+     * This value is used to annotate an element as indicating safety, non-urgency, timeliness,
+     * or another “mild” value on the semantic hierarchy.
+     *
+     * <p>Safety is generally represented to users by styling the element with a green color.
+     */
+    @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+    public static final int SEMANTIC_STYLE_SAFE = 2;
+
+    /**
+     * This value is used to annotate an element as indicating caution, moderate urgency, tardiness,
+     * or another “intermediate” value on the semantic hierarchy.
+     *
+     * <p>Caution is generally represented to users by styling the element with a yellow or
+     * orange color.
+     */
+    @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+    public static final int SEMANTIC_STYLE_CAUTION = 3;
+
+    /**
+     * This value is used to annotate an element as indicating danger, extreme urgency or
+     * lateness, or another “extreme” value on the semantic hierarchy.
+     *
+     * <p>Danger is generally represented to users by styling the element with a red color.
+     */
+    @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+    public static final int SEMANTIC_STYLE_DANGER = 4;
+
+    /** @hide */
+    @IntDef(prefix = { "SEMANTIC_STYLE_" }, value = {
+            SEMANTIC_STYLE_UNSPECIFIED,
+            SEMANTIC_STYLE_INFO,
+            SEMANTIC_STYLE_SAFE,
+            SEMANTIC_STYLE_CAUTION,
+            SEMANTIC_STYLE_DANGER
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface SemanticStyle {}
+
+    private static final String ANNOTATION_SEMANTIC_STYLE_KEY =
+            "android.app.notification.semanticStyle";
+
+    /**
+     * Constructs an {@link Annotation} that can be used to span text in a {@link Spanned}
+     * {@link CharSequence} in some Notification text fields, and which may then be converted into
+     * styling of that section of text in order to indicate the semantic style. Since Notifications
+     * may strip styling, even for semantic styles, it’s important that stripping these styles
+     * should not distort the meaning of the text.
+     *
+     * @see android.text.Spannable#setSpan(Object, int, int, int)
+     */
+    @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+    @NonNull
+    public static Annotation createSemanticStyleAnnotation(@SemanticStyle int semanticStyle) {
+        return new Annotation(ANNOTATION_SEMANTIC_STYLE_KEY, String.valueOf(semanticStyle));
+    }
 
     /**
      * Accent color (an ARGB integer like the constants in {@link android.graphics.Color})
@@ -1375,7 +1453,6 @@ public class Notification implements Parcelable
      *
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public static final String EXTRA_SHORT_CRITICAL_TEXT = "android.shortCriticalText";
 
     /**
@@ -1690,7 +1767,6 @@ public class Notification implements Parcelable
      * This extra is a parcelable array list of bundles.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public static final String EXTRA_PROGRESS_SEGMENTS = "android.progressSegments";
 
     /**
@@ -1702,7 +1778,6 @@ public class Notification implements Parcelable
      * This extra is a parcelable array list of bundles.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public static final String EXTRA_PROGRESS_POINTS = "android.progressPoints";
 
     /**
@@ -1711,7 +1786,6 @@ public class Notification implements Parcelable
      * This extra is a boolean.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public static final String EXTRA_STYLED_BY_PROGRESS = "android.styledByProgress";
 
     /**
@@ -1720,7 +1794,6 @@ public class Notification implements Parcelable
      * {@link ProgressStyle#setProgressTrackerIcon(Icon)}.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public static final String EXTRA_PROGRESS_TRACKER_ICON = "android.progressTrackerIcon";
 
     /**
@@ -1729,7 +1802,6 @@ public class Notification implements Parcelable
      * {@link ProgressStyle#setProgressStartIcon(Icon)}.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public static final String EXTRA_PROGRESS_START_ICON = "android.progressStartIcon";
 
     /**
@@ -1738,7 +1810,6 @@ public class Notification implements Parcelable
      * {@link ProgressStyle#setProgressEndIcon(Icon)}.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public static final String EXTRA_PROGRESS_END_ICON = "android.progressEndIcon";
 
     /**
@@ -2056,6 +2127,67 @@ public class Notification implements Parcelable
         @SuppressLint("ActionValue")
         public static final String EXTRA_IS_ANIMATED = "android.extra.IS_ANIMATED";
 
+        /**
+         * The action’s visual emphasis is generally the default, or may be automatically
+         * determined by the system based on context.
+         */
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+        public static final int EMPHASIS_AUTO = 0;
+
+        /**
+         * The action’s visual emphasis may indicate that this action is more important than others.
+         */
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+        public static final int EMPHASIS_PRIMARY = 1;
+
+        /**
+         * The action’s visual emphasis may indicate that this action is less important than others.
+         */
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+        public static final int EMPHASIS_SECONDARY = 2;
+
+        /** @hide */
+        @IntDef(prefix = { "EMPHASIS_" }, value = {
+                EMPHASIS_AUTO,
+                EMPHASIS_PRIMARY,
+                EMPHASIS_SECONDARY
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        public @interface Emphasis {}
+
+        /** The action can be presented with the best form for the content and context. */
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+        public static final int STYLE_AUTO = 0;
+
+        /** The action is best represented by only the text (its {@link #title}). */
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+        public static final int STYLE_TEXT_ONLY = 1;
+
+        /** The action is best represented by a combo of the icon and text. */
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+        public static final int STYLE_ICON_AND_TEXT = 2;
+
+        /** The action is best represented by only its icon. */
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+        public static final int STYLE_ICON_ONLY = 3;
+
+        /** @hide */
+        @IntDef(prefix = { "STYLE_" }, value = {
+                STYLE_AUTO,
+                STYLE_TEXT_ONLY,
+                STYLE_ICON_AND_TEXT,
+                STYLE_ICON_ONLY
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        public @interface Style {}
+
+
+        /**
+         * {@link #extras} key to a String defining this action's content description.
+         * @hide
+         */
+        public static final String EXTRA_CONTENT_DESCRIPTION = "android.extra.CONTENT_DESCRIPTION";
+
         private final Bundle mExtras;
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
         private Icon mIcon;
@@ -2063,7 +2195,9 @@ public class Notification implements Parcelable
         private boolean mAllowGeneratedReplies = true;
         private final @SemanticAction int mSemanticAction;
         private final boolean mIsContextual;
-        private boolean mAuthenticationRequired;
+        private final @Emphasis int mEmphasisHint;
+        private final @Style int mStyleHint;
+        private final boolean mAuthenticationRequired;
 
         /**
          * Small icon representing the action.
@@ -2100,6 +2234,8 @@ public class Notification implements Parcelable
             mAllowGeneratedReplies = in.readInt() == 1;
             mSemanticAction = in.readInt();
             mIsContextual = in.readInt() == 1;
+            mEmphasisHint = in.readInt();
+            mStyleHint = in.readInt();
             mAuthenticationRequired = in.readInt() == 1;
         }
 
@@ -2109,13 +2245,15 @@ public class Notification implements Parcelable
         @Deprecated
         public Action(int icon, CharSequence title, @Nullable PendingIntent intent) {
             this(Icon.createWithResource("", icon), title, intent, new Bundle(), null, true,
-                    SEMANTIC_ACTION_NONE, false /* isContextual */, false /* requireAuth */);
+                    SEMANTIC_ACTION_NONE, /* isContextual= */ false, EMPHASIS_AUTO, STYLE_AUTO,
+                    /* requireAuth= */ false);
         }
 
         /** Keep in sync with {@link Notification.Action.Builder#Builder(Action)}! */
         private Action(Icon icon, CharSequence title, PendingIntent intent, Bundle extras,
                 RemoteInput[] remoteInputs, boolean allowGeneratedReplies,
                 @SemanticAction int semanticAction, boolean isContextual,
+                @Emphasis int emphasisHint, @Style int styleHint,
                 boolean requireAuth) {
             this.mIcon = icon;
             if (icon != null && icon.getType() == Icon.TYPE_RESOURCE) {
@@ -2128,6 +2266,8 @@ public class Notification implements Parcelable
             this.mAllowGeneratedReplies = allowGeneratedReplies;
             this.mSemanticAction = semanticAction;
             this.mIsContextual = isContextual;
+            this.mEmphasisHint = emphasisHint;
+            this.mStyleHint = styleHint;
             this.mAuthenticationRequired = requireAuth;
         }
 
@@ -2185,6 +2325,23 @@ public class Notification implements Parcelable
         }
 
         /**
+         * Returns the app’s hint about the importance of this action relative to others in this
+         * notification.
+         */
+        @Emphasis
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+        public int getEmphasisHint() {
+            return mEmphasisHint;
+        }
+
+        /** Returns the app’s hint about the preferred visual style of this action. */
+        @Style
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+        public int getStyleHint() {
+            return mStyleHint;
+        }
+
+        /**
          * Get the list of inputs to be collected from the user that ONLY accept data when this
          * action is sent. These remote inputs are guaranteed to return {@code true} on a call to
          * {@link RemoteInput#isDataOnly}.
@@ -2221,6 +2378,8 @@ public class Notification implements Parcelable
             @Nullable private ArrayList<RemoteInput> mRemoteInputs;
             private @SemanticAction int mSemanticAction;
             private boolean mIsContextual;
+            private @Emphasis int mEmphasisHint;
+            private @Style int mStyleHint;
             private boolean mAuthenticationRequired;
 
             /**
@@ -2271,7 +2430,10 @@ public class Notification implements Parcelable
              * system UI.
              */
             public Builder(Icon icon, CharSequence title, @Nullable PendingIntent intent) {
-                this(icon, title, intent, new Bundle(), null, true, SEMANTIC_ACTION_NONE, false);
+                this(icon, title, intent, new Bundle(), /* remoteInputs= */ null,
+                        /* allowGeneratedReplies= */ true, SEMANTIC_ACTION_NONE,
+                        /* isContextual= */ false, EMPHASIS_AUTO, STYLE_AUTO,
+                        /* authRequired= */ false);
             }
 
             /**
@@ -2283,13 +2445,15 @@ public class Notification implements Parcelable
                 this(action.getIcon(), action.title, action.actionIntent,
                         new Bundle(action.mExtras), action.getRemoteInputs(),
                         action.getAllowGeneratedReplies(), action.getSemanticAction(),
+                        action.isContextual(), action.getEmphasisHint(), action.getStyleHint(),
                         action.isAuthenticationRequired());
             }
 
             private Builder(@Nullable Icon icon, @Nullable CharSequence title,
                     @Nullable PendingIntent intent, @NonNull Bundle extras,
                     @Nullable RemoteInput[] remoteInputs, boolean allowGeneratedReplies,
-                    @SemanticAction int semanticAction, boolean authRequired) {
+                    @SemanticAction int semanticAction, boolean isContextual,
+                    @Emphasis int emphasisHint, @Style int styleHint, boolean authRequired) {
                 mIcon = icon;
                 mTitle = title;
                 mIntent = intent;
@@ -2300,6 +2464,9 @@ public class Notification implements Parcelable
                 }
                 mAllowGeneratedReplies = allowGeneratedReplies;
                 mSemanticAction = semanticAction;
+                mIsContextual = isContextual;
+                mEmphasisHint = emphasisHint;
+                mStyleHint = styleHint;
                 mAuthenticationRequired = authRequired;
             }
 
@@ -2385,6 +2552,30 @@ public class Notification implements Parcelable
             }
 
             /**
+             * Sets a hint about the importance of this action relative to others in this
+             * notification. This may be used for {@link Notification#FLAG_PROMOTED_ONGOING
+             * promoted ongoing} notifications, and is not binding on standard notifications.
+             */
+            @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+            @NonNull
+            public Builder setEmphasisHint(@Emphasis int emphasis) {
+                mEmphasisHint = emphasis;
+                return this;
+            }
+
+            /**
+             * Sets a preferred visual style of this action. This may be used for
+             * {@link Notification#FLAG_PROMOTED_ONGOING promoted ongoing} notifications, and is
+             * not binding on standard notifications.
+             */
+            @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
+            @NonNull
+            public Builder setStyleHint(@Style int style) {
+                mStyleHint = style;
+                return this;
+            }
+
+            /**
              * Apply an {@link Extender} to this action builder. Extenders may be used to add
              * metadata or change options on this builder.
              */
@@ -2462,7 +2653,7 @@ public class Notification implements Parcelable
                         ? null : textInputs.toArray(new RemoteInput[textInputs.size()]);
                 return new Action(mIcon, mTitle, mIntent, mExtras, textInputsArr,
                         mAllowGeneratedReplies, mSemanticAction, mIsContextual,
-                        mAuthenticationRequired);
+                        mEmphasisHint, mStyleHint, mAuthenticationRequired);
             }
         }
 
@@ -2481,6 +2672,8 @@ public class Notification implements Parcelable
                     getAllowGeneratedReplies(),
                     getSemanticAction(),
                     isContextual(),
+                    getEmphasisHint(),
+                    getStyleHint(),
                     isAuthenticationRequired());
         }
 
@@ -2510,6 +2703,8 @@ public class Notification implements Parcelable
             out.writeInt(mAllowGeneratedReplies ? 1 : 0);
             out.writeInt(mSemanticAction);
             out.writeInt(mIsContextual ? 1 : 0);
+            out.writeInt(mEmphasisHint);
+            out.writeInt(mStyleHint);
             out.writeInt(mAuthenticationRequired ? 1 : 0);
         }
 
@@ -3374,6 +3569,8 @@ public class Notification implements Parcelable
     }
 
     /**
+     * Returns whether the notification has a title, or a title-like element that can be used in
+     * its place (such as the caller's name for a call notification).
      * @hide
      */
     public boolean hasTitle() {
@@ -3384,6 +3581,11 @@ public class Notification implements Parcelable
         if (isStyle(CallStyle.class)) {
             Person person = extras.getParcelable(EXTRA_CALL_PERSON, Person.class);
             return person != null && !TextUtils.isEmpty(person.getName());
+        }
+        if (Flags.apiMetricStyle() && isStyle(MetricStyle.class)) {
+            // MetricStyle has at least one metric, and their titles will be used as the
+            // notification's "title".
+            return true;
         }
         // non-CallStyle notifications can use EXTRA_TITLE
         if (!TextUtils.isEmpty(extras.getCharSequence(EXTRA_TITLE))) {
@@ -3400,7 +3602,6 @@ public class Notification implements Parcelable
     /**
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public boolean hasPromotableStyle() {
         final Class<? extends Style> notificationStyle = getNotificationStyle();
 
@@ -3418,7 +3619,6 @@ public class Notification implements Parcelable
      * the notification will be assigned {@link #FLAG_PROMOTED_ONGOING} by the system, but if this
      * returns {@code false}, it will not.
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public boolean hasPromotableCharacteristics() {
         if (Flags.uiRichOngoing()) {
             return isRequestPromotedOngoing()
@@ -4326,11 +4526,9 @@ public class Notification implements Parcelable
             flagStrings.add("USER_INITIATED_JOB");
             flags &= ~FLAG_USER_INITIATED_JOB;
         }
-        if (Flags.lifetimeExtensionRefactor()) {
-            if ((flags & FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY) != 0) {
-                flagStrings.add("LIFETIME_EXTENDED_BY_DIRECT_REPLY");
-                flags &= ~FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
-            }
+        if ((flags & FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY) != 0) {
+            flagStrings.add("LIFETIME_EXTENDED_BY_DIRECT_REPLY");
+            flags &= ~FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
         }
         if ((flags & FLAG_PROMOTED_ONGOING) != 0) {
             flagStrings.add("PROMOTED_ONGOING");
@@ -4392,7 +4590,6 @@ public class Notification implements Parcelable
      * notification, or {@code null} if this field was not set.
      */
     @Nullable
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public String getShortCriticalText() {
         return extras.getString(EXTRA_SHORT_CRITICAL_TEXT);
     }
@@ -5333,7 +5530,6 @@ public class Notification implements Parcelable
          * notification. Suggested max length is 7 characters, and there is no guarantee how much or
          * how little of this text will be shown.
          */
-        @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
         @NonNull
         public Builder setShortCriticalText(@Nullable String shortCriticalText) {
             mN.extras.putString(EXTRA_SHORT_CRITICAL_TEXT, safeString(shortCriticalText));
@@ -6108,6 +6304,10 @@ public class Notification implements Parcelable
         }
 
         private void bindProfileBadge(RemoteViews contentView, StandardTemplateParams p) {
+            if (richOngoingImprovements() && p.mHideProfileBadge) {
+                return;
+            }
+
             Bitmap profileBadge = Notification.getProfileBadge(mContext);
 
             if (profileBadge != null) {
@@ -6151,6 +6351,24 @@ public class Notification implements Parcelable
             return contentViewUsesHeader && bigContentViewUsesHeader;
         }
 
+        /**
+         * Whether the notification shows a subtext or a summary text in the header. Doesn't support
+         * the legacy info field used before Android N.
+         *
+         * @see #bindHeaderText
+         * @hide
+         */
+        final boolean hasHeaderText(StandardTemplateParams p) {
+            if (p.mHideSubText) {
+                return false;
+            }
+            if (!TextUtils.isEmpty(p.mSubText)) {
+                return true;
+            }
+            return mStyle != null && mStyle.mSummaryTextSet
+                    && mStyle.hasSummaryInHeader() && !TextUtils.isEmpty(mStyle.mSummaryText);
+        }
+
         private void resetStandardTemplate(RemoteViews contentView) {
             resetNotificationHeader(contentView);
             contentView.setViewVisibility(R.id.right_icon, View.GONE);
@@ -6158,6 +6376,10 @@ public class Notification implements Parcelable
             contentView.setTextViewText(R.id.title, null);
             contentView.setViewVisibility(R.id.text, View.GONE);
             contentView.setTextViewText(R.id.text, null);
+            if (richOngoingImprovements()) {
+                contentView.setViewVisibility(R.id.alt_subtext, View.GONE);
+                contentView.setTextViewText(R.id.alt_subtext, null);
+            }
         }
 
         /**
@@ -6195,8 +6417,9 @@ public class Notification implements Parcelable
                     || resId == getCollapsedMessagingLayoutResource()
                     || resId == getCollapsedMediaLayoutResource()
                     || resId == getCollapsedConversationLayoutResource()
-                    || (apiMetricStyle()
-                    && resId == getCollapsedMetricLayoutResource())
+                    || (apiMetricStyle() && (resId == getCollapsedMetricLayoutResource()
+                    || resId == getCompactHeadsUpMetricLayoutResource()
+                    || resId == getHeadsUpMetricLayoutResource()))
                     || (notificationsRedesignTemplates()
                     && resId == getCollapsedCallLayoutResource()));
             RemoteViews contentView = new BuilderRemoteViews(mContext.getApplicationInfo(), resId);
@@ -6224,17 +6447,30 @@ public class Notification implements Parcelable
                 contentView.setViewVisibility(p.mTitleViewId, View.GONE);
                 contentView.setTextViewText(p.mTitleViewId, null);
             }
-            if (p.mText != null && p.mText.length() != 0
-                    && (!showProgress || p.mAllowTextWithProgress)) {
+            boolean isCollapsedContent = p.mViewType != StandardTemplateParams.VIEW_TYPE_EXPANDED;
+            if (Flags.nmSummarizationAll()
+                    && isCollapsedContent && !TextUtils.isEmpty(p.mSummarization)) {
                 contentView.setViewVisibility(p.mTextViewId, View.VISIBLE);
-                contentView.setTextViewText(p.mTextViewId,
-                        ensureColorSpanContrastOrStripStyling(p.mText, p));
+                contentView.setBoolean(p.mTextViewId, "showAsSummarization", true);
+                contentView.setTextViewText(p.mTextViewId, p.mSummarization);
                 setTextViewColorSecondary(contentView, p.mTextViewId, p);
                 hasSecondLine = true;
-            } else if (p.mTextViewId != R.id.text) {
-                // This alternate text view ID is not cleared by resetStandardTemplate
-                contentView.setViewVisibility(p.mTextViewId, View.GONE);
-                contentView.setTextViewText(p.mTextViewId, null);
+            } else {
+                if (p.mText != null && p.mText.length() != 0
+                        && (!showProgress || p.mAllowTextWithProgress)) {
+                    contentView.setViewVisibility(p.mTextViewId, View.VISIBLE);
+                    contentView.setTextViewText(p.mTextViewId,
+                            ensureColorSpanContrastOrStripStyling(p.mText, p));
+                    setTextViewColorSecondary(contentView, p.mTextViewId, p);
+                    hasSecondLine = true;
+                } else if (p.mTextViewId != R.id.text) {
+                    // This alternate text view ID is not cleared by resetStandardTemplate
+                    contentView.setViewVisibility(p.mTextViewId, View.GONE);
+                    contentView.setTextViewText(p.mTextViewId, null);
+                }
+            }
+            if (hasHeaderText(p) && p.mSubtextViewId == R.id.alt_subtext) {
+                hasSecondLine = true;
             }
 
             updateExpanderAlignment(contentView, p, hasSecondLine);
@@ -6399,9 +6635,20 @@ public class Notification implements Parcelable
                             R.id.notification_header);
                 }
                 result.mTitleMarginSet.applyToView(contentView, R.id.title);
-                // If there is no title, the text (or big_text) needs to wrap around the image
+                // When there's no title, or the title is in the top line, we need to indent the
+                // end of the first line of text (or big_text) to leave space for the large icon.
                 result.mTitleMarginSet.applyToView(contentView, p.mTextViewId);
-                contentView.setInt(p.mTextViewId, "setNumIndentLines", p.hasTitle() ? 0 : 1);
+                boolean shouldWrapAroundImage = !p.hasTitle() || p.mTitleViewId == R.id.alt_title;
+                if (richOngoingImprovements() && shouldWrapAroundImage
+                        && hasHeaderText(p) && p.mSubtextViewId == R.id.alt_subtext) {
+                    // If the alternate subtext is the first line of text that needs to be wrapped,
+                    // it gets the margin instead of the content text.
+                    result.mTitleMarginSet.applyToView(contentView, p.mSubtextViewId);
+                    contentView.setInt(p.mTextViewId, "setNumIndentLines", 0);
+                } else {
+                    contentView.setInt(p.mTextViewId, "setNumIndentLines",
+                            shouldWrapAroundImage ? 1 : 0);
+                }
             } else if (notificationsRedesignTemplates() && p.mNeedsExtraTextMargin) {
                 // In the collapsed view (except for compact HUNs), the top line needs to
                 // accommodate both the expander and large icon (when present)
@@ -6564,17 +6811,20 @@ public class Notification implements Parcelable
         private void bindNotificationHeader(RemoteViews contentView, StandardTemplateParams p) {
             bindSmallIcon(contentView, p);
 
-            boolean hasTextToLeft = Flags.apiMetricStyle()
-                && p.mTitleViewId == R.id.alt_title && p.hasTitle();
+            boolean hasTextToLeft = p.mTitleViewId == R.id.alt_title && p.hasTitle();
             // Populate text left-to-right so that separators are only shown between strings
             hasTextToLeft |= bindHeaderAppName(contentView, p, false /* force */, hasTextToLeft);
             hasTextToLeft |= bindHeaderTextSecondary(contentView, p, hasTextToLeft);
             hasTextToLeft |= bindHeaderText(contentView, p, hasTextToLeft);
             if (!hasTextToLeft) {
                 // If there's still no text, force add the app name so there is some text.
-                hasTextToLeft |= bindHeaderAppName(contentView, p, true /* force */, hasTextToLeft);
+                hasTextToLeft = bindHeaderAppName(contentView, p, true /* force */, hasTextToLeft);
             }
-            bindHeaderChronometerAndTime(contentView, p, hasTextToLeft);
+            if (richOngoingImprovements()) {
+                bindHeaderChronometerAndTime(contentView, p, hasTextToLeft);
+            } else {
+                bindHeaderChronometerAndTimeLegacy(contentView, p, hasTextToLeft);
+            }
             bindPhishingAlertIcon(contentView, p);
             bindProfileBadge(contentView, p);
             bindAlertedIcon(contentView, p);
@@ -6612,7 +6862,35 @@ public class Notification implements Parcelable
 
         private void bindHeaderChronometerAndTime(RemoteViews contentView,
                 StandardTemplateParams p, boolean hasTextToLeft) {
-            if (!p.mHideTime && showsTimeOrChronometer()) {
+            boolean showsTime = mN.showsTime() && !p.mHideTime;
+            boolean showsChronometer = mN.showsChronometer() && !p.mHideChronometer;
+
+            if ((showsTime || showsChronometer) && hasTextToLeft) {
+                contentView.setViewVisibility(R.id.time_divider, View.VISIBLE);
+                setTextViewColorSecondary(contentView, R.id.time_divider, p);
+            }
+            if (showsChronometer) {
+                contentView.setViewVisibility(R.id.chronometer, View.VISIBLE);
+                contentView.setLong(R.id.chronometer, "setBase", mN.getWhen()
+                        + (SystemClock.elapsedRealtime() - System.currentTimeMillis()));
+                contentView.setBoolean(R.id.chronometer, "setStarted", true);
+                boolean countsDown = mN.extras.getBoolean(EXTRA_CHRONOMETER_COUNT_DOWN);
+                contentView.setChronometerCountDown(R.id.chronometer, countsDown);
+                setTextViewColorSecondary(contentView, R.id.chronometer, p);
+            } else if (showsTime) {
+                contentView.setViewVisibility(R.id.time, View.VISIBLE);
+            }
+            // We bind the time even if it's not visible, such that we can show and hide it
+            // on demand in case it's a child notification without anything in the header
+            contentView.setLong(R.id.time, "setTime", mN.getWhen() != 0 ? mN.getWhen() :
+                    mN.creationTime);
+            setTextViewColorSecondary(contentView, R.id.time, p);
+        }
+
+        private void bindHeaderChronometerAndTimeLegacy(RemoteViews contentView,
+                StandardTemplateParams p, boolean hasTextToLeft) {
+            // TODO: b/440125908 - Remove this method when inlining the flag.
+            if (!p.mHideTime && showsTimeOrChronometer(p)) {
                 if (hasTextToLeft) {
                     contentView.setViewVisibility(R.id.time_divider, View.VISIBLE);
                     setTextViewColorSecondary(contentView, R.id.time_divider, p);
@@ -6652,17 +6930,20 @@ public class Notification implements Parcelable
                     && mStyle.hasSummaryInHeader()) {
                 headerText = mStyle.mSummaryText;
             }
-            if (headerText == null
-                    && mContext.getApplicationInfo().targetSdkVersion < Build.VERSION_CODES.N
-                    && mN.extras.getCharSequence(EXTRA_INFO_TEXT) != null) {
-                headerText = mN.extras.getCharSequence(EXTRA_INFO_TEXT);
+            // The alternate subtext views don't support the legacy field
+            if (p.mSubtextViewId == R.id.header_text) {
+                if (headerText == null
+                        && mContext.getApplicationInfo().targetSdkVersion < Build.VERSION_CODES.N
+                        && mN.extras.getCharSequence(EXTRA_INFO_TEXT) != null) {
+                    headerText = mN.extras.getCharSequence(EXTRA_INFO_TEXT);
+                }
             }
             if (!TextUtils.isEmpty(headerText)) {
-                contentView.setTextViewText(R.id.header_text, ensureColorSpanContrastOrStripStyling(
+                contentView.setTextViewText(p.mSubtextViewId, ensureColorSpanContrastOrStripStyling(
                         processLegacyText(headerText), p));
-                setTextViewColorSecondary(contentView, R.id.header_text, p);
-                contentView.setViewVisibility(R.id.header_text, View.VISIBLE);
-                if (hasTextToLeft) {
+                setTextViewColorSecondary(contentView, p.mSubtextViewId, p);
+                contentView.setViewVisibility(p.mSubtextViewId, View.VISIBLE);
+                if (hasTextToLeft && p.mSubtextViewId == R.id.header_text) {
                     contentView.setViewVisibility(R.id.header_text_divider, View.VISIBLE);
                     setTextViewColorSecondary(contentView, R.id.header_text_divider, p);
                 }
@@ -6761,7 +7042,8 @@ public class Notification implements Parcelable
          * @return {@code true} if the built notification will show the time or the chronometer;
          *   {@code false} otherwise
          */
-        private boolean showsTimeOrChronometer() {
+        private boolean showsTimeOrChronometer(StandardTemplateParams p) {
+            // TODO: b/440125908 - Remove this method when inlining the flag.
             return mN.showsTime() || mN.showsChronometer();
         }
 
@@ -7166,11 +7448,15 @@ public class Notification implements Parcelable
                 }
             }
             if (result == null) {
+                // Use "StandardStyle" (a.k.a. no style)
                 if (expandedContentViewRequired()) {
                     StandardTemplateParams p = mParams.reset()
                             .viewType(StandardTemplateParams.VIEW_TYPE_EXPANDED)
                             .allowTextWithProgress(true)
                             .fillTextsFrom(this);
+                    if (richOngoingImprovements() && mN.isPromotedOngoing()) {
+                        p.useMinimalHeader();
+                    }
                     result = applyStandardTemplateWithActions(getExpandedBaseLayoutResource(), p,
                             null /* result */);
                 }
@@ -7268,10 +7554,17 @@ public class Notification implements Parcelable
                     .viewType(StandardTemplateParams.VIEW_TYPE_HEADS_UP)
                     .needsExtraTextMargin(false)
                     .fillTextsFrom(this);
+            if (Flags.nmSummarizationAll()) {
+                p.mSummarization = getExtras().getCharSequence(EXTRA_SUMMARIZED_CONTENT);
+            }
             // Notification text is shown as secondary header text
             // for the minimal hun when it is provided.
             // Time(when and chronometer) is not shown for the minimal hun.
-            p.headerTextSecondary(p.mText).text(null).hideTime(true).summaryText("");
+            p.headerTextSecondary(p.mText)
+                    .text(null)
+                    .hideTime(true)
+                    .hideChronometer(true)
+                    .summaryText("");
 
             return applyStandardTemplate(
                     getCompactHeadsUpBaseLayoutResource(), p,
@@ -8057,8 +8350,16 @@ public class Notification implements Parcelable
             }
         }
 
+        private int getCompactHeadsUpMetricLayoutResource() {
+            return R.layout.notification_2025_template_compact_heads_up_metric;
+        }
+
         private int getCollapsedMetricLayoutResource() {
             return R.layout.notification_2025_template_collapsed_metric;
+        }
+
+        private int getHeadsUpMetricLayoutResource() {
+            return R.layout.notification_2025_template_heads_up_metric;
         }
 
         private int getExpandedMetricLayoutResource() {
@@ -8341,6 +8642,17 @@ public class Notification implements Parcelable
     public boolean isStyle(@NonNull Class<? extends Style> styleClass) {
         String templateClass = extras.getString(Notification.EXTRA_TEMPLATE);
         return Objects.equals(templateClass, styleClass.getName());
+    }
+
+    /**
+     * returns whether the style supports showing summarized content
+     * @hide
+     */
+    public boolean supportsSummarization() {
+        return getNotificationStyle() == null
+                || isStyle(MessagingStyle.class)
+                || isStyle(InboxStyle.class)
+                || isStyle(BigTextStyle.class);
     }
 
     /**
@@ -9234,10 +9546,15 @@ public class Notification implements Parcelable
                     .textViewId(R.id.big_text)
                     .fillTextsFrom(mBuilder);
 
+            boolean promoted = mBuilder.mN.isPromotedOngoing();
+            if (richOngoingImprovements() && promoted) {
+                p.useMinimalHeader();
+            }
+
             // Replace the text with the big text, but only if the big text is not empty.
             CharSequence bigTextText = mBuilder.processLegacyText(mBigText);
             // Ongoing promoted notifications are allowed to have styling.
-            if (!mBuilder.mN.isPromotedOngoing() && Flags.cleanUpSpansAndNewLines()) {
+            if (!promoted && Flags.cleanUpSpansAndNewLines()) {
                 bigTextText = normalizeBigText(stripStyling(bigTextText));
             }
             if (!TextUtils.isEmpty(bigTextText)) {
@@ -10148,6 +10465,7 @@ public class Notification implements Parcelable
                     .highlightExpander(isConversationLayout)
                     .fillTextsFrom(mBuilder)
                     .hideTime(true)
+                    .hideChronometer(true)
                     .needsExtraTextMargin(false);
 
             fixTitleAndTextForCompactMessaging(p);
@@ -11019,10 +11337,12 @@ public class Notification implements Parcelable
                         numActions, numActions - 1));
             }
 
+            boolean actionsWiderThanRightIcon = numActionsToShow > 1;
             StandardTemplateParams p = mBuilder.mParams.reset()
                     .viewType(StandardTemplateParams.VIEW_TYPE_NORMAL)
-                    .hideTime(numActionsToShow > 1)       // hide if actions wider than a right icon
-                    .hideSubText(numActionsToShow > 1)    // hide if actions wider than a right icon
+                    .hideTime(actionsWiderThanRightIcon)
+                    .hideChronometer(actionsWiderThanRightIcon)
+                    .hideSubText(actionsWiderThanRightIcon)
                     .hideLeftIcon(false)                  // allow large icon on left when grouped
                     .hideRightIcon(numActionsToShow > 0)  // right icon or actions; not both
                     .hideProgress(true)
@@ -11813,29 +12133,59 @@ public class Notification implements Parcelable
             final TemplateBindResult result = new TemplateBindResult();
             final RemoteViews contentView = getStandardView(
                     mBuilder.getCollapsedMetricLayoutResource(), p, result);
-            return bindMetricStyleMetrics(contentView, p, /* isExpandedView = */ false);
+            return bindMetricStyleMetrics(contentView, p, mMetrics, /* isExpandedView = */ false);
+        }
+
+        /** @hide */
+        @Override
+        public RemoteViews makeCompactHeadsUpContentView() {
+            final StandardTemplateParams p = mBuilder.mParams.reset()
+                    .viewType(StandardTemplateParams.VIEW_TYPE_HEADS_UP)
+                    .fillTextsFrom(mBuilder)
+                    .text(null)
+                    .hideAppName(true).hideSubText(true).hideTime(true)
+                    .hideProgress(true)
+                    .hideRightIcon(true);
+            final TemplateBindResult result = new TemplateBindResult();
+            final RemoteViews contentView = getStandardView(
+                    mBuilder.getCompactHeadsUpMetricLayoutResource(), p, result);
+            return bindMetricStyleMetrics(contentView, p,
+                    getCompactHeadsUpMetrics(), /* isExpandedView = */false);
+        }
+
+        private List<Metric> getCompactHeadsUpMetrics() {
+            return mMetrics.size() > 0 ? mMetrics.subList(0, 1) : List.of();
         }
 
         /** @hide */
         @Override
         public RemoteViews makeHeadsUpContentView() {
-            return makeLargeMetricContentView(StandardTemplateParams.VIEW_TYPE_HEADS_UP);
+            final StandardTemplateParams p = mBuilder.mParams.reset()
+                    .viewType(StandardTemplateParams.VIEW_TYPE_HEADS_UP)
+                    .fillTextsFrom(mBuilder).text(null)
+                    .hideProgress(true)
+                    .hideRightIcon(true);
+            final TemplateBindResult result = new TemplateBindResult();
+            final RemoteViews contentView = getStandardView(
+                    mBuilder.getHeadsUpMetricLayoutResource(), p, result);
+            return bindMetricStyleMetrics(contentView, p, mMetrics, /* isExpandedView = */false);
         }
 
         /** @hide */
         @Override
         public RemoteViews makeExpandedContentView() {
-            return makeLargeMetricContentView(StandardTemplateParams.VIEW_TYPE_EXPANDED);
-        }
-
-        private RemoteViews makeLargeMetricContentView(int viewType){
             final StandardTemplateParams p = mBuilder.mParams.reset()
-                    .viewType(viewType)
+                    .viewType(StandardTemplateParams.VIEW_TYPE_EXPANDED)
                     .hideProgress(true)
                     .fillTextsFrom(mBuilder)
                     .text(null)
                     .titleViewId(R.id.alt_title)
                     .hideRightIcon(true);
+            if (Flags.richOngoingImprovements() && mBuilder.mN.isPromotedOngoing()) {
+                // Use the minimal header style when promoted, but keep the subtext in the top line
+                // (even if it may be cramped).
+                p.useMinimalHeader().subTextViewId(R.id.header_text);
+            }
             final TemplateBindResult result = new TemplateBindResult();
             final int expandedLayoutRes;
             if (mMetrics.size() == 1) {
@@ -11845,24 +12195,24 @@ public class Notification implements Parcelable
             }
 
             final RemoteViews contentView = getStandardView(expandedLayoutRes, p, result);
-            return bindMetricStyleMetrics(contentView, p, /* isExpandedView = */true);
+            return bindMetricStyleMetrics(contentView, p, mMetrics, /* isExpandedView = */true);
         }
 
         private RemoteViews bindMetricStyleMetrics(
-                RemoteViews contentView, StandardTemplateParams p, boolean isExpandedView) {
+                RemoteViews contentView, StandardTemplateParams p,
+                List<Metric> metrics, boolean isExpandedView) {
             for (int i = 0; i < MAX_METRICS; i++) {
                 final MetricView metricView = MetricView.VIEWS.get(i);
-                if (i < mMetrics.size()) {
+                if (i < metrics.size()) {
                     contentView.setViewVisibility(metricView.containerId(), View.VISIBLE);
-                    final Metric metric = mMetrics.get(i);
+                    final Metric metric = metrics.get(i);
                     final Metric.MetricValue metricValue = metric.getValue();
                     final Metric.MetricValue.ValueString valueString = metricValue.toValueString(
                             mBuilder.mContext);
 
                     final CharSequence metricLabel;
                     if (isExpandedView) {
-                        if (Flags.metricStyleUnitInLabel()
-                                && !TextUtils.isEmpty(valueString.subtext())) {
+                        if (!TextUtils.isEmpty(valueString.subtext())) {
                             metricLabel = mBuilder.mContext.getString(
                                     R.string.notification_metric_label_unit,
                                     metric.getLabel(), valueString.subtext());
@@ -11878,16 +12228,6 @@ public class Notification implements Parcelable
 
                     mBuilder.setTextViewColorSecondary(contentView, metricView.labelId(), p);
                     contentView.setTextViewText(metricView.labelId(), metricLabel);
-                    if (Flags.metricStyleUnitInLabel()) {
-                        contentView.setViewVisibility(metricView.unitId(), View.GONE);
-                    } else if (isExpandedView) {
-                        mBuilder.setTextViewColorSecondary(contentView, metricView.unitId(), p);
-                        contentView.setViewVisibility(metricView.unitId(),
-                                TextUtils.isEmpty(valueString.subtext())
-                                        ? View.GONE
-                                        : View.VISIBLE);
-                        contentView.setTextViewText(metricView.unitId(), valueString.subtext());
-                    }
 
                     if (metricValue instanceof Metric.TimeDifference timeDifference) {
                         contentView.setViewVisibility(metricView.textValueId(), View.GONE);
@@ -11934,27 +12274,24 @@ public class Notification implements Parcelable
         private record MetricView(int containerId,
                            int labelId,
                            int textValueId,
-                           int chronometerId,
-                           int unitId) {
+                           int chronometerId
+        ) {
             private static final List<MetricView> VIEWS = List.of(
                     new MetricView(
                             /* containerId = */R.id.metric_view_0,
                             /* labelId = */R.id.metric_label_0,
                             /* textValueId = */R.id.metric_value_0,
-                            /* chronometerId = */R.id.metric_chronometer_0,
-                            /* unitId = */R.id.metric_unit_0),
+                            /* chronometerId = */R.id.metric_chronometer_0),
                     new MetricView(
                             /* containerId = */R.id.metric_view_1,
                             /* labelId = */R.id.metric_label_1,
                             /* textValueId = */R.id.metric_value_1,
-                            /* chronometerId = */R.id.metric_chronometer_1,
-                            /* unitId = */R.id.metric_unit_1),
+                            /* chronometerId = */R.id.metric_chronometer_1),
                     new MetricView(
                             /* containerId = */R.id.metric_view_2,
                             /* labelId = */R.id.metric_label_2,
                             /* textValueId = */R.id.metric_value_2,
-                            /* chronometerId = */R.id.metric_chronometer_2,
-                            /* unitId = */R.id.metric_unit_2)
+                            /* chronometerId = */R.id.metric_chronometer_2)
             );
         }
 
@@ -11968,9 +12305,11 @@ public class Notification implements Parcelable
 
         private static final String KEY_VALUE = "value";
         private static final String KEY_LABEL = "label";
+        private static final String KEY_SEMANTIC_STYLE = "semanticStyle";
 
         private final MetricValue mValue;
         private final String mLabel;
+        private final @SemanticStyle int mSemanticStyle;
 
         /**
          * Creates a Metric with the specified value and label.
@@ -11979,9 +12318,25 @@ public class Notification implements Parcelable
          * @param label metric label -- should be 10 characters or fewer
          */
         public Metric(@NonNull MetricValue value, @NonNull CharSequence label) {
+            this(value, label, SEMANTIC_STYLE_UNSPECIFIED);
+        }
+
+        /**
+         * Creates a Metric with the specified value, label, and semantic style.
+         *
+         * @param value one of the subclasses of {@link MetricValue}, such as {@link FixedInt}
+         * @param label metric label -- should be 10 characters or fewer
+         * @param semanticStyle semantic style applied to the metric. When the notification
+         *                      {@link #FLAG_PROMOTED_ONGOING is promoted} the metric value will be
+         *                      displayed (e.g. colored) according to this style.
+         */
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+        public Metric(@NonNull MetricValue value, @NonNull CharSequence label,
+                @SemanticStyle int semanticStyle) {
             mValue = requireNonNull(value);
             mLabel = safeCharSequenceToString(requireNonNull(label));
             checkArgument(!mLabel.isBlank(), "Metric label is required");
+            mSemanticStyle = semanticStyle;
         }
 
         @Nullable
@@ -11995,7 +12350,12 @@ public class Notification implements Parcelable
                 return null;
             }
             String label = bundle.getString(KEY_LABEL);
-            return new Metric(value, label);
+            if (Flags.apiNotificationSemanticStyle()) {
+                int semanticStyle = bundle.getInt(KEY_SEMANTIC_STYLE, SEMANTIC_STYLE_UNSPECIFIED);
+                return new Metric(value, label, semanticStyle);
+            } else {
+                return new Metric(value, label);
+            }
         }
 
         @NonNull
@@ -12003,6 +12363,9 @@ public class Notification implements Parcelable
             Bundle bundle = new Bundle();
             bundle.putBundle(KEY_VALUE, MetricValue.toBundle(metric.mValue));
             bundle.putString(KEY_LABEL, metric.mLabel);
+            if (Flags.apiNotificationSemanticStyle()) {
+                bundle.putInt(KEY_SEMANTIC_STYLE, metric.mSemanticStyle);
+            }
             return bundle;
         }
 
@@ -12011,12 +12374,13 @@ public class Notification implements Parcelable
             if (!(obj instanceof Metric that)) return false;
             if (this == that) return true;
             return Objects.equals(this.mValue, that.mValue)
-                    && Objects.equals(this.mLabel, that.mLabel);
+                    && Objects.equals(this.mLabel, that.mLabel)
+                    && this.mSemanticStyle == that.mSemanticStyle;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(mValue, mLabel);
+            return Objects.hash(mValue, mLabel, mSemanticStyle);
         }
 
         @Override
@@ -12024,6 +12388,7 @@ public class Notification implements Parcelable
             return "Metric{"
                     + "mValue=" + mValue
                     + ", mLabel=" + mLabel
+                    + ", mSemanticStyle=" + mSemanticStyle
                     + "}";
         }
 
@@ -12044,6 +12409,16 @@ public class Notification implements Parcelable
             return mLabel;
         }
 
+        /**
+         * Applies semantics to the metric. When the notification {@link #FLAG_PROMOTED_ONGOING
+         * is promoted} the metric value will be displayed (e.g. colored) according to this style.
+         */
+        @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+        @SemanticStyle
+        public int getSemanticStyle() {
+            return mSemanticStyle;
+        }
+
         /** A superclass for the various value types used by the {@link Metric} class. */
         public abstract static class MetricValue {
 
@@ -12053,7 +12428,7 @@ public class Notification implements Parcelable
             private static final int TYPE_FIXED_TIME = 3;
             private static final int TYPE_FIXED_INT = 4;
             private static final int TYPE_FIXED_FLOAT = 5;
-            private static final int TYPE_FIXED_STRING = 6;
+            private static final int TYPE_FIXED_TEXT = 6;
 
             // Restrict inheritance to inner classes of Notification.
             private MetricValue() { }
@@ -12067,7 +12442,7 @@ public class Notification implements Parcelable
                     case TYPE_FIXED_TIME -> FixedTime.fromBundle(bundle);
                     case TYPE_FIXED_INT -> FixedInt.fromBundle(bundle);
                     case TYPE_FIXED_FLOAT -> FixedFloat.fromBundle(bundle);
-                    case TYPE_FIXED_STRING -> FixedString.fromBundle(bundle);
+                    case TYPE_FIXED_TEXT -> FixedText.fromBundle(bundle);
                     default -> null;
                 };
             }
@@ -12085,8 +12460,8 @@ public class Notification implements Parcelable
                     bundle.putInt(KEY_TYPE, TYPE_FIXED_INT);
                 } else if (value instanceof FixedFloat) {
                     bundle.putInt(KEY_TYPE, TYPE_FIXED_FLOAT);
-                } else if (value instanceof FixedString) {
-                    bundle.putInt(KEY_TYPE, TYPE_FIXED_STRING);
+                } else if (value instanceof FixedText) {
+                    bundle.putInt(KEY_TYPE, TYPE_FIXED_TEXT);
                 } else {
                     throw new AssertionError("Impossible MetricValue subclass: " + value);
                 }
@@ -12881,8 +13256,8 @@ public class Notification implements Parcelable
             }
         }
 
-        /** Metric corresponding to a string value. */
-        public static final class FixedString extends MetricValue {
+        /** Metric corresponding to a text value. */
+        public static final class FixedText extends MetricValue {
 
             private static final String KEY_VALUE = "value";
             private static final String KEY_UNIT = "unit";
@@ -12891,25 +13266,25 @@ public class Notification implements Parcelable
             private final String mUnit;
 
             /**
-             * Creates a {@link FixedString} instance with the specified String.
+             * Creates a {@link FixedText} instance with the specified text.
              */
-            public FixedString(@NonNull CharSequence value) {
+            public FixedText(@NonNull CharSequence value) {
                 this(value, null);
             }
 
             /**
-             * Creates a {@link FixedString} instance with the specified String.
+             * Creates a {@link FixedText} instance with the specified text.
              *
              * @param unit optional unit for the value. Limit this to a few characters.
              */
-            public FixedString(@NonNull CharSequence value, @Nullable CharSequence unit) {
+            public FixedText(@NonNull CharSequence value, @Nullable CharSequence unit) {
                 mValue = safeCharSequenceToString(requireNonNull(value));
                 mUnit = safeCharSequenceToString(unit);
             }
 
             @NonNull
-            private static FixedString fromBundle(Bundle bundle) {
-                return new FixedString(
+            private static FixedText fromBundle(Bundle bundle) {
+                return new FixedText(
                         bundle.getString(KEY_VALUE, ""),
                         bundle.getString(KEY_UNIT));
             }
@@ -12923,7 +13298,7 @@ public class Notification implements Parcelable
 
             @Override
             public boolean equals(Object obj) {
-                if (!(obj instanceof FixedString that)) return false;
+                if (!(obj instanceof FixedText that)) return false;
                 if (this == that) return true;
                 return Objects.equals(this.mValue, that.mValue)
                         && Objects.equals(this.mUnit, that.mUnit);
@@ -12942,7 +13317,7 @@ public class Notification implements Parcelable
                         + "}";
             }
 
-            /** The string value. */
+            /** The text value. */
             @NonNull
             public CharSequence getValue() {
                 return mValue;
@@ -13016,12 +13391,12 @@ public class Notification implements Parcelable
      * </p>
      *
      */
-    @FlaggedApi(Flags.FLAG_API_RICH_ONGOING)
     public static class ProgressStyle extends Notification.Style {
         private static final String KEY_ELEMENT_ID = "id";
         private static final String KEY_ELEMENT_COLOR = "colorInt";
         private static final String KEY_SEGMENT_LENGTH = "length";
         private static final String KEY_POINT_POSITION = "position";
+        private static final String KEY_ELEMENT_SEMANTIC_STYLE = "semanticStyle";
 
         private static final int MAX_PROGRESS_SEGMENT_LIMIT = 10;
         private static final int MAX_PROGRESS_POINT_LIMIT = 4;
@@ -13489,6 +13864,10 @@ public class Notification implements Parcelable
                     .hideProgress(true)
                     .fillTextsFrom(mBuilder);
 
+            if (richOngoingImprovements() && mBuilder.mN.isPromotedOngoing()) {
+                p.useMinimalHeader();
+            }
+
             // Replace the text with the big text, but only if the big text is not empty.
             RemoteViews contentView = getStandardView(mBuilder.getProgressLayoutResource(), p,
                     null /* result */);
@@ -13541,6 +13920,9 @@ public class Notification implements Parcelable
                     bundle.putInt(KEY_SEGMENT_LENGTH, segment.getLength());
                     bundle.putInt(KEY_ELEMENT_ID, segment.getId());
                     bundle.putInt(KEY_ELEMENT_COLOR, segment.getColor());
+                    if (Flags.apiNotificationSemanticStyle()) {
+                        bundle.putInt(KEY_ELEMENT_SEMANTIC_STYLE, segment.getSemanticStyle());
+                    }
 
                     segments.add(bundle);
                 }
@@ -13568,6 +13950,11 @@ public class Notification implements Parcelable
                             Notification.COLOR_DEFAULT);
                     final Segment segment = new Segment(length)
                             .setId(id).setColor(color);
+                    if (Flags.apiNotificationSemanticStyle()) {
+                        segment.setSemanticStyle(
+                                segmentBundle.getInt(KEY_ELEMENT_SEMANTIC_STYLE,
+                                        SEMANTIC_STYLE_UNSPECIFIED));
+                    }
 
                     segments.add(segment);
                 }
@@ -13575,6 +13962,7 @@ public class Notification implements Parcelable
 
             return segments;
         }
+
         /**
          * @hide
          */
@@ -13592,6 +13980,9 @@ public class Notification implements Parcelable
                     bundle.putInt(KEY_POINT_POSITION, point.getPosition());
                     bundle.putInt(KEY_ELEMENT_ID, point.getId());
                     bundle.putInt(KEY_ELEMENT_COLOR, point.getColor());
+                    if (Flags.apiNotificationSemanticStyle()) {
+                        bundle.putInt(KEY_ELEMENT_SEMANTIC_STYLE, point.getSemanticStyle());
+                    }
 
                     points.add(bundle);
                 }
@@ -13618,6 +14009,11 @@ public class Notification implements Parcelable
                     final int color = pointBundle.getInt(KEY_ELEMENT_COLOR,
                             Notification.COLOR_DEFAULT);
                     final Point point = new Point(position).setId(id).setColor(color);
+                    if (Flags.apiNotificationSemanticStyle()) {
+                        point.setSemanticStyle(
+                                pointBundle.getInt(KEY_ELEMENT_SEMANTIC_STYLE,
+                                        SEMANTIC_STYLE_UNSPECIFIED));
+                    }
                     points.add(point);
                 }
             }
@@ -13773,10 +14169,10 @@ public class Notification implements Parcelable
          * For example, Traffic conditions along a navigation journey.
          */
         public static final class Segment {
-            private int mLength;
+            private final int mLength;
             private int mId = 0;
-            @ColorInt
-            private int mColor = Notification.COLOR_DEFAULT;
+            private @ColorInt int mColor = Notification.COLOR_DEFAULT;
+            private @SemanticStyle int mSemanticStyle = SEMANTIC_STYLE_UNSPECIFIED;
 
             /**
              * Create a segment with a non-zero length.
@@ -13834,20 +14230,44 @@ public class Notification implements Parcelable
             }
 
             /**
-             * Needed for {@link Notification.Style#areNotificationsVisiblyDifferent}
+             * Returns the semantics applied to the Segment. When the notification
+             * {@link #FLAG_PROMOTED_ONGOING is promoted} this value is used to style (e.g.
+             * color) the segment.
              */
+            @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+            @SemanticStyle
+            public int getSemanticStyle() {
+                return mSemanticStyle;
+            }
+
+            /**
+             * Applies semantics to the Segment. When the notification
+             * {@link #FLAG_PROMOTED_ONGOING is promoted} this value is used to style (e.g.
+             * color) the segment.
+             *
+             * <p>If an app specifies <em>both</em> color and semantic style, the style overrides
+             * the color. This allows apps to provide a color as a fallback on platforms that do not
+             * support style.
+             */
+            @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+            public @NonNull Segment setSemanticStyle(@SemanticStyle int semanticStyle) {
+                mSemanticStyle = semanticStyle;
+                return this;
+            }
+
+            // Needed for Notification.Style.areNotificationsVisiblyDifferent()
             @Override
             public boolean equals(Object o) {
                 if (this == o) return true;
                 if (o == null || getClass() != o.getClass()) return false;
                 final Segment segment = (Segment) o;
                 return mLength == segment.mLength && mId == segment.mId
-                        && mColor == segment.mColor;
+                        && mColor == segment.mColor && mSemanticStyle == segment.mSemanticStyle;
             }
 
             @Override
             public int hashCode() {
-                return Objects.hash(mLength, mId, mColor);
+                return Objects.hash(mLength, mId, mColor, mSemanticStyle);
             }
         }
 
@@ -13858,11 +14278,10 @@ public class Notification implements Parcelable
          * navigation journey, where each point represents a destination.
          */
         public static final class Point {
-
             private int mPosition;
             private int mId = 0;
-            @ColorInt
-            private int mColor = Notification.COLOR_DEFAULT;
+            private @ColorInt int mColor = Notification.COLOR_DEFAULT;
+            private @SemanticStyle int mSemanticStyle = SEMANTIC_STYLE_UNSPECIFIED;
 
             /**
              * Create a point element.
@@ -13903,7 +14322,7 @@ public class Notification implements Parcelable
             }
 
             /**
-             * Returns the color of this Segment.
+             * Returns the color of this Point.
              *
              * @see #setColor
              */
@@ -13913,7 +14332,7 @@ public class Notification implements Parcelable
             }
 
             /**
-             * Optional color of this Segment
+             * Optional color of this Point
              */
             public @NonNull Point setColor(@ColorInt int color) {
                 mColor = color;
@@ -13921,20 +14340,44 @@ public class Notification implements Parcelable
             }
 
             /**
-             * Needed for {@link Notification.Style#areNotificationsVisiblyDifferent}
+             * Returns the semantics applied to the Point. When the notification
+             * {@link #FLAG_PROMOTED_ONGOING is promoted} this value is used to style (e.g.
+             * color) the point.
              */
+            @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+            @SemanticStyle
+            public int getSemanticStyle() {
+                return mSemanticStyle;
+            }
+
+            /**
+             * Applies semantics to the Point. When the notification
+             * {@link #FLAG_PROMOTED_ONGOING is promoted} this value is used to style (e.g.
+             * color) the point.
+             *
+             * <p>If an app specifies <em>both</em> color and semantic style, the style overrides
+             * the color. This allows apps to provide a color as a fallback on platforms that do not
+             * support style.
+             */
+            @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+            public @NonNull Point setSemanticStyle(@SemanticStyle int semanticStyle) {
+                mSemanticStyle = semanticStyle;
+                return this;
+            }
+
+            // Needed for Notification.Style.areNotificationsVisiblyDifferent()
             @Override
             public boolean equals(Object o) {
                 if (this == o) return true;
                 if (o == null || getClass() != o.getClass()) return false;
                 final Point point = (Point) o;
                 return mPosition == point.mPosition && mId == point.mId
-                        && mColor == point.mColor;
+                        && mColor == point.mColor && mSemanticStyle == point.mSemanticStyle;
             }
 
             @Override
             public int hashCode() {
-                return Objects.hash(mPosition, mId, mColor);
+                return Objects.hash(mPosition, mId, mColor, mSemanticStyle);
             }
         }
     }
@@ -16488,6 +16931,8 @@ public class Notification implements Parcelable
         boolean mHideTitle;
         boolean mHideSubText;
         boolean mHideTime;
+        boolean mHideChronometer;
+        boolean mHideProfileBadge;
         boolean mHideActions;
         boolean mHideProgress;
         boolean mHideSnoozeButton;
@@ -16497,11 +16942,13 @@ public class Notification implements Parcelable
         boolean mCallStyleActions;
         boolean mAllowTextWithProgress;
         int mTitleViewId;
+        int mSubtextViewId;
         int mTextViewId;
         @Nullable CharSequence mTitle;
         @Nullable CharSequence mText;
         @Nullable CharSequence mHeaderTextSecondary;
         @Nullable CharSequence mSubText;
+        @Nullable CharSequence mSummarization;
         int maxRemoteInputHistory = Style.MAX_REMOTE_INPUT_HISTORY_LINES;
         boolean allowColorization  = true;
         boolean mHighlightExpander = false;
@@ -16523,6 +16970,7 @@ public class Notification implements Parcelable
             mCallStyleActions = false;
             mAllowTextWithProgress = false;
             mTitleViewId = R.id.title;
+            mSubtextViewId = R.id.header_text;
             mTextViewId = R.id.text;
             mTitle = null;
             mText = null;
@@ -16531,6 +16979,7 @@ public class Notification implements Parcelable
             maxRemoteInputHistory = Style.MAX_REMOTE_INPUT_HISTORY_LINES;
             allowColorization = true;
             mHighlightExpander = false;
+            mSummarization = null;
             return this;
         }
 
@@ -16565,6 +17014,22 @@ public class Notification implements Parcelable
 
         public StandardTemplateParams hideTime(boolean hideTime) {
             mHideTime = hideTime;
+            if (!richOngoingImprovements()) {
+                // When the flag is off, hideTime controls both the time and the chronometer. With
+                // the flag on, the chronometer is controlled explicitly through hideChronometer and
+                // hideTime affects only the when.
+                hideChronometer(hideTime);
+            }
+            return this;
+        }
+
+        public StandardTemplateParams hideChronometer(boolean hideChronometer) {
+            mHideChronometer = hideChronometer;
+            return this;
+        }
+
+        public StandardTemplateParams hideProfileBadge(boolean hideProfileBadge) {
+            mHideProfileBadge = hideProfileBadge;
             return this;
         }
 
@@ -16608,6 +17073,14 @@ public class Notification implements Parcelable
             return this;
         }
 
+        public StandardTemplateParams subTextViewId(int subTextViewId) {
+            if (!richOngoingImprovements()) {
+                return this;
+            }
+            mSubtextViewId = subTextViewId;
+            return this;
+        }
+
         public StandardTemplateParams textViewId(int textViewId) {
             mTextViewId = textViewId;
             return this;
@@ -16625,6 +17098,11 @@ public class Notification implements Parcelable
 
         final StandardTemplateParams summaryText(@Nullable CharSequence text) {
             this.mSubText = text;
+            return this;
+        }
+
+        final StandardTemplateParams summarization(@Nullable CharSequence text) {
+            this.mSummarization = text;
             return this;
         }
 
@@ -16659,6 +17137,9 @@ public class Notification implements Parcelable
             this.mTitle = b.processLegacyText(extras.getCharSequence(EXTRA_TITLE));
             this.mText = b.processLegacyText(extras.getCharSequence(EXTRA_TEXT));
             this.mSubText = extras.getCharSequence(EXTRA_SUB_TEXT);
+            if (Flags.nmSummarizationAll()) {
+                this.mSummarization = extras.getCharSequence(EXTRA_SUMMARIZED_CONTENT);
+            }
             return this;
         }
 
@@ -16669,6 +17150,21 @@ public class Notification implements Parcelable
          */
         public StandardTemplateParams setMaxRemoteInputHistory(int maxRemoteInputHistory) {
             this.maxRemoteInputHistory = maxRemoteInputHistory;
+            return this;
+        }
+
+        /**
+         * Certain promoted notifications show a simplified version of the header. This also moves
+         * the title to the top line.
+         */
+        public StandardTemplateParams useMinimalHeader() {
+            if (Flags.richOngoingImprovements()) {
+                titleViewId(R.id.alt_title);
+                subTextViewId(R.id.alt_subtext);
+                hideAppName(true);
+                hideTime(true);
+                hideProfileBadge(true);
+            }
             return this;
         }
 

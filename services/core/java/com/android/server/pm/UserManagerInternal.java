@@ -29,6 +29,7 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.UserManager;
+import android.service.notification.StatusBarNotification;
 import android.util.DebugUtils;
 
 import com.android.internal.annotations.Keep;
@@ -80,6 +81,14 @@ public abstract class UserManagerInternal {
             USER_START_MODE_BACKGROUND_VISIBLE
     })
     public @interface UserStartMode {}
+
+    /** Pre-defined filter that exclude all "incomplete" users (dying, partial, etc). */
+    public static final UserFilter USER_FILTER_WITH_ALL_COMPLETE_USERS = UserFilter.builder()
+            .build();
+
+    /** Pre-defined filter that include dying users. */
+    public static final UserFilter USER_FILTER_WITH_DYING_USERS = UserFilter.builder()
+            .withDyingUsers().build();
 
     // TODO(b/248408342): Move keep annotations below to the method referencing these fields
     // reflectively.
@@ -296,8 +305,21 @@ public abstract class UserManagerInternal {
      * Internal implementation of getUsers does not check permissions.
      * This improves performance for calls from inside system server which already have permissions
      * checked.
+     *
+     * @deprecated use {@link #getUsers(UserFilter)} with
+     * {@link #USER_FILTER_WITH_ALL_COMPLETE_USERS} (for when {@code excludeDying} is {@code true})
+     * or {@link #USER_FILTER_WITH_DYING_USERS} (for when its {@code false}).
      */
+    @Deprecated
     public abstract @NonNull List<UserInfo> getUsers(boolean excludeDying);
+
+    /**
+     * Gets the users that match the given {@code filter}.
+     *
+     * <p><b>Note: </b>for performance reasons, prefer using pre-existing filters, like
+     * {@link #USER_FILTER_WITH_ALL_COMPLETE_USERS} or {@link #USER_FILTER_WITH_DYING_USERS}.
+     */
+    public abstract List<UserInfo> getUsers(UserFilter userFilter);
 
     /**
      * Returns a list of the users that are associated with the specified user, including the user
@@ -625,10 +647,22 @@ public abstract class UserManagerInternal {
     /** Optimized version of {@link UserManager#isHeadlessSystemUserMode()} */
     public abstract boolean isHeadlessSystemUserMode();
 
-    // TODO(b/414326600): for now it's only logging launched activities, but once the allowlist
-    // mechanism is implemented, it should pass some sort of @HsuUiActionResult int result
+    /**
+     * Checks if the given activity can be launched for the
+     * {@link UserManager#isHeadlessSystemUserMode() Headless System User}.
+     */
+    public abstract boolean isActivityAllowlistedForHsu(ComponentName activity);
+
+    // TODO(b/414326600): for now it's only using different methods for launched and blocked
+    // activities, but once the allowlist logging mechanism is properly designed, it should pass
+    // some sort of @HsuUiActionResult int result instead
     /** Logs an activity launched in the headless system user */
     public abstract void logLaunchedHsuActivity(ComponentName activity);
+    /** Logs an activity blocked in the headless system user */
+    public abstract void logBlockedHsuActivity(ComponentName activity);
+
+    /** Logs a notification shown in the headless system user */
+    public abstract void logShownHsuNotification(StatusBarNotification sbn);
 
     /**
      * Sets the id of the {@code DeviceOwner}, if any.

@@ -1054,6 +1054,10 @@
     <string name="lockscreen_pattern_correct" msgid="8050630103651508582">"अचूक!"</string>
     <string name="lockscreen_pattern_wrong" msgid="2940138714468358458">"पुन्हा प्रयत्न करा"</string>
     <string name="lockscreen_password_wrong" msgid="8605355913868947490">"पुन्हा प्रयत्न करा"</string>
+    <!-- no translation found for lockscreen_click_to_unlock_hint (6056691847669178119) -->
+    <skip />
+    <!-- no translation found for lockscreen_key_to_unlock_hint (9042402393653798264) -->
+    <skip />
     <string name="lockscreen_storage_locked" msgid="634993789186443380">"सर्व वैशिष्‍ट्ये आणि डेटासाठी अनलॉक करा"</string>
     <string name="faceunlock_multiple_failures" msgid="681991538434031708">"कमाल फेस अनलॉक प्रयत्न ओलांडले"</string>
     <string name="lockscreen_missing_sim_message_short" msgid="1229301273156907613">"सिम नाही"</string>
@@ -1623,12 +1627,9 @@
     <string name="gpsNotifMessage" msgid="7346649122793758032">"<xliff:g id="NAME">%1$s</xliff:g> (<xliff:g id="SERVICE">%2$s</xliff:g>) द्वारे विनंती केली"</string>
     <string name="gpsVerifYes" msgid="3719843080744112940">"होय"</string>
     <string name="gpsVerifNo" msgid="1671201856091564741">"नाही"</string>
-    <!-- no translation found for emergency_location_notification_title (917557758257778958) -->
-    <skip />
-    <!-- no translation found for emergency_location_notification_message (1877038822515882885) -->
-    <skip />
-    <!-- no translation found for emergency_location_notification_learn_more (8718634939217070481) -->
-    <skip />
+    <string name="emergency_location_notification_title" msgid="917557758257778958">"आणीबाणीच्या परिस्थितीसाठी स्थान शेअर केले आहे"</string>
+    <string name="emergency_location_notification_message" msgid="1877038822515882885">"आणीबाणी सेवांना तुमच्या वाहकाकडून तुमच्या स्थानाची माहिती मिळाली"</string>
+    <string name="emergency_location_notification_learn_more" msgid="8718634939217070481">"अधिक जाणून घ्या"</string>
     <string name="sync_too_many_deletes" msgid="6999440774578705300">"ओलांडलेली मर्यादा हटवा"</string>
     <string name="sync_too_many_deletes_desc" msgid="7409327940303504440">"<xliff:g id="ACCOUNT_NAME">%3$s</xliff:g> खात्यासाठी <xliff:g id="TYPE_OF_SYNC">%2$s</xliff:g>, <xliff:g id="NUMBER_OF_DELETED_ITEMS">%1$d</xliff:g> हटविलेले आयटम आहेत. तुम्ही काय करू इच्छिता?"</string>
     <string name="sync_really_delete" msgid="5657871730315579051">"आयटम हटवा"</string>
@@ -1799,8 +1800,10 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"दोन्ही व्हॉल्यूम की काही सेकंद धरून ठेवल्याने <xliff:g id="SERVICE">%1$s</xliff:g>, एक अ‍ॅक्सेसिबिलिटी वैशिष्ट्य सुरू होते. यामुळे तुमचे डिव्हाइस कसे काम करते हे पूर्णपणे बदलते.\n\nतुम्ही हा शॉर्टकट सेटिंग्ज &gt; अ‍ॅक्सेसिबिलिटी मध्ये बदलू शकता."</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"सुरू करा"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"सुरू करू नका"</string>
-    <string name="accessibility_shortcut_menu_item_status_on" msgid="6608392117189732543">"सुरू आहे"</string>
-    <string name="accessibility_shortcut_menu_item_status_off" msgid="5531598275559472393">"बंद आहे"</string>
+    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
+    <skip />
+    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
+    <skip />
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"<xliff:g id="SERVICE">%1$s</xliff:g> ला तुमचे डिव्हाइसच संपूर्णपणे नियंत्रित करायची अनुमती द्यायची का?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"जी ॲप्स तुमच्या ॲक्सेसिबिलिटी गरजा पूर्ण करतात अशा ॲप्ससाठी संपूर्ण नियंत्रण योग्य आहे. पण ते सर्व ॲप्सना लागू होईल असे नाही."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"स्क्रीन पहा आणि नियंत्रित करा"</string>
@@ -1814,6 +1817,16 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"वैशिष्ट्य वापरणे सुरू करण्यासाठी त्यावर टॅप करा:"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"अ‍ॅक्सेसिबिलिटी बटणासोबत वापरायची असलेली ॲप्स निवडा"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"व्‍हॉल्‍यूम की शॉर्टकटसोबत वापरायची असलेली ॲप्स निवडा"</string>
+    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
+    <skip />
+    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
+    <skip />
+    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
+    <skip />
+    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
+    <skip />
+    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
+    <skip />
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> बंद केले आहे"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"शॉर्टकट संपादित करा"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"पूर्ण झाले"</string>
@@ -2368,8 +2381,8 @@
     <string name="PERSOSUBSTATE_SIM_IMPI_ENTRY" msgid="7043865376145617024">"IMPI अनलॉक पिन"</string>
     <string name="PERSOSUBSTATE_SIM_NS_SP_ENTRY" msgid="6144227308185112176">"नेटवर्क सबसेट सेवा पुरवठादार अनलॉक पिन"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_IN_PROGRESS" msgid="4233355366318061180">"SIM नेटवर्क अनलॉक करण्याची विनंती करत आहे…"</string>
-    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_IN_PROGRESS" msgid="6742563947637715645">"SIM नेटवर्क सबसेट अनलॉक करण्याची विनंती करत आहे …"</string>
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_IN_PROGRESS" msgid="2033399698172403560">"SIM सेवा पुरवठादार अनलॉक करण्याची विनंती करत आहे…"</string>
+    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_IN_PROGRESS" msgid="2917242135129860371">"सिम नेटवर्कचा उपसंच अनलॉक करण्याची विनंती करत आहे…"</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_IN_PROGRESS" msgid="4435641041692795695">"सिमचा सेवा पुरवठादार अनलॉक करण्याची विनंती करत आहे…"</string>
     <string name="PERSOSUBSTATE_SIM_CORPORATE_IN_PROGRESS" msgid="4795977251920732254">"SIM कॉर्पोरेट अनलॉक करण्याची विनंती करत आहे…"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_PUK_IN_PROGRESS" msgid="1090425878157254446">"PUK अनलॉक करण्याची विनंती करत आहे…"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK_IN_PROGRESS" msgid="6476898876518094438">"PUK अनलॉक करण्याची विनंती करत आहे…"</string>
@@ -2395,15 +2408,15 @@
     <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_PUK_IN_PROGRESS" msgid="2695678959963807782">"PUK अनलॉक करण्याची विनंती करत आहे…"</string>
     <string name="PERSOSUBSTATE_RUIM_RUIM_PUK_IN_PROGRESS" msgid="1230605365926493599">"PUK अनलॉक करण्याची विनंती करत आहे…"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_ERROR" msgid="1924844017037151535">"SIM नेटवर्क अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
-    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_ERROR" msgid="3372797822292089708">"SIM नेटवर्क सबसेट अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_ERROR" msgid="1878443146720411381">"SIM सेवा पुरवठादार अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
+    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_ERROR" msgid="7136658591279283417">"सिम नेटवर्कचा उपसंच अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_ERROR" msgid="8344463467085504202">"सिमचा सेवा पुरवठादार अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
     <string name="PERSOSUBSTATE_SIM_CORPORATE_ERROR" msgid="7664778312218023192">"SIM कॉर्पोरेट अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
     <string name="PERSOSUBSTATE_SIM_SIM_ERROR" msgid="2472944311643350302">"SIM अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK1_ERROR" msgid="828089694480999120">"RUIM Network1 अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK2_ERROR" msgid="17619001007092511">"RUIM Network2 अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
     <string name="PERSOSUBSTATE_RUIM_HRPD_ERROR" msgid="807214229604353614">"RUIM Hrpd अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
     <string name="PERSOSUBSTATE_RUIM_CORPORATE_ERROR" msgid="8644184447744175747">"RUIM कॉर्पोरेट अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
-    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_ERROR" msgid="3801002648649640407">"RUIM सेवा पुरवठादार अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
+    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_ERROR" msgid="1882547895012628428">"RUIM चा सेवा पुरवठादार अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
     <string name="PERSOSUBSTATE_RUIM_RUIM_ERROR" msgid="707397021218680753">"RUIM अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_PUK_ERROR" msgid="894358680773257820">"PUK अनलॉक करणे यशस्वी झाले नाही."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK_ERROR" msgid="352466878146726991">"PUK अनलॉक करणे यशस्वी झाले नाही."</string>
@@ -2423,13 +2436,13 @@
     <string name="PERSOSUBSTATE_SIM_NS_SP_ERROR" msgid="1890493954453456758">"नेटवर्क सबसेट सेवा पुरवठादार अनलॉक करण्याची विनंती यशस्वी झाली नाही."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUCCESS" msgid="4886243367747126325">"SIM नेटवर्क अनलॉक करणे यशस्वी झाले."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_SUCCESS" msgid="4053809277733513987">"SIM नेटवर्क सबसेट अनलॉक करणे यशस्वी झाले."</string>
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_SUCCESS" msgid="8249342930499801740">"SIM सेवा पुरवठादार अनलॉक करणे यशस्वी झाले."</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_SUCCESS" msgid="6233653087159353652">"सिमचा सेवा पुरवठादार यशस्वीरीत्या अनलॉक झाला आहे."</string>
     <string name="PERSOSUBSTATE_SIM_CORPORATE_SUCCESS" msgid="2339794542560381270">"SIM कॉर्पोरेट अनलॉक करणे यशस्वी झाले."</string>
     <string name="PERSOSUBSTATE_SIM_SIM_SUCCESS" msgid="6975608174152828954">"SIM अनलॉक करणे यशस्वी झाले."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK1_SUCCESS" msgid="2846699261330463192">"RUIM Network1 अनलॉक करणे यशस्वी झाले."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK2_SUCCESS" msgid="5335414726057102801">"RUIM Network2 अनलॉक करणे यशस्वी झाले."</string>
     <string name="PERSOSUBSTATE_RUIM_HRPD_SUCCESS" msgid="8868100318474971969">"RUIM Hrpd अनलॉक करणे यशस्वी झाले."</string>
-    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_SUCCESS" msgid="6020936629725666932">"RUIM सेवा पुरवठादार अनलॉक करणे यशस्वी झाले."</string>
+    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_SUCCESS" msgid="6724555357287036238">"RUIM चा सेवा पुरवठादार यशस्वीरीत्या अनलॉक झाला आहे."</string>
     <string name="PERSOSUBSTATE_RUIM_CORPORATE_SUCCESS" msgid="6944873647584595489">"RUIM कॉर्पोरेट अनलॉक करणे यशस्वी झाले."</string>
     <string name="PERSOSUBSTATE_RUIM_RUIM_SUCCESS" msgid="2526483514124121988">"RUIM अनलॉक करणे यशस्वी झाले."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_PUK_SUCCESS" msgid="7662200333621664621">"PUK अनलॉक करणे यशस्वी झाले."</string>

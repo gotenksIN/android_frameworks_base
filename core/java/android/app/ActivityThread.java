@@ -236,6 +236,7 @@ import android.window.SizeConfigurationBuckets;
 import android.window.SplashScreen;
 import android.window.SplashScreenView;
 import android.window.TaskFragmentTransaction;
+import android.window.TaskSnapshotManager;
 import android.window.WindowContextInfo;
 import android.window.WindowProviderService;
 import android.window.WindowTokenClientController;
@@ -1940,6 +1941,13 @@ public final class ActivityThread extends ClientTransactionHandler
                 pw.println(" ");
                 pw.println(" Asset Allocations");
                 pw.print(assetAlloc);
+            }
+
+            // Task Snapshot
+            if (com.android.window.flags.Flags.reduceTaskSnapshotMemoryUsage()) {
+                if (TaskSnapshotManager.isUsed()) {
+                    TaskSnapshotManager.getInstance().dump(pw);
+                }
             }
 
             // Unreachable native memory
@@ -8188,7 +8196,7 @@ public final class ActivityThread extends ClientTransactionHandler
                                 data.appInfo.packageName,
                                 PackageManager.GET_META_DATA /*flags*/,
                                 UserHandle.myUserId());
-                if (info.metaData != null) {
+                if (info != null && info.metaData != null) {
                     final int preloadedFontsResource = info.metaData.getInt(
                             ApplicationInfo.METADATA_PRELOADED_FONTS, 0);
                     if (preloadedFontsResource != 0) {

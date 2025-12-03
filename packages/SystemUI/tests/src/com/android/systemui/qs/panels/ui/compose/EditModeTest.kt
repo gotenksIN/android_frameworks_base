@@ -16,7 +16,9 @@
 
 package com.android.systemui.qs.panels.ui.compose
 
+import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
+import android.platform.test.flag.junit.FlagsParameterization
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,7 +26,9 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -33,12 +37,14 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.text.AnnotatedString
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.theme.PlatformTheme
 import com.android.systemui.SysuiTestCase
@@ -59,11 +65,18 @@ import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4
+import platform.test.runner.parameterized.Parameters
 
 @OptIn(ExperimentalTestApi::class)
 @SmallTest
-@RunWith(AndroidJUnit4::class)
-class EditModeTest : SysuiTestCase() {
+@RunWith(ParameterizedAndroidJunit4::class)
+class EditModeTest(flags: FlagsParameterization) : SysuiTestCase() {
+
+    init {
+        mSetFlagsRule.setFlagsParameterization(flags)
+    }
+
     @get:Rule val composeRule = createComposeRule()
 
     private val kosmos = testKosmos()
@@ -136,6 +149,7 @@ class EditModeTest : SysuiTestCase() {
         composeRule.assertAvailableTilesGridContainsExactly(TestEditTiles.map { it.tileSpec.spec })
     }
 
+    @DisableFlags(QsEditModeV2.FLAG_NAME)
     @Test
     fun clickCurrentTile_shouldRemove() {
         composeRule.setContent { EditTileGridUnderTest() }
@@ -148,6 +162,23 @@ class EditModeTest : SysuiTestCase() {
             )
             .onFirst()
             .performClick()
+
+        composeRule.assertCurrentTilesGridContainsExactly(
+            listOf("tileB", "tileC", "tileD_large", "tileE")
+        )
+        composeRule.assertAvailableTilesGridContainsExactly(TestEditTiles.map { it.tileSpec.spec })
+    }
+
+    @EnableFlags(QsEditModeV2.FLAG_NAME)
+    @Test
+    fun clickCurrentTile_shouldRemove_v2() {
+        composeRule.setContent { EditTileGridUnderTest() }
+        composeRule.waitForIdle()
+
+        // Select tile and click on the remove button
+        composeRule.onNodeWithContentDescription("tileA").performClick()
+        composeRule.onNodeWithText("Remove").assertIsEnabled()
+        composeRule.onNodeWithText("Remove").performClick()
 
         composeRule.assertCurrentTilesGridContainsExactly(
             listOf("tileB", "tileC", "tileD_large", "tileE")
@@ -169,6 +200,25 @@ class EditModeTest : SysuiTestCase() {
         // Assert tileA moved to tileE's position
         composeRule.assertCurrentTilesGridContainsExactly(
             listOf("tileB", "tileC", "tileD_large", "tileE", "tileA")
+        )
+    }
+
+    @Test
+    fun placementMode_withKeyboard_shouldRepositionTile() {
+        composeRule.setContent { EditTileGridUnderTest() }
+        composeRule.waitForIdle()
+
+        // Tab over to the first tile and enter placement mode
+        composeRule.onRoot().performKeyInput { pressKey(Key.Tab) }
+        composeRule.onNodeWithContentDescription("tileA").performKeyInput { pressKey(Key.M) }
+
+        // Tab over to the next tile (tileB) and complete the move
+        composeRule.onRoot().performKeyInput { pressKey(Key.Tab) }
+        composeRule.onNodeWithContentDescription("tileB").performKeyInput { pressKey(Key.Enter) }
+
+        // Assert tileA moved to tileE's position
+        composeRule.assertCurrentTilesGridContainsExactly(
+            listOf("tileB", "tileA", "tileC", "tileD_large", "tileE")
         )
     }
 
@@ -303,6 +353,11 @@ class EditModeTest : SysuiTestCase() {
     ) = assertGridContainsExactly(AVAILABLE_TILES_GRID_TEST_TAG, specs)
 
     companion object {
+
+        @Parameters(name = "{0}")
+        @JvmStatic
+        fun data() = FlagsParameterization.progressionOf(QsEditModeV2.FLAG_NAME)
+
         private val CURRENT_TILES_GRID_TEST_TAG = resIdToTestTag("CurrentTilesGrid")
         private val AVAILABLE_TILES_GRID_TEST_TAG = resIdToTestTag("AvailableTilesGrid")
         private val EDIT_MODE_ROOT_TEST_TAG = resIdToTestTag("EditModeRoot")

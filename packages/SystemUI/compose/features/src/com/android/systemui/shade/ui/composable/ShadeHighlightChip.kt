@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,12 +19,14 @@ package com.android.systemui.shade.ui.composable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
@@ -39,7 +41,7 @@ import com.android.compose.modifiers.thenIf
 import com.android.systemui.shade.ui.composable.ShadeHeader.Dimensions.ChipPaddingHorizontal
 import com.android.systemui.shade.ui.composable.ShadeHeader.Dimensions.ChipPaddingVertical
 
-/** Represents the background and foreground colors of a ShadeHighlightChip. */
+/** Represents the colors used in a ShadeHighlightChip. */
 sealed interface ChipHighlightModel {
     val backgroundColor: Color
         @Composable @ReadOnlyComposable get
@@ -47,18 +49,43 @@ sealed interface ChipHighlightModel {
     val foregroundColor: Color
         @Composable @ReadOnlyComposable get
 
-    val onHoveredBackgroundColor: Color
+    val hoverBackgroundColor: Color
         @Composable @ReadOnlyComposable get
+
+    val rippleColor: Color
+        @Composable @ReadOnlyComposable get
+
+    companion object {
+        /** Alpha values for the different chip states. */
+        internal object Alpha {
+            const val DEFAULT_HOVER = 0.11f
+            const val DEFAULT_RIPPLE = 0.15f
+            const val TRANSPARENT_HOVER = 0.22f
+            const val TRANSPARENT_RIPPLE = 0.26f
+        }
+    }
 
     data object Weak : ChipHighlightModel {
         override val backgroundColor: Color
-            @Composable get() = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+            @Composable
+            get() {
+                val alpha =
+                    if (isSystemInDarkTheme()) {
+                        0.1f
+                    } else {
+                        0.4f
+                    }
+                return Color.White.copy(alpha = alpha)
+            }
 
         override val foregroundColor: Color
-            @Composable get() = MaterialTheme.colorScheme.onSurface
+            @Composable get() = if (isSystemInDarkTheme()) Color.White else Color.Black
 
-        override val onHoveredBackgroundColor: Color
-            @Composable get() = backgroundColor
+        override val hoverBackgroundColor: Color
+            @Composable get() = foregroundColor.copy(alpha = Alpha.DEFAULT_HOVER)
+
+        override val rippleColor: Color
+            @Composable get() = foregroundColor.copy(alpha = Alpha.DEFAULT_RIPPLE)
     }
 
     data object Strong : ChipHighlightModel {
@@ -66,10 +93,13 @@ sealed interface ChipHighlightModel {
             @Composable get() = MaterialTheme.colorScheme.secondary
 
         override val foregroundColor: Color
-            @Composable get() = MaterialTheme.colorScheme.onSecondary
+            @Composable get() = if (isSystemInDarkTheme()) Color.Black else Color.White
 
-        override val onHoveredBackgroundColor: Color
-            @Composable get() = backgroundColor
+        override val hoverBackgroundColor: Color
+            @Composable get() = foregroundColor.copy(alpha = Alpha.DEFAULT_HOVER)
+
+        override val rippleColor: Color
+            @Composable get() = foregroundColor.copy(alpha = Alpha.DEFAULT_RIPPLE)
     }
 
     data object Transparent : ChipHighlightModel {
@@ -79,8 +109,11 @@ sealed interface ChipHighlightModel {
         override val foregroundColor: Color
             @Composable get() = MaterialTheme.colorScheme.onSurface
 
-        override val onHoveredBackgroundColor: Color
-            @Composable get() = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+        override val hoverBackgroundColor: Color
+            @Composable get() = foregroundColor.copy(alpha = Alpha.TRANSPARENT_HOVER)
+
+        override val rippleColor: Color
+            @Composable get() = foregroundColor.copy(alpha = Alpha.TRANSPARENT_RIPPLE)
     }
 }
 
@@ -89,13 +122,15 @@ sealed interface ChipHighlightModel {
 fun ShadeHighlightChip(
     modifier: Modifier = Modifier,
     backgroundColor: Color = Color.Unspecified,
-    onHoveredBackgroundColor: Color = Color.Unspecified,
+    hoverBackgroundColor: Color = Color.Unspecified,
+    rippleColor: Color = Color.Unspecified,
     horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
     onClick: () -> Unit = {},
     content: @Composable RowScope.() -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val indication = ripple(color = rippleColor)
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -103,16 +138,23 @@ fun ShadeHighlightChip(
         modifier =
             modifier
                 .clip(RoundedCornerShape(25.dp))
-                .clickableWithoutFocus(onClick)
                 .thenIf(backgroundColor != Color.Unspecified) {
-                    Modifier.background(
-                            if (isHovered) {
-                                onHoveredBackgroundColor
-                            } else {
-                                backgroundColor
-                            }
-                        )
-                        .padding(horizontal = ChipPaddingHorizontal, vertical = ChipPaddingVertical)
+                    Modifier.background(backgroundColor)
+                }
+                .thenIf(isHovered && hoverBackgroundColor != Color.Unspecified) {
+                    Modifier.background(hoverBackgroundColor)
+                }
+                .clickableWithoutFocus(
+                    interactionSource = interactionSource,
+                    indication = indication,
+                ) {
+                    onClick()
+                }
+                .thenIf(backgroundColor != Color.Unspecified) {
+                    Modifier.padding(
+                        horizontal = ChipPaddingHorizontal,
+                        vertical = ChipPaddingVertical,
+                    )
                 },
         content = content,
     )

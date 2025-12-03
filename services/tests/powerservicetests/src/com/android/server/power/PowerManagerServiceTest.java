@@ -29,6 +29,7 @@ import static android.os.PowerManager.FLAG_AMBIENT_SUPPRESSION_NONE;
 import static android.os.PowerManager.SCREEN_TIMEOUT_KEEP_DISPLAY_ON;
 import static android.os.PowerManager.SCREEN_TIMEOUT_ACTIVE;
 import static android.os.PowerManager.USER_ACTIVITY_EVENT_BUTTON;
+import static android.os.PowerManagerInternal.UserActivityListener;
 import static android.os.PowerManagerInternal.WAKEFULNESS_ASLEEP;
 import static android.os.PowerManagerInternal.WAKEFULNESS_AWAKE;
 import static android.os.PowerManagerInternal.WAKEFULNESS_DOZING;
@@ -39,6 +40,7 @@ import static android.service.dreams.Flags.FLAG_DREAMS_V2;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doThrow;
 import static com.android.server.deviceidle.Flags.FLAG_DISABLE_WAKELOCKS_IN_LIGHT_IDLE;
 import static com.android.server.display.feature.flags.Flags.FLAG_SEPARATE_TIMEOUTS;
+import static com.android.server.power.PowerManagerService.DisplayGroupPowerChangeListener.DISPLAY_GROUP_ADDED;
 import static com.android.server.power.PowerManagerService.DisplayGroupPowerChangeListener.DISPLAY_GROUP_REMOVED;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -65,15 +67,18 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import android.app.ActivityManagerInternal;
 import android.attention.AttentionManagerInternal;
 import android.compat.testing.PlatformCompatChangeRule;
 import android.content.AttributionSource;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
@@ -109,6 +114,7 @@ import android.os.test.FakePermissionEnforcer;
 import android.os.test.TestLooper;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
+import android.platform.test.annotations.RequiresFlagsDisabled;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
 import android.platform.test.flag.junit.DeviceFlagsValueProvider;
@@ -2304,6 +2310,7 @@ public class PowerManagerServiceTest {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_WAIT_FOR_USER_BOOT_COMPLETE)
     public void testSuspendBlockerHeldDuringBoot() {
         final String suspendBlockerName = "PowerManagerService.Booting";
 
@@ -3406,6 +3413,60 @@ public class PowerManagerServiceTest {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_INTERACTIVE_DOZE_EXPERIENCE)
+    public void testUserActivity_notifiesListeners() {
+        createService();
+        startSystem();
+        advanceTime(1500);
+
+        UserActivityListener listener1 = mock(UserActivityListener.class);
+        UserActivityListener listener2 = mock(UserActivityListener.class);
+        mService.getLocalServiceInstance().registerUserActivityListener(listener1);
+        mService.getLocalServiceInstance().registerUserActivityListener(listener2);
+        mService.getBinderServiceInstance().userActivity(Display.DEFAULT_DISPLAY, mClock.now(),
+                PowerManager.USER_ACTIVITY_EVENT_OTHER, PowerManager.USER_ACTIVITY_FLAG_INDIRECT);
+        // Check that all listeners have been notified.
+        verify(listener1).onUserActivity(mClock.now(), PowerManager.USER_ACTIVITY_EVENT_OTHER,
+                PowerManager.USER_ACTIVITY_FLAG_INDIRECT);
+        verify(listener2).onUserActivity(mClock.now(), PowerManager.USER_ACTIVITY_EVENT_OTHER,
+                PowerManager.USER_ACTIVITY_FLAG_INDIRECT);
+
+        reset(listener1, listener2);
+        advanceTime(1000);
+        mService.getLocalServiceInstance().unregisterUserActivityListener(listener2);
+        mService.getBinderServiceInstance().userActivity(Display.DEFAULT_DISPLAY, mClock.now(),
+                PowerManager.USER_ACTIVITY_EVENT_BUTTON, /* flags= */ 0);
+        // Check that only listener1 is notified, because listener2 is unregistered.
+        verify(listener1).onUserActivity(
+                mClock.now(), PowerManager.USER_ACTIVITY_EVENT_BUTTON, /* flags= */ 0);
+        verifyNoInteractions(listener2);
+
+        reset(listener1, listener2);
+        advanceTime(1000);
+        mService.getLocalServiceInstance().unregisterUserActivityListener(listener1);
+        mService.getBinderServiceInstance().userActivity(Display.DEFAULT_DISPLAY, mClock.now(),
+                PowerManager.USER_ACTIVITY_EVENT_BUTTON, /* flags= */ 0);
+        // Check that no listener has been notified since they all have been removed.
+        verifyNoInteractions(listener1);
+        verifyNoInteractions(listener2);
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_INTERACTIVE_DOZE_EXPERIENCE)
+    public void testUserActivity_interactiveDozeFlagOff_doesNotNotifyListeners() {
+        createService();
+        startSystem();
+        advanceTime(1500);
+
+        UserActivityListener listener = mock(UserActivityListener.class);
+        mService.getLocalServiceInstance().registerUserActivityListener(listener);
+        mService.getBinderServiceInstance().userActivity(Display.DEFAULT_DISPLAY, mClock.now(),
+                PowerManager.USER_ACTIVITY_EVENT_OTHER, PowerManager.USER_ACTIVITY_FLAG_INDIRECT);
+
+        verifyNoInteractions(listener);
+    }
+
+    @Test
     public void testMultiDisplay_onlyOneDisplaySleeps_onWakefulnessChangedEventsFire() {
         createService();
         startSystem();
@@ -3972,7 +4033,6 @@ public class PowerManagerServiceTest {
      * Test IPowerManager.updateWakeLockUids() updates the workchain with the new uids
      */
     @Test
-    @RequiresFlagsEnabled({Flags.FLAG_WAKELOCK_ATTRIBUTION_VIA_WORKCHAIN})
     public void test_updateWakelockUids_updatesWorkchain() {
         createService();
         startSystem();
@@ -4608,6 +4668,7 @@ public class PowerManagerServiceTest {
 
     @RequiresFlagsEnabled({FLAG_SEPARATE_TIMEOUTS,
             com.android.server.power.feature.flags.Flags.FLAG_LOCK_ON_UNPLUG})
+    @RequiresFlagsDisabled({Flags.FLAG_LOCK_ON_POWER_GROUP_DISCONNECT})
     @Test
     public void testLocksWhenAdjacentSleepingAndUnplug_shouldLock() {
         final int nonDefaultPowerGroupId = Display.DEFAULT_DISPLAY_GROUP + 1;
@@ -4631,6 +4692,8 @@ public class PowerManagerServiceTest {
         createService();
         startSystem();
         listener.get().onDisplayGroupAdded(nonDefaultPowerGroupId);
+        mService.onPowerGroupEventLocked(DISPLAY_GROUP_ADDED, pg2);
+
         verify(mDisplayManagerMock).registerDisplayListener(
                 mDisplayListenerArgumentCaptor.capture(), any());
 
@@ -4651,8 +4714,53 @@ public class PowerManagerServiceTest {
         verify(mWindowManagerInternalMock).lockNow();
     }
 
+    @RequiresFlagsEnabled({Flags.FLAG_LOCK_ON_POWER_GROUP_DISCONNECT})
+    @Test
+    public void testLocksWhenAdjacentSleepingAndUnplug_shouldLock_group() {
+        final int nonDefaultPowerGroupId = Display.DEFAULT_DISPLAY_GROUP + 1;
+        when(mDisplayManagerInternalMock.getDisplayGroupFlags(nonDefaultPowerGroupId))
+                .thenReturn(DisplayGroup.FLAG_DEFAULT_GROUP_ADJACENT);
+        PowerGroup pg2 = new PowerGroup(/* groupId= */ nonDefaultPowerGroupId,
+                /* wakefulnessListener= */ null, mNotifierMock,
+                mDisplayManagerInternalMock, WAKEFULNESS_ASLEEP, /* ready= */ true,
+                /* supportsSandman= */ true,
+                /* eventTime= */ mClock.now(), /* featureFlags= */ null,
+                /* isDefaultGroupAdjacent= */ true);
+        int displayInNonDefaultGroup = 1;
+        final AtomicReference<DisplayManagerInternal.DisplayGroupListener> listener =
+                new AtomicReference<>();
+        long eventTime1 = 10;
+        doAnswer((Answer<Void>) invocation -> {
+            listener.set(invocation.getArgument(0));
+            return null;
+        }).when(mDisplayManagerInternalMock).registerDisplayGroupListener(any());
+
+        createService();
+        startSystem();
+        listener.get().onDisplayGroupAdded(nonDefaultPowerGroupId);
+        mService.onPowerGroupEventLocked(DISPLAY_GROUP_ADDED, pg2);
+
+        verify(mDisplayManagerMock).registerDisplayListener(
+                mDisplayListenerArgumentCaptor.capture(), any());
+
+        // Verify the global wakefulness is AWAKE
+        assertThat(mService.getGlobalWakefulnessLocked()).isEqualTo(WAKEFULNESS_AWAKE);
+
+        // Transition default display to doze, and verify the global wakefulness
+        mService.setWakefulnessLocked(Display.DEFAULT_DISPLAY_GROUP, WAKEFULNESS_DOZING,
+                eventTime1, 0, PowerManager.GO_TO_SLEEP_REASON_INATTENTIVE, 0, null, null);
+        assertThat(mService.getGlobalWakefulnessLocked()).isEqualTo(WAKEFULNESS_AWAKE);
+
+        listener.get().onDisplayGroupRemoved(nonDefaultPowerGroupId);
+
+        advanceTime(500);
+        verify(mWindowManagerInternalMock).lockNow();
+    }
+
     @RequiresFlagsEnabled({FLAG_SEPARATE_TIMEOUTS,
             com.android.server.power.feature.flags.Flags.FLAG_LOCK_ON_UNPLUG})
+    @RequiresFlagsDisabled({
+            com.android.server.power.feature.flags.Flags.FLAG_LOCK_ON_POWER_GROUP_DISCONNECT})
     @Test
     public void testLocksWhenAwakeAndUnplug_shouldntLock() {
         final int nonDefaultPowerGroupId = Display.DEFAULT_DISPLAY_GROUP + 1;
@@ -4694,10 +4802,141 @@ public class PowerManagerServiceTest {
         verify(mWindowManagerInternalMock, never()).lockNow();
     }
 
+    @RequiresFlagsEnabled({
+            com.android.server.power.feature.flags.Flags.FLAG_LOCK_ON_POWER_GROUP_DISCONNECT})
+    @Test
+    public void testLocksWhenAwakeAndUnplug_shouldntLock_group() {
+        final int nonDefaultPowerGroupId = Display.DEFAULT_DISPLAY_GROUP + 1;
+        PowerGroup pg2 = new PowerGroup(/* groupId= */ nonDefaultPowerGroupId,
+                /* wakefulnessListener= */ null, mNotifierMock,
+                mDisplayManagerInternalMock, WAKEFULNESS_AWAKE, /* ready= */ true,
+                /* supportsSandman= */ true,
+                /* eventTime= */ mClock.now(), /* featureFlags= */ null,
+                /* isDefaultGroupAdjacent= */ false);
+        int displayInNonDefaultGroup = 1;
+        final AtomicReference<DisplayManagerInternal.DisplayGroupListener> listener =
+                new AtomicReference<>();
+        long eventTime1 = 10;
+        doAnswer((Answer<Void>) invocation -> {
+            listener.set(invocation.getArgument(0));
+            return null;
+        }).when(mDisplayManagerInternalMock).registerDisplayGroupListener(any());
+
+        createService();
+        startSystem();
+        listener.get().onDisplayGroupAdded(nonDefaultPowerGroupId);
+        verify(mDisplayManagerMock).registerDisplayListener(
+                mDisplayListenerArgumentCaptor.capture(), any());
+
+        // Verify the global wakefulness is AWAKE
+        assertThat(mService.getGlobalWakefulnessLocked()).isEqualTo(WAKEFULNESS_AWAKE);
+
+        // Transition default display to awake, and verify the global wakefulness
+        mService.setWakefulnessLocked(Display.DEFAULT_DISPLAY_GROUP, WAKEFULNESS_AWAKE, eventTime1,
+                0, PowerManager.GO_TO_SLEEP_REASON_INATTENTIVE, 0, null, null);
+        assertThat(mService.getGlobalWakefulnessLocked()).isEqualTo(WAKEFULNESS_AWAKE);
+
+        listener.get().onDisplayGroupRemoved(nonDefaultPowerGroupId);
+
+        advanceTime(500);
+        verify(mWindowManagerInternalMock, never()).lockNow();
+    }
+
+    @EnableFlags(Flags.FLAG_WAIT_FOR_USER_BOOT_COMPLETE)
+    @Test
+    public void testBootSuspendBlocker_HeldUntilUserBootCompletedBroadcast() {
+        ArgumentCaptor<BroadcastReceiver> bootCompletedCaptor =
+                ArgumentCaptor.forClass(BroadcastReceiver.class);
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BOOT_COMPLETED);
+        filter.setPriority(IntentFilter.SYSTEM_LOW_PRIORITY);
+
+        createService();
+        // BootingSuspendBlocker is acquired in the constructor
+        verify(mNativeWrapperMock).nativeAcquireSuspendBlocker("PowerManagerService.Booting");
+        clearInvocations(mNativeWrapperMock);
+
+        // This calls onBootPhase(READY) and onBootPhase(BOOT_COMPLETED)
+        startSystem();
+
+        // Verify the new receiver was registered during systemReady() with the new flag
+        verify(mContextSpy)
+                .registerReceiver(
+                        bootCompletedCaptor.capture(),
+                        argThat(new IntentFilterMatcher(filter)),
+                        isNull(),
+                        isA(Handler.class),
+                        eq(Context.RECEIVER_NOT_EXPORTED));
+
+        // In the OLD code, the blocker would be released by startSystem() (which calls
+        // onBootPhase(BOOT_COMPLETED)).
+        // Verify NEW behavior: the blocker is NOT released, because mUserBootCompleted is still
+        // false.
+        verify(mNativeWrapperMock, never())
+                .nativeReleaseSuspendBlocker("PowerManagerService.Booting");
+
+        // Now, simulate the ACTION_BOOT_COMPLETED broadcast being received by our new receiver
+        BroadcastReceiver bootCompletedReceiver = bootCompletedCaptor.getValue();
+        bootCompletedReceiver.onReceive(mContextSpy, new Intent(Intent.ACTION_BOOT_COMPLETED));
+        advanceTime(1); // Allow handler msg (updateSuspendBlockerLocked) to be processed
+
+        // Verify the blocker is NOW released.
+        verify(mNativeWrapperMock, times(1))
+                .nativeReleaseSuspendBlocker("PowerManagerService.Booting");
+    }
+
+    @EnableFlags(Flags.FLAG_WAIT_FOR_USER_BOOT_COMPLETE)
+    @Test
+    public void testQuiescentBoot_HoldsSuspendBlockerUntilUserBootCompletedBroadcast() {
+        when(mSystemPropertiesMock.get(eq(SYSTEM_PROPERTY_QUIESCENT), anyString()))
+                .thenReturn("1");
+
+        ArgumentCaptor<BroadcastReceiver> bootCompletedCaptor =
+                ArgumentCaptor.forClass(BroadcastReceiver.class);
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BOOT_COMPLETED);
+        filter.setPriority(IntentFilter.SYSTEM_LOW_PRIORITY);
+
+        createService();
+        // BootingSuspendBlocker is acquired in constructor
+        verify(mNativeWrapperMock).nativeAcquireSuspendBlocker("PowerManagerService.Booting");
+        clearInvocations(mNativeWrapperMock);
+
+        startSystem();
+
+        // Verify we are in quiescent (asleep) mode
+        assertThat(mService.getGlobalWakefulnessLocked()).isEqualTo(WAKEFULNESS_ASLEEP);
+
+        // Verify the new receiver was registered with the new flag
+        verify(mContextSpy)
+                .registerReceiver(
+                        bootCompletedCaptor.capture(),
+                        argThat(new IntentFilterMatcher(filter)),
+                        isNull(),
+                        isA(Handler.class),
+                        eq(Context.RECEIVER_NOT_EXPORTED));
+
+        // Verify blocker is still held, even though boot completed and device wakefulness is ASLEEP
+        // This is the key fix: it prevents the CPU from suspending before the broadcast.
+        verify(mNativeWrapperMock, never())
+                .nativeReleaseSuspendBlocker("PowerManagerService.Booting");
+
+        // Simulate the ACTION_BOOT_COMPLETED broadcast
+        BroadcastReceiver bootCompletedReceiver = bootCompletedCaptor.getValue();
+        bootCompletedReceiver.onReceive(mContextSpy, new Intent(Intent.ACTION_BOOT_COMPLETED));
+        advanceTime(1); // Allow handler msg to be processed
+
+        // Verify blocker is NOW released
+        verify(mNativeWrapperMock, times(1))
+                .nativeReleaseSuspendBlocker("PowerManagerService.Booting");
+
+        // Device should remain asleep since it was a quiescent boot
+        assertThat(mService.getGlobalWakefulnessLocked()).isEqualTo(WAKEFULNESS_ASLEEP);
+    }
 
     // Default adjacent groups that are awake, should prevent the device from locking.
     @RequiresFlagsEnabled({FLAG_SEPARATE_TIMEOUTS,
             com.android.server.power.feature.flags.Flags.FLAG_LOCK_ON_UNPLUG})
+    @RequiresFlagsDisabled(
+            com.android.server.power.feature.flags.Flags.FLAG_LOCK_ON_POWER_GROUP_DISCONNECT)
     @Test
     public void testLocksWhenSleepingAndUnplug_butTheresAnAwakeAdjacentGroup_shouldntLock() {
         final int defaultGroupAdjacentPowerGroupId = Display.DEFAULT_DISPLAY_GROUP + 1;
@@ -4752,6 +4991,65 @@ public class PowerManagerServiceTest {
 
         advanceTime(500);
         verify(mNotifierMock).clearScreenTimeoutPolicyListeners(displayInAdjacentDefaultGroup);
+        verify(mWindowManagerInternalMock, never()).lockNow();
+    }
+
+    // Default adjacent groups that are awake, should prevent the device from locking.
+    @RequiresFlagsEnabled({
+            com.android.server.power.feature.flags.Flags.FLAG_LOCK_ON_POWER_GROUP_DISCONNECT})
+    @Test
+    public void testLocksWhenSleepingAndUnplug_butTheresAnAwakeAdjacentGroup_shouldntLock_group() {
+        final int defaultGroupAdjacentPowerGroupId = Display.DEFAULT_DISPLAY_GROUP + 1;
+        final int nonDefaultPowerGroupId = defaultGroupAdjacentPowerGroupId + 1;
+        when(mDisplayManagerInternalMock.getDisplayGroupFlags(defaultGroupAdjacentPowerGroupId))
+                .thenReturn(DisplayGroup.FLAG_DEFAULT_GROUP_ADJACENT);
+        PowerGroup pg2 = new PowerGroup(/* groupId= */ defaultGroupAdjacentPowerGroupId,
+                /* wakefulnessListener= */ null, mNotifierMock,
+                mDisplayManagerInternalMock, WAKEFULNESS_AWAKE, /* ready= */ true,
+                /* supportsSandman= */ true,
+                /* eventTime= */ mClock.now(), /* featureFlags= */ null,
+                /* isDefaultGroupAdjacent= */ true);
+        PowerGroup pg3 = new PowerGroup(/* groupId= */ nonDefaultPowerGroupId,
+                /* wakefulnessListener= */ null, mNotifierMock,
+                mDisplayManagerInternalMock, WAKEFULNESS_AWAKE, /* ready= */ true,
+                /* supportsSandman= */ true,
+                /* eventTime= */ mClock.now(), /* featureFlags= */ null,
+                /* isDefaultGroupAdjacent= */ false);
+        int displayInAdjacentDefaultGroup = 1;
+        final AtomicReference<DisplayManagerInternal.DisplayGroupListener> listener =
+                new AtomicReference<>();
+        long eventTime1 = 10;
+        doAnswer((Answer<Void>) invocation -> {
+            listener.set(invocation.getArgument(0));
+            return null;
+        }).when(mDisplayManagerInternalMock).registerDisplayGroupListener(any());
+
+        createService();
+        startSystem();
+        listener.get().onDisplayGroupAdded(defaultGroupAdjacentPowerGroupId);
+        listener.get().onDisplayGroupAdded(nonDefaultPowerGroupId);
+        verify(mDisplayManagerMock).registerDisplayListener(
+                mDisplayListenerArgumentCaptor.capture(), any());
+
+        // Verify the global wakefulness is AWAKE
+        assertThat(mService.getGlobalWakefulnessLocked()).isEqualTo(WAKEFULNESS_AWAKE);
+
+        // Transition default display to doze
+        // Transition adjacent display to awake, and verify the global wakefulness
+        mService.setWakefulnessLocked(Display.DEFAULT_DISPLAY_GROUP, WAKEFULNESS_DOZING,
+                eventTime1, 0, PowerManager.GO_TO_SLEEP_REASON_INATTENTIVE, 0, null, null);
+        mService.setWakefulnessLocked(defaultGroupAdjacentPowerGroupId, WAKEFULNESS_AWAKE,
+                eventTime1, 0, PowerManager.GO_TO_SLEEP_REASON_INATTENTIVE, 0, null, null);
+
+        assertThat(mService.getGlobalWakefulnessLocked()).isEqualTo(WAKEFULNESS_AWAKE);
+
+        listener.get().onDisplayGroupRemoved(nonDefaultPowerGroupId);
+        mDisplayListenerArgumentCaptor.getValue()
+                .onDisplayRemoved(displayInAdjacentDefaultGroup);
+        mDisplayListenerArgumentCaptor.getValue()
+                .onDisplayDisconnected(displayInAdjacentDefaultGroup);
+
+        advanceTime(500);
         verify(mWindowManagerInternalMock, never()).lockNow();
     }
 

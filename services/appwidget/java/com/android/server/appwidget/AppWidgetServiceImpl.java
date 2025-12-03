@@ -17,7 +17,6 @@
 package com.android.server.appwidget;
 
 import static android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_CONFIGURATION_OPTIONAL;
-import static android.appwidget.flags.Flags.playStorePinWidgets;
 import static android.appwidget.flags.Flags.remoteAdapterConversion;
 import static android.appwidget.flags.Flags.remoteViewsProto;
 import static android.appwidget.flags.Flags.removeAppWidgetServiceIoFromCriticalPath;
@@ -2643,7 +2642,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         boolean hasClearAppUserData = mContext.checkPermission(
                 Manifest.permission.CLEAR_APP_USER_DATA, callingPid, callingUid)
                 == PackageManager.PERMISSION_GRANTED;
-        boolean hasInstallPackages = playStorePinWidgets() && mContext.checkPermission(
+        boolean hasInstallPackages = mContext.checkPermission(
                 Manifest.permission.INSTALL_PACKAGES, callingPid, callingUid)
                 == PackageManager.PERMISSION_GRANTED;
         return hasClearAppUserData || hasInstallPackages;
@@ -3459,7 +3458,11 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         // If the provider was not found it may be because it was restored and
         // we did not know its UID so let us find if there is such one.
         if (existing == null) {
-            ProviderId restoredProviderId = new ProviderId(UNKNOWN_UID, componentName);
+            ProviderId restoredProviderId =
+                    new ProviderId(
+                            UNKNOWN_UID,
+                            componentName,
+                            /* profileId= */ providerId.getProfile().getIdentifier());
             existing = lookupProviderLocked(restoredProviderId);
         }
 
@@ -6142,7 +6145,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         int tag = TAG_UNDEFINED; // for use while saving state (the index)
 
         public int getUserId() {
-            return UserHandle.getUserId(id.uid);
+            return id.getProfile().getIdentifier();
         }
 
         public boolean isInPackageForUser(String packageName, int userId) {
@@ -6321,14 +6324,30 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     static final class ProviderId {
         final int uid;
         final ComponentName componentName;
+        final UserHandle profile;
 
         ProviderId(int uid, ComponentName componentName) {
+            this(uid, componentName, UserHandle.getUserId(uid));
+            if (uid == UNKNOWN_UID) {
+                Slog.w(TAG, "ProviderId created with UNKNOWN_UID for " + componentName);
+            }
+        }
+
+        /**
+         * @param uid the uid associated with the provider OR {@code UNKNOWN_UID} if provider is
+         *     pending restore.
+         * @param componentName the component name of the provider.
+         * @param profileId the profile id associated with the provider. Helps disambiguate between
+         *     restored providers with the {@code UNKNOWN_UID} and same component name.
+         */
+        ProviderId(int uid, ComponentName componentName, int profileId) {
             this.uid = uid;
             this.componentName = componentName;
+            this.profile = UserHandle.of(profileId);
         }
 
         public UserHandle getProfile() {
-            return UserHandle.getUserHandleForUid(uid);
+            return profile;
         }
 
         @Override
@@ -6352,6 +6371,8 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 }
             } else if (!componentName.equals(other.componentName)) {
                 return false;
+            } else if (profile != other.profile) {
+                return false;
             }
             return true;
         }
@@ -6361,13 +6382,15 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
             int result = uid;
             result = 31 * result + ((componentName != null)
                     ? componentName.hashCode() : 0);
+            result = 31 * result + profile.getIdentifier();
             return result;
         }
 
         @Override
         public String toString() {
-            return "ProviderId{user:" + UserHandle.getUserId(uid) + ", app:"
-                    + UserHandle.getAppId(uid) + ", cmp:" + componentName + '}';
+            return "ProviderId{uid:" + uid + ", app:"
+                    + UserHandle.getAppId(uid) + ", cmp:" + componentName + ", profile:" + profile
+                    + '}';
         }
     }
 
@@ -6962,7 +6985,11 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                                     info.provider = componentName;
 
                                     p = new Provider();
-                                    p.id = new ProviderId(UNKNOWN_UID, componentName);
+                                    p.id =
+                                            new ProviderId(
+                                                    UNKNOWN_UID,
+                                                    componentName,
+                                                    /* profileId= */ userId);
                                     p.setPartialInfoLocked(info);
                                     p.zombie = true;
                                     mProviders.add(p);

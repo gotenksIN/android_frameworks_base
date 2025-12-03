@@ -46,6 +46,7 @@ import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_STEAL
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED;
 import static android.hardware.display.DisplayManagerGlobal.DisplayEvent;
 import static android.hardware.display.DisplayManagerGlobal.InternalEventFlag;
+import static android.hardware.display.DisplayManagerGlobal.eventsToString;
 import static android.hardware.display.DisplayViewport.VIEWPORT_EXTERNAL;
 import static android.hardware.display.DisplayViewport.VIEWPORT_INTERNAL;
 import static android.hardware.display.DisplayViewport.VIEWPORT_VIRTUAL;
@@ -196,6 +197,7 @@ import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 import com.android.server.display.config.SensorData;
 import com.android.server.display.feature.DeviceConfigParameterProvider;
 import com.android.server.display.feature.DisplayManagerFlags;
+import com.android.server.display.feature.flags.Flags;
 import com.android.server.display.layout.Layout;
 import com.android.server.display.mode.DisplayModeDirector;
 import com.android.server.display.notifications.DisplayNotificationManager;
@@ -563,6 +565,7 @@ public final class DisplayManagerService extends SystemService {
     // Whether default display should be included in the display topology. Note that this should
     // only be used for the devices in projected mode.
     private boolean mIncludeDefaultDisplayInTopology;
+    private final boolean mStableEdidsFlag;
 
     private final BroadcastReceiver mIdleModeReceiver = new BroadcastReceiver() {
         @Override
@@ -666,7 +669,11 @@ public final class DisplayManagerService extends SystemService {
         mHandlerExecutor = new HandlerExecutor(mHandler);
         mUiHandler = UiThread.getHandler();
         mPersistentDataStore = mInjector.getPersistentDataStore();
-        mDisplayDeviceRepo = new DisplayDeviceRepository(mSyncRoot, mPersistentDataStore);
+        mStableEdidsFlag = Boolean.parseBoolean(
+                SystemProperties.get("persist.debug.sf.stable_edid_ids", "false"))
+                ||  com.android.graphics.surfaceflinger.flags.Flags.stableEdidIds();
+        mDisplayDeviceRepo = new DisplayDeviceRepository(
+                mSyncRoot, mPersistentDataStore, mStableEdidsFlag);
         if (mFlags.isDisplayTopologyEnabled()) {
             final var backupManager = new BackupManager(mContext);
             Consumer<Pair<DisplayTopology, DisplayTopologyGraph>> topologyChangedCallback =
@@ -693,7 +700,7 @@ public final class DisplayManagerService extends SystemService {
                         && mDisplayTopologyCoordinator.isDisplayAllowedInTopology(info);
         mLogicalDisplayMapper = new LogicalDisplayMapper(mContext, foldSettingProvider,
                 mDisplayDeviceRepo, new LogicalDisplayListener(), mSyncRoot, mHandler, mFlags,
-                isDisplayAllowedInTopoogy);
+                isDisplayAllowedInTopoogy, mStableEdidsFlag);
         mDisplayModeDirector = new DisplayModeDirector(
                 context, mHandler, mFlags, mDisplayDeviceConfigProvider);
         mBrightnessSynchronizer = new BrightnessSynchronizer(mContext, displayThreadLooper);
@@ -723,7 +730,7 @@ public final class DisplayManagerService extends SystemService {
         mExtraDisplayEventLogging = !TextUtils.isEmpty(mExtraDisplayLoggingPackageName);
         mExternalDisplayStatsService = new ExternalDisplayStatsService(mContext, mHandler,
                 () -> !shouldMirrorBuiltInDisplay());
-        mDisplayNotificationManager = new DisplayNotificationManager(mFlags, mContext,
+        mDisplayNotificationManager = new DisplayNotificationManager(mContext,
                 mExternalDisplayStatsService);
         mExternalDisplayPolicy = new ExternalDisplayPolicy(new ExternalDisplayPolicyInjector());
         mPluginManager = new PluginManager(mContext, mFlags);
@@ -1132,13 +1139,15 @@ public final class DisplayManagerService extends SystemService {
         final String traceMessage;
         synchronized (mSyncRoot) {
             final int index = mDisplayStates.indexOfKey(displayId);
+            if (index < 0) {
+                return; // Display no longer exists.
+            }
 
-            final BrightnessPair brightnessPair =
-                    index < 0 ? null : mDisplayBrightnesses.valueAt(index);
-            if (index < 0 || (mDisplayStates.valueAt(index) == state
-                    && brightnessPair.brightness == brightnessState
-                    && brightnessPair.sdrBrightness == sdrBrightnessState)) {
-                return; // Display no longer exists or no change.
+            final BrightnessPair brightnessPair = mDisplayBrightnesses.valueAt(index);
+            if (!Flags.fixSetDisplayStateAfterDeviceChange() && mDisplayStates.valueAt(index)
+                    == state && brightnessPair.brightness == brightnessState
+                    && brightnessPair.sdrBrightness == sdrBrightnessState) {
+                return; // No change.
             }
 
             if (Trace.isTagEnabled(Trace.TRACE_TAG_POWER)) {
@@ -1509,24 +1518,31 @@ public final class DisplayManagerService extends SystemService {
         DisplayInfo overriddenInfo = new DisplayInfo();
         overriddenInfo.copyFrom(info);
 
-        // If there is a mode that matches the override, use that one
-        for (Display.Mode mode : info.supportedModes) {
-            if (!mode.equalsExceptRefreshRate(currentMode)) {
-                continue;
-            }
-
-            if (mode.getRefreshRate() >= frameRateHz - THRESHOLD_FOR_REFRESH_RATES_DIVISORS
-                    && mode.getRefreshRate()
-                    <= frameRateHz + THRESHOLD_FOR_REFRESH_RATES_DIVISORS) {
-                if (DEBUG) {
-                    Slog.d(TAG, "found matching modeId " + mode.getModeId());
+        // If there is a mode that matches the override, use that one.
+        // On ARR devices, this logic is not needed as the mode doesn't change based
+        // on refresh rate override.
+        boolean skipMatchingModeSearch =
+                com.android.graphics.surfaceflinger.flags.Flags.supportedRefreshRateUpdate()
+                        && info.hasArrSupport;
+        if (!skipMatchingModeSearch) {
+            for (Display.Mode mode : info.supportedModes) {
+                if (!mode.equalsExceptRefreshRate(currentMode)) {
+                    continue;
                 }
-                overriddenInfo.refreshRateOverride = mode.getRefreshRate();
 
-                if (!displayModeReturnsPhysicalRefreshRate) {
-                    overriddenInfo.modeId = mode.getModeId();
+                if (mode.getRefreshRate() >= frameRateHz - THRESHOLD_FOR_REFRESH_RATES_DIVISORS
+                        && mode.getRefreshRate()
+                        <= frameRateHz + THRESHOLD_FOR_REFRESH_RATES_DIVISORS) {
+                    if (DEBUG) {
+                        Slog.d(TAG, "found matching modeId " + mode.getModeId());
+                    }
+                    overriddenInfo.refreshRateOverride = mode.getRefreshRate();
+
+                    if (!displayModeReturnsPhysicalRefreshRate) {
+                        overriddenInfo.modeId = mode.getModeId();
+                    }
+                    return overriddenInfo;
                 }
-                return overriddenInfo;
             }
         }
         overriddenInfo.refreshRateOverride = frameRateHz;
@@ -1564,6 +1580,23 @@ public final class DisplayManagerService extends SystemService {
                         + callingUid);
             }
             return null;
+        }
+    }
+
+    private boolean doesInternalMaskRequiresPermissionCheck(
+            int callingPid, @InternalEventFlag long internalEventFlagsMask) {
+        synchronized (mSyncRoot) {
+            if ((internalEventFlagsMask
+                    & DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED) == 0) {
+                // No need to check permission because protected event flag is not set
+                return false;
+            }
+
+            CallbackRecord record = mCallbacks.get(callingPid);
+            // Need to check permissions if there is no callback registered yet
+            // Or the current callback mask does not have protected flag yet
+            return record == null || (record.getCurrentMask()
+                    & DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED) == 0;
         }
     }
 
@@ -2375,7 +2408,7 @@ public final class DisplayManagerService extends SystemService {
             // main display adapter
             registerDisplayAdapterLocked(mInjector.getLocalDisplayAdapter(mSyncRoot, mContext,
                     mHandler, mDisplayDeviceRepo, mFlags,
-                    mDisplayNotificationManager));
+                    mDisplayNotificationManager, mStableEdidsFlag));
 
             // Standalone VR devices rely on a virtual display as their primary display for
             // 2D UI. We register virtual display adapter along side the main display adapter
@@ -2428,8 +2461,13 @@ public final class DisplayManagerService extends SystemService {
     }
 
     @GuardedBy("mSyncRoot")
-    private void handleLogicalDisplayDisconnectedLocked(LogicalDisplay display) {
-        releaseDisplayAndEmitEvent(display, DisplayManagerGlobal.EVENT_DISPLAY_DISCONNECTED);
+    private void handleLogicalDisplayDisconnectedPreProcessLocked(LogicalDisplay display) {
+        releaseDisplay(display);
+    }
+
+    @GuardedBy("mSyncRoot")
+    private void handleLogicalDisplayDisconnectedPostProcessLocked(LogicalDisplay display) {
+        scheduleTraversalLocked(false);
         mExternalDisplayPolicy.handleLogicalDisplayDisconnectedLocked(display);
     }
 
@@ -2493,15 +2531,16 @@ public final class DisplayManagerService extends SystemService {
     }
 
     @SuppressLint("AndroidFrameworkRequiresPermission")
-    private void handleLogicalDisplayConnectedLocked(LogicalDisplay display) {
+    private void handleLogicalDisplayConnectedPreProcessLocked(LogicalDisplay display) {
         setupLogicalDisplay(display);
 
         if (ExternalDisplayPolicy.isExternalDisplayLocked(display)) {
             mExternalDisplayPolicy.handleExternalDisplayConnectedLocked(display);
-        } else {
-            sendDisplayEventLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_CONNECTED);
         }
+    }
 
+    @SuppressLint("AndroidFrameworkRequiresPermission")
+    private void handleLogicalDisplayConnectedPostProcessLocked(LogicalDisplay display) {
         updateLogicalDisplayState(display);
     }
 
@@ -2525,7 +2564,7 @@ public final class DisplayManagerService extends SystemService {
     }
 
     @SuppressLint("AndroidFrameworkRequiresPermission")
-    private void handleLogicalDisplayAddedLocked(LogicalDisplay display) {
+    private void handleLogicalDisplayAddedPreProcessLocked(LogicalDisplay display) {
         final int displayId = display.getDisplayIdLocked();
         final boolean isDefault = displayId == Display.DEFAULT_DISPLAY;
 
@@ -2533,9 +2572,10 @@ public final class DisplayManagerService extends SystemService {
         if (isDefault) {
             mSyncRoot.notifyAll();
         }
+    }
 
-        sendDisplayEventIfEnabledLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_ADDED);
-
+    @SuppressLint("AndroidFrameworkRequiresPermission")
+    private void handleLogicalDisplayAddedPostProcessLocked(LogicalDisplay display) {
         updateLogicalDisplayState(display);
 
         mExternalDisplayPolicy.handleLogicalDisplayContentModeChange(display);
@@ -2551,17 +2591,25 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private void handleLogicalDisplayChangedLocked(@NonNull LogicalDisplay display) {
+        handleLogicalDisplayChangedPreProcessLocked(display);
+        // We don't bother invalidating the display info caches here because any changes to the
+        // display info will trigger a cache invalidation inside of LogicalDisplay before we hit
+        // this point.
+        sendDisplayEventsIfEnabledLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED);
+        handleLogicalDisplayChangedPostProcessLocked(display);
+    }
+
+
+    private void handleLogicalDisplayChangedPreProcessLocked(@NonNull LogicalDisplay display) {
         updateViewportPowerStateLocked(display);
 
         final int displayId = display.getDisplayIdLocked();
         if (displayId == Display.DEFAULT_DISPLAY) {
             recordTopInsetLocked(display);
         }
-        // We don't bother invalidating the display info caches here because any changes to the
-        // display info will trigger a cache invalidation inside of LogicalDisplay before we hit
-        // this point.
-        sendDisplayEventIfEnabledLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED);
+    }
 
+    private void handleLogicalDisplayChangedPostProcessLocked(@NonNull LogicalDisplay display) {
         applyDisplayChangedLocked(display);
 
         if (mDisplayTopologyCoordinator != null) {
@@ -2620,20 +2668,19 @@ public final class DisplayManagerService extends SystemService {
         // We don't bother invalidating the display info caches here because any changes to the
         // display info will trigger a cache invalidation inside of LogicalDisplay before we hit
         // this point.
-        sendEventLocked(display, event, MSG_DELIVER_DISPLAY_EVENT_FRAME_RATE_OVERRIDE);
+        sendEventsLocked(display, event, MSG_DELIVER_DISPLAY_EVENT_FRAME_RATE_OVERRIDE);
         scheduleTraversalLocked(false);
     }
 
-    private void handleLogicalDisplayRemovedLocked(@NonNull LogicalDisplay display) {
+    private void handleLogicalDisplayRemovedPreProcessLocked(@NonNull LogicalDisplay display) {
         // The display is removed when disabled, and it might still exist.
         // Resources must only be released when the disconnected signal is received.
         if (display.isValidLocked()) {
             updateViewportPowerStateLocked(display);
         }
+    }
 
-        // Note: This method is only called if the display was enabled before being removed.
-        sendDisplayEventLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_REMOVED);
-
+    private void handleLogicalDisplayRemovedPostProcessLocked(@NonNull LogicalDisplay display) {
         if (display.isValidLocked()) {
             applyDisplayChangedLocked(display);
         }
@@ -2644,7 +2691,7 @@ public final class DisplayManagerService extends SystemService {
         Slog.i(TAG, "Logical display removed: " + display.getDisplayIdLocked());
     }
 
-    private void releaseDisplayAndEmitEvent(LogicalDisplay display, int event) {
+    private void releaseDisplay(LogicalDisplay display) {
         final int displayId = display.getDisplayIdLocked();
 
         final DisplayPowerController dpc =
@@ -2667,9 +2714,6 @@ public final class DisplayManagerService extends SystemService {
                 });
             }
         }
-
-        sendDisplayEventLocked(display, event);
-        scheduleTraversalLocked(false);
     }
 
     private void handleLogicalDisplaySwappedLocked(@NonNull LogicalDisplay display) {
@@ -2685,25 +2729,6 @@ public final class DisplayManagerService extends SystemService {
         } finally {
             Trace.traceEnd(Trace.TRACE_TAG_POWER);
         }
-    }
-
-    private void handleLogicalDisplayHdrSdrRatioChangedLocked(@NonNull LogicalDisplay display) {
-        sendDisplayEventIfEnabledLocked(display,
-                DisplayManagerGlobal.EVENT_DISPLAY_HDR_SDR_RATIO_CHANGED);
-    }
-
-    private void handleLogicalDisplayRefreshRateChangedLocked(@NonNull LogicalDisplay display) {
-        sendDisplayEventIfEnabledLocked(display,
-                DisplayManagerGlobal.EVENT_DISPLAY_REFRESH_RATE_CHANGED);
-    }
-
-    private void handleLogicalDisplayStateChangedLocked(@NonNull LogicalDisplay display) {
-        sendDisplayEventIfEnabledLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_STATE_CHANGED);
-    }
-
-    private void handleLogicalDisplayCommittedStateChangedLocked(@NonNull LogicalDisplay display) {
-        sendDisplayEventIfEnabledLocked(display,
-                DisplayManagerGlobal.EVENT_DISPLAY_COMMITTED_STATE_CHANGED);
     }
 
     private void notifyDefaultDisplayDeviceUpdated(LogicalDisplay display) {
@@ -2827,7 +2852,7 @@ public final class DisplayManagerService extends SystemService {
     private void updateCanHostTasksIfNeededLocked(LogicalDisplay display,
             boolean shouldSendDisplayChangeEvent) {
         if (display.setCanHostTasksLocked(!mMirrorBuiltInDisplay) && shouldSendDisplayChangeEvent) {
-            sendDisplayEventIfEnabledLocked(display,
+            sendDisplayEventsIfEnabledLocked(display,
                     DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED);
         }
     }
@@ -3621,7 +3646,8 @@ public final class DisplayManagerService extends SystemService {
                     + device.getDisplayDeviceInfoLocked());
             return;
         }
-        display.configureDisplayLocked(t, device, info.state == Display.STATE_OFF);
+        display.configureDisplayLocked(t, device, info.state == Display.STATE_OFF,
+                mHandlerExecutor);
         final Optional<Integer> viewportType = getViewportType(info);
         if (viewportType.isPresent()) {
             populateViewportLocked(viewportType.get(), display.getDisplayIdLocked(), device, info);
@@ -3688,41 +3714,47 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
-    // Send a display event if the display is enabled
-    private void sendDisplayEventIfEnabledLocked(@NonNull LogicalDisplay display,
-                                                 @DisplayEvent int event) {
+    private boolean shouldSendDisplayEventsIfEnabledLocked(@NonNull LogicalDisplay display,
+            int eventMask) {
         final boolean displayIsEnabled = display.isEnabledLocked();
         if (Trace.isTagEnabled(Trace.TRACE_TAG_POWER)) {
             Trace.instant(Trace.TRACE_TAG_POWER,
-                    "sendDisplayEventLocked#event=" + event + ",displayEnabled="
-                            + displayIsEnabled);
+                    "sendDisplayEventsLocked#event=" + eventsToString(eventMask)
+                            + ",displayEnabled=" + displayIsEnabled);
         }
 
         // Only send updates outside of DisplayManagerService for enabled displays
         if (displayIsEnabled) {
-            sendDisplayEventLocked(display, event);
+            return true;
         } else if (mExtraDisplayEventLogging) {
-            Slog.i(TAG, "Not Sending Display Event; display is not enabled: " + display);
+            Slog.i(TAG, "Not Sending Display Events; display is not enabled: " + display);
+        }
+        return false;
+    }
+
+    // Send a display eventMask if the display is enabled
+    private void sendDisplayEventsIfEnabledLocked(@NonNull LogicalDisplay display, int eventMask) {
+        if (shouldSendDisplayEventsIfEnabledLocked(display, eventMask)) {
+            sendDisplayEventsLocked(display, eventMask);
         }
     }
 
-    private void sendEventLocked(@NonNull LogicalDisplay display,
-            @DisplayEvent int event, int messageType) {
+    private void sendEventsLocked(@NonNull LogicalDisplay display, int eventMask, int messageType) {
         int displayId = display.getDisplayIdLocked();
-        Message msg = mHandler.obtainMessage(messageType, displayId, event);
+        Message msg = mHandler.obtainMessage(messageType, displayId, eventMask);
         if (mFlags.isDisplayEventsLoggingEnabled()
-                && event == DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED) {
+                && ((eventMask & DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED) != 0)) {
             msg.obj = new DisplayInfoChangedFields(display.getDisplayInfoGroupsChangedLocked(),
-                    display.getDisplayInfoChangeSource());
+                    display.getDisplayInfoChangeSourceLocked());
         }
         if (messageType == MSG_DELIVER_DISPLAY_EVENT && mExtraDisplayEventLogging) {
-            Slog.i(TAG, "Deliver Display Event on Handler: " + event);
+            Slog.i(TAG, "Deliver Display Events on Handler: " + eventsToString(eventMask));
         }
         mHandler.sendMessage(msg);
     }
 
-    private void sendDisplayEventLocked(@NonNull LogicalDisplay display, @DisplayEvent int event) {
-        sendEventLocked(display, event, MSG_DELIVER_DISPLAY_EVENT);
+    private void sendDisplayEventsLocked(@NonNull LogicalDisplay display, @DisplayEvent int event) {
+        sendEventsLocked(display, event, MSG_DELIVER_DISPLAY_EVENT);
     }
 
     private void sendDisplayGroupEvent(int groupId, int event) {
@@ -3743,16 +3775,16 @@ public final class DisplayManagerService extends SystemService {
 
     // Runs on Handler thread.
     // Delivers display event notifications to callbacks.
-    private void deliverDisplayEvent(int displayId, ArraySet<Integer> uids,
-            @DisplayEvent int event, DisplayInfoChangedFields displayInfoChangedFields) {
+    private void deliverDisplayEvents(int displayId, ArraySet<Integer> uids,
+            int eventMask, DisplayInfoChangedFields displayInfoChangedFields) {
         if (DEBUG || mExtraDisplayEventLogging) {
-            Slog.d(TAG, "Delivering display event: displayId="
-                    + displayId + ", event=" + event
+            Slog.d(TAG, "Delivering display events: displayId="
+                    + displayId + ", events=" + eventsToString(eventMask)
                     + (uids != null ? ", uids=" + uids : ""));
         }
         if (Trace.isTagEnabled(Trace.TRACE_TAG_POWER)) {
             Trace.instant(Trace.TRACE_TAG_POWER,
-                    "deliverDisplayEvent#event=" + event + ",displayId="
+                    "deliverDisplayEvent#events=" + eventsToString(eventMask) + ",displayId="
                             + displayId   + (uids != null ? ", uids=" + uids : ""));
         }
         // Grab the lock and copy the callbacks.
@@ -3767,25 +3799,25 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
-        // Map that maps a uid to the number of times it was notified
-        SparseIntArray notifiedUids = new SparseIntArray();
+        // Maps a uid to the events (eventMask) it is notified about
+        SparseIntArray notifiedUidsToEvents = new SparseIntArray();
 
         // After releasing the lock, send the notifications out.
         for (int i = 0; i < mTempCallbacks.size(); i++) {
             CallbackRecord callbackRecord = mTempCallbacks.get(i);
-            boolean notified = callbackRecord.notifyDisplayEventAsync(displayId, event);
-            if (notified) {
+            int eventsToSendMask = callbackRecord.notifyDisplayEventAsync(displayId, eventMask);
+            if (eventsToSendMask != 0) {
                 int uid = callbackRecord.mUid;
-                notifiedUids.put(uid, notifiedUids.get(uid, 0) + 1);
+                notifiedUidsToEvents.put(uid, eventsToSendMask);
             }
         }
 
         if (mFlags.isDisplayEventsLoggingEnabled()) {
             // Log DisplayEventCallbackOccurred atom
-            mStatsLogger.logDisplayEvent(event, notifiedUids);
+            mStatsLogger.logDisplayEvents(notifiedUidsToEvents);
 
             // Log DisplayInfoChanged atom
-            if (event == DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED) {
+            if ((eventMask & DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED) != 0) {
                 mStatsLogger.logDisplayInfoChanged(displayInfoChangedFields.changedGroups(),
                         displayInfoChangedFields.source());
             }
@@ -4087,6 +4119,23 @@ public final class DisplayManagerService extends SystemService {
     }
 
     /**
+     * Stop the DisplayPowerControllers and LocalDisplayAdapters.
+     */
+    @VisibleForTesting
+    void stop() {
+        synchronized (mSyncRoot) {
+            for (int i = 0; i < mDisplayPowerControllers.size(); i++) {
+                mDisplayPowerControllers.valueAt(i).stop();
+            }
+            for (DisplayAdapter adapter : mDisplayAdapters) {
+                if (adapter instanceof LocalDisplayAdapter) {
+                    ((LocalDisplayAdapter) adapter).stop();
+                }
+            }
+        }
+    }
+
+    /**
      * This is the object that everything in the display manager locks on.
      * We make it an inner class within the {@link DisplayManagerService} to so that it is
      * clear that the object belongs to the display manager service and that it is
@@ -4107,9 +4156,9 @@ public final class DisplayManagerService extends SystemService {
         LocalDisplayAdapter getLocalDisplayAdapter(SyncRoot syncRoot, Context context,
                 Handler handler, DisplayAdapter.Listener displayAdapterListener,
                 DisplayManagerFlags flags,
-                DisplayNotificationManager displayNotificationManager) {
+                DisplayNotificationManager displayNotificationManager, boolean stableEdidsFlag) {
             return new LocalDisplayAdapter(syncRoot, context, handler, displayAdapterListener,
-                    flags, displayNotificationManager);
+                    flags, displayNotificationManager, stableEdidsFlag);
         }
 
         long getDefaultDisplayDelayTimeout() {
@@ -4232,7 +4281,7 @@ public final class DisplayManagerService extends SystemService {
 
     private void handleBrightnessChange(LogicalDisplay display) {
         synchronized (mSyncRoot) {
-            sendDisplayEventIfEnabledLocked(display,
+            sendDisplayEventsIfEnabledLocked(display,
                     DisplayManagerGlobal.EVENT_DISPLAY_BRIGHTNESS_CHANGED);
         }
     }
@@ -4335,7 +4384,7 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private final class DisplayManagerHandler extends Handler {
-        public DisplayManagerHandler(Looper looper) {
+        private DisplayManagerHandler(Looper looper) {
             super(looper, null, true /*async*/);
         }
 
@@ -4351,7 +4400,7 @@ public final class DisplayManagerService extends SystemService {
                     break;
 
                 case MSG_DELIVER_DISPLAY_EVENT:
-                    deliverDisplayEvent(msg.arg1, null, msg.arg2,
+                    deliverDisplayEvents(msg.arg1, null, msg.arg2,
                             (DisplayInfoChangedFields) msg.obj);
                     break;
 
@@ -4396,7 +4445,7 @@ public final class DisplayManagerService extends SystemService {
                         uids = display.getPendingFrameRateOverrideUids();
                         display.clearPendingFrameRateOverrideUids();
                     }
-                    deliverDisplayEvent(msg.arg1, uids, msg.arg2,
+                    deliverDisplayEvents(msg.arg1, uids, msg.arg2,
                             (DisplayInfoChangedFields) msg.obj);
                     break;
 
@@ -4415,53 +4464,112 @@ public final class DisplayManagerService extends SystemService {
 
         @GuardedBy("mSyncRoot")
         @Override
-        public void onLogicalDisplayEventLocked(LogicalDisplay display, int event) {
-            switch (event) {
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_ADDED:
-                    handleLogicalDisplayAddedLocked(display);
-                    break;
-
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_BASIC_CHANGED:
-                    handleLogicalDisplayChangedLocked(display);
-                    break;
-
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_REMOVED:
-                    handleLogicalDisplayRemovedLocked(display);
-                    break;
-
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_SWAPPED:
-                    handleLogicalDisplaySwappedLocked(display);
-                    break;
-
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_FRAME_RATE_OVERRIDES_CHANGED:
-                    handleLogicalDisplayFrameRateOverridesChangedLocked(display);
-                    break;
-
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_DEVICE_STATE_TRANSITION:
-                    handleLogicalDisplayDeviceStateTransitionLocked(display);
-                    break;
-
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_HDR_SDR_RATIO_CHANGED:
-                    handleLogicalDisplayHdrSdrRatioChangedLocked(display);
-                    break;
-
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_CONNECTED:
-                    handleLogicalDisplayConnectedLocked(display);
-                    break;
-
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_DISCONNECTED:
-                    handleLogicalDisplayDisconnectedLocked(display);
-                    break;
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_REFRESH_RATE_CHANGED:
-                    handleLogicalDisplayRefreshRateChangedLocked(display);
-                    break;
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_STATE_CHANGED:
-                    handleLogicalDisplayStateChangedLocked(display);
-                    break;
-                case LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_COMMITTED_STATE_CHANGED:
-                    handleLogicalDisplayCommittedStateChangedLocked(display);
-                    break;
+        public void onLogicalDisplayEventLocked(LogicalDisplay display, int eventMask) {
+            // Does not send message of type MSG_DELIVER_DISPLAY_EVENT
+            if ((eventMask
+                    & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_DEVICE_STATE_TRANSITION) != 0) {
+                handleLogicalDisplayDeviceStateTransitionLocked(display);
             }
+            // Sends message of type MSG_DELIVER_DISPLAY_EVENT_FRAME_RATE_OVERRIDE
+            if ((eventMask
+                    & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_FRAME_RATE_OVERRIDES_CHANGED)
+                    != 0) {
+                handleLogicalDisplayFrameRateOverridesChangedLocked(display);
+            }
+            // Sends MSG_DELIVER_DISPLAY_EVENT message but uses traces
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_SWAPPED) != 0) {
+                handleLogicalDisplaySwappedLocked(display);
+            }
+
+            // Handle all "before" logic and state updates
+            handleBeforeLogicalDisplayEventsLocked(display, eventMask);
+
+            // Send all events of type MSG_DELIVER_DISPLAY_EVENT
+            int sendDisplayEventLockedMask = getSendDisplayEventMaskLocked(display, eventMask);
+            sendDisplayEventsLocked(display, sendDisplayEventLockedMask);
+
+            // It is important to keep the "before" and "after" logic in this order
+            // and separated to avoid race conditions.
+            handleAfterLogicalDisplayEventsLocked(display, eventMask);
+        }
+
+        /** Handles all preliminary logic before display events are sent. */
+        private void handleBeforeLogicalDisplayEventsLocked(LogicalDisplay display, int eventMask) {
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_REMOVED) != 0) {
+                handleLogicalDisplayRemovedPreProcessLocked(display);
+            }
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_DISCONNECTED) != 0) {
+                handleLogicalDisplayDisconnectedPreProcessLocked(display);
+            }
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_CONNECTED) != 0) {
+                handleLogicalDisplayConnectedPreProcessLocked(display);
+            }
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_BASIC_CHANGED) != 0) {
+                handleLogicalDisplayChangedPreProcessLocked(display);
+            }
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_ADDED) != 0) {
+                handleLogicalDisplayAddedPreProcessLocked(display);
+            }
+        }
+
+        /** Handles all follow-up logic after display events have been sent. */
+        private void handleAfterLogicalDisplayEventsLocked(LogicalDisplay display, int eventMask) {
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_REMOVED) != 0) {
+                handleLogicalDisplayRemovedPostProcessLocked(display);
+            }
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_DISCONNECTED) != 0) {
+                handleLogicalDisplayDisconnectedPostProcessLocked(display);
+            }
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_CONNECTED) != 0) {
+                handleLogicalDisplayConnectedPostProcessLocked(display);
+            }
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_BASIC_CHANGED) != 0) {
+                handleLogicalDisplayChangedPostProcessLocked(display);
+            }
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_ADDED) != 0) {
+                handleLogicalDisplayAddedPostProcessLocked(display);
+            }
+        }
+
+        /** Calculates the eventMask mask for events that should be sent. */
+        private int getSendDisplayEventMaskLocked(LogicalDisplay display, int eventMask) {
+            int mask = 0;
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_REMOVED) != 0) {
+                mask |= DisplayManagerGlobal.EVENT_DISPLAY_REMOVED;
+            }
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_DISCONNECTED) != 0) {
+                mask |= DisplayManagerGlobal.EVENT_DISPLAY_DISCONNECTED;
+            }
+            if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_CONNECTED) != 0) {
+                if (!ExternalDisplayPolicy.isExternalDisplayLocked(display)) {
+                    mask |= DisplayManagerGlobal.EVENT_DISPLAY_CONNECTED;
+                }
+            }
+            if (shouldSendDisplayEventsIfEnabledLocked(display, eventMask)) {
+                if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_BASIC_CHANGED) != 0) {
+                    mask |= DisplayManagerGlobal.EVENT_DISPLAY_BASIC_CHANGED;
+                }
+                if ((eventMask
+                        & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_REFRESH_RATE_CHANGED) != 0) {
+                    mask |= DisplayManagerGlobal.EVENT_DISPLAY_REFRESH_RATE_CHANGED;
+                }
+                if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_STATE_CHANGED) != 0) {
+                    mask |= DisplayManagerGlobal.EVENT_DISPLAY_STATE_CHANGED;
+                }
+                if ((eventMask
+                        & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_COMMITTED_STATE_CHANGED)
+                        != 0) {
+                    mask |= DisplayManagerGlobal.EVENT_DISPLAY_COMMITTED_STATE_CHANGED;
+                }
+                if ((eventMask & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_ADDED) != 0) {
+                    mask |= DisplayManagerGlobal.EVENT_DISPLAY_ADDED;
+                }
+                if ((eventMask
+                        & LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_HDR_SDR_RATIO_CHANGED) != 0) {
+                    mask |= DisplayManagerGlobal.EVENT_DISPLAY_HDR_SDR_RATIO_CHANGED;
+                }
+            }
+            return mask;
         }
 
         @Override
@@ -4477,7 +4585,8 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
-    private final class CallbackRecord implements DeathRecipient, FrozenStateChangeCallback {
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    final class CallbackRecord implements DeathRecipient, FrozenStateChangeCallback {
         public final int mPid;
         public final int mUid;
         private final IDisplayManagerCallback mCallback;
@@ -4486,14 +4595,16 @@ public final class DisplayManagerService extends SystemService {
 
         public boolean mWifiDisplayScanRequested;
 
-        // A single pending display event.
-        private record Event(int displayId, @DisplayEvent int event) { };
+        // A single pending display eventMask.
+        @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+        record Event(int displayId, int eventMask) { };
 
         // The list of pending display events. This is null until there is a pending event to be
         // saved.
         @GuardedBy("mCallback")
         @Nullable
-        private ArrayList<Event> mPendingDisplayEvents;
+        @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+        ArrayList<Event> mPendingDisplayEvents;
 
         @GuardedBy("mCallback")
         @Nullable
@@ -4535,9 +4646,9 @@ public final class DisplayManagerService extends SystemService {
             mPackageName = packageNames == null ? null : packageNames[0];
         }
 
-        public boolean shouldReceiveRefreshRateWithChangeUpdate(int event) {
+        public boolean shouldReceiveRefreshRateWithChangeUpdate(int eventMask) {
             if (mFlags.isRefreshRateEventForForegroundAppsEnabled()
-                    && event == DisplayManagerGlobal.EVENT_DISPLAY_REFRESH_RATE_CHANGED
+                    && (eventMask & DisplayManagerGlobal.EVENT_DISPLAY_REFRESH_RATE_CHANGED) != 0
                     && mActivityManagerInternal != null) {
                 int procState = mActivityManagerInternal.getUidProcessState(mUid);
                 int importance = ActivityManager.RunningAppProcessInfo
@@ -4548,8 +4659,12 @@ public final class DisplayManagerService extends SystemService {
             return true;
         }
 
-        public void updateEventFlagsMask(@InternalEventFlag long internalEventFlag) {
+        private void updateEventFlagsMask(@InternalEventFlag long internalEventFlag) {
             mInternalEventFlagsMask.set(internalEventFlag);
+        }
+
+        private long getCurrentMask() {
+            return mInternalEventFlagsMask.get();
         }
 
         /**
@@ -4620,68 +4735,84 @@ public final class DisplayManagerService extends SystemService {
         }
 
         /**
-         * @return {@code true} if the notification was processed (sent, queued).
-         * Returns {@code false} if the notification was not sent e.g. because client is
-         * not registered for this event.
+         * @return the event mask that was sent to the client. Returns 0 if the notification was
+         * not sent e.g. because client is not registered for any of the events.
          */
-        public boolean notifyDisplayEventAsync(int displayId, @DisplayEvent int event) {
-            if (!shouldSendDisplayEvent(event)) {
+        private int notifyDisplayEventAsync(int displayId, int oldEventMask) {
+            int eventMask = calculateEventsToSend(oldEventMask);
+            if (eventMask == 0) {
                 if (extraLogging(mPackageName)) {
                     Slog.i(TAG,
-                            "Not sending displayEvent: " + event + " due to mask:"
-                                    + mInternalEventFlagsMask);
+                            "Not sending displayEvent: " + eventsToString(eventMask)
+                                    + " due to mask:" + mInternalEventFlagsMask);
                 }
                 if (Trace.isTagEnabled(Trace.TRACE_TAG_POWER)) {
                     Trace.instant(Trace.TRACE_TAG_POWER,
-                            "notifyDisplayEventAsync#notSendingEvent=" + event
-                                    + ",mInternalEventFlagsMask=" + mInternalEventFlagsMask
-                                    + ",uid" + mUid);
+                            "notifyDisplayEventAsync#notSendingEvents="
+                                    + eventsToString(eventMask) + ",mInternalEventFlagsMask="
+                                    + mInternalEventFlagsMask + ",uid" + mUid);
                 }
-                // The client is not interested in this event, so do nothing.
-                return false;
+                // The client is not interested in these events, so do nothing.
+                return 0;
             }
 
             synchronized (mCallback) {
-                // Add the new event to the pending list if the client frozen or cached (not
+                // Add the new eventMask to the pending list if the client frozen or cached (not
                 // ready) or if there are existing pending events.  The latter condition
                 // occurs as the client is transitioning to ready but pending events have not
-                // been dispatched.  The new event must be added to the pending list to
-                // preserve event ordering.
+                // been dispatched.  The new eventMask must be added to the pending list to
+                // preserve eventMask ordering.
                 if (!isReadyLocked() || (mPendingDisplayEvents != null
                         && !mPendingDisplayEvents.isEmpty())) {
-                    // The client is interested in the event but is not ready to receive it.
-                    // Put the event on the pending list.
-                    addDisplayEvent(displayId, event);
-                    return true;
+                    // The client is interested in the eventMask but is not ready to receive it.
+                    // Put the new events on the pending list.
+                    return addDisplayEvents(displayId, eventMask);
                 }
             }
 
-            if (!shouldReceiveRefreshRateWithChangeUpdate(event)) {
+            if (!shouldReceiveRefreshRateWithChangeUpdate(eventMask)) {
                 // The client is not visible to the user and is not a system service, so do nothing.
-                return false;
+                return 0;
             }
 
             try {
-                transmitDisplayEvent(displayId, event);
-                return true;
+                transmitDisplayEvents(displayId, eventMask);
+                return eventMask;
             } catch (RemoteException ex) {
                 Slog.w(TAG, "Failed to notify process "
                         + mPid + " that displays changed, assuming it died.", ex);
                 binderDied();
-                return false;
+                return 0;
             }
         }
 
         /**
-         * Transmit a single display event.  The client is presumed ready.  This throws if the
+         * Transmit a display eventMask. The client is presumed ready.  This throws if the
          * client has died; callers must catch and handle the exception.  The exception cannot be
          * handled directly here because {@link #binderDied()} must not be called whilst holding
          * the mCallback lock.
          */
-        private void transmitDisplayEvent(int displayId, @DisplayEvent int event)
+        private void transmitDisplayEvents(int displayId, int eventMask)
                 throws RemoteException {
-            // The client is ready to receive the event.
-            mCallback.onDisplayEvent(displayId, event);
+            // The client is ready to receive the event(s).
+            mCallback.onDisplayEvent(displayId, eventMask);
+        }
+
+        /** Calculate which events should be sent */
+        private int calculateEventsToSend(int eventMask) {
+            int maskToSend = 0;
+            int remainingEvents = eventMask;
+
+            while (remainingEvents != 0) {
+                // Isolate the lowest single event bit (e.g., 1, 2, 4, 8...)
+                int nextEvent = Integer.lowestOneBit(remainingEvents);
+                if (shouldSendDisplayEvent(nextEvent)) {
+                    maskToSend |= nextEvent;
+                }
+                remainingEvents &= ~nextEvent;
+            }
+
+            return maskToSend;
         }
 
         /**
@@ -4729,26 +4860,76 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
-        // Add a single event to the pending list, possibly combining or collapsing events in the
-        // list.
+        /**
+         * Adds display events to the pending list for this callback, merging with previous
+         * events if possible.
+         *
+         * @return A bitmask of the new events that were actually added to the pending queue. If
+         * the event is merged with a pre-existing event, this will be a mask of only the newly
+         * added event types.
+         */
         @GuardedBy("mCallback")
-        private void addDisplayEvent(int displayId, int event) {
+        @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+        int addDisplayEvents(int displayId, int eventMask) {
             if (mPendingDisplayEvents == null) {
                 mPendingDisplayEvents = new ArrayList<>();
             }
-            if (!mPendingDisplayEvents.isEmpty()) {
-                // Ignore redundant events. Further optimization is possible by merging adjacent
-                // events.
-                Event last = mPendingDisplayEvents.get(mPendingDisplayEvents.size() - 1);
-                if (last.displayId == displayId && last.event == event) {
-                    if (DEBUG) {
-                        Slog.d(TAG, "Ignore redundant display event " + displayId + "/" + event
-                                + " to " + mUid + "/" + mPid);
+            if (Flags.enableDisplayEventMerging()) {
+                // A mask for events that should not be merged. Events such as BASIC_CHANGED,
+                // REFRESH_RATE_CHANGED can be merged with any other event.
+                final int nonMergeableEvents = DisplayManagerGlobal.EVENT_DISPLAY_ADDED
+                        | DisplayManagerGlobal.EVENT_DISPLAY_CONNECTED
+                        | DisplayManagerGlobal.EVENT_DISPLAY_REMOVED
+                        | DisplayManagerGlobal.EVENT_DISPLAY_DISCONNECTED;
+
+                // Iterate backwards to find the last event for this display.
+                for (int i = mPendingDisplayEvents.size() - 1; i >= 0; i--) {
+                    Event last = mPendingDisplayEvents.get(i);
+                    if (last.displayId() == displayId) {
+                        // Check for all mergeable conditions:
+                        // 1. The new event is a subset of the last one.
+                        // 2. The last event is a subset of the new one.
+                        // 3. The last event is a simple, mergeable type e.g. BASIC_CHANGED can
+                        //    be merged with ADDED.
+                        // 4. The new event is a simple, mergeable type.
+                        if ((last.eventMask | eventMask) == last.eventMask
+                                || (last.eventMask | eventMask) == eventMask
+                                || (last.eventMask & nonMergeableEvents) == 0
+                                || (eventMask & nonMergeableEvents) == 0) {
+                            int newMask = last.eventMask | eventMask;
+                            Event updatedEvent = new Event(displayId, newMask);
+                            mPendingDisplayEvents.set(i, updatedEvent); // Replace old event
+                            if (DEBUG) {
+                                Slog.d(TAG, "Merge display eventMasks. Display ID: "
+                                        + displayId + "/" + eventsToString(eventMask) + " to "
+                                        + mUid + "/" + mPid + ". New mask: "
+                                        + eventsToString(newMask));
+                            }
+                            return eventMask & ~last.eventMask; // get only the new events
+                        }
+                        // If we found the last event for this display but couldn't merge,
+                        // we must stop and add the new event to the end to preserve order.
+                        break;
                     }
-                    return;
+                }
+            } else if (!mPendingDisplayEvents.isEmpty()) {
+                int lastIndex = mPendingDisplayEvents.size() - 1;
+                Event last = mPendingDisplayEvents.get(lastIndex);
+
+                if (last.displayId() == displayId) {
+                    int newMask = last.eventMask | eventMask;
+                    Event updatedEvent = new Event(last.displayId, newMask);
+                    mPendingDisplayEvents.set(lastIndex, updatedEvent); // Replace old event
+                    if (DEBUG) {
+                        Slog.d(TAG, "Merge display eventMasks. Display ID: " + displayId + "/"
+                                + eventsToString(eventMask) + " to " + mUid + "/" + mPid
+                                + ". New mask: " + eventsToString(newMask));
+                    }
+                    return eventMask & ~last.eventMask; // get only the new events
                 }
             }
-            mPendingDisplayEvents.add(new Event(displayId, event));
+            mPendingDisplayEvents.add(new Event(displayId, eventMask));
+            return eventMask;
         }
 
         /**
@@ -4801,8 +4982,8 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
-        // Send all pending events.  This can safely be called if the process is not ready, but it
-        // would be unusual to do so.  The method returns true on success.
+        // Send all pending events. This can safely be called if the process is not ready, but it
+        // would be unusual to do so. The method returns true on success.
         public boolean dispatchPending() {
             Event[] pendingDisplayEvents = null;
             DisplayTopology pendingTopology;
@@ -4828,16 +5009,16 @@ public final class DisplayManagerService extends SystemService {
                     for (int i = 0; i < pendingDisplayEvents.length; i++) {
                         Event displayEvent = pendingDisplayEvents[i];
                         if (DEBUG) {
-                            Slog.d(TAG, "Send pending display event #" + i + " "
+                            Slog.d(TAG, "Send pending display eventMask #" + i + " "
                                     + displayEvent.displayId + "/"
-                                    + displayEvent.event + " to " + mUid + "/" + mPid);
+                                    + displayEvent.eventMask + " to " + mUid + "/" + mPid);
                         }
 
-                        if (!shouldReceiveRefreshRateWithChangeUpdate(displayEvent.event)) {
+                        if (!shouldReceiveRefreshRateWithChangeUpdate(displayEvent.eventMask)) {
                             continue;
                         }
 
-                        transmitDisplayEvent(displayEvent.displayId, displayEvent.event);
+                        transmitDisplayEvents(displayEvent.displayId, displayEvent.eventMask);
                     }
                 }
 
@@ -4956,9 +5137,7 @@ public final class DisplayManagerService extends SystemService {
             final int callingPid = Binder.getCallingPid();
             final int callingUid = Binder.getCallingUid();
 
-            if ((internalEventFlagsMask
-                    & DisplayManagerGlobal
-                    .INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED) != 0) {
+            if (doesInternalMaskRequiresPermissionCheck(callingPid, internalEventFlagsMask)) {
                 mContext.enforceCallingOrSelfPermission(MANAGE_DISPLAYS,
                         "Permission required to get signals about connection events.");
             }
@@ -6555,7 +6734,7 @@ public final class DisplayManagerService extends SystemService {
         @Override
         public void sendExternalDisplayEventLocked(@NonNull final LogicalDisplay display,
                 @DisplayEvent int event) {
-            sendDisplayEventLocked(display, event);
+            sendDisplayEventsLocked(display, event);
         }
 
         /**

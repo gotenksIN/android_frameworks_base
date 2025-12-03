@@ -16,12 +16,15 @@
 
 package android.security;
 
+import android.annotation.FlaggedApi;
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.security.net.config.ApplicationConfig;
-import android.security.net.config.ManifestConfigSource;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
 /**
  * Network security policy.
@@ -112,6 +115,75 @@ public class NetworkSecurityPolicy {
     }
 
     /**
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @FlaggedApi(android.security.Flags.FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION)
+    @IntDef(prefix = {"DOMAIN_ENCRYPTION_MODE_"}, value = {
+        DOMAIN_ENCRYPTION_MODE_UNKNOWN,
+        DOMAIN_ENCRYPTION_MODE_DISABLED,
+        DOMAIN_ENCRYPTION_MODE_OPPORTUNISTIC,
+        DOMAIN_ENCRYPTION_MODE_ENABLED,
+        DOMAIN_ENCRYPTION_MODE_REQUIRED
+    })
+    public @interface DomainEncryptionMode {}
+
+    /**
+     * Unknown setting for domain encryption in the app.
+     *
+     * <p>This is the default value returned by {@link #getDomainEncryptionMode(String)} when not
+     * overridden. Network libraries should avoid performing any domain encryption and perform a
+     * standard TLS handshake, equivalent to {@link #DOMAIN_ENCRYPTION_MODE_DISABLED}.
+     */
+    @FlaggedApi(android.security.Flags.FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION)
+    public static final int DOMAIN_ENCRYPTION_MODE_UNKNOWN =
+            libcore.net.NetworkSecurityPolicy.DOMAIN_ENCRYPTION_MODE_UNKNOWN;
+
+    /**
+     * Domain encryption is disabled for the app. ECH and GREASE should not be used.
+     */
+    @FlaggedApi(android.security.Flags.FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION)
+    public static final int DOMAIN_ENCRYPTION_MODE_DISABLED =
+            libcore.net.NetworkSecurityPolicy.DOMAIN_ENCRYPTION_MODE_DISABLED;
+
+    /**
+     * Domain encryption is in opportunistic mode for the app. ECH will only be enabled when there
+     * is server support, and GREASE will not be used.
+     */
+    @FlaggedApi(android.security.Flags.FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION)
+    public static final int DOMAIN_ENCRYPTION_MODE_OPPORTUNISTIC =
+            libcore.net.NetworkSecurityPolicy.DOMAIN_ENCRYPTION_MODE_OPPORTUNISTIC;
+
+    /**
+     * Domain encryption is in fully enabled mode for the app. ECH will be enabled when there is
+     * server support, otherwise GREASE will be used.
+     */
+    @FlaggedApi(android.security.Flags.FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION)
+    public static final int DOMAIN_ENCRYPTION_MODE_ENABLED =
+            libcore.net.NetworkSecurityPolicy.DOMAIN_ENCRYPTION_MODE_ENABLED;
+
+    /**
+     * Domain encryption is required for the app and should fail closed (i.e. if encryption cannot
+     * be enabled for any reason, the connection will fail).
+     */
+    @FlaggedApi(android.security.Flags.FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION)
+    public static final int DOMAIN_ENCRYPTION_MODE_REQUIRED =
+            libcore.net.NetworkSecurityPolicy.DOMAIN_ENCRYPTION_MODE_REQUIRED;
+
+    /**
+     * Returns the domain encryption mode the app has chosen for the given {@code hostname},
+     * including the setting for Encrypted Client Hello.
+     *
+     * @param hostname hostname to check what domain encryption mode has been chosen by the app
+     * @return int representing the domain encryption mode.
+     */
+    @FlaggedApi(android.security.Flags.FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION)
+    @DomainEncryptionMode
+    public int getDomainEncryptionMode(@NonNull String hostname) {
+        return libcore.net.NetworkSecurityPolicy.getInstance().getDomainEncryptionMode(hostname);
+    }
+
+    /**
      * Handle an update to the system or user certificate stores.
      * @hide
      */
@@ -120,17 +192,5 @@ public class NetworkSecurityPolicy {
         if (config != null) {
             config.handleTrustStorageUpdate();
         }
-    }
-
-    /**
-     * Returns an {@link ApplicationConfig} based on the configuration for {@code packageName}.
-     *
-     * @hide
-     */
-    public static ApplicationConfig getApplicationConfigForPackage(Context context,
-            String packageName) throws PackageManager.NameNotFoundException {
-        Context appContext = context.createPackageContext(packageName, 0);
-        ManifestConfigSource source = new ManifestConfigSource(appContext);
-        return new ApplicationConfig(source);
     }
 }

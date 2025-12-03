@@ -200,6 +200,30 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     }
 
     @Test
+    fun addTask_withSavedBounds_updatesDeskObject() {
+        val taskId = 1
+        // Create a freeform task to and add it to the desk first.
+        repo.addTask(DEFAULT_DISPLAY, taskId, isVisible = true, taskBounds = TEST_TASK_BOUNDS)
+
+        // Assume the user adjusts the bounds of the task.
+        val boundsBeforeSnapOrMaximize = Rect(100, 200, 300, 400)
+
+        // Then, user snaps or maximizes this task.
+        repo.saveBoundsBeforeSnapOrMaximize(taskId, boundsBeforeSnapOrMaximize)
+
+        // Calling addTask again will call updateTaskInDesk, which should copy the previous
+        // bounds to the desk object.
+        // taskBounds parameter below can be seen as the current bounds of the task in its maximized
+        // or snapped state.
+        repo.addTask(DEFAULT_DISPLAY, taskId, isVisible = true, taskBounds = Rect(0, 0, 1280, 800))
+
+        val desk = repo.getAllDesks().find { it.deskId == DEFAULT_DESKTOP_ID }
+        assertNotNull(desk)
+        assertThat(desk.boundsBeforeSnapOrMaximizeByTaskId[taskId])
+            .isEqualTo(boundsBeforeSnapOrMaximize)
+    }
+
+    @Test
     @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun addTask_deskDoesNotExist_throws() {
         repo.removeDesk(deskId = 0)
@@ -1459,14 +1483,35 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     }
 
     @Test
-    fun removeTask_removesTaskBoundsBeforeMaximize() {
-        val taskId = 1
-        repo.addTask(DEFAULT_DISPLAY, taskId, isVisible = true, taskBounds = TEST_TASK_BOUNDS)
-        repo.saveBoundsBeforeMaximize(taskId, Rect(0, 0, 200, 200))
+    fun removeTask_removesTaskBoundsBeforeSnapOrMaximize() {
 
+        val taskId = 1
+        // Create a freeform task to and add it to the desk first.
+        repo.addTask(DEFAULT_DISPLAY, taskId, isVisible = true, taskBounds = TEST_TASK_BOUNDS)
+
+        // Assume the user adjusts the bounds of the task.
+        val boundsBeforeSnapOrMaximize = Rect(100, 200, 300, 400)
+
+        // Then, user snaps or maximizes this task.
+        repo.saveBoundsBeforeSnapOrMaximize(taskId, boundsBeforeSnapOrMaximize)
+
+        // Calling addTask again will call updateTaskInDesk, which should copy the previous
+        // bounds to the desk object.
+        // taskBounds parameter below can be seen as the current bounds of the task in its maximized
+        // or snapped state.
+        repo.addTask(DEFAULT_DISPLAY, taskId, isVisible = true, taskBounds = Rect(0, 0, 1280, 800))
+
+        // Task is removed due to drag-exit or other reasons like closing the app.
         repo.removeTask(taskId)
 
-        assertThat(repo.removeBoundsBeforeMaximize(taskId)).isNull()
+        // Verify bounds are removed from repository's sparse array
+        // (boundsBeforeSnapOrMaximizeByTaskId)
+        assertThat(repo.removeBoundsBeforeSnapOrMaximize(taskId)).isNull()
+
+        // Verify bounds are removed from desk object as well
+        val desk = repo.getAllDesks().find { it.deskId == DEFAULT_DESKTOP_ID }
+        assertNotNull(desk)
+        assertThat(desk.boundsBeforeSnapOrMaximizeByTaskId.containsKey(taskId)).isFalse()
     }
 
     @Test
@@ -1517,23 +1562,38 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     }
 
     @Test
-    fun saveBoundsBeforeMaximize_boundsSavedByTaskId() {
+    fun saveBoundsBeforeSnapOrMaximize_boundsSavedByTaskId() {
         val taskId = 1
         val bounds = Rect(0, 0, 200, 200)
 
-        repo.saveBoundsBeforeMaximize(taskId, bounds)
+        repo.saveBoundsBeforeSnapOrMaximize(taskId, bounds)
 
-        assertThat(repo.removeBoundsBeforeMaximize(taskId)).isEqualTo(bounds)
+        assertThat(repo.removeBoundsBeforeSnapOrMaximize(taskId)).isEqualTo(bounds)
     }
 
     @Test
-    fun removeBoundsBeforeMaximize_returnsNullAfterBoundsRemoved() {
+    fun saveBoundsBeforeSnapOrMaximize_alreadyExists_doesNotOverwrite() {
+        val taskId = 1
+        val initialBounds = Rect(0, 0, 200, 200)
+        val newBounds = Rect(10, 10, 300, 300)
+
+        // Save initial bounds
+        repo.saveBoundsBeforeSnapOrMaximize(taskId, initialBounds)
+        // Attempt to save new bounds, which should be ignored
+        repo.saveBoundsBeforeSnapOrMaximize(taskId, newBounds)
+
+        // Verify that the initial bounds are still the ones stored
+        assertThat(repo.removeBoundsBeforeSnapOrMaximize(taskId)).isEqualTo(initialBounds)
+    }
+
+    @Test
+    fun removeBoundsBeforeSnapOrMaximize_returnsNullAfterBoundsRemoved() {
         val taskId = 1
         val bounds = Rect(0, 0, 200, 200)
-        repo.saveBoundsBeforeMaximize(taskId, bounds)
-        repo.removeBoundsBeforeMaximize(taskId)
+        repo.saveBoundsBeforeSnapOrMaximize(taskId, bounds)
+        repo.removeBoundsBeforeSnapOrMaximize(taskId)
 
-        val boundsBeforeMaximize = repo.removeBoundsBeforeMaximize(taskId)
+        val boundsBeforeMaximize = repo.removeBoundsBeforeSnapOrMaximize(taskId)
 
         assertThat(boundsBeforeMaximize).isNull()
     }
@@ -2173,11 +2233,11 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
             isVisible = true,
             taskBounds = TEST_TASK_BOUNDS,
         )
-        repo.saveBoundsBeforeMaximize(taskId = 10, bounds = Rect(10, 10, 100, 100))
+        repo.saveBoundsBeforeSnapOrMaximize(taskId = 10, bounds = Rect(10, 10, 100, 100))
 
         repo.removeTaskFromDesk(deskId = 6, taskId = 10)
 
-        assertThat(repo.removeBoundsBeforeMaximize(taskId = 10)).isNull()
+        assertThat(repo.removeBoundsBeforeSnapOrMaximize(taskId = 10)).isNull()
     }
 
     @Test
@@ -2686,6 +2746,25 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
         verify(persistentRepository, never())
             .addOrUpdateDesktop(any(), any(), any(), any(), any(), any(), any(), any())
         verify(persistentRepository, never()).addOrUpdateRepository(any(), any(), any(), any())
+    }
+
+    @Test
+    fun hasBoundsBeforeSnapOrMaximize_boundsExist_returnsTrue() {
+        val taskId = 123
+        val taskInfo = TestRunningTaskInfoBuilder().setTaskId(taskId).build()
+        val bounds = Rect(0, 0, 100, 100)
+        repo.saveBoundsBeforeSnapOrMaximize(taskId, bounds)
+
+        assertThat(repo.hasBoundsBeforeSnapOrMaximize(taskInfo)).isTrue()
+    }
+
+    @Test
+    fun hasBoundsBeforeSnapOrMaximize_noBounds_returnsFalse() {
+        val taskId = 456
+        val taskInfo = TestRunningTaskInfoBuilder().setTaskId(taskId).build()
+
+        // taskId and its bounds are not saved into the storage.
+        assertThat(repo.hasBoundsBeforeSnapOrMaximize(taskInfo)).isFalse()
     }
 
     private class TestDeskChangeListener : DesktopRepository.DeskChangeListener {

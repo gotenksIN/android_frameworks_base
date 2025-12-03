@@ -17,10 +17,10 @@
 package com.android.internal.widget;
 
 import static android.app.Flags.notificationsRedesignTemplates;
+import static android.app.Flags.notificationTransparentBadgeRing;
 
 import static com.android.internal.widget.MessagingGroup.IMAGE_DISPLAY_LOCATION_EXTERNAL;
 import static com.android.internal.widget.MessagingGroup.IMAGE_DISPLAY_LOCATION_INLINE;
-import static com.android.internal.widget.flags.Flags.notificationTransparentBadgeRing;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -175,6 +175,7 @@ public class ConversationLayout extends FrameLayout
     private int mSpacingForExpander;
     private int mSpacingForImage;
     private LinearLayout mConversationContentView;
+    private int mDefaultStartMargin;
     private int mSummarizationStartMargin;
 
     public ConversationLayout(@NonNull Context context) {
@@ -361,6 +362,8 @@ public class ConversationLayout extends FrameLayout
         });
 
         mConversationContentView = findViewById(R.id.notification_main_column);
+        mDefaultStartMargin = getResources().getDimensionPixelSize(
+                R.dimen.notification_2025_content_margin_start);
         mSummarizationStartMargin = getResources().getDimensionPixelSize(
                 R.dimen.notification_2025_content_margin_start_summarization);
     }
@@ -1713,11 +1716,12 @@ public class ConversationLayout extends FrameLayout
             }
         }
         mMessagingLinearLayout.setMaxDisplayedLines(maxLines);
-        if (isShowingSummarization()) {
+
+        if (mIsCollapsed) {
             ViewGroup.LayoutParams lp = mConversationContentView.getLayoutParams();
-            if (lp != null && lp instanceof MarginLayoutParams) {
-                final MarginLayoutParams mlp = (MarginLayoutParams) lp;
-                mlp.setMarginStart(mSummarizationStartMargin);
+            if (lp instanceof MarginLayoutParams mlp) {
+                mlp.setMarginStart(
+                        isShowingSummarization() ? mSummarizationStartMargin : mDefaultStartMargin);
                 // this happens before layout, so we don't need to explicitly ask for one
             }
         }

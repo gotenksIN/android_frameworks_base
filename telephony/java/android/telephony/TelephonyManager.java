@@ -16,6 +16,7 @@
 
 package android.telephony;
 
+import static android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE;
 import static android.content.Context.TELECOM_SERVICE;
 import static android.provider.Telephony.Carriers.DPC_URI;
 import static android.provider.Telephony.Carriers.INVALID_APN_ID;
@@ -96,6 +97,7 @@ import android.telephony.Annotation.NetworkType;
 import android.telephony.Annotation.RadioPowerState;
 import android.telephony.Annotation.SimActivationState;
 import android.telephony.Annotation.ThermalMitigationResult;
+import android.telephony.Annotation.TtyMode;
 import android.telephony.Annotation.UiccAppType;
 import android.telephony.Annotation.UiccAppTypeExt;
 import android.telephony.CallForwardingInfo.CallForwardingReason;
@@ -8903,7 +8905,7 @@ public class TelephonyManager {
      * </ul>
      *
      * The use of {@link Manifest.permission#READ_PRIVILEGED_PHONE_STATE} is deprecated.
-     * Use {@link Manifest.permission#USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER instead.
+     * Use {@link Manifest.permission#USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER} instead.
      *
      * @param appType the icc application type, like {@link #APPTYPE_USIM}
      * @param authType the authentication type, any one of {@link #AUTHTYPE_EAP_AKA} or
@@ -11101,6 +11103,25 @@ public class TelephonyManager {
     }
 
     /**
+     * Returns the current TTY mode of the device. For TTY to be on the user must enable it in
+     * settings and have a wired headset plugged in.
+     */
+    @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CALLING)
+    @RequiresPermission(READ_PRIVILEGED_PHONE_STATE)
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    public @TtyMode int getCurrentTtyMode() {
+        try {
+            ITelephony telephony = getITelephony();
+            if (telephony != null)
+                return telephony.getCurrentTtyMode();
+        } catch (RemoteException e) {
+            Log.e(TAG, "Error calling ITelephony#getCurrentTtyMode", e);
+            e.rethrowAsRuntimeException();
+        }
+        return TTY_MODE_OFF;
+    }
+
+    /**
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
@@ -12537,6 +12558,35 @@ public class TelephonyManager {
      */
     public static final int CARD_POWER_UP_PASS_THROUGH = 2;
 
+    /**
+     * TTY (teletypewriter) mode is off.
+     */
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    public static final int TTY_MODE_OFF = 0;
+
+    /**
+     * TTY (teletypewriter) mode is on. The speaker is off and the microphone is muted. The user
+     * will communicate with the remote party by sending and receiving text messages.
+     */
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    public static final int TTY_MODE_FULL = 1;
+
+    /**
+     * TTY (teletypewriter) mode is in hearing carryover mode (HCO). The microphone is muted but the
+     * speaker is on. The user will communicate with the remote party by sending text messages and
+     * hearing an audible reply.
+     */
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    public static final int TTY_MODE_HCO = 2;
+
+    /**
+     * TTY (teletypewriter) mode is in voice carryover mode (VCO). The speaker is off but the
+     * microphone is still on. User will communicate with the remote party by speaking and receiving
+     * text message replies.
+     */
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    public static final int TTY_MODE_VCO = 3;
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"CARD_POWER"},
@@ -13386,14 +13436,13 @@ public class TelephonyManager {
      *
      * @param slotIndex of phone whose service state is returned
      * @return ServiceState on specified SIM slot.
-     *
-     * @hide
      */
     @RequiresPermission(allOf = {
             Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.ACCESS_COARSE_LOCATION
     })
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
+    @FlaggedApi(Flags.FLAG_GET_SERVICE_STATE_FOR_SLOT)
     public @Nullable ServiceState getServiceStateForSlot(int slotIndex) {
         return getServiceStateForSlot(slotIndex, false, false);
     }
@@ -16225,7 +16274,7 @@ public class TelephonyManager {
      *
      * @param context Context to use.
      * @return {@link List} of APNs that have been set as overrides.
-     * @throws {@link SecurityException} if the caller is not the system or phone process.
+     * @throws SecurityException if the caller is not the system or phone process.
      * @hide
      */
     @TestApi
@@ -16255,7 +16304,7 @@ public class TelephonyManager {
      *         modify the APN in the future via {@link #modifyDevicePolicyOverrideApn}, or
      *         {@link android.provider.Telephony.Carriers.INVALID_APN_ID} if the override operation
      *         failed.
-     * @throws {@link SecurityException} if the caller is not the system or phone process.
+     * @throws SecurityException if the caller is not the system or phone process.
      * @hide
      */
     @TestApi
@@ -16285,7 +16334,7 @@ public class TelephonyManager {
      *              {@link #addDevicePolicyOverrideApn}
      * @param apnSetting The {@link ApnSetting} describing the updated APN.
      * @return {@code true} if successful, {@code false} otherwise.
-     * @throws {@link SecurityException} if the caller is not the system or phone process.
+     * @throws SecurityException if the caller is not the system or phone process.
      * @hide
      */
     @TestApi

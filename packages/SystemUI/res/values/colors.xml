@@ -48,6 +48,8 @@
 
     <!-- The color of the background in the grid of the Global Actions menu -->
     <color name="global_actions_grid_background">#F1F3F4</color>
+    <color name="global_actions_grid_background_blur">@androidprv:color/surface_effect_0</color>
+    <color name="global_actions_grid_background_blur_fallback">@android:color/system_accent1_200</color>
 
     <!-- Colors for Power Menu Lite -->
     <color name="global_actions_lite_button_background_focused">#808080</color>
@@ -196,6 +198,8 @@
     <!-- Volume dialog colors -->
     <color name="volume_dialog_background_color">@android:color/transparent</color>
     <color name="volume_dialog_background_color_above_blur">@android:color/transparent</color>
+    <color name="volume_dialog_view_background_blur">@androidprv:color/surface_effect_0</color>
+    <color name="volume_dialog_view_background_blur_fallback">@android:color/system_accent1_200</color>
 
     <!-- media -->
     <color name="media_seamless_border">?android:attr/colorAccent</color>
@@ -204,7 +208,6 @@
     <color name="media_outlined_button_background">#4D000000</color> <!-- 30% -->
 
     <!-- media output dialog-->
-    <color name="media_dialog_item_main_content">@color/material_dynamic_primary20</color>
     <color name="media_dialog_primary">@android:color/system_primary_light</color>
     <color name="media_dialog_on_primary">@android:color/system_on_primary_light</color>
     <color name="media_dialog_secondary">@android:color/system_secondary_light</color>
@@ -243,6 +246,7 @@
 
     <color name="privacy_chip_background">#3ddc84</color>
     <color name="privacy_chip_location_only_background">#3dbaf4</color>
+    <color name="privacy_chip_location_only_outline">#ffffff</color>
 
     <!-- Accessibility floating menu -->
     <color name="accessibility_floating_menu_background">#CCFFFFFF</color> <!-- 80% -->

@@ -16,6 +16,8 @@
 package com.android.server.wm;
 
 import static android.app.WindowConfiguration.ROTATION_UNDEFINED;
+import static android.content.pm.ActivityInfo.INSETS_DECOUPLED_CONFIGURATION_ENFORCED;
+import static android.content.pm.ActivityInfo.OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION;
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import static android.content.res.Configuration.ORIENTATION_UNDEFINED;
@@ -28,6 +30,7 @@ import static com.android.server.wm.AppCompatUtils.isInDesktopMode;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.WindowConfiguration.WindowingMode;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Insets;
 import android.graphics.Rect;
@@ -41,8 +44,18 @@ class AppCompatSandboxingPolicy {
     @NonNull
     private final ActivityRecord mActivityRecord;
 
+    @NonNull
+    private final ConfigOverrideHint mResolveConfigHint;
+
     AppCompatSandboxingPolicy(@NonNull ActivityRecord activityRecord) {
         mActivityRecord = activityRecord;
+        mResolveConfigHint = new ConfigOverrideHint();
+        final ActivityInfo info = mActivityRecord.info;
+        // When the stable configuration is the default behavior, override for the legacy apps
+        // without forward override flag.
+        mResolveConfigHint.mUseOverrideInsetsForConfig =
+                !info.isChangeEnabled(INSETS_DECOUPLED_CONFIGURATION_ENFORCED)
+                        && !info.isChangeEnabled(OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION);
     }
 
     /**
@@ -66,14 +79,40 @@ class AppCompatSandboxingPolicy {
             if (appBounds == null || appBounds.isEmpty()) {
                 // When there is no override bounds, the activity will inherit the bounds from
                 // parent.
-                appBounds = mActivityRecord.mResolveConfigHint.mParentAppBoundsOverride;
+                appBounds = mResolveConfigHint.mParentAppBoundsOverride;
             }
-            if (!resolvedConfig.windowConfiguration.getBounds().isEmpty()) {
-                // Only set if there is a resolved override config.
+            if (mResolveConfigHint.shouldSandboxToAppBounds()) {
                 resolvedConfig.windowConfiguration.setBounds(appBounds);
             }
         }
     }
+
+    @NonNull
+    ConfigOverrideHint getResolveConfigHint() {
+        return mResolveConfigHint;
+    }
+
+    void resolveTmpOverrides(@NonNull Configuration parentConfig,
+            boolean isFixedRotationTransforming, @Nullable Rect safeRegionBounds,
+            boolean shouldApplyLegacyInsets, @Nullable AppCompatDisplayInsets compatDisplayInsets) {
+        mResolveConfigHint.resolveTmpOverrides(mActivityRecord.mDisplayContent, parentConfig,
+                isFixedRotationTransforming, safeRegionBounds, shouldApplyLegacyInsets);
+        mResolveConfigHint.mTmpCompatInsets = compatDisplayInsets;
+    }
+
+    void resetTmpOverrides() {
+        mResolveConfigHint.resetTmpOverrides();
+    }
+
+    void updateOverrideDisplayInfo() {
+        mResolveConfigHint.mTmpOverrideDisplayInfo =
+                mActivityRecord.getFixedRotationTransformDisplayInfo();
+    }
+
+    void resetDisplayInfoOverride() {
+        mResolveConfigHint.mTmpOverrideDisplayInfo = null;
+    }
+
 
     /**
      * Contains sandboxed parent configuration important for resolving activity window
@@ -81,19 +120,26 @@ class AppCompatSandboxingPolicy {
      * unaffected.
      */
     static class ConfigOverrideHint {
-        @Nullable DisplayInfo mTmpOverrideDisplayInfo;
-        @Nullable AppCompatDisplayInsets mTmpCompatInsets;
-        @Nullable Rect mParentAppBoundsOverride;
-        @Nullable Rect mParentBoundsOverride;
-        int mTmpOverrideConfigOrientation;
-        boolean mUseOverrideInsetsForConfig;
+        @Nullable
+        private DisplayInfo mTmpOverrideDisplayInfo;
+        @Nullable
+        private AppCompatDisplayInsets mTmpCompatInsets;
+        @NonNull
+        private final Rect mParentAppBoundsOverride = new Rect();
+        @NonNull
+        private final Rect mParentBoundsOverride = new Rect();
+        @Configuration.Orientation
+        private int mTmpOverrideConfigOrientation;
+        private boolean mUseOverrideInsetsForConfig;
 
-        void resolveTmpOverrides(DisplayContent dc, Configuration parentConfig,
+        private void resolveTmpOverrides(DisplayContent dc, Configuration parentConfig,
                 boolean isFixedRotationTransforming, @Nullable Rect safeRegionBounds,
                 boolean shouldApplyLegacyInsets) {
-            mParentAppBoundsOverride = safeRegionBounds != null ? safeRegionBounds : new Rect(
-                    parentConfig.windowConfiguration.getAppBounds());
-            mParentBoundsOverride = safeRegionBounds != null ? safeRegionBounds : new Rect(
+            final Rect parentAppBounds = parentConfig.windowConfiguration.getAppBounds() != null
+                    ? parentConfig.windowConfiguration.getAppBounds() : new Rect();
+            mParentAppBoundsOverride.set(safeRegionBounds != null ? safeRegionBounds :
+                    parentAppBounds);
+            mParentBoundsOverride.set(safeRegionBounds != null ? safeRegionBounds :
                     parentConfig.windowConfiguration.getBounds());
             mTmpOverrideConfigOrientation = parentConfig.orientation;
             Insets insets = Insets.NONE;
@@ -123,10 +169,51 @@ class AppCompatSandboxingPolicy {
             mParentAppBoundsOverride.inset(insets);
         }
 
-        void resetTmpOverrides() {
+        private void resetTmpOverrides() {
+            mParentAppBoundsOverride.setEmpty();
+            mParentBoundsOverride.setEmpty();
             mTmpOverrideDisplayInfo = null;
             mTmpCompatInsets = null;
             mTmpOverrideConfigOrientation = ORIENTATION_UNDEFINED;
+        }
+
+        @Nullable
+        DisplayInfo getOverrideDisplayInfo() {
+            return mTmpOverrideDisplayInfo;
+        }
+
+        @Nullable
+        AppCompatDisplayInsets getAppCompatDisplayInsets() {
+            return mTmpCompatInsets;
+        }
+
+        @NonNull
+        Rect getParentAppBoundsOverride() {
+            return mParentAppBoundsOverride;
+        }
+
+        @NonNull
+        Rect getParentBoundsOverride() {
+            return mParentBoundsOverride;
+        }
+
+        boolean shouldUseOverrideInsetsForConfig() {
+            return mUseOverrideInsetsForConfig;
+        }
+
+        @Configuration.Orientation
+        int getOverrideOrientation() {
+            return mTmpOverrideConfigOrientation;
+        }
+
+        /**
+         * Returns {@code true} if the app bounds should be sandboxed to the parent app bounds.
+         * This is typically true when the top inset of the app bounds differs from the top inset
+         * of the parent bounds, indicating that compatibility treatment (like excluding caption
+         * insets) has been applied.
+         */
+        private boolean shouldSandboxToAppBounds() {
+            return mParentAppBoundsOverride.top != mParentBoundsOverride.top;
         }
     }
 }

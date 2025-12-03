@@ -19,15 +19,17 @@ package com.android.server.companion.virtual.computercontrol;
 import static android.app.PendingIntent.FLAG_CANCEL_CURRENT;
 import static android.app.PendingIntent.FLAG_IMMUTABLE;
 import static android.app.PendingIntent.FLAG_ONE_SHOT;
+import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_USER_INITIATED;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.AppOpsManager;
 import android.app.KeyguardManager;
 import android.app.PendingIntent;
-import android.companion.virtual.IVirtualDevice;
-import android.companion.virtual.IVirtualDeviceActivityListener;
+import android.app.admin.DevicePolicyManagerInternal;
+import android.companion.virtual.VirtualDeviceManager.VirtualDevice;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.computercontrol.ComputerControlSession;
 import android.companion.virtual.computercontrol.ComputerControlSessionParams;
@@ -48,10 +50,10 @@ import android.os.ResultReceiver;
 import android.os.UserHandle;
 import android.util.ArraySet;
 import android.util.Slog;
-import android.view.Display;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.server.LocalServices;
 import com.android.server.ServiceThread;
 
 import java.util.Objects;
@@ -75,7 +77,7 @@ public class ComputerControlSessionProcessor {
     private final KeyguardManager mKeyguardManager;
     private final AppOpsManager mAppOpsManager;
     private final PackageManager mPackageManager;
-    private final ComputerControlAccessManager mAccessManager;
+    private final DevicePolicyManagerInternal mDevicePolicyManagerInternal;
     private final VirtualDeviceFactory mVirtualDeviceFactory;
     private final PendingIntentFactory mPendingIntentFactory;
 
@@ -102,7 +104,7 @@ public class ComputerControlSessionProcessor {
         mKeyguardManager = context.getSystemService(KeyguardManager.class);
         mAppOpsManager = context.getSystemService(AppOpsManager.class);
         mPackageManager = context.getPackageManager();
-        mAccessManager = new ComputerControlAccessManager(context);
+        mDevicePolicyManagerInternal = LocalServices.getService(DevicePolicyManagerInternal.class);
     }
 
     /**
@@ -117,7 +119,6 @@ public class ComputerControlSessionProcessor {
             @NonNull ComputerControlSessionParams params,
             @NonNull IComputerControlSessionCallback callback) {
         validateParams(attributionSource, params);
-        Set<UserHandle> allowedUsers = mAccessManager.validateAndGetAllowedUsers(attributionSource);
         startHandlerThreadIfNeeded();
 
         final boolean canCreateWithoutConsent;
@@ -130,7 +131,7 @@ public class ComputerControlSessionProcessor {
         }
 
         if (canCreateWithoutConsent) {
-            mHandler.post(() -> createSession(attributionSource, params, allowedUsers, callback));
+            mHandler.post(() -> createSession(attributionSource, params, callback));
             return;
         }
 
@@ -141,8 +142,7 @@ public class ComputerControlSessionProcessor {
         }
 
         final ResultReceiver resultReceiver =
-                new ConsentResultReceiver(attributionSource, params, allowedUsers, callback)
-                        .prepareForIpc();
+                new ConsentResultReceiver(attributionSource, params, callback).prepareForIpc();
         final Intent intent = new Intent(ComputerControlSession.ACTION_REQUEST_ACCESS)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 .putExtra(Intent.EXTRA_PACKAGE_NAME, attributionSource.getPackageName())
@@ -159,6 +159,16 @@ public class ComputerControlSessionProcessor {
 
     private void validateParams(AttributionSource attributionSource,
             ComputerControlSessionParams params) {
+        if (Flags.computerControlUserRestriction()) {
+            // TODO: b/445856399 - Support managed profiles.
+            Binder.withCleanCallingIdentity(() -> {
+                if (mDevicePolicyManagerInternal.isUserOrganizationManaged(
+                        UserHandle.getUserId(attributionSource.getUid()))) {
+                    throw new SecurityException(
+                        "Managed profiles are not allowed to use Computer Control.");
+                }
+            });
+        }
         synchronized (mSessions) {
             for (int i = 0; i < mSessions.size(); i++) {
                 ComputerControlSessionImpl session = mSessions.valueAt(i);
@@ -170,29 +180,22 @@ public class ComputerControlSessionProcessor {
             }
         }
 
-        if (!Flags.computerControlActivityPolicyStrict()) {
-            return;
-        }
+        Binder.withCleanCallingIdentity(() -> {
+            // Ensure all packages the ComputerControl session should be able to launch are:
+            // 1) Applications with a valid launcher Intent
+            // 2) NOT PermissionController
+            for (int i = 0; i < params.getTargetPackageNames().size(); i++) {
+                String packageName = params.getTargetPackageNames().get(i);
 
-        // TODO(b/437849228): Should be non-null
-        if (params.getTargetPackageNames() == null || params.getTargetPackageNames().isEmpty()) {
-            return;
-        }
-
-        // Ensure all packages the ComputerControl session should be able to launch are:
-        // 1) Applications with a valid launcher Intent
-        // 2) NOT PermissionController
-        for (int i = 0; i < params.getTargetPackageNames().size(); i++) {
-            String packageName = params.getTargetPackageNames().get(i);
-
-            if (packageName == null
-                    || packageName.isEmpty()
-                    || mPackageManager.getPermissionControllerPackageName().equals(packageName)
-                    || mPackageManager.getLaunchIntentForPackage(packageName) == null) {
-                throw new IllegalArgumentException(
-                        "Invalid target package for ComputerControl: " + packageName);
+                if (packageName == null
+                        || packageName.isEmpty()
+                        || mPackageManager.getPermissionControllerPackageName().equals(packageName)
+                        || mPackageManager.getLaunchIntentForPackage(packageName) == null) {
+                    throw new IllegalArgumentException(
+                            "Invalid target package for ComputerControl: " + packageName);
+                }
             }
-        }
+        });
     }
 
     /**
@@ -225,7 +228,6 @@ public class ComputerControlSessionProcessor {
     private void createSession(
             @NonNull AttributionSource attributionSource,
             @NonNull ComputerControlSessionParams params,
-            @NonNull Set<UserHandle> allowedUsers,
             @NonNull IComputerControlSessionCallback callback) {
         if (!callback.asBinder().pingBinder()) {
             Slog.w(TAG, "Binder is dead for ComputerControlSession " + params.getName()
@@ -241,17 +243,16 @@ public class ComputerControlSessionProcessor {
             Slog.d(TAG, "Creating ComputerControlSession " + params.getName());
             session = new ComputerControlSessionImpl(
                     mContext, callback.asBinder(), params, attributionSource, mVirtualDeviceFactory,
-                    allowedUsers, new OnSessionClosedListener(params.getName(), callback));
+                    (closedSession) -> {
+                synchronized (mSessions) {
+                    mSessions.remove(closedSession);
+                }
+            });
             mSessions.add(session);
         }
 
-        // If the client provided a surface, disable the screenshot API.
-        // TODO(b/439774796): Do not allow client-provided surface and dimensions.
-        final int displayId = params.getDisplaySurface() == null
-                ? session.getVirtualDisplayId()
-                : Display.INVALID_DISPLAY;
         try {
-            callback.onSessionCreated(displayId, session.getVirtualDisplayToken(), session);
+            callback.onSessionCreated(session.getVirtualDisplayId(), session);
         } catch (RemoteException e) {
             Slog.e(TAG, "Failed to notify ComputerControlSession " + params.getName()
                     + " about session creation success");
@@ -259,19 +260,14 @@ public class ComputerControlSessionProcessor {
     }
 
     /** Closes the session with the given ID. */
-    public void closeSession(int deviceId) {
+    public void closeSessionByUserIntent(int deviceId) {
         synchronized (mSessions) {
             for (int i = 0; i < mSessions.size(); i++) {
                 ComputerControlSessionImpl session = mSessions.valueAt(i);
                 if (session.getDeviceId() != deviceId) {
                     continue;
                 }
-                try {
-                    session.close();
-                } catch (RemoteException e) {
-                    Slog.w(TAG, "Failed to close ComputerControlSession for deviceId "
-                            + deviceId, e);
-                }
+                session.close(CLOSE_REASON_USER_INITIATED);
                 return;
             }
         }
@@ -282,7 +278,9 @@ public class ComputerControlSessionProcessor {
     private boolean checkSessionCreationPreconditionsLocked(
             @NonNull ComputerControlSessionParams params,
             @NonNull IComputerControlSessionCallback callback) {
-        if (mKeyguardManager.isDeviceLocked()) {
+        boolean isDeviceLocked = Binder.withCleanCallingIdentity(
+            () -> mKeyguardManager.isDeviceLocked());
+        if (isDeviceLocked) {
             dispatchSessionCreationFailed(callback, params,
                     ComputerControlSession.ERROR_DEVICE_LOCKED);
             return false;
@@ -322,26 +320,22 @@ public class ComputerControlSessionProcessor {
 
         private final AttributionSource mAttributionSource;
         private final ComputerControlSessionParams mParams;
-        private final Set<UserHandle> mAllowedUsers;
         private final IComputerControlSessionCallback mCallback;
 
         ConsentResultReceiver(
                 @NonNull AttributionSource attributionSource,
                 @NonNull ComputerControlSessionParams params,
-                @NonNull Set<UserHandle> allowedUsers,
                 @NonNull IComputerControlSessionCallback callback) {
             super(mHandler);
             mAttributionSource = attributionSource;
             mParams = params;
-            mAllowedUsers = allowedUsers;
             mCallback = callback;
         }
 
         @Override
         protected void onReceiveResult(int resultCode, Bundle data) {
             if (resultCode == Activity.RESULT_OK) {
-                mHandler.post(
-                        () -> createSession(mAttributionSource, mParams, mAllowedUsers, mCallback));
+                mHandler.post(() -> createSession(mAttributionSource, mParams, mCallback));
             } else {
                 dispatchSessionCreationFailed(mCallback, mParams,
                         ComputerControlSession.ERROR_PERMISSION_DENIED);
@@ -366,41 +360,6 @@ public class ComputerControlSessionProcessor {
     }
 
     /**
-     * Listener for when a {@link ComputerControlSessionImpl} is closed.
-     *
-     * <p>Removes the session from the set of active sessions and notifies the client.
-     */
-    private class OnSessionClosedListener implements ComputerControlSessionImpl.OnClosedListener {
-        @NonNull
-        private final String mSessionName;
-        @NonNull
-        private final IComputerControlSessionCallback mAppCallback;
-
-        OnSessionClosedListener(@NonNull String sessionName,
-                @NonNull IComputerControlSessionCallback appCallback) {
-            mSessionName = sessionName;
-            mAppCallback = appCallback;
-        }
-
-        @Override
-        public void onClosed(@NonNull ComputerControlSessionImpl session) {
-            synchronized (mSessions) {
-                if (!mSessions.remove(session)) {
-                    // The session was already removed, which can happen if close() is called
-                    // multiple times.
-                    return;
-                }
-            }
-            try {
-                mAppCallback.onSessionClosed();
-            } catch (RemoteException e) {
-                Slog.w(TAG, "Failed to notify ComputerControlSession " + mSessionName
-                        + " about session closure");
-            }
-        }
-    }
-
-    /**
      * Returns {@code true}, if any of the ongoing computer control sessions are running on the
      * provided virtual display id, {@code false} otherwise.
      */
@@ -416,17 +375,39 @@ public class ComputerControlSessionProcessor {
     }
 
     /**
+     * Returns if the provided notification id and tag are used for a computer control session by
+     * the given package.
+     */
+    public boolean isComputerControlNotification(int notificationId,
+            @Nullable String notificationTag, @NonNull String packageName) {
+        if (!Flags.computerControlNonDismissibleNotifications()) {
+            return false;
+        }
+        final ComputerControlSessionImpl.NotificationInfo notificationInfo =
+                new ComputerControlSessionImpl.NotificationInfo(notificationId, notificationTag);
+        synchronized (mSessions) {
+            for (int i = 0; i < mSessions.size(); i++) {
+                ComputerControlSessionImpl session = mSessions.valueAt(i);
+                if (Objects.equals(session.getOwnerPackageName(), packageName)
+                        && Objects.equals(session.getNotificationInfo(), notificationInfo)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Interface for creating a virtual device for a computer control session.
      */
     public interface VirtualDeviceFactory {
         /**
          * Creates a new virtual device.
          */
-        IVirtualDevice createVirtualDevice(
+        VirtualDevice createVirtualDevice(
                 IBinder token,
                 AttributionSource attributionSource,
-                VirtualDeviceParams params,
-                IVirtualDeviceActivityListener activityListener);
+                VirtualDeviceParams params);
     }
 
     /**

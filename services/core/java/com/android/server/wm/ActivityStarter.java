@@ -58,6 +58,7 @@ import static android.os.Process.INVALID_UID;
 import static android.security.Flags.preventIntentRedirectAbortOrThrowException;
 import static android.security.Flags.preventIntentRedirectShowToast;
 import static android.view.Display.DEFAULT_DISPLAY;
+import static android.view.Display.INVALID_DISPLAY;
 import static android.view.WindowManager.TRANSIT_FLAG_AVOID_MOVE_TO_FRONT;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.window.TaskFragmentOperation.OP_TYPE_START_ACTIVITY_IN_TASK_FRAGMENT;
@@ -148,11 +149,11 @@ import com.android.server.pm.PackageArchiver;
 import com.android.server.power.ShutdownCheckPoints;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.uri.NeededUriGrants;
+import com.android.server.utils.Slogf;
 import com.android.server.wm.ActivityMetricsLogger.LaunchingState;
 import com.android.server.wm.BackgroundActivityStartController.BalVerdict;
 import com.android.server.wm.LaunchParamsController.LaunchParams;
 import com.android.server.wm.TaskFragment.EmbeddingCheckResult;
-import com.android.window.flags.Flags;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -191,6 +192,7 @@ class ActivityStarter {
     private final ActivityTaskSupervisor mSupervisor;
     private final ActivityStartInterceptor mInterceptor;
     private final ActivityStartController mController;
+    private final boolean mIsHeadlessSystemUserMode;
 
     // Share state variable among methods when starting an activity.
     @VisibleForTesting
@@ -718,6 +720,7 @@ class ActivityStarter {
         mRootWindowContainer = service.mRootWindowContainer;
         mSupervisor = supervisor;
         mInterceptor = interceptor;
+        mIsHeadlessSystemUserMode = service.getUserManagerInternal().isHeadlessSystemUserMode();
         reset(true);
     }
 
@@ -839,12 +842,6 @@ class ActivityStarter {
             synchronized (mService.mGlobalLock) {
                 final boolean globalConfigWillChange = mRequest.globalConfig != null
                         && mService.getGlobalConfiguration().diff(mRequest.globalConfig) != 0;
-                final Task rootTask = mRootWindowContainer.getTopDisplayFocusedRootTask();
-                if (rootTask != null) {
-                    rootTask.mConfigWillChange = globalConfigWillChange;
-                }
-                ProtoLog.v(WM_DEBUG_CONFIGURATION, "Starting activity when config "
-                        + "will change = %b", globalConfigWillChange);
 
                 final long origId = Binder.clearCallingIdentity();
                 try {
@@ -869,9 +866,6 @@ class ActivityStarter {
                     mService.mAmInternal.enforceCallingPermission(
                             android.Manifest.permission.CHANGE_CONFIGURATION,
                             "updateConfiguration()");
-                    if (rootTask != null) {
-                        rootTask.mConfigWillChange = false;
-                    }
                     ProtoLog.v(WM_DEBUG_CONFIGURATION,
                                 "Updating to new configuration after starting activity.");
 
@@ -1204,6 +1198,30 @@ class ActivityStarter {
             }
         }
 
+        if (android.multiuser.Flags.hsuAllowlistActivities() && err == ActivityManager.START_SUCCESS
+                && aInfo != null && mIsHeadlessSystemUserMode && userId == UserHandle.USER_SYSTEM) {
+            // If running in Headless System User Mode, check if the activity is allowlisted.
+            // This check is done as late as possible because it affects a very small number of the
+            // occurrences (as few devices are HSUM, and most of them don't even allow switching to
+            // the system user, so we want to minimize its impact.
+            var compName = intent.getComponent();
+            if (compName != null) {
+                var umi = mService.getUserManagerInternal();
+                if (!umi.isActivityAllowlistedForHsu(compName)) {
+                    Slogf.w(TAG, "Activity %s not allowed on headless system user",
+                            compName.flattenToShortString());
+                    // TODO(b/414326600): consolidate with the logLaunchedHsuActivity() on
+                    // handleResult (once the final API for logging is defined)
+                    umi.logBlockedHsuActivity(compName);
+                    err = ActivityManager.START_NOT_ALLOWED_FOR_HEADLESS_SYSTEM_USER;
+                }
+            } else {
+                // Should not be happen, but better be safe than sorry....
+                Slogf.wtf(TAG, "Could not check if %s is allowed for HSU because its intent (%s) "
+                        + "doesn't have a Component Name", aInfo, intent);
+            }
+        }
+
         final Task resultRootTask = resultRecord == null
                 ? null : resultRecord.getRootTask();
 
@@ -1337,9 +1355,12 @@ class ActivityStarter {
 
         final TaskDisplayArea suggestedLaunchDisplayArea =
                 computeSuggestedLaunchDisplayArea(inTask, sourceRecord, checkedOptions);
+        final int sourceDisplayId =
+                sourceRecord != null ? sourceRecord.getDisplayId() : INVALID_DISPLAY;
         mInterceptor.setStates(userId, realCallingPid, realCallingUid, startFlags,
                 callingPackage,
-                callingFeatureId);
+                callingFeatureId,
+                sourceDisplayId);
         if (mInterceptor.intercept(intent, rInfo, aInfo, resolvedType, inTask, inTaskFragment,
                 callingPid, callingUid, checkedOptions, suggestedLaunchDisplayArea,
                 request.componentSpecified)) {
@@ -1746,7 +1767,7 @@ class ActivityStarter {
      */
     private @Nullable Task handleStartResult(@NonNull ActivityRecord started,
             ActivityOptions options, int result, boolean isIndependentLaunch,
-            RemoteTransition remoteTransition, @NonNull Transition transition) {
+            RemoteTransition remoteTransition, Transition transition) {
         final boolean userLeaving = mSupervisor.mUserLeaving;
         mSupervisor.mUserLeaving = false;
         final Task currentRootTask = started.getRootTask();
@@ -1908,16 +1929,15 @@ class ActivityStarter {
         }
 
         if (android.multiuser.Flags.hsuAllowlistActivities()
-                && isStarted && started.mUserId == UserHandle.USER_SYSTEM) {
+                && isStarted && mIsHeadlessSystemUserMode
+                &&  started.mUserId == UserHandle.USER_SYSTEM) {
             // TODO(b/412177078): for now we're just logging activities launched on HSU, but once
             // the allowlist mechanism is in place, we'll need to change this call to log a
             // successful launch, but also log when it's blocked earlier on (probably before the
             // check for voice session on executeRequest(), as voice interaction is not supported
             // on the HSU)
             var umi = mService.getUserManagerInternal();
-            if (umi.isHeadlessSystemUserMode()) {
-                umi.logLaunchedHsuActivity(started.mActivityComponent);
-            }
+            umi.logLaunchedHsuActivity(started.mActivityComponent);
         }
 
         return startedActivityRootTask;
@@ -2521,6 +2541,7 @@ class ActivityStarter {
         mSupervisor.handleNonResizableTaskIfNeeded(top.getTask(),
                 mLaunchParams.mWindowingMode, mPreferredTaskDisplayArea, topRootTask);
 
+        mLastStartActivityRecord = top;
         return START_DELIVERED_TO_TOP;
     }
 
@@ -3079,16 +3100,11 @@ class ActivityStarter {
         Task intentTask = intentActivity.getTask();
         // The intent task might be reparented while in getOrCreateRootTask, caches the original
         // root task to distinguish if it is moving to front or not.
-        final Task origRootTask;
-        if (Flags.fixBalReparentExistingTask()) {
-            origRootTask = intentTask.getRootTask();
-        } else {
-            origRootTask = intentTask != null ? intentTask.getRootTask() : null;
-        }
+        final Task origRootTask = intentTask.getRootTask();
 
         // Update launch target task when it is not indicated.
         if (mTargetRootTask == null) {
-            if (Flags.fixBalReparentExistingTask() && mBalVerdict.blocks()) {
+            if (mBalVerdict.blocks()) {
                 // Stays on the same root task if the activity launch is not allowed.
                 mTargetRootTask = origRootTask;
             } else if (mSourceRecord != null && mSourceRecord.mLaunchRootTask != null) {
@@ -3687,6 +3703,8 @@ class ActivityStarter {
         pw.print(mAddingToTask);
         pw.print(" mInTaskFragment=");
         pw.println(mInTaskFragment);
+        pw.print(" mIsHeadlessSystemUserMode=");
+        pw.println(mIsHeadlessSystemUserMode);
     }
 
     /**

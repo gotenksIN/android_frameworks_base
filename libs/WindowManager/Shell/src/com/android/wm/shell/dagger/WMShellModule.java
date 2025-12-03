@@ -21,7 +21,6 @@ import static android.window.DesktopExperienceFlags.ENABLE_MULTI_DISPLAY_HOME_FO
 import static android.window.DesktopExperienceFlags.ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_SYSTEM_DIALOGS_TRANSITIONS;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_ENTER_TRANSITIONS_BUGFIX;
-import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_MODALS_POLICY;
 import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_TASK_LIMIT;
 
 import static com.android.systemui.Flags.enableViewCaptureTracing;
@@ -147,6 +146,7 @@ import com.android.wm.shell.desktopmode.ToggleResizeDesktopTaskTransitionHandler
 import com.android.wm.shell.desktopmode.VisualIndicatorUpdateScheduler;
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository;
 import com.android.wm.shell.desktopmode.WindowDragTransitionHandler;
+import com.android.wm.shell.desktopmode.clientfullscreenrequest.ClientFullscreenRequestTransitionHandler;
 import com.android.wm.shell.desktopmode.compatui.SystemModalsTransitionHandler;
 import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer;
 import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializerImpl;
@@ -177,6 +177,7 @@ import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.onehanded.OneHandedController;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController;
 import com.android.wm.shell.pip.PipTransitionController;
+import com.android.wm.shell.pip2.phone.PipTransitionState;
 import com.android.wm.shell.recents.RecentTasksController;
 import com.android.wm.shell.recents.RecentsTransitionHandler;
 import com.android.wm.shell.shared.TransactionPool;
@@ -186,6 +187,7 @@ import com.android.wm.shell.shared.annotations.ShellDesktopThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.shared.desktopmode.DesktopConfig;
 import com.android.wm.shell.shared.desktopmode.DesktopState;
+import com.android.wm.shell.shared.pip.PipFlags;
 import com.android.wm.shell.splitscreen.SplitScreenController;
 import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
@@ -762,6 +764,7 @@ public abstract class WMShellModule {
             ShellInit shellInit,
             Optional<SplitScreenController> splitScreenOptional,
             @Nullable PipTransitionController pipTransitionController,
+            Optional<PinnedLayerController> pinnedLayerController,
             Optional<RecentsTransitionHandler> recentsTransitionHandler,
             KeyguardTransitionHandler keyguardTransitionHandler,
             Optional<DesktopTasksController> desktopTasksController,
@@ -774,6 +777,7 @@ public abstract class WMShellModule {
                 transitions,
                 splitScreenOptional,
                 pipTransitionController,
+                pinnedLayerController.orElse(null),
                 recentsTransitionHandler,
                 keyguardTransitionHandler,
                 desktopTasksController,
@@ -949,6 +953,7 @@ public abstract class WMShellModule {
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             DesktopRepositoryInitializer desktopRepositoryInitializer,
             Optional<DesktopImmersiveController> desktopImmersiveController,
+            ClientFullscreenRequestTransitionHandler clientFullscreenRequestTransitionHandler,
             DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver,
             LaunchAdjacentController launchAdjacentController,
             RecentsTransitionHandler recentsTransitionHandler,
@@ -980,7 +985,9 @@ public abstract class WMShellModule {
             VisualIndicatorUpdateScheduler visualIndicatorUpdateScheduler,
             Optional<DesktopFirstListenerManager> desktopFirstListenerManager,
             TaskSnapshotManager taskSnapshotManager,
-            TransactionPool transactionPool) {
+            TransactionPool transactionPool,
+            PipTransitionState pipTransitionState,
+            LockTaskChangeListener lockTaskChangeListener) {
         return new DesktopTasksController(
                 context,
                 shellInit,
@@ -1001,6 +1008,7 @@ public abstract class WMShellModule {
                 toggleResizeDesktopTaskTransitionHandler,
                 dragToDesktopTransitionHandler,
                 desktopImmersiveController.get(),
+                clientFullscreenRequestTransitionHandler,
                 desktopUserRepositories,
                 desktopRepositoryInitializer,
                 recentsTransitionHandler,
@@ -1031,7 +1039,10 @@ public abstract class WMShellModule {
                 visualIndicatorUpdateScheduler,
                 desktopFirstListenerManager,
                 taskSnapshotManager,
-                transactionPool);
+                transactionPool,
+                PipFlags.isPip2ExperimentEnabled() ? Optional.of(pipTransitionState)
+                        : Optional.empty(),
+                lockTaskChangeListener);
     }
 
     @WMSingleton
@@ -1215,12 +1226,17 @@ public abstract class WMShellModule {
     @WMSingleton
     @Provides
     static Optional<DisplayDisconnectTransitionHandler> provideDisplayDisconnectTransitionHandler(
-            ShellInit shellInit, Transitions transitions) {
+            ShellInit shellInit, Transitions transitions,
+            Optional<DesktopTasksController> desktopTasksController,
+            DisplayController displayController,
+            RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer) {
         if (!DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()) {
             return Optional.empty();
         } else {
             return Optional.of(
-                    new DisplayDisconnectTransitionHandler(transitions, shellInit)
+                    new DisplayDisconnectTransitionHandler(transitions, shellInit,
+                            desktopTasksController, displayController,
+                            rootTaskDisplayAreaOrganizer)
             );
         }
     }
@@ -1443,7 +1459,6 @@ public abstract class WMShellModule {
             DesktopModeCompatPolicy desktopModeCompatPolicy,
             DesktopState desktopState) {
         if (!desktopState.canEnterDesktopMode()
-                || !ENABLE_DESKTOP_WINDOWING_MODALS_POLICY.isTrue()
                 || !ENABLE_DESKTOP_SYSTEM_DIALOGS_TRANSITIONS.isTrue()) {
             return Optional.empty();
         }
@@ -1660,12 +1675,26 @@ public abstract class WMShellModule {
 
     @WMSingleton
     @Provides
+    static ClientFullscreenRequestTransitionHandler provideClientFullscreenRequestTransitionHandler(
+            Context context,
+            @DynamicOverride DesktopUserRepositories desktopUserRepositories,
+            DesksOrganizer desksOrganizer,
+            DesktopWallpaperActivityTokenProvider desktopWallpaperActivityTokenProvider,
+            DisplayController displayController
+    ) {
+        return new ClientFullscreenRequestTransitionHandler(context, desktopUserRepositories,
+                desksOrganizer, desktopWallpaperActivityTokenProvider, displayController);
+    }
+
+    @WMSingleton
+    @Provides
     static Optional<DesktopMixedTransitionHandler> provideDesktopMixedTransitionHandler(
             Context context,
             Transitions transitions,
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             FreeformTaskTransitionHandler freeformTaskTransitionHandler,
             CloseDesktopTaskTransitionHandler closeDesktopTaskTransitionHandler,
+            ClientFullscreenRequestTransitionHandler clientFullscreenRequestTransitionHandler,
             Optional<DesktopImmersiveController> desktopImmersiveController,
             DesktopMinimizationTransitionHandler desktopMinimizationTransitionHandler,
             DesktopModeDragAndDropTransitionHandler desktopModeDragAndDropTransitionHandler,
@@ -1690,6 +1719,7 @@ public abstract class WMShellModule {
                         freeformTaskTransitionHandler,
                         closeDesktopTaskTransitionHandler,
                         desktopImmersiveController.get(),
+                        clientFullscreenRequestTransitionHandler,
                         desktopMinimizationTransitionHandler,
                         desktopModeDragAndDropTransitionHandler,
                         systemModalsTransitionHandler,

@@ -357,7 +357,8 @@ public:
     void setTouchpadAccelerationEnabled(bool enabled);
     void setTouchpadsEnabled(bool enabled);
     void setInputDeviceEnabled(uint32_t deviceId, bool enabled);
-    void setShowTouches(bool enabled);
+    void setShowTouchesEnabled(bool enabled);
+    void setForceShowTouchesOnDisplay(ui::LogicalDisplayId displayId, bool enabled);
     void setNonInteractiveDisplays(const std::set<ui::LogicalDisplayId>& displayIds);
     void reloadCalibration();
     void reloadPointerIcons();
@@ -374,6 +375,7 @@ public:
     void setStylusPointerIconEnabled(bool enabled);
     void setInputMethodConnectionIsActive(bool isActive);
     void setKeyRemapping(const std::map<int32_t, int32_t>& keyRemapping);
+    void setKeyRemappingForDevice(int32_t deviceId, const std::map<int32_t, int32_t>& keyRemapping);
 
     /* --- InputReaderPolicyInterface implementation --- */
 
@@ -557,6 +559,12 @@ private:
 
         // Keycodes to be remapped.
         std::map<int32_t /* fromKeyCode */, int32_t /* toKeyCode */> keyRemapping{};
+
+        // Keycodes to be remapped for device. This take precedence over global key remapping stored
+        // in keyRemapping map which applies to all devices.
+        std::map<int32_t /* deviceId */,
+                 std::map<int32_t /* fromKeyCode */, int32_t /* toKeyCode */>>
+                keyRemappingPerDevice{};
 
         // Displays which are non-interactive.
         std::set<ui::LogicalDisplayId> nonInteractiveDisplays;
@@ -832,6 +840,7 @@ void NativeInputManager::getReaderConfiguration(InputReaderConfiguration* outCon
         outConfig->stylusPointerIconEnabled = mLocked.stylusPointerIconEnabled;
 
         outConfig->keyRemapping = mLocked.keyRemapping;
+        outConfig->keyRemappingPerDevice = mLocked.keyRemappingPerDevice;
     } // release lock
 }
 
@@ -1697,8 +1706,13 @@ void NativeInputManager::setInputDeviceEnabled(uint32_t deviceId, bool enabled) 
     }
 }
 
-void NativeInputManager::setShowTouches(bool enabled) {
+void NativeInputManager::setShowTouchesEnabled(bool enabled) {
     mInputManager->getChoreographer().setShowTouchesEnabled(enabled);
+}
+
+void NativeInputManager::setForceShowTouchesOnDisplay(ui::LogicalDisplayId displayId,
+                                                      bool enabled) {
+    mInputManager->getChoreographer().setForceShowTouchesOnDisplay(displayId, enabled);
 }
 
 void NativeInputManager::requestPointerCapture(const sp<IBinder>& windowToken,
@@ -2199,6 +2213,37 @@ void NativeInputManager::setKeyRemapping(const std::map<int32_t, int32_t>& keyRe
             InputReaderConfiguration::Change::KEY_REMAPPING);
 }
 
+void NativeInputManager::setKeyRemappingForDevice(int32_t deviceId,
+                                                  const std::map<int32_t, int32_t>& keyRemapping) {
+    bool needsRefresh = false;
+    { // acquire lock
+        std::scoped_lock _l(mLock);
+        auto it = mLocked.keyRemappingPerDevice.find(deviceId);
+        if (it == mLocked.keyRemappingPerDevice.end()) {
+            // The key doesn't exist. If the new remapping is not empty, we need to add it.
+            if (!keyRemapping.empty()) {
+                mLocked.keyRemappingPerDevice.emplace(deviceId, keyRemapping);
+                needsRefresh = true;
+            }
+        } else {
+            // The key exists. Check if the value is different.
+            if (it->second != keyRemapping) {
+                if (keyRemapping.empty()) {
+                    mLocked.keyRemappingPerDevice.erase(it);
+                } else {
+                    it->second = keyRemapping;
+                }
+                needsRefresh = true;
+            }
+        }
+    } // release lock
+
+    if (needsRefresh) {
+        mInputManager->getReader().requestRefreshConfiguration(
+                InputReaderConfiguration::Change::KEY_REMAPPING);
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 static NativeInputManager* getNativeInputManager(JNIEnv* env, jobject clazz) {
@@ -2291,6 +2336,21 @@ static void nativeSetKeyRemapping(JNIEnv* env, jobject nativeImplObj, jintArray 
         keyRemapping.insert_or_assign(fromKeycodes[i], toKeycodes[i]);
     }
     im->setKeyRemapping(keyRemapping);
+}
+
+static void nativeSetKeyRemappingForDevice(JNIEnv* env, jobject nativeImplObj, jint deviceId,
+                                           jintArray fromKeyCodesArr, jintArray toKeyCodesArr) {
+    const std::vector<int32_t> fromKeyCodes = getIntArray(env, fromKeyCodesArr);
+    const std::vector<int32_t> toKeycodes = getIntArray(env, toKeyCodesArr);
+    if (fromKeyCodes.size() != toKeycodes.size()) {
+        jniThrowRuntimeException(env, "FromKeycodes and toKeycodes sizes cannot match.");
+    }
+    NativeInputManager* im = getNativeInputManager(env, nativeImplObj);
+    std::map<int32_t, int32_t> keyRemapping;
+    for (int i = 0; i < fromKeyCodes.size(); i++) {
+        keyRemapping.insert_or_assign(fromKeyCodes[i], toKeycodes[i]);
+    }
+    im->setKeyRemappingForDevice(deviceId, keyRemapping);
 }
 
 static jboolean nativeHasKeys(JNIEnv* env, jobject nativeImplObj, jint deviceId, jint sourceMask,
@@ -2666,10 +2726,17 @@ static void nativeSetTouchpadsEnabled(JNIEnv* env, jobject nativeImplObj, jboole
     getNativeInputManager(env, nativeImplObj)->setTouchpadsEnabled(enabled);
 }
 
-static void nativeSetShowTouches(JNIEnv* env, jobject nativeImplObj, jboolean enabled) {
+static void nativeSetShowTouchesEnabled(JNIEnv* env, jobject nativeImplObj, jboolean enabled) {
     NativeInputManager* im = getNativeInputManager(env, nativeImplObj);
 
-    im->setShowTouches(enabled);
+    im->setShowTouchesEnabled(enabled);
+}
+
+static void nativeSetForceShowTouchesOnDisplay(JNIEnv* env, jobject nativeImplObj, jint displayId,
+                                               jboolean enabled) {
+    NativeInputManager* im = getNativeInputManager(env, nativeImplObj);
+
+    im->setForceShowTouchesOnDisplay(ui::LogicalDisplayId{displayId}, enabled);
 }
 
 static void nativeSetNonInteractiveDisplays(JNIEnv* env, jobject nativeImplObj,
@@ -3361,6 +3428,7 @@ static const JNINativeMethod gInputManagerMethods[] = {
         {"getKeyCodeState", "(III)I", (void*)nativeGetKeyCodeState},
         {"getSwitchState", "(III)I", (void*)nativeGetSwitchState},
         {"setKeyRemapping", "([I[I)V", (void*)nativeSetKeyRemapping},
+        {"setKeyRemappingForDevice", "(I[I[I)V", (void*)nativeSetKeyRemappingForDevice},
         {"hasKeys", "(II[I[Z)Z", (void*)nativeHasKeys},
         {"getKeyCodeForKeyLocation", "(II)I", (void*)nativeGetKeyCodeForKeyLocation},
         {"createInputChannel", "(Ljava/lang/String;)Landroid/view/InputChannel;",
@@ -3412,7 +3480,8 @@ static const JNINativeMethod gInputManagerMethods[] = {
         {"setTouchpadSystemGesturesEnabled", "(Z)V", (void*)nativeSetTouchpadSystemGesturesEnabled},
         {"setTouchpadAccelerationEnabled", "(Z)V", (void*)nativeSetTouchpadAccelerationEnabled},
         {"setTouchpadsEnabled", "(Z)V", (void*)nativeSetTouchpadsEnabled},
-        {"setShowTouches", "(Z)V", (void*)nativeSetShowTouches},
+        {"setShowTouchesEnabled", "(Z)V", (void*)nativeSetShowTouchesEnabled},
+        {"setForceShowTouchesOnDisplay", "(IZ)V", (void*)nativeSetForceShowTouchesOnDisplay},
         {"setNonInteractiveDisplays", "([I)V", (void*)nativeSetNonInteractiveDisplays},
         {"reloadCalibration", "()V", (void*)nativeReloadCalibration},
         {"vibrate", "(I[J[III)V", (void*)nativeVibrate},

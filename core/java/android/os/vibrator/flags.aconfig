@@ -17,7 +17,7 @@ flag {
     name: "vibration_attribute_ime_usage_api"
     is_exported: true
     description: "A public API for IME usage vibration attribute"
-    bug: "332661766"
+    bug: "304262887"
     metadata {
         purpose: PURPOSE_FEATURE
     }
@@ -79,16 +79,6 @@ flag {
 
 flag {
     namespace: "haptics"
-    name: "vibration_scale_device_config_enabled"
-    description: "Enables device-configurable vibration scale factors"
-    bug: "427503922"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    namespace: "haptics"
     name: "vibration_scale_bounds_fix_enabled"
     description: "Enables audio-coupled haptics vibration scale bounds fix"
     bug: "427912736"
@@ -104,16 +94,6 @@ flag {
     bug: "417649629"
     metadata {
       purpose: PURPOSE_FEATURE
-    }
-}
-
-flag {
-    namespace: "haptics"
-    name: "decouple_frequency_profile_from_resonance"
-    description: "Removes frequency profiles dependency on resonant frequency when not present"
-    bug: "430503750"
-    metadata {
-        purpose: PURPOSE_BUGFIX
     }
 }
 

@@ -16,6 +16,7 @@
 
 package com.android.server.companion.utils;
 
+import static android.Manifest.permission.ACCESS_COMPANION_MESSAGE_PCC;
 import static android.Manifest.permission.ADD_MIRROR_DISPLAY;
 import static android.Manifest.permission.ADD_TRUSTED_DISPLAY;
 import static android.Manifest.permission.ACCESS_COMPANION_INFO;
@@ -51,6 +52,7 @@ import static android.Manifest.permission.RECORD_AUDIO;
 import static android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED;
 import static android.Manifest.permission.REQUEST_OBSERVE_DEVICE_UUID_PRESENCE;
 import static android.Manifest.permission.SEND_SMS;
+import static android.Manifest.permission.USE_COMPANION_TRANSPORTS;
 import static android.Manifest.permission.USE_SIP;
 import static android.Manifest.permission.WRITE_CALENDAR;
 import static android.Manifest.permission.WRITE_CALL_LOG;
@@ -72,6 +74,8 @@ import static android.companion.CompanionDeviceManager.FLAG_CALL_METADATA;
 import static android.companion.CompanionDeviceManager.FLAG_TASK_CONTINUITY;
 import static android.companion.CompanionDeviceManager.FLAG_UNIVERSAL_MODES;
 import static android.companion.CompanionDeviceManager.FLAG_UNIVERSAL_CLIPBOARD;
+import static android.companion.AssociationRequest.PERMISSION_GROUP_NEARBY;
+import static android.companion.CompanionDeviceManager.MESSAGE_ONEWAY_PCC;
 import static android.companion.CompanionResources.PERMISSION_ADD_MIRROR_DISPLAY;
 import static android.companion.CompanionResources.PERMISSION_ADD_TRUSTED_DISPLAY;
 import static android.companion.CompanionResources.PERMISSION_CALENDAR;
@@ -107,11 +111,14 @@ import android.content.Context;
 import android.os.Binder;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.UserHandle;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 
 import com.android.internal.app.IAppOpsService;
+import com.android.internal.util.CollectionUtils;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -143,6 +150,10 @@ public final class PermissionsUtils {
             Map.entry(PERMISSION_CREATE_VIRTUAL_DEVICE, List.of(CREATE_VIRTUAL_DEVICE)),
             Map.entry(PERMISSION_ADD_MIRROR_DISPLAY, List.of(ADD_MIRROR_DISPLAY)),
             Map.entry(PERMISSION_ADD_TRUSTED_DISPLAY, List.of(ADD_TRUSTED_DISPLAY)));
+
+    public static final Map<String, Integer> EXTRA_PERM_SET_TO_ID = Map.ofEntries(
+            Map.entry(PERMISSION_GROUP_NEARBY, PERMISSION_NEARBY_DEVICES)
+    );
 
     private static final Set<String> SYSTEM_ONLY_DEVICE_PROFILES;
     static {
@@ -371,6 +382,57 @@ public final class PermissionsUtils {
         if (callingUid == SHELL_UID || callingUid == ROOT_UID) return;
 
         throw new SecurityException("Caller is neither Shell nor Root");
+    }
+
+    /**
+     * Convert a set of permissions to a list of their corresponding Integer IDs.
+     */
+    public static Set<Integer> extraPermissionsToIds(Set<String> permissionSetKeys) {
+        Set<Integer> extraPermissionIds = new HashSet<>();
+        if (CollectionUtils.isEmpty(permissionSetKeys)) {
+            return extraPermissionIds;
+        }
+
+        for (String setKey : permissionSetKeys) {
+            if (setKey != null) {
+                extraPermissionIds.add(EXTRA_PERM_SET_TO_ID.get(setKey));
+            }
+        }
+        return extraPermissionIds;
+    }
+
+    /**
+     * Converts a set of permission group keys into a single set of all individual permissions
+     * contained within those groups.
+     */
+    public static Set<String> getIndividualPermissionsFromKeys(
+            @NonNull Set<String> permissionSetKeys) {
+        Set<String> individualPermissions = new HashSet<>();
+        for (Integer permSetKeyInt : extraPermissionsToIds(permissionSetKeys)) {
+            individualPermissions.addAll(PERM_SET_TO_PERMS.get(permSetKeyInt));
+        }
+        return individualPermissions;
+    }
+
+    /**
+     * Enforce permissions for sending messages.
+     */
+    public static void enforceMessagePermissions(Context context, int messageType) {
+        if (UserHandle.getAppId(Binder.getCallingUid()) == SYSTEM_UID
+                || context.checkCallingPermission(USE_COMPANION_TRANSPORTS)
+                == PERMISSION_GRANTED) {
+            return;
+        }
+        switch (messageType) {
+            case MESSAGE_ONEWAY_PCC -> {
+                if (context.checkCallingPermission(ACCESS_COMPANION_MESSAGE_PCC)
+                        != PERMISSION_GRANTED) {
+                    throw new SecurityException("sendMessage(PCC) permission denied");
+                }
+            }
+            default -> throw new SecurityException("sendMessage(" + messageType
+                    + ") permission denied");
+        }
     }
 
     private static boolean checkPackage(@UserIdInt int uid, @NonNull String packageName) {

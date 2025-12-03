@@ -16,6 +16,7 @@
 
 package android.permission;
 
+import static android.Manifest.permission.PACKAGE_USAGE_STATS;
 import static android.Manifest.permission_group.CAMERA;
 import static android.Manifest.permission_group.LOCATION;
 import static android.Manifest.permission_group.MICROPHONE;
@@ -40,6 +41,8 @@ import static android.telephony.TelephonyManager.CARRIER_PRIVILEGE_STATUS_HAS_AC
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
+import android.annotation.WorkerThread;
 import android.app.ActivityManager;
 import android.app.AppOpsManager;
 import android.companion.virtual.VirtualDevice;
@@ -107,6 +110,7 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
             10_000L - DEFAULT_RUNNING_TIME_MS;
     // LINT.ThenChange(/packages/SystemUI/src/com/android/systemui/privacy/PrivacyItemController.kt, /packages/SystemUI/src/com/android/systemui/appops/AppOpsControllerImpl.java)
     private static final long DEFAULT_RECENT_TIME_MS = 15000L;
+    private static final long ADDITIONAL_RECENT_TIME_LOCATION_ONLY_MS = 5000L;
 
     private static boolean shouldShowIndicators() {
         return DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_PRIVACY,
@@ -161,6 +165,7 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
     private ArrayMap<UserHandle, Context> mUserContexts;
     private PackageManager mPkgManager;
     private AppOpsManager mAppOpsManager;
+    private ActivityManager mActivityManager;
     private VirtualDeviceManager mVirtualDeviceManager;
     @GuardedBy("mAttributionChains")
     private final ArrayMap<Integer, ArrayList<AccessChainLink>> mAttributionChains =
@@ -175,6 +180,7 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
         mContext = context;
         mPkgManager = context.getPackageManager();
         mAppOpsManager = context.getSystemService(AppOpsManager.class);
+        mActivityManager = context.getSystemService(ActivityManager.class);
         mVirtualDeviceManager = context.getSystemService(VirtualDeviceManager.class);
         mUserContexts = new ArrayMap<>();
         mUserContexts.put(Process.myUserHandle(), mContext);
@@ -517,18 +523,20 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
      * <p>TODO(b/422799135): refactor isSystemApp() and isBackgroundApp(). Before this is fixed,
      *           make sure to update AppOpsPrivacyItemMonitor when changing this method
      */
+    @WorkerThread
+    @RequiresPermission(PACKAGE_USAGE_STATS)
     private boolean isBackgroundApp(int uid) {
-        ActivityManager activityManager =  mContext.getSystemService(ActivityManager.class);
-        List<ActivityManager.RunningAppProcessInfo> runningAppProcesses =
-                activityManager.getRunningAppProcesses();
-        if (runningAppProcesses == null) {
-            return false;
-        }
-        for (ActivityManager.RunningAppProcessInfo processInfo : runningAppProcesses) {
+        for (var processInfo : mActivityManager.getRunningAppProcesses()) {
             if (processInfo.uid == uid) {
                 return processInfo.importance
                         > ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE;
             }
+        }
+        if (android.location.flags.Flags.locationIndicatorGetUidImportanceFallback()) {
+            // In case a uid is not found because runningAppProcesses might return stale results
+            Slog.w(LOG_TAG, "UID " + uid + " not found in getRunningAppProcesses()");
+            return mActivityManager.getUidImportance(uid)
+                    > ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE;
         }
         return false;
     }
@@ -592,15 +600,6 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
                     AppOpsManager.AttributedOpEntry attrOpEntry =
                             opEntry.getAttributedOpEntries().get(attributionTag);
 
-                    long lastAccessTime = attrOpEntry.getLastAccessTime(opFlags);
-                    if (attrOpEntry.isRunning()) {
-                        lastAccessTime = now;
-                    }
-
-                    if (lastAccessTime < recentThreshold && !attrOpEntry.isRunning()) {
-                        continue;
-                    }
-
                     String permGroupName = getGroupForOp(op);
                     boolean isLocationOp =
                             android.location.flags.Flags.locationIndicatorsEnabled()
@@ -608,6 +607,19 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
                     long currentRunningThreshold =
                             runningThreshold
                                     - (isLocationOp ? ADDITIONAL_RUNNING_TIME_LOCATION_ONLY_MS : 0);
+                    long currentRecentThreshold =
+                            recentThreshold
+                                    - (isLocationOp ? ADDITIONAL_RECENT_TIME_LOCATION_ONLY_MS : 0);
+
+                    long lastAccessTime = attrOpEntry.getLastAccessTime(opFlags);
+                    if (attrOpEntry.isRunning()) {
+                        lastAccessTime = now;
+                    }
+
+                    if (lastAccessTime < currentRecentThreshold && !attrOpEntry.isRunning()) {
+                        continue;
+                    }
+
                     boolean isRunning =
                             attrOpEntry.isRunning() || lastAccessTime >= currentRunningThreshold;
 
@@ -626,7 +638,7 @@ public class PermissionUsageHelper implements AppOpsManager.OnOpActiveChangedLis
                         long lastFgAccess = attrOpEntry.getLastAccessForegroundTime(opFlags);
                         boolean isBackgroundAndNotRecentlyForeground =
                                 isBackgroundApp(uid)
-                                        && lastFgAccess < currentRunningThreshold
+                                        && lastFgAccess < currentRecentThreshold
                                         && !attrOpEntry.isRunning();
                         if (isSystemApp(op, packageName, user, uid)
                                 || isBackgroundAndNotRecentlyForeground) {

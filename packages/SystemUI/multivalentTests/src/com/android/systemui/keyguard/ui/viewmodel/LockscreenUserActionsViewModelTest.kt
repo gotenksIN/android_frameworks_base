@@ -16,6 +16,7 @@
 
 package com.android.systemui.keyguard.ui.viewmodel
 
+import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.testing.TestableLooper.RunWithLooper
 import androidx.test.filters.SmallTest
@@ -47,7 +48,6 @@ import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.TransitionKeys
-import com.android.systemui.scene.ui.viewmodel.SceneContainerArea
 import com.android.systemui.shade.domain.interactor.disableDualShade
 import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.shade.domain.interactor.enableSingleShade
@@ -178,6 +178,7 @@ class LockscreenUserActionsViewModelTest : SysuiTestCase() {
 
     @Test
     @EnableFlags(Flags.FLAG_COMMUNAL_HUB)
+    @DisableFlags(Flags.FLAG_DUAL_SHADE)
     fun userActions_combinedShade() =
         kosmos.runTest {
             disableDualShade()
@@ -266,7 +267,7 @@ class LockscreenUserActionsViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_COMMUNAL_HUB)
+    @EnableFlags(Flags.FLAG_COMMUNAL_HUB, Flags.FLAG_DUAL_SHADE)
     fun userActions_dualShade() =
         kosmos.runTest {
             enableDualShade(wideLayout = !isNarrowScreen)
@@ -302,20 +303,15 @@ class LockscreenUserActionsViewModelTest : SysuiTestCase() {
                 assertThat(downDestination?.transitionKey).isNull()
             }
 
-            val downFromEndHalfDestination =
-                userActions?.get(
-                    Swipe.Down(
-                        fromSource = SceneContainerArea.EndHalf,
-                        pointerCount = if (downWithTwoPointers) 2 else 1,
-                    )
-                )
+            val downFromBelowEdge =
+                userActions?.get(Swipe.Down(pointerCount = if (downWithTwoPointers) 2 else 1))
             when {
-                !isShadeTouchable -> assertThat(downFromEndHalfDestination).isNull()
-                downWithTwoPointers -> assertThat(downFromEndHalfDestination).isNull()
+                !isShadeTouchable -> assertThat(downFromBelowEdge).isNull()
+                downWithTwoPointers -> assertThat(downFromBelowEdge).isNull()
                 else -> {
-                    assertThat(downFromEndHalfDestination)
-                        .isEqualTo(ShowOverlay(Overlays.QuickSettingsShade))
-                    assertThat(downFromEndHalfDestination?.transitionKey).isNull()
+                    assertThat(downFromBelowEdge)
+                        .isEqualTo(ShowOverlay(Overlays.NotificationsShade))
+                    assertThat(downFromBelowEdge?.transitionKey).isNull()
                 }
             }
 

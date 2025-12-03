@@ -19,7 +19,6 @@ package com.android.server.adb;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 
 import static com.android.internal.util.dump.DumpUtils.writeStringIfNotNull;
-import static com.android.server.adb.AdbDebuggingManager.AdbDebuggingHandler.MSG_START_ADB_WIFI;
 import static com.android.server.adb.AdbService.ADBD;
 
 import android.annotation.NonNull;
@@ -87,6 +86,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.TimeoutException;
@@ -178,6 +178,11 @@ public class AdbDebuggingManager {
         mTempKeysFile = tempKeysFile;
         mTicker = ticker;
         mHandler = new AdbDebuggingHandler(FgThread.get().getLooper(), adbDebuggingThread);
+    }
+
+    void onDeviceNameChanged() {
+        Message msg = mHandler.obtainMessage(AdbDebuggingHandler.MSG_DEVICE_NAME_CHANGED);
+        mHandler.sendMessage(msg);
     }
 
     static void sendBroadcastWithDebugPermission(
@@ -291,11 +296,17 @@ public class AdbDebuggingManager {
                         break;
                     }
 
-                    Slog.d(TAG, "Recv packet: " + new String(Arrays.copyOfRange(buffer, 0, 2)));
-
                     // These messages are send from AdbdAuthContext::SendPacket
                     // in frameworks/native/libs/adbd_auth/adbd_auth.cpp
+                    AdbdMessage msgParser = new AdbdMessage(buffer);
+                    Optional<String> messageType = msgParser.readType();
+                    if (messageType.isEmpty()) {
+                        continue;
+                    }
 
+                    Slog.d(TAG, "Recv packet: " + messageType.get());
+
+                    // TODO, convert all these tests to check with messageType.
                     if (buffer[0] == 'P' && buffer[1] == 'K') {
                         // PK adbauth.AdbdAuthPacketRequestAuthorization
                         String key = new String(Arrays.copyOfRange(buffer, 2, count));
@@ -399,11 +410,53 @@ public class AdbDebuggingManager {
                                                 : AdbDebuggingHandler.MSG_SERVER_DISCONNECTED);
                         msg.obj = port;
                         mHandler.sendMessage(msg);
+                    } else if (messageType.get().equals(AdbdMessage.REGISTER_SERVICE)) {
+                        Optional<String> instanceName = msgParser.readU8String();
+                        if (instanceName.isEmpty()) {
+                            continue;
+                        }
+
+                        Optional<String> serviceType = msgParser.readU8String();
+                        if (serviceType.isEmpty()) {
+                            continue;
+                        }
+
+                        Optional<Integer> port = msgParser.readU16();
+                        if (port.isEmpty()) {
+                            continue;
+                        }
+
+                        Bundle bundle = new Bundle();
+                        bundle.putString("instanceName", instanceName.get());
+                        bundle.putString("serviceType", serviceType.get());
+                        bundle.putInt("port", port.get());
+
+                        mHandler.sendMessage(
+                                Message.obtain(
+                                        mHandler,
+                                        AdbDebuggingHandler.MSG_REGISTER_SERVICE,
+                                        bundle));
+                    } else if (messageType.get().equals(AdbdMessage.UNREGISTER_SERVICE)) {
+                        Optional<String> instanceName = msgParser.readU8String();
+                        if (instanceName.isEmpty()) {
+                            continue;
+                        }
+
+                        Optional<String> serviceType = msgParser.readU8String();
+                        if (serviceType.isEmpty()) {
+                            continue;
+                        }
+
+                        Bundle bundle = new Bundle();
+                        bundle.putString("instanceName", instanceName.get());
+                        bundle.putString("serviceType", serviceType.get());
+                        mHandler.sendMessage(
+                                Message.obtain(
+                                        mHandler,
+                                        AdbDebuggingHandler.MSG_UNREGISTER_SERVICE,
+                                        bundle));
                     } else {
-                        Slog.e(
-                                TAG,
-                                "Wrong message: " + (new String(Arrays.copyOfRange(buffer, 0, 2))));
-                        break;
+                        Slog.e(TAG, "Skipping unknown message type: " + messageType.get());
                     }
                 }
             } finally {
@@ -453,7 +506,7 @@ public class AdbDebuggingManager {
 
     // We need to know if ADBd will have access to the version of adbdauth which allows
     // to send ADB Wifi TSL port and ADBWifi lifecycle management over methods.
-    private static boolean wifiLifeCycleOverAdbdauthSupported() {
+    static boolean wifiLifeCycleOverAdbdauthSupported() {
         return Flags.useTlsLifecycle()
                 && (Build.VERSION.SDK_INT >= 37
                         || (Build.VERSION.SDK_INT == 36 && isAtLeastPreReleaseCodename("Baklava")));
@@ -478,6 +531,8 @@ public class AdbDebuggingManager {
         private final AdbNetworkMonitor mAdbNetworkMonitor;
 
         private static final String ADB_NOTIFICATION_CHANNEL_ID_TV = "usbdevicemanager.adb.tv";
+
+        private final AdbdServicesManager mAdbdServicesManager;
 
         private boolean isTv() {
             return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK);
@@ -564,8 +619,13 @@ public class AdbDebuggingManager {
         // Notification when adbd socket is disconnected.
         static final int MSG_ADBD_SOCKET_DISCONNECTED = 27;
 
-        // === Messages from other parts of the system
         private static final int MESSAGE_KEY_FILES_UPDATED = 28;
+
+        private static final int MSG_REGISTER_SERVICE = 29;
+        private static final int MSG_UNREGISTER_SERVICE = 30;
+
+        // Event sent when the framework device name was been changed by the user.
+        static final int MSG_DEVICE_NAME_CHANGED = 31;
 
         // === Messages we can send to adbd ===========
         static final String MSG_DISCONNECT_DEVICE = "DD";
@@ -606,6 +666,7 @@ public class AdbDebuggingManager {
             } else {
                 mAdbNetworkMonitor = new AdbBroadcastReceiver(mContext, mAdbConnectionInfo);
             }
+            mAdbdServicesManager = new AdbdServicesManager(mContext);
         }
 
         // Show when at least one device is connected.
@@ -851,18 +912,21 @@ public class AdbDebuggingManager {
                     if (mAdbWifiEnabled) {
                         break;
                     }
-                    String bssid = (String) msg.obj;
+                    Bundle bundle = (Bundle) msg.obj;
+                    String bssid = bundle.getString("bssid");
+                    String ssid = bundle.getString("ssid");
                     boolean alwaysAllow = msg.arg1 == 1;
                     if (alwaysAllow) {
-                        mAdbKeyStore.addTrustedNetwork(bssid);
+                        mAdbKeyStore.addTrustedNetwork(bssid, ssid);
                     }
 
                     // Let's check again to make sure we didn't switch networks while verifying
-                    // the wifi bssid.
+                    // the wifi network trust status.
                     AdbConnectionInfo newInfo = getCurrentWifiApInfo();
-                    if (newInfo == null || !bssid.equals(newInfo.getBSSID())) {
+                    if (newInfo == null || !ssid.equals(newInfo.getSSID())) {
                         break;
                     }
+
                     mAdbConnectionInfo.copy(newInfo);
                     Settings.Global.putInt(mContentResolver, Settings.Global.ADB_WIFI_ENABLED, 1);
                     mAdbNetworkMonitor.register();
@@ -970,10 +1034,30 @@ public class AdbDebuggingManager {
                     if (mAdbWifiEnabled) {
                         // In scenarios where adbd is restarted, the tls port may change.
                         onAdbdWifiServerDisconnected(-1);
+                        mAdbdServicesManager.unregisterAll();
                     }
                 }
                 case MESSAGE_KEY_FILES_UPDATED -> {
                     mAdbKeyStore.reloadKeyMap();
+                }
+                case MSG_REGISTER_SERVICE -> {
+                    Bundle bundle = (Bundle) msg.obj;
+                    String instanceName = bundle.getString("instanceName");
+                    String serviceType = bundle.getString("serviceType");
+                    int port = bundle.getInt("port");
+                    mAdbdServicesManager.registerService(instanceName, serviceType, port);
+                }
+                case MSG_UNREGISTER_SERVICE -> {
+                    Bundle bundle = (Bundle) msg.obj;
+                    String instanceName = bundle.getString("instanceName");
+                    String serviceType = bundle.getString("serviceType");
+                    mAdbdServicesManager.unregisterService(instanceName, serviceType);
+                }
+                case MSG_DEVICE_NAME_CHANGED -> {
+                    if (!mAdbWifiEnabled) {
+                        return;
+                    }
+                    mAdbdServicesManager.onAttributeChanged();
                 }
             }
         }
@@ -1126,7 +1210,7 @@ public class AdbDebuggingManager {
 
         private boolean verifyWifiNetwork(String bssid, String ssid) {
             // Check against a list of user-trusted networks.
-            if (mAdbKeyStore.isTrustedNetwork(bssid)) {
+            if (mAdbKeyStore.isTrustedNetwork(bssid, ssid)) {
                 return true;
             }
 
@@ -1422,10 +1506,13 @@ public class AdbDebuggingManager {
      * Allows wireless debugging on the network identified by {@code bssid} either once or always if
      * {@code alwaysAllow} is {@code true}.
      */
-    public void allowWirelessDebugging(boolean alwaysAllow, String bssid) {
+    public void allowWirelessDebugging(boolean alwaysAllow, String bssid, String ssid) {
         Message msg = mHandler.obtainMessage(AdbDebuggingHandler.MSG_ADBWIFI_ALLOW);
         msg.arg1 = alwaysAllow ? 1 : 0;
-        msg.obj = bssid;
+        Bundle bundle = new Bundle();
+        bundle.putString("bssid", bssid);
+        bundle.putString("ssid", ssid);
+        msg.obj = bundle;
         mHandler.sendMessage(msg);
     }
 

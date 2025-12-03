@@ -2017,6 +2017,14 @@ public abstract class ConnectionService extends Service {
             Log.d(this, "Adapter conference onRingback %b", ringback);
             mAdapter.setRingbackRequested(id, ringback);
         }
+
+        @Override
+        public void onConferenceMergeFailed(Conference conference) {
+            String id = mIdByConference.get(conference);
+            if (id != null) {
+                mAdapter.onConferenceMergeFailed(id);
+            }
+        }
     };
 
     private final Connection.Listener mConnectionListener = new Connection.Listener() {
@@ -3091,6 +3099,7 @@ public abstract class ConnectionService extends Service {
             // Conduct cleanup by getting rid of the original connection in Telecom here:
             mConnectionById.remove(id);
             mIdByConnection.remove(originalConnection);
+            onConnectionRemoved(originalConnection);
         } else {
             Log.w(this, "addConferenceFromConnection: Original connection not "
                     + "found in CS.");
@@ -3286,7 +3295,7 @@ public abstract class ConnectionService extends Service {
                     connection.getExtras(),
                     conferenceId,
                     connection.getCallDirection(),
-                    Connection.VERIFICATION_STATUS_NOT_VERIFIED);
+                    connection.getCallerNumberVerificationStatus());
             mAdapter.addExistingConnection(id, parcelableConnection);
         }
     }

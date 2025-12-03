@@ -27,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.scene.ContentScope
@@ -35,6 +34,7 @@ import com.android.compose.animation.scene.ElementContentScope
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardRootViewModel
+import com.android.systemui.plugins.keyguard.ui.composable.elements.BaseLockscreenElement.ElementSource
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElement
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementKeys
 import com.android.systemui.plugins.keyguard.ui.composable.elements.LockscreenElementProvider
@@ -47,7 +47,6 @@ import com.android.systemui.util.ui.isAnimating
 import com.android.systemui.util.ui.stopAnimating
 import com.android.systemui.util.ui.value
 import javax.inject.Inject
-import kotlin.collections.List
 
 @SysUISingleton
 class AodPromotedNotificationAreaElementProvider
@@ -62,6 +61,7 @@ constructor(
     private inner class PromotedNotificationElement : LockscreenElement {
         override val key = LockscreenElementKeys.Notifications.AOD.Promoted
         override val context = this@AodPromotedNotificationAreaElementProvider.context
+        override val source = ElementSource.STANDARD
 
         @Composable
         override fun LockscreenScope<ElementContentScope>.LockscreenElement() {
@@ -89,7 +89,7 @@ constructor(
             visibleState = transitionState,
             enter = if (isVisible.isAnimating) fadeIn() else EnterTransition.None,
             exit = if (isVisible.isAnimating) fadeOut() else ExitTransition.None,
-            modifier = modifier.then(context.burnInModifier),
+            modifier = modifier.then(context.burnInModifier).then(context.nonAuthUIModifier),
         ) {
             AODPromotedNotification(
                 viewModelFactory = aodPromotedNotificationViewModelFactory,

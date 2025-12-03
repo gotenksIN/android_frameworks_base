@@ -112,6 +112,7 @@ import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeViewController;
 import com.android.systemui.shade.display.StatusBarTouchShadeDisplayPolicy;
+import com.android.systemui.shade.display.domain.interactor.ShadeExpansionTargetDisplayInteractor;
 import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround;
 import com.android.systemui.shared.recents.ILauncherProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
@@ -172,6 +173,8 @@ public class LauncherProxyService implements CallbackController<LauncherProxyLis
     private final NotificationShadeWindowController mStatusBarWinController;
     private final Provider<SceneInteractor> mSceneInteractor;
     private final StatusBarTouchShadeDisplayPolicy mShadeDisplayPolicy;
+
+    private final ShadeExpansionTargetDisplayInteractor mShadeExpansionTargetDisplayInteractor;
 
     private final Runnable mConnectionRunnable = () ->
             internalConnectToCurrentUser("runnable: startConnectionToCurrentUser");
@@ -257,8 +260,9 @@ public class LauncherProxyService implements CallbackController<LauncherProxyLis
                 // TODO: b/407496148 - Refactor to use DisplayMetricsRepository instead
                 final DisplayInfo displayInfo = new DisplayInfo();
                 mDisplayTracker.getDisplay(event.getDisplayId()).getDisplayInfo(displayInfo);
-                int displayWidth = displayInfo.logicalWidth;
-                mShadeDisplayPolicy.onStatusBarOrLauncherTouched(event, displayWidth);
+                // Gestures on the launcher homescreen always open the notifications shade.
+                mShadeExpansionTargetDisplayInteractor.setExpansionIntentForNotificationElement(
+                        event.getDisplayId());
                 Trace.endSection();
             }
         }
@@ -706,6 +710,7 @@ public class LauncherProxyService implements CallbackController<LauncherProxyLis
             PerDisplayRepository<SysUiState> perDisplaySysUiStateRepository,
             Provider<SceneInteractor> sceneInteractor,
             StatusBarTouchShadeDisplayPolicy shadeDisplayPolicy,
+            ShadeExpansionTargetDisplayInteractor shadeExpansionTargetDisplayInteractor,
             UserTracker userTracker,
             UserManager userManager,
             WakefulnessLifecycle wakefulnessLifecycle,
@@ -748,6 +753,7 @@ public class LauncherProxyService implements CallbackController<LauncherProxyLis
         mStatusBarWinController = statusBarWinController;
         mSceneInteractor = sceneInteractor;
         mShadeDisplayPolicy = shadeDisplayPolicy;
+        mShadeExpansionTargetDisplayInteractor = shadeExpansionTargetDisplayInteractor;
         mUserTracker = userTracker;
         mConnectionBackoffAttempts = 0;
         mRecentsComponentName = ComponentName.unflattenFromString(context.getString(

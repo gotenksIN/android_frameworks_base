@@ -311,16 +311,6 @@ flag {
 }
 
 flag {
-    name: "consolidate_package_changed_broadcasts"
-    namespace: "package_manager_service"
-    description: "Flag guarding the changes to consolidate package_changed broadcasts into a single one, instead of sending them individually"
-    bug: "433394697"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "alternative_for_dexopt_cleanup"
     namespace: "art_cloud"
     description: "Flag guarding the alternative code path replacing the legacy dexopt code, to allow legacy dexopt cleanup."
@@ -329,19 +319,19 @@ flag {
 }
 
 flag {
-    name: "include_broadcast_debug_reason"
-    namespace: "package_manager_service"
-    description: "Include the debug reason when sending the package_changed broadcast"
-    bug: "433392586"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "verified_dexopt"
     namespace: "desktop_security"
     description: "Flag guarding the PackageState verifiedDexOpt API."
     is_exported: true
     bug: "439646165"
+}
+
+flag {
+    name: "allow_updated_version_better_than_apk_in_apex"
+    namespace: "package_manager_service"
+    description: "Allow successful install of APEX containing APK, even with a better APK version in /data."
+    bug: "421220425"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

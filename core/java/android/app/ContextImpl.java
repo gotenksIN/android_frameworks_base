@@ -2468,7 +2468,7 @@ class ContextImpl extends Context {
      * TODO(b/147647877): Fix usages and remove.
      */
     @SuppressWarnings("AndroidFrameworkClientSidePermissionCheck")
-    @RavenwoodIgnore // Always false on Ravenwood.
+    @RavenwoodRedirect
     private static boolean isSystemOrSystemUI(Context context) {
         return ActivityThread.isSystem() || context.checkPermission(
                 "android.permission.STATUS_BAR_SERVICE",
@@ -3748,7 +3748,7 @@ class ContextImpl extends Context {
         mParams = Objects.requireNonNull(params);
         mAttributionSource = createAttributionSource(attributionTag, nextAttributionSource,
                 params.getRenouncedPermissions(), params.shouldRegisterAttributionSource(), mDeviceId);
-        mContentResolver = newApplicationContentResolver(this, mainThread);
+        mContentResolver = new ApplicationContentResolver(this, mainThread);
     }
 
     @RavenwoodKeep
@@ -3971,16 +3971,12 @@ class ContextImpl extends Context {
     // ----------------------------------------------------------------------
     // ----------------------------------------------------------------------
 
-    @RavenwoodIgnore
-    private static ApplicationContentResolver newApplicationContentResolver(
-            Context context, ActivityThread mainThread) {
-        return new ApplicationContentResolver(context, mainThread);
-    }
-
-    private static final class ApplicationContentResolver extends ContentResolver {
+    @RavenwoodKeepPartialClass
+    static final class ApplicationContentResolver extends ContentResolver {
         @UnsupportedAppUsage
         private final ActivityThread mMainThread;
 
+        @RavenwoodKeep
         public ApplicationContentResolver(Context context, ActivityThread mainThread) {
             super(context);
             mMainThread = Objects.requireNonNull(mainThread);

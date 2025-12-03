@@ -2801,7 +2801,7 @@
     <!-- On the keyguard screen, when pattern lock is disabled, only tell them to press menu to unlock.  This is shown in small font at the bottom. -->
     <string name="lockscreen_instructions_when_pattern_disabled">Press Menu to unlock.</string>
 
-    <!-- On the unlock pattern screen, shown at the top of the unlock screen to tell the user what to do. Below this text is the place for theu ser to draw the pattern. -->
+    <!-- On the unlock pattern screen, shown at the top of the unlock screen to tell the user what to do. Below this text is the place for the user to draw the pattern. -->
     <string name="lockscreen_pattern_instructions">Draw pattern to unlock</string>
     <!-- Button at the bottom of the unlock screen to make an emergency call or access other emergency assistance functions. -->
     <string name="lockscreen_emergency_call">Emergency</string>
@@ -2814,7 +2814,14 @@
     <!-- On the unlock password screen, shown when the user enters the wrong lock password and must try again. -->
     <string name="lockscreen_password_wrong">Try again</string>
 
-    <!-- On the keyguard screen, this string explains that some features or data may not be available until the device is unlocked. [CHAR LIMIT=48] -->
+    <!-- On the keyguard screen, this string explains that the user can click anywhere to go to the
+         bouncer and, ultimately, unlock the device. [CHAR LIMIT=48] -->
+    <string name="lockscreen_click_to_unlock_hint">Click to unlock</string>
+    <!-- On the keyguard screen, this string explains that the user can press any key to go to the
+         bouncer and, ultimately, unlock the device. [CHAR LIMIT=48] -->
+    <string name="lockscreen_key_to_unlock_hint">Press any key to unlock</string>
+    <!-- On the keyguard screen, this string explains that some features or data may not be
+         available until the device is unlocked. [CHAR LIMIT=48] -->
     <string name="lockscreen_storage_locked">Unlock for all features and data</string>
 
     <!-- Shown when face unlock failed multiple times so we're just using the backup -->
@@ -4964,10 +4971,10 @@
     <string name="accessibility_shortcut_off">Don’t turn on</string>
 
     <!-- Text for a feature status that is enabled. [CHAR LIMIT=20] -->
-    <string name="accessibility_shortcut_menu_item_status_on">ON</string>
+    <string name="accessibility_shortcut_menu_item_status_on">On</string>
 
     <!-- Text for a feature status that is disabled. [CHAR LIMIT=20] -->
-    <string name="accessibility_shortcut_menu_item_status_off">OFF</string>
+    <string name="accessibility_shortcut_menu_item_status_off">Off</string>
 
     <!-- Title for a warning about security implications of enabling an accessibility
     service. [CHAR LIMIT=NONE] -->
@@ -5023,6 +5030,24 @@
     <string name="accessibility_edit_shortcut_menu_volume_title">Choose features to use with the
         volume keys shortcut
     </string>
+
+    <!-- Label for accessibility button shortcut. [CHAR LIMIT=100] -->
+    <string name="accessibility_shortcut_label_button">accessibility button</string>
+
+    <!-- Label for volume keys shortcut. [CHAR LIMIT=100] -->
+    <string name="accessibility_shortcut_label_volume_keys">volume keys</string>
+
+    <!-- Label for gesture shortcut. [CHAR LIMIT=100] -->
+    <string name="accessibility_shortcut_label_gesture">gesture</string>
+
+    <!-- Label for quick settings shortcut. [CHAR LIMIT=100] -->
+    <string name="accessibility_shortcut_label_quick_settings">quick settings</string>
+
+    <!-- Label for triple tap shortcut. [CHAR LIMIT=100] -->
+    <string name="accessibility_shortcut_label_triple_tap">triple tap</string>
+
+    <!-- DO NOT TRANSLATE -->
+    <string name="accessibility_shortcut_label_top_row_key">top row key</string>
 
     <!-- Text for showing the warning to user when uncheck the legacy app item in the accessibility
     shortcut menu, user can aware the service to be disabled. [CHAR LIMIT=100] -->
@@ -6452,11 +6477,9 @@
     <!-- Status message displayed on SIM Network Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_SIM_NETWORK_IN_PROGRESS">Requesting SIM network unlock\u2026</string>
     <!-- Status message displayed on SIM Network Subset Depersonalization panel [CHAR LIMIT=none] -->
-    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_IN_PROGRESS">Requesting SIM network subset unlock
-\u2026</string>
+    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_IN_PROGRESS">Requesting SIM network subset unlock\u2026</string>
     <!-- Status message displayed on SIM Service Provider Depersonalization panel [CHAR LIMIT=none] -->
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_IN_PROGRESS">Requesting SIM service provider un
-lock\u2026</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_IN_PROGRESS">Requesting SIM service provider unlock\u2026</string>
     <!-- Status message displayed on SIM Corporate Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_SIM_CORPORATE_IN_PROGRESS">Requesting SIM corporate unlock\u2026</string>
     <!-- Status message displayed on PUK Depersonalization panel [CHAR LIMIT=none] -->
@@ -6478,8 +6501,7 @@ lock\u2026</string>
     <!-- Status message displayed on RUIM Hrpd Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_RUIM_HRPD_IN_PROGRESS">Requesting RUIM hrpd unlock\u2026</string>
     <!-- Status message displayed on RUIM Service Provider Depersonalization panel [CHAR LIMIT=none] -->
-    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_IN_PROGRESS">Requesting RUIM service provider
-unlock\u2026</string>
+    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_IN_PROGRESS">Requesting RUIM service provider unlock\u2026</string>
     <!-- Status message displayed on RUIM Corporate Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_RUIM_CORPORATE_IN_PROGRESS">Requesting RUIM corporate unlock\u2026</string>
 
@@ -6511,11 +6533,9 @@ unlock\u2026</string>
     <!-- Error message displayed on SIM Network Depersonalization panel  [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_SIM_NETWORK_ERROR">SIM Network unlock request unsuccessful.</string>
     <!-- Error message displayed on SIM Network Subset Depersonalization panel  [CHAR LIMIT=none] -->
-    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_ERROR">SIM Network Subset unlock request unsucces
-sful.</string>
+    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_ERROR">SIM Network Subset unlock request unsuccessful.</string>
     <!-- Error message displayed on SIM Service Provider Depersonalization panel  [CHAR LIMIT=none] -->
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_ERROR">SIM Service Provider unlock request unsu
-ccessful.</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_ERROR">SIM Service Provider unlock request unsuccessful.</string>
     <!-- Error message displayed on SIM Corporate Depersonalization panel  [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_SIM_CORPORATE_ERROR">SIM Corporate unlock request unsuccessful.</string>
     <!-- Error message displayed on SIM SIM Depersonalization panel  [CHAR LIMIT=none] -->
@@ -6529,8 +6549,7 @@ ccessful.</string>
     <!-- Error message displayed on RUIM Corporate Depersonalization panel  [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_RUIM_CORPORATE_ERROR">RUIM Corporate unlock request unsuccessful.</string>
     <!-- Error message displayed on RUIM Service Provider Depersonalization panel  [CHAR LIMIT=none] -->
-    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_ERROR">RUIM Service Provider unlock request un
-successful.</string>
+    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_ERROR">RUIM Service Provider unlock request unsuccessful.</string>
     <!-- Error message displayed on RUIM RUIM Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_RUIM_RUIM_ERROR">RUIM unlock request unsuccessful.</string>
     <!-- Error message displayed on PUK Depersonalization panel [CHAR LIMIT=none] -->
@@ -6566,14 +6585,12 @@ successful.</string>
     <string name="PERSOSUBSTATE_SIM_IMPI_ERROR">IMPI unlock request unsuccessful.</string>
     <!--  Error message displayed on SIM NS_SP Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_SIM_NS_SP_ERROR">Network subset service provider unlock request unsuccessful.</string>
-
     <!-- Success message displayed on SIM Network Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUCCESS">SIM Network unlock successful.</string>
     <!-- Success message displayed on SIM Network Subset Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_SUCCESS">SIM Network Subset unlock successful.</string>
     <!-- Success message displayed on SIM Service Provider Depersonalization panel [CHAR LIMIT=none] -->
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_SUCCESS">SIM Service Provider unlock successful
-.</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_SUCCESS">SIM Service Provider unlock successful.</string>
     <!-- Success message displayed on SIM Corporate Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_SIM_CORPORATE_SUCCESS">SIM Corporate unlock successful.</string>
     <!-- Success message displayed on SIM SIM Depersonalization panel [CHAR LIMIT=none] -->
@@ -6585,8 +6602,7 @@ successful.</string>
     <!-- Success message displayed on RUIM Hrpd Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_RUIM_HRPD_SUCCESS">RUIM Hrpd unlock successful.</string>
     <!-- Success message displayed on RUIM Service Provider Depersonalization panel [CHAR LIMIT=none] -->
-    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_SUCCESS">RUIM Service Provider unlock successf
-ul.</string>
+    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_SUCCESS">RUIM Service Provider unlock successful.</string>
     <!-- Success message displayed on RUIM Corporate Depersonalization panel [CHAR LIMIT=none] -->
     <string name="PERSOSUBSTATE_RUIM_CORPORATE_SUCCESS">RUIM Corporate unlock successful.</string>
     <!-- Success message displayed on RUIM RUIM Depersonalization panel [CHAR LIMIT=none] -->

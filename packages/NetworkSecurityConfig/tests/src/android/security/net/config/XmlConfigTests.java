@@ -16,6 +16,18 @@
 
 package android.security.net.config;
 
+import static android.security.Flags.FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION;
+import static android.security.NetworkSecurityPolicy.DOMAIN_ENCRYPTION_MODE_DISABLED;
+import static android.security.NetworkSecurityPolicy.DOMAIN_ENCRYPTION_MODE_ENABLED;
+import static android.security.NetworkSecurityPolicy.DOMAIN_ENCRYPTION_MODE_REQUIRED;
+import static android.security.NetworkSecurityPolicy.DOMAIN_ENCRYPTION_MODE_OPPORTUNISTIC;
+import static android.security.net.config.NetworkSecurityConfig.DEFAULT_DOMAIN_ENCRYPTION_MODE;
+
+import static com.android.org.conscrypt.net.flags.Flags.FLAG_CERTIFICATE_TRANSPARENCY_DEFAULT_ENABLED;
+
+import static libcore.net.NetworkSecurityPolicy.CERTIFICATE_TRANSPARENCY_REASON_SDK_TARGET_DEFAULT_ENABLED;
+import static libcore.net.NetworkSecurityPolicy.CERTIFICATE_TRANSPARENCY_REASON_APP_OPT_IN;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -25,27 +37,40 @@ import static org.junit.Assert.fail;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.platform.test.annotations.RequiresFlagsDisabled;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
+
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.security.KeyStore;
 import java.security.Provider;
 import java.security.cert.X509Certificate;
 import java.util.Set;
+
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
 
 @RunWith(AndroidJUnit4.class)
 public class XmlConfigTests {
 
     private static final String DEBUG_CA_SUBJ = "O=AOSP, CN=Test debug CA";
     private Context mContext;
+
+    @Rule
+    public final CheckFlagsRule mCheckFlagsRule =
+            DeviceFlagsValueProvider.createCheckFlagsRule();
 
     @Before
     public void setUp() throws Exception {
@@ -446,7 +471,7 @@ public class XmlConfigTests {
 
     @Test
     public void testBadConfig5() throws Exception {
-        testBadConfig(R.xml.bad_config4);
+        testBadConfig(R.xml.bad_config5);
     }
 
     @Test
@@ -577,6 +602,29 @@ public class XmlConfigTests {
     }
 
     @Test
+    @RequiresFlagsEnabled(FLAG_CERTIFICATE_TRANSPARENCY_DEFAULT_ENABLED)
+    public void getCertificateTransparencyVerificationReason_post37_isSdkTargetDefaultEnabled()
+            throws Exception {
+        XmlConfigSource source = new XmlConfigSource(mContext, R.xml.ct_domains,
+                TestUtils.makeApplicationInfo());
+        ApplicationConfig appConfig = new ApplicationConfig(source);
+
+        assertEquals(CERTIFICATE_TRANSPARENCY_REASON_SDK_TARGET_DEFAULT_ENABLED,
+                appConfig.getCertificateTransparencyVerificationReason(""));
+    }
+
+    @Test
+    @RequiresFlagsDisabled(FLAG_CERTIFICATE_TRANSPARENCY_DEFAULT_ENABLED)
+    public void getCertificateTransparencyVerificationReason_pre37_isAppOptIn() throws Exception {
+        XmlConfigSource source = new XmlConfigSource(mContext, R.xml.ct_domains,
+                TestUtils.makeApplicationInfo());
+        ApplicationConfig appConfig = new ApplicationConfig(source);
+
+        assertEquals(CERTIFICATE_TRANSPARENCY_REASON_APP_OPT_IN,
+                appConfig.getCertificateTransparencyVerificationReason(""));
+    }
+
+    @Test
     public void testCertificateTransparencyUserConfig() throws Exception {
         XmlConfigSource source = new XmlConfigSource(mContext, R.xml.ct_users,
                 TestUtils.makeApplicationInfo());
@@ -592,5 +640,66 @@ public class XmlConfigTests {
 
         config = appConfig.getConfigForHostname("subdomain.android.com");
         assertTrue(config.isCertificateTransparencyVerificationRequired());
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION)
+    public void testDomainEncryptionBaseConfig() throws Exception {
+        XmlConfigSource source = new XmlConfigSource(mContext, R.xml.domain_encryption_base_config,
+                TestUtils.makeApplicationInfo());
+        ApplicationConfig appConfig = new ApplicationConfig(source);
+        assertFalse(appConfig.hasPerDomainConfigs());
+        NetworkSecurityConfig config = appConfig.getConfigForHostname(/* hostname= */ "");
+        assertNotNull(config);
+
+        assertEquals(DOMAIN_ENCRYPTION_MODE_ENABLED, config.getDomainEncryptionMode());
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION)
+    public void testDomainEncryptionDomainConfig() throws Exception {
+        XmlConfigSource source = new XmlConfigSource(mContext,
+                R.xml.domain_encryption_domain_config, TestUtils.makeApplicationInfo());
+        ApplicationConfig appConfig = new ApplicationConfig(source);
+        assertTrue(appConfig.hasPerDomainConfigs());
+        NetworkSecurityConfig config = appConfig.getConfigForHostname(/* hostname= */ "");
+        assertNotNull(config);
+
+        // Assert base config setting
+        assertEquals(DOMAIN_ENCRYPTION_MODE_DISABLED, config.getDomainEncryptionMode());
+
+        // Assert domain config settings
+        config = appConfig.getConfigForHostname("android.com");
+        assertEquals(DOMAIN_ENCRYPTION_MODE_OPPORTUNISTIC, config.getDomainEncryptionMode());
+
+        config = appConfig.getConfigForHostname("enabled.android.com");
+        assertEquals(DOMAIN_ENCRYPTION_MODE_ENABLED, config.getDomainEncryptionMode());
+
+        config = appConfig.getConfigForHostname("required.android.com");
+        assertEquals(DOMAIN_ENCRYPTION_MODE_REQUIRED, config.getDomainEncryptionMode());
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ENCRYPTED_CLIENT_HELLO_CONFIGURATION)
+    public void testDomainEncryptionInvalidValues() throws Exception {
+        XmlConfigSource source = new XmlConfigSource(mContext, R.xml.domain_encryption_invalid,
+                TestUtils.makeApplicationInfo());
+        ApplicationConfig appConfig = new ApplicationConfig(source);
+        assertTrue(appConfig.hasPerDomainConfigs());
+        NetworkSecurityConfig config = appConfig.getConfigForHostname(/* hostname= */ "");
+        assertNotNull(config);
+
+        // Assert default base config setting
+        assertEquals(DEFAULT_DOMAIN_ENCRYPTION_MODE, config.getDomainEncryptionMode());
+
+        // Assert domain config settings
+        config = appConfig.getConfigForHostname("android.com");
+        assertEquals(DEFAULT_DOMAIN_ENCRYPTION_MODE, config.getDomainEncryptionMode());
+
+        config = appConfig.getConfigForHostname("whitespace.android.com");
+        assertEquals(DEFAULT_DOMAIN_ENCRYPTION_MODE, config.getDomainEncryptionMode());
+
+        config = appConfig.getConfigForHostname("capitalized.android.com");
+        assertEquals(DEFAULT_DOMAIN_ENCRYPTION_MODE, config.getDomainEncryptionMode());
     }
 }

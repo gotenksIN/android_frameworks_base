@@ -16,9 +16,6 @@
 
 package com.android.systemui.screencapture.record.smallscreen.ui.compose
 
-import android.graphics.Rect as AndroidRect
-import android.view.ViewTreeObserver.InternalInsetsInfo
-import android.view.Window
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -56,7 +53,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,16 +60,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.android.compose.PlatformIconButton
 import com.android.compose.modifiers.thenIf
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.res.R
-import com.android.systemui.screencapture.common.ScreenCaptureUi
 import com.android.systemui.screencapture.common.ScreenCaptureUiScope
 import com.android.systemui.screencapture.common.ui.compose.LoadingIcon
 import com.android.systemui.screencapture.common.ui.compose.PrimaryButton
@@ -82,7 +75,6 @@ import com.android.systemui.screencapture.common.ui.compose.loadIcon
 import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModel
 import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.RecordDetailsPopupType
 import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.SmallScreenCaptureRecordViewModel
-import com.android.systemui.util.view.listenToComputeInternalInsets
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -91,10 +83,8 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 class SmallScreenCaptureRecordContent
 @Inject
-constructor(
-    @ScreenCaptureUi private val window: Window?,
-    private val viewModelFactory: SmallScreenCaptureRecordViewModel.Factory,
-) : ScreenCaptureContent {
+constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Factory) :
+    ScreenCaptureContent {
 
     @Composable
     override fun Content() {
@@ -102,18 +92,6 @@ constructor(
             rememberViewModel("SmallScreenCaptureRecordContent#viewModel") {
                 viewModelFactory.create()
             }
-
-        val toolbarRect: AndroidRect = remember(Unit) { AndroidRect() }
-        val detailsRect: AndroidRect = remember(Unit) { AndroidRect() }
-        LaunchedEffect(window) {
-            window ?: return@LaunchedEffect
-            window.decorView.viewTreeObserver.listenToComputeInternalInsets {
-                setTouchableInsets(InternalInsetsInfo.TOUCHABLE_INSETS_REGION)
-
-                touchableRegion.union(toolbarRect)
-                touchableRegion.union(detailsRect)
-            }
-        }
 
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -132,7 +110,6 @@ constructor(
                 shape = FloatingToolbarDefaults.ContainerShape,
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 6.dp,
-                modifier = Modifier.onGloballyPositioned { toolbarRect.set(it.boundsInWindow()) },
             ) {
                 Row(
                     modifier = Modifier.height(64.dp).padding(horizontal = 12.dp),
@@ -158,6 +135,24 @@ constructor(
                                         loadIcon(
                                                 viewModel = viewModel,
                                                 resId = R.drawable.ic_settings,
+                                                contentDescription = null,
+                                            )
+                                            .value,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            },
+                        )
+                    }
+                    AnimatedVisibility(visible = viewModel.shouldShowMarkupButton) {
+                        ToggleToolbarButton(
+                            checked = viewModel.markupEnabled == true,
+                            onCheckedChanged = { viewModel.setMarkupEnabled(it) },
+                            icon = {
+                                LoadingIcon(
+                                    icon =
+                                        loadIcon(
+                                                viewModel = viewModel,
+                                                resId = R.drawable.ic_markup,
                                                 contentDescription = null,
                                             )
                                             .value,
@@ -196,10 +191,7 @@ constructor(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(28.dp),
                     shadowElevation = 2.dp,
-                    modifier =
-                        Modifier.animateContentSize().onGloballyPositioned {
-                            detailsRect.set(it.boundsInWindow())
-                        },
+                    modifier = Modifier.animateContentSize(),
                 ) {
                     AnimatedContent(
                         targetState = viewModel.detailsPopup,
@@ -248,15 +240,15 @@ private fun ToggleToolbarButton(
     modifier: Modifier = Modifier,
 ) {
     val secondaryColor = MaterialTheme.colorScheme.secondary
+    val shape = RoundedCornerShape(12.dp)
     Box(
         contentAlignment = Alignment.Center,
         modifier =
             modifier
                 .size(48.dp)
                 .padding(6.dp)
-                .thenIf(checked) {
-                    Modifier.background(color = secondaryColor, shape = RoundedCornerShape(12.dp))
-                }
+                .clip(shape)
+                .thenIf(checked) { Modifier.background(color = secondaryColor, shape = shape) }
                 .clickable(onClick = { onCheckedChanged(!checked) }),
     ) {
         CompositionLocalProvider(
@@ -322,8 +314,4 @@ private fun ToolbarPrimaryButton(
             )
         }
     }
-}
-
-private fun AndroidRect.set(rect: Rect) {
-    set(rect.left.toInt(), rect.top.toInt(), rect.right.toInt(), rect.bottom.toInt())
 }

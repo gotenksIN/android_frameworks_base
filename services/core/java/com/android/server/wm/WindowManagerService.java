@@ -141,7 +141,6 @@ import static com.android.server.wm.SensitiveContentPackages.PackageInfo;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_ALL;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_WINDOW_ANIMATION;
 import static com.android.server.wm.WindowContainer.AnimationFlags.CHILDREN;
-import static com.android.server.wm.WindowContainer.SYNC_STATE_WAITING_FOR_DRAW;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_DISPLAY;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_INPUT_METHOD;
@@ -157,7 +156,6 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerInternal.OnWindowRemovedListener;
 import static com.android.server.wm.WindowManagerInternal.WindowFocusChangeListener;
 import static com.android.systemui.shared.Flags.enableLppAssistInvocationEffect;
-import static com.android.window.flags.Flags.enableDeviceStateAutoRotateSettingRefactor;
 import static com.android.window.flags.Flags.multiCrop;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
 
@@ -611,8 +609,6 @@ public class WindowManagerService extends IWindowManager.Stub
     @NonNull
     @VisibleForTesting
     WindowManagerPolicy mPolicy;
-
-    final WindowManagerFlags mFlags;
 
     final IActivityManager mActivityManager;
     final ActivityManagerInternal mAmInternal;
@@ -1315,7 +1311,6 @@ public class WindowManagerService extends IWindowManager.Stub
         mGlobalLock = atm.getGlobalLock();
         mAtmService = atm;
         mContext = context;
-        mFlags = new WindowManagerFlags();
         mIsPc = mContext.getPackageManager().hasSystemFeature(FEATURE_PC);
         mAlwaysSeqId = mContext.getPackageManager().hasSystemFeature(FEATURE_WATCH)
                 ? Flags.alwaysSeqIdLayoutWear() : Flags.alwaysSeqIdLayout();
@@ -1754,19 +1749,19 @@ public class WindowManagerService extends IWindowManager.Stub
                     final Bundle options = mWindowContextListenerController
                             .getOptions(windowContextToken);
                     token = new WindowToken.Builder(this, binder, type)
-                            .setDisplayContent(displayContent)
                             .setOwnerCanManageAppTokens(session.mCanAddInternalSystemWindow)
                             .setRoundedCornerOverlay(isRoundedCornerOverlay)
                             .setFromClientToken(true)
                             .setOptions(options)
                             .build();
+                    displayContent.addWindowToken(token);
                 } else {
                     final IBinder binder = attrs.token != null ? attrs.token : client.asBinder();
                     token = new WindowToken.Builder(this, binder, type)
-                            .setDisplayContent(displayContent)
                             .setOwnerCanManageAppTokens(session.mCanAddInternalSystemWindow)
                             .setRoundedCornerOverlay(isRoundedCornerOverlay)
                             .build();
+                    displayContent.addWindowToken(token);
                 }
             } else if (rootType >= FIRST_APPLICATION_WINDOW
                     && rootType <= LAST_APPLICATION_WINDOW) {
@@ -1838,9 +1833,9 @@ public class WindowManagerService extends IWindowManager.Stub
                 // instead make a new token for it (as if null had been passed in for the token).
                 attrs.token = null;
                 token = new WindowToken.Builder(this, client.asBinder(), type)
-                        .setDisplayContent(displayContent)
                         .setOwnerCanManageAppTokens(session.mCanAddInternalSystemWindow)
                         .build();
+                displayContent.addWindowToken(token);
             }
 
             final WindowState win = new WindowState(this, session, client, token, parentWindow,
@@ -2393,7 +2388,7 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized (mGlobalLock) {
             if (a11yControllerInternal.hasWindowManagerEventDispatcher()) {
                 WindowState window = mWindowMap.get(token);
-                if (window != null) {
+                if (window != null && window.isFocused()) {
                     a11yControllerInternal.onRectangleOnScreenRequested(
                             window.getDisplayId(), rectangle, source);
                 }
@@ -2613,23 +2608,14 @@ public class WindowManagerService extends IWindowManager.Stub
             }
 
             if (DEBUG_LAYOUT) {
-                Slog.v(
-                        TAG_WM,
-                        "Relayout "
-                                + win
-                                + ": viewVisibility="
-                                + viewVisibility
-                                + " req="
-                                + requestedWidth
-                                + "x"
-                                + requestedHeight
-                                + " "
-                                + win.mAttrs);
+                Slog.v(TAG_WM, "Relayout " + win + ": viewVisibility=" + viewVisibility
+                        + " req=" + requestedWidth + "x" + requestedHeight + " " + win.mAttrs);
             }
             if ((attrChanges & WindowManager.LayoutParams.ALPHA_CHANGED) != 0) {
                 winAnimator.mAlpha = attrs.alpha;
             }
             if ((attrChanges & WindowManager.LayoutParams.TITLE_CHANGED) != 0) {
+                win.updateName();
                 win.mInputWindowHandle.setName(win.getName());
             }
             win.setWindowScale(win.mRequestedWidth, win.mRequestedHeight);
@@ -2872,33 +2858,18 @@ public class WindowManagerService extends IWindowManager.Stub
                 } else {
                     outRelayoutResult.syncSeqId = -1;
                     if (mAlwaysSeqId && (result & RELAYOUT_RES_CANCEL_AND_REDRAW) == 0
-                            && win.cancelAndRedraw(syncSeqId)) {
-                        // Surface-placement has resulted in a new configuration or a new sync,
-                        // so this current layout is invalid until subsequent reportResized.
-
-                        // However, make a targeted optimization to let the client draw early if the
-                        // relayout result won't change even after the client receives the new
-                        // configuration. If there is an explicit sync, though, the user-perceived
-                        // latency will be worse due to the client drawing content that won't be
-                        // presented; so, don't "optimize" in that case.
-                        final boolean inExplicitSync = syncSeqId <= win.mBufferSeqId
-                                || win.mSyncState == SYNC_STATE_WAITING_FOR_DRAW;
-                        if (!inExplicitSync && win.layoutIgnoresClientConfig()) {
-                            // Returning a seqId indicates, to the client, that it can use this
-                            // result even though it's configuration is out-dated.
-                            outRelayoutResult.syncSeqId = win.mSyncSeqId;
-                            if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
-                                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "ignoreCancelDraw seqId="
-                                        + win.mSyncSeqId);
-                            }
-                        } else {
-                            result |= RELAYOUT_RES_CANCEL_AND_REDRAW;
-                            if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
-                                Trace.instant(TRACE_TAG_WINDOW_MANAGER, "lateCancelDraw "
-                                        + " clientSeqId=" + syncSeqId
-                                        + " serverSeqId=" + win.mSyncSeqId
-                                        + " bufferSeqId=" + win.mBufferSeqId);
-                            }
+                            && win.cancelAndRedraw(syncSeqId)
+                            && !displayContent.mWaitingForConfig) {
+                        // Surface-placement has resulted in a new configuration or a new sync.
+                        // This means the layout is technically invalid; however, it's very unlikely
+                        // that this will matter and we can often save a frame of latency by
+                        // returning the config/seqId here.
+                        // Returning a seqId indicates, to the client, that it can use this
+                        // result even though it called relayout with out-of-date config.
+                        outRelayoutResult.syncSeqId = win.mSyncSeqId;
+                        if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+                            Trace.instant(TRACE_TAG_WINDOW_MANAGER, "ignoreCancelDraw seqId="
+                                    + win.mSyncSeqId);
                         }
                     }
                 }
@@ -3089,16 +3060,15 @@ public class WindowManagerService extends IWindowManager.Stub
                 return;
             }
             if (type == TYPE_WALLPAPER) {
-                new WallpaperWindowToken(this, binder, true, dc,
-                        true /* ownerCanManageAppTokens */, options);
+                token = new WallpaperWindowToken(this, binder, options);
             } else {
-                new WindowToken.Builder(this, binder, type)
-                        .setDisplayContent(dc)
+                token = new WindowToken.Builder(this, binder, type)
                         .setPersistOnEmpty(true)
                         .setOwnerCanManageAppTokens(true)
                         .setOptions(options)
                         .build();
             }
+            dc.addWindowToken(token);
         }
     }
 
@@ -3987,81 +3957,108 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     /** Update the current user. */
-    public void setCurrentUser(@UserIdInt int newUserId, UserState uss) {
+    public void setCurrentUser(@UserIdInt int newUserId) {
+        if (DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()) return;
         synchronized (mGlobalLock) {
-            if (DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()) {
-                mRoot.mTaskSupervisor.mStartingUsers.add(uss);
-            }
             final TransitionController controller = mAtmService.getTransitionController();
-            final Runnable applyUserChange = () -> {
-                mCurrentUserId = newUserId;
-                mDisplayWindowSettingsProvider.setOverrideSettingsForUser(newUserId);
-                mPolicy.setCurrentUserLw(newUserId);
-                mKeyguardDisableHandler.setCurrentUser(newUserId);
-
-                // Hide windows that should not be seen by the new user.
-                mRoot.switchUser(newUserId);
-                if (DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()) {
-                    // Restore the new user's previous windows or home.
-                    mRoot.switchUser(newUserId, uss);
-                }
-                mWindowPlacerLocked.performSurfacePlacement();
-
-                // Notify whether the root docked task exists for the current user
-                final DisplayContent displayContent = getDefaultDisplayContentLocked();
-
-                if (mDisplayReady) {
-                    // If the display is already prepared, update the density.
-                    // Otherwise, we'll update it when it's prepared.
-                    final int forcedDensity = getForcedDisplayDensityForUserLocked(newUserId);
-                    final int targetDensity = forcedDensity != 0
-                            ? forcedDensity : displayContent.getInitialDisplayDensity();
-                    displayContent.setForcedDensity(targetDensity, UserHandle.USER_CURRENT);
-
-                    // Because DisplayWindowSettingsProvider.mOverrideSettings has been reset for
-                    // the new user, we need to update DisplayWindowSettings.mShouldShowSystemDecors
-                    // to ensure it reflects the latest value.
-                    if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
-                        final int displayCount = mRoot.mChildren.size();
-                        for (int i = 0; i < displayCount; ++i) {
-                            final DisplayContent dc = mRoot.mChildren.get(i);
-                            dc.updateShouldShowSystemDecorations();
-                        }
-                    }
-                }
-
-                // This call is crucial on user switch to ensure the Magnify IME state
-                // is correctly re-evaluated and applied for the new user.
-                mSettingsObserver.updateMagnifyIme();
-                mAtmService.mChainTracker.end();
-            };
-            if (!controller.isShellTransitionsEnabled()) {
-                applyUserChange.run();
-                return;
+            final ActionChain chain = mAtmService.mChainTracker.startTransit("setUser");
+            if (!chain.isCollecting() && controller.isShellTransitionsEnabled()) {
+                chain.attachTransition(controller.createTransition(TRANSIT_OPEN));
+                controller.requestStartTransition(chain.getTransition(),
+                        null /* trigger */, null /* remote */, null /* disp */);
             }
-            if (!DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()) {
-                final ActionChain chain = mAtmService.mChainTracker.startTransit("setUser");
-                if (!chain.isCollecting()) {
-                    chain.attachTransition(controller.createTransition(TRANSIT_OPEN));
-                    controller.requestStartTransition(chain.getTransition(),
-                            null /* trigger */, null /* remote */, null /* disp */);
-                }
-                applyUserChange.run();
+            prepareUserStart(newUserId);
+            switchUserInternal(newUserId);
+            mAtmService.mChainTracker.end();
+        }
+    }
+
+    /**
+     * Called when a new user is about to start.
+     */
+    public void prepareUserStart(@UserIdInt int newUserId) {
+        synchronized (mGlobalLock) {
+            mCurrentUserId = newUserId;
+            mDisplayWindowSettingsProvider.setOverrideSettingsForUser(newUserId);
+            mPolicy.setCurrentUserLw(newUserId);
+            mKeyguardDisableHandler.setCurrentUser(newUserId);
+            // This call is crucial on user switch to ensure the Magnify IME state
+            // is correctly re-evaluated and applied for the new user.
+            mSettingsObserver.updateMagnifyIme();
+        }
+    }
+
+    /**
+     * Starts a user-switch transition to the given user.
+     */
+    public void startUserSwitchTransition(@UserIdInt int oldUserId, @UserIdInt int newUserId,
+            UserState uss) {
+        synchronized (mGlobalLock) {
+            mRoot.mTaskSupervisor.mStartingUsers.add(uss);
+            final Runnable switchUserRunnable = () -> {
+                switchUserInternal(newUserId);
+                moveUserToForeground(newUserId, uss, "startUserSwitchTransition");
+            };
+
+            final TransitionController controller = mAtmService.getTransitionController();
+            if (!controller.isShellTransitionsEnabled()) {
+                switchUserRunnable.run();
                 return;
             }
             final Transition transition = new Transition(TRANSIT_OPEN, 0 /* flags */,
                     controller, mAtmService.mWindowManager.mSyncEngine);
             controller.startCollectOrQueue(transition, (deferred) -> {
-                final ActionChain chain = mAtmService.mChainTracker.start("setUser",
-                        transition);
+                final ActionChain chain = mAtmService.mChainTracker.start("setUser", transition);
                 final TransitionRequestInfo.UserChange userChange =
-                        DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()
-                                ? new TransitionRequestInfo.UserChange(mCurrentUserId,
-                                newUserId)
-                                : null;
+                           new TransitionRequestInfo.UserChange(oldUserId, newUserId);
                 controller.requestStartUserTransition(chain.getTransition(), userChange);
-                applyUserChange.run();
+                switchUserRunnable.run();
+                mAtmService.mChainTracker.end();
             });
+        }
+    }
+
+    private void switchUserInternal(@UserIdInt int newUserId) {
+        synchronized (mGlobalLock) {
+            // Hide windows that should not be seen by the new user.
+            mRoot.switchUser(newUserId);
+            mWindowPlacerLocked.performSurfacePlacement();
+
+            // Notify whether the root docked task exists for the current user
+            final DisplayContent displayContent = getDefaultDisplayContentLocked();
+
+            if (mDisplayReady) {
+                // If the display is already prepared, update the density.
+                // Otherwise, we'll update it when it's prepared.
+                final int forcedDensity = getForcedDisplayDensityForUserLocked(newUserId);
+                final int targetDensity = forcedDensity != 0
+                        ? forcedDensity : displayContent.getInitialDisplayDensity();
+                displayContent.setForcedDensity(targetDensity, UserHandle.USER_CURRENT);
+
+                // Because DisplayWindowSettingsProvider.mOverrideSettings has been reset for
+                // the new user, we need to update DisplayWindowSettings.mShouldShowSystemDecors
+                // to ensure it reflects the latest value.
+                if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
+                    final int displayCount = mRoot.mChildren.size();
+                    for (int i = 0; i < displayCount; ++i) {
+                        final DisplayContent dc = mRoot.mChildren.get(i);
+                        dc.updateShouldShowSystemDecorations();
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Moves a user to the foreground, either by starting its home activity or restoring its
+     * previous tasks.
+     */
+    public void moveUserToForeground(@UserIdInt int newUserId, UserState uss, String reason) {
+        boolean homeInFront = mAtmService.mInternal.switchUser(newUserId, uss);
+        if (homeInFront) {
+            mAtmService.mInternal.startHomeActivity(newUserId, reason);
+        } else {
+            mAtmService.mInternal.resumeTopActivities(false /* scheduleIdle */);
         }
     }
 
@@ -4778,11 +4775,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 "setDeviceStateAutoRotateSetting()")) {
             throw new SecurityException("Requires SET_ORIENTATION permission");
         }
-        if (!enableDeviceStateAutoRotateSettingRefactor()) {
-            throw new UnsupportedOperationException(
-                    "API setDeviceStateAutoRotateSetting should not be used when "
-                            + "enableDeviceStateAutoRotateSettingRefactor is disabled");
-        }
         synchronized (mGlobalLock) {
             final DisplayContent display = mRoot.getDefaultDisplay();
             display.getDisplayRotation().requestDeviceStateAutoRotateSettingChange(deviceState,
@@ -4891,11 +4883,6 @@ public class WindowManagerService extends IWindowManager.Stub
         if (!checkCallingPermission(android.Manifest.permission.SET_ORIENTATION,
                 "setRotationAtAngleIfAllowed()")) {
             throw new SecurityException("Requires SET_ORIENTATION permission");
-        }
-        if (!enableDeviceStateAutoRotateSettingRefactor()) {
-            throw new UnsupportedOperationException(
-                    "API setRotationAtAngleIfAllowed should not be used when "
-                            + "enableDeviceStateAutoRotateSettingRefactor is disabled");
         }
         final long origId = Binder.clearCallingIdentity();
         try {
@@ -5218,9 +5205,11 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized (mGlobalLock) {
             final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
             if (displayContent == null) {
-                throw new IllegalArgumentException(
+                Slog.w(
+                        TAG,
                         "Trying to unregister system gesture exclusion event for invalid display: "
                                 + displayId);
+                return;
             }
             displayContent.unregisterSystemGestureExclusionListener(listener);
         }
@@ -5906,6 +5895,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
     public void systemReady() {
         mSystemReady = true;
+        mAnimatorScale.onSystemReady();
         mPolicy.systemReady();
         mRoot.forAllDisplayPolicies(DisplayPolicy::systemReady);
         mSnapshotController.systemReady();
@@ -7745,22 +7735,15 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
+    /**
+     * This method should be no longer used. Preserve the declaration because it has the
+     * UnsupportedAppUsage annotation.
+     *
+     * @deprecated Use {@link WindowManager#getCurrentWindowMetrics()} instead.
+     */
     @Override
     public void getStableInsets(int displayId, Rect outInsets) throws RemoteException {
-        synchronized (mGlobalLock) {
-            getStableInsetsLocked(displayId, outInsets);
-        }
-    }
-
-    /** This is used when there's no app info available and shall return the system default.*/
-    void getStableInsetsLocked(int displayId, Rect outInsets) {
         outInsets.setEmpty();
-        final DisplayContent dc = mRoot.getDisplayContent(displayId);
-        if (dc != null) {
-            final DisplayInfo di = dc.getDisplayInfo();
-            outInsets.set(dc.getDisplayPolicy().getDecorInsetsInfo(
-                    di.rotation, di.logicalWidth, di.logicalHeight).mConfigInsets);
-        }
     }
 
     /**
@@ -8580,6 +8563,26 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
+        public SurfaceControl createMirrorForDisplayContent(int displayId) {
+            synchronized (mGlobalLock) {
+                final DisplayContent dc = mRoot.getDisplayContent(displayId);
+                if (dc == null) {
+                    Slog.e(TAG, "Failed to create mirror for display: "
+                            + displayId + " - DisplayContent not found.");
+                    return null;
+                }
+                final SurfaceControl sc = dc.getSurfaceControl();
+                if (sc == null) {
+                    Slog.e(TAG, "Failed to create mirror for display: " + displayId
+                            + " - SurfaceControl is not initialized.");
+                    return null;
+                }
+                // Return the mirror surface to avoid leaking the display surface outside of WM.
+                return SurfaceControl.mirrorSurface(sc);
+            }
+        }
+
+        @Override
         @ImeClientFocusResult
         public int hasInputMethodClientFocus(IBinder windowToken, int uid, int pid, int displayId) {
             if (displayId == Display.INVALID_DISPLAY) {
@@ -8841,7 +8844,7 @@ public class WindowManagerService extends IWindowManager.Stub
             final String imeLayeringTargetName;
             final String imeInputTargetName;
             final String imeControlTargetName;
-            final String imeSurfaceParentName;
+            final String imeParentName;
             synchronized (mGlobalLock) {
                 focusedWindowName = String.valueOf(mWindowMap.get(focusedToken));
                 requestWindowName = String.valueOf(mWindowMap.get(requestToken));
@@ -8850,7 +8853,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     imeLayeringTargetName = String.valueOf(dc.getImeLayeringTarget());
                     imeInputTargetName =  String.valueOf(dc.getImeInputTarget());
                     imeControlTargetName = String.valueOf(dc.getImeControlTarget());
-                    imeSurfaceParentName = String.valueOf(dc.mInputMethodSurfaceParent);
+                    imeParentName = String.valueOf(dc.getImeParent());
                     if (show) {
                         dc.onShowImeRequested();
                     }
@@ -8858,11 +8861,11 @@ public class WindowManagerService extends IWindowManager.Stub
                     imeLayeringTargetName = "no-display";
                     imeInputTargetName = "no-display";
                     imeControlTargetName = "no-display";
-                    imeSurfaceParentName = "no-display";
+                    imeParentName = "no-display";
                 }
             }
             return new ImeTargetInfo(focusedWindowName, requestWindowName, imeLayeringTargetName,
-                    imeInputTargetName, imeControlTargetName, imeSurfaceParentName);
+                    imeInputTargetName, imeControlTargetName, imeParentName);
         }
 
         @Override

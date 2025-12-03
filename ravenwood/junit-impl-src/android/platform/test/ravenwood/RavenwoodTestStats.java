@@ -109,12 +109,15 @@ public class RavenwoodTestStats {
                 // Keep unwrapping the exception until we found
                 // unsupported API exception or the deepest cause.
                 for (;;) {
-                    if (ex instanceof RavenwoodUnsupportedApiException) {
+                    if (ex instanceof RavenwoodUnsupportedApiException re) {
                         // The test hit a Ravenwood unsupported API
-                        return getCaller(ex);
+                        return re.getReason();
                     }
                     var cause = ex.getCause();
                     if (cause == null) {
+                        if (ex instanceof UnsatisfiedLinkError) {
+                            return getCaller(ex);
+                        }
                         if (ex instanceof ExceptionInInitializerError
                                 && ex.getMessage().contains("RavenwoodUnsupportedApiException")) {
                             // A static initializer hit a Ravenwood unsupported API
@@ -206,12 +209,6 @@ public class RavenwoodTestStats {
                 skipped += outcome.skippedCount();
                 failed += outcome.failedCount();
                 totalDuration = totalDuration.plus(outcome.duration);
-
-                // Skip the constructor method, which shows up as a result if a class
-                // has @DisabledOnRavenwood.
-                if ("<init>".equals(method)) {
-                    continue;
-                }
 
                 var rawMethodName = extractMethodName(method);
 

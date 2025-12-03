@@ -23,11 +23,11 @@ import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
 import static com.android.server.am.OomAdjuster.CPU_TIME_REASON_NONE;
 import static com.android.server.am.OomAdjuster.IMPLICIT_CPU_TIME_REASON_NONE;
 import static com.android.server.am.OomAdjusterImpl.ProcessRecordNode.NUM_NODE_TYPE;
-import static com.android.server.am.ProcessList.CACHED_APP_MIN_ADJ;
-import static com.android.server.am.ProcessList.INVALID_ADJ;
-import static com.android.server.am.ProcessList.SCHED_GROUP_BACKGROUND;
-import static com.android.server.am.ProcessList.SERVICE_B_ADJ;
-import static com.android.server.am.ProcessList.UNKNOWN_ADJ;
+import static com.android.server.am.psc.Constants.CACHED_APP_MIN_ADJ;
+import static com.android.server.am.psc.Constants.INVALID_ADJ;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_BACKGROUND;
+import static com.android.server.am.psc.Constants.SERVICE_B_ADJ;
+import static com.android.server.am.psc.Constants.UNKNOWN_ADJ;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_VISIBLE;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER;
 
@@ -42,7 +42,6 @@ import android.util.TimeUtils;
 
 import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
-import com.android.server.am.Flags;
 import com.android.server.am.OomAdjuster;
 import com.android.server.am.OomAdjusterImpl;
 import com.android.server.am.ProcessCachedOptimizerRecord.ShouldNotFreezeReason;
@@ -140,71 +139,13 @@ public abstract class ProcessRecordInternal {
          * @param hasStartedServices The new mHasStartedServices value.
          */
         void onHasStartedServicesChanged(boolean hasStartedServices);
-
-        /**
-         * Called when the broadcast-receiving state changes.
-         *
-         * @param isReceivingBroadcast The new isReceivingBroadcast value.
-         */
-        void onIsReceivingBroadcastChanged(boolean isReceivingBroadcast);
-
-        /**
-         * Called when the activity-hosting state changes.
-         *
-         * @param hasActivities The new hasActivities value.
-         */
-        void onHasActivitiesChanged(boolean hasActivities);
     }
-
-    // TODO(b/401350380): Remove these methods after the push model is migrated.
-    /** @return {@code true} if the process has any activities. */
-    public abstract boolean hasActivities();
-
-    /** @return {@code true} if the process is considered a heavy-weight process. */
-    public abstract boolean isHeavyWeightProcess();
-
-    /** @return {@code true} if the process has any visible activities. */
-    public abstract boolean hasVisibleActivities();
-
-    /** @return {@code true} if the process is the current home process. */
-    public abstract boolean isHomeProcess();
-
-    /** @return {@code true} if the process was the previous top process. */
-    public abstract boolean isPreviousProcess();
-
-    /** @return {@code true} if the process is associated with any recent tasks. */
-    public abstract boolean hasRecentTasks();
-
-    /** Checks if the process is currently showing UI while the device is in doze mode. */
-    public abstract boolean isShowingUiWhileDozing();
-
-    /**
-     * Retrieves the activity state flags from the underlying window process controller.
-     * TODO: b/401350380 - Remove it after the feature of pushing activity state is launched.
-     */
-    public abstract int getActivityStateFlagsLegacy();
-
-    /**
-     * Retrieves the perceptible task stopped time in milliseconds from the underlying window
-     * process controller.
-     * TODO: b/401350380 - Remove it after the feature of pushing activity state is launched.
-     */
-    public abstract long getPerceptibleTaskStoppedTimeMillisLegacy();
 
     /** Retrieves the last reported PSS (Proportional Set Size) for this process. */
     public abstract long getLastPss();
 
     /** Retrieves the last reported RSS (Resident Set Size) for this process. */
     public abstract long getLastRss();
-
-    /**
-     * Checks if the process is currently receiving a broadcast.
-     *
-     * @param outSchedGroup An output array of size 1 where the scheduling group associated
-     *                      with the broadcast will be placed if one is active.
-     * @return {@code true} if the process is receiving a broadcast.
-     */
-    public abstract boolean isReceivingBroadcast(int[] outSchedGroup);
 
     /**
      * Checks if a specific compatibility change is enabled for the process.
@@ -584,7 +525,7 @@ public abstract class ProcessRecordInternal {
      * Is this process currently showing a non-activity UI that the user
      * is interacting with? E.g. The status bar when it is expanded, but
      * not when it is minimized. When true the
-     * process will be set to use the ProcessList#SCHED_GROUP_TOP_APP
+     * process will be set to use the {@link Constants#SCHED_GROUP_TOP_APP}
      * scheduling group to boost performance.
      */
     @GuardedBy("mServiceLock")
@@ -595,7 +536,7 @@ public abstract class ProcessRecordInternal {
      * overlays on-top of activity UIs on screen. E.g. display a window
      * of type android.view.WindowManager.LayoutParams#TYPE_APPLICATION_OVERLAY
      * When true the process will oom adj score will be set to
-     * ProcessList#PERCEPTIBLE_APP_ADJ at minimum to reduce the chance
+     * {@link Constants#PERCEPTIBLE_APP_ADJ} at minimum to reduce the chance
      * of the process getting killed.
      */
     @GuardedBy("mServiceLock")
@@ -604,9 +545,9 @@ public abstract class ProcessRecordInternal {
     /**
      * Is the process currently running a remote animation? When true
      * the process will be set to use the
-     * ProcessList#SCHED_GROUP_TOP_APP scheduling group to boost
+     * {@link Constants#SCHED_GROUP_TOP_APP} scheduling group to boost
      * performance, as well as oom adj score will be set to
-     * ProcessList#VISIBLE_APP_ADJ at minimum to reduce the chance
+     * {@link Constants#VISIBLE_APP_ADJ} at minimum to reduce the chance
      * of the process getting killed.
      */
     @GuardedBy("mServiceLock")
@@ -792,21 +733,6 @@ public abstract class ProcessRecordInternal {
     private static final int VALUE_INVALID = -1;
     private static final int VALUE_FALSE = 0;
     private static final int VALUE_TRUE = 1;
-
-    @GuardedBy("mServiceLock")
-    private int mCachedHasActivities = VALUE_INVALID;
-    @GuardedBy("mServiceLock")
-    private int mCachedIsHeavyWeight = VALUE_INVALID;
-    @GuardedBy("mServiceLock")
-    private int mCachedHasVisibleActivities = VALUE_INVALID;
-    @GuardedBy("mServiceLock")
-    private int mCachedIsHomeProcess = VALUE_INVALID;
-    @GuardedBy("mServiceLock")
-    private int mCachedIsPreviousProcess = VALUE_INVALID;
-    @GuardedBy("mServiceLock")
-    private int mCachedHasRecentTasks = VALUE_INVALID;
-    @GuardedBy("mServiceLock")
-    private int mCachedIsReceivingBroadcast = VALUE_INVALID;
 
     /**
      * Cache the return value of PlatformCompat.isChangeEnabled().
@@ -1486,13 +1412,6 @@ public abstract class ProcessRecordInternal {
     /** Resets all cached information used by the OomAdjuster. */
     @GuardedBy("mServiceLock")
     public void resetCachedInfo() {
-        mCachedHasActivities = VALUE_INVALID;
-        mCachedIsHeavyWeight = VALUE_INVALID;
-        mCachedHasVisibleActivities = VALUE_INVALID;
-        mCachedIsHomeProcess = VALUE_INVALID;
-        mCachedIsPreviousProcess = VALUE_INVALID;
-        mCachedHasRecentTasks = VALUE_INVALID;
-        mCachedIsReceivingBroadcast = VALUE_INVALID;
         mCachedAdj = INVALID_ADJ;
         mCachedForegroundActivities = false;
         mCachedProcState = ActivityManager.PROCESS_STATE_CACHED_EMPTY;
@@ -1500,142 +1419,22 @@ public abstract class ProcessRecordInternal {
         mCachedAdjType = null;
     }
 
-    /** Returns whether the process has any activities, using a cached value or pulling it. */
-    @GuardedBy("mServiceLock")
-    private boolean getCachedHasActivities() {
-        if (mCachedHasActivities == VALUE_INVALID) {
-            final boolean hasActivities = hasActivities();
-            mCachedHasActivities = hasActivities ? VALUE_TRUE : VALUE_FALSE;
-            mStartedServiceObserver.onHasActivitiesChanged(hasActivities);
-        }
-        return mCachedHasActivities == VALUE_TRUE;
-    }
-
-    /**
-     * Returns whether the process has any activities.
-     * Delegates to {@link #mHasActivities} if {@link Flags#pushActivityStateToOomadjuster()}
-     * is enabled, otherwise uses {@link #getCachedHasActivities()}.
-     */
+    /** Returns whether the process has any activities. */
     @GuardedBy("mServiceLock")
     public boolean getHasActivities() {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            return mHasActivities;
-        } else {
-            return getCachedHasActivities();
-        }
+        return mHasActivities;
     }
 
-    /**
-     * Returns whether the process is considered a heavy-weight process, using a cached value or
-     * pulling it.
-     */
-    @GuardedBy("mServiceLock")
-    public boolean getCachedIsHeavyWeight() {
-        if (mCachedIsHeavyWeight == VALUE_INVALID) {
-            mCachedIsHeavyWeight = isHeavyWeightProcess() ? VALUE_TRUE : VALUE_FALSE;
-        }
-        return mCachedIsHeavyWeight == VALUE_TRUE;
-    }
-
-    /**
-     * Returns whether the process has any visible activities, using a cached value or pulling it.
-     */
-    @GuardedBy("mServiceLock")
-    private boolean getCachedHasVisibleActivities() {
-        if (mCachedHasVisibleActivities == VALUE_INVALID) {
-            setCachedHasVisibleActivities(hasVisibleActivities());
-        }
-        return mCachedHasVisibleActivities == VALUE_TRUE;
-    }
-
-    /** Sets the cached state of whether the process has visible activities. */
-    @GuardedBy("mServiceLock")
-    public void setCachedHasVisibleActivities(boolean cachedHasVisibleActivities) {
-        mCachedHasVisibleActivities = cachedHasVisibleActivities ? VALUE_TRUE : VALUE_FALSE;
-    }
-
-    /**
-     * Returns whether the process has any visible activities.
-     * Delegates to {@link #mActivityStateFlags} if {@link Flags#pushActivityStateToOomadjuster()}
-     * is enabled, otherwise uses {@link #getCachedHasVisibleActivities()}.
-     */
+    /** Returns whether the process has any visible activities. */
     @GuardedBy("mServiceLock")
     public boolean getHasVisibleActivities() {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            return (mActivityStateFlags & ACTIVITY_STATE_FLAG_IS_VISIBLE) != 0;
-        } else {
-            return getCachedHasVisibleActivities();
-        }
+        return (mActivityStateFlags & ACTIVITY_STATE_FLAG_IS_VISIBLE) != 0;
     }
 
-    /**
-     * Returns whether the process is the current home process, using a cached value or pulling it.
-     */
-    @GuardedBy("mServiceLock")
-    public boolean getCachedIsHomeProcess() {
-        if (mCachedIsHomeProcess == VALUE_INVALID) {
-            mCachedIsHomeProcess = isHomeProcess() ? VALUE_TRUE : VALUE_FALSE;
-        }
-        return mCachedIsHomeProcess == VALUE_TRUE;
-    }
-
-    /**
-     * Returns whether the process was the previous top process, using a cached value or pulling it.
-     */
-    @GuardedBy("mServiceLock")
-    public boolean getCachedIsPreviousProcess() {
-        if (mCachedIsPreviousProcess == VALUE_INVALID) {
-            mCachedIsPreviousProcess = isPreviousProcess() ? VALUE_TRUE : VALUE_FALSE;
-        }
-        return mCachedIsPreviousProcess == VALUE_TRUE;
-    }
-
-    /**
-     * Returns whether the process is associated with any recent tasks, using a cached value or
-     * pulling it.
-     */
-    @GuardedBy("mServiceLock")
-    public boolean getCachedHasRecentTasks() {
-        if (mCachedHasRecentTasks == VALUE_INVALID) {
-            mCachedHasRecentTasks = hasRecentTasks() ? VALUE_TRUE : VALUE_FALSE;
-        }
-        return mCachedHasRecentTasks == VALUE_TRUE;
-    }
-
-    /**
-     * Returns whether the process is associated with any recent tasks.
-     * Delegates to {@link #mHasRecentTask} if {@link Flags#pushActivityStateToOomadjuster()}
-     * is enabled, otherwise uses {@link #getCachedHasRecentTasks()}.
-     */
+    /** Returns whether the process is associated with any recent tasks. */
     @GuardedBy("mServiceLock")
     public boolean getHasRecentTasks() {
-        if (Flags.pushActivityStateToOomadjuster()) {
-            return mHasRecentTask;
-        } else {
-            return getCachedHasRecentTasks();
-        }
-    }
-
-    /**
-     * Returns whether the process is currently receiving a broadcast, using a cached value or
-     * pulling it. The scheduling group associated with the broadcast will be placed in
-     * {@code outSchedGroup} if active.
-     *
-     * @param outSchedGroup An output array of size 1 where the scheduling group associated
-     *                      with the broadcast will be placed if one is active.
-     * @return True if the process is receiving a broadcast, false otherwise.
-     */
-    @GuardedBy("mServiceLock")
-    public boolean getCachedIsReceivingBroadcast(int[] outSchedGroup) {
-        if (mCachedIsReceivingBroadcast == VALUE_INVALID) {
-            final boolean isReceivingBroadcast = isReceivingBroadcast(outSchedGroup);
-            mCachedIsReceivingBroadcast = isReceivingBroadcast ? VALUE_TRUE : VALUE_FALSE;
-            if (isReceivingBroadcast) {
-                mCachedSchedGroup = outSchedGroup[0];
-            }
-            mStartedServiceObserver.onIsReceivingBroadcastChanged(isReceivingBroadcast);
-        }
-        return mCachedIsReceivingBroadcast == VALUE_TRUE;
+        return mHasRecentTask;
     }
 
     /**

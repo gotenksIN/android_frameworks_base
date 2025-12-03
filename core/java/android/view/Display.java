@@ -104,7 +104,6 @@ public final class Display {
     private final DisplayManagerGlobal mGlobal;
     private final int mDisplayId;
     private final int mFlags;
-    private final int mType;
     private final int mOwnerUid;
     private final String mOwnerPackageName;
     private final Resources mResources;
@@ -727,7 +726,6 @@ public final class Display {
 
         // Cache properties that cannot change as long as the display is valid.
         mFlags = displayInfo.flags;
-        mType = displayInfo.type;
         mOwnerUid = displayInfo.ownerUid;
         mOwnerPackageName = displayInfo.ownerPackageName;
     }
@@ -839,7 +837,10 @@ public final class Display {
     @UnsupportedAppUsage
     @TestApi
     public int getType() {
-        return mType;
+        synchronized (mLock) {
+            updateDisplayInfoLocked();
+            return mDisplayInfo.type;
+        }
     }
 
     /**
@@ -848,7 +849,7 @@ public final class Display {
      */
     @FlaggedApi(FLAG_DISPLAY_TOPOLOGY_API)
     public boolean isInternal() {
-        return mType == TYPE_INTERNAL;
+        return getType() == TYPE_INTERNAL;
     }
 
 
@@ -2556,6 +2557,9 @@ public final class Display {
          * Returns flags associated with this mode.
          * @hide
          */
+
+        @SuppressWarnings("UnflaggedApi") // For testing only
+        @TestApi
         @ModeFlags
         public int getFlags() {
             return mFlags;
@@ -2778,6 +2782,9 @@ public final class Display {
             }
             if ((flags & FLAG_SIZE_OVERRIDE) != 0) {
                 msg.append(", FLAG_SIZE_OVERRIDE");
+            }
+            if ((flags & FLAG_ANISOTROPY_CORRECTION) != 0) {
+                msg.append(", FLAG_ANISOTROPY_CORRECTION");
             }
             return msg.toString();
         }

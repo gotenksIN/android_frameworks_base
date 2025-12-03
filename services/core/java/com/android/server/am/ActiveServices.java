@@ -129,7 +129,10 @@ import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_SERVICE;
 import static com.android.server.am.ActivityManagerDebugConfig.POSTFIX_SERVICE_EXECUTING;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NAME;
-import static com.android.server.am.ProcessList.UNKNOWN_ADJ;
+import static com.android.server.am.psc.Constants.INVALID_ADJ;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_BACKGROUND;
+import static com.android.server.am.psc.Constants.UNKNOWN_ADJ;
+import static com.android.server.am.psc.Constants.VISIBLE_APP_ADJ;
 
 import android.Manifest;
 import android.annotation.IntDef;
@@ -249,6 +252,7 @@ import com.android.server.am.ActivityManagerService.ItemMatcher;
 import com.android.server.am.LowMemDetector.MemFactor;
 import com.android.server.am.ServiceRecord.ShortFgsInfo;
 import com.android.server.am.ServiceRecord.TimeLimitedFgsInfo;
+import com.android.server.am.psc.SyncBatchSession;
 import com.android.server.pm.KnownPackages;
 import com.android.server.uri.NeededUriGrants;
 import com.android.server.wm.ActivityRecord;
@@ -1055,7 +1059,7 @@ public final class ActiveServices {
                         + " (pid=" + callingPid
                         + ") when starting service " + service);
             }
-            callerFg = callerApp.getSetSchedGroup() != ProcessList.SCHED_GROUP_BACKGROUND;
+            callerFg = callerApp.getSetSchedGroup() != SCHED_GROUP_BACKGROUND;
         } else {
             callerFg = true;
         }
@@ -1723,7 +1727,8 @@ public final class ActiveServices {
         return cn != null ? cn.getShortClassName() : null;
     }
 
-    private void stopServiceLocked(ServiceRecord service, boolean enqueueOomAdj) {
+    private void stopServiceLocked(ServiceRecord service, boolean enqueueOomAdj,
+            @ServiceBindingOomAdjPolicy int serviceBindingOomAdjPolicy) {
         traceInstant("stopService(): ", service);
         try {
             Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "stopServiceLocked()");
@@ -1757,7 +1762,7 @@ public final class ActiveServices {
             service.callStart = false;
 
             bringDownServiceIfNeededLocked(service, false, false, enqueueOomAdj,
-                    "stopService");
+                    serviceBindingOomAdjPolicy, "stopService");
         } finally {
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
         }
@@ -1787,7 +1792,7 @@ public final class ActiveServices {
             if (r.record != null) {
                 final long origId = mAm.mInjector.clearCallingIdentity();
                 try {
-                    stopServiceLocked(r.record, false);
+                    stopServiceLocked(r.record, false, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                 } finally {
                     mAm.mInjector.restoreCallingIdentity(origId);
                 }
@@ -1844,7 +1849,7 @@ public final class ActiveServices {
                         ServiceRecord service = stopping.get(i);
                         service.delayed = false;
                         services.ensureNotStartingBackgroundLocked(service);
-                        stopServiceLocked(service, true);
+                        stopServiceLocked(service, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                     }
                     if (size > 0) {
                         if (Flags.pscBatchServiceUpdates()) {
@@ -1864,14 +1869,14 @@ public final class ActiveServices {
         synchronized (mAm) {
             if (!r.destroying) {
                 // This service is still alive, stop it.
-                stopServiceLocked(r, false);
+                stopServiceLocked(r, false, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
             } else {
                 // Check if there is another instance of it being started in parallel,
                 // if so, stop that too to avoid spamming the system.
                 final ServiceMap smap = getServiceMapLocked(r.userId);
                 final ServiceRecord found = smap.mServicesByInstanceName.remove(r.instanceName);
                 if (found != null) {
-                    stopServiceLocked(found, false);
+                    stopServiceLocked(found, false, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                 }
             }
             mAm.crashApplicationWithType(appUid, appPid, localPackageName, -1,
@@ -1953,7 +1958,8 @@ public final class ActiveServices {
             }
             r.callStart = false;
             final long origId = mAm.mInjector.clearCallingIdentity();
-            bringDownServiceIfNeededLocked(r, false, false, false, "stopServiceToken");
+            bringDownServiceIfNeededLocked(r, false, false, false,
+                    SERVICE_BIND_OOMADJ_POLICY_LEGACY, "stopServiceToken");
             mAm.mInjector.restoreCallingIdentity(origId);
             return true;
         }
@@ -4353,7 +4359,7 @@ public final class ActiveServices {
                     + ") set BIND_SIMULATE_ALLOW_FREEZE when binding service " + service);
         }
 
-        final boolean callerFg = callerApp.getSetSchedGroup() != ProcessList.SCHED_GROUP_BACKGROUND;
+        final boolean callerFg = callerApp.getSetSchedGroup() != SCHED_GROUP_BACKGROUND;
         final boolean isBindExternal =
                 (flags & Integer.toUnsignedLong(Context.BIND_EXTERNAL_SERVICE)) != 0
                 || (flags & Context.BIND_EXTERNAL_SERVICE_LONG) != 0;
@@ -4417,8 +4423,8 @@ public final class ActiveServices {
 
         final long origId = mAm.mInjector.clearCallingIdentity();
 
-        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
-                OOM_ADJ_REASON_UID_IDLE)) {
+        try (SyncBatchSession batch = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_BIND_SERVICE)) {
             if (unscheduleServiceRestartLocked(s, callerApp.info.uid, false)) {
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "BIND SERVICE WHILE RESTART PENDING: "
                         + s);
@@ -4528,6 +4534,12 @@ public final class ActiveServices {
             final int serviceBindingOomAdjPolicy = hostApp != null
                     ? getServiceBindingOomAdjPolicyForAddLocked(b.client, hostApp, c)
                     : SERVICE_BIND_OOMADJ_POLICY_LEGACY;
+            if (batch != null && (serviceBindingOomAdjPolicy
+                    & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CONNECT) != 0) {
+                // Batch session is active and this binding won't affect the service host process's
+                // importance. Mark the service host process as skippable for the session.
+                batch.skipProcDueToServiceBindPolicy(hostApp);
+            }
 
             final boolean shouldFreezeCaller = !packageFrozen && !permissionsReviewRequired
                     && (serviceBindingOomAdjPolicy & SERVICE_BIND_OOMADJ_POLICY_FREEZE_CALLER) != 0
@@ -4999,7 +5011,7 @@ public final class ActiveServices {
                         for (int i=b.apps.size()-1; i>=0; i--) {
                             ProcessRecord client = b.apps.valueAt(i).client;
                             if (client != null && client.getSetSchedGroup()
-                                    != ProcessList.SCHED_GROUP_BACKGROUND) {
+                                    != SCHED_GROUP_BACKGROUND) {
                                 inFg = true;
                                 break;
                             }
@@ -5303,8 +5315,11 @@ public final class ActiveServices {
                             throw new SecurityException("BIND_EXTERNAL_SERVICE failed, "
                                     + className + " is not an isolatedProcess");
                         }
-                        if (!mAm.getPackageManagerInternal().isSameApp(callingPackage, callingUid,
-                                userId)) {
+                        // Calling package check would have happened before if service check flag
+                        // is on
+                        if (!com.android.server.am.Flags.serviceCheckCallingPkg()
+                                && !mAm.getPackageManagerInternal().isSameApp(
+                                        callingPackage, callingUid, userId)) {
                             throw new SecurityException("BIND_EXTERNAL_SERVICE failed, "
                                     + "calling package not owned by calling UID ");
                         }
@@ -5511,12 +5526,14 @@ public final class ActiveServices {
 
     /**
      * Bump the given service record into executing state.
+     *
      * @param oomAdjReason The caller requests it to perform the oomAdjUpdate not {@link
-     *         ActivityManagerInternal#OOM_ADJ_REASON_NONE}.
+     *                     ActivityManagerInternal#OOM_ADJ_REASON_NONE}.
      */
     private void bumpServiceExecutingLocked(
             ServiceRecord r, boolean fg, String why, @OomAdjReason int oomAdjReason,
-            boolean skipTimeoutIfPossible) {
+            boolean skipTimeoutIfPossible,
+            @ServiceBindingOomAdjPolicy int serviceBindingOomAdjPolicy) {
         if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, ">>> EXECUTING "
                 + why + " of " + r + " in app " + r.app);
         else if (DEBUG_SERVICE_EXECUTING) Slog.v(TAG_SERVICE_EXECUTING, ">>> EXECUTING "
@@ -5544,7 +5561,14 @@ public final class ActiveServices {
         final boolean shouldSkipTimeout = skipTimeoutIfPossible && r.app != null
                 && (r.app.mOptRecord.isPendingFreeze() || r.app.mOptRecord.isFrozen());
 
-        try (var unused = mAm.mProcessStateController.startServiceBatchSession(oomAdjReason)) {
+        try (SyncBatchSession batch = mAm.mProcessStateController.startServiceBatchSession(
+                oomAdjReason)) {
+            if (batch != null && (serviceBindingOomAdjPolicy
+                    & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CONNECT) != 0) {
+                // Batch session is active and this binding won't affect the service host process's
+                // importance. Mark the service host process as skippable for the session.
+                batch.skipProcDueToServiceBindPolicy(r.app);
+            }
             ProcessServiceRecord psr;
             if (r.executeNesting == 0) {
                 r.executeFg = fg;
@@ -5617,9 +5641,10 @@ public final class ActiveServices {
                 & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_BIND) != 0;
         if ((!b.requested || rebind) && b.apps.size() > 0) {
             try {
+                final boolean skipTimeout = skipOomAdj;
                 bumpServiceExecutingLocked(r, execInFg, "bind",
                         skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_BIND_SERVICE,
-                        skipOomAdj /* skipTimeoutIfPossible */);
+                        skipTimeout, serviceBindingOomAdjPolicy);
                 if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                     Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, "requestServiceBinding="
                             + b.intent.getIntent() + ". bindSeq=" + mBindServiceSeqCounter);
@@ -6056,7 +6081,7 @@ public final class ActiveServices {
                 boolean isPersistent
                         = !((r.serviceInfo.applicationInfo.flags&ApplicationInfo.FLAG_PERSISTENT) == 0);
                 if (pRec != null)
-                    isVisible = ((pRec.mProfile.getCurRawAdj()) ==  ProcessList.VISIBLE_APP_ADJ);
+                    isVisible = ((pRec.mProfile.getCurRawAdj()) ==  VISIBLE_APP_ADJ);
                 if(top_rc != null) {
                     if(top_rc.launching && !r.shortInstanceName.contains(top_rc.packageName)
                         && !isPersistent && !r.isForeground() && !isVisible) {
@@ -6239,7 +6264,7 @@ public final class ActiveServices {
                     + r.appInfo.uid + " for service "
                     + r.intent.getIntent() + ": user " + r.userId + " is stopped";
             Slog.w(TAG, msg);
-            bringDownServiceLocked(r, enqueueOomAdj);
+            bringDownServiceLocked(r, enqueueOomAdj, serviceBindingOomAdjPolicy);
             return msg;
         }
 
@@ -6382,7 +6407,7 @@ public final class ActiveServices {
                         + r.appInfo.uid + " for service "
                         + r.intent.getIntent() + ": process is bad";
                 Slog.w(TAG, msg);
-                bringDownServiceLocked(r, enqueueOomAdj);
+                bringDownServiceLocked(r, enqueueOomAdj, serviceBindingOomAdjPolicy);
                 return msg;
             }
             mAm.mProcessList.getAppStartInfoTracker().handleProcessServiceStart(startTimeNs, app,
@@ -6414,7 +6439,7 @@ public final class ActiveServices {
             if (r.isStartRequested()) {
                 if (DEBUG_DELAYED_STARTS) Slog.v(TAG_SERVICE,
                         "Applying delayed stop (in bring up): " + r);
-                stopServiceLocked(r, enqueueOomAdj);
+                stopServiceLocked(r, enqueueOomAdj, serviceBindingOomAdjPolicy);
             }
         }
 
@@ -6507,8 +6532,15 @@ public final class ActiveServices {
         if (DEBUG_MU)
             Slog.v(TAG_MU, "realStartServiceLocked, ServiceRecord.uid = " + r.appInfo.uid
                     + ", ProcessRecord.uid = " + app.uid);
-        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+        try (SyncBatchSession batch = mAm.mProcessStateController.startServiceBatchSession(
                 OOM_ADJ_REASON_START_SERVICE)) {
+            if (batch != null && (serviceBindingOomAdjPolicy
+                    & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CREATE) != 0) {
+                // Batch session is active and this binding won't affect the service host process's
+                // importance. Mark the service host process as skippable for the session.
+                batch.skipProcDueToServiceBindPolicy(app);
+            }
+
             r.setProcess(app, thread, pid, uidRecord);
             final long now = SystemClock.uptimeMillis();
             r.restartTime = now;
@@ -6517,9 +6549,10 @@ public final class ActiveServices {
                     & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CREATE) != 0;
             final ProcessServiceRecord psr = app.mServices;
             final boolean newService = mAm.mProcessStateController.startService(psr, r);
+            final boolean skipTimeout = skipOomAdj;
             bumpServiceExecutingLocked(r, execInFg, "create",
                     OOM_ADJ_REASON_NONE /* use "none" to avoid extra oom adj */,
-                    skipOomAdj /* skipTimeoutIfPossible */);
+                    skipTimeout, serviceBindingOomAdjPolicy);
             mAm.updateLruProcessLocked(app, false, null);
             updateServiceForegroundLocked(psr, /* oomAdj= */ false);
             // Skip the oom adj update if it's a self-binding, the Service#onCreate() will be
@@ -6648,7 +6681,7 @@ public final class ActiveServices {
             if (r.isStartRequested()) {
                 if (DEBUG_DELAYED_STARTS) Slog.v(TAG_SERVICE,
                         "Applying delayed stop (from start): " + r);
-                stopServiceLocked(r, enqueueOomAdj);
+                stopServiceLocked(r, enqueueOomAdj, serviceBindingOomAdjPolicy);
             }
         }
     }
@@ -6688,7 +6721,7 @@ public final class ActiveServices {
                 );
                 bumpServiceExecutingLocked(r, execInFg, "start",
                         OOM_ADJ_REASON_NONE /* use "none" to avoid extra oom adj */,
-                        false /* skipTimeoutIfPossible */);
+                        false, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                 if (r.fgRequired && !r.fgWaiting) {
                     if (!r.isForeground()) {
                         if (DEBUG_BACKGROUND_CHECK) {
@@ -6785,7 +6818,8 @@ public final class ActiveServices {
     }
 
     private void bringDownServiceIfNeededLocked(ServiceRecord r, boolean knowConn,
-            boolean hasConn, boolean enqueueOomAdj, String debugReason) {
+            boolean hasConn, boolean enqueueOomAdj,
+            @ServiceBindingOomAdjPolicy int serviceBindingOomAdjPolicy, String debugReason) {
         if (DEBUG_SERVICE) {
             Slog.i(TAG, "Bring down service for " + debugReason + " :" + r.toString());
         }
@@ -6799,12 +6833,19 @@ public final class ActiveServices {
             return;
         }
 
-        bringDownServiceLocked(r, enqueueOomAdj);
+        bringDownServiceLocked(r, enqueueOomAdj, serviceBindingOomAdjPolicy);
     }
 
-    private void bringDownServiceLocked(ServiceRecord r, boolean enqueueOomAdj) {
-        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+    private void bringDownServiceLocked(ServiceRecord r, boolean enqueueOomAdj,
+            @ServiceBindingOomAdjPolicy int serviceBindingOomAdjPolicy) {
+        try (SyncBatchSession batch = mAm.mProcessStateController.startServiceBatchSession(
                 OOM_ADJ_REASON_STOP_SERVICE)) {
+            if (batch != null && (serviceBindingOomAdjPolicy
+                    & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CONNECT) != 0) {
+                // Batch session is active and this binding won't affect the service host process's
+                // importance. Mark the service host process as skippable for the session.
+                batch.skipProcDueToServiceBindPolicy(r.app);
+            }
 
         if (!isLowRamDevice) {
             try {
@@ -6868,10 +6909,12 @@ public final class ActiveServices {
                     }
                     if (ibr.hasBound) {
                         try {
+                            final boolean skipTimeout = oomAdjusted;
                             bumpServiceExecutingLocked(r, false, "bring down unbind",
                                     oomAdjusted ? OOM_ADJ_REASON_NONE
                                             : OOM_ADJ_REASON_UNBIND_SERVICE,
-                                    oomAdjusted /* skipTimeoutIfPossible */);
+                                    skipTimeout,
+                                    serviceBindingOomAdjPolicy);
                             oomAdjusted |= r.wasOomAdjUpdated();
                             ibr.hasBound = false;
                             ibr.requested = false;
@@ -7029,10 +7072,12 @@ public final class ActiveServices {
                         }
                     } else {
                         try {
+                            final boolean skipTimeout = oomAdjusted;
                             bumpServiceExecutingLocked(r, false, "destroy",
                                     oomAdjusted ? OOM_ADJ_REASON_NONE
                                             : OOM_ADJ_REASON_UNBIND_SERVICE,
-                                    oomAdjusted /* skipTimeoutIfPossible */);
+                                    skipTimeout,
+                                    serviceBindingOomAdjPolicy);
                             mDestroyingServices.add(r);
                             oomAdjusted |= r.wasOomAdjUpdated();
                             r.destroying = true;
@@ -7188,58 +7233,72 @@ public final class ActiveServices {
             b.intent.apps.remove(b.client);
         }
 
-        if (!c.serviceDead) {
-            if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Disconnecting binding " + b.intent
-                    + ": shouldUnbind=" + b.intent.hasBound);
-            if (s.app != null && s.app.isThreadReady() && b.intent.apps.size() == 0
-                    && b.intent.hasBound) {
-                serviceBindingOomAdjPolicy = getServiceBindingOomAdjPolicyForRemovalLocked(b.client,
-                        s.app, c);
-                final boolean skipOomAdj = (serviceBindingOomAdjPolicy
-                        & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CONNECT) != 0;
-                try {
-                    bumpServiceExecutingLocked(s, false, "unbind",
-                            skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE,
-                            skipOomAdj /* skipTimeoutIfPossible */);
-                    if (b.client != s.app && c.notHasFlag(Context.BIND_WAIVE_PRIORITY)
-                            && s.app.getSetProcState() <= PROCESS_STATE_HEAVY_WEIGHT) {
-                        // If this service's process is not already in the cached list,
-                        // then update it in the LRU list here because this may be causing
-                        // it to go down there and we want it to start out near the top.
-                        mAm.updateLruProcessLocked(s.app, false, null);
-                    }
-                    b.intent.hasBound = false;
-                    // Assume the client doesn't want to know about a rebind;
-                    // we will deal with that later if it asks for one.
-                    b.intent.doRebind = false;
-                    s.app.getThread().scheduleUnbindService(s, b.intent,
-                            b.intent.intent.getIntent());
-                } catch (Exception e) {
-                    Slog.w(TAG, "Exception when unbinding service " + s.shortInstanceName, e);
-                    serviceProcessGoneLocked(s, enqueueOomAdj);
+        try (SyncBatchSession batch = mAm.mProcessStateController.startServiceBatchSession(
+                OOM_ADJ_REASON_UNBIND_SERVICE)) {
+            if (!c.serviceDead) {
+                if (DEBUG_SERVICE) {
+                    Slog.v(TAG_SERVICE, "Disconnecting binding " + b.intent
+                            + ": shouldUnbind=" + b.intent.hasBound);
                 }
-            }
+                if (s.app != null && s.app.isThreadReady() && b.intent.apps.size() == 0
+                        && b.intent.hasBound) {
+                    serviceBindingOomAdjPolicy = getServiceBindingOomAdjPolicyForRemovalLocked(
+                            b.client,
+                            s.app, c);
+                    final boolean skipOomAdj = (serviceBindingOomAdjPolicy
+                            & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CONNECT) != 0;
+                    if (batch != null && skipOomAdj) {
+                        // Batch session is active and this unbind won't affect the service host
+                        // process's importance. Mark the service host process as skippable for the
+                        // session.
+                        batch.skipProcDueToServiceBindPolicy(s.app);
+                    }
+                    try {
+                        final boolean skipTimeout = skipOomAdj;
+                        bumpServiceExecutingLocked(s, false, "unbind",
+                                skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_UNBIND_SERVICE,
+                                skipTimeout,
+                                serviceBindingOomAdjPolicy);
+                        if (b.client != s.app && c.notHasFlag(Context.BIND_WAIVE_PRIORITY)
+                                && s.app.getSetProcState() <= PROCESS_STATE_HEAVY_WEIGHT) {
+                            // If this service's process is not already in the cached list,
+                            // then update it in the LRU list here because this may be causing
+                            // it to go down there and we want it to start out near the top.
+                            mAm.updateLruProcessLocked(s.app, false, null);
+                        }
+                        b.intent.hasBound = false;
+                        // Assume the client doesn't want to know about a rebind;
+                        // we will deal with that later if it asks for one.
+                        b.intent.doRebind = false;
+                        s.app.getThread().scheduleUnbindService(s, b.intent,
+                                b.intent.intent.getIntent());
+                    } catch (Exception e) {
+                        Slog.w(TAG, "Exception when unbinding service " + s.shortInstanceName, e);
+                        serviceProcessGoneLocked(s, enqueueOomAdj);
+                    }
+                }
 
-            // If unbound while waiting to start and there is no connection left in this service,
-            // remove the pending service
-            if (s.getConnections().isEmpty() && !s.isStartRequested()) {
-                mPendingServices.remove(s);
-                mPendingBringups.remove(s);
-                if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Removed pending service: " + s);
-            }
+                // If unbound while waiting to start and there is no connection left in this
+                // service, remove the pending service
+                if (s.getConnections().isEmpty() && !s.isStartRequested()) {
+                    mPendingServices.remove(s);
+                    mPendingBringups.remove(s);
+                    if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Removed pending service: " + s);
+                }
 
-            if (c.hasFlag(Context.BIND_AUTO_CREATE)) {
-                boolean hasAutoCreate = s.hasAutoCreateConnections();
-                if (!hasAutoCreate) {
-                    if (s.tracker != null) {
-                        synchronized (mAm.mProcessStats.mLock) {
-                            s.tracker.setBound(false, mAm.mProcessStats.getMemFactorLocked(),
-                                    SystemClock.uptimeMillis());
+                if (c.hasFlag(Context.BIND_AUTO_CREATE)) {
+                    boolean hasAutoCreate = s.hasAutoCreateConnections();
+                    if (!hasAutoCreate) {
+                        if (s.tracker != null) {
+                            synchronized (mAm.mProcessStats.mLock) {
+                                s.tracker.setBound(false, mAm.mProcessStats.getMemFactorLocked(),
+                                        SystemClock.uptimeMillis());
+                            }
                         }
                     }
+                    bringDownServiceIfNeededLocked(s, true, hasAutoCreate, enqueueOomAdj,
+                            serviceBindingOomAdjPolicy, "removeConnection");
                 }
-                bringDownServiceIfNeededLocked(s, true, hasAutoCreate, enqueueOomAdj,
-                        "removeConnection");
             }
         }
         return serviceBindingOomAdjPolicy;
@@ -7463,7 +7522,7 @@ public final class ActiveServices {
                         // longer needed.  This could happen because bringDownServiceIfNeeded
                         // won't bring down a service that is pending...  so now the pending
                         // is done, so let's drop it.
-                        bringDownServiceLocked(sr, true);
+                        bringDownServiceLocked(sr, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                     }
                     if (Flags.pscBatchServiceUpdates()) {
                         // Do nothing. The ProcessStateController BatchSession close
@@ -7529,7 +7588,7 @@ public final class ActiveServices {
                     size = mPendingServices.size();
                     i--;
                     needOomAdj = true;
-                    bringDownServiceLocked(sr, true);
+                    bringDownServiceLocked(sr, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                 }
             }
             if (needOomAdj) {
@@ -7582,7 +7641,7 @@ public final class ActiveServices {
     boolean bringDownDisabledPackageServicesLocked(String packageName, Set<String> filterByClasses,
             int userId, boolean evenPersistent, boolean fullStop, boolean doit) {
         return bringDownDisabledPackageServicesLocked(packageName, filterByClasses, userId,
-                evenPersistent, fullStop, doit, ProcessList.INVALID_ADJ);
+                evenPersistent, fullStop, doit, INVALID_ADJ);
     }
 
     boolean bringDownDisabledPackageServicesLocked(String packageName, Set<String> filterByClasses,
@@ -7622,7 +7681,8 @@ public final class ActiveServices {
                     OOM_ADJ_REASON_COMPONENT_DISABLED)) {
                 final int size = mTmpCollectionResults.size();
                 for (int i = size - 1; i >= 0; i--) {
-                    bringDownServiceLocked(mTmpCollectionResults.get(i), true);
+                    bringDownServiceLocked(mTmpCollectionResults.get(i), true,
+                            SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                 }
                 if (size > 0) {
                     if (Flags.pscBatchServiceUpdates()) {
@@ -7743,7 +7803,7 @@ public final class ActiveServices {
                     if ((sr.serviceInfo.flags & ServiceInfo.FLAG_STOP_WITH_TASK) != 0) {
                         Slog.i(TAG, "Stopping service " + sr.shortInstanceName + ": remove task");
                         needOomAdj = true;
-                        stopServiceLocked(sr, true);
+                        stopServiceLocked(sr, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                     } else {
                         sr.pendingStarts.add(new ServiceRecord.StartItem(sr, true,
                                 sr.getLastStartId(), baseIntent, null, 0, null, null,
@@ -7800,7 +7860,7 @@ public final class ActiveServices {
             }
         }
 
-        try (var unused = mAm.mProcessStateController.startBatchSession(
+        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
                 OOM_ADJ_REASON_STOP_SERVICE)) {
 
         try {
@@ -7930,10 +7990,10 @@ public final class ActiveServices {
                     EventLog.writeEvent(EventLogTags.AM_SERVICE_CRASHED_TOO_MUCH,
                             sr.userId, sr.crashCount, sr.shortInstanceName,
                             sr.app != null ? sr.app.getPid() : -1);
-                    bringDownServiceLocked(sr, true);
+                    bringDownServiceLocked(sr, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                 } else if (!allowRestart
                         || !mAm.mUserController.isUserRunning(sr.userId, 0)) {
-                    bringDownServiceLocked(sr, true);
+                    bringDownServiceLocked(sr, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                 } else {
                     final boolean scheduled = scheduleServiceRestartLocked(sr,
                             true /* allowCancel */);
@@ -7942,7 +8002,7 @@ public final class ActiveServices {
                     // extreme case of so many attempts to deliver a command
                     // that it failed we also will stop it here.
                     if (!scheduled) {
-                        bringDownServiceLocked(sr, true);
+                        bringDownServiceLocked(sr, true, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
                     } else if (sr.canStopIfKilled(false /* isStartCanceled */)) {
                         // Update to stopped state because the explicit start is gone. The
                         // service is scheduled to restart for other reason (e.g. connections) so
@@ -8260,7 +8320,7 @@ public final class ActiveServices {
                     Slog.i(TAG, "Service foreground-required timeout for " + r);
                 }
                 r.fgWaiting = false;
-                stopServiceLocked(r, false);
+                stopServiceLocked(r, false, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
             }
 
             if (app != null) {
@@ -9152,12 +9212,13 @@ public final class ActiveServices {
         }
 
         if (ret == REASON_DENIED) {
-            // Allow FGS while-in-use if the caller is in the while-in-use allowlist. Right now
-            // AttentionService and SystemCaptionsService packageName are in this allowlist.
-            if (verifyPackage(callingPackage, callingUid)) {
-                final boolean isAllowedPackage =
-                        mAllowListWhileInUsePermissionInFgs.contains(callingPackage);
-                if (isAllowedPackage) {
+            // If service check flag is on, the calling package check has already been made by
+            // this point
+            if (com.android.server.am.Flags.serviceCheckCallingPkg()
+                    || verifyPackage(callingPackage, callingUid)) {
+                // Allow FGS while-in-use if the caller is in the while-in-use allowlist. Right now
+                // AttentionService and SystemCaptionsService packageName are in this allowlist.
+                if (mAllowListWhileInUsePermissionInFgs.contains(callingPackage)) {
                     ret = REASON_ALLOWLISTED_PACKAGE;
                 }
             } else {
@@ -9934,7 +9995,7 @@ public final class ActiveServices {
         }
         if (r != null) {
             r.updateOomAdjSeq();
-            bringDownServiceLocked(r, false);
+            bringDownServiceLocked(r, false, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
         } else {
             Slog.e(TAG, "stopForegroundServiceDelegateLocked delegate does not exist "
                     + options.getDescription());
@@ -9960,7 +10021,7 @@ public final class ActiveServices {
         }
         if (r != null) {
             r.updateOomAdjSeq();
-            bringDownServiceLocked(r, false);
+            bringDownServiceLocked(r, false, SERVICE_BIND_OOMADJ_POLICY_LEGACY);
         } else {
             Slog.e(TAG, "stopForegroundServiceDelegateLocked delegate does not exist");
         }

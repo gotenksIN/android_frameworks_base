@@ -62,7 +62,6 @@ public abstract class MediaOutputAdapterBase extends RecyclerView.Adapter<Recycl
     private static final String TAG = "MediaOutputAdapterBase";
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
     protected final List<MediaItem> mMediaItemList = new CopyOnWriteArrayList<>();
-    private boolean mShouldGroupSelectedMediaItems = true;
 
     public MediaOutputAdapterBase(MediaSwitchingController controller) {
         mController = controller;
@@ -72,8 +71,9 @@ public abstract class MediaOutputAdapterBase extends RecyclerView.Adapter<Recycl
     }
 
     boolean isCurrentlyConnected(MediaDevice device) {
-        return TextUtils.equals(device.getId(),
-                mController.getCurrentConnectedMediaDevice().getId())
+        MediaDevice currentConnectedMediaDevice = mController.getCurrentConnectedMediaDevice();
+        return (currentConnectedMediaDevice != null
+                && TextUtils.equals(device.getId(), currentConnectedMediaDevice.getId()))
                 || (!mController.hasGroupPlayback() && device.isSelected());
     }
 
@@ -87,19 +87,6 @@ public abstract class MediaOutputAdapterBase extends RecyclerView.Adapter<Recycl
 
     int getCurrentActivePosition() {
         return mCurrentActivePosition;
-    }
-
-    /** Refreshes the RecyclerView dataset and forces re-render. */
-    public void updateItems() {
-        mMediaItemList.clear();
-        mMediaItemList.addAll(mController.getMediaItemList());
-        if (mShouldGroupSelectedMediaItems) {
-            if (!mController.hasGroupPlayback()) {
-                // Don't group devices if initially there isn't more than one selected.
-                mShouldGroupSelectedMediaItems = false;
-            }
-        }
-        notifyDataSetChanged();
     }
 
     @Override

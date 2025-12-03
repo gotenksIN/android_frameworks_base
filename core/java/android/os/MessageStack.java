@@ -133,11 +133,12 @@ public final class MessageStack {
      * Iterates through messages and creates a reverse-ordered chain of messages to remove.
      * @return true if any messages were removed, false otherwise
      */
-    public boolean moveMatchingToFreelist(Message.MessageCompare compare, Handler h, int what,
+    public int moveMatchingToFreelist(Message.MessageCompare compare, Handler h, int what,
             Object object, Runnable r, long when) {
         Message current = (Message) sTop.getAcquire(this);
         Message prev = null;
         Message firstRemoved = null;
+        int numRemoved = 0;
 
         while (current != null) {
             if (messageMatches(current, compare, h, what, object, r, when)
@@ -149,6 +150,7 @@ public final class MessageStack {
                 // nextFree links each to-be-removed message to the one processed before.
                 current.nextFree = prev;
                 prev = current;
+                numRemoved++;
             }
             current = current.next;
         }
@@ -160,11 +162,9 @@ public final class MessageStack {
                 firstRemoved.nextFree = freelist;
             // prev points to the last to-be-removed message that was processed.
             } while (!sFreelistHead.compareAndSet(this, freelist, prev));
-
-            return true;
         }
 
-        return false;
+        return numRemoved;
     }
 
     /**
@@ -228,13 +228,28 @@ public final class MessageStack {
      * Iterate through the freelist and unlink Messages.
      */
     public void drainFreelist() {
+        boolean shrinkSyncHeap = false;
+        boolean shrinkAsyncHeap = false;
         Message current = (Message) sFreelistHead.getAndSetAcquire(this, null);
         while (current != null) {
             Message nextFree = current.nextFree;
             current.nextFree = null;
-            maybeRemoveFromHeap(current);
+            if (maybeRemoveFromHeap(current)) {
+                if (current.isAsynchronous()) {
+                    shrinkAsyncHeap = true;
+                } else {
+                    shrinkSyncHeap = true;
+                }
+            }
             removeFromStack(current);
             current = nextFree;
+        }
+
+        if (shrinkSyncHeap) {
+            mSyncHeap.maybeShrink();
+        }
+        if (shrinkAsyncHeap) {
+            mAsyncHeap.maybeShrink();
         }
     }
 
@@ -258,12 +273,14 @@ public final class MessageStack {
         return m;
     }
 
-    private void maybeRemoveFromHeap(Message m) {
+    private boolean maybeRemoveFromHeap(Message m) {
         // An out of range heapIndex means that we've already removed this message from the heap, or
         // it was never added to the heap in the first place.
         if (m.heapIndex >= 0) {
             getHeap(m).removeMessage(m);
+            return true;
         }
+        return false;
     }
 
     /**
@@ -338,7 +355,10 @@ public final class MessageStack {
      * This is suitable to use with the output of peek().
      */
     public void remove(Message m) {
-        maybeRemoveFromHeap(m);
+        if (maybeRemoveFromHeap(m)) {
+            MessageHeap heap = m.isAsynchronous() ? mAsyncHeap : mSyncHeap;
+            heap.maybeShrink();
+        }
         removeFromStack(m);
     }
 
@@ -387,6 +407,13 @@ public final class MessageStack {
      */
     public int combinedHeapSizesForTest() {
         return mSyncHeap.size() + mAsyncHeap.size();
+    }
+
+    /**
+     * Returns the total capacity in the underlying MessageHeaps.
+     */
+    public int combinedHeapCapacitiesForTest() {
+        return mSyncHeap.capacity() + mAsyncHeap.capacity();
     }
 
     @NeverCompile

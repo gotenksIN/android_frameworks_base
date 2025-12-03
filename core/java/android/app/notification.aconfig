@@ -5,12 +5,6 @@ container: "system"
 # when appropriate, as it's not currently part of the namespace so it may not be obvious what the
 # flag relates to.
 
-flag {
-  name: "notifications_redesign_app_icons"
-  namespace: "systemui"
-  description: "Notifications Redesign: Use app icons in notification rows"
-  bug: "371174789"
-}
 
 flag {
   name: "notifications_redesign_themed_app_icons"
@@ -35,6 +29,13 @@ flag {
 }
 
 flag {
+  name: "headline_prototypes"
+  namespace: "notifications"
+  description: "This flag adds static control for enabling prototypes for the headline project"
+  bug: "449676256"
+}
+
+flag {
   name: "api_metric_style"
   is_exported: true
   namespace: "notifications"
@@ -43,13 +44,19 @@ flag {
 }
 
 flag {
-  name: "metric_style_unit_in_label"
+  name: "api_notification_action_custom"
+  is_exported: true
   namespace: "notifications"
-  description: "In MetricStyle, concatenate the unit of the MetricValue to the label, instead of displaying it next to the value. This flag is only for prototyping; either the flag-on or flag-off path will be inlined once the behavior is decided."
-  bug: "434910979"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
+  description: "Adds APIs to control Notification Action emphasis and style (for RONs)"
+  bug: "440125908"
+}
+
+flag {
+  name: "api_notification_semantic_style"
+  is_exported: true
+  namespace: "notifications"
+  description: "Adds APIs to apply semantic style (color) to notification components"
+  bug: "440125908"
 }
 
 flag {
@@ -67,13 +74,6 @@ flag {
   namespace: "systemui"
   description: "Experiment to restore the pre-S behavior where standard notifications are not expandable unless they have actions."
   bug: "339523906"
-}
-
-flag {
-  name: "notification_no_custom_view_conversations"
-  namespace: "systemui"
-  description: "Ensures that conversations are not allowed to use Custom Views."
-  bug: "368817201"
 }
 
 flag {
@@ -197,10 +197,23 @@ flag {
 }
 
 flag {
-  name: "set_notification_background_color_refactor"
+  name: "notification_transparent_badge_ring"
   namespace: "systemui"
-  description: "Skips #setNotificationBackgroundColor when unnecessary."
-  bug: "442592454"
+  description: "Makes notification badge ring transparent and skips no longer necessary method."
+  bug: "409346132"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "notification_animated_action_content_description"
+  namespace: "systemui"
+  description: "This flag enables the customized content description for animated actions and replies."
+  bug: "412288906"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 # Start: exported flags that cannot be removed
@@ -285,6 +298,13 @@ flag {
   namespace: "systemui"
   description: "[RONs] Guards new promotion logic and UI, including AOD notification and Colorization"
   bug: "367705002"
+}
+
+flag {
+  name: "rich_ongoing_improvements"
+  namespace: "systemui"
+  description: "[RONs] Visual Improvements for Live Updates, for glanceability"
+  bug: "440125908"
 }
 
 flag {

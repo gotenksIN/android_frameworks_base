@@ -48,6 +48,7 @@ import android.util.AtomicFile;
 import android.util.Slog;
 import android.util.Xml;
 
+import com.android.internal.util.CollectionUtils;
 import com.android.internal.util.XmlUtils;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
@@ -65,8 +66,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -190,7 +193,6 @@ public final class AssociationDiskStore {
     private static final String XML_TAG_PACKAGES_TO_NOTIFY = "packages_to_notify";
     private static final String XML_TAG_METADATA = "metadata";
 
-
     private static final String XML_ATTR_PERSISTENCE_VERSION = "persistence-version";
     private static final String XML_ATTR_MAX_ID = "max-id";
     private static final String XML_ATTR_ID = "id";
@@ -212,6 +214,7 @@ public final class AssociationDiskStore {
     private static final String XML_ATTR_KEY_DEVICE_ID = "key_device_id";
     private static final String XML_ATTR_PACKAGE_TO_NOTIFY = "package_to_notify";
     private static final String XML_ATTR_METADATA = "metadata";
+    private static final String XML_ATTR_EXTRA_PERMISSIONS = "extra_permissions";
 
     private static final String LEGACY_XML_ATTR_DEVICE = "device";
 
@@ -549,6 +552,8 @@ public final class AssociationDiskStore {
                 XML_ATTR_TRANSPORT_FLAGS, 0);
         final Icon deviceIcon = byteArrayToIcon(
                 readByteArrayAttribute(parser, XML_ATTR_DEVICE_ICON));
+        final String permissionsString = readStringAttribute(parser, XML_ATTR_EXTRA_PERMISSIONS);
+        final Set<String> extraPermissions = deserializeExtraPermissions(permissionsString);
 
         // Read nested tags
         DeviceId deviceId = null;
@@ -587,6 +592,7 @@ public final class AssociationDiskStore {
                 .setDeviceId(deviceId)
                 .setPackagesToNotify(packagesToNotify)
                 .setMetadata(metadata)
+                .setExtraPermissions(extraPermissions)
                 .build();
     }
 
@@ -606,15 +612,19 @@ public final class AssociationDiskStore {
                 parser, XML_ATTR_CUSTOM_DEVICE_ID);
         final MacAddress macAddress = stringToMacAddress(
                 readStringAttribute(parser, XML_ATTR_MAC_ADDRESS_DEVICE_ID));
-        byte[] id = readByteArrayAttribute(parser, XML_ATTR_KEY_DEVICE_ID);
-        if (id == null) {
-            id = generateRandom128BitKey();
+        if (customDeviceId == null && macAddress == null) {
+            return null;
+        }
+        byte[] key = readByteArrayAttribute(parser, XML_ATTR_KEY_DEVICE_ID);
+        if (key == null) {
+            key = generateRandom128BitKey();
         }
 
         // Manually move to the END tag of XML_TAG_DEVICE_ID.
         parser.nextTag();
 
-        return new DeviceId(customDeviceId, macAddress, id);
+        return new DeviceId.Builder().setCustomId(customDeviceId).setMacAddress(macAddress).setKey(
+                key).build();
     }
 
     private static PersistableBundle readMetadata(@NonNull TypedXmlPullParser parser)
@@ -659,6 +669,11 @@ public final class AssociationDiskStore {
         writeIntAttribute(serializer, XML_ATTR_TRANSPORT_FLAGS, a.getTransportFlags());
         writeByteArrayAttribute(
                 serializer, XML_ATTR_DEVICE_ICON, iconToByteArray(a.getDeviceIcon()));
+        Set<String> extraPermissions = a.getExtraPermissions();
+        if (!CollectionUtils.isEmpty(extraPermissions)) {
+            writeStringAttribute(serializer, XML_ATTR_EXTRA_PERMISSIONS,
+                    String.join(DELIMITER, extraPermissions));
+        }
 
         if (a.getDeviceId() != null) {
             writeDeviceId(serializer, a);
@@ -756,5 +771,14 @@ public final class AssociationDiskStore {
         }
         String[] stringArray = serializedString.split(REGEX);
         return Arrays.asList(stringArray);
+    }
+
+    private static Set<String> deserializeExtraPermissions(String serializedString) {
+        if (serializedString == null || serializedString.isEmpty()) {
+            return new HashSet<>();
+        }
+
+        String[] stringArray = serializedString.split(REGEX);
+        return new HashSet<>(Arrays.asList(stringArray));
     }
 }

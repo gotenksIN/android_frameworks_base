@@ -369,7 +369,6 @@
         <item><xliff:g id="qualcomm">Qualcomm®</xliff:g> <xliff:g id="aptx">aptX™</xliff:g> audio</item>
         <item><xliff:g id="qualcomm">Qualcomm®</xliff:g> <xliff:g id="aptx_hd">aptX™ HD</xliff:g> audio</item>
         <item>LDAC</item>
-        <item>LC3</item>
         <item>Opus</item>
 <!-- QTI_BEGIN: 2018-07-17: Bluetooth: BT: Adding aptX-Adaptive codec entry to Framework-->
 <!-- QTI_END: 2018-07-17: Bluetooth: BT: Adding aptX-Adaptive codec entry to Framework-->
@@ -387,7 +386,6 @@
         <item><xliff:g id="qualcomm">Qualcomm®</xliff:g> <xliff:g id="aptx">aptX™</xliff:g> audio</item>
         <item><xliff:g id="qualcomm">Qualcomm®</xliff:g> <xliff:g id="aptx_hd">aptX™ HD</xliff:g> audio</item>
         <item>LDAC</item>
-        <item>LC3</item>
         <item>Opus</item>
 <!-- QTI_BEGIN: 2018-07-17: Bluetooth: BT: Adding aptX-Adaptive codec entry to Framework-->
 <!-- QTI_END: 2018-07-17: Bluetooth: BT: Adding aptX-Adaptive codec entry to Framework-->

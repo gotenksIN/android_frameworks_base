@@ -23,22 +23,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.android.systemui.screencapture.common.ui.viewmodel.RecentTaskViewModel
-import com.android.systemui.screencapture.sharescreen.largescreen.ui.viewmodel.AudioSwitchViewModel
 import com.android.systemui.screencapture.sharescreen.largescreen.ui.viewmodel.PreShareToolbarViewModel
-import com.android.systemui.screencapture.sharescreen.largescreen.ui.viewmodel.ShareContentListViewModel
 
 /** Main component for the screen share UI. */
 @Composable
-fun PreShareUI(
-    preShareToolbarViewModel: PreShareToolbarViewModel,
-    shareContentListViewModel: ShareContentListViewModel,
-    audioSwitchViewModel: AudioSwitchViewModel,
-    recentTaskViewModelFactory: RecentTaskViewModel.Factory,
-) {
+fun PreShareUI(preShareToolbarViewModel: PreShareToolbarViewModel) {
     Box(
         contentAlignment = Alignment.TopCenter,
         modifier = Modifier.fillMaxSize().padding(top = 16.dp),
@@ -48,17 +41,15 @@ fun PreShareUI(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.width(560.dp),
         ) {
+            val targetsViewModel by preShareToolbarViewModel.currentTargetsModel
+
             PreShareToolbar(
                 preShareToolbarViewModel = preShareToolbarViewModel,
                 expanded = true,
                 onCloseClick = { preShareToolbarViewModel.onCloseClicked() },
-                shareButtonEnabled = shareContentListViewModel.selectedRecentTaskViewModel != null,
+                shareButtonEnabled = targetsViewModel.selectedTarget.value != null,
             )
-            ShareContentSelector(
-                shareContentListViewModel = shareContentListViewModel,
-                recentTaskViewModelFactory = recentTaskViewModelFactory,
-                audioSwitchViewModel = audioSwitchViewModel,
-            )
+            ShareContentSelector(targetsViewModel)
         }
     }
 }

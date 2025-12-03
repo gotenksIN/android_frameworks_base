@@ -656,12 +656,12 @@ public class HeadsUpManagerImpl
             mHeadsUpEntryMap.remove(key);
             onEntryRemoved(finalHeadsUpEntry, reason);
             if (NotificationThrottleHun.isEnabled()) {
-                finalHeadsUpEntry.cancelAutoRemovalCallbacks("removeEntry");
+                finalHeadsUpEntry.cancelAutoRemovalCallbacks(reason +" => removeEntry");
             } else {
                 finalHeadsUpEntry.reset();
             }
         };
-        mAvalancheController.delete(headsUpEntry, runnable, "removeEntry");
+        mAvalancheController.delete(headsUpEntry, runnable, reason + " => removeEntry");
     }
 
     /**
@@ -848,15 +848,26 @@ public class HeadsUpManagerImpl
     }
 
     private String getEntryMapStr() {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("\n mHeadsUpEntryMap: ");
         if (mHeadsUpEntryMap.isEmpty()) {
-            return "";
+            sb.append("(empty)");
+        } else {
+            for (HeadsUpEntry entry : mHeadsUpEntryMap.values()) {
+                sb.append("\n  ").append(entry.mEntry == null ? "null" : entry.mEntry.getKey());
+            }
         }
-        StringBuilder entryMapStr = new StringBuilder();
-        for (HeadsUpEntry entry: mHeadsUpEntryMap.values()) {
-            entryMapStr.append("\n ").append(
-                    entry.mEntry == null ? "null" : entry.mEntry.getKey());
+
+        sb.append("\n mEntriesToRemoveWhenReorderingAllowed: ");
+        if (mEntriesToRemoveWhenReorderingAllowed.isEmpty()) {
+            sb.append("(empty)");
+        } else {
+            for (NotificationEntry entry : mEntriesToRemoveWhenReorderingAllowed) {
+                sb.append("\n  ").append(entry.getKey());
+            }
         }
-        return entryMapStr.toString();
+        return sb.toString();
     }
 
     @Override
@@ -985,7 +996,7 @@ public class HeadsUpManagerImpl
      * @param userUnPinned The unpinned action is trigger by user real operation.
      */
     @Override
-    public void unpinAll(boolean userUnPinned) {
+    public void unpinAll(boolean userUnPinned, String reason) {
         for (String key : mHeadsUpEntryMap.keySet()) {
             HeadsUpEntry headsUpEntry = getHeadsUpEntry(key);
             if (headsUpEntry == null) {
@@ -996,7 +1007,7 @@ public class HeadsUpManagerImpl
             Runnable runnable = () -> {
                 mLogger.logUnpinEntry(key);
 
-                setEntryPinned(headsUpEntry, PinnedStatus.NotPinned, "unpinAll");
+                setEntryPinned(headsUpEntry, PinnedStatus.NotPinned, reason + " => unpinAll");
                 // maybe it got un sticky
                 headsUpEntry.updateEntry(false /* updatePostTime */, "unpinAll");
 
@@ -1765,6 +1776,7 @@ public class HeadsUpManagerImpl
                     mEntriesToRemoveWhenReorderingAllowed.add(entry);
                     mVisualStabilityProvider.addTemporaryReorderingAllowedListener(
                             mOnReorderingAllowedListener);
+                    mLogger.logRemoveEntryWhenReorderingAllowed(entry);
                 } else if (mTrackingHeadsUp.getValue()) {
                     mEntriesToRemoveAfterExpand.add(entry);
                     mLogger.logRemoveEntryAfterExpand(entry);

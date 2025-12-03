@@ -23,7 +23,10 @@ import com.android.systemui.display.data.repository.DisplayStateRepository
 import com.android.systemui.display.domain.interactor.DisplayStateInteractor
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsViewModel
+import com.android.systemui.statusbar.data.repository.StatusBarConfigurationController
+import com.android.systemui.statusbar.disableflags.domain.interactor.DisableFlagsInteractor
 import com.android.systemui.statusbar.domain.interactor.StatusBarIconRefreshInteractor
+import com.android.systemui.statusbar.gesture.SwipeStatusBarAwayGestureHandler
 import com.android.systemui.statusbar.layout.StatusBarContentInsetsProvider
 import com.android.systemui.statusbar.phone.SysuiDarkIconDispatcher
 import com.android.systemui.statusbar.ui.SystemBarUtilsState
@@ -69,9 +72,15 @@ interface SystemUIDisplaySubcomponent {
 
     @get:DisplayAware val systemBarUtilsState: SystemBarUtilsState
 
+    @get:DisplayAware val statusBarConfigurationController: StatusBarConfigurationController
+
     @get:DisplayAware val configurationState: ConfigurationState
 
     @get:DisplayAware val sysUICutoutProvider: SysUICutoutProvider
+
+    @get:DisplayAware val disableFlagsInteractor: DisableFlagsInteractor
+
+    @get:DisplayAware val swipeStatusBarAwayGestureHandler: SwipeStatusBarAwayGestureHandler
 
     @Subcomponent.Factory
     interface Factory {
@@ -86,6 +95,9 @@ interface SystemUIDisplaySubcomponent {
 
     /** Qualifier used to represent that the object is provided/bound with the proper display. */
     @Qualifier @Retention(AnnotationRetention.RUNTIME) annotation class DisplayAware
+
+    /** Same as [DisplayAware] but specific to status bar. */
+    @Qualifier @Retention(AnnotationRetention.RUNTIME) annotation class DisplayAwareStatusBar
 
     /** Annotates the display id inside the subcomponent. */
     @Qualifier @Retention(AnnotationRetention.RUNTIME) annotation class DisplayId

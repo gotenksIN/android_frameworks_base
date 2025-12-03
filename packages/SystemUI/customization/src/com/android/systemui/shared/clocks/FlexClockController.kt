@@ -20,9 +20,8 @@ import android.content.res.Resources
 import android.icu.util.TimeZone
 import com.android.systemui.animation.GSFAxes
 import com.android.systemui.customization.R
-import com.android.systemui.customization.clocks.ClockContext
+import com.android.systemui.customization.clocks.ClockContextImpl
 import com.android.systemui.customization.clocks.utils.FontUtils.put
-import com.android.systemui.customization.clocks.utils.FontUtils.set
 import com.android.systemui.customization.clocks.utils.FontUtils.toClockAxis
 import com.android.systemui.plugins.keyguard.data.model.AlarmData
 import com.android.systemui.plugins.keyguard.data.model.WeatherData
@@ -39,14 +38,13 @@ import com.android.systemui.plugins.keyguard.ui.clocks.ClockFontAxis.Companion.m
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockMessageBuffers
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockSettings
 import com.android.systemui.plugins.keyguard.ui.clocks.TimeFormatKind
-import com.android.systemui.shared.clocks.view.FlexClockViewGroup
 import java.io.PrintWriter
 import java.util.Locale
 
 /** Controller for the default flex clock */
 class FlexClockController(
-    private val clockCtx: ClockContext,
-    private val messageBuffers: ClockMessageBuffers,
+    private val clockCtx: ClockContextImpl,
+    messageBuffers: ClockMessageBuffers,
 ) : ClockController {
     override val smallClock =
         FlexClockFaceController(
@@ -70,13 +68,6 @@ class FlexClockController(
 
     override val events =
         object : ClockEvents {
-            override var isReactiveTouchInteractionEnabled = false
-                set(value) {
-                    field = value
-                    val view = largeClock.view as FlexClockViewGroup
-                    view.isReactiveTouchInteractionEnabled = value
-                }
-
             override fun onTimeZoneChanged(timeZone: TimeZone) {
                 smallClock.events.onTimeZoneChanged(timeZone)
                 largeClock.events.onTimeZoneChanged(timeZone)

@@ -3110,9 +3110,13 @@ public final class CameraManager {
             }
 
             if (exposeMonoCamera == false) {
-                if (Integer.parseInt(info.mCameraId) >= 2) {
-                    Log.w(TAG, "[soar.cts] ignore the status update of camera: " + info.mCameraId);
-                    return;
+                try {
+                    if (Integer.parseInt(info.mCameraId) >= 2) {
+                        Log.w(TAG, "[soar.cts] ignore the status update of camera: " + info.mCameraId);
+                        return;
+                    }
+                } catch (NumberFormatException e) {
+                    Log.w(TAG, "[soar.cts] ignore the status change of camera: " + info.mCameraId);
                 }
             }
 

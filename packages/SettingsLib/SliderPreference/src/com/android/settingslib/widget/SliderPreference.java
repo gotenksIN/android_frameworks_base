@@ -738,13 +738,13 @@ public class SliderPreference extends Preference {
         }
 
         iconFrame.setOnClickListener((view) -> {
-            if (mSliderValue > 0) {
+            if (mSliderValue > mMin) {
                 setValue(mSliderValue - mSliderIncrement);
             }
         });
 
         iconFrame.setVisibility(View.VISIBLE);
-        setIconViewAndFrameEnabled(icon, iconFrame, mSliderValue > mMin);
+        setIconViewAndFrameEnabled(icon, iconFrame, isEnabled() && mSliderValue > mMin);
     }
 
     private void updateIconEndIfNeeded(ImageView icon) {
@@ -778,7 +778,7 @@ public class SliderPreference extends Preference {
         });
 
         iconFrame.setVisibility(View.VISIBLE);
-        setIconViewAndFrameEnabled(icon, iconFrame, mSliderValue < mMax);
+        setIconViewAndFrameEnabled(icon, iconFrame, isEnabled() && mSliderValue < mMax);
     }
 
     /**

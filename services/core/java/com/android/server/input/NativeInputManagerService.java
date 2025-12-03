@@ -53,6 +53,8 @@ interface NativeInputManagerService {
 
     void setKeyRemapping(int[] fromKeyCodes, int[] toKeyCodes);
 
+    void setKeyRemappingForDevice(int deviceId, int[] fromKeyCodes, int[] toKeyCodes);
+
     boolean hasKeys(int deviceId, int sourceMask, int[] keyCodes, boolean[] keyExists);
 
     int getKeyCodeForKeyLocation(int deviceId, int locationKeyCode);
@@ -162,7 +164,9 @@ interface NativeInputManagerService {
 
     void setTouchpadsEnabled(boolean enabled);
 
-    void setShowTouches(boolean enabled);
+    void setShowTouchesEnabled(boolean enabled);
+
+    void setForceShowTouchesOnDisplay(int displayId, boolean enabled);
 
     void setNonInteractiveDisplays(int[] displayIds);
 
@@ -386,6 +390,10 @@ interface NativeInputManagerService {
         public native void setKeyRemapping(int[] fromKeyCodes, int[] toKeyCodes);
 
         @Override
+        public native void setKeyRemappingForDevice(int deviceId, int[] fromKeyCodes,
+                int[] toKeyCodes);
+
+        @Override
         public native boolean hasKeys(int deviceId, int sourceMask, int[] keyCodes,
                 boolean[] keyExists);
 
@@ -508,7 +516,10 @@ interface NativeInputManagerService {
         public native void setTouchpadsEnabled(boolean enabled);
 
         @Override
-        public native void setShowTouches(boolean enabled);
+        public native void setShowTouchesEnabled(boolean enabled);
+
+        @Override
+        public native void setForceShowTouchesOnDisplay(int displayId, boolean enabled);
 
         @Override
         public native void setNonInteractiveDisplays(int[] displayIds);

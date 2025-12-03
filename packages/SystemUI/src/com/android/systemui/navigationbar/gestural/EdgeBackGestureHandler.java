@@ -21,10 +21,7 @@ import static android.view.InputDevice.SOURCE_TOUCHPAD;
 import static android.view.MotionEvent.TOOL_TYPE_FINGER;
 import static android.view.MotionEvent.TOOL_TYPE_MOUSE;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_EXCLUDE_FROM_SCREEN_MAGNIFICATION;
-
-import static com.android.systemui.Flags.blockMouseEdgeBackGesture;
 import static com.android.systemui.Flags.edgebackGestureHandlerGetRunningTasksBackground;
-import static com.android.window.flags.Flags.predictiveBackDelayWmTransition;
 import static com.android.systemui.classifier.Classifier.BACK_GESTURE;
 import static com.android.systemui.navigationbar.gestural.Utilities.isTrackpadThreeFingerSwipe;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TOUCHPAD_GESTURES_DISABLED;
@@ -1309,9 +1306,6 @@ public class EdgeBackGestureHandler {
                         return;
                     } else if (dx > dy && dx > mTouchSlop) {
                         if (mAllowGesture) {
-                            if (!predictiveBackDelayWmTransition() && mBackAnimation != null) {
-                                mBackAnimation.onThresholdCrossed();
-                            }
                             if (mBackAnimation == null) {
                                 pilferPointers(ev.getDisplayId());
                             }
@@ -1331,8 +1325,7 @@ public class EdgeBackGestureHandler {
                     mEdgeBackPlugin.onMotionEvent(ev);
                 }
                 dispatchToBackAnimation(ev);
-                if (predictiveBackDelayWmTransition() && mBackAnimation != null
-                        && mThresholdCrossed && !mLastFrameThresholdCrossed) {
+                if (mBackAnimation != null && mThresholdCrossed && !mLastFrameThresholdCrossed) {
                     mBackAnimation.onThresholdCrossed();
                 }
             }
@@ -1363,17 +1356,12 @@ public class EdgeBackGestureHandler {
     }
 
     private boolean isButtonPressFromTrackpadOrMouse(MotionEvent ev) {
-        if (blockMouseEdgeBackGesture()) {
-            boolean isSourceMouseOrTouchpad = ev.getSource() == SOURCE_MOUSE
-                    || ev.getSource() == SOURCE_TOUCHPAD
-                    || ev.getSource() == (SOURCE_MOUSE | SOURCE_TOUCHPAD);
-            boolean isTooltypeMouseOrFinger = ev.getToolType(ev.getActionIndex()) == TOOL_TYPE_MOUSE
-                    || ev.getToolType(ev.getActionIndex()) == TOOL_TYPE_FINGER;
-            return isSourceMouseOrTouchpad && isTooltypeMouseOrFinger;
-        } else {
-            return ev.getSource() == (SOURCE_MOUSE | SOURCE_TOUCHPAD)
-                    && ev.getToolType(ev.getActionIndex()) == TOOL_TYPE_FINGER;
-        }
+        boolean isSourceMouseOrTouchpad = ev.getSource() == SOURCE_MOUSE
+                || ev.getSource() == SOURCE_TOUCHPAD
+                || ev.getSource() == (SOURCE_MOUSE | SOURCE_TOUCHPAD);
+        boolean isTooltypeMouseOrFinger = ev.getToolType(ev.getActionIndex()) == TOOL_TYPE_MOUSE
+                || ev.getToolType(ev.getActionIndex()) == TOOL_TYPE_FINGER;
+        return isSourceMouseOrTouchpad && isTooltypeMouseOrFinger;
     }
 
     private void dispatchToBackAnimation(MotionEvent event) {

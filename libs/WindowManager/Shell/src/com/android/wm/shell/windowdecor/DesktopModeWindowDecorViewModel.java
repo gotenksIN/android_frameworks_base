@@ -72,7 +72,6 @@ import android.view.InsetsState;
 import android.view.MotionEvent;
 import android.view.SurfaceControl;
 import android.view.SurfaceControl.Transaction;
-import android.view.WindowManager;
 import android.window.DesktopExperienceFlags;
 import android.window.DesktopModeFlags;
 import android.window.TaskSnapshot;
@@ -137,7 +136,6 @@ import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.shared.desktopmode.DesktopConfig;
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 import com.android.wm.shell.shared.desktopmode.DesktopState;
-import com.android.wm.shell.shared.split.SplitScreenConstants.SplitPosition;
 import com.android.wm.shell.splitscreen.SplitScreenController;
 import com.android.wm.shell.sysui.KeyguardChangeListener;
 import com.android.wm.shell.sysui.ShellCommandHandler;
@@ -161,7 +159,6 @@ import com.android.wm.shell.windowdecor.viewholder.AppHeaderViewHolder;
 import kotlin.Pair;
 import kotlin.Unit;
 import kotlin.coroutines.Continuation;
-import kotlin.jvm.functions.Function1;
 
 import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.ExperimentalCoroutinesApi;
@@ -575,6 +572,10 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         mFocusTransitionObserver.setLocalFocusTransitionListener(this, mMainExecutor);
         mDesksOrganizer.addOnDesktopTaskInfoChangedListener((taskInfo) -> {
             onTaskInfoChanged(taskInfo);
+            return Unit.INSTANCE;
+        });
+        mDesksOrganizer.addOnDesktopTaskVanishedListener((taskInfo) -> {
+            onTaskVanished(taskInfo);
             return Unit.INSTANCE;
         });
         mLockTaskChangeListener.addListener(this);
@@ -1237,68 +1238,35 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
 
     /**
      * Closes a task.
-     * This method closes a task as if the close button on the window decor is clicked.
-     * It does nothing if the task does not have a window decor, thus cannot be closed through the
-     * UI.
+     * This method requests DesktopTasksController to close a task and announce a new focus window
+     * if it closes a desktop task.
      * Must call the method on the shell main executor.
      * @param task Task to be closed.
+     *
+     * TODO(b/448484440): Make the method private.
      */
     public void closeTask(RunningTaskInfo task) {
-        if (mTaskOperations == null) {
-            ProtoLog.e(WM_SHELL_WINDOW_DECORATION,
-                    "%s: handled close key gesture but mTaskOperations is null, ignoring", TAG);
-            return;
-        }
-        ProtoLog.e(WM_SHELL_WINDOW_DECORATION,
-                "%s: close task %d vis key gesture", TAG, task.taskId);
-        onCloseTask(task.taskId);
-    }
-
-    private void onCloseTask(int taskId) {
-        if (isTaskInSplitScreen(taskId)) {
-            ProtoLog.i(WM_SHELL_WINDOW_DECORATION,
-                    "%s: onCloseTask(taskId=%d): closing split screen", TAG, taskId);
-            mSplitScreenController.moveTaskToFullscreen(getOtherSplitTask(taskId).taskId,
-                    SplitScreenController.EXIT_REASON_DESKTOP_MODE);
-            return;
-        }
-        final WindowDecorationWrapper decoration = mWindowDecorByTaskId.get(taskId);
-        if (decoration == null) {
-            ProtoLog.e(WM_SHELL_WINDOW_DECORATION,
-                    "%s: onCloseTask(taskId=%d): decoration is null, ignoring", TAG, taskId);
-            return;
-        }
-        if (DesktopExperienceFlags
-                .CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT.isTrue()
-                && decoration.getTaskInfo().getWindowingMode() == WINDOWING_MODE_FULLSCREEN) {
-            ProtoLog.i(WM_SHELL_WINDOW_DECORATION,
-                    "%s: onCloseTask(taskId=%d): closing fullscreen task", TAG, taskId);
-            final WindowContainerTransaction wct = new WindowContainerTransaction();
-            wct.removeTask(decoration.getTaskInfo().token);
-            mTransitions.startTransition(WindowManager.TRANSIT_CLOSE, wct, null);
-            return;
-        }
-        if (DesktopExperienceFlags
-                .ENABLE_DESKTOP_APP_HEADER_STATE_CHANGE_ANNOUNCEMENTS.isTrue()) {
-            final int nextFocusedTaskId = mDesktopTasksController.getNextFocusedTask(
-                    decoration.getTaskInfo());
-            final WindowDecorationWrapper nextFocusedWindow =
-                    mWindowDecorationFinder.apply(nextFocusedTaskId);
-            if (nextFocusedWindow != null) {
-                nextFocusedWindow.a11yAnnounceNewFocusedWindow();
+        if (!DesktopExperienceFlags
+                .CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT.isTrue()) {
+            final WindowDecorationWrapper decoration = mWindowDecorByTaskId.get(task.taskId);
+            if (decoration == null) {
+                ProtoLog.e(WM_SHELL_WINDOW_DECORATION,
+                        "%s: closeTask(taskId=%d): decoration is null, ignoring", TAG, task.taskId);
+                return;
             }
         }
-        ProtoLog.w(WM_SHELL_WINDOW_DECORATION,
-                "%s: onCloseTask(taskId=%d): closing desktop task", TAG, taskId);
-        final WindowContainerTransaction wct = new WindowContainerTransaction();
-        final Function1<IBinder, Unit> runOnTransitionStart =
-                mDesktopTasksController.onDesktopWindowClose(wct,
-                        decoration.getTaskInfo().displayId, decoration.getTaskInfo());
-        final IBinder transition = mTaskOperations.closeTask(
-                decoration.getTaskInfo().token, wct);
-        if (transition != null && runOnTransitionStart != null) {
-            runOnTransitionStart.invoke(transition);
+        final DesktopTasksController.CloseTaskResult result =
+                mDesktopTasksController.closeTask(task);
+        if (result != DesktopTasksController.CloseTaskResult.CLOSED_DESKTOP) {
+            return;
         }
+
+        final int nextFocusedTaskId = mDesktopTasksController.getNextFocusedTask(task);
+        final WindowDecorationWrapper nextFocusedWindow =
+                mWindowDecorationFinder.apply(nextFocusedTaskId);
+        if (nextFocusedWindow == null) return;
+        nextFocusedWindow.a11yAnnounceNewFocusedWindow();
+
     }
 
     /** Listener for caption touch events. */
@@ -1723,6 +1691,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                     mMainDispatcher,
                     mMainScope,
                     mBgExecutor,
+                    mBgScope,
                     mTransitions,
                     mMainChoreographer,
                     mSyncQueue,
@@ -1795,7 +1764,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 mMultiDisplayDragMoveIndicatorController,
                 mShellDesktopState,
                 mDesktopConfig,
-                mDesktopTasksController);
+                mDesktopTasksController,
+                mDesktopUserRepositories);
         windowDecoration.setTaskDragResizer(taskPositioner);
 
         final DesktopModeTouchEventListener touchEventListener =
@@ -1820,14 +1790,6 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         if (!DesktopModeFlags.ENABLE_HANDLE_INPUT_FIX.isTrue()) {
             incrementEventReceiverTasks(taskInfo.displayId);
         }
-    }
-
-    @Nullable
-    private RunningTaskInfo getOtherSplitTask(int taskId) {
-        @SplitPosition int remainingTaskPosition = mSplitScreenController
-                .getSplitPosition(taskId) == SPLIT_POSITION_BOTTOM_OR_RIGHT
-                ? SPLIT_POSITION_TOP_OR_LEFT : SPLIT_POSITION_BOTTOM_OR_RIGHT;
-        return mSplitScreenController.getTaskInfo(remainingTaskPosition);
     }
 
     private boolean isTaskInSplitScreen(int taskId) {
@@ -2084,15 +2046,10 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
 
         @Override
         public void onMinimize(@NonNull RunningTaskInfo taskInfo) {
-            if (DesktopExperienceFlags
-                    .ENABLE_DESKTOP_APP_HEADER_STATE_CHANGE_ANNOUNCEMENTS.isTrue()) {
-                final int nextFocusedTaskId = mDesktopTasksController.getNextFocusedTask(taskInfo);
-                WindowDecorationWrapper nextFocusedWindow =
-                        mViewModel.mWindowDecorByTaskId.get(nextFocusedTaskId);
-                if (nextFocusedWindow != null) {
-                    nextFocusedWindow.a11yAnnounceNewFocusedWindow();
-                }
-            }
+            final int nextFocusedTaskId = mDesktopTasksController.getNextFocusedTask(taskInfo);
+            WindowDecorationWrapper nextFocusedWindow =
+                    mViewModel.mWindowDecorByTaskId.get(nextFocusedTaskId);
+            if (nextFocusedWindow != null) nextFocusedWindow.a11yAnnounceNewFocusedWindow();
             mDesktopTasksController.minimizeTask(taskInfo, MinimizeReason.MINIMIZE_BUTTON);
         }
 
@@ -2102,8 +2059,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         }
 
         @Override
-        public void onClose(int taskId) {
-            mViewModel.onCloseTask(taskId);
+        public void onClose(@NonNull RunningTaskInfo taskInfo) {
+            mViewModel.closeTask(taskInfo);
         }
 
         @Override
@@ -2197,7 +2154,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 MultiDisplayDragMoveIndicatorController multiDisplayDragMoveIndicatorController,
                 DesktopState desktopState,
                 DesktopConfig desktopConfig,
-                DesktopTasksController desktopTasksController) {
+                DesktopTasksController desktopTasksController,
+                DesktopUserRepositories desktopUserRepositories) {
             final TaskPositioner taskPositioner = desktopConfig.isVeiledResizeEnabled()
                     // TODO(b/383632995): Update when the flag is launched.
                     ? (DesktopExperienceFlags.ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG.isTrue()
@@ -2210,7 +2168,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                             handler,
                             multiDisplayDragMoveIndicatorController,
                             desktopState,
-                            desktopTasksController)
+                            desktopTasksController,
+                            desktopUserRepositories)
                         : new VeiledResizeTaskPositioner(
                             taskOrganizer,
                             windowDecoration,

@@ -57,16 +57,6 @@ flag {
 }
 
 flag {
-    name: "scrypt_parameter_change"
-    namespace: "security"
-    description: "Use n=9 instead of n=11 for scrypt for lock screen knowledge factors"
-    bug: "416772194"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "software_ratelimiter"
     namespace: "security"
     description: "Enable support for SoftwareRateLimiter in LockSettingsService"
@@ -162,13 +152,6 @@ flag {
 }
 
 flag {
-    name: "disable_adaptive_auth_counter_lock"
-    namespace: "biometrics"
-    description: "Flag to allow an adb secure setting to disable the adaptive auth lock"
-    bug: "371057865"
-}
-
-flag {
     name: "failed_auth_lock_toggle"
     namespace: "biometrics"
     description: "Feature flag to enable the toggle for failed authentication lock"
@@ -191,6 +174,20 @@ flag {
 }
 
 flag {
+    name: "lockscreen_timeout_deactivate_pin_pad"
+    namespace: "security"
+    description: "Deactivate pin pad buttons when lockscreen is timed out"
+    bug: "445769118"
+}
+
+flag {
+    name: "lockscreen_larger_timeout_time_units"
+    namespace: "security"
+    description: "Show larger time units than seconds on lockscreen"
+    bug: "443823194"
+}
+
+flag {
     name: "manage_lockout_end_time_in_service"
     namespace: "security"
     description: "Manage lockout end time in LockSettingsService rather than LockPatternUtils"
@@ -198,4 +195,22 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "lockscreen_indicate_duplicate_guesses"
+    namespace: "security"
+    description: "Indicate explicitly that duplicate failed lockscreen guesses are duplicates"
+    bug: "322014085"
+}
+
+flag {
+  name: "thread_safe_key_generation"
+  namespace: "hardware_backed_security"
+  description: "Retry key generation requests when the key generation thread is busy"
+  bug: "445922389"
+  is_fixed_read_only: true
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }

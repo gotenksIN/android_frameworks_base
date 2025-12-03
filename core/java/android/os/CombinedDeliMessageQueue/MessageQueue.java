@@ -23,11 +23,15 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.TestApi;
+import android.app.compat.CompatChanges;
 import android.app.ActivityThread;
+import android.app.Instrumentation;
+import android.compat.annotation.ChangeId;
+import android.compat.annotation.Disabled;
+import android.compat.annotation.EnabledAfter;
+import android.compat.annotation.Overridable;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
-import android.ravenwood.annotation.RavenwoodRedirect;
-import android.ravenwood.annotation.RavenwoodRedirectionClass;
 import android.ravenwood.annotation.RavenwoodThrow;
 import android.util.Log;
 import android.util.Printer;
@@ -55,11 +59,19 @@ import java.util.concurrent.locks.LockSupport;
  * {@link Looper#myQueue() Looper.myQueue()}.
  */
 @RavenwoodKeepWholeClass
-@RavenwoodRedirectionClass("MessageQueue_ravenwood")
 public final class MessageQueue {
     private static final String TAG_L = "LegacyMessageQueue";
     private static final String TAG_D = "DeliQueue";
     private static final boolean DEBUG = false;
+
+    /**
+     * Enables concurrent message queue implementation in all applications.
+     *
+     * @hide
+     */
+    @ChangeId
+    @EnabledAfter(targetSdkVersion = android.os.Build.VERSION_CODES.BAKLAVA)
+    public static final long USE_NEW_MESSAGEQUEUE = 421623328L;
 
     // True if the message queue can be quit.
     @UnsupportedAppUsage
@@ -123,7 +135,6 @@ public final class MessageQueue {
     private static final VarHandle sMptrRefCount;
     private volatile long mMptrRefCountValue = 0;
 
-    private static final VarHandle sSyncBarrier;
     private volatile Message mSyncBarrier = null;
 
     /* ------------------------------------------------------------------------------------------ */
@@ -153,8 +164,16 @@ public final class MessageQueue {
     }
 
     private static boolean computeUseDeliQueue() {
-        if (Flags.useConcurrentMessageQueueInApps()) {
-            return true;
+        if (CompatChanges.isChangeEnabled(USE_NEW_MESSAGEQUEUE)
+                || Flags.useConcurrentMessageQueueInApps()) {
+            // b/447778739: Some Robolectric tests still use legacy LooperMode.
+            try {
+                Class.forName("org.robolectric.Robolectric");
+                // This is a Robolectric test. Concurrent MessageQueue is not supported yet.
+                return false;
+            } catch (ClassNotFoundException e) {
+                return true;
+            }
         }
 
         final String processName = Process.myProcessName();
@@ -167,13 +186,7 @@ public final class MessageQueue {
         // used by tests.
         // For now, we limit it to system processes to avoid breaking apps and their tests.
         if (UserHandle.isCore(Process.myUid())) {
-            // Some platform tests run in core UIDs.
-            // Use this awful heuristic to detect them.
-            if (processName.contains("test") || processName.contains("Test")) {
-                return false;
-            } else {
-                return true;
-            }
+            return true;
         }
 
         // Also explicitly allow SystemUI processes.
@@ -207,21 +220,14 @@ public final class MessageQueue {
         sSkipEpollWaitForZeroTimeoutInitialized = true;
     }
 
-    @RavenwoodRedirect
     private native static long nativeInit();
-    @RavenwoodRedirect
     private native static void nativeDestroy(long ptr);
     @UnsupportedAppUsage
-    @RavenwoodRedirect
     private native void nativePollOnce(long ptr, int timeoutMillis); /*non-static for callbacks*/
 
-    @RavenwoodRedirect
     private native static void nativeWake(long ptr);
-    @RavenwoodRedirect
     private native static boolean nativeIsPolling(long ptr);
-    @RavenwoodRedirect
     private native static void nativeSetFileDescriptorEvents(long ptr, int fd, int events);
-    @RavenwoodRedirect
     private native static void nativeSetSkipEpollWaitForZeroTimeout(long ptr);
 
     @UnsupportedAppUsage
@@ -247,8 +253,6 @@ public final class MessageQueue {
                     long.class);
             sMptrRefCount = l.findVarHandle(MessageQueue.class, "mMptrRefCountValue",
                     long.class);
-            sSyncBarrier = l.findVarHandle(MessageQueue.class, "mSyncBarrier",
-                    Message.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -418,34 +422,51 @@ public final class MessageQueue {
         }
 
         while (true) {
-            long waitState = mWaitState;
-            long newWaitState;
-            boolean needWake = false;
-            Message barrier = msg.isAsynchronous() ? null :
-                    (Message) sSyncBarrier.getVolatile(this);
-            boolean reCheckBarrier = false;
+            final long waitState = mWaitState;
+            final long newWaitState;
+            final boolean needWake;
+            final Message checkBarrier;
 
             if (WaitState.isCounter(waitState)) {
+                // Looper is already awake
                 newWaitState = WaitState.incrementCounter(waitState);
+                checkBarrier = null;
+                needWake = false;
+            } else if (msg.when >= WaitState.getTSMillis(waitState)) {
+                // The enqueued message is not earlier than the current wake
+                // deadline, so we don't need to wake.
+                newWaitState = WaitState.incrementDeadline(waitState);
+                checkBarrier = null;
+                needWake = false;
+            } else if (msg.isAsynchronous()) {
+                // The enqueued message has an earlier deadline.
+                // It is async, so it can bypass barriers.
+                newWaitState = WaitState.initCounter();
+                checkBarrier = null;
+                needWake = true;
             } else {
-                final long TSmillis = WaitState.getTSMillis(waitState);
-                boolean weComeBeforeBarrier = barrier != null && msg.when <= barrier.when;
-                if (weComeBeforeBarrier || (msg.when < TSmillis
-                        && (!WaitState.hasSyncBarrier(waitState) || msg.isAsynchronous()))) {
-                    newWaitState = WaitState.initCounter();
-                    needWake = true;
-                } else {
+                // We may need to wake up, depending on the state of the sync barrier.
+                Message barrier = WaitState.hasSyncBarrier(waitState) ? mSyncBarrier : null;
+                boolean blockedByBarrier =
+                        barrier != null && Message.compareMessages(barrier, msg) < 0;
+                if (blockedByBarrier) {
                     newWaitState = WaitState.incrementDeadline(waitState);
-                    reCheckBarrier = true;
+                    checkBarrier = barrier;
+                    needWake = false;
+                } else {
+                    newWaitState = WaitState.initCounter();
+                    checkBarrier = null;
+                    needWake = true;
                 }
             }
+
             if (sWaitState.compareAndSet(this, waitState, newWaitState)) {
-                if (reCheckBarrier && barrier != (Message) sSyncBarrier.getVolatile(this)) {
+                if (checkBarrier != null && checkBarrier != mSyncBarrier) {
                     /*
-                     * If barrier state changed underneath us and we chose not to wake the
-                     * looper thread, we have to recheck to ensure that the barrier we saw was
-                     * actually in place while we did the CAS.
-                     */
+                    * If barrier state changed underneath us and we chose not to wake the
+                    * looper thread, we have to recheck to ensure that the barrier we saw was
+                    * actually in place while we did the CAS.
+                    */
                     continue;
                 }
                 if (needWake) {
@@ -453,6 +474,7 @@ public final class MessageQueue {
                 }
                 return true;
             }
+            // Failed to update wait state, loop and retry
         }
     }
 
@@ -702,7 +724,7 @@ public final class MessageQueue {
                 }
             }
 
-            sSyncBarrier.setVolatile(this, syncBarrier);
+            mSyncBarrier = syncBarrier;
             /*
              * Try to swap waitstate back from a counter to a deadline. If we can't then that means
              * the counter was incremented and we need to loop back to pick up any new items.
@@ -724,6 +746,11 @@ public final class MessageQueue {
         }
     }
 
+    @UnsupportedAppUsage(
+            maxTargetSdk = Build.VERSION_CODES.BAKLAVA,
+            publicAlternatives =
+                    "To manipulate the queue in Instrumentation tests, use {@link"
+                        + " android.os.TestLooperManager}")
     Message next() {
         if (sUseDeliQueue) {
             return nextDeliQueue();
@@ -1264,13 +1291,14 @@ public final class MessageQueue {
     private void removeSyncBarrierDeliQueue(int token) {
         final MatchBarrierToken matchBarrierToken = new MatchBarrierToken(token);
 
-        final boolean removed = mStack.moveMatchingToFreelist(matchBarrierToken, null, -1, null,
+        final int removed = mStack.moveMatchingToFreelist(matchBarrierToken, null, -1, null,
                 null, 0);
-        if (!removed) {
+        if (removed == 0) {
             throw new IllegalStateException("The specified message queue synchronization "
                     + " barrier token has not been posted or has already been removed.");
         }
         maybeDrainFreelist();
+        decAndTraceMessageCount();
 
         boolean needWake;
         while (true) {
@@ -1570,7 +1598,9 @@ public final class MessageQueue {
     }
 
     private void removeMessagesDeliQueue(Handler h, int what, Object object) {
-        mStack.moveMatchingToFreelist(sMatchHandlerWhatAndObject, h, what, object, null, 0);
+        final int numRemoved = mStack.moveMatchingToFreelist(sMatchHandlerWhatAndObject, h, what,
+                object, null, 0);
+        decAndTraceMessageCount(numRemoved);
         maybeDrainFreelist();
     }
 
@@ -1631,7 +1661,9 @@ public final class MessageQueue {
     }
 
     private void removeEqualMessagesDeliQueue(Handler h, int what, Object object) {
-        mStack.moveMatchingToFreelist(sMatchHandlerWhatAndObjectEquals, h, what, object, null, 0);
+        final int numRemoved = mStack.moveMatchingToFreelist(sMatchHandlerWhatAndObjectEquals, h,
+                what, object, null, 0);
+        decAndTraceMessageCount(numRemoved);
         maybeDrainFreelist();
     }
 
@@ -1692,7 +1724,9 @@ public final class MessageQueue {
     }
 
     private void removeMessagesDeliQueue(Handler h, Runnable r, Object object) {
-        mStack.moveMatchingToFreelist(sMatchHandlerRunnableAndObject, h, -1, object, r, 0);
+        final int numRemoved = mStack.moveMatchingToFreelist(sMatchHandlerRunnableAndObject, h,
+                -1, object, r, 0);
+        decAndTraceMessageCount(numRemoved);
         maybeDrainFreelist();
     }
 
@@ -1753,7 +1787,9 @@ public final class MessageQueue {
     }
 
     private void removeEqualMessagesDeliQueue(Handler h, Runnable r, Object object) {
-        mStack.moveMatchingToFreelist(sMatchHandlerRunnableAndObjectEquals, h, -1, object, r, 0);
+        final int numRemoved = mStack.moveMatchingToFreelist(sMatchHandlerRunnableAndObjectEquals,
+                h, -1, object, r, 0);
+        decAndTraceMessageCount(numRemoved);
         maybeDrainFreelist();
     }
 
@@ -1814,7 +1850,9 @@ public final class MessageQueue {
     }
 
     private void removeCallbacksAndMessagesDeliQueue(Handler h, Object object) {
-        mStack.moveMatchingToFreelist(sMatchHandlerAndObject, h, -1, object, null, 0);
+        final int numRemoved = mStack.moveMatchingToFreelist(sMatchHandlerAndObject, h, -1, object,
+                null, 0);
+        decAndTraceMessageCount(numRemoved);
         maybeDrainFreelist();
     }
 
@@ -1874,7 +1912,9 @@ public final class MessageQueue {
     }
 
     private void removeCallbacksAndEqualMessagesDeliQueue(Handler h, Object object) {
-        mStack.moveMatchingToFreelist(sMatchHandlerAndObjectEquals, h, -1, object, null, 0);
+        final int numRemoved = mStack.moveMatchingToFreelist(sMatchHandlerAndObjectEquals, h, -1,
+                object, null, 0);
+        decAndTraceMessageCount(numRemoved);
         maybeDrainFreelist();
     }
 
@@ -1971,12 +2011,16 @@ public final class MessageQueue {
     }
 
     private void removeAllMessages() {
-        mStack.moveMatchingToFreelist(sMatchAllMessages, null, -1, null, null, 0);
+        final int numRemoved = mStack.moveMatchingToFreelist(sMatchAllMessages, null, -1, null,
+                null, 0);
+        decAndTraceMessageCount(numRemoved);
         maybeDrainFreelist();
     }
 
     private void removeAllFutureMessages(long when) {
-        mStack.moveMatchingToFreelist(sMatchAllFutureMessages, null, -1, null, null, when);
+        final int numRemoved = mStack.moveMatchingToFreelist(sMatchAllFutureMessages, null, -1,
+                null, null, when);
+        decAndTraceMessageCount(numRemoved);
         maybeDrainFreelist();
     }
 
@@ -2417,11 +2461,17 @@ public final class MessageQueue {
         proto.end(messageQueueToken);
     }
 
-    private void decAndTraceMessageCount() {
-        mMessageCount.decrementAndGet();
-        if (PerfettoTrace.isMQCategoryEnabled()) {
-            traceMessageCount();
+    private void decAndTraceMessageCount(int n) {
+        if (n != 0) {
+            mMessageCount.addAndGet(-1 * n);
+            if (PerfettoTrace.isMQCategoryEnabled()) {
+                traceMessageCount();
+            }
         }
+    }
+
+    private void decAndTraceMessageCount() {
+        decAndTraceMessageCount(1);
     }
 
     private void incAndTraceMessageCount(Message msg, long when) {

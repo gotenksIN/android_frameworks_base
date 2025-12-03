@@ -44,6 +44,7 @@ import com.android.systemui.statusbar.featurepods.media.ui.compose.MediaControlP
 import com.android.systemui.statusbar.featurepods.popups.ui.model.PopupChipId
 import com.android.systemui.statusbar.featurepods.popups.ui.model.PopupChipModel
 import com.android.systemui.statusbar.featurepods.sharescreen.ui.compose.ShareScreenPrivacyIndicatorPopup
+import com.android.systemui.statusbar.featurepods.sharescreen.ui.viewmodel.ShareScreenPrivacyIndicatorPopupViewModel
 
 /**
  * Displays a popup in the status bar area. The offset is calculated to draw the popup below the
@@ -56,6 +57,7 @@ fun StatusBarPopup(
     mediaHost: MediaHost,
 ) {
     val density = Density(LocalContext.current)
+
     Popup(
         alignment = Alignment.TopCenter,
         properties =
@@ -96,9 +98,19 @@ fun StatusBarPopup(
                 is PopupChipId.AvControlsIndicator -> {
                     AvControlsChipPopup()
                 }
+
                 is PopupChipId.ShareScreenPrivacyIndicator -> {
-                    ShareScreenPrivacyIndicatorPopup()
+                    ShareScreenPrivacyIndicatorPopup(
+                        viewModelFactory =
+                            viewModel.popupViewModelFactory
+                                as ShareScreenPrivacyIndicatorPopupViewModel.Factory
+                    )
                 }
+                /**
+                 * Some chip ids (e.g. AssistantIcon) have custom [PopupChipModel.Shown.showPopup]
+                 * and don't rely on this Composable.
+                 */
+                is PopupChipId.AssistantIcon -> {}
             }
             // Future popup types will be handled here.
         }

@@ -100,25 +100,27 @@ final class LocalDisplayAdapter extends DisplayAdapter {
     private boolean mEvenDimmerEnabled = false;
     private ColorDisplayService.ColorDisplayServiceInternal mCdsi;
     private Spline mNitsToEvenDimmerStrength;
+    private final boolean mStableEdidsFlag;
 
     // Called with SyncRoot lock held.
     LocalDisplayAdapter(DisplayManagerService.SyncRoot syncRoot, Context context,
             Handler handler, Listener listener, DisplayManagerFlags flags,
-            DisplayNotificationManager displayNotificationManager) {
+            DisplayNotificationManager displayNotificationManager, boolean stableEdidsFlag) {
         this(syncRoot, context, handler, listener, flags, displayNotificationManager,
-                new Injector());
+                new Injector(), stableEdidsFlag);
     }
 
     @VisibleForTesting
     LocalDisplayAdapter(DisplayManagerService.SyncRoot syncRoot, Context context, Handler handler,
             Listener listener, DisplayManagerFlags flags,
             DisplayNotificationManager displayNotificationManager,
-            Injector injector) {
+            Injector injector, boolean stableEdidsFlag) {
         super(syncRoot, context, handler, listener, TAG, flags);
         mDisplayNotificationManager = displayNotificationManager;
         mInjector = injector;
         mSurfaceControlProxy = mInjector.getSurfaceControlProxy();
         mIsBootDisplayModeSupported = mSurfaceControlProxy.getBootDisplayModeSupport();
+        mStableEdidsFlag = stableEdidsFlag;
     }
 
     @Override
@@ -211,6 +213,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                 new DisplayModeDirector.DesiredDisplayModeSpecs();
         private final boolean mIsFirstDisplay;
         private final BacklightAdapter mBacklightAdapter;
+        private int mPort;
         private final SidekickInternal mSidekickInternal;
 
         private DisplayDeviceInfo mInfo;
@@ -266,6 +269,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                     getContext());
             mPhysicalDisplayId = physicalDisplayId;
             mIsFirstDisplay = isFirstDisplay;
+            mPort = staticDisplayInfo.port;
             updateDisplayPropertiesLocked(staticDisplayInfo, dynamicInfo, modeSpecs);
             mSidekickInternal = LocalServices.getService(SidekickInternal.class);
             mBacklightAdapter = mInjector.getBacklightAdapter(displayToken, isFirstDisplay,
@@ -558,7 +562,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
             // Load display device config
             final Context context = getOverlayContext();
             mDisplayDeviceConfig = mInjector.createDisplayDeviceConfig(context, mPhysicalDisplayId,
-                    mIsFirstDisplay, getFeatureFlags());
+                    mPort, mIsFirstDisplay, getFeatureFlags());
 
             // Load brightness HWC quirk
             mBacklightAdapter.setForceSurfaceControl(mDisplayDeviceConfig.hasQuirk(
@@ -752,9 +756,9 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                 mInfo.state = mState;
                 mInfo.committedState = mCommittedState;
                 mInfo.uniqueId = getUniqueId();
-                final DisplayAddress.Physical physicalAddress =
-                        DisplayAddress.fromPhysicalDisplayId(mPhysicalDisplayId);
-                mInfo.address = physicalAddress;
+                final DisplayAddress displayAddress = DisplayAddress.fromPhysicalDisplayId(
+                        mPhysicalDisplayId, mPort, mStableEdidsFlag);
+                mInfo.address = displayAddress;
                 mInfo.densityDpi = getLogicalDensity();
                 mInfo.xDpi = mActiveSfDisplayMode.xDpi;
                 mInfo.yDpi = mActiveSfDisplayMode.yDpi;
@@ -770,7 +774,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
 
                 final Resources res = getOverlayContext().getResources();
                 final boolean isBuiltIn = ((mInfo.address) != null) ?
-                   ((((DisplayAddress.Physical) mInfo.address).getPort() & 0x80) == 0x80) : false;
+                   ((((DisplayAddress) mInfo.address).getPort() & 0x80) == 0x80) : false;
 
                 mInfo.flags |= DisplayDeviceInfo.FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY;
 
@@ -805,11 +809,11 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                         mInfo.flags |= DisplayDeviceInfo.FLAG_OWN_CONTENT_ONLY;
                     }
 
-                    if (isDisplayPrivate(physicalAddress)) {
+                    if (isDisplayPrivate(displayAddress)) {
                         mInfo.flags |= DisplayDeviceInfo.FLAG_PRIVATE;
                     }
 
-                    if (isDisplayStealTopFocusDisabled(physicalAddress)) {
+                    if (isDisplayStealTopFocusDisabled(displayAddress)) {
                         mInfo.flags |= DisplayDeviceInfo.FLAG_OWN_FOCUS;
                         mInfo.flags |= DisplayDeviceInfo.FLAG_STEAL_TOP_FOCUS_DISABLED;
                     }
@@ -819,7 +823,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                     // Public display with FLAG_OWN_CONTENT_ONLY disabled is allowed to switch the
                     // content mode.
                     if (mIsFirstDisplay
-                            || (!isDisplayPrivate(physicalAddress) && !shouldOwnContentOnly())) {
+                            || (!isDisplayPrivate(displayAddress) && !shouldOwnContentOnly())) {
                         mInfo.flags |= DisplayDeviceInfo.FLAG_ALLOWS_CONTENT_MODE_SWITCH;
                     }
                 }
@@ -846,7 +850,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                 mInfo.installOrientation = mStaticDisplayInfo.installOrientation;
 
                 mInfo.displayShape = DisplayShape.fromResources(
-                        res, mInfo.uniqueId, maxWidth, maxHeight, mInfo.width, mInfo.height);
+                        mInfo.uniqueId, maxWidth, maxHeight, mInfo.width, mInfo.height);
 
                 mInfo.name = getDisplayDeviceConfig().getName();
 
@@ -1402,6 +1406,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
         public void dumpLocked(PrintWriter pw) {
             super.dumpLocked(pw);
             pw.println("mPhysicalDisplayId=" + mPhysicalDisplayId);
+            pw.println("mPort=" + mPort);
             pw.println("mDisplayModeSpecs={" + mDisplayModeSpecs + "}");
             pw.println("mDisplayModeSpecsInvalid=" + mDisplayModeSpecsInvalid);
             pw.println("mActiveModeId=" + mActiveModeId);
@@ -1439,6 +1444,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
             pw.println("mEvenDimmerEnabled=" + mEvenDimmerEnabled);
             pw.println("mEvenDimmerStrength=" + mEvenDimmerStrength);
             pw.println("mNitsToEvenDimmerStrength=" + mNitsToEvenDimmerStrength);
+            pw.println("mStableEdidsFlag=" + mStableEdidsFlag);
         }
 
         private int findSfDisplayModeIdLocked(Display.Mode mode, int modeGroup) {
@@ -1536,14 +1542,17 @@ final class LocalDisplayAdapter extends DisplayAdapter {
             return modes;
         }
 
-        private boolean isDisplayPrivate(DisplayAddress.Physical physicalAddress) {
-            if (physicalAddress == null) {
+        private boolean isDisplayPrivate(DisplayAddress displayAddress) {
+            if (displayAddress == null) {
+                return false;
+            }
+            int port = displayAddress.getPort();
+            if (port == DisplayAddress.INVALID_PORT) {
                 return false;
             }
             final Resources res = getOverlayContext().getResources();
             int[] ports = res.getIntArray(R.array.config_localPrivateDisplayPorts);
             if (ports != null) {
-                int port = physicalAddress.getPort();
                 for (int p : ports) {
                     if (p == port) {
                         return true;
@@ -1558,14 +1567,17 @@ final class LocalDisplayAdapter extends DisplayAdapter {
             return !res.getBoolean(R.bool.config_localDisplaysMirrorContent);
         }
 
-        private boolean isDisplayStealTopFocusDisabled(DisplayAddress.Physical physicalAddress) {
-            if (physicalAddress == null) {
+        private boolean isDisplayStealTopFocusDisabled(DisplayAddress displayAddress) {
+            if (displayAddress == null) {
+                return false;
+            }
+            int port = displayAddress.getPort();
+            if (port == DisplayAddress.INVALID_PORT) {
                 return false;
             }
             final Resources res = getOverlayContext().getResources();
             int[] ports = res.getIntArray(R.array.config_localNotStealTopFocusDisplayPorts);
             if (ports != null) {
-                int port = physicalAddress.getPort();
                 for (int p : ports) {
                     if (p == port) {
                         return true;
@@ -1589,6 +1601,13 @@ final class LocalDisplayAdapter extends DisplayAdapter {
             mOverlayContext = ActivityThread.currentActivityThread().getSystemUiContext();
         }
         return mOverlayContext;
+    }
+
+    /**
+     * Dispose of the allocated resources.
+     */
+    void stop() {
+        mInjector.mReceiver.dispose();
     }
 
     /**
@@ -1634,8 +1653,10 @@ final class LocalDisplayAdapter extends DisplayAdapter {
         }
 
         public DisplayDeviceConfig createDisplayDeviceConfig(Context context,
-                long physicalDisplayId, boolean isFirstDisplay, DisplayManagerFlags flags) {
-            return DisplayDeviceConfig.create(context, physicalDisplayId, isFirstDisplay, flags);
+                long physicalDisplayId, int port, boolean isFirstDisplay,
+                DisplayManagerFlags flags) {
+            return DisplayDeviceConfig.create(context, physicalDisplayId, port, isFirstDisplay,
+                    flags);
         }
 
         public BacklightAdapter getBacklightAdapter(IBinder displayToken, boolean isFirstDisplay,

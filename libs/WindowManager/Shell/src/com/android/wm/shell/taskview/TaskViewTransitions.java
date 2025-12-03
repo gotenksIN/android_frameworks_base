@@ -68,6 +68,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.concurrent.Executor;
+import java.util.function.Predicate;
 
 /**
  * Handles Shell Transitions that involve TaskView tasks.
@@ -92,6 +93,12 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
      * transition once the TaskView is ready.
      */
     private PendingRedirectTransition mPendingRedirectTransition;
+
+    /**
+     * The task info of the Root Task that organized the TaskView's tasks.
+     */
+    @Nullable
+    private ActivityManager.RunningTaskInfo mRootTaskInfo;
 
     /**
      * TaskView makes heavy use of startTransition. Only one shell-initiated transition can be
@@ -494,7 +501,7 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             wct = overrideTransaction;
         } else {
             wct = new WindowContainerTransaction();
-            wct.setBounds(taskView.getTaskInfo().token, state.mBounds);
+            updateTaskViewTaskBounds(wct, taskView.getTaskInfo(), state.mBounds);
             if (reorder && !syncHiddenWithVisibilityOnReorder) {
                 // Reset hidden state to fix corner case where surface was destroyed before task
                 // appeared in #prepareOpenAnimation.
@@ -598,7 +605,7 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         // If there is a pending redirect transition, it may have a WCT with other operations.
         final WindowContainerTransaction wct = mPendingRedirectTransition != null
                 ? mPendingRedirectTransition.takePendingWct() : new WindowContainerTransaction();
-        wct.setBounds(taskView.getTaskInfo().token, boundsOnScreen);
+        updateTaskViewTaskBounds(wct, taskView.getTaskInfo(), boundsOnScreen);
         mPending.add(new PendingTransition(TRANSIT_CHANGE, wct, taskView, null /* cookie */));
         startNextTransition();
     }
@@ -722,6 +729,15 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             return false;
         }
 
+        if (isBubbleTrampoline(transitionInfo)) {
+            PendingTransition pending = findPending(transition);
+            if (pending != null) {
+                mPending.remove(pending);
+                startNextTransition();
+            }
+            return false;
+        }
+
         if (!Flags.taskViewTransitionsRefactor() && !enableHandlersDebuggingMode()) {
             return startAnimationLegacy(transition, transitionInfo, startTransaction,
                     finishTransaction, finishCallback);
@@ -767,6 +783,13 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             }
         }
         if (inDataCollectionModeOnly) {
+            return false;
+        }
+
+        if (pending == null && taskViews.isEmpty()) {
+            // Not a taskView transition, have some other handler animate it
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY,
+                    "Transitions.startAnimation(): skipping non-taskView transition");
             return false;
         }
 
@@ -1054,6 +1077,35 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         return true;
     }
 
+    private static boolean isBubbleTrampoline(TransitionInfo info) {
+        return hasOpeningAppBubble(info) && hasClosingAppBubble(info);
+    }
+
+    private static boolean hasOpeningAppBubble(TransitionInfo info) {
+        return containsChange(info, change ->
+                change.getTaskInfo() != null
+                        && change.getTaskInfo().isAppBubble
+                        && TransitionUtil.isOpeningType(change.getMode()));
+    }
+
+    private static boolean hasClosingAppBubble(TransitionInfo info) {
+        return containsChange(info, change ->
+                change.getTaskInfo() != null
+                        && change.getTaskInfo().isAppBubble
+                        && TransitionUtil.isClosingType(change.getMode()));
+    }
+
+    private static boolean containsChange(TransitionInfo info,
+            Predicate<TransitionInfo.Change> predicate) {
+        for (int i = 0; i < info.getChanges().size(); ++i) {
+            final TransitionInfo.Change chg = info.getChanges().get(i);
+            if (predicate.test(chg)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Prepares the TaskView for an open animation.
      *
@@ -1163,13 +1215,39 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         // to its "original" parent by default.
         if (finishTransaction != null) {
             finishTransaction.reparent(leash, tvSurface)
-                    .setPosition(leash, 0, 0)
-                    .setWindowCrop(leash, boundsOnScreen.width(), boundsOnScreen.height());
+                    .setPosition(leash, 0, 0);
+            if (!BubbleAnythingFlagHelper.enableRootTaskForBubble() || !taskInfo.hasParentTask()) {
+                finishTransaction.setWindowCrop(leash, boundsOnScreen.width(),
+                        boundsOnScreen.height());
+            }
         }
         updateBoundsState(taskView, boundsOnScreen);
         updateVisibilityState(taskView, true /* visible */);
-        wct.setBounds(taskInfo.token, boundsOnScreen);
+        updateTaskViewTaskBounds(wct, taskInfo, boundsOnScreen);
         taskView.applyCaptionInsetsIfNeeded();
+    }
+
+    /**
+     * Update the TaskView's task bounds. The bounds are set to the root task that organized the
+     * TaskView task if any. Otherwise, it is set to the TaskView task directly.
+     */
+    public void updateTaskViewTaskBounds(@NonNull WindowContainerTransaction wct,
+            @NonNull ActivityManager.RunningTaskInfo taskInfo, @NonNull Rect bounds) {
+        final WindowContainerToken token;
+        if (!taskInfo.hasParentTask() || mRootTaskInfo == null
+                || taskInfo.parentTaskId != mRootTaskInfo.taskId) {
+            token = taskInfo.token;
+        } else {
+            token = mRootTaskInfo.token;
+        }
+        wct.setBounds(token, bounds);
+    }
+
+    /**
+     * Sets the root task info that organize the TaskView's task.
+     */
+    public void setTaskViewRootTaskInfo(@NonNull ActivityManager.RunningTaskInfo rootTaskInfo) {
+        mRootTaskInfo = rootTaskInfo;
     }
 
     private void executePendingRedirectTransition() {

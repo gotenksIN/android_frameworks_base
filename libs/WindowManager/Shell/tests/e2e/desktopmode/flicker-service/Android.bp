@@ -45,6 +45,7 @@ test_module_config {
     test_suites: ["device-tests"],
     exclude_filters: [
         "com.android.wm.shell.flicker.appcompat.AppDialogStaysInsideDesktopAppFlickerTest",
+        "com.android.wm.shell.flicker.appcompat.OpenTrampolineAppInDesktopModeTaskPositionFlickerTest",
         "com.android.wm.shell.flicker.appcompat.ResizeActivityEmbeddedAppToMinimumWindowFlickerTest",
         "com.android.wm.shell.flicker.appcompat.ShowAppDialogInDesktopModeFlickerTest",
         "com.android.wm.shell.flicker.appcompat.ShowQuickShareDialogFromQuickSettingsFlickerTest",
@@ -64,13 +65,13 @@ test_module_config {
         "com.android.wm.shell.flicker.fundamentals.OpenAppFromTaskbarFlickerTest",
         "com.android.wm.shell.flicker.fundamentals.OpenAppsInDesktopModeFlickerTest",
         "com.android.wm.shell.flicker.fundamentals.OpenUnlimitedAppsFlickerTest",
-        "com.android.wm.shell.flicker.fundamentals.QuickSwitchBetweenDesktopAndFullscreenTest",
+        "com.android.wm.shell.flicker.fundamentals.QuickSwitchBetweenDesktopAndFullscreenFlickerTest",
         "com.android.wm.shell.flicker.fundamentals.SwitchFocusBetweenAppsTest",
         "com.android.wm.shell.flicker.fundamentals.SwitchToDesktopFromOverviewFlickerTest",
         "com.android.wm.shell.flicker.fundamentals.SwitchToHomeFromDesktopTest",
         "com.android.wm.shell.flicker.fundamentals.SwitchToOverviewFromDesktopFlickerTest",
-        "com.android.wm.shell.flicker.fundamentals.UnlockIntoDesktopFromLockScreenFlickerTest",
         "com.android.wm.shell.flicker.immersive.EnterImmersiveViaHeaderMenuFlickerTest",
+        "com.android.wm.shell.flicker.keyboardshortcuts.ActionTabSwitchToDesktopAppFlickerTest",
         "com.android.wm.shell.flicker.keyboardshortcuts.AltTabSwitchInDesktopModeFlickerTest",
         "com.android.wm.shell.flicker.keyboardshortcuts.AltTabSwitchToUnminimizeInDesktopModeFlickerTest",
         "com.android.wm.shell.flicker.keyboardshortcuts.EnterDesktopFromKeyboardShortcutFlickerTest",
@@ -90,6 +91,7 @@ test_module_config {
         "com.android.wm.shell.flicker.multiinstance.ManageOpenInstancesFromAppHeaderFlickerTest",
         "com.android.wm.shell.flicker.multiinstance.ManageOpenInstancesFromAppMenuFlickerTest",
         "com.android.wm.shell.flicker.multiinstance.ManageOpenInstancesFromTaskbarMenuFlickerTest",
+        "com.android.wm.shell.flicker.overview.ClearOpenAppsFromOverviewFlickerTest",
         "com.android.wm.shell.flicker.resizing.ResizeAppToMaximumWindowSizeFlickerTest",
         "com.android.wm.shell.flicker.resizing.ResizeAppToMinimumWindowSizeFlickerTest",
         "com.android.wm.shell.flicker.resizing.ResizeAppWithCornerResizeFlickerTest",
@@ -119,6 +121,13 @@ test_module_config {
     base: "WMShellFlickerTestsDesktopMode",
     test_suites: ["device-tests"],
     include_filters: ["com.android.wm.shell.flicker.appcompat.AppDialogStaysInsideDesktopAppFlickerTest"],
+}
+
+test_module_config {
+    name: "WMShellFlickerTestsDesktopMode-appcompat-OpenTrampolineAppInDesktopModeTaskPositionFlickerTest",
+    base: "WMShellFlickerTestsDesktopMode",
+    test_suites: ["device-tests"],
+    include_filters: ["com.android.wm.shell.flicker.appcompat.OpenTrampolineAppInDesktopModeTaskPositionFlickerTest"],
 }
 
 test_module_config {
@@ -255,10 +264,10 @@ test_module_config {
 }
 
 test_module_config {
-    name: "WMShellFlickerTestsDesktopMode-fundamentals-QuickSwitchBetweenDesktopAndFullscreenTest",
+    name: "WMShellFlickerTestsDesktopMode-fundamentals-QuickSwitchBetweenDesktopAndFullscreenFlickerTest",
     base: "WMShellFlickerTestsDesktopMode",
     test_suites: ["device-tests"],
-    include_filters: ["com.android.wm.shell.flicker.fundamentals.QuickSwitchBetweenDesktopAndFullscreenTest"],
+    include_filters: ["com.android.wm.shell.flicker.fundamentals.QuickSwitchBetweenDesktopAndFullscreenFlickerTest"],
 }
 
 test_module_config {
@@ -287,13 +296,6 @@ test_module_config {
     base: "WMShellFlickerTestsDesktopMode",
     test_suites: ["device-tests"],
     include_filters: ["com.android.wm.shell.flicker.fundamentals.SwitchToOverviewFromDesktopFlickerTest"],
-}
-
-test_module_config {
-    name: "WMShellFlickerTestsDesktopMode-fundamentals-UnlockIntoDesktopFromLockScreenFlickerTest",
-    base: "WMShellFlickerTestsDesktopMode",
-    test_suites: ["device-tests"],
-    include_filters: ["com.android.wm.shell.flicker.fundamentals.UnlockIntoDesktopFromLockScreenFlickerTest"],
 }
 
 test_module_config {
@@ -441,6 +443,13 @@ test_module_config {
     base: "WMShellFlickerTestsDesktopMode",
     test_suites: ["device-tests"],
     include_filters: ["com.android.wm.shell.flicker.multiinstance.ManageOpenInstancesFromTaskbarMenuFlickerTest"],
+}
+
+test_module_config {
+    name: "WMShellFlickerTestsDesktopMode-overview-ClearOpenAppsFromOverviewFlickerTest",
+    base: "WMShellFlickerTestsDesktopMode",
+    test_suites: ["device-tests"],
+    include_filters: ["com.android.wm.shell.flicker.overview.ClearOpenAppsFromOverviewFlickerTest"],
 }
 
 test_module_config {

@@ -22,6 +22,7 @@ import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UI_VISIBILITY;
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER;
 
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_OOM_ADJ;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_UNDEFINED;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -36,18 +37,19 @@ import android.os.Looper;
 import android.os.PowerManagerInternal;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.util.SparseBooleanArray;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
 import com.android.server.am.psc.AsyncBatchSession;
+import com.android.server.am.psc.ProcessListInternal;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.am.psc.ServiceRecordInternal;
 import com.android.server.am.psc.SyncBatchSession;
 import com.android.server.am.psc.annotation.RequiresEnclosingBatchSession;
 import com.android.server.wm.WindowProcessController;
 
-import java.lang.ref.WeakReference;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -60,6 +62,7 @@ import java.util.function.Consumer;
 public class ProcessStateController {
     public static final String TAG = "ProcessStateController";
 
+    private final OomAdjuster.Constants mOomConstants;
     private final OomAdjuster mOomAdjuster;
     private final BiConsumer<ConnectionRecord, Boolean> mServiceBinderCallUpdater;
 
@@ -80,13 +83,14 @@ public class ProcessStateController {
      */
     private final ConcurrentLinkedQueue<Runnable> mStagingQueue = new ConcurrentLinkedQueue<>();
 
-    private ProcessStateController(ActivityManagerService ams, ProcessList processList,
+    private ProcessStateController(ActivityManagerService ams, ProcessListInternal processList,
             ActiveUids activeUids, ServiceThread handlerThread,
             Object lock, Object procLock, Consumer<ProcessRecord> topChangeCallback,
             ProcessLruUpdater lruUpdater, OomAdjuster.Injector oomAdjInjector,
-            OomAdjuster.Callback callback) {
+            OomAdjuster.Constants oomConstants, OomAdjuster.Callback callback) {
+        mOomConstants = oomConstants;
         mOomAdjuster = new OomAdjusterImpl(ams, processList, activeUids, handlerThread,
-                mGlobalState, oomAdjInjector, callback);
+                mOomConstants, mGlobalState, oomAdjInjector, callback);
 
         mLock = lock;
         mProcLock = procLock;
@@ -103,16 +107,45 @@ public class ProcessStateController {
 
     }
 
+    public OomAdjuster.Constants getOomConstants() {
+        return mOomConstants;
+    }
+
+    public void setServiceBindAlmostPerceptibleTimeoutMs(long value) {
+        mOomConstants.mServiceBindAlmostPerceptibleTimeoutMs = value;
+    }
+
+    public void setShortFgsTimeoutDuration(long value) {
+        mOomConstants.mShortFgsTimeoutDuration = value;
+    }
+
+    public void setShortFgsProcStateExtraWaitDuration(long value) {
+        mOomConstants.mShortFgsProcStateExtraWaitDuration = value;
+    }
+
+    public void setCurMaxCachedProcesses(int value) {
+        mOomConstants.mCurMaxCachedProcesses = value;
+    }
+
+    public void setCurMaxEmptyProcesses(int value) {
+        mOomConstants.mCurMaxEmptyProcesses = value;
+    }
+
+    public void setCurTrimEmptyProcesses(int value) {
+        mOomConstants.mCurTrimEmptyProcesses = value;
+    }
+
+    public void setProcStateDebugUids(SparseBooleanArray value) {
+        mOomConstants.mProcStateDebugUids = value;
+    }
+
     /**
      * Start a batch session for specifically service state changes. ProcessStateController updates
      * will not be triggered until until the returned SyncBatchSession is closed.
      */
     public SyncBatchSession startServiceBatchSession(@OomAdjReason int reason) {
         if (!Flags.pscBatchServiceUpdates()) return null;
-
-        final SyncBatchSession batchSession = getBatchSession();
-        batchSession.start(reason);
-        return batchSession;
+        return startBatchSession(reason);
     }
 
     /**
@@ -121,8 +154,6 @@ public class ProcessStateController {
      */
     @GuardedBy("mLock")
     public SyncBatchSession startBatchSession(@OomAdjReason int reason) {
-        if (!Flags.pscBatchUpdate()) return null;
-
         final SyncBatchSession batchSession = getBatchSession();
         batchSession.start(reason);
         return batchSession;
@@ -130,8 +161,8 @@ public class ProcessStateController {
 
     private SyncBatchSession getBatchSession() {
         if (mBatchSession == null) {
-            mBatchSession = new SyncBatchSession(this::runFullUpdateImpl,
-                    this::runPendingUpdateImpl);
+            mBatchSession = new SyncBatchSession(this::enqueueUpdateTargetImpl,
+                    this::runFullUpdateImpl, this::runPendingUpdateImpl);
         }
         return mBatchSession;
     }
@@ -150,6 +181,16 @@ public class ProcessStateController {
      */
     @GuardedBy("mLock")
     public void enqueueUpdateTarget(@Nullable ProcessRecord proc) {
+        if (mBatchSession != null && mBatchSession.isActive()) {
+            // BatchSession is active and a process has been enqueued for an update.
+            getBatchSession().maybeEnqueueProcess(proc);
+            return;
+        }
+        enqueueUpdateTargetImpl(proc);
+    }
+
+    @GuardedBy("mLock")
+    private void enqueueUpdateTargetImpl(@Nullable ProcessRecordInternal proc) {
         mOomAdjuster.enqueueOomAdjTargetLocked(proc);
     }
 
@@ -196,7 +237,7 @@ public class ProcessStateController {
     }
 
     @GuardedBy("mLock")
-    private void runPendingUpdateImpl(@OomAdjReason int oomAdjReason) {
+    public void runPendingUpdateImpl(@OomAdjReason int oomAdjReason) {
         commitStagedEvents();
         mOomAdjuster.updateOomAdjPendingTargetsLocked(oomAdjReason);
     }
@@ -254,7 +295,7 @@ public class ProcessStateController {
             return connectionRecord.mBoundServiceSession;
         }
         connectionRecord.mBoundServiceSession = new BoundServiceSession(mServiceBinderCallUpdater,
-                new WeakReference<>(connectionRecord), connectionRecord.toShortString());
+                connectionRecord);
         return connectionRecord.mBoundServiceSession;
     }
 
@@ -276,6 +317,8 @@ public class ProcessStateController {
         private ProcessRecordInternal mHeavyWeightProcess = null;
         private ProcessRecordInternal mShowingUiWhileDozingProcess = null;
         private ProcessRecordInternal mPreviousProcess = null;
+        private static final int NONE_DEBUG_UID = -1;
+        private volatile int mDebugUid = NONE_DEBUG_UID;
 
         private void commitStagedState() {
             mUnlocking = mUnlockingStaged;
@@ -285,7 +328,7 @@ public class ProcessStateController {
             return mIsAwake;
         }
 
-        public ProcessRecord getBackupTarget(@UserIdInt int userId) {
+        public ProcessRecordInternal getBackupTarget(@UserIdInt int userId) {
             return mBackupTargets.get(userId);
         }
 
@@ -329,6 +372,10 @@ public class ProcessStateController {
         @Nullable
         public ProcessRecordInternal getPreviousProcess() {
             return mPreviousProcess;
+        }
+
+        public boolean isDebugEnabled(ProcessRecordInternal app) {
+            return app.getApplicationUid() == mDebugUid;
         }
     }
 
@@ -415,6 +462,27 @@ public class ProcessStateController {
     @GuardedBy("mLock")
     public void setIsLastMemoryLevelNormal(boolean isMemoryNormal) {
         mGlobalState.mIsLastMemoryLevelNormal = isMemoryNormal;
+    }
+
+    /**
+     * Sets the UID for which OOM adjustment debugging messages should be reported.
+     */
+    public void setDebugUid(int uid) {
+        mGlobalState.mDebugUid = uid;
+    }
+
+    /**
+     * Clears the UID for which OOM adjustment debugging messages are reported.
+     */
+    public void clearDebugUid() {
+        mGlobalState.mDebugUid = GlobalState.NONE_DEBUG_UID;
+    }
+
+    /**
+     * Returns the UID for which OOM adjustment debugging messages are currently being reported.
+     */
+    public int getDebugUid() {
+        return mGlobalState.mDebugUid;
     }
 
     /***************************** UID State Events ****************************/
@@ -526,20 +594,15 @@ public class ProcessStateController {
      * @return true if the state changed, otherwise returns false.
      */
     @GuardedBy("mLock")
-    public boolean setRunningRemoteAnimation(@NonNull ProcessRecord proc,
+    public void setRunningRemoteAnimation(@NonNull ProcessRecord proc,
             boolean runningRemoteAnimation) {
-        if (proc.isRunningRemoteAnimation() == runningRemoteAnimation) return false;
+        if (proc.isRunningRemoteAnimation() == runningRemoteAnimation) return;
         if (DEBUG_OOM_ADJ) {
             Slog.i(TAG, "Setting runningRemoteAnimation=" + runningRemoteAnimation
                     + " for pid=" + proc.getPid());
         }
         proc.setIsRunningRemoteAnimation(runningRemoteAnimation);
-
-        if (Flags.autoTriggerOomadjUpdates()) {
-            enqueueUpdateTarget(proc);
-            runPendingUpdate(OOM_ADJ_REASON_UI_VISIBILITY);
-        }
-        return true;
+        runUpdate(proc, OOM_ADJ_REASON_UI_VISIBILITY);
     }
 
     /**
@@ -894,9 +957,7 @@ public class ProcessStateController {
         proc.getReceivers().setIsReceivingBroadcast(true);
         proc.getReceivers().setBroadcastReceiverSchedGroup(schedGroup);
 
-        if (Flags.pushBroadcastStateToOomadjuster()) {
-            proc.mProfile.addHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
-        }
+        proc.mProfile.addHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
     }
 
     /**
@@ -905,23 +966,19 @@ public class ProcessStateController {
     @GuardedBy("mLock")
     public void noteBroadcastDeliveryEnded(@NonNull ProcessRecord proc) {
         proc.getReceivers().setIsReceivingBroadcast(false);
-        proc.getReceivers().setBroadcastReceiverSchedGroup(ProcessList.SCHED_GROUP_UNDEFINED);
+        proc.getReceivers().setBroadcastReceiverSchedGroup(SCHED_GROUP_UNDEFINED);
 
-        if (Flags.pushBroadcastStateToOomadjuster()) {
-            proc.mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
-        }
+        proc.mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
     }
 
     @GuardedBy("mLock")
     private void commitStagedEvents() {
         mGlobalState.commitStagedState();
 
-        if (Flags.pushActivityStateToOomadjuster()) {
-            // Drain any activity state changes from the staging queue.
-            final ConcurrentLinkedQueue<Runnable> queue = mStagingQueue;
-            while (!queue.isEmpty()) {
-                queue.poll().run();
-            }
+        // Drain any activity state changes from the staging queue.
+        final ConcurrentLinkedQueue<Runnable> queue = mStagingQueue;
+        while (!queue.isEmpty()) {
+            queue.poll().run();
         }
     }
 
@@ -952,8 +1009,6 @@ public class ProcessStateController {
          * the returned AsyncBatchSession is closed.
          */
         public AsyncBatchSession startBatchSession() {
-            if (!Flags.pushActivityStateToOomadjuster()) return null;
-
             final AsyncBatchSession session = getBatchSession();
             session.start(OOM_ADJ_REASON_ACTIVITY);
             return session;
@@ -970,8 +1025,6 @@ public class ProcessStateController {
          * Set whether the device is currently unlocking.
          */
         public void setDeviceUnlocking(boolean unlocking) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             mPsc.mGlobalState.mUnlockingStaged = unlocking;
         }
 
@@ -979,8 +1032,6 @@ public class ProcessStateController {
          * Set whether the top process is occluded by the notification shade.
          */
         public void setExpandedNotificationShadeAsync(boolean expandedShade) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             getBatchSession().stage(() -> mPsc.setExpandedNotificationShade(expandedShade));
         }
 
@@ -989,8 +1040,6 @@ public class ProcessStateController {
          */
         public void setTopProcessAsync(@Nullable WindowProcessController wpc, boolean clearPrev,
                 boolean cancelExpandedShade) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             final ProcessRecord top = wpc != null ? (ProcessRecord) wpc.mOwner : null;
             getBatchSession().stage(() -> {
                 mPsc.setTopProcess(top);
@@ -1007,8 +1056,6 @@ public class ProcessStateController {
          * Set which process state Top processes should get.
          */
         public void setTopProcessStateAsync(@ActivityManager.ProcessState int procState) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             getBatchSession().stage(() -> mPsc.setTopProcessState(procState));
         }
 
@@ -1016,8 +1063,6 @@ public class ProcessStateController {
          * Set which process is considered the Previous process, if any.
          */
         public void setPreviousProcessAsync(@Nullable WindowProcessController wpc) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             final ProcessRecordInternal prev = wpc != null
                     ? (ProcessRecordInternal) wpc.mOwner : null;
             getBatchSession().stage(() -> mPsc.setPreviousProcess(prev));
@@ -1028,8 +1073,6 @@ public class ProcessStateController {
          * Set which process is considered the Home process, if any.
          */
         public void setHomeProcessAsync(@Nullable WindowProcessController wpc) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             final ProcessRecordInternal home = wpc != null
                     ? (ProcessRecordInternal) wpc.mOwner : null;
             getBatchSession().stage(() -> mPsc.setHomeProcess(home));
@@ -1040,8 +1083,6 @@ public class ProcessStateController {
          * Set which process is considered the Heavy Weight process, if any.
          */
         public void setHeavyWeightProcessAsync(@Nullable WindowProcessController wpc) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             final ProcessRecord heavy = wpc != null ? (ProcessRecord) wpc.mOwner : null;
             getBatchSession().stage(() -> mPsc.setHeavyWeightProcess(heavy));
         }
@@ -1050,8 +1091,6 @@ public class ProcessStateController {
          * Set which process is showing UI while the screen is off, if any.
          */
         public void setVisibleDozeUiProcessAsync(@Nullable WindowProcessController wpc) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             final ProcessRecord dozeUi = wpc != null ? (ProcessRecord) wpc.mOwner : null;
             getBatchSession().stage(() -> mPsc.setVisibleDozeUiProcess(dozeUi));
         }
@@ -1060,8 +1099,6 @@ public class ProcessStateController {
          * Note whether the process has an activity or not.
          */
         public void setHasActivityAsync(@NonNull WindowProcessController wpc, boolean hasActivity) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             final ProcessRecordInternal activity = (ProcessRecordInternal) wpc.mOwner;
             getBatchSession().stage(() -> mPsc.setHasActivity(activity, hasActivity));
         }
@@ -1071,8 +1108,6 @@ public class ProcessStateController {
          */
         public void setActivityStateAsync(@NonNull WindowProcessController wpc, int flags,
                 long perceptibleStopTimeMs) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             final ProcessRecordInternal activity = (ProcessRecordInternal) wpc.mOwner;
             getBatchSession().stage(() -> {
                 mPsc.setActivityStateFlags(activity, flags);
@@ -1085,8 +1120,6 @@ public class ProcessStateController {
          */
         public void setHasRecentTasksAsync(@NonNull WindowProcessController wpc,
                 boolean hasRecentTasks) {
-            if (!Flags.pushActivityStateToOomadjuster()) return;
-
             final ProcessRecordInternal proc = (ProcessRecordInternal) wpc.mOwner;
             getBatchSession().stage(() -> mPsc.setHasRecentTasks(proc, hasRecentTasks));
         }
@@ -1119,8 +1152,9 @@ public class ProcessStateController {
      */
     public static class Builder {
         private final ActivityManagerService mAms;
-        private final ProcessList mProcessList;
+        private final ProcessListInternal mProcessList;
         private final ActiveUids mActiveUids;
+        private final OomAdjuster.Constants mOomConstants;
         private final OomAdjuster.Callback mOomAdjCallback;
 
         private ServiceThread mHandlerThread = null;
@@ -1129,11 +1163,13 @@ public class ProcessStateController {
         private ProcessLruUpdater mProcessLruUpdater = null;
         private OomAdjuster.Injector mOomAdjInjector = null;
 
-        public Builder(ActivityManagerService ams, ProcessList processList, ActiveUids activeUids,
+        public Builder(ActivityManagerService ams, ProcessListInternal processList,
+                ActiveUids activeUids, OomAdjuster.Constants oomConstants,
                 OomAdjuster.Callback oomAdjCallback) {
             mAms = ams;
             mProcessList = processList;
             mActiveUids = activeUids;
+            mOomConstants = oomConstants;
             mOomAdjCallback = oomAdjCallback;
         }
 
@@ -1163,7 +1199,7 @@ public class ProcessStateController {
             }
             return new ProcessStateController(mAms, mProcessList, mActiveUids, mHandlerThread,
                     mLock, mAms.mProcLock, mTopChangeCallback, mProcessLruUpdater, mOomAdjInjector,
-                    mOomAdjCallback);
+                    mOomConstants, mOomAdjCallback);
         }
 
         /**

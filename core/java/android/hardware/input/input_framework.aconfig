@@ -177,14 +177,6 @@ flag {
 }
 
 flag {
-   name: "enable_backup_and_restore_for_input_gestures"
-   namespace: "input"
-   description: "Adds backup and restore support for custom input gestures"
-   bug: "382184249"
-   is_fixed_read_only: true
-}
-
-flag {
     name: "request_key_capture_api"
     namespace: "input"
     description: "Adds support for key capture APIs"
@@ -209,8 +201,6 @@ flag {
     description: "Adds support for creating a virtual keyboard API"
     bug: "416054433"
 }
-
-
 
 flag {
     name: "mouse_to_touch_per_app_compat"
@@ -249,6 +239,13 @@ flag {
 }
 
 flag {
+    name: "relative_capture_mode_by_default"
+    namespace: "input"
+    description: "Use the RELATIVE pointer capture mode by default, in which touchpad gestures are recognized and converted into mouse-like events. Requires pointer_capture_modes to be enabled"
+    bug: "403531245"
+}
+
+flag {
     name: "enable_partial_screenshot_keyboard_shortcut"
     namespace: "input"
     description: "Enables keyboard shortcut for taking partial screenshots via large screen capture UI"
@@ -256,15 +253,32 @@ flag {
 }
 
 flag {
-  name: "keyboard_backlight_shortcuts"
-  namespace: "desktop_input"
-  description: "Enables new keyboard shortcuts to adjust keyboard backlight"
-  bug: "401626732"
+    name: "keyboard_backlight_shortcuts"
+    namespace: "desktop_input"
+    description: "Enables new keyboard shortcuts to adjust keyboard backlight"
+    bug: "401626732"
 }
 
 flag {
-    name: "bluetooth_wakeup_state_check"
-    namespace: "desktop_pnp"
-    description: "Check Bluetooth HID profile connection state is changed before waking up the device."
-    bug: "440645135"
+    name: "enable_contextual_search_desktop_entrypoints"
+    namespace: "input"
+    description: "Enables desktop entrypoints for contextual search"
+    bug: "442915863"
+}
+
+flag {
+    name: "use_event_display_id_for_key_wakeup"
+    namespace: "input"
+    description: "Use the display associated with a waking KeyEvent, instead of DEFAULT_DISPLAY."
+    bug: "444390628"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "controller_remapping"
+    namespace: "input"
+    description: "Enables game controller remapping"
+    bug: "435503326"
 }

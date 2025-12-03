@@ -120,6 +120,7 @@ import static android.view.accessibility.Flags.reduceWindowContentChangedEventTh
 import static android.view.flags.Flags.disableDrawWakeLock;
 import static android.view.flags.Flags.sensitiveContentAppProtection;
 import static android.view.flags.Flags.sensitiveContentPrematureProtectionRemovedFix;
+import static android.view.flags.Flags.toolkitDisableCategoryOnMrr;
 import static android.view.flags.Flags.toolkitFrameRateDebug;
 import static android.view.flags.Flags.toolkitFrameRateTouchBoost25q1;
 import static android.view.flags.Flags.toolkitInitialTouchBoost;
@@ -816,8 +817,8 @@ public final class ViewRootImpl implements ViewParent,
     /**
      * The combined transactions passed in from {@link #applyTransactionOnDraw}
      */
-    private Transaction mPendingTransaction = new Transaction();
-
+    @NonNull
+    private final Transaction mPendingTransaction;
 
     boolean mIsDrawing;
     int mLastSystemUiVisibility;
@@ -868,8 +869,10 @@ public final class ViewRootImpl implements ViewParent,
      * surfaces can ensure they do not draw into the surface inset region set by the parent window.
      */
     private SurfaceControl mBoundsLayer;
-    private final Transaction mTransaction = new Transaction();
-    private final Transaction mFrameRateTransaction = new Transaction();
+    @NonNull
+    private final Transaction mTransaction;
+    @NonNull
+    private final Transaction mFrameRateTransaction;
 
     @UnsupportedAppUsage
     boolean mAdded;
@@ -1253,6 +1256,7 @@ public final class ViewRootImpl implements ViewParent,
     private final boolean mDisableDrawWakeLock;
 
     private String mTag = TAG;
+    private String mDrawTrace = "draw-" + mTag; // cache to avoid allocating on each frame
     private String mFpsTraceName;
     private String mLargestViewTraceName;
 
@@ -1275,6 +1279,7 @@ public final class ViewRootImpl implements ViewParent,
     private static final boolean sEnableVrr = ViewProperties.vrr_enabled().orElse(true);
     private static final boolean sToolkitInitialTouchBoostFlagValue = toolkitInitialTouchBoost();
     private static boolean sToolkitFrameRateDebugFlagValue =  toolkitFrameRateDebug();
+    private static boolean sToolkitDisableCategoryOnMrrFlagValue =  toolkitDisableCategoryOnMrr();
 
     static {
         sToolkitSetFrameRateReadOnlyFlagValue = toolkitSetFrameRateReadOnly();
@@ -1338,6 +1343,11 @@ public final class ViewRootImpl implements ViewParent,
                 InputSettings.isStylusPointerIconEnabled(mContext);
 
         initializeProtoLogInProcess();
+
+        // Transaction constructor might use ProtoLog, so initialize after it is setup.
+        mPendingTransaction = new Transaction();
+        mTransaction = new Transaction();
+        mFrameRateTransaction = new Transaction();
 
         mInputCompatHandler = InputEventCompatHandler.buildChain(context, mHandler);
 
@@ -1887,6 +1897,7 @@ public final class ViewRootImpl implements ViewParent,
         final String[] split = mWindowAttributes.getTitle().toString().split("\\.");
         if (split.length > 0) {
             mTag =  "VRI[" + split[split.length - 1] + "]";
+            mDrawTrace = "draw-" + mTag;
         }
     }
 
@@ -2269,10 +2280,12 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private boolean hasSystemApplicationOverlayAppOp() {
+        final Context viewContext = mView != null && mView.mContext != null
+                ? mView.mContext : mContext;
         return mContext.getSystemService(AppOpsManager.class).checkOpRawNoThrow(
                 AppOpsManager.OPSTR_SYSTEM_APPLICATION_OVERLAY,
-                mView.mContext.getAttributionSource().getUid(),
-                mView.mContext.getPackageName(), null) == AppOpsManager.MODE_ALLOWED;
+                viewContext.getAttributionSource().getUid(),
+                viewContext.getPackageName(), null) == AppOpsManager.MODE_ALLOWED;
     }
 
     private int adjustLayoutInDisplayCutoutMode(WindowManager.LayoutParams attrs) {
@@ -4181,16 +4194,6 @@ public final class ViewRootImpl implements ViewParent,
                             mWindowAttributes.surfaceInsets);
                     mNeedsRendererSetup = false;
                 }
-
-                if (setClientDrawnCornerRadii() && !mCornerRadii.isEmpty()
-                                            && mSurfaceControl.isValid()) {
-                    applyTransactionOnDraw(mTransaction
-                            .setClientDrawnCornerRadius(mSurfaceControl, mCornerRadii.topLeft,
-                            mCornerRadii.topRight, mCornerRadii.bottomLeft,
-                            mCornerRadii.bottomRight,
-                            threadedRenderer.getRoundedClipBounds()));
-                    threadedRenderer.setCornerRadius(mCornerRadii);
-                }
             }
 
             // TODO: In the CL "ViewRootImpl: Fix issue with early draw report in
@@ -4853,6 +4856,22 @@ public final class ViewRootImpl implements ViewParent,
             }
             mAttachInfo.mNeedsUpdateLightCenter = false;
         }
+    }
+
+    private void prepareCornerRadiiForDraw() {
+        final ThreadedRenderer threadedRenderer = mAttachInfo.mThreadedRenderer;
+        if (threadedRenderer == null
+                || !setClientDrawnCornerRadii()
+                || !mSurfaceControl.isValid()) {
+            return;
+        }
+        applyOpacity(false);
+        RectF bounds = threadedRenderer.setCornerRadius(mCornerRadii);
+        applyTransactionOnDraw(mTransaction
+                .setClientDrawnCornerRadius(mSurfaceControl, mCornerRadii.topLeft,
+                                mCornerRadii.topRight, mCornerRadii.bottomLeft,
+                                mCornerRadii.bottomRight,
+                                bounds));
     }
 
     private void handleWindowFocusChanged() {
@@ -5577,7 +5596,7 @@ public final class ViewRootImpl implements ViewParent,
         mFullRedrawNeeded = false;
 
         mIsDrawing = true;
-        Trace.traceBegin(Trace.TRACE_TAG_VIEW, "draw-" + mTag);
+        Trace.traceBegin(Trace.TRACE_TAG_VIEW, mDrawTrace);
 
         addFrameCommitCallbackIfNeeded();
 
@@ -5668,8 +5687,10 @@ public final class ViewRootImpl implements ViewParent,
             }
             surfaceSyncGroup.markSyncReady();
         } else if (hasPendingTransaction && pendingTransaction != null) {
-            Trace.instant(Trace.TRACE_TAG_VIEW,
-                    "Transaction not synced due to " + logReason + "-" + mTag);
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                Trace.instant(Trace.TRACE_TAG_VIEW,
+                        "Transaction not synced due to " + logReason + "-" + mTag);
+            }
             if (DEBUG_BLAST) {
                 Log.d(mTag, "Pending transaction will not be applied in sync with a draw due to "
                         + logReason);
@@ -5919,6 +5940,8 @@ public final class ViewRootImpl implements ViewParent,
                             mHdrRenderState.getDesiredHdrSdrRatio()));
                     mAttachInfo.mThreadedRenderer.setTargetHdrSdrRatio(renderRatio);
                 }
+
+                prepareCornerRadiiForDraw();
 
                 if (activeSyncGroup != null) {
                     registerCallbacksForSync(syncBuffer, activeSyncGroup);
@@ -9855,11 +9878,15 @@ public final class ViewRootImpl implements ViewParent,
             return;
         }
 
+        applyOpacity(opaque);
+    }
+
+    private void applyOpacity(boolean opaque) {
         final ThreadedRenderer renderer = mAttachInfo.mThreadedRenderer;
         if (renderer != null && renderer.rendererOwnsSurfaceControlOpacity()) {
             opaque = renderer.setSurfaceControlOpaque(opaque);
         } else {
-            mTransaction.setOpaque(mSurfaceControl, opaque).apply();
+            applyTransactionOnDraw(mTransaction.setOpaque(mSurfaceControl, opaque));
         }
 
         mIsSurfaceOpaque = opaque;
@@ -10258,6 +10285,14 @@ public final class ViewRootImpl implements ViewParent,
         @Override
         public int hashCode() {
             return Objects.hash(topLeft, topRight, bottomRight, bottomLeft);
+        }
+
+        @Override
+        public String toString() {
+            return "CornerRadii{ topLeft=" + topLeft
+                   + ", topRight=" + topRight
+                   + ", bottomRight=" + bottomRight
+                   + ", bottomLeft=" + bottomLeft + "}";
         }
     }
 
@@ -10879,6 +10914,8 @@ public final class ViewRootImpl implements ViewParent,
 
         @Override
         public void onFocusEvent(boolean hasFocus) {
+            EventLog.writeEvent(LOGTAG_INPUT_FOCUS,
+                    "ViewRootImpl focus=" + hasFocus + " for " + getTitle());
             windowFocusChanged(hasFocus);
         }
 
@@ -12885,7 +12922,9 @@ public final class ViewRootImpl implements ViewParent,
             logAndTrace("applyTransactionOnDraw applyImmediately");
             t.apply();
         } else {
-            Trace.instant(Trace.TRACE_TAG_VIEW, "applyTransactionOnDraw-" + mTag);
+            if (Trace.isTagEnabled(TRACE_TAG_VIEW)) {
+                Trace.instant(Trace.TRACE_TAG_VIEW, "applyTransactionOnDraw-" + mTag);
+            }
             // Copy and clear the passed in transaction for thread safety. The new transaction is
             // accessed on the render thread.
             mPendingTransaction.merge(t);
@@ -13236,8 +13275,10 @@ public final class ViewRootImpl implements ViewParent,
             });
         }
 
-        Trace.instant(Trace.TRACE_TAG_VIEW,
-                "getOrCreateSurfaceSyncGroup isNew=" + newSyncGroup + " " + mTag);
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.instant(Trace.TRACE_TAG_VIEW,
+                    "getOrCreateSurfaceSyncGroup isNew=" + newSyncGroup + " " + mTag);
+        }
 
         if (DEBUG_BLAST) {
             if (newSyncGroup) {
@@ -13491,7 +13532,10 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private boolean shouldSetFrameRateCategory() {
-        // use toolkitSetFrameRate flag to gate the change
+        // We only want to call setFrameRateCategory when it supports ARR.
+        if (sToolkitDisableCategoryOnMrrFlagValue) {
+            return shouldEnableDvrr() && mSurface.isValid() && mDisplay.hasArrSupport();
+        }
         return shouldEnableDvrr() && mSurface.isValid();
     }
 
@@ -13731,6 +13775,14 @@ public final class ViewRootImpl implements ViewParent,
         mHandler.removeMessages(MSG_TOUCH_BOOST_TIMEOUT);
         mHandler.sendEmptyMessageDelayed(MSG_TOUCH_BOOST_TIMEOUT,
                 boostTimeOut);
+    }
+
+    /**
+     * Get the value of mDisplay.hasArrSupport()
+     */
+    @VisibleForTesting
+    public boolean getHasArrSupport() {
+        return mDisplay.hasArrSupport();
     }
 
     /**

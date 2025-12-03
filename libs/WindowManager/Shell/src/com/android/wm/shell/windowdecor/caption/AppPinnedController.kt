@@ -29,7 +29,9 @@ import android.view.View
 import android.window.WindowContainerTransaction
 import com.android.app.tracing.traceSection
 import com.android.wm.shell.R
+import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.common.DisplayController
+import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.windowdecor.WindowDecorLinearLayout
 import com.android.wm.shell.windowdecor.WindowDecoration2
 import com.android.wm.shell.windowdecor.WindowDecorationActions
@@ -37,6 +39,7 @@ import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHost
 import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHostSupplier
 import com.android.wm.shell.windowdecor.viewholder.AppPinnedViewHolder
 import com.android.wm.shell.windowdecor.viewholder.WindowDecorationViewHolder
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Controller for the Pinned Caption, used for exclusive floating windows, interactive PiP, or
@@ -45,13 +48,20 @@ import com.android.wm.shell.windowdecor.viewholder.WindowDecorationViewHolder
 class AppPinnedController(
     taskInfo: RunningTaskInfo,
     windowDecorViewHostSupplier: WindowDecorViewHostSupplier<WindowDecorViewHost>,
-    private val context: Context,
     private val decorWindowContext: Context,
     private val displayController: DisplayController,
     private val onTouchListener: View.OnTouchListener,
     private val onGenericMotionEventListener: View.OnGenericMotionListener,
     private val windowDecorationActions: WindowDecorationActions,
-) : CaptionController<WindowDecorLinearLayout>(taskInfo, windowDecorViewHostSupplier) {
+    taskOrganizer: ShellTaskOrganizer,
+    @ShellBackgroundThread bgScope: CoroutineScope,
+) :
+    CaptionController<WindowDecorLinearLayout>(
+        taskInfo,
+        windowDecorViewHostSupplier,
+        taskOrganizer,
+        bgScope,
+    ) {
 
     companion object {
         private const val TAG = "AppPinnedController"
@@ -71,7 +81,7 @@ class AppPinnedController(
                         windowDecorationActions.onOpenIntent(taskInfo.taskId, it)
                     }
                 },
-                onCloseWindow = { windowDecorationActions.onClose(taskInfo.taskId) },
+                onCloseWindow = { windowDecorationActions.onClose(taskInfo) },
             )
             .also { viewHolder = it }
     }
@@ -111,14 +121,14 @@ class AppPinnedController(
         arrayListOf(
             OccludingElement(
                 width =
-                    context.resources.getDimensionPixelSize(
+                    decorWindowContext.resources.getDimensionPixelSize(
                         R.dimen.desktop_mode_pinned_header_margin_start
                     ),
                 alignment = OccludingElement.Alignment.START,
             ),
             OccludingElement(
                 width =
-                    context.resources.getDimensionPixelSize(
+                    decorWindowContext.resources.getDimensionPixelSize(
                         R.dimen.desktop_mode_pinned_header_margin_end
                     ),
                 alignment = OccludingElement.Alignment.END,
@@ -126,8 +136,9 @@ class AppPinnedController(
         )
 
     override fun getCaptionHeight(): Int =
-        context.resources.getDimensionPixelSize(R.dimen.desktop_mode_pinned_header_height) +
-            getCaptionTopPadding()
+        decorWindowContext.resources.getDimensionPixelSize(
+            R.dimen.desktop_mode_pinned_header_height
+        ) + getCaptionTopPadding()
 
     override fun getCaptionWidth(): Int =
         taskInfo.getConfiguration().windowConfiguration.bounds.width()

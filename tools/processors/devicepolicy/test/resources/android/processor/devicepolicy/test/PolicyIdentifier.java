@@ -20,31 +20,44 @@ import android.annotation.IntDef;
 import android.processor.devicepolicy.BooleanPolicyDefinition;
 import android.processor.devicepolicy.EnumPolicyDefinition;
 import android.processor.devicepolicy.IntegerPolicyDefinition;
+import android.processor.devicepolicy.ListOfStringPolicyDefinition;
 import android.processor.devicepolicy.PolicyDefinition;
+import android.processor.devicepolicy.StringPolicyDefinition;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.List;
 
 public final class PolicyIdentifier<T> {
-    // We don't actually do anything with this.
+    private final String mId;
+
     public PolicyIdentifier(String id) {
+        mId = id;
     }
 
-    private static final String SIMPLE_BOOLEAN_POLICY_KEY = "simple_boolean_policy_key";
+    public String getId() {
+        return mId;
+    }
 
     /**
      * Test policy 1
+     * Second line
      */
     @BooleanPolicyDefinition(
             base = @PolicyDefinition(
-                    allowedScopes = {1, 2},
-                    affectedResource = 2
+                    allowedScopes = {
+                            1, // POLICY_SCOPE_USER
+                            2  // POLICY_SCOPE_DEVICE
+                    },
+                    affectedResource = 2, // RESOURCE_DEVICE_PER_USER
+                    requiredPermission =
+                            "android.permission.MANAGE_POLICY_SIMPLE_BOOLEAN",
+                    requiredCrossUserPermission =
+                            "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS_FULL"
             )
     )
-    public static final PolicyIdentifier<Boolean> SIMPLE_BOOLEAN_POLICY = new PolicyIdentifier<>(
-            SIMPLE_BOOLEAN_POLICY_KEY);
-
-    private static final String SIMPLE_ENUM_POLICY_KEY = "simple_enum_policy_key";
+    public static final PolicyIdentifier<Boolean> SIMPLE_BOOLEAN_POLICY =
+            new PolicyIdentifier<>("SIMPLE_BOOLEAN_POLICY");
 
     /**
      * First entry
@@ -79,26 +92,68 @@ public final class PolicyIdentifier<T> {
      */
     @EnumPolicyDefinition(
             base = @PolicyDefinition(
-                    allowedScopes = {2, 3},
-                    affectedResource = 1
+                    allowedScopes = {
+                            2, // POLICY_SCOPE_DEVICE
+                            3  // POLICY_SCOPE_PARENT_USER
+                    },
+                    affectedResource = 1, // RESOURCE_DEVICE_WIDE
+                    requiredPermission =
+                            "android.permission.MANAGE_POLICY_SIMPLE_ENUM",
+                    requiredCrossUserPermission =
+                            "android.permission.MANAGE_DEVICE_POLICY_ACROSS_USERS"
             ),
             defaultValue = ENUM_ENTRY_2,
             intDef = SimpleEnumPolicyEnum.class
     )
-    public static final PolicyIdentifier<Integer> SIMPLE_ENUM_POLICY = new PolicyIdentifier<>(
-            SIMPLE_ENUM_POLICY_KEY);
-
-    private static final String SIMPLE_INTEGER_POLICY_KEY = "simple_integer_policy_key";
+    public static final PolicyIdentifier<Integer> SIMPLE_ENUM_POLICY =
+            new PolicyIdentifier<>("SIMPLE_ENUM_POLICY");
 
     /**
      * Test policy 3
      */
     @IntegerPolicyDefinition(
             base = @PolicyDefinition(
-                    allowedScopes = {1},
-                    affectedResource = 1
+                    allowedScopes = {
+                            1 // POLICY_SCOPE_USER
+                    },
+                    affectedResource = 1 // RESOURCE_DEVICE_WIDE
+                    // requiredPermission and requiredCrossUserPermission using the default values.
             )
     )
-    public static final PolicyIdentifier<Integer> SIMPLE_INTEGER_POLICY = new PolicyIdentifier<>(
-            SIMPLE_INTEGER_POLICY_KEY);
+    public static final PolicyIdentifier<Integer> SIMPLE_INTEGER_POLICY =
+            new PolicyIdentifier<>("SIMPLE_INTEGER_POLICY");
+
+    /**
+     * Test policy 4
+     */
+    @StringPolicyDefinition(
+            base = @PolicyDefinition(
+                    allowedScopes = {
+                            1 // POLICY_SCOPE_USER
+                    },
+                    affectedResource = 1 // RESOURCE_DEVICE_WIDE
+                    // requiredPermission and requiredCrossUserPermission using the default values.
+            )
+    )
+    public static final PolicyIdentifier<String> SIMPLE_STRING_POLICY =
+            new PolicyIdentifier<>("SIMPLE_STRING_POLICY");
+
+    /**
+     * Test policy 5
+     */
+    @ListOfStringPolicyDefinition(
+            base = @StringPolicyDefinition(
+                    base = @PolicyDefinition(
+                            allowedScopes = {
+                                    1 // POLICY_SCOPE_USER
+                            },
+                            affectedResource = 1 // RESOURCE_DEVICE_WIDE
+                            // requiredPermission and requiredCrossUserPermission using the
+                            // default values.
+                    ),
+                    emptyStringAllowed = true
+            )
+    )
+    public static final PolicyIdentifier<List<String>> SIMPLE_STRING_LIST_POLICY =
+            new PolicyIdentifier<>("SIMPLE_STRING_LIST_POLICY");
 }

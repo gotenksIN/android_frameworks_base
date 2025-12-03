@@ -98,58 +98,61 @@ public final class DisplayManagerGlobal {
     private static final boolean DEBUG = DisplayManager.DEBUG || sExtraDisplayListenerLogging;
 
     @IntDef(prefix = {"EVENT_DISPLAY_"}, flag = true, value = {
+            EVENT_DISPLAY_CONNECTED,
             EVENT_DISPLAY_ADDED,
             EVENT_DISPLAY_BASIC_CHANGED,
-            EVENT_DISPLAY_REMOVED,
-            EVENT_DISPLAY_BRIGHTNESS_CHANGED,
-            EVENT_DISPLAY_HDR_SDR_RATIO_CHANGED,
-            EVENT_DISPLAY_CONNECTED,
-            EVENT_DISPLAY_DISCONNECTED,
             EVENT_DISPLAY_REFRESH_RATE_CHANGED,
             EVENT_DISPLAY_STATE_CHANGED,
-            EVENT_DISPLAY_COMMITTED_STATE_CHANGED
+            EVENT_DISPLAY_COMMITTED_STATE_CHANGED,
+            EVENT_DISPLAY_HDR_SDR_RATIO_CHANGED,
+            EVENT_DISPLAY_BRIGHTNESS_CHANGED,
+            EVENT_DISPLAY_REMOVED,
+            EVENT_DISPLAY_DISCONNECTED
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface DisplayEvent {}
 
-    public static final int EVENT_DISPLAY_ADDED = 1;
-    public static final int EVENT_DISPLAY_BASIC_CHANGED = 1 << 1;
-
-    public static final int EVENT_DISPLAY_REMOVED = 1 << 2;
-    public static final int EVENT_DISPLAY_BRIGHTNESS_CHANGED = 1 << 3;
-    public static final int EVENT_DISPLAY_HDR_SDR_RATIO_CHANGED = 1 << 4;
-    public static final int EVENT_DISPLAY_CONNECTED = 1 << 5;
-    public static final int EVENT_DISPLAY_DISCONNECTED = 1 << 6;
-    public static final int EVENT_DISPLAY_REFRESH_RATE_CHANGED = 1 << 7;
-    public static final int EVENT_DISPLAY_STATE_CHANGED = 1 << 8;
-    public static final int EVENT_DISPLAY_COMMITTED_STATE_CHANGED = 1 << 9;
-
+    /**
+     * The order of the events here is important.
+     * It determines the order in which they will be handled.
+     * See {@link DisplayListenerDelegate#handleDisplayEventsInner}
+     */
+    public static final int EVENT_DISPLAY_CONNECTED = 1 << 0;
+    public static final int EVENT_DISPLAY_ADDED = 1 << 1;
+    public static final int EVENT_DISPLAY_BASIC_CHANGED = 1 << 2;
+    public static final int EVENT_DISPLAY_REFRESH_RATE_CHANGED = 1 << 3;
+    public static final int EVENT_DISPLAY_STATE_CHANGED = 1 << 4;
+    public static final int EVENT_DISPLAY_COMMITTED_STATE_CHANGED = 1 << 5;
+    public static final int EVENT_DISPLAY_HDR_SDR_RATIO_CHANGED = 1 << 6;
+    public static final int EVENT_DISPLAY_BRIGHTNESS_CHANGED = 1 << 7;
+    public static final int EVENT_DISPLAY_REMOVED = 1 << 8;
+    public static final int EVENT_DISPLAY_DISCONNECTED = 1 << 9;
 
     @LongDef(prefix = {"INTERNAL_EVENT_FLAG_"}, flag = true, value = {
+            INTERNAL_EVENT_FLAG_TOPOLOGY_UPDATED,
+            INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED,
             INTERNAL_EVENT_FLAG_DISPLAY_ADDED,
             INTERNAL_EVENT_FLAG_DISPLAY_BASIC_CHANGED,
-            INTERNAL_EVENT_FLAG_DISPLAY_REMOVED,
-            INTERNAL_EVENT_FLAG_DISPLAY_BRIGHTNESS_CHANGED,
-            INTERNAL_EVENT_FLAG_DISPLAY_HDR_SDR_RATIO_CHANGED,
-            INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED,
             INTERNAL_EVENT_FLAG_DISPLAY_REFRESH_RATE,
             INTERNAL_EVENT_FLAG_DISPLAY_STATE,
-            INTERNAL_EVENT_FLAG_TOPOLOGY_UPDATED,
-            INTERNAL_EVENT_FLAG_DISPLAY_COMMITTED_STATE_CHANGED
+            INTERNAL_EVENT_FLAG_DISPLAY_COMMITTED_STATE_CHANGED,
+            INTERNAL_EVENT_FLAG_DISPLAY_HDR_SDR_RATIO_CHANGED,
+            INTERNAL_EVENT_FLAG_DISPLAY_BRIGHTNESS_CHANGED,
+            INTERNAL_EVENT_FLAG_DISPLAY_REMOVED
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InternalEventFlag {}
 
-    public static final long INTERNAL_EVENT_FLAG_DISPLAY_ADDED = 1L << 0;
-    public static final long INTERNAL_EVENT_FLAG_DISPLAY_BASIC_CHANGED = 1L << 1;
-    public static final long INTERNAL_EVENT_FLAG_DISPLAY_REMOVED = 1L << 2;
-    public static final long INTERNAL_EVENT_FLAG_DISPLAY_BRIGHTNESS_CHANGED = 1L << 3;
-    public static final long INTERNAL_EVENT_FLAG_DISPLAY_HDR_SDR_RATIO_CHANGED = 1L << 4;
-    public static final long INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED = 1L << 5;
-    public static final long INTERNAL_EVENT_FLAG_DISPLAY_REFRESH_RATE = 1L << 6;
-    public static final long INTERNAL_EVENT_FLAG_DISPLAY_STATE = 1L << 7;
-    public static final long INTERNAL_EVENT_FLAG_TOPOLOGY_UPDATED = 1L << 8;
-    public static final long INTERNAL_EVENT_FLAG_DISPLAY_COMMITTED_STATE_CHANGED = 1L << 9;
+    public static final long INTERNAL_EVENT_FLAG_TOPOLOGY_UPDATED = 1L << 0;
+    public static final long INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED = 1L << 1;
+    public static final long INTERNAL_EVENT_FLAG_DISPLAY_ADDED = 1L << 2;
+    public static final long INTERNAL_EVENT_FLAG_DISPLAY_BASIC_CHANGED = 1L << 3;
+    public static final long INTERNAL_EVENT_FLAG_DISPLAY_REFRESH_RATE = 1L << 4;
+    public static final long INTERNAL_EVENT_FLAG_DISPLAY_STATE = 1L << 5;
+    public static final long INTERNAL_EVENT_FLAG_DISPLAY_COMMITTED_STATE_CHANGED = 1L << 6;
+    public static final long INTERNAL_EVENT_FLAG_DISPLAY_HDR_SDR_RATIO_CHANGED = 1L << 7;
+    public static final long INTERNAL_EVENT_FLAG_DISPLAY_BRIGHTNESS_CHANGED = 1L << 8;
+    public static final long INTERNAL_EVENT_FLAG_DISPLAY_REMOVED = 1L << 9;
 
 
     @UnsupportedAppUsage
@@ -223,7 +226,7 @@ public final class DisplayManagerGlobal {
      * before the display manager has been fully initialized.
      */
     @UnsupportedAppUsage
-    @android.ravenwood.annotation.RavenwoodIgnore
+    @android.ravenwood.annotation.RavenwoodKeep
     public static DisplayManagerGlobal getInstance() {
         synchronized (DisplayManagerGlobal.class) {
             if (sInstance == null) {
@@ -602,6 +605,7 @@ public final class DisplayManagerGlobal {
 
     private void handleDisplayEvents(int displayId, int eventMask, boolean forceUpdate) {
         final DisplayInfo info;
+        boolean shouldNotifyNativeListeners  = false;
         synchronized (mLock) {
             info = getDisplayInfoLocked(displayId);
             if ((((eventMask & EVENT_DISPLAY_BASIC_CHANGED) != 0)
@@ -610,17 +614,30 @@ public final class DisplayManagerGlobal {
                 // Choreographer only supports a single display, so only dispatch refresh rate
                 // changes for the default display.
                 if (displayId == Display.DEFAULT_DISPLAY) {
-                    // We can likely save a binder hop if we attach the refresh rate onto the
-                    // listener.
-                    DisplayInfo display = getDisplayInfoLocked(displayId);
-                    if (display != null
-                            && mNativeCallbackReportedRefreshRate != display.getRefreshRate()) {
-                        mNativeCallbackReportedRefreshRate = display.getRefreshRate();
-                        // Signal native callbacks if we ever set a refresh rate.
-                        nSignalNativeCallbacks(mNativeCallbackReportedRefreshRate);
+                    if (Flags.nativeRrCallbacksOutsideLock()) {
+                        if (info != null
+                                && mNativeCallbackReportedRefreshRate != info.getRefreshRate()) {
+                            mNativeCallbackReportedRefreshRate = info.getRefreshRate();
+                            shouldNotifyNativeListeners = true;
+                        }
+                    } else {
+                        // We can likely save a binder hop if we attach the refresh rate onto the
+                        // listener.
+                        DisplayInfo display = getDisplayInfoLocked(displayId);
+                        if (display != null
+                                && mNativeCallbackReportedRefreshRate != display.getRefreshRate()) {
+                            mNativeCallbackReportedRefreshRate = display.getRefreshRate();
+                            // Signal native callbacks if we ever set a refresh rate.
+                            nSignalNativeCallbacks(mNativeCallbackReportedRefreshRate);
+                        }
                     }
                 }
             }
+        }
+
+        if (shouldNotifyNativeListeners) {
+            // Signal native callbacks if we ever set a refresh rate.
+            nSignalNativeCallbacks(mNativeCallbackReportedRefreshRate);
         }
         // Accepting an Executor means the listener may be synchronously invoked, so we must
         // not be holding mLock when we do so
@@ -1867,7 +1884,8 @@ public final class DisplayManagerGlobal {
         }
     }
 
-    private static String eventsToString(int eventMask) {
+    /** Converts an event mask to a string. */
+    public static String eventsToString(int eventMask) {
         if (eventMask == 0) {
             return "NONE";
         }

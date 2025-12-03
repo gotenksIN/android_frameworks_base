@@ -78,8 +78,8 @@ import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.rememberViewModel
-import com.android.systemui.notifications.ui.composable.HeadsUpNotificationSpace
-import com.android.systemui.notifications.ui.composable.NotificationScrollingStack
+import com.android.systemui.notifications.ui.composable.HeadsUpNotificationPlaceholder
+import com.android.systemui.notifications.ui.composable.ScrollingNotificationPanel
 import com.android.systemui.qs.composefragment.ui.GridAnchor
 import com.android.systemui.qs.footer.ui.compose.FooterActionsWithAnimatedVisibility
 import com.android.systemui.qs.panels.ui.compose.EditMode
@@ -206,7 +206,9 @@ private fun ContentScope.QuickSettingsScene(
         }
     val animatedBlurRadiusPx: Float by
         animateFloatAsState(targetValue = targetBlur, label = "QS-blurRadius")
-    Box(modifier.blur(with(LocalDensity.current) { animatedBlurRadiusPx.toDp() }).fillMaxSize()) {
+    Box(modifier
+        .blur(with(LocalDensity.current) { animatedBlurRadiusPx.toDp() })
+        .fillMaxSize()) {
         // This is the background for the whole scene, as the elements don't necessarily provide
         // a background that extends to the edges.
         ShadePanelScrim(viewModel.isTransparencyEnabled)
@@ -261,7 +263,9 @@ private fun ContentScope.QuickSettingsScene(
                     EditMode(
                         viewModel.qsContainerViewModel.editModeViewModel,
                         Modifier.testTag("edit_mode_scene")
-                            .padding(horizontal = QuickSettingsShade.Dimensions.Padding)
+                            .padding(
+                                horizontal = QuickSettingsShade.Dimensions.HorizontalPadding
+                            )
                             .padding(top = ShadeHeader.Dimensions.StatusBarHeight),
                     )
                 }
@@ -338,14 +342,18 @@ private fun ContentScope.QuickSettingsContent(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier =
-                Modifier.fillMaxSize()
+                Modifier
+                    .fillMaxSize()
                     .overscroll(verticalOverscrollEffect)
                     .padding(bottom = navBarBottomHeight.coerceAtLeast(0.dp)),
         ) {
-            Box(modifier = Modifier.fillMaxSize().weight(1f)) {
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)) {
                 Column(
                     modifier =
-                        Modifier.verticalScroll(scrollState, enabled = isScrollable)
+                        Modifier
+                            .verticalScroll(scrollState, enabled = isScrollable)
                             .clipScrollableContainer(Orientation.Horizontal)
                             .fillMaxWidth()
                             .wrapContentHeight(unbounded = true)
@@ -376,17 +384,20 @@ private fun ContentScope.QuickSettingsContent(
                 isCustomizing = false,
                 customizingAnimationDuration = 0,
                 modifier =
-                    Modifier.align(Alignment.CenterHorizontally)
+                    Modifier
+                        .align(Alignment.CenterHorizontally)
                         .sysuiResTag("qs_footer_actions")
                         .padding(horizontal = shadeHorizontalPadding),
             )
         }
-        HeadsUpNotificationSpace(
+        HeadsUpNotificationPlaceholder(
+            tag = "QSScene",
             stackScrollView = notificationStackScrollView,
             viewModel = notificationsPlaceholderViewModel,
             useHunBounds = { shouldUseQuickSettingsHunBounds(layoutState) },
             modifier =
-                Modifier.align(Alignment.BottomCenter)
+                Modifier
+                    .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .padding(horizontal = shadeHorizontalPadding),
         )
@@ -401,19 +412,20 @@ private fun ContentScope.QuickSettingsContent(
         // the notification stack is entirely "below" the entire screen.
         val minNotificationStackTop = screenHeight.roundToInt() + 1
         val notificationStackPadding = dimensionResource(id = R.dimen.notification_side_paddings)
-        NotificationScrollingStack(
+        ScrollingNotificationPanel(
+            tag = "QSScene",
             shadeSession = shadeSession,
             stackScrollView = notificationStackScrollView,
             viewModel = notificationsPlaceholderViewModel,
             jankMonitor = jankMonitor,
-            maxScrimTop = { minNotificationStackTop.toFloat() },
             shouldPunchHoleBehindScrim = shouldPunchHoleBehindScrim,
+            isTransparencyEnabled = viewModel.isTransparencyEnabled,
             stackTopPadding = notificationStackPadding,
             stackBottomPadding = navBarBottomHeight,
             shouldIncludeHeadsUpSpace = false,
-            supportNestedScrolling = false,
             modifier =
-                Modifier.fillMaxWidth()
+                Modifier
+                    .fillMaxWidth()
                     // Match the screen height with the scrim, so it covers the whole screen,
                     // when the stack "passes by" during the QS -> Gone transition.
                     .height(LocalWindowInfo.current.containerSize.height.dp)
@@ -424,5 +436,6 @@ private fun ContentScope.QuickSettingsContent(
 }
 
 private fun shouldUseQuickSettingsHunBounds(layoutState: SceneTransitionLayoutState): Boolean {
-    return layoutState.isIdle(Scenes.QuickSettings)
+    return layoutState.isIdle(Scenes.QuickSettings) ||
+        layoutState.isTransitioning(to = Scenes.QuickSettings)
 }

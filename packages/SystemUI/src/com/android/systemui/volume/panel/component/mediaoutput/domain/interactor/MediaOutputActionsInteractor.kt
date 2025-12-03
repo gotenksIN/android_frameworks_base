@@ -28,10 +28,11 @@ import com.android.systemui.animation.Expandable
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.media.dialog.MediaOutputDialog
 import com.android.systemui.media.dialog.MediaOutputDialogManager
+import com.android.systemui.media.dialog.MediaSwitchingType
 import com.android.systemui.qs.panels.data.repository.QSPanelAppearanceRepository
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimShape
-import com.android.systemui.volume.dialog.domain.interactor.DesktopAudioTileDetailsFeatureInteractor
+import com.android.systemui.volume.dialog.domain.interactor.ExpandedAudioTileDetailsFeatureInteractor
 import com.android.systemui.volume.panel.component.mediaoutput.domain.model.MediaOutputComponentModel
 import com.android.systemui.volume.panel.dagger.scope.VolumePanelScope
 import javax.inject.Inject
@@ -44,15 +45,19 @@ constructor(
     @Application private val context: Context,
     private val mediaOutputDialogManager: MediaOutputDialogManager,
     private val qsPanelAppearanceRepository: QSPanelAppearanceRepository,
-    private val desktopAudioTileDetailsFeatureInteractor: DesktopAudioTileDetailsFeatureInteractor,
+    private val expandedAudioTileDetailsFeatureInteractor: ExpandedAudioTileDetailsFeatureInteractor,
 ) {
     private val mDesktopDialogWidth =
         context.getResources().getDimensionPixelSize(R.dimen.shade_panel_width)
     private val mDesktopDialogHeight = 650
 
-    fun onBarClick(model: MediaOutputComponentModel?, expandable: Expandable?) {
+    fun onBarClick(
+        model: MediaOutputComponentModel?,
+        expandable: Expandable?,
+        mediaSwitchingType: MediaSwitchingType?,
+    ) {
         val onDialogEventListener =
-            if (desktopAudioTileDetailsFeatureInteractor.isEnabled()) {
+            if (expandedAudioTileDetailsFeatureInteractor.isEnabled()) {
                 object : MediaOutputDialog.OnDialogEventListener {
                     override fun onConfigurationChanged(dialog: Dialog, newConfig: Configuration) {
                         updateDialogBounds(dialog, qsPanelAppearanceRepository.qsPanelShape.value)
@@ -72,11 +77,13 @@ constructor(
                 aboveStatusBar = false,
                 controller = expandable?.dialogController(),
                 onDialogEventListener = onDialogEventListener,
+                mediaSwitchingType = mediaSwitchingType,
             )
         } else {
             mediaOutputDialogManager.createAndShowForSystemRouting(
                 expandable?.dialogController(),
                 onDialogEventListener,
+                mediaSwitchingType,
             )
         }
     }
@@ -97,7 +104,7 @@ constructor(
     }
 
     private fun Expandable.dialogController(): DialogTransitionAnimator.Controller? {
-        if (desktopAudioTileDetailsFeatureInteractor.isEnabled()) {
+        if (expandedAudioTileDetailsFeatureInteractor.isEnabled()) {
             return null
         }
         return dialogTransitionController(

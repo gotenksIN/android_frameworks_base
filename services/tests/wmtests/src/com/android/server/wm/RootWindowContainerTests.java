@@ -41,7 +41,6 @@ import static com.android.server.wm.ActivityRecord.State.STOPPING;
 import static com.android.server.wm.ActivityTaskSupervisor.ON_TOP;
 import static com.android.server.wm.RootWindowContainer.MATCH_ATTACHED_TASK_OR_RECENT_TASKS_AND_RESTORE;
 import static com.android.server.wm.WindowContainer.POSITION_BOTTOM;
-import static com.android.window.flags.Flags.FLAG_RETURN_ALL_VISIBLE_ACTIVITIES_FOR_VIS;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -54,10 +53,12 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.refEq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -93,6 +94,7 @@ import com.android.window.flags.Flags;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -282,10 +284,10 @@ public class RootWindowContainerTests extends WindowTestsBase {
         activity1.setVisibleRequested(false);
         activity2.setVisibleRequested(false);
         doReturn(true).when(mAtm).isSleepingOrShuttingDownLocked();
-        doReturn(true).when(mRootWindowContainer).putTasksToSleep(anyBoolean(), anyBoolean());
+        doReturn(true).when(mRootWindowContainer).putTasksToSleep(anyBoolean());
         mSupervisor.mGoingToSleepWakeLock = mock(PowerManager.WakeLock.class);
         doReturn(false).when(mSupervisor.mGoingToSleepWakeLock).isHeld();
-        mAtm.mTaskSupervisor.checkReadyForSleepLocked(false /* allowDelay */);
+        mAtm.mTaskSupervisor.finishEnteringSleep();
         assertEquals(Task.LAYER_RANK_INVISIBLE, task1.mLayerRank);
         assertEquals(Task.LAYER_RANK_INVISIBLE, task2.mLayerRank);
     }
@@ -694,10 +696,11 @@ public class RootWindowContainerTests extends WindowTestsBase {
         doReturn(isFocusedTask ? task : null).when(display).getFocusedRootTask();
         TaskDisplayArea defaultTaskDisplayArea = display.getDefaultTaskDisplayArea();
         doReturn(isFocusedTask ? task : null).when(defaultTaskDisplayArea).getFocusedRootTask();
-        mRootWindowContainer.applySleepTokens(true);
+        mRootWindowContainer.applySleepTokens(mAtm.mChainTracker.startTransit("test"));
         verify(task, times(expectWakeFromSleep ? 1 : 0)).awakeFromSleeping();
         verify(task, times(expectResumeTopActivity ? 1 : 0)).resumeTopActivityUncheckedLocked(
                 isNull() /* target */, isNull() /* targetOptions */, eq(false) /* deferPause */);
+        waitHandlerIdle(mAtm.mH);
     }
 
     @Test
@@ -722,7 +725,7 @@ public class RootWindowContainerTests extends WindowTestsBase {
         doReturn(false).when(display).shouldSleep();
         // Allow to resume when awaking.
         setBooted(mAtm);
-        mRootWindowContainer.applySleepTokens(true);
+        mRootWindowContainer.applySleepTokens(ActionChain.test());
 
         // The display orientation should be changed by the activity so there is no relaunch.
         verify(activity, never()).relaunchActivityLocked(anyBoolean(), anyInt());
@@ -1518,7 +1521,6 @@ public class RootWindowContainerTests extends WindowTestsBase {
         assertEquals(splitActivity0.token, result.get(1).getActivityToken());
     }
 
-    @EnableFlags(FLAG_RETURN_ALL_VISIBLE_ACTIVITIES_FOR_VIS)
     @Test
     public void testGetTopVisibleActivities_rootTaskWithMultiLeafTasks() {
         final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
@@ -1537,7 +1539,6 @@ public class RootWindowContainerTests extends WindowTestsBase {
         assertEquals(activity0.token, result.get(2).getActivityToken());
     }
 
-    @EnableFlags(FLAG_RETURN_ALL_VISIBLE_ACTIVITIES_FOR_VIS)
     @Test
     public void testGetTopVisibleActivities_activityEmbedding() {
         final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
@@ -1562,7 +1563,98 @@ public class RootWindowContainerTests extends WindowTestsBase {
         assertEquals(activity0.token, result.get(1).getActivityToken());
     }
 
-    @EnableFlags(FLAG_RETURN_ALL_VISIBLE_ACTIVITIES_FOR_VIS)
+    @Test
+    public void testGetTopVisibleActivities_focusedAndNonFocusedRootTasks() {
+        // Make every Task opaque.
+        final ActivityTaskSupervisor.OpaqueContainerHelper opaqueContainerHelper =
+                mAtm.mTaskSupervisor.mOpaqueContainerHelper;
+        spyOn(opaqueContainerHelper);
+        doReturn(true).when(opaqueContainerHelper).isOpaque(
+                any(), any(), anyBoolean(), anyBoolean());
+
+        final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
+        resizeDisplay(display, 1000, 1000);
+
+        // Create an invisible fullscreen root task. It is created first, so it will be at the
+        // bottom and occluded by the tasks created later.
+        final Task invisibleRootTask = createTask(display, WINDOWING_MODE_FULLSCREEN,
+                ACTIVITY_TYPE_STANDARD);
+        createActivityRecordWithParentTask(invisibleRootTask);
+        invisibleRootTask.setVisibleRequested(false);
+
+        // Create a non-focused fullscreen root task with two activities.
+        final Task nonFocusedRootTask = createTask(display, WINDOWING_MODE_FULLSCREEN,
+                ACTIVITY_TYPE_STANDARD);
+        final ActivityRecord nonFocusedActivity1 = createActivityRecordWithParentTask(
+                nonFocusedRootTask);
+        final ActivityRecord nonFocusedActivity2 = createActivityRecordWithParentTask(
+                nonFocusedRootTask);
+        nonFocusedRootTask.setVisibleRequested(true);
+
+        // Create a focused multi-window root task with two activities. It is created last, so it
+        // will be on top.
+        final Task focusedRootTask = createTask(display, WINDOWING_MODE_MULTI_WINDOW,
+                ACTIVITY_TYPE_STANDARD);
+        final ActivityRecord focusedActivity1 = createActivityRecordWithParentTask(focusedRootTask);
+        final ActivityRecord focusedActivity2 = createActivityRecordWithParentTask(focusedRootTask);
+        focusedRootTask.setBounds(500, 0, 1000, 1000);
+        focusedRootTask.setVisibleRequested(true);
+
+        // Set the focused root task on the display.
+        doReturn(focusedRootTask.getRootTask()).when(display).getFocusedRootTask();
+
+        // Call the method under test.
+        final List<ActivityAssistInfo> result = mRootWindowContainer.getTopVisibleActivities(
+                display.mDisplayId);
+
+        // Verify the results.
+        // Total visible activities should be 4.
+        assertEquals(4, result.size());
+
+        // The activities from the focused root task should be first, in top-to-bottom order.
+        assertEquals(focusedActivity2.token, result.get(0).getActivityToken());
+        assertEquals(focusedActivity1.token, result.get(1).getActivityToken());
+
+        // The activities from the non-focused visible root task should be next, in top-to-bottom
+        // order.
+        assertEquals(nonFocusedActivity2.token, result.get(2).getActivityToken());
+        assertEquals(nonFocusedActivity1.token, result.get(3).getActivityToken());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_HOME_ACTIVITY_ALWAYS_PRESENT)
+    public void testStartHomeOnDisplaysWithNoHome() {
+        // Create a display with no home activity.
+        final TestDisplayContent displayWithNoHome = new TestDisplayContent.Builder(mAtm, 1000,
+                1500).build();
+        // Ensure there are no tasks on the display.
+        displayWithNoHome.getDefaultTaskDisplayArea().removeIfPossible();
+
+        // Create a display with a home activity.
+        final TestDisplayContent displayWithHome = new TestDisplayContent.Builder(mAtm, 1000,
+                1500).build();
+        new ActivityBuilder(mAtm).setTask(
+                displayWithHome.getDefaultTaskDisplayArea().createRootTask(
+                        WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_HOME, true /* onTop */)).build();
+
+        mRootWindowContainer.startHomeOnDisplaysWithNoHome("test");
+
+        // Capture the TaskDisplayArea arguments passed to startHomeOnTaskDisplayArea.
+        ArgumentCaptor<TaskDisplayArea> tdaCaptor = ArgumentCaptor.forClass(
+                TaskDisplayArea.class);
+        verify(mRootWindowContainer, atLeastOnce()).startHomeOnTaskDisplayArea(anyInt(),
+                anyString(), tdaCaptor.capture(), anyBoolean(), anyBoolean(), anyBoolean());
+
+        List<TaskDisplayArea> capturedTdas = tdaCaptor.getAllValues();
+
+        // Verify that home was started on the display with no home.
+        assertTrue(capturedTdas.stream().anyMatch(
+                tda -> tda == displayWithNoHome.getDefaultTaskDisplayArea()));
+        // Verify that home was NOT started on the display that already had a home.
+        assertFalse(capturedTdas.stream().anyMatch(
+                tda -> tda == displayWithHome.getDefaultTaskDisplayArea()));
+    }
+
     @Test
     public void testGetTopVisibleActivities_behindTranslucent() {
         final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
@@ -1578,6 +1670,22 @@ public class RootWindowContainerTests extends WindowTestsBase {
         assertEquals(2, result.size());
         assertEquals(activity1.token, result.get(0).getActivityToken());
         assertEquals(activity0.token, result.get(1).getActivityToken());
+    }
+
+    @Test
+    public void testOnDisplayAddedOrRemovedNotifiesTmaChanged() {
+        final DisplayInfo displayInfo = new DisplayInfo();
+        displayInfo.copyFrom(mDisplayInfo);
+        final DisplayContent dc = createNewDisplay(displayInfo);
+        final int displayId = dc.getDisplayId();
+
+        mRootWindowContainer.onDisplayAdded(displayId);
+
+        verify(mAtm).onTaskMoveAllowedChanged();
+
+        mRootWindowContainer.onDisplayRemoved(displayId);
+
+        verify(mAtm, times(2)).onTaskMoveAllowedChanged();
     }
 
     /**

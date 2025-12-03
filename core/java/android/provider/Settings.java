@@ -2490,7 +2490,6 @@ public final class Settings {
      * <p>
      * Output: Nothing.
      */
-    @FlaggedApi(android.app.Flags.FLAG_API_RICH_ONGOING)
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS
             = "android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS";
@@ -6951,6 +6950,16 @@ public final class Settings {
         public static final String CLOCKWORK_BLUETOOTH_SETTINGS_PREF = "cw_bt_settings_pref";
 
         /**
+         * Controls whether alerting notifications should be displayed without a tap or tilt.
+         *
+         * <p>The valid values for this key are: 0 (disabled) or 1 (enabled).
+         *
+         * @hide
+         */
+        public static final String ENABLE_NOTIFICATION_WITHOUT_TAP_OR_TILT =
+                "enable_notification_without_tap_or_tilt";
+
+        /**
          * Controls whether the unread notification dot indicator is shown on wearable devices.
          *
          * <p>The valid values for this key are: 0 (disabled) or 1 (enabled).
@@ -10517,6 +10526,9 @@ public final class Settings {
          * Note that this value is used for projected mode.
          * @hide
          */
+        @TestApi
+        @Readable
+        @SuppressLint({"UnflaggedApi", "NoSettingsProvider"}) // @TestApi purely for CTS support.
         public static final String INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY =
                 "include_default_display_in_topology";
 
@@ -10649,6 +10661,16 @@ public final class Settings {
          */
         public static final String DOZE_ALWAYS_ON_WALLPAPER_ENABLED =
                 "doze_always_on_wallpaper_enabled";
+
+        /**
+         * Whether to power down the display when no user activity is detected.
+         * <p>
+         * Type: int (0 for false, 1 for true)
+         *
+         * @hide
+         */
+        public static final String DOZE_ALWAYS_ON_INACTIVITY_DETECTION =
+                "doze_always_on_inactivity_detection";
 
         /**
          * Whether the device should pulse on pick up gesture.
@@ -13086,7 +13108,7 @@ public final class Settings {
 
         /**
          * Whether to always expand notification bundles in the notification shade.
-         * 1 = expand, 0 = collapse.
+         * 1 = always expand, 0 = auto, -1 always collapse.
          * @hide
          */
         public static final String NOTIFICATION_BUNDLES_ALWAYS_EXPAND =
@@ -13947,6 +13969,13 @@ public final class Settings {
          */
         @Readable
         public static final String AIRPLANE_MODE_ON = "airplane_mode_on";
+
+        /**
+         * Whether Airplane Mode should be synced across devices.
+         * (0 disabled, 1 - enabled)
+         * @hide
+         */
+        public static final String AIRPLANE_MODE_SYNC = "airplane_mode_sync";
 
         /**
          * Whether Theater Mode is on.
@@ -17560,6 +17589,16 @@ public final class Settings {
         public static final String ANGLE_DEBUG_PACKAGE = "angle_debug_package";
 
         /**
+         * List of package names that should not use ANGLE unless explicitly opted in by users.
+         * This is not a list of installed packages on the device, but a dynamic list of denied
+         * names set through adb commands or server config push.
+         *
+         * @hide
+         */
+        @Readable
+        public static final String ANGLE_DYNAMIC_DENYLIST = "angle_dynamic_denylist";
+
+        /**
          * Force all PKGs to use ANGLE, regardless of any other settings
          * The value is a boolean (1 or 0).
          * @hide
@@ -19132,17 +19171,6 @@ public final class Settings {
                 "hearing_device_local_notification";
 
         /**
-         * This defines the order in which the 3-button navigation bar's buttons are displayed.
-         * 0 = left-to-right (back, home, recent)
-         * 1 = right-to-left (recent, home, back)
-         * @hide
-         * @deprecated Use
-         * {@link Secure#NAVIGATIONBAR_KEY_ORDER} instead.
-         */
-        @Deprecated
-        public static final String NAVIGATIONBAR_KEY_ORDER = "navigationbar_key_order";
-
-        /**
          * Global settings that shouldn't be persisted.
          *
          * @hide
@@ -19190,7 +19218,6 @@ public final class Settings {
             MOVED_TO_SECURE.add(Global.BUGREPORT_IN_POWER_MENU);
             MOVED_TO_SECURE.add(Global.CUSTOM_BUGREPORT_HANDLER_APP);
             MOVED_TO_SECURE.add(Global.CUSTOM_BUGREPORT_HANDLER_USER);
-            MOVED_TO_SECURE.add(Global.NAVIGATIONBAR_KEY_ORDER);
         }
 
         // Certain settings have been moved from global to the per-user system namespace
@@ -19827,16 +19854,6 @@ public final class Settings {
                 "notification_snooze_options";
 
         /**
-         * When enabled, notifications the notification assistant service has modified will show an
-         * indicator. When tapped, this indicator will describe the adjustment made and solicit
-         * feedback. This flag will also add a "automatic" option to the long press menu.
-         *
-         * The value 1 - enable, 0 - disable
-         * @hide
-         */
-        public static final String NOTIFICATION_FEEDBACK_ENABLED = "notification_feedback_enabled";
-
-        /**
          * Configuration flags for SQLite Compatibility WAL. Encoded as a key-value list, separated
          * by commas. E.g.: compatibility_wal_supported=true, wal_syncmode=OFF
          *
@@ -19917,30 +19934,6 @@ public final class Settings {
          */
         @Readable
         public static final String CACHED_APPS_FREEZER_ENABLED = "cached_apps_freezer";
-
-        /**
-         * Configuration flags for smart replies in notifications.
-         * This is encoded as a key=value list, separated by commas. Ex:
-         *
-         * "enabled=1,max_squeeze_remeasure_count=3"
-         *
-         * The following keys are supported:
-         *
-         * <pre>
-         * enabled                           (boolean)
-         * requires_targeting_p              (boolean)
-         * max_squeeze_remeasure_attempts    (int)
-         * edit_choices_before_sending       (boolean)
-         * show_in_heads_up                  (boolean)
-         * min_num_system_generated_replies  (int)
-         * max_num_actions                   (int)
-         * </pre>
-         * @see com.android.systemui.statusbar.policy.SmartReplyConstants
-         * @hide
-         */
-        @Readable
-        public static final String SMART_REPLIES_IN_NOTIFICATIONS_FLAGS =
-                "smart_replies_in_notifications_flags";
 
         /**
          * If nonzero, crashes in foreground processes will bring up a dialog.

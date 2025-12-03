@@ -20,7 +20,8 @@ import static android.bluetooth.BluetoothHidHost.ACTION_CONNECTION_STATE_CHANGED
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.DEFAULT_DISPLAY_GROUP;
-import static android.view.Display.TYPE_INTERNAL;
+import static android.view.KeyEvent.ACTION_DOWN;
+import static android.view.KeyEvent.KEYCODE_POWER;
 import static android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_WALLPAPER;
 import static android.view.WindowManagerGlobal.ADD_OKAY;
@@ -29,7 +30,6 @@ import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentat
 
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH;
-import static com.android.hardware.input.Flags.FLAG_BLUETOOTH_WAKEUP_STATE_CHECK;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
@@ -44,6 +44,7 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.when;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN;
 import static com.android.server.policy.PhoneWindowManager.EXTRA_TRIGGER_HUB;
+import static com.android.server.policy.PhoneWindowManager.MULTI_PRESS_POWER_BRIGHTNESS_BOOST;
 import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_DREAM_OR_AWAKE_OR_SLEEP;
 import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_GO_TO_SLEEP;
 import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_HUB_OR_DREAM_OR_SLEEP;
@@ -85,7 +86,9 @@ import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.Settings;
 import android.service.dreams.DreamManagerInternal;
 import android.testing.TestableContext;
+import android.view.Display;
 import android.view.DisplayInfo;
+import android.view.KeyEvent;
 
 import androidx.test.filters.SmallTest;
 
@@ -203,6 +206,7 @@ public class PhoneWindowManagerTests {
                 mDreamManagerInternal);
         mLocalServiceKeeperRule.overrideLocalService(InputManagerInternal.class,
                 mInputManagerInternal);
+        mPhoneWindowManager.mInputManagerInternal = mInputManagerInternal;
         mLocalServiceKeeperRule.overrideLocalService(PowerManagerInternal.class,
                 mPowerManagerInternal);
         mLocalServiceKeeperRule.overrideLocalService(StatusBarManagerInternal.class,
@@ -229,7 +233,7 @@ public class PhoneWindowManagerTests {
 
     @Test
     public void testShouldNotStartDockOrHomeWhenSetup() throws Exception {
-        mockStartDockOrHome();
+        mockStartDockOrHome(Display.TYPE_INTERNAL);
         doReturn(false).when(mPhoneWindowManager).isUserSetupComplete();
 
         mPhoneWindowManager.startDockOrHome(
@@ -240,7 +244,7 @@ public class PhoneWindowManagerTests {
 
     @Test
     public void testShouldStartDockOrHomeAfterSetup() throws Exception {
-        mockStartDockOrHome();
+        mockStartDockOrHome(Display.TYPE_INTERNAL);
         doReturn(true).when(mPhoneWindowManager).isUserSetupComplete();
 
         mPhoneWindowManager.startDockOrHome(
@@ -574,6 +578,68 @@ public class PhoneWindowManagerTests {
     }
 
     @Test
+    @EnableFlags(com.android.hardware.input.Flags.FLAG_USE_EVENT_DISPLAY_ID_FOR_KEY_WAKEUP)
+    public void testWakeKey_wakesCorrectDisplay_useEventDisplayId() {
+        testWakeKey_wakesCorrectDisplay(/* expectEventDisplayIdForWakeup= */ true);
+    }
+
+    @Test
+    @DisableFlags(com.android.hardware.input.Flags.FLAG_USE_EVENT_DISPLAY_ID_FOR_KEY_WAKEUP)
+    public void testWakeKey_wakesCorrectDisplay_notUseEventDisplayId() {
+        testWakeKey_wakesCorrectDisplay(/* expectEventDisplayIdForWakeup= */ false);
+    }
+
+    private void testWakeKey_wakesCorrectDisplay(boolean expectEventDisplayIdForWakeup) {
+        initPhoneWindowManager();
+        final int keyCode = KEYCODE_POWER;
+        final long time = 100L;
+        final int displayId = 3;
+        final int userId = 4;
+        // Create the KeyEvent.
+        final KeyEvent event =
+                new KeyEvent(time, time, ACTION_DOWN, keyCode, /* repeat= */ 0, /* metaState= */ 0);
+        event.setDisplayId(displayId);
+        // Set up the current user ID.
+        mPhoneWindowManager.setCurrentUserLw(userId);
+        when(mUserManagerInternal.getUserAssignedToDisplay(displayId)).thenReturn(userId);
+
+        mPhoneWindowManager.interceptKeyBeforeQueueing(event, WindowManagerPolicy.FLAG_WAKE);
+
+        final int expectedDisplayId = expectEventDisplayIdForWakeup ? displayId : DEFAULT_DISPLAY;
+        verify(mWindowWakeUpPolicy)
+                .wakeUpFromKey(expectedDisplayId, time, keyCode, /* isDown= */ true);
+    }
+
+    @Test
+    @EnableFlags(com.android.hardware.input.Flags.FLAG_USE_EVENT_DISPLAY_ID_FOR_KEY_WAKEUP)
+    public void testPowerMultiPress_wakesCorrectDisplay_useEventDisplayId() {
+        testPowerMultiPress_wakesCorrectDisplay(/* expectEventDisplayIdForWakeup= */ true);
+    }
+
+    @Test
+    @DisableFlags(com.android.hardware.input.Flags.FLAG_USE_EVENT_DISPLAY_ID_FOR_KEY_WAKEUP)
+    public void testPowerMultiPress_wakesCorrectDisplay_notUseEventDisplayId() {
+        testPowerMultiPress_wakesCorrectDisplay(/* expectEventDisplayIdForWakeup= */ false);
+    }
+
+    private void testPowerMultiPress_wakesCorrectDisplay(boolean expectEventDisplayIdForWakeup) {
+        when(mDisplayPolicy.isAwake()).thenReturn(false);
+        when(mDisplayPolicy.isScreenOnEarly()).thenReturn(false);
+        Settings.Global.putInt(mContext.getContentResolver(),
+                Settings.Global.POWER_BUTTON_TRIPLE_PRESS, MULTI_PRESS_POWER_BRIGHTNESS_BOOST);
+        initPhoneWindowManager();
+        mPhoneWindowManager.updateSettings(null);
+
+        final long time = 3L;
+        final int displayId = 5;
+        mPhoneWindowManager.powerPress(time, /* count= */ 3, displayId);
+
+        final int expectedDisplayId = expectEventDisplayIdForWakeup ? displayId : DEFAULT_DISPLAY;
+        verify(mWindowWakeUpPolicy)
+                .wakeUpFromKey(expectedDisplayId, time, KEYCODE_POWER, /* isDown= */ false);
+    }
+
+    @Test
     @DisableFlags(Flags.FLAG_GRANT_MANAGE_KEY_GESTURES_TO_RECENTS)
     public void testKeyGestureEvents_recentKeyGesturesEventsDisabled_registered() {
         initPhoneWindowManager();
@@ -615,7 +681,6 @@ public class PhoneWindowManagerTests {
     }
 
     @Test
-    @EnableFlags(FLAG_BLUETOOTH_WAKEUP_STATE_CHECK)
     public void testBluetoothHidConnectionBroadcastCanWakeup() {
         when(mContext.getPackageManager()).thenReturn(mPackageManager);
         when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_PC)).thenReturn(true);
@@ -628,8 +693,9 @@ public class PhoneWindowManagerTests {
         intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, BluetoothProfile.STATE_DISCONNECTED);
         intent.putExtra(BluetoothProfile.EXTRA_STATE, BluetoothProfile.STATE_CONNECTED);
         ArgumentCaptor<BroadcastReceiver> captor = ArgumentCaptor.forClass(BroadcastReceiver.class);
-        verify(mContext).registerReceiver(captor.capture(), argThat(intentFilter ->
-                                intentFilter.matchAction(ACTION_CONNECTION_STATE_CHANGED)));
+        verify(mContext).registerReceiverForAllUsers(captor.capture(), argThat(intentFilter ->
+                                intentFilter.matchAction(ACTION_CONNECTION_STATE_CHANGED)),
+                                eq(null), eq(null));
         captor.getValue().onReceive(mContext, intent);
         verify(mWindowWakeUpPolicy).wakeUpFromBluetooth();
     }
@@ -714,6 +780,74 @@ public class PhoneWindowManagerTests {
                 /* drawnListener= */ any());
     }
 
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT)
+    public void startDockOrHome_externalDisplay_flagEnabled_shouldHandleKeyGesture()
+            throws Exception {
+        mockStartDockOrHome(Display.TYPE_EXTERNAL);
+        doReturn(true).when(mPhoneWindowManager).isUserSetupComplete();
+
+        mPhoneWindowManager.startDockOrHome(
+                /* displayId= */ DEFAULT_DISPLAY, /* fromHomeKey= */ true, /* awakenFromDreams= */
+                false);
+
+        verify(mInputManagerInternal).handleKeyGestureInKeyGestureController(
+                any(KeyGestureEvent.class));
+        verify(mAtmInternal, never()).startHomeOnDisplay(anyInt(), anyString(), anyInt(),
+                anyBoolean(), anyBoolean());
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT)
+    public void startDockOrHome_externalDisplay_flagDisabled_shouldStartHome() throws Exception {
+        mockStartDockOrHome(Display.TYPE_EXTERNAL);
+        doReturn(true).when(mPhoneWindowManager).isUserSetupComplete();
+
+        mPhoneWindowManager.startDockOrHome(
+                /* displayId= */ DEFAULT_DISPLAY, /* fromHomeKey= */ true, /* awakenFromDreams= */
+                false);
+
+        verify(mInputManagerInternal, never()).handleKeyGestureInKeyGestureController(
+                any(KeyGestureEvent.class));
+        verify(mAtmInternal).startHomeOnDisplay(/* userId= */ anyInt(), /* reason= */
+                anyString(), /* displayId= */ eq(DEFAULT_DISPLAY), /* allowInstrumenting= */
+                eq(true), /* fromHomeKey= */ eq(true));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT)
+    public void startDockOrHome_internalDisplay_flagEnabled_shouldStartHome() throws Exception {
+        mockStartDockOrHome(Display.TYPE_INTERNAL);
+        doReturn(true).when(mPhoneWindowManager).isUserSetupComplete();
+
+        mPhoneWindowManager.startDockOrHome(
+                /* displayId= */DEFAULT_DISPLAY, /* fromHomeKey= */ true, /* awakenFromDreams= */
+                false);
+
+        verify(mInputManagerInternal, never()).handleKeyGestureInKeyGestureController(
+                any(KeyGestureEvent.class));
+        verify(mAtmInternal).startHomeOnDisplay(/* userId= */ anyInt(), /* reason= */
+                anyString(), /* displayId= */ eq(DEFAULT_DISPLAY), /* allowInstrumenting= */
+                eq(true), /* fromHomeKey= */ eq(true));
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT)
+    public void startDockOrHome_internalDisplay_flagDisabled_shouldStartHome() throws Exception {
+        mockStartDockOrHome(Display.TYPE_INTERNAL);
+        doReturn(true).when(mPhoneWindowManager).isUserSetupComplete();
+
+        mPhoneWindowManager.startDockOrHome(
+                /* displayId= */ DEFAULT_DISPLAY, /* fromHomeKey= */ true, /* awakenFromDreams= */
+                false);
+
+        verify(mInputManagerInternal, never()).handleKeyGestureInKeyGestureController(
+                any(KeyGestureEvent.class));
+        verify(mAtmInternal).startHomeOnDisplay(/* userId= */ anyInt(), /* reason= */
+                anyString(), /* displayId= */ eq(DEFAULT_DISPLAY), /* allowInstrumenting= */
+                eq(true), /* fromHomeKey= */ eq(true));
+    }
+
     private void initNonSpyPhoneWindowManager() {
         mNonSpyPhoneWindowManager.mDefaultDisplayPolicy = mDisplayPolicy;
         mNonSpyPhoneWindowManager.mDefaultDisplayRotation = mock(DisplayRotation.class);
@@ -728,14 +862,14 @@ public class PhoneWindowManagerTests {
                 new TestInjector(mContext, mock(WindowManagerPolicy.WindowManagerFuncs.class))), 0);
     }
 
-    private void mockStartDockOrHome() throws Exception {
+    private void mockStartDockOrHome(int displayType) throws Exception {
         doNothing().when(ActivityManager.getService()).stopAppSwitches();
         when(mAtmInternal.startHomeOnDisplay(
                 anyInt(), anyString(), anyInt(), anyBoolean(), anyBoolean())).thenReturn(false);
         mPhoneWindowManager.mUserManagerInternal = mock(UserManagerInternal.class);
 
         mPhoneWindowManager.mDisplayManagerInternal = mDisplayManagerInternal;
-        mDisplayInfo.type = TYPE_INTERNAL;
+        mDisplayInfo.type = displayType;
         when(mDisplayManagerInternal.getDisplayInfo(anyInt())).thenReturn(mDisplayInfo);
     }
 

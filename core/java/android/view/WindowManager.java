@@ -530,13 +530,6 @@ public interface WindowManager extends ViewManager {
     int TRANSIT_FLAG_KEYGUARD_UNOCCLUDING = (1 << 13); // 0x2000
 
     /**
-     * Transition flag: Indicates that there is a physical display switch
-     * TODO(b/316112906) remove after defer_display_updates flag roll out
-     * @hide
-     */
-    int TRANSIT_FLAG_PHYSICAL_DISPLAY_SWITCH = (1 << 14); // 0x4000
-
-    /**
      * Transition flag: Indicates that aod is showing hidden by entering doze
      * @hide
      */
@@ -574,7 +567,6 @@ public interface WindowManager extends ViewManager {
             TRANSIT_FLAG_KEYGUARD_APPEARING,
             TRANSIT_FLAG_KEYGUARD_OCCLUDING,
             TRANSIT_FLAG_KEYGUARD_UNOCCLUDING,
-            TRANSIT_FLAG_PHYSICAL_DISPLAY_SWITCH,
             TRANSIT_FLAG_AOD_APPEARING,
             TRANSIT_FLAG_AVOID_MOVE_TO_FRONT,
             TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION
@@ -1410,6 +1402,7 @@ public interface WindowManager extends ViewManager {
      * {@link android.R.attr#maxAspectRatio min aspect ratio}
      * {@link android.R.attr#resizeableActivity unresizable} on large screen devices with the
      * ignore orientation request display setting enabled since Android 16 (API level 36) or higher.
+     * <p>This property is ignored if the app's target SDK is Android 17 (API level 37) or higher.
      *
      * <p>The default value is {@code false}.
      *
@@ -1430,7 +1423,6 @@ public interface WindowManager extends ViewManager {
      * </pre>
      * @hide
      */
-    // TODO(b/357141415): Remove this from sdk 37
     String PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY =
             "android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY";
 
@@ -2678,8 +2670,7 @@ public interface WindowManager extends ViewManager {
          * @hide
          */
         public static boolean isSubWindowType(@WindowType int type) {
-            return (type >= FIRST_SUB_WINDOW && type <= LAST_SUB_WINDOW)
-                    || type == TYPE_STATUS_BAR_SUB_PANEL;
+            return (type >= FIRST_SUB_WINDOW && type <= LAST_SUB_WINDOW);
         }
 
         /** @deprecated this is ignored, this value is set automatically when needed. */

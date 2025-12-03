@@ -26,7 +26,7 @@ import android.app.Notification.Metric;
 import android.app.Notification.Metric.FixedDate;
 import android.app.Notification.Metric.FixedFloat;
 import android.app.Notification.Metric.FixedInt;
-import android.app.Notification.Metric.FixedString;
+import android.app.Notification.Metric.FixedText;
 import android.app.Notification.Metric.FixedTime;
 import android.app.Notification.Metric.MetricValue.ValueString;
 import android.app.Notification.Metric.TimeDifference;
@@ -186,9 +186,9 @@ public class NotificationMetricStyleTest {
                         new FixedFloat(12.345f, null, 0, 3),
                         "Active time"))
                 .addMetric(new Metric(
-                        new FixedString("A LOT", "things"), "With unit"))
+                        new FixedText("A LOT", "things"), "With unit"))
                 .addMetric(new Metric(
-                        new FixedString("This is the last"), "Last"));
+                        new FixedText("This is the last"), "Last"));
 
         original.addExtras(bundle);
         MetricStyle recovered = new MetricStyle();
@@ -246,14 +246,14 @@ public class NotificationMetricStyleTest {
                 .addMetric(new Metric(new FixedInt(1), "a"))
                 .addMetric(new Metric(new FixedInt(2), "b"))
                 .addMetric(new Metric(new FixedInt(3), "c"))
-                .addMetric(new Metric(new FixedString("Ignored thing"), "d"));
+                .addMetric(new Metric(new FixedText("Ignored thing"), "d"));
 
         MetricStyle style2 = new MetricStyle()
                 .addMetric(new Metric(new FixedInt(1), "a"))
                 .addMetric(new Metric(new FixedInt(2), "b"))
                 .addMetric(new Metric(new FixedInt(3), "c"))
-                .addMetric(new Metric(new FixedString("Also ignored"), "d"))
-                .addMetric(new Metric(new FixedString("And this too"), "e"));
+                .addMetric(new Metric(new FixedText("Also ignored"), "d"))
+                .addMetric(new Metric(new FixedText("And this too"), "e"));
 
         assertThat(style1.areNotificationsVisiblyDifferent(style2)).isFalse();
         assertThat(style2.areNotificationsVisiblyDifferent(style1)).isFalse();
@@ -424,16 +424,15 @@ public class NotificationMetricStyleTest {
     }
 
     @Test
-    public void valueToString_fixedString() {
-        FixedString withUnit = new FixedString("120/80", "mmHg");
+    public void valueToString_fixedText() {
+        FixedText withUnit = new FixedText("120/80", "mmHg");
         assertThat(withUnit.toValueString(mContext)).isEqualTo(new ValueString("120/80", "mmHg"));
 
-        FixedString noUnit = new FixedString("Boring");
+        FixedText noUnit = new FixedText("Boring");
         assertThat(noUnit.toValueString(mContext)).isEqualTo(new ValueString("Boring", null));
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_METRIC_STYLE_UNIT_IN_LABEL)
     public void makeContentView_displaysLabelButNoUnit() {
         Notification.Builder n = new Notification.Builder(mContext, "channel")
                 .setStyle(new MetricStyle()
@@ -448,69 +447,14 @@ public class NotificationMetricStyleTest {
                 .isEqualTo("Answer:");
         assertThat(((TextView) container.findViewById(R.id.metric_value_0)).getText().toString())
                 .isEqualTo("42");
-        assertThat((View) container.findViewById(R.id.metric_unit_0)).isNull();
 
         assertThat(((TextView) container.findViewById(R.id.metric_label_1)).getText().toString())
                 .isEqualTo("Temp:");
         assertThat(((TextView) container.findViewById(R.id.metric_value_1)).getText().toString())
                 .isEqualTo("273");
-        assertThat((View) container.findViewById(R.id.metric_unit_1)).isNull();
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_METRIC_STYLE_UNIT_IN_LABEL)
-    public void makeContentView_displaysLabelButNoUnit_evenWithUnitInLabelFlag() {
-        Notification.Builder n = new Notification.Builder(mContext, "channel")
-                .setStyle(new MetricStyle()
-                        .addMetric(new Metric(new FixedInt(42), "Answer"))
-                        .addMetric(new Metric(new FixedInt(273, "°K"), "Temp")));
-
-        RemoteViews remoteViews = n.getStyle().makeContentView();
-        FrameLayout container = new FrameLayout(mContext);
-        container.addView(remoteViews.apply(mContext, container));
-
-        assertThat(((TextView) container.findViewById(R.id.metric_label_0)).getText().toString())
-                .isEqualTo("Answer:");
-        assertThat(((TextView) container.findViewById(R.id.metric_value_0)).getText().toString())
-                .isEqualTo("42");
-        assertThat((View) container.findViewById(R.id.metric_unit_0)).isNull();
-
-        assertThat(((TextView) container.findViewById(R.id.metric_label_1)).getText().toString())
-                .isEqualTo("Temp:");
-        assertThat(((TextView) container.findViewById(R.id.metric_value_1)).getText().toString())
-                .isEqualTo("273");
-        assertThat((View) container.findViewById(R.id.metric_unit_1)).isNull();
-    }
-
-    @Test
-    @DisableFlags(Flags.FLAG_METRIC_STYLE_UNIT_IN_LABEL)
-    public void makeExpandedContentView_displaysLabelAndUnit() {
-        Notification.Builder n = new Notification.Builder(mContext, "channel")
-                .setStyle(new MetricStyle()
-                        .addMetric(new Metric(new FixedInt(42), "Answer"))
-                        .addMetric(new Metric(new FixedInt(273, "°K"), "Temp")));
-
-        RemoteViews remoteViews = n.getStyle().makeExpandedContentView();
-        FrameLayout container = new FrameLayout(mContext);
-        container.addView(remoteViews.apply(mContext, container));
-
-        assertThat(((TextView) container.findViewById(R.id.metric_label_0)).getText().toString())
-                .isEqualTo("Answer");
-        assertThat(((TextView) container.findViewById(R.id.metric_value_0)).getText().toString())
-                .isEqualTo("42");
-        assertThat(container.findViewById(R.id.metric_unit_0).getVisibility()).isEqualTo(GONE);
-
-        assertThat(((TextView) container.findViewById(R.id.metric_label_1)).getText().toString())
-                .isEqualTo("Temp");
-        assertThat(((TextView) container.findViewById(R.id.metric_value_1)).getText().toString())
-                .isEqualTo("273");
-        assertThat(container.findViewById(R.id.metric_unit_1).getVisibility()).isEqualTo(VISIBLE);
-        assertThat(((TextView) container.findViewById(R.id.metric_unit_1)).getText().toString())
-                .isEqualTo("°K");
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_METRIC_STYLE_UNIT_IN_LABEL)
     public void makeExpandedContentView_concatenatesLabelAndUnit() {
         Notification.Builder n = new Notification.Builder(mContext, "channel")
                 .setStyle(new MetricStyle()
@@ -525,13 +469,11 @@ public class NotificationMetricStyleTest {
                 .isEqualTo("Answer");
         assertThat(((TextView) container.findViewById(R.id.metric_value_0)).getText().toString())
                 .isEqualTo("42");
-        assertThat(container.findViewById(R.id.metric_unit_0).getVisibility()).isEqualTo(GONE);
 
         assertThat(((TextView) container.findViewById(R.id.metric_label_1)).getText().toString())
                 .isEqualTo("Temp (°K)");
         assertThat(((TextView) container.findViewById(R.id.metric_value_1)).getText().toString())
                 .isEqualTo("273");
-        assertThat(container.findViewById(R.id.metric_unit_1).getVisibility()).isEqualTo(GONE);
     }
 
     @Test

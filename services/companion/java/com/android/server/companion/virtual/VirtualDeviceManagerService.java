@@ -198,7 +198,11 @@ public class VirtualDeviceManagerService extends SystemService {
         mNativeImpl = new VirtualDeviceManagerNativeImpl();
         mLocalService = new LocalService();
         mComputerControlSessionProcessor =
-                new ComputerControlSessionProcessor(context, mImpl::createLocalVirtualDevice);
+                new ComputerControlSessionProcessor(context,
+                        (token, attributionSource, params) ->
+                                new VirtualDeviceManager.VirtualDevice(context,
+                                        mImpl.createLocalVirtualDevice(
+                                                token, attributionSource, params)));
         mAutomatedPackagesRepository = new AutomatedPackagesRepository(mHandler);
     }
 
@@ -209,6 +213,25 @@ public class VirtualDeviceManagerService extends SystemService {
                 @Override
                 public ActivityInterceptResult onInterceptActivityLaunch(@NonNull
                         ActivityInterceptorInfo info) {
+                    Integer overrideDisplayId = getOverrideDisplayIdForPendingTrampoline(info);
+                    if (overrideDisplayId == null) {
+                        overrideDisplayId = getOverrideDisplayIdForCrossDisplayLaunches(info);
+                    }
+
+                    if (overrideDisplayId == null) {
+                        return null;
+                    }
+                    ActivityOptions options = info.getCheckedOptions();
+                    if (options == null) {
+                        options = ActivityOptions.makeBasic();
+                    }
+                    return new ActivityInterceptResult(
+                            info.getIntent(), options.setLaunchDisplayId(overrideDisplayId));
+                }
+
+                @Nullable
+                private Integer getOverrideDisplayIdForPendingTrampoline(
+                        ActivityInterceptorInfo info) {
                     if (info.getCallingPackage() == null) {
                         return null;
                     }
@@ -217,12 +240,20 @@ public class VirtualDeviceManagerService extends SystemService {
                         return null;
                     }
                     pt.mResultReceiver.send(VirtualDeviceManager.LAUNCH_SUCCESS, null);
-                    ActivityOptions options = info.getCheckedOptions();
-                    if (options == null) {
-                        options = ActivityOptions.makeBasic();
+                    return pt.mDisplayId;
+                }
+
+                @Nullable
+                private Integer getOverrideDisplayIdForCrossDisplayLaunches(
+                        ActivityInterceptorInfo info) {
+                    final int sourceDisplayId = info.getSourceDisplayId();
+                    if (mComputerControlSessionProcessor.isComputerControlDisplay(
+                            sourceDisplayId)) {
+                        // Prevent cross-display activity launches for computer control sessions.
+                        // TODO: b/450304983 - Consider migrating this to a VirtualDevice policy.
+                        return sourceDisplayId;
                     }
-                    return new ActivityInterceptResult(
-                            info.getIntent(), options.setLaunchDisplayId(pt.mDisplayId));
+                    return null;
                 }
             };
 
@@ -537,10 +568,9 @@ public class VirtualDeviceManagerService extends SystemService {
         private IVirtualDevice createLocalVirtualDevice(
                 IBinder token,
                 AttributionSource attributionSource,
-                @NonNull VirtualDeviceParams params,
-                @NonNull IVirtualDeviceActivityListener activityListener) {
+                @NonNull VirtualDeviceParams params) {
             return createVirtualDevice(token, attributionSource, /* associationInfo= */ null,
-                    params, activityListener, /* soundEffectListener= */ null);
+                    params, /* activityListener= */ null, /* soundEffectListener= */ null);
         }
 
         private IVirtualDevice createVirtualDevice(
@@ -645,7 +675,7 @@ public class VirtualDeviceManagerService extends SystemService {
             return mAutomatedPackagesRepository.createAutomatedAppLaunchWarningIntent(
                     packageName, userId, /* callingPackageName= */ null,
                     /* deviceOwnerForLaunchDisplayId= */ null,
-                    mComputerControlSessionProcessor::closeSession);
+                    mComputerControlSessionProcessor::closeSessionByUserIntent);
         }
 
         @Override // Binder call
@@ -978,7 +1008,14 @@ public class VirtualDeviceManagerService extends SystemService {
             final String deviceOwnerForLaunchDisplayId = getDeviceOwnerForDisplayId(displayId);
             return mAutomatedPackagesRepository.createAutomatedAppLaunchWarningIntent(
                     packageName, userId, callingPackageName, deviceOwnerForLaunchDisplayId,
-                    mComputerControlSessionProcessor::closeSession);
+                    mComputerControlSessionProcessor::closeSessionByUserIntent);
+        }
+
+        @Override
+        public boolean isComputerControlNotification(int notificationId,
+                @Nullable String notificationTag, @NonNull String packageName) {
+            return mComputerControlSessionProcessor.isComputerControlNotification(
+                    notificationId, notificationTag, packageName);
         }
 
         @Override

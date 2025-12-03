@@ -42,14 +42,12 @@ import com.android.systemui.common.ui.compose.Icon
 import com.android.systemui.res.R
 import com.android.systemui.screencapture.common.ui.compose.LoadingIcon
 import com.android.systemui.screencapture.common.ui.compose.StyledTooltip
-import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureType
-import com.android.systemui.screencapture.record.largescreen.ui.viewmodel.PreCaptureViewModel
+import com.android.systemui.screencapture.record.largescreen.ui.viewmodel.PreCaptureToolbarViewModel
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun CaptureSettingsMenu(viewModel: PreCaptureViewModel) {
-    val recordParameters = viewModel.screenCaptureRecordParametersViewModel
-    val isScreenRecording = viewModel.captureType == ScreenCaptureType.RECORDING
+fun CaptureSettingsMenu(viewModel: PreCaptureToolbarViewModel, screenRecordingSelected: Boolean) {
+    val recordParameters = viewModel.recordParametersViewModel
     val icons = viewModel.icons
 
     val settingsButtonContentDescription =
@@ -81,21 +79,21 @@ fun CaptureSettingsMenu(viewModel: PreCaptureViewModel) {
                 leadingIcon = { icons?.showClicks?.let { Icon(icon = it) } },
                 checked = recordParameters.shouldShowTaps ?: false,
                 onCheckedChange = { recordParameters.setShouldShowTaps(it) },
-                enabled = isScreenRecording,
+                enabled = screenRecordingSelected,
             )
             SettingsMenuItem(
                 text = stringResource(R.string.screen_capture_device_audio),
                 leadingIcon = { icons?.deviceAudio?.let { Icon(icon = it) } },
                 checked = recordParameters.shouldRecordDevice,
                 onCheckedChange = { recordParameters.shouldRecordDevice = it },
-                enabled = isScreenRecording,
+                enabled = screenRecordingSelected,
             )
             SettingsMenuItem(
                 text = stringResource(R.string.screen_capture_microphone_audio),
                 leadingIcon = { icons?.microphone?.let { Icon(icon = it) } },
                 checked = recordParameters.shouldRecordMicrophone,
                 onCheckedChange = { recordParameters.shouldRecordMicrophone = it },
-                enabled = isScreenRecording,
+                enabled = screenRecordingSelected,
             )
             SettingsMenuItem(
                 text = stringResource(R.string.screen_capture_front_camera),
@@ -104,6 +102,28 @@ fun CaptureSettingsMenu(viewModel: PreCaptureViewModel) {
                 onCheckedChange = { recordParameters.setShouldShowFrontCamera(it) },
                 enabled = true,
             )
+
+            // TODO (b/444278100) - Implement UI provided by designer, this is a placeholder
+            if (viewModel.customSaveLocationSupported) {
+                DropdownMenuItem(
+                    text = { Text("Save Location: ${viewModel.customSaveLocationUriString}") },
+                    onClick = { /* TODO (b/444278100) - Add selectable options based off UI design */
+                    },
+                )
+
+                DropdownMenuItem(
+                    text = { Text("Default folder?: ${!viewModel.isCustomSaveLocationActive}") },
+                    onClick = { /* TODO: Remove, this is for testing purposes */ },
+                )
+
+                DropdownMenuItem(
+                    text = { Text("Set Custom Save Location (Test)") },
+                    onClick = {
+                        viewModel.requestLaunchDirectoryPicker()
+                        showMenu = false
+                    },
+                )
+            }
         }
     }
 }

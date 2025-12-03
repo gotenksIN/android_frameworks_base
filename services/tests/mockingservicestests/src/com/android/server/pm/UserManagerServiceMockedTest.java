@@ -27,12 +27,10 @@ import static android.multiuser.Flags.FLAG_BLOCK_PRIVATE_SPACE_CREATION;
 import static android.multiuser.Flags.FLAG_CREATE_INITIAL_USER;
 import static android.multiuser.Flags.FLAG_DEMOTE_MAIN_USER;
 import static android.multiuser.Flags.FLAG_DISALLOW_REMOVING_LAST_ADMIN_USER;
-import static android.multiuser.Flags.FLAG_ENABLE_PRIVATE_SPACE_FEATURES;
 import static android.multiuser.Flags.FLAG_HSU_NOT_ADMIN;
 import static android.multiuser.Flags.FLAG_LOGOUT_USER_API;
 import static android.multiuser.Flags.FLAG_UNICORN_MODE_REFACTORING_FOR_HSUM_READ_ONLY;
 import static android.multiuser.Flags.FLAG_USER_FILTER_REFACTORING;
-import static android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE;
 import static android.os.UserHandle.USER_NULL;
 import static android.os.UserHandle.USER_SYSTEM;
 import static android.os.UserManager.DISALLOW_OUTGOING_CALLS;
@@ -41,7 +39,7 @@ import static android.os.UserManager.DISALLOW_USER_SWITCH;
 import static android.os.UserManager.REMOVE_RESULT_ALREADY_BEING_REMOVED;
 import static android.os.UserManager.REMOVE_RESULT_ERROR_LAST_ADMIN_USER;
 import static android.os.UserManager.REMOVE_RESULT_ERROR_MAIN_USER_PERMANENT_ADMIN;
-import static android.os.UserManager.REMOVE_RESULT_DEVICE_OWNER;
+import static android.os.UserManager.REMOVE_RESULT_ERROR_DEVICE_OWNER;
 import static android.os.UserManager.REMOVE_RESULT_ERROR_SYSTEM_USER;
 import static android.os.UserManager.REMOVE_RESULT_ERROR_USER_NOT_FOUND;
 import static android.os.UserManager.REMOVE_RESULT_USER_IS_REMOVABLE;
@@ -225,6 +223,8 @@ public final class UserManagerServiceMockedTest {
     private @Mock StorageManagerInternal mStorageManagerInternal;
     private @Mock LockSettingsInternal mLockSettingsInternal;
     private @Mock PackageManagerInternal mPackageManagerInternal;
+    // NOTE: do not call mockGetLocalService() to set DevicePolicyManagerInternal on
+    // setFixtures() as some tests exercise the scenario where it's null
     private @Mock DevicePolicyManagerInternal mDevicePolicyManagerInternal;
     private @Mock KeyguardManager mKeyguardManager;
     private @Mock PowerManager mPowerManager;
@@ -670,7 +670,6 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @EnableFlags({FLAG_ALLOW_PRIVATE_PROFILE, FLAG_ENABLE_PRIVATE_SPACE_FEATURES})
     public void testAutoLockPrivateProfile() {
         int mainUser = mUms.getMainUserId();
         assumeTrue(mUms.canAddPrivateProfile(mainUser));
@@ -688,10 +687,6 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @EnableFlags({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
     public void testAutoLockOnDeviceLockForPrivateProfile() {
         int mainUser = mUms.getMainUserId();
         assumeTrue(mUms.canAddPrivateProfile(mainUser));
@@ -710,10 +705,6 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @EnableFlags({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
     public void testAutoLockOnDeviceLockForPrivateProfile_keyguardUnlocked() {
         assumeTrue(mUms.canAddPrivateProfile(0));
         UserManagerService mSpiedUms = spy(mUms);
@@ -730,10 +721,6 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @EnableFlags({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
     public void testAutoLockAfterInactityForPrivateProfile() {
         int mainUser = mUms.getMainUserId();
         assumeTrue(mUms.canAddPrivateProfile(mainUser));
@@ -754,10 +741,6 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @EnableFlags({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
     public void testSetOrUpdateAutoLockPreference_noPrivateProfile() {
         mUms.setOrUpdateAutoLockPreferenceForPrivateProfile(
                 Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_AFTER_INACTIVITY);
@@ -769,10 +752,6 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @EnableFlags({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
     public void testSetOrUpdateAutoLockPreference() {
         int mainUser = mUms.getMainUserId();
         assumeTrue(mUms.canAddPrivateProfile(mainUser));
@@ -824,10 +803,6 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @EnableFlags({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES,
-    })
     public void testGetProfileIdsExcludingHidden() {
         assumeTrue(mUms.canAddPrivateProfile(0));
         UserInfo privateProfileUser =
@@ -857,11 +832,7 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @RequiresFlagsEnabled({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_BLOCK_PRIVATE_SPACE_CREATION,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
+    @RequiresFlagsEnabled({FLAG_BLOCK_PRIVATE_SPACE_CREATION})
     public void testCreatePrivateProfileOnHeadlessSystemUser_shouldAllowCreation() {
         UserManagerService mSpiedUms = spy(mUms);
         assumeTrue(mUms.isHeadlessSystemUserMode());
@@ -873,11 +844,7 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @RequiresFlagsEnabled({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_BLOCK_PRIVATE_SPACE_CREATION,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
+    @RequiresFlagsEnabled({FLAG_BLOCK_PRIVATE_SPACE_CREATION})
     public void testCreatePrivateProfileOnSecondaryUser_shouldNotAllowCreation() {
         assumeTrue(mUms.canAddMoreUsersOfType(USER_TYPE_FULL_SECONDARY));
         UserInfo user = mUms.createUserWithThrow(generateLongString(), USER_TYPE_FULL_SECONDARY, 0);
@@ -888,11 +855,7 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @RequiresFlagsEnabled({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_BLOCK_PRIVATE_SPACE_CREATION,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
+    @RequiresFlagsEnabled({FLAG_BLOCK_PRIVATE_SPACE_CREATION})
     public void testCreatePrivateProfileOnAutoDevices_shouldNotAllowCreation() {
         doReturn(true).when(mMockPms).hasSystemFeature(eq(FEATURE_AUTOMOTIVE), anyInt());
         int mainUser = mUms.getMainUserId();
@@ -903,11 +866,7 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @RequiresFlagsEnabled({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_BLOCK_PRIVATE_SPACE_CREATION,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
+    @RequiresFlagsEnabled({FLAG_BLOCK_PRIVATE_SPACE_CREATION})
     public void testCreatePrivateProfileOnTV_shouldNotAllowCreation() {
         doReturn(true).when(mMockPms).hasSystemFeature(eq(FEATURE_LEANBACK), anyInt());
         int mainUser = mUms.getMainUserId();
@@ -918,11 +877,7 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @RequiresFlagsEnabled({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_BLOCK_PRIVATE_SPACE_CREATION,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
+    @RequiresFlagsEnabled({FLAG_BLOCK_PRIVATE_SPACE_CREATION})
     public void testCreatePrivateProfileOnEmbedded_shouldNotAllowCreation() {
         doReturn(true).when(mMockPms).hasSystemFeature(eq(FEATURE_EMBEDDED), anyInt());
         int mainUser = mUms.getMainUserId();
@@ -933,11 +888,7 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
-    @RequiresFlagsEnabled({
-        FLAG_ALLOW_PRIVATE_PROFILE,
-        FLAG_BLOCK_PRIVATE_SPACE_CREATION,
-        FLAG_ENABLE_PRIVATE_SPACE_FEATURES
-    })
+    @RequiresFlagsEnabled({FLAG_BLOCK_PRIVATE_SPACE_CREATION})
     public void testCreatePrivateProfileOnWatch_shouldNotAllowCreation() {
         doReturn(true).when(mMockPms).hasSystemFeature(eq(FEATURE_WATCH), anyInt());
         int mainUser = mUms.getMainUserId();
@@ -1392,6 +1343,54 @@ public final class UserManagerServiceMockedTest {
         }
     }
 
+    /**
+     * Tests {@code getUsers(excludeDying)} - returned users should have name resolved.
+     */
+    @Test
+    @DisableFlags(FLAG_USER_FILTER_REFACTORING)
+    public void testGetUsers() {
+        var adminUser = addUser(new UserInfo(USER_ID, A_USER_HAS_NO_NAME, FLAG_FULL | FLAG_ADMIN));
+        var nonAdminUser = addUser(new UserInfo(USER_ID2, A_USER_HAS_NO_NAME, FLAG_FULL));
+        var partialUser = addUser(new UserInfo(USER_ID3, A_USER_HAS_NO_NAME, FLAG_FULL));
+        partialUser.partial = true;
+        // NOTE: user pre-creation is not supported anymore, so it won't be returned
+        var preCreatedUser = addUser(new UserInfo(USER_ID4, A_USER_HAS_NO_NAME, FLAG_FULL));
+        preCreatedUser.preCreated = true;
+        var dyingUser = addDyingUser(new UserInfo(USER_ID5, A_USER_HAS_NO_NAME, FLAG_FULL));
+        var namedUser = addUser(new UserInfo(USER_ID6, NAME, FLAG_FULL));
+
+        // NOTE: cannot check for users with resolved names on containsExactly() because
+        // UserInfo doesn't implement equals, hence checks below need to explicitly check them
+        List<UserInfo> resolvedNameUsers;
+
+        resolvedNameUsers = mUms.getUsers(EXCLUDE_DYING);
+        expect.withMessage("getUsers(%s)", EXCLUDE_DYING)
+                .that(resolvedNameUsers)
+                .hasSize(4);
+        expect.withMessage("getUsers(%s)", EXCLUDE_DYING)
+                .that(resolvedNameUsers)
+                .contains(namedUser);
+        assertDefaultSystemUserName(resolvedNameUsers);
+        assertDefaultNewUserName(resolvedNameUsers, adminUser.id, nonAdminUser.id);
+
+        resolvedNameUsers = mUms.getUsers(DONT_EXCLUDE_DYING);
+        expect.withMessage("getUsers(%s)", DONT_EXCLUDE_DYING)
+                .that(resolvedNameUsers)
+                .hasSize(5);
+        expect.withMessage("getUsers(%s)", DONT_EXCLUDE_DYING)
+                .that(resolvedNameUsers)
+                .contains(namedUser);
+        assertDefaultSystemUserName(resolvedNameUsers);
+        assertDefaultNewUserName(resolvedNameUsers, adminUser.id, nonAdminUser.id, dyingUser.id);
+    }
+
+    @Test
+    @EnableFlags(FLAG_USER_FILTER_REFACTORING)
+    public void testGetUsers_refactored() {
+        // Should behave exactly the same ways as without the flag
+        testGetUsers();
+    }
+
     @Test
     @DisableFlags(FLAG_USER_FILTER_REFACTORING)
     public void testGetUsersWithUnresolvedNames() {
@@ -1813,6 +1812,41 @@ public final class UserManagerServiceMockedTest {
     }
 
     @Test
+    @EnableFlags(FLAG_DISALLOW_REMOVING_LAST_ADMIN_USER)
+    public void testIsLastFullAdminNonRemovable_deviceUnmanaged_returnsTrue() {
+        setSystemUserHeadless(true);
+        mockDisallowRemovingLastAdminUser(true);
+        mockGetLocalService(DevicePolicyManagerInternal.class, mDevicePolicyManagerInternal);
+        addAdminUser(USER_ID); // USER_ID is full, admin (target)
+        mockIsDeviceOrganizationManaged(false);
+
+        assertThat(mUms.isNonRemovableLastAdminUserLU(mUsers.get(USER_ID).info)).isTrue();
+    }
+
+    @Test
+    @EnableFlags(FLAG_DISALLOW_REMOVING_LAST_ADMIN_USER)
+    public void testIsLastFullAdminNonRemovable_deviceManaged_returnsFalse() {
+        setSystemUserHeadless(true);
+        mockDisallowRemovingLastAdminUser(true);
+        mockGetLocalService(DevicePolicyManagerInternal.class, mDevicePolicyManagerInternal);
+        addAdminUser(USER_ID); // USER_ID is full, admin (target)
+        mockIsDeviceOrganizationManaged(true);
+
+        assertThat(mUms.isNonRemovableLastAdminUserLU(mUsers.get(USER_ID).info)).isFalse();
+    }
+
+    @Test
+    @EnableFlags(FLAG_DISALLOW_REMOVING_LAST_ADMIN_USER)
+    public void testIsLastFullAdminNonRemovable_dpmiNull_returnsTrue() {
+        setSystemUserHeadless(true);
+        mockDisallowRemovingLastAdminUser(true);
+        mockGetLocalService(DevicePolicyManagerInternal.class, null);
+        addAdminUser(USER_ID); // USER_ID is full, admin (target)
+
+        assertThat(mUms.isNonRemovableLastAdminUserLU(mUsers.get(USER_ID).info)).isTrue();
+    }
+
+    @Test
     public void testSetUserAdmin() {
         addSecondaryUser(USER_ID);
 
@@ -2092,7 +2126,8 @@ public final class UserManagerServiceMockedTest {
         expectGetUserRemovability("system user", USER_SYSTEM, REMOVE_RESULT_ERROR_SYSTEM_USER);
         expectGetUserRemovability("null user", USER_NULL, REMOVE_RESULT_ERROR_USER_NOT_FOUND);
         expectGetUserRemovability("dying user", dyingUser.id, REMOVE_RESULT_ALREADY_BEING_REMOVED);
-        expectGetUserRemovability("device owner", deviceOwnerUser.id, REMOVE_RESULT_DEVICE_OWNER);
+        expectGetUserRemovability("device owner", deviceOwnerUser.id,
+                REMOVE_RESULT_ERROR_DEVICE_OWNER);
 
         // Then success ones
         expectGetUserRemovability("non-admin", nonAdminUser.id, REMOVE_RESULT_USER_IS_REMOVABLE);
@@ -2326,6 +2361,10 @@ public final class UserManagerServiceMockedTest {
 
         when(mActivityManagerInternal.getCurrentAndTargetUserIds())
                 .thenReturn(new Pair<>(currentUserId, targetUserId));
+    }
+
+    private void mockIsDeviceOrganizationManaged(boolean value) {
+        when(mDevicePolicyManagerInternal.isDeviceOrganizationManaged()).thenReturn(value);
     }
 
     private <T> void mockGetLocalService(Class<T> serviceClass, T service) {

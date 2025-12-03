@@ -271,21 +271,23 @@ public final class Debug
         public static final int OTHER_GL = 15;
         /** @hide */
         public static final int OTHER_OTHER_MEMTRACK = 16;
+        /** @hide */
+        public static final int OTHER_MEMFD = 17;
 
         // Needs to be declared here for the DVK_STAT ranges below.
         /** @hide */
         @UnsupportedAppUsage
-        public static final int NUM_OTHER_STATS = 17;
+        public static final int NUM_OTHER_STATS = 18;
 
         // Dalvik subsections.
         /** @hide */
-        public static final int OTHER_DALVIK_NORMAL = 17;
+        public static final int OTHER_DALVIK_NORMAL = 18;
         /** @hide */
-        public static final int OTHER_DALVIK_LARGE = 18;
+        public static final int OTHER_DALVIK_LARGE = 19;
         /** @hide */
-        public static final int OTHER_DALVIK_ZYGOTE = 19;
+        public static final int OTHER_DALVIK_ZYGOTE = 20;
         /** @hide */
-        public static final int OTHER_DALVIK_NON_MOVING = 20;
+        public static final int OTHER_DALVIK_NON_MOVING = 21;
         // Section begins and ends for dumpsys, relative to the DALVIK categories.
         /** @hide */
         public static final int OTHER_DVK_STAT_DALVIK_START =
@@ -296,17 +298,17 @@ public final class Debug
 
         // Dalvik Other subsections.
         /** @hide */
-        public static final int OTHER_DALVIK_OTHER_LINEARALLOC = 21;
+        public static final int OTHER_DALVIK_OTHER_LINEARALLOC = 22;
         /** @hide */
-        public static final int OTHER_DALVIK_OTHER_ACCOUNTING = 22;
+        public static final int OTHER_DALVIK_OTHER_ACCOUNTING = 23;
         /** @hide */
-        public static final int OTHER_DALVIK_OTHER_ZYGOTE_CODE_CACHE = 23;
+        public static final int OTHER_DALVIK_OTHER_ZYGOTE_CODE_CACHE = 24;
         /** @hide */
-        public static final int OTHER_DALVIK_OTHER_APP_CODE_CACHE = 24;
+        public static final int OTHER_DALVIK_OTHER_APP_CODE_CACHE = 25;
         /** @hide */
-        public static final int OTHER_DALVIK_OTHER_COMPILER_METADATA = 25;
+        public static final int OTHER_DALVIK_OTHER_COMPILER_METADATA = 26;
         /** @hide */
-        public static final int OTHER_DALVIK_OTHER_INDIRECT_REFERENCE_TABLE = 26;
+        public static final int OTHER_DALVIK_OTHER_INDIRECT_REFERENCE_TABLE = 27;
         /** @hide */
         public static final int OTHER_DVK_STAT_DALVIK_OTHER_START =
                 OTHER_DALVIK_OTHER_LINEARALLOC - NUM_OTHER_STATS;
@@ -316,11 +318,11 @@ public final class Debug
 
         // Dex subsections (Boot vdex, App dex, and App vdex).
         /** @hide */
-        public static final int OTHER_DEX_BOOT_VDEX = 27;
+        public static final int OTHER_DEX_BOOT_VDEX = 28;
         /** @hide */
-        public static final int OTHER_DEX_APP_DEX = 28;
+        public static final int OTHER_DEX_APP_DEX = 29;
         /** @hide */
-        public static final int OTHER_DEX_APP_VDEX = 29;
+        public static final int OTHER_DEX_APP_VDEX = 30;
         /** @hide */
         public static final int OTHER_DVK_STAT_DEX_START = OTHER_DEX_BOOT_VDEX - NUM_OTHER_STATS;
         /** @hide */
@@ -328,9 +330,9 @@ public final class Debug
 
         // Art subsections (App image, boot image).
         /** @hide */
-        public static final int OTHER_ART_APP = 30;
+        public static final int OTHER_ART_APP = 31;
         /** @hide */
-        public static final int OTHER_ART_BOOT = 31;
+        public static final int OTHER_ART_BOOT = 32;
         // LINT.ThenChange(/system/memory/libmeminfo/include/meminfo/androidprocheaps.h)
         /** @hide */
         public static final int OTHER_DVK_STAT_ART_START = OTHER_ART_APP - NUM_OTHER_STATS;
@@ -559,6 +561,7 @@ public final class Debug
                 case OTHER_GRAPHICS: return "EGL mtrack";
                 case OTHER_GL: return "GL mtrack";
                 case OTHER_OTHER_MEMTRACK: return "Other mtrack";
+                case OTHER_MEMFD: return "Memfd";
                 case OTHER_DALVIK_NORMAL: return ".Heap";
                 case OTHER_DALVIK_LARGE: return ".LOS";
                 case OTHER_DALVIK_ZYGOTE: return ".Zygote";
@@ -2083,67 +2086,41 @@ public final class Debug
     /** @hide */
     public static final int MEMINFO_PAGE_TABLES = 13;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_SEC_PAGE_TABLES = 14;
-    /** @hide */
-    public static final int MEMINFO_KERNEL_STACK = 15;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_KERNEL_STACK = 14;
     /**
      * Note: MEMINFO_KRECLAIMABLE includes MEMINFO_SLAB_RECLAIMABLE (see KReclaimable field
      * description in kernel documentation).
      * @hide
      */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_KRECLAIMABLE = 16;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_KRECLAIMABLE = 15;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_ACTIVE = 17;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_ACTIVE = 16;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_INACTIVE = 18;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_INACTIVE = 17;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_UNEVICTABLE = 19;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_UNEVICTABLE = 18;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_AVAILABLE = 20;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_AVAILABLE = 19;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_ACTIVE_ANON = 21;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_ACTIVE_ANON = 20;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_INACTIVE_ANON = 22;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_INACTIVE_ANON = 21;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_ACTIVE_FILE = 23;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_ACTIVE_FILE = 22;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_INACTIVE_FILE = 24;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_INACTIVE_FILE = 23;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_CMA_TOTAL = 25;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_CMA_TOTAL = 24;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_CMA_FREE = 26;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_CMA_FREE = 25;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_SWAP_CACHED = 27;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_SWAP_CACHED = 26;
     /** @hide */
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
-    public static final int MEMINFO_COUNT = 28;
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
+    public static final int MEMINFO_SEC_PAGE_TABLES = 27;
+    /** @hide */
+    public static final int MEMINFO_PERCPU = 28;
+    /** @hide */
+    public static final int MEMINFO_COUNT = 29;
 
     /**
      * Retrieves /proc/meminfo.  outSizes is filled with fields
@@ -2908,28 +2885,12 @@ public final class Debug
     public static native long getDmabufHeapTotalExportedKb();
 
     /**
-     * Return memory size in kilobytes allocated for ION heaps or -1 if
-     * /sys/kernel/ion/total_heaps_kb could not be read.
-     *
-     * @hide
-     */
-    public static native long getIonHeapsSizeKb();
-
-    /**
      * Return memory size in kilobytes allocated for DMA-BUF heap pools or -1 if
      * /sys/kernel/dma_heap/total_pools_kb could not be read.
      *
      * @hide
      */
     public static native long getDmabufHeapPoolsSizeKb();
-
-    /**
-     * Return memory size in kilobytes allocated for ION pools or -1 if
-     * /sys/kernel/ion/total_pools_kb could not be read.
-     *
-     * @hide
-     */
-    public static native long getIonPoolsSizeKb();
 
     /**
      * Returns the global total GPU-private memory in kB or -1 on error.

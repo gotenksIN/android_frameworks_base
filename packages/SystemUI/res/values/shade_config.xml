@@ -36,13 +36,17 @@
     <!--
     Whether Dual Shade should be enabled in the absence of an explicit preference set by the user.
     -->
-    <bool name="config_dualShadeEnabledByDefault">false</bool>
+    <bool name="config_dualShadeEnabledByDefault">true</bool>
 
     <!--
-    Whether to allow the user to choose between Single and Dual Shade modes via the Settings app.
-    When `false`, the preference and associated Settings Page are absent from the Settings app
-    (including any shortcuts to them), the user preference value is ignored, and
-    `config_dualShadeEnabledByDefault` is used.
+    Sets the boundary for the swipe-down gesture from the top of the screen that opens the
+    Notifications and Quick Settings shades in Dual Shade mode.
+
+    This value is a ratio (from 0.0 to 1.0) that represents the fraction of the screen width
+    dedicated to notifications, measured from the "start" edge (left in LTR layouts, right in RTL).
+
+     - Swiping from the start edge to this boundary opens Notifications.
+     - Swiping from this boundary to the end edge opens Quick Settings.
     -->
-    <bool name="config_useDualShadeSetting">true</bool>
+    <item name="config_invocationGestureSplitRatio" format="float" type="dimen">0.75</item>
 </resources>

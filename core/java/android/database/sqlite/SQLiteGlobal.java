@@ -28,10 +28,10 @@ import android.content.res.Resources;
 import android.os.StatFs;
 import android.os.SystemProperties;
 
-// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
-import android.os.Process;
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+import android.util.BoostFramework;
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 
-// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 /**
  * Provides access to SQLite functions that affect all database connection,
  * such as memory management.
@@ -101,9 +101,10 @@ public final class SQLiteGlobal {
      * Gets the default journal mode when WAL is not in use.
      */
     public static @SQLiteDatabase.JournalMode String getDefaultJournalMode() {
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+        if (BoostFramework.shouldUseUiPerf()) {
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 // QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
-        if (SystemProperties.getBoolean(UI_PERF_PROP, false) &&
-                SystemProperties.get(UI_PERF_PROC_PROP, "").equals(Process.myProcessName())) {
             return SystemProperties.get("debug.sqlite.journalmode", "PERSIST");
         }
 // QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
@@ -130,9 +131,10 @@ public final class SQLiteGlobal {
         if (defaultMode != null) {
             return defaultMode;
         }
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+        if (BoostFramework.shouldUseUiPerf()) {
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 // QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
-        if (SystemProperties.getBoolean(UI_PERF_PROP, false) &&
-                SystemProperties.get(UI_PERF_PROC_PROP, "").equals(Process.myProcessName())) {
             return SystemProperties.get("debug.sqlite.syncmode", "OFF");
         }
 // QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization

@@ -17,7 +17,7 @@
 package com.android.server.am;
 
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_ACTIVITY;
-import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UI_VISIBILITY;
+import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_FOREGROUND_SERVICE;
 
 import static com.android.internal.util.Preconditions.checkArgument;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
@@ -1085,55 +1085,12 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         mInFullBackup = inFullBackup;
     }
 
-    @Override
     public boolean hasActivities() {
         return mWindowProcessController.hasActivities();
     }
 
-    @Override
-    public boolean isHeavyWeightProcess() {
-        return mWindowProcessController.isHeavyWeightProcess();
-    }
-
-    @Override
-    public boolean hasVisibleActivities() {
-        return mWindowProcessController.hasVisibleActivities();
-    }
-
-    @Override
-    public boolean isHomeProcess() {
-        return mWindowProcessController.isHomeProcess();
-    }
-
-    @Override
-    public boolean isPreviousProcess() {
-        return mWindowProcessController.isPreviousProcess();
-    }
-
-    @Override
     public boolean hasRecentTasks() {
         return mWindowProcessController.hasRecentTasks();
-    }
-
-    @Override
-    public boolean isShowingUiWhileDozing() {
-        return mWindowProcessController.isShowingUiWhileDozing();
-    }
-
-    @Override
-    public int getActivityStateFlagsLegacy() {
-        return mWindowProcessController.getActivityStateFlags();
-    }
-
-    @Override
-    public long getPerceptibleTaskStoppedTimeMillisLegacy() {
-        return mWindowProcessController.getPerceptibleTaskStoppedTimeMillis();
-    }
-
-
-    @Override
-    public boolean isReceivingBroadcast(int[] outSchedGroup) {
-        return mService.isReceivingBroadcastLocked(this, outSchedGroup);
     }
 
     @Override
@@ -1307,7 +1264,8 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                     && mErrorState.getAnrAnnotation() != null) {
                 description = description + ": " + mErrorState.getAnrAnnotation();
             }
-            if (mService != null && (noisy || info.uid == mService.mCurOomAdjUid)) {
+            if (mService != null
+                    && (noisy || info.uid == mService.mProcessStateController.getDebugUid())) {
                 mService.reportUidInfoMessageLocked(TAG,
                         "Killing " + toShortString() + " (adj " + getSetAdj()
                         + "): " + reason, info.uid);
@@ -1781,15 +1739,8 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
             return;
         }
         synchronized (mService) {
-            if (mService.mProcessStateController.setRunningRemoteAnimation(this,
-                    runningRemoteAnimation)) {
-                if (Flags.autoTriggerOomadjUpdates()) {
-                    // Do nothing.
-                    // ProcessStateController handled the update in setRunningRemoteAnimation.
-                } else {
-                    mService.mProcessStateController.runUpdate(this, OOM_ADJ_REASON_UI_VISIBILITY);
-                }
-            }
+            mService.mProcessStateController.setRunningRemoteAnimation(this,
+                    runningRemoteAnimation);
         }
     }
 
@@ -1847,5 +1798,15 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     @Override
     public void onHasClientActivitiesChanged(boolean hasClientActivities) {
         mWindowProcessController.setHasClientActivities(hasClientActivities);
+    }
+
+    @Override
+    public void onHasForegroundServicesChanged(boolean hasForegroundServices) {
+        mWindowProcessController.setHasForegroundServices(hasForegroundServices);
+        if (hasForegroundServices) {
+            mProfile.addHostingComponentType(HOSTING_COMPONENT_TYPE_FOREGROUND_SERVICE);
+        } else {
+            mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_FOREGROUND_SERVICE);
+        }
     }
 }

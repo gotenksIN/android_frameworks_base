@@ -249,11 +249,11 @@
     <!-- Label for UI element which allows editing the screenshot [CHAR LIMIT=30] -->
     <string name="screenshot_edit_label">Edit</string>
     <!-- Content description indicating that tapping the element will allow editing the screenshot [CHAR LIMIT=NONE] -->
-    <string name="screenshot_edit_description">Edit screenshot</string>
+    <string name="screenshot_edit_description">Edit screenshot button</string>
     <!-- Label for UI element which allows sharing the screenshot [CHAR LIMIT=30] -->
     <string name="screenshot_share_label">Share</string>
     <!-- Content description indicating that tapping the element will allow sharing the screenshot [CHAR LIMIT=NONE] -->
-    <string name="screenshot_share_description">Share screenshot</string>
+    <string name="screenshot_share_description">Share screenshot button</string>
     <!-- Label for UI element which allows the user to capture additional off-screen content in a screenshot. [CHAR LIMIT=30] -->
     <string name="screenshot_scroll_label">Capture more</string>
     <!-- Content description indicating that tapping a button will dismiss the screenshots UI [CHAR LIMIT=NONE] -->
@@ -399,6 +399,8 @@
     <string name="screen_record_unmute">Unmute</string>
     <string name="screen_record_video_preview_elapsed_time_template" translatable="false">%s / %s</string>
 
+    <!-- Notification text displayed when screen capture is blocked by an IT admin. [CHAR LIMIT=100] -->
+    <string name="screen_capture_blocked_by_admin">Screen capture is blocked by your IT admin</string>
     <!-- Button text for taking a fullscreen screenshot [CHAR LIMIT=50] -->
     <string name="screen_capture_fullscreen_screenshot_button">Take screenshot of entire screen</string>
     <!-- Button text for taking a fullscreen screenshot [CHAR LIMIT=50] -->
@@ -415,8 +417,12 @@
     <string name="screen_share_toolbar_share_button">Share</string>
     <!-- Text for app screen sharing thumbnail when no app is selected. [CHAR LIMIT=35] -->
     <string name="screen_share_no_select_app_thumbnail">Select an app to share</string>
-    <!-- Text for share app audio. [CHAR LIMIT=35] -->
-    <string name="screen_share_app_audio_sharing">Share window audio</string>
+    <!-- Text for share audio. [CHAR LIMIT=35] -->
+    <string name="screen_share_audio_sharing_text">Share audio</string>
+    <!-- Text for app sharing title [CHAR LIMIT=35] -->
+    <string name="screen_share_app_window_sharing_title">Share app window</string>
+    <!-- Text diclaimer that tells a user that they're currently sharing screen [CHAR LIMIT=100] -->
+    <string name="screen_share_disclaimer">When sharing, the contents of your screen are visible</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "screenshot". [CHAR LIMIT=NONE] -->
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y">Take screenshot of window</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "record". [CHAR LIMIT=NONE] -->
@@ -852,6 +858,9 @@
     <!-- Content description of the clear button in the notification panel for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_clear_all">Clear all notifications.</string>
 
+    <!-- Accessibility text describing the notification bell. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_notification_bell">Notifications</string>
+
     <!-- The overflow indicator shown when a group has more notification inside the group than the visible ones. An example is "+ 3" [CHAR LIMIT=5] -->
     <string name="notification_group_overflow_indicator">+ <xliff:g id="number" example="3">%s</xliff:g></string>
 
@@ -1020,12 +1029,24 @@
      <!-- QuickSettings: Cast detail panel, default device description [CHAR LIMIT=NONE] -->
     <!-- QuickSettings: Cast detail panel, text when there are no items [CHAR LIMIT=NONE] -->
     <string name="quick_settings_cast_detail_empty_text">No devices available</string>
+    <!-- QuickSettings: Cast detail panel, default title for the device chooser view [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_cast_detail_title">Cast screen to device</string>
+    <!-- QuickSettings: Cast detail panel, default subtitle for the device chooser view [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_cast_detail_subtitle">Searching for devices...</string>
     <!-- QuickSettings: Cast unavailable, text when not connected to WiFi or ethernet[CHAR LIMIT=NONE] -->
     <string name="quick_settings_cast_no_network">No Wi\u2011Fi or Ethernet connection</string>
     <!-- QuickSettings: Cast details, text on the disconnect button, click to disconnect a device [CHAR LIMIT=NONE] -->
     <string name="quick_settings_cast_disconnect">Disconnect</string>
     <!-- QuickSettings: Audio details, text on the input device indicating what the current input device is [CHAR LIMIT=NONE] -->
     <string name="quick_settings_audio_current_input">Current mic is</string>
+    <!-- QuickSettings: Audio details, text on top of the output device, indicating this is the output section [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_audio_output_section_title">Output</string>
+    <!-- QuickSettings: Audio details, text on top of the input device, indicating this is the input section [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_audio_input_section_title">Input</string>
+    <!-- QuickSettings: Audio details, text within the input section, indicating that volume of the device's mic will be automatically adjusted [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_audio_input_disclaimer_text">Mic volume will be automatically adjusted</string>
+    <!-- QuickSettings: Audio details, text on top of all the audio effect buttons, indicating this is the effects section [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_audio_effects_section_title">Effects</string>
     <!-- QuickSettings: Brightness dialog title [CHAR LIMIT=NONE] -->
     <string name="quick_settings_brightness_dialog_title">Brightness</string>
     <!-- QuickSettings: Label for the toggle that controls whether display inversion is enabled. [CHAR LIMIT=NONE] -->
@@ -1742,6 +1763,9 @@
     <!-- Section title for conversational notifications. [CHAR LIMIT=40] -->
     <string name="notification_section_header_conversations">Conversations</string>
 
+    <!-- Section title for highlighted notifications. [CHAR LIMIT=40] -->
+    <string name="notification_section_header_highlights">Highlights</string>
+
     <!-- Content description for accessibility: Tapping this button will dismiss all gentle notifications [CHAR LIMIT=NONE] -->
     <string name="accessibility_notification_section_header_gentle_clear_all">Clear all silent notifications</string>
 
@@ -1910,10 +1934,13 @@
     <string name="monitoring_description_vpn_settings">Open VPN settings</string>
 
     <!-- Dialog that a user can access via Quick Settings. [CHAR LIMIT=NONE]-->
-    <string name="monitoring_description_parental_controls">This device is managed by your parent. Your parent can see and manage information such as the apps you use, your location, and your screen time.</string>
+    <string name="monitoring_description_parental_controls_legacy">This device is managed by your parent. Your parent can see and manage information such as the apps you use, your location, and your screen time.</string>
 
     <!-- Dialog that a user can access via Quick Settings. [CHAR LIMIT=NONE]-->
     <string name="monitoring_description_pin_protection">Some controls on your device, like daily limits \u0026 downtime, can only be changed with a PIN.</string>
+
+    <!-- Monitoring dialog: Description of a device supervised by a parent. [CHAR LIMIT=NONE]-->
+    <string name="monitoring_description_parental_controls">Some controls can only be changed by your parent</string>
 
     <!-- Name for a generic legacy VPN connection [CHAR LIMIT=20] -->
     <string name="legacy_vpn_name">VPN</string>
@@ -2602,6 +2629,8 @@
     <string name="group_system_access_system_settings">Open settings</string>
     <!-- User visible title for the keyboard shortcut that accesses Assistant app. [CHAR LIMIT=70] -->
     <string name="group_system_access_google_assistant">Open digital assistant</string>
+    <!-- User visible title for the keyboard shortcut that opens contextual search. [CHAR LIMIT=70] -->
+    <string name="group_system_access_contextual_search">Contextual Search</string>
     <!-- User visible title for the keyboard shortcut that locks screen. [CHAR LIMIT=70] -->
     <string name="group_system_lock_screen">Lock screen</string>
     <!-- User visible title for the keyboard shortcut that pulls up Notes app for quick memo. [CHAR LIMIT=70] -->
@@ -2802,12 +2831,6 @@
     <!-- SysUI Tuner: Settings to change nav bar icon [CHAR LIMIT=30] -->
     <string name="right_icon">Right icon</string>
 
-    <!-- Label for area where tiles can be dragged out of [CHAR LIMIT=60] -->
-    <string name="drag_to_add_tiles">Hold and drag to add tiles</string>
-
-    <!-- Label for header of customize QS [CHAR LIMIT=60] -->
-    <string name="drag_to_rearrange_tiles">Hold and drag to rearrange tiles</string>
-
     <!-- Label for header of customize QS to indicate that tiles can be selected to be edited [CHAR LIMIT=60] -->
     <string name="select_to_rearrange_tiles">Select tiles to rearrange and resize</string>
 
@@ -2825,15 +2848,6 @@
 
     <!-- Label for placing tiles in edit mode for QS [CHAR LIMIT=60] -->
     <string name="tap_to_position_tile">Tap to position tile</string>
-
-    <!-- Label for area where tiles can be dragged in to [CHAR LIMIT=60] -->
-    <string name="drag_to_remove_tiles">Drag here to remove</string>
-
-    <!-- Label to indicate to users that additional tiles cannot be removed. [CHAR LIMIT=60] -->
-    <string name="drag_to_remove_disabled">You need at least <xliff:g id="min_num_tiles" example="6">%1$d</xliff:g> tiles</string>
-
-    <!-- Button to edit the tile ordering of quick settings [CHAR LIMIT=60] -->
-    <string name="qs_edit">Edit</string>
 
     <!-- Title for QS Edit mode screen [CHAR LIMIT=30] -->
     <string name="qs_edit_tiles">Edit tiles</string>
@@ -2885,26 +2899,8 @@
     <!-- Accessibility description of action to toggle the QS tile selection. It will read as "Double-tap to toggle selection" in screen readers [CHAR LIMIT=NONE] -->
     <string name="accessibility_qs_edit_toggle_selection">toggle selection</string>
 
-    <!-- Accessibility action of action to add QS tile to end. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_qs_edit_tile_add_action">Add tile to the last position</string>
-
     <!-- Accessibility action of action to add a named QS tile to the end. [CHAR LIMIT=NONE] -->
     <string name="accessibility_qs_edit_named_tile_add_action">Add <xliff:g id="name" example="Internet">%1$s</xliff:g> to the last position</string>
-
-    <!-- Accessibility action for context menu to move QS tile [CHAR LIMIT=NONE] -->
-    <string name="accessibility_qs_edit_tile_start_move">Move tile</string>
-
-    <!-- Accessibility action for context menu to add QS tile to a position [CHAR LIMIT=NONE] -->
-    <string name="accessibility_qs_edit_tile_start_add">Add tile to desired position</string>
-
-    <!-- Accessibility description when QS tile is to be moved, indicating the destination position [CHAR LIMIT=NONE] -->
-    <string name="accessibility_qs_edit_tile_move_to_position">Move to <xliff:g id="position" example="5">%1$d</xliff:g></string>
-
-    <!-- Accessibility description when QS tile is to be added, indicating the destination position [CHAR LIMIT=NONE] -->
-    <string name="accessibility_qs_edit_tile_add_to_position">Add to position <xliff:g id="position" example="5">%1$d</xliff:g></string>
-
-    <!-- Accessibility description when QS tile would be added or moved, but the current position is not valid for adding or moving to [CHAR LIMIT=NONE] -->
-    <string name="accessibilit_qs_edit_tile_add_move_invalid_position">Position invalid.</string>
 
     <!-- Accessibility description indicating the currently selected tile's position. Only used for tiles that are currently in use [CHAR LIMIT=NONE] -->
     <string name="accessibility_qs_edit_position">Position <xliff:g id="position" example="5">%1$d</xliff:g></string>
@@ -2963,11 +2959,11 @@
     <!-- Text for the dialog title. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_dialog_title">Turn on <xliff:g name="feature_name" example="Magnification">%1$s</xliff:g>?</string>
     <!-- Text for showing inside the dialog. [CHAR LIMIT=NONE] -->
+    <!-- TODO: b/447609974 Update "Action" to a param in case of translation the hardware key for all of key gesture dialogs. -->
     <string name="accessibility_key_gesture_dialog_content">Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="M">^2</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="TalkBack">^3</xliff:g>. <xliff:g name="feature_intro" example="TalkBack intro">^4</xliff:g></string>
-    <!-- The text for the TalkBack introduction. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_key_gesture_dialog_talkback_intro"><xliff:g name="feature_name" example="TalkBack">%1$s</xliff:g> is a screen reader that allows you to hear items spoken aloud. It can be helpful for people who have difficulty seeing the screen.</string>
-    <!-- Positive button text for the dialog. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_key_gesture_dialog_positive_button_text">Turn on</string>
+    <!-- The text for the TalkBack TextToSpeech announcement. [CHAR LIMIT=NONE] -->
+    <!-- TODO: b/447609974 Update the TTS announced string to final one. -->
+    <string name="accessibility_key_gesture_dialog_screen_reader_tts">Press Action + <xliff:g name="secondary_key" example="Alt">%1$s</xliff:g> + <xliff:g name="key_code" example="T">%2$s</xliff:g> again to enable <xliff:g name="feature_name" example="TalkBack">%3$s</xliff:g></string>
 
     <!-- Text for the dialog title when keyboard shortcut has not yet been enabled. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title">Turn on <xliff:g name="feature_name" example="Voice Access">%1$s</xliff:g> keyboard shortcut?</string>
@@ -2985,8 +2981,21 @@
     <!-- Positive button text for the Magnification dialog when the keyboard shortcut is enabled. [CHAR LIMIT=NONE] -->
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text">Keep on</string>
 
+    <!-- Text for showing inside the screen reader dialog. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_key_gesture_screen_reader_dialog_content">Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="T">^2</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="TalkBack">^3</xliff:g>. <xliff:g name="feature_name" example="TalkBack">^3</xliff:g> is a screen reader that allows you to hear items spoken aloud. It can be helpful for people who have difficulty seeing the screen. This may change how your device works.</string>
+
     <!-- Text for showing inside the Voice Access dialog. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_key_gesture_voice_access_dialog_content">Pressing Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="M">^2</xliff:g> turns on <xliff:g name="feature_name" example="Voice Access">^3</xliff:g>, an accessibility feature. This lets you control your device hands-free.</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content">Pressing Action <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^1</xliff:g> + <xliff:g name="key_code" example="V">^2</xliff:g> turns on <xliff:g name="feature_name" example="Voice Access">^3</xliff:g>, an accessibility feature. This lets you control your device hands-free.</string>
+
+    <!-- TODO: b/450609147 - Update to final string and remove "translatable" -->
+    <!-- Text for the title of top row key tutorial dialog. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_title" translatable="false">Accessibility key</string>
+    <!-- TODO: b/450609147 - Update to final string and remove "translatable" -->
+    <!-- Text for the content of top row key tutorial dialog. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_content" translatable="false">You can press the accessibility action key to activate accessibility features. Add features you would like to activate using this key</string>
+    <!-- TODO: b/450609147 - Update to final string and remove "translatable" -->
+    <!-- Text for the confirmation button of top row key tutorial dialog. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_positive_button_text" translatable="false">Add features</string>
 
     <!-- Plugin control section of the tuner. Non-translatable since it should
          not appear on production builds ever. -->
@@ -3599,14 +3608,8 @@
     <!-- Controls menu, remove app [CHAR_LIMIT=30] -->
     <string name="controls_menu_remove">Remove app</string>
 
-    <!-- Title for the media output dialog with media related devices [CHAR LIMIT=50] -->
-    <string name="media_output_dialog_add_output">Add outputs</string>
     <!-- Title for the media output slice with group devices [CHAR LIMIT=50] -->
     <string name="media_output_dialog_group">Group</string>
-    <!-- Summary for media output group with only one device which is active [CHAR LIMIT=NONE] -->
-    <string name="media_output_dialog_single_device">1 device selected</string>
-    <!-- Summary for media output group with the active device count [CHAR LIMIT=NONE] -->
-    <string name="media_output_dialog_multiple_devices"><xliff:g id="count" example="2">%1$d</xliff:g> devices selected</string>
     <!-- Accessibility label for media output item connected state [CHAR LIMIT=50] -->
     <string name="media_output_item_connected_state">Connected</string>
     <!-- Summary for connecting error message [CHAR LIMIT=NONE] -->
@@ -3646,8 +3649,6 @@
 
     <!-- Label for clip data when copying the build number off QS [CHAR LIMIT=NONE]-->
     <string name="build_number_clip_data_label">Build number</string>
-    <!-- Text to display when copying the build number off QS [CHAR LIMIT=NONE]-->
-    <string name="build_number_copy_toast">Build number copied to clipboard.</string>
 
     <!-- Text for accessibility action for copying content to clipboard [CHAR LIMIT=NONE]-->
     <string name="copy_to_clipboard_a11y_action">copy to clipboard.</string>
@@ -3810,10 +3811,19 @@
     <!-- Text for TileService request dialog. This is shown to the user that an app is requesting
          user approval to add the shown tile to Quick Settings [CHAR LIMIT=NONE] -->
     <string name="qs_tile_request_dialog_text"><xliff:g id="appName" example="Fake App">%1$s</xliff:g> wants to add the following tile to Quick Settings</string>
+    <!-- Text for TileService request dialog. This is shown to the user that an app is requesting
+         user approval to select a size and add the shown tile to Quick Settings [CHAR LIMIT=NONE] -->
+    <string name="qs_tile_request_dialog_text_with_size"><xliff:g id="appName" example="Fake App">%1$s</xliff:g> wants to add a tile to Quick Settings. Select a tile size to continue.</string>
     <!-- Text for TileService request dialog. Text for button for user to approve adding the tile [CHAR LIMIT=20] -->
     <string name="qs_tile_request_dialog_add">Add tile</string>
     <!-- Text for TileService request dialog. Text for button for user to reject adding the tile [CHAR LIMIT=20] -->
-    <string name="qs_tile_request_dialog_not_add">Do not add tile</string>
+    <string name="qs_tile_request_dialog_not_add">Don\'t add tile</string>
+    <!-- Title for TileService request dialog. [CHAR LIMIT=20] -->
+    <string name="qs_tile_request_dialog_title">Add tile to Quick Settings</string>
+    <!-- Content description for the tile's small format. [CHAR LIMIT=20] -->
+    <string name="qs_tile_request_dialog_small_format_content_description">Small format</string>
+    <!-- Content description for the tile's large format. [CHAR LIMIT=20] -->
+    <string name="qs_tile_request_dialog_large_format_content_description">Large format</string>
 
     <!-- Title for User Switch dialog. [CHAR LIMIT=20] -->
     <string name="qs_user_switch_dialog_title">Select user</string>
@@ -4581,6 +4591,9 @@
 
     <!-- Content of button shown on the bouncer screen to navigate back to keyguard. [CHAR LIMIT=NONE] -->
     <string name="back_button_on_bouncer">Back</string>
+
+    <!-- Content description of a button shown on the bouncer screen with an accessibility icon to open an accessibility dialog. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_button_on_bouncer_description">Accessibility</string>
 
     <!-- Content description for arrow in Pager Dots to navigate to previous page [CHAR LIMIT=NONE] -->
     <string name="pager_dots_previous_content_description">Previous</string>

@@ -91,8 +91,8 @@ import static android.view.WindowManagerGlobal.ADD_OKAY;
 import static android.view.WindowManagerGlobal.ADD_PERMISSION_DENIED;
 import static android.view.contentprotection.flags.Flags.createAccessibilityOverlayAppOpEnabled;
 
-import static com.android.hardware.input.Flags.bluetoothWakeupStateCheck;
 import static com.android.hardware.input.Flags.enableNew25q2Keycodes;
+import static com.android.hardware.input.Flags.useEventDisplayIdForKeyWakeup;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_CANCEL;
@@ -799,7 +799,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     requestBugreportForTv();
                     break;
                 case MSG_DISPATCH_BACK_KEY_TO_AUTOFILL:
-                    mAutofillManagerInternal.onBackKeyPressed();
+                    final int displayId2 = msg.arg1;
+                    final int userId = mUserManagerInternal.getUserAssignedToDisplay(displayId2);
+                    mAutofillManagerInternal.onBackKeyPressed(userId);
                     break;
                 case MSG_SYSTEM_KEY_PRESS:
                     KeyEvent event = (KeyEvent) msg.obj;
@@ -1015,7 +1017,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     // returns true if the key was handled and should not be passed to the user
-    private boolean backKeyPress() {
+    private boolean backKeyPress(int displayId) {
         mLogger.count("key_back_press", 1);
         // Cache handled state
         boolean handled = mBackKeyHandled;
@@ -1042,7 +1044,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         if (mAutofillManagerInternal != null) {
-            mHandler.sendMessage(mHandler.obtainMessage(MSG_DISPATCH_BACK_KEY_TO_AUTOFILL));
+            mHandler.sendMessage(mHandler.obtainMessage(
+                    MSG_DISPATCH_BACK_KEY_TO_AUTOFILL, displayId, 0 /* unused */));
         }
         return handled;
     }
@@ -1136,9 +1139,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         + mShortPressOnPowerBehavior);
 
         if (count == 2) {
-            powerMultiPressAction(eventTime, interactive, mDoublePressOnPowerBehavior);
+            powerMultiPressAction(displayId, eventTime, interactive, mDoublePressOnPowerBehavior);
         } else if (count == 3) {
-            powerMultiPressAction(eventTime, interactive, mTriplePressOnPowerBehavior);
+            powerMultiPressAction(displayId, eventTime, interactive, mTriplePressOnPowerBehavior);
         } else if (count > 3 && count <= getMaxMultiPressPowerCount()) {
             Slog.d(TAG, "No behavior defined for power press count " + count);
         } else if (count == 1 && shouldHandleShortPressPowerAction(interactive, eventTime)) {
@@ -1389,8 +1392,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private void shortPressPowerGoHome() {
-        launchHomeFromHotKey(DEFAULT_DISPLAY, true /* awakenFromDreams */,
-                false /*respectKeyguard*/);
+        KeyGestureEvent keyGestureEvent =
+                new KeyGestureEvent.Builder()
+                        .setKeyGestureType(KeyGestureEvent.KEY_GESTURE_TYPE_HOME)
+                        .setAction(KeyGestureEvent.ACTION_GESTURE_COMPLETE)
+                        .setDisplayId(mDefaultDisplay.getDisplayId())
+                        .setKeycodes(new int[] {KEYCODE_POWER})
+                        .setModifierState(/* metaState= */ 0)
+                        .build();
+        mInputManagerInternal.handleKeyGestureInKeyGestureController(keyGestureEvent);
         if (isKeyguardShowingAndNotOccluded()) {
             // Notify keyguard so it can do any special handling for the power button since the
             // device will not power off and only launch home.
@@ -1398,14 +1408,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    private void powerMultiPressAction(long eventTime, boolean interactive, int behavior) {
+    private void powerMultiPressAction(
+            int displayId, long eventTime, boolean interactive, int behavior) {
         switch (behavior) {
             case MULTI_PRESS_POWER_NOTHING:
                 break;
             case MULTI_PRESS_POWER_BRIGHTNESS_BOOST:
                 Slog.i(TAG, "Starting brightness boost.");
                 if (!interactive) {
-                    wakeUpFromWakeKey(eventTime, KEYCODE_POWER, /* isDown= */ false);
+                    wakeUpFromWakeKey(displayId, eventTime, KEYCODE_POWER, /* isDown= */ false);
                 }
                 mPowerManager.boostScreenBrightness(eventTime);
                 break;
@@ -2455,7 +2466,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         // register for Bluetooth HID profile broadcasts.
         filter = new IntentFilter(ACTION_CONNECTION_STATE_CHANGED);
-        mContext.registerReceiver(mBluetoothHidReceiver, filter);
+        mContext.registerReceiverForAllUsers(mBluetoothHidReceiver, filter, null, null);
 
         mVibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
 
@@ -2656,7 +2667,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             switch (event.getType()) {
                 case SINGLE_KEY_GESTURE_TYPE_PRESS:
                     if (event.getPressCount() == 1) {
-                        mBackKeyHandled |= backKeyPress();
+                        mBackKeyHandled |= backKeyPress(event.getDisplayId());
                     }
                     break;
                 case SINGLE_KEY_GESTURE_TYPE_LONG_PRESS:
@@ -4577,7 +4588,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     mBackKeyHandled = false;
                 } else {
                     if (!hasLongPressOnBackBehavior()) {
-                        mBackKeyHandled |= backKeyPress();
+                        mBackKeyHandled |= backKeyPress(event.getDisplayId());
                     }
                     // Don't pass back press to app if we've already handled it via long press
                     if (mBackKeyHandled) {
@@ -5295,7 +5306,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     BroadcastReceiver mBluetoothHidReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (bluetoothWakeupStateCheck() && !SystemProperties.getBoolean(
+            if (!SystemProperties.getBoolean(
                     "bluetooth.power.suspend.hid_wake_up.enabled", false)) {
                 Slog.d(TAG, "Bluetooth HID wake up disabled.");
                 return;
@@ -5305,8 +5316,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 Integer prevState = (Integer) intent.getExtra(
                         BluetoothProfile.EXTRA_PREVIOUS_STATE);
                 final boolean interactive = mDefaultDisplayPolicy.isAwake();
-                if (bluetoothWakeupStateCheck()
-                        && (newState == null || prevState == null || prevState.equals(newState))) {
+                if (newState == null || prevState == null || prevState.equals(newState)) {
                     if (DEBUG_WAKEUP) {
                         Slog.w(TAG, "Bluetooth connection state does not change: " + intent);
                     }
@@ -5348,10 +5358,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // We only care about default and default-adjacent groups
         if (displayGroupId != Display.DEFAULT_DISPLAY_GROUP
                 && !mPowerManagerInternal.isDefaultGroupAdjacent(displayGroupId)) {
-            if (com.android.server.power.feature.flags.Flags.extraLoggingSeparateTimeout()) {
-                Slog.i(TAG, "Not signalling isReadyToSignalSleep because it's a non default "
-                        + "adjacent group " + displayGroupId);
-            }
             return false;
         }
 
@@ -5359,15 +5365,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 !mPowerManagerInternal.isAnyDefaultAdjacentGroupInteractive();
         boolean isDefaultGroupNonInteractive =
                 !mPowerManagerInternal.isGroupInteractive(Display.DEFAULT_DISPLAY_GROUP);
-        if (com.android.server.power.feature.flags.Flags.extraLoggingSeparateTimeout()) {
-            Slog.i(TAG, "Started going to sleep check status for group " + displayGroupId
-                    + " : "
-                    + (areAllDefaultAdjacentGroupsNonInteractive && isDefaultGroupNonInteractive)
-                    + " areAllDefaultAdjacentGroupsNonInteractive "
-                    + areAllDefaultAdjacentGroupsNonInteractive
-                    + " isDefaultGroupNonInteractive "
-                    + isDefaultGroupNonInteractive);
-        }
         return areAllDefaultAdjacentGroupsNonInteractive && isDefaultGroupNonInteractive;
     }
 
@@ -5444,16 +5441,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         setPendingSleepingGroup(displayGroupId);
 
         if (mKeyguardDelegate != null) {
-            if (com.android.server.power.feature.flags.Flags.extraLoggingSeparateTimeout()) {
-                Slog.i(TAG, "Notifying keyguard about onGoingToSleep displayGroupId "
-                        + displayGroupId);
-            }
             mKeyguardDelegate.onStartedGoingToSleep(pmSleepReason);
-        } else {
-            if (com.android.server.power.feature.flags.Flags.extraLoggingSeparateTimeout()) {
-                Slog.i(TAG, "Not notifying keyguard about onGoingToSleep displayGroupId "
-                        + displayGroupId);
-            }
         }
     }
 
@@ -5579,18 +5567,21 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return;
         }
         wakeUpFromWakeKey(
+                event.getDisplayId(),
                 event.getEventTime(),
                 event.getKeyCode(),
                 event.getAction() == KeyEvent.ACTION_DOWN);
     }
 
-    private void wakeUpFromWakeKey(long eventTime, int keyCode, boolean isDown) {
-        if (mWindowWakeUpPolicy.wakeUpFromKey(DEFAULT_DISPLAY, eventTime, keyCode, isDown)) {
+    private void wakeUpFromWakeKey(
+            int eventDisplayId, long eventTime, int keyCode, boolean isDown) {
+        final int displayId = useEventDisplayIdForKeyWakeup() ? eventDisplayId : DEFAULT_DISPLAY;
+        if (mWindowWakeUpPolicy.wakeUpFromKey(displayId, eventTime, keyCode, isDown)) {
             final boolean keyCanLaunchHome = keyCode == KEYCODE_HOME || keyCode == KEYCODE_POWER;
             // Start HOME with "reason" extra if sleeping for more than mWakeUpToLastStateTimeout
             if (shouldWakeUpWithHomeIntent() &&  keyCanLaunchHome) {
                 startDockOrHome(
-                        DEFAULT_DISPLAY,
+                        displayId,
                         /*fromHomeKey*/ keyCode == KEYCODE_HOME,
                         /*wakenFromDreams*/ true,
                         "Wake from " + KeyEvent. keyCodeToString(keyCode));

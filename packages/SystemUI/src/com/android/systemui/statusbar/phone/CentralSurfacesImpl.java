@@ -82,6 +82,7 @@ import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
 import android.view.accessibility.AccessibilityManager;
 import android.widget.DateTimeView;
+import android.window.IRemoteTransition;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.Lifecycle;
@@ -152,14 +153,12 @@ import com.android.systemui.plugins.PluginManager;
 import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.power.domain.interactor.PowerInteractor;
-import com.android.systemui.qs.QSFragmentLegacy;
 import com.android.systemui.qs.composefragment.QSFragmentCompose;
 import com.android.systemui.res.R;
 import com.android.systemui.scene.domain.interactor.WindowRootViewVisibilityInteractor;
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.scrim.ScrimView;
 import com.android.systemui.settings.UserTracker;
-import com.android.systemui.settings.brightness.BrightnessSliderController;
 import com.android.systemui.settings.brightness.data.repository.BrightnessMirrorShowingRepository;
 import com.android.systemui.shade.CameraLauncher;
 import com.android.systemui.shade.GlanceableHubContainerController;
@@ -210,7 +209,6 @@ import com.android.systemui.statusbar.notification.stack.NotificationStackScroll
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
 import com.android.systemui.statusbar.phone.dagger.StatusBarPhoneModule;
 import com.android.systemui.statusbar.policy.BatteryController;
-import com.android.systemui.statusbar.policy.BrightnessMirrorController;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
@@ -363,7 +361,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final PhoneStatusBarPolicy mIconPolicy;
 
     private final VolumeComponent mVolumeComponent;
-    private BrightnessMirrorController mBrightnessMirrorController;
     private boolean mBrightnessMirrorVisible;
     private BiometricUnlockController mBiometricUnlockController;
     private final LightBarController mLightBarController;
@@ -437,7 +434,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final NotificationGutsManager mGutsManager;
     private final ShadeExpansionStateManager mShadeExpansionStateManager;
     private final KeyguardViewMediator mKeyguardViewMediator;
-    private final BrightnessSliderController.Factory mBrightnessSliderFactory;
     private final FeatureFlags mFeatureFlags;
     private final FragmentService mFragmentService;
     private final ScreenOffAnimationController mScreenOffAnimationController;
@@ -680,7 +676,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             DemoModeController demoModeController,
             Lazy<NotificationShadeDepthController> notificationShadeDepthControllerLazy,
             ShadeTouchableRegionManager shadeTouchableRegionManager,
-            BrightnessSliderController.Factory brightnessSliderFactory,
             ScreenOffAnimationController screenOffAnimationController,
             WallpaperController wallpaperController,
             StatusBarHideIconsForBouncerManager statusBarHideIconsForBouncerManager,
@@ -784,7 +779,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mUserInfoControllerImpl = userInfoControllerImpl;
         mIconPolicy = phoneStatusBarPolicy;
         mDemoModeController = demoModeController;
-        mBrightnessSliderFactory = brightnessSliderFactory;
         mWallpaperController = wallpaperController;
         mStatusBarSignalPolicy = statusBarSignalPolicy;
         mStatusBarHideIconsForBouncerManager = statusBarHideIconsForBouncerManager;
@@ -1289,19 +1283,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                             .withPlugin(QS.class)
                             .withDefault(this::createDefaultQSFragment)
                             .build());
-            mBrightnessMirrorController = new BrightnessMirrorController(
-                    getNotificationShadeWindowView(),
-                    mShadeSurface,
-                    mNotificationShadeDepthControllerLazy.get(),
-                    mBrightnessSliderFactory,
-                    this::setBrightnessMirrorShowing);
-            fragmentHostManager.addTagListener(QS.TAG, (tag, f) -> {
-                QS qs = (QS) f;
-                if (qs instanceof QSFragmentLegacy) {
-                    QSFragmentLegacy qsFragment = (QSFragmentLegacy) qs;
-                    qsFragment.setBrightnessMirrorController(mBrightnessMirrorController);
-                }
-            });
         }
 
         mReportRejectedTouch = getNotificationShadeWindowView()
@@ -1937,9 +1918,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             if (mShadeSurface != null) {
                 mShadeSurface.updateResources();
             }
-        }
-        if (mBrightnessMirrorController != null) {
-            mBrightnessMirrorController.updateResources();
         }
         if (mStatusBarKeyguardViewManager != null) {
             mStatusBarKeyguardViewManager.updateResources();
@@ -2965,19 +2943,12 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
         @Override
         public void onDensityOrFontScaleChanged() {
-            // TODO: Remove this.
-            if (mBrightnessMirrorController != null) {
-                mBrightnessMirrorController.onDensityOrFontScaleChanged();
-            }
             // TODO: Bring these out of CentralSurfaces.
             mUserInfoControllerImpl.onDensityOrFontScaleChanged();
         }
 
         @Override
         public void onThemeChanged() {
-            if (mBrightnessMirrorController != null) {
-                mBrightnessMirrorController.onOverlayChanged();
-            }
             // We need the new R.id.keyguard_indication_area before recreating
             // mKeyguardIndicationController
             mShadeSurface.onThemeChanged();
@@ -2987,13 +2958,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             }
             if (mAmbientIndicationContainer instanceof AutoReinflateContainer) {
                 ((AutoReinflateContainer) mAmbientIndicationContainer).inflateLayout();
-            }
-        }
-
-        @Override
-        public void onUiModeChanged() {
-            if (mBrightnessMirrorController != null) {
-                mBrightnessMirrorController.onUiModeChanged();
             }
         }
     };
@@ -3083,7 +3047,19 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 }
 
                 @Override
-                public void hideKeyguardWithAnimation(IRemoteAnimationRunner runner) {
+                public void hideKeyguardWithAnimation(@Nullable IRemoteTransition transition) {
+                    // We post to the main thread for 2 reasons:
+                    //   1. KeyguardViewMediator is not thread-safe.
+                    //   2. To ensure that ViewMediatorCallback#keyguardDonePending is called before
+                    //      ViewMediatorCallback#readyForKeyguardDone. The wrong order could occur
+                    //      when doing
+                    //      dismissKeyguardThenExecute { hideKeyguardWithAnimation(transition) }.
+                    mMainExecutor.execute(
+                            () -> mKeyguardViewMediator.hideWithAnimation(transition));
+                }
+
+                @Override
+                public void hideKeyguardWithAnimation(@Nullable IRemoteAnimationRunner runner) {
                     // We post to the main thread for 2 reasons:
                     //   1. KeyguardViewMediator is not thread-safe.
                     //   2. To ensure that ViewMediatorCallback#keyguardDonePending is called before
@@ -3108,14 +3084,14 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             new ActivityTransitionAnimator.Listener() {
                 @Override
                 public void onTransitionAnimationStart() {
-                    if (!Flags.notificationShadeBlur() || !Flags.moveTransitionAnimationLayer()) {
+                    if (!Flags.notificationShadeBlur()) {
                         mKeyguardViewMediator.setBlursDisabledForAppLaunch(true);
                     }
                 }
 
                 @Override
                 public void onTransitionAnimationProgress(float linearProgress) {
-                    if (Flags.notificationShadeBlur() && Flags.moveTransitionAnimationLayer()) {
+                    if (Flags.notificationShadeBlur()) {
                         mNotificationShadeDepthControllerLazy.get()
                                 .onTransitionAnimationProgress(linearProgress);
                     }
@@ -3123,7 +3099,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
                 @Override
                 public void onTransitionAnimationEnd() {
-                    if (Flags.notificationShadeBlur() && Flags.moveTransitionAnimationLayer()) {
+                    if (Flags.notificationShadeBlur()) {
                         mNotificationShadeDepthControllerLazy.get()
                                 .onTransitionAnimationEnd();
                     } else {

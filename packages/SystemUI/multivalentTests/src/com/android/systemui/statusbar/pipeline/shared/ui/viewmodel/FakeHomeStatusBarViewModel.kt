@@ -70,6 +70,8 @@ class FakeHomeStatusBarViewModel(
 
     override fun onNotificationIconChipClicked() {}
 
+    override fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int) {}
+
     override val ongoingActivityChipsLegacy =
         MutableStateFlow(MultipleOngoingActivityChipsModelLegacy())
 
@@ -170,6 +172,15 @@ class FakeHomeStatusBarViewModel(
         hydrator.hydratedStateOf(
             traceName = "areaDark",
             source = desktopStatusBarEnabledSource,
+            initialValue = false,
+        )
+
+    val hasStatusBarNotificationsSource = MutableStateFlow(false)
+
+    override val hasStatusBarNotifications: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "hasStatusBarNotifications",
+            source = hasStatusBarNotificationsSource,
             initialValue = false,
         )
 

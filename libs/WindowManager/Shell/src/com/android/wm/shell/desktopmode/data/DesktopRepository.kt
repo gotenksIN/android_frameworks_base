@@ -72,8 +72,8 @@ class DesktopRepository(
     /* Tracks corner/caption regions of desktop tasks, used to determine gesture exclusion. */
     private val desktopExclusionRegions = SparseArray<Region>()
 
-    /* Tracks last bounds of task before toggled to stable bounds. */
-    private val boundsBeforeMaximizeByTaskId = SparseArray<Rect>()
+    /* Tracks previous bounds of the task right before being snapped or maximized. */
+    private val boundsBeforeSnapOrMaximizeByTaskId = SparseArray<Rect>()
 
     /* Tracks last bounds of task before it is minimized. */
     private val boundsBeforeMinimizeByTaskId = SparseArray<Rect>()
@@ -118,6 +118,10 @@ class DesktopRepository(
                 }
             }
     }
+
+    /** Returns true if the task has previous bounds. */
+    fun hasBoundsBeforeSnapOrMaximize(taskInfo: ActivityManager.RunningTaskInfo): Boolean =
+        taskInfo.taskId in boundsBeforeSnapOrMaximizeByTaskId
 
     /** Updates tasks changes on all the active task listeners for given display id. */
     private fun updateActiveTasksListeners(displayId: Int) {
@@ -628,7 +632,7 @@ class DesktopRepository(
 
     fun isActiveTask(taskId: Int) = desksSequence().any { taskId in it.activeTasks }
 
-    @VisibleForTesting
+    /** Returns whether the given task is active in the given desk. */
     fun isActiveTaskInDesk(taskId: Int, deskId: Int): Boolean {
         val desk = desktopData.getDesk(deskId) ?: return false
         return taskId in desk.activeTasks
@@ -842,6 +846,9 @@ class DesktopRepository(
             desk.visibleTasks.remove(taskId)
         }
         taskBounds?.let { desk.boundsByTaskId[taskId] = it }
+        boundsBeforeSnapOrMaximizeByTaskId.get(taskId)?.let {
+            desk.boundsBeforeSnapOrMaximizeByTaskId[taskId] = it
+        }
         if (desk.transientDesk) return
         val newCount = getVisibleTaskCountInDesk(deskId)
         if (prevCount != newCount) {
@@ -943,8 +950,7 @@ class DesktopRepository(
             val hasTopTransparentFullscreenTask =
                 getTopTransparentFullscreenTaskData(desk.deskId) != null
             if (
-                DesktopModeFlags.INCLUDE_TOP_TRANSPARENT_FULLSCREEN_TASK_IN_DESKTOP_HEURISTIC
-                    .isTrue && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_MODALS_POLICY.isTrue
+                DesktopModeFlags.INCLUDE_TOP_TRANSPARENT_FULLSCREEN_TASK_IN_DESKTOP_HEURISTIC.isTrue
             ) {
                 logD(
                     "isAnyDeskActive: hasVisibleTasks=%s hasTopTransparentFullscreenTask=%s",
@@ -1086,11 +1092,12 @@ class DesktopRepository(
         // TODO: b/362720497 - consider not clearing bounds on any removal, such as when moving
         //  it between desks. It might be better to allow restoring to the previous bounds as long
         //  as they're valid (probably valid if in the same display).
-        boundsBeforeMaximizeByTaskId.remove(taskId)
+        boundsBeforeSnapOrMaximizeByTaskId.remove(taskId)
         boundsBeforeFullImmersiveByTaskId.remove(taskId)
         val desk = desktopData.getDesk(deskId) ?: return
         if (desk.freeformTasksInZOrder.remove(taskId)) {
             desk.boundsByTaskId.remove(taskId)
+            desk.boundsBeforeSnapOrMaximizeByTaskId.remove(taskId)
             logD(
                 "Remaining freeform tasks in desk: %d, tasks: %s",
                 desk.deskId,
@@ -1183,13 +1190,21 @@ class DesktopRepository(
         }
     }
 
-    /** Removes and returns the bounds saved before maximizing the given task. */
-    fun removeBoundsBeforeMaximize(taskId: Int): Rect? =
-        boundsBeforeMaximizeByTaskId.removeReturnOld(taskId)
+    /** Removes and returns the bounds saved before snapping or maximizing the given task. */
+    fun removeBoundsBeforeSnapOrMaximize(taskId: Int): Rect? =
+        boundsBeforeSnapOrMaximizeByTaskId.removeReturnOld(taskId)
 
-    /** Saves the bounds of the given task before maximizing. */
-    fun saveBoundsBeforeMaximize(taskId: Int, bounds: Rect) =
-        boundsBeforeMaximizeByTaskId.set(taskId, Rect(bounds))
+    /**
+     * Saves the bounds of the given task before snapping or maximizing if there is no existence for
+     * the given taskId.
+     *
+     * This prevents unwanted overwrites.
+     */
+    fun saveBoundsBeforeSnapOrMaximize(taskId: Int, bounds: Rect) {
+        if (taskId !in boundsBeforeSnapOrMaximizeByTaskId) {
+            boundsBeforeSnapOrMaximizeByTaskId.set(taskId, Rect(bounds))
+        }
+    }
 
     /** Removes and returns the bounds saved before minimizing the given task. */
     fun removeBoundsBeforeMinimize(taskId: Int): Rect? =

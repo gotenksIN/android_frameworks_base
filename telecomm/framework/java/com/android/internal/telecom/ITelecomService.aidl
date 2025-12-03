@@ -24,7 +24,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.UserHandle;
 import android.telecom.PhoneAccount;
-import android.content.pm.ParceledListSlice;
+import com.android.modules.utils.ParceledListSlice;
 import android.telecom.CallAttributes;
 import com.android.internal.telecom.ICallEventCallback;
 
@@ -451,4 +451,41 @@ interface ITelecomService {
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)")
      void setVoipCallLogIntegrationEnabled(in String callingPackage, in String packageName,
          in boolean enabled);
+
+    /**
+     * @see TelecomServiceImpl#setTestLocalVoicemailService
+     */
+    void setTestLocalVoicemailService(in String packageName);
+
+    /**
+     * @see TelecomServiceImpl#isLocalVoicemailSupported
+     */
+    boolean isLocalVoicemailSupported(in String packageName);
+
+    /**
+     * @see TelecomServiceImpl#enableLocalVoicemailTimeout
+     */
+    void enableLocalVoicemail(in String packageName, in PhoneAccountHandle phoneAccountHandle,
+        long timeout);
+
+    /**
+     * @see TelecomServiceImpl# disableLocalVoicemail
+     */
+    void disableLocalVoicemail(in String packageName, in PhoneAccountHandle phoneAccountHandle);
+
+    /**
+     * @see TelecomServiceImpl#getLocalVoicemailTimeout
+     */
+    long getLocalVoicemailTimeout(in String packageName, in PhoneAccountHandle phoneAccountHandle);
+
+    /**
+     * @see TelecomServiceImpl#setTestOemCallScreeningService
+     */
+    void setTestOemCallScreeningService(in ComponentName componentName);
+
+    /**
+     * @see TelecomServiceImpl#isLocalVoicemailEnabled
+     */
+    boolean isLocalVoicemailEnabled(in String packageName,
+        in PhoneAccountHandle phoneAccountHandle);
 }

@@ -12,16 +12,6 @@ flag {
 }
 
 flag {
-  name: "remove_get_dimmer"
-  namespace: "windowing_frontend"
-  description: "Clean up old usages of dimmer"
-  bug: "435301249"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "release_all_transition_surfaces"
   namespace: "windowing_frontend"
   description: "Reduce offscreen layers which rely on GC to release"
@@ -74,17 +64,6 @@ flag {
 }
 
 flag {
-  name: "do_not_force_wallpaper_for_freeform_task"
-  namespace: "windowing_frontend"
-  description: "Remove legacy condition to reduce overhead"
-  bug: "433694978"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "rank_task_layer_with_window_layout"
   namespace: "windowing_frontend"
   description: "Reduce lock contention of display thread"
@@ -120,6 +99,26 @@ flag {
 }
 
 flag {
+  name: "disable_opt_out_universal_resizable_by_default"
+  namespace: "windowing_frontend"
+  description: "Disable opt out universal resizability on large screen since target SDK 37"
+  bug: "447301631"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "skip_add_recents_to_sync_set"
+  namespace: "windowing_frontend"
+  description: "Reduce recents transition latency"
+  bug: "451795568"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "reduce_unnecessary_schedule_idle_msg"
   namespace: "windowing_frontend"
   description: "Reduce lock contention on display thread"
@@ -144,16 +143,6 @@ flag {
   namespace: "windowing_frontend"
   description: "Show the app handle and the app menu also on large screens that don't enable desktop mode"
   bug: "377689543"
-}
-
-flag {
-  name: "app_handle_no_relayout_on_exclusion_change"
-  namespace: "windowing_frontend"
-  description: "Remove unnecessary relayouts for app handle when exclusion regions change"
-  bug: "383672263"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -185,16 +174,6 @@ flag {
   is_fixed_read_only: true
   metadata {
       purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "keyguard_remove_default_display_usage"
-  namespace: "windowing_frontend"
-  description: "Execute transitions on affected DisplayContent(s) instead of Default DisplayContent"
-  bug: "430227391"
-  metadata {
-    purpose: PURPOSE_BUGFIX
   }
 }
 
@@ -245,11 +224,31 @@ flag {
 }
 
 flag {
+    name: "handle_repeated_display_switches"
+    namespace: "windowing_frontend"
+    description: "Ensures that we wait for the last transition when doing repeated fold/unfolds"
+    bug: "416255987"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
   name: "relative_insets"
   namespace: "windowing_frontend"
   description: "Support insets definition and calculation relative to task bounds."
   bug: "277292497"
   is_fixed_read_only: true
+}
+
+flag {
+  name: "prevent_scheduling_redundant_frame"
+  namespace: "windowing_frontend"
+  description: "Prevent scheduling redundant frames for insets animation"
+  bug: "446575234"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -325,16 +324,6 @@ flag {
 }
 
 flag {
-    name: "predictive_back_delay_wm_transition"
-    namespace: "windowing_frontend"
-    description: "Separate the predictive back transition request from start navigation"
-    bug: "301195601"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "predictive_back_intercept_transition"
     namespace: "windowing_frontend"
     description: "Allows back gesture to intercept a running transition."
@@ -394,16 +383,6 @@ flag {
 }
 
 flag {
-    name: "predictive_back_callback_cancellation_fix"
-    namespace: "windowing_frontend"
-    description: "Fixes a bug that caused the wrong callback to receive onBackCancelled sometimes"
-    bug: "420650888"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "excluding_layer_from_task_snapshot"
     namespace: "windowing_frontend"
     description: "Supports excluding non-window layers from being included in a task snapshot."
@@ -418,16 +397,6 @@ flag {
     namespace: "windowing_frontend"
     description: "Use a fallback transition-player while sysui is starting or crashed."
     bug: "365884835"
-}
-
-flag {
-    name: "update_task_crop_in_sync"
-    namespace: "windowing_frontend"
-    description: "Fixes a bug where we fail to update task crops during transitions"
-    bug: "410684072"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -474,3 +443,22 @@ flag {
     }
 }
 
+flag {
+    name: "sleep_wake_transitions"
+    namespace: "windowing_frontend"
+    description: "Make the rest of sleep/wake situations into transitions."
+    bug: "423701190"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "choosing_visible_as_wallpaper_target"
+    namespace: "windowing_frontend"
+    description: "Prefer choosing a visible window as wallpaper target."
+    bug: "446629055"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}

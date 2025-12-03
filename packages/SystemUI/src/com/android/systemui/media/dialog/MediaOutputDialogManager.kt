@@ -25,9 +25,6 @@ import com.android.internal.logging.UiEventLogger
 import com.android.systemui.animation.DialogCuj
 import com.android.systemui.animation.DialogTransitionAnimator
 import com.android.systemui.broadcast.BroadcastSender
-import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.dagger.qualifiers.Main
-import java.util.concurrent.Executor
 import javax.inject.Inject
 
 /** Manager to create and show a [MediaOutputDialog]. */
@@ -40,9 +37,6 @@ constructor(
     private val dialogTransitionAnimator: DialogTransitionAnimator,
     private val mediaSwitchingControllerFactory: MediaSwitchingController.Factory,
 ) {
-    @Inject @Main lateinit var mainExecutor: Executor
-    @Inject @Background lateinit var backgroundExecutor: Executor
-
     companion object {
         const val INTERACTION_JANK_TAG = "media_output"
         var mediaOutputDialog: MediaOutputDialog? = null
@@ -88,6 +82,7 @@ constructor(
         userHandle: UserHandle? = null,
         token: MediaSession.Token? = null,
         onDialogEventListener: MediaOutputDialog.OnDialogEventListener? = null,
+        mediaSwitchingType: MediaSwitchingType? = null,
     ) {
         createAndShow(
             packageName,
@@ -97,12 +92,14 @@ constructor(
             userHandle = userHandle,
             token = token,
             onDialogEventListener = onDialogEventListener,
+            mediaSwitchingType = mediaSwitchingType,
         )
     }
 
     open fun createAndShowForSystemRouting(
         controller: DialogTransitionAnimator.Controller? = null,
         onDialogEventListener: MediaOutputDialog.OnDialogEventListener? = null,
+        mediaSwitchingType: MediaSwitchingType? = null,
     ) {
         createAndShow(
             packageName = null,
@@ -111,6 +108,7 @@ constructor(
             includePlaybackAndAppMetadata = false,
             userHandle = null,
             onDialogEventListener = onDialogEventListener,
+            mediaSwitchingType = mediaSwitchingType,
         )
     }
 
@@ -125,11 +123,18 @@ constructor(
         userHandle: UserHandle? = null,
         token: MediaSession.Token? = null,
         onDialogEventListener: MediaOutputDialog.OnDialogEventListener? = null,
+        mediaSwitchingType: MediaSwitchingType? = null,
     ) {
         // Dismiss the previous dialog, if any.
         mediaOutputDialog?.dismiss()
 
-        val controller = mediaSwitchingControllerFactory.create(packageName, userHandle, token)
+        val controller =
+            mediaSwitchingControllerFactory.create(
+                packageName,
+                userHandle,
+                token,
+                mediaSwitchingType,
+            )
 
         val mediaOutputDialog =
             MediaOutputDialog(
@@ -139,8 +144,6 @@ constructor(
                 controller,
                 dialogTransitionAnimator,
                 uiEventLogger,
-                mainExecutor,
-                backgroundExecutor,
                 includePlaybackAndAppMetadata,
                 onDialogEventListener,
             )

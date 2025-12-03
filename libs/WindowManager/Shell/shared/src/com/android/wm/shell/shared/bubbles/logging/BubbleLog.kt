@@ -18,7 +18,10 @@ package com.android.wm.shell.shared.bubbles.logging
 
 import android.util.Log
 import androidx.annotation.VisibleForTesting
+import com.android.wm.shell.shared.bubbles.logging.BubbleLog.addLogger
+import com.android.wm.shell.shared.bubbles.logging.BubbleLog.dump
 import java.io.PrintWriter
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Logs debug events related to bubbles.
@@ -34,8 +37,9 @@ object BubbleLog {
 
     const val TAG = "BubbleLog"
 
-    private val bubbleEventHistoryLogger = BubbleEventHistoryLogger()
-    @VisibleForTesting val loggers = mutableListOf<DebugLogger>(bubbleEventHistoryLogger)
+    @VisibleForTesting val bubbleEventHistoryLogger = BubbleEventHistoryLogger()
+    @VisibleForTesting
+    var loggers = CopyOnWriteArrayList<DebugLogger>().apply { add(bubbleEventHistoryLogger) }
 
     /**
      * Adds a new [DebugLogger] to the list of loggers used by this class.
@@ -85,13 +89,26 @@ object BubbleLog {
         logSafelyForAllLoggers { logger -> logger.e(message, *parameters, eventData = eventData) }
     }
 
+    /** Logs a record to be printed on the [dump] only */
+    @JvmOverloads
+    @JvmStatic
+    fun record(message: String, vararg parameters: Any? = emptyArray(), eventData: String? = null) {
+        performSafely("Exception while logging for history logger") {
+            bubbleEventHistoryLogger.record(message, *parameters, eventData = eventData)
+        }
+    }
+
     private inline fun logSafelyForAllLoggers(logFunction: (DebugLogger) -> Unit) {
         for (logger in loggers) {
-            try {
-                logFunction.invoke(logger)
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception while logging for $logger", e)
-            }
+            performSafely("Exception while logging for $logger") { logFunction.invoke(logger) }
+        }
+    }
+
+    private inline fun performSafely(errorMessage: String, action: () -> Unit) {
+        try {
+            action.invoke()
+        } catch (e: Exception) {
+            Log.e(TAG, errorMessage, e)
         }
     }
 

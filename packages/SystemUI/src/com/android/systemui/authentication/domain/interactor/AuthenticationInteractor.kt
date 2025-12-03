@@ -32,9 +32,6 @@ import com.android.systemui.authentication.shared.model.AuthenticationWipeModel.
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.log.table.TableLogBuffer
-import com.android.systemui.log.table.logDiffsForTable
-import com.android.systemui.scene.domain.SceneFrameworkTableLog
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor
 import com.android.systemui.util.time.SystemClock
 import javax.inject.Inject
@@ -69,7 +66,6 @@ constructor(
     @Background private val backgroundDispatcher: CoroutineDispatcher,
     private val repository: AuthenticationRepository,
     private val selectedUserInteractor: SelectedUserInteractor,
-    @SceneFrameworkTableLog private val tableLogBuffer: TableLogBuffer,
 ) {
     /**
      * The currently-configured authentication method. This determines how the authentication
@@ -89,11 +85,7 @@ constructor(
      * `true` even when the lockscreen is showing and still needs to be dismissed by the user to
      * proceed.
      */
-    val authenticationMethod: Flow<AuthenticationMethodModel> =
-        repository.authenticationMethod.logDiffsForTable(
-            tableLogBuffer = tableLogBuffer,
-            initialValue = AuthenticationMethodModel.None,
-        )
+    val authenticationMethod: StateFlow<AuthenticationMethodModel> = repository.authenticationMethod
 
     /**
      * Whether the auto confirm feature is enabled for the currently-selected user.
@@ -281,9 +273,13 @@ constructor(
         return repository.getMaximumTimeToLock()
     }
 
-    /** Returns `true` if the power button should instantly lock the device, `false` otherwise. */
-    suspend fun getPowerButtonInstantlyLocks(): Boolean {
-        return !getAuthenticationMethod().isSecure || repository.getPowerButtonInstantlyLocks()
+    /**
+     * Returns `true` if the power button should instantly lock the device, `false` otherwise.
+     *
+     * WARNING: This causes a blocking IPC to LockPatternUtils (b/446735679).
+     */
+    fun getPowerButtonInstantlyLocks(): Boolean {
+        return repository.getPowerButtonInstantlyLocks()
     }
 
     private suspend fun shouldSkipAuthenticationAttempt(

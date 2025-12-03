@@ -19,30 +19,37 @@ package android.companion.virtual.computercontrol;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.notNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertThrows;
 
 import android.content.ComponentName;
+import android.content.Context;
 import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.IDisplayManager;
-import android.hardware.display.IVirtualDisplayCallback;
-import android.hardware.input.VirtualKeyEvent;
-import android.hardware.input.VirtualTouchEvent;
 import android.os.RemoteException;
+import android.util.Size;
 import android.view.DisplayInfo;
-import android.view.KeyEvent;
-import android.view.Surface;
+import android.view.accessibility.AccessibilityManager;
+import android.view.accessibility.IAccessibilityManager;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+
+import java.util.concurrent.Executor;
 
 @RunWith(AndroidJUnit4.class)
 public class ComputerControlSessionTest {
@@ -58,9 +65,11 @@ public class ComputerControlSessionTest {
     @Mock
     private IDisplayManager mDisplayManager;
     @Mock
-    private IVirtualDisplayCallback mVirtualDisplayCallback;
+    private IAccessibilityManager mAccessibilityManager;
     @Mock
-    private IInteractiveMirrorDisplay mMockInteractiveMirrorDisplay;
+    private IInteractiveMirror mMockInteractiveMirror;
+    @Mock
+    private Runnable mMockOnClosedRunnable;
 
     private ComputerControlSession mSession;
 
@@ -73,8 +82,13 @@ public class ComputerControlSessionTest {
         displayInfo.logicalWidth = WIDTH;
         displayInfo.logicalHeight = HEIGHT;
         when(mDisplayManager.getDisplayInfo(DISPLAY_ID)).thenReturn(displayInfo);
-        mSession = new ComputerControlSession(DISPLAY_ID, mVirtualDisplayCallback, mMockSession,
-                new DisplayManagerGlobal(mDisplayManager));
+
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        AccessibilityManager accessibilityManager = new AccessibilityManager(
+                context, context.getMainThreadHandler(), mAccessibilityManager, 0, true);
+
+        mSession = new ComputerControlSession(DISPLAY_ID, mMockSession, accessibilityManager,
+                mMockOnClosedRunnable, new DisplayManagerGlobal(mDisplayManager));
     }
 
     @After
@@ -83,24 +97,8 @@ public class ComputerControlSessionTest {
     }
 
     @Test
-    public void setsVirtualDisplaySurface() throws RemoteException {
-        verify(mDisplayManager).setVirtualDisplaySurface(eq(mVirtualDisplayCallback), any());
-    }
-
-    @Test
-    public void getVirtualDisplayId_returnsId() throws RemoteException {
-        when(mMockSession.getVirtualDisplayId()).thenReturn(DISPLAY_ID);
-        assertThat(mSession.getVirtualDisplayId()).isEqualTo(DISPLAY_ID);
-    }
-
-    @Test
-    public void sendKeyEvent_sendsEvent() throws RemoteException {
-        VirtualKeyEvent keyEvent = new VirtualKeyEvent.Builder()
-                .setAction(VirtualKeyEvent.ACTION_DOWN)
-                .setKeyCode(KeyEvent.KEYCODE_A)
-                .build();
-        mSession.sendKeyEvent(keyEvent);
-        verify(mMockSession).sendKeyEvent(eq(keyEvent));
+    public void constructor_initializesSession() throws RemoteException {
+        verify(mMockSession).initialize(notNull(), notNull());
     }
 
     @Test
@@ -116,25 +114,16 @@ public class ComputerControlSessionTest {
     }
 
     @Test
-    public void sendTouchEvent_sendsEvent() throws RemoteException {
-        VirtualTouchEvent touchEvent = new VirtualTouchEvent.Builder()
-                .setPointerId(0)
-                .setToolType(VirtualTouchEvent.TOOL_TYPE_FINGER)
-                .setAction(VirtualTouchEvent.ACTION_DOWN)
-                .setX(0)
-                .setY(0)
-                .build();
-        mSession.sendTouchEvent(touchEvent);
-        verify(mMockSession).sendTouchEvent(eq(touchEvent));
+    public void createInteractiveMirror_returns() throws RemoteException {
+        when(mMockSession.createInteractiveMirror(any()))
+                .thenReturn(mMockInteractiveMirror);
+        InteractiveMirror mirror = mSession.createInteractiveMirror();
+        assertThat(mirror).isNotNull();
     }
 
     @Test
-    public void createInteractiveMirrorDisplay_returnsDisplay() throws RemoteException {
-        when(mMockSession.createInteractiveMirrorDisplay(eq(WIDTH), eq(HEIGHT), any()))
-                .thenReturn(mMockInteractiveMirrorDisplay);
-        InteractiveMirrorDisplay display =
-                mSession.createInteractiveMirrorDisplay(WIDTH, HEIGHT, new Surface());
-        assertThat(display).isNotNull();
+    public void getDisplaySize_returns() {
+        assertThat(mSession.getDisplaySize()).isEqualTo(new Size(WIDTH, HEIGHT));
     }
 
     @Test
@@ -153,6 +142,12 @@ public class ComputerControlSessionTest {
     public void launchApplication_withComponentName_launchesApplication() throws RemoteException {
         mSession.launchApplication(new ComponentName(TARGET_PACKAGE, TARGET_CLASS));
         verify(mMockSession).launchApplication(TARGET_PACKAGE, TARGET_CLASS);
+    }
+
+    @Test
+    public void handOverApplications_handsOverApplications() throws RemoteException {
+        mSession.handOverApplications();
+        verify(mMockSession).handOverApplications();
     }
 
     @Test
@@ -191,5 +186,54 @@ public class ComputerControlSessionTest {
     public void longPressNotInRange_throws() {
         assertThrows(IllegalArgumentException.class, () -> mSession.longPress(-1, 2));
         assertThrows(IllegalArgumentException.class, () -> mSession.longPress(1, -2));
+    }
+
+    @Test
+    public void setLifecycleCallback_providesLifecycleCallbacks() throws RemoteException {
+        ArgumentCaptor<IComputerControlLifecycleCallback> lifecycleCallbackCaptor =
+                ArgumentCaptor.forClass(IComputerControlLifecycleCallback.class);
+        verify(mMockSession).initialize(lifecycleCallbackCaptor.capture(), notNull());
+        ComputerControlSession.LifecycleCallback mockCallback = Mockito.mock(
+                ComputerControlSession.LifecycleCallback.class);
+
+        mSession.setLifecycleCallback(new TestExecutor(), mockCallback);
+
+        lifecycleCallbackCaptor.getValue().onClosed(123);
+        verify(mockCallback).onClosed(eq(123));
+        verify(mMockOnClosedRunnable).run();
+    }
+
+    @Test
+    public void attachNotificationInfo_attachesNotificationInfo() throws RemoteException {
+        final int notificationId = 5;
+        final String notificationTag = "hello";
+        mSession.attachNotificationInfo(notificationId, notificationTag);
+        verify(mMockSession).attachNotificationInfo(eq(notificationId), eq(notificationTag));
+    }
+
+    @Test
+    public void clearLifecycleCallback_stopsLifecycleCallbacks() throws RemoteException {
+        ArgumentCaptor<IComputerControlLifecycleCallback> lifecycleCallbackCaptor =
+                ArgumentCaptor.forClass(IComputerControlLifecycleCallback.class);
+        verify(mMockSession).initialize(lifecycleCallbackCaptor.capture(), notNull());
+        ComputerControlSession.LifecycleCallback mockCallback = Mockito.mock(
+                ComputerControlSession.LifecycleCallback.class);
+        mSession.setLifecycleCallback(new TestExecutor(), mockCallback);
+
+        mSession.clearLifecycleCallback();
+
+        lifecycleCallbackCaptor.getValue().onClosed(123);
+        verify(mockCallback, never()).onClosed(anyInt());
+        verify(mMockOnClosedRunnable).run();
+    }
+
+    /**
+     * A mock Executor that runs the runnable immediately on the calling thread.
+     */
+    private static final class TestExecutor implements Executor {
+        @Override
+        public void execute(Runnable command) {
+            command.run();
+        }
     }
 }

@@ -36,11 +36,13 @@ import java.util.Optional
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlin.jvm.optionals.getOrNull
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 
 /** Domain logic related to notification icons. */
 class NotificationIconsInteractor
@@ -65,9 +67,7 @@ constructor(
         }
 
     /** Returns a subset of all active notifications based on the supplied filtration parameters. */
-    // TODO(b/444176294): Remove unused forceShowHeadsUp parameter.
     fun filteredNotifSet(
-        forceShowHeadsUp: Boolean = false,
         showAmbient: Boolean = true,
         showLowPriority: Boolean = true,
         showDismissed: Boolean = true,
@@ -235,11 +235,11 @@ constructor(
     iconsInteractor: NotificationIconsInteractor,
     settingsRepository: NotificationListenerSettingsRepository,
 ) {
+    @OptIn(ExperimentalCoroutinesApi::class)
     val statusBarNotifs: Flow<Set<ActiveNotificationIconModel>> =
         settingsRepository.showSilentStatusIcons
             .flatMapLatest { showSilentIcons ->
                 iconsInteractor.filteredNotifSet(
-                    forceShowHeadsUp = true,
                     showAmbient = false,
                     showLowPriority = showSilentIcons,
                     showDismissed = false,
@@ -247,4 +247,8 @@ constructor(
                 )
             }
             .flowOn(bgContext)
+
+    /** Emits `true` whenever there is at least one status bar notification. */
+    val hasStatusBarNotifications: Flow<Boolean> =
+        statusBarNotifs.map { it.isNotEmpty() }.flowOn(bgContext)
 }

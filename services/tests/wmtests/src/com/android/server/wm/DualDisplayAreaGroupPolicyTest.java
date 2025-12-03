@@ -372,8 +372,9 @@ public class DualDisplayAreaGroupPolicyTest extends WindowTestsBase {
     @Test
     public void testPlaceImeContainer_reparentToTargetDisplayAreaGroup() {
         setupImeWindow();
-        final DisplayArea.Tokens imeContainer = mDisplay.getImeContainer();
+        final ImeContainer imeContainer = mDisplay.getImeContainer();
         final WindowToken imeToken = tokenOfType(TYPE_INPUT_METHOD);
+        mDisplay.addWindowToken(imeToken);
 
         // By default, the ime container is attached to DC as defined in DAPolicy.
         assertThat(imeContainer.getRootDisplayArea()).isEqualTo(mDisplay);
@@ -420,8 +421,9 @@ public class DualDisplayAreaGroupPolicyTest extends WindowTestsBase {
     @Test
     public void testPlaceImeContainer_hidesImeWhenParentChanges() {
         setupImeWindow();
-        final DisplayArea.Tokens imeContainer = mDisplay.getImeContainer();
+        final ImeContainer imeContainer = mDisplay.getImeContainer();
         final WindowToken imeToken = tokenOfType(TYPE_INPUT_METHOD);
+        mDisplay.addWindowToken(imeToken);
         final WindowState firstActivityWin = newWindowBuilder("firstActivityWin",
                 TYPE_APPLICATION_STARTING).setWindowToken(mFirstActivity).build();
         spyOn(firstActivityWin);
@@ -453,8 +455,9 @@ public class DualDisplayAreaGroupPolicyTest extends WindowTestsBase {
     @Test
     public void testPlaceImeContainer_skipReparentForOrganizedImeContainer() {
         setupImeWindow();
-        final DisplayArea.Tokens imeContainer = mDisplay.getImeContainer();
+        final ImeContainer imeContainer = mDisplay.getImeContainer();
         final WindowToken imeToken = tokenOfType(TYPE_INPUT_METHOD);
+        mDisplay.addWindowToken(imeToken);
 
         // By default, the ime container is attached to DC as defined in DAPolicy.
         assertThat(imeContainer.getRootDisplayArea()).isEqualTo(mDisplay);
@@ -487,8 +490,9 @@ public class DualDisplayAreaGroupPolicyTest extends WindowTestsBase {
         // Define the DualDisplayArea hierarchy without IME_PLACEHOLDER in DAGs.
         setupDisplay(new DualDisplayTestPolicyProvider(new ArrayList<>(), new ArrayList<>()));
         setupImeWindow();
-        final DisplayArea.Tokens imeContainer = mDisplay.getImeContainer();
+        final ImeContainer imeContainer = mDisplay.getImeContainer();
         final WindowToken imeToken = tokenOfType(TYPE_INPUT_METHOD);
+        mDisplay.addWindowToken(imeToken);
 
         // By default, the ime container is attached to DC as defined in DAPolicy.
         assertThat(imeContainer.getRootDisplayArea()).isEqualTo(mDisplay);
@@ -560,9 +564,9 @@ public class DualDisplayAreaGroupPolicyTest extends WindowTestsBase {
         mDisplay.mInputMethodWindow = imeWindow;
     }
 
+    @NonNull
     private WindowToken tokenOfType(int type) {
-        return new WindowToken.Builder(mWm, new Binder(), type)
-                .setDisplayContent(mDisplay).build();
+        return new WindowToken.Builder(mWm, new Binder(), type).build();
     }
 
     /** Display with two {@link DisplayAreaGroup}. Each of them take half of the screen. */
@@ -687,7 +691,7 @@ public class DualDisplayAreaGroupPolicyTest extends WindowTestsBase {
         @Override
         public DisplayAreaPolicy instantiate(@NonNull WindowManagerService wmService,
                 @NonNull DisplayContent content, @NonNull RootDisplayArea root,
-                @NonNull DisplayArea.Tokens imeContainer) {
+                @NonNull ImeContainer imeContainer) {
             // Root
             // Include FEATURE_TOP_LEVEL_ZOOM because it will be used as the screen rotation layer
             DisplayAreaPolicyBuilder.HierarchyBuilder rootHierarchy =

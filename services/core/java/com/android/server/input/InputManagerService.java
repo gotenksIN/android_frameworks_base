@@ -62,6 +62,7 @@ import android.hardware.input.IKeyGestureHandler;
 import android.hardware.input.IKeyboardBacklightListener;
 import android.hardware.input.IStickyModifierStateListener;
 import android.hardware.input.ITabletModeChangedListener;
+import android.hardware.input.IVirtualGamepad;
 import android.hardware.input.IVirtualInputDevice;
 import android.hardware.input.InputDeviceIdentifier;
 import android.hardware.input.InputGestureData;
@@ -74,6 +75,7 @@ import android.hardware.input.KeyboardLayout;
 import android.hardware.input.KeyboardLayoutSelectionResult;
 import android.hardware.input.TouchCalibration;
 import android.hardware.input.VirtualDpadConfig;
+import android.hardware.input.VirtualGamepadConfig;
 import android.hardware.input.VirtualKeyboardConfig;
 import android.hardware.input.VirtualMouseConfig;
 import android.hardware.input.VirtualNavigationTouchpadConfig;
@@ -378,7 +380,10 @@ public class InputManagerService extends IInputManager.Stub
     private final VirtualInputDeviceController mVirtualInputDeviceController;
 
     // Manages Keyboard modifier keys remapping
-    private final KeyRemapper mKeyRemapper;
+    private final ModifierKeyRemapper mModifierKeyRemapper;
+
+    // Manages Controller remapping
+    private final InputDeviceRemapper mInputDeviceRemapper;
 
     // Manages Keyboard glyphs for specific keyboards
     private final KeyboardGlyphManager mKeyboardGlyphManager;
@@ -571,7 +576,10 @@ public class InputManagerService extends IInputManager.Stub
                 mNative);
         mVirtualInputDeviceController = new VirtualInputDeviceController(
                 mContext, mContext.getMainThreadHandler(), this);
-        mKeyRemapper = new KeyRemapper(mContext, mNative, mDataStore, injector.getLooper());
+        mModifierKeyRemapper = new ModifierKeyRemapper(mContext, mNative, mDataStore,
+                injector.getLooper());
+        mInputDeviceRemapper = new InputDeviceRemapper(mContext, mNative,
+                injector.getLooper());
         mKeyboardGlyphManager = new KeyboardGlyphManager(mContext, injector.getLooper());
         mPointerIconCache = new PointerIconCache(mContext, mNative);
 
@@ -695,7 +703,8 @@ public class InputManagerService extends IInputManager.Stub
         mSysfsNodeMonitor.systemRunning();
         mKeyboardBacklightController.systemRunning();
         mKeyboardLedController.systemRunning();
-        mKeyRemapper.systemRunning();
+        mModifierKeyRemapper.systemRunning();
+        mInputDeviceRemapper.systemRunning();
         mPointerIconCache.systemRunning();
         mKeyboardGlyphManager.systemRunning();
         mKeyGestureController.systemRunning();
@@ -1062,7 +1071,7 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     @NonNull
-    @Override
+    @Override // Binder call
     @EnforcePermission(anyOf = {
             Manifest.permission.INJECT_KEY_EVENTS,
             Manifest.permission.INJECT_EVENTS
@@ -1071,22 +1080,23 @@ public class InputManagerService extends IInputManager.Stub
             @NonNull VirtualKeyboardConfig config) {
         super.createVirtualKeyboard_enforcePermission();
 
-        int displayId = config.getAssociatedDisplayId();
-        if (displayId != Display.INVALID_DISPLAY && displayId != Display.DEFAULT_DISPLAY) {
-            DisplayInfo displayInfo =
-                    mDisplayManagerInternal.getDisplayInfo(displayId);
-            int callingUid = Binder.getCallingUid();
-            // Explicit display association requires either the caller to own the display or if
-            // it's from the system.
-            if (callingUid != displayInfo.ownerUid && callingUid != Process.SYSTEM_UID
-                    && callingUid != 0) {
-                throw new SecurityException(
-                        "Explicit display association requires caller to own the display");
-            }
-        }
+        checkDisplayAssociationPermission(config.getAssociatedDisplayId(), Binder.getCallingUid());
 
         return createVirtualKeyboardInternal(token, config);
     }
+
+    @NonNull
+    @Override // Binder call
+    @EnforcePermission(Manifest.permission.INJECT_EVENTS)
+    public IVirtualGamepad createVirtualGamepad(
+            @NonNull IBinder token, @NonNull VirtualGamepadConfig config) {
+        super.createVirtualGamepad_enforcePermission();
+
+        checkDisplayAssociationPermission(config.associatedDisplayId, Binder.getCallingUid());
+
+        return createVirtualGamepadInternal(token, config);
+    }
+
 
     @Override // Binder call
     public VerifiedInputEvent verifyInputEvent(@NonNull InputEvent event) {
@@ -1984,6 +1994,16 @@ public class InputManagerService extends IInputManager.Stub
                 InputManagerService.this.getTargetDisplayIdForInput(
                         config.getAssociatedDisplayId()),
                 config.getLanguageTag(), config.getLayoutType());
+    }
+
+    @NonNull
+    IVirtualGamepad createVirtualGamepadInternal(@NonNull IBinder token,
+            @NonNull VirtualGamepadConfig config) {
+        return mVirtualInputDeviceController.createGamepad(config.name,
+                config.vendorId, config.productId, token,
+                InputManagerService.this.getTargetDisplayIdForInput(
+                        config.associatedDisplayId),
+                config.registerTriggerAxes);
     }
 
     @Override // Binder call
@@ -3124,21 +3144,71 @@ public class InputManagerService extends IInputManager.Stub
     @Override // Binder call
     public void remapModifierKey(int fromKey, int toKey) {
         super.remapModifierKey_enforcePermission();
-        mKeyRemapper.remapKey(fromKey, toKey);
+        mModifierKeyRemapper.remapKey(fromKey, toKey);
     }
 
     @EnforcePermission(Manifest.permission.REMAP_MODIFIER_KEYS)
     @Override // Binder call
     public void clearAllModifierKeyRemappings() {
         super.clearAllModifierKeyRemappings_enforcePermission();
-        mKeyRemapper.clearAllKeyRemappings();
+        mModifierKeyRemapper.clearAllKeyRemappings();
     }
 
     @EnforcePermission(Manifest.permission.REMAP_MODIFIER_KEYS)
     @Override // Binder call
     public Map<Integer, Integer> getModifierKeyRemapping() {
         super.getModifierKeyRemapping_enforcePermission();
-        return mKeyRemapper.getKeyRemapping();
+        return mModifierKeyRemapper.getKeyRemapping();
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @Override // Binder call
+    public void remapControllerButton(@UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier,
+            @InputManager.ControllerButton int fromButton, int toKeyCode) {
+        super.remapControllerButton_enforcePermission();
+        if (!isControllerButton(fromButton)) {
+            throw new IllegalArgumentException(
+                    "Invalid controller fromButton provided for remapping: "
+                            + KeyEvent.keyCodeToString(fromButton));
+        }
+        if (!KeyEvent.isGamepadButton(toKeyCode)) {
+            throw new IllegalArgumentException(
+                    "Invalid controller toKeyCode for remapping: " + KeyEvent.keyCodeToString(
+                            toKeyCode));
+        }
+        mInputDeviceRemapper.remapKey(userId, identifier, fromButton, toKeyCode);
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @Override // Binder call
+    public void removeControllerButtonRemapping(@UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier,
+            @InputManager.ControllerButton int fromButton) {
+        super.removeControllerButtonRemapping_enforcePermission();
+        if (!isControllerButton(fromButton)) {
+            throw new IllegalArgumentException(
+                    "Invalid controller fromButton provided for remapping: "
+                            + KeyEvent.keyCodeToString(fromButton));
+        }
+        mInputDeviceRemapper.removeKeyRemapping(userId, identifier, fromButton);
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @Override // Binder call
+    public void clearAllControllerButtonRemapping(@UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier) {
+        super.clearAllControllerButtonRemapping_enforcePermission();
+        mInputDeviceRemapper.clearAllKeyRemapping(userId, identifier);
+    }
+
+    @EnforcePermission(Manifest.permission.CONTROLLER_REMAPPING)
+    @NonNull
+    @Override // Binder call
+    public Map<Integer, Integer> getControllerButtonRemapping(@UserIdInt int userId,
+            @NonNull InputDeviceIdentifier identifier) {
+        super.getControllerButtonRemapping_enforcePermission();
+        return mInputDeviceRemapper.getKeyRemapping(userId, identifier);
     }
 
     // Native callback.
@@ -3330,6 +3400,21 @@ public class InputManagerService extends IInputManager.Stub
 
     private void handleCurrentUserChanged(@UserIdInt int userId) {
         mKeyGestureController.setCurrentUserId(userId);
+        mInputDeviceRemapper.setCurrentUserId(userId);
+    }
+
+    private void checkDisplayAssociationPermission(int displayId, int callingUid) {
+        if (displayId != Display.INVALID_DISPLAY && displayId != Display.DEFAULT_DISPLAY) {
+            DisplayInfo displayInfo =
+                    mDisplayManagerInternal.getDisplayInfo(displayId);
+            // Explicit display association requires either the caller to own the display or if
+            // it's from the system.
+            if (callingUid != displayInfo.ownerUid && callingUid != Process.SYSTEM_UID
+                    && callingUid != 0) {
+                throw new SecurityException(
+                        "Explicit display association requires caller to own the display");
+            }
+        }
     }
 
     /**
@@ -4011,6 +4096,12 @@ public class InputManagerService extends IInputManager.Stub
         public void closeVirtualInputDevice(IBinder token) {
             mVirtualInputDeviceController.unregisterInputDevice(token);
         }
+
+        @Override
+        public void setForceShowTouchesOnDisplay(int displayId, boolean enabled) {
+            updateAdditionalDisplayInputProperties(displayId,
+                    properties -> properties.forceShowTouches = enabled);
+        }
     }
 
     @Override
@@ -4023,6 +4114,7 @@ public class InputManagerService extends IInputManager.Stub
 
         static final boolean DEFAULT_POINTER_ICON_VISIBLE = true;
         static final boolean DEFAULT_MOUSE_SCALING_ENABLED = true;
+        static final boolean DEFAULT_FORCE_SHOW_TOUCHES = false;
 
         /**
          * Whether to enable mouse pointer scaling on this display. Note that this only affects
@@ -4035,18 +4127,24 @@ public class InputManagerService extends IInputManager.Stub
         // Whether the pointer icon should be visible or hidden on this display.
         public boolean pointerIconVisible;
 
+        // Whether to show the positions of the touches on the given display, despite the global
+        // setting for "show touches" being turned off.
+        public boolean forceShowTouches;
+
         AdditionalDisplayInputProperties() {
             reset();
         }
 
         public boolean allDefaults() {
             return mouseScalingEnabled == DEFAULT_MOUSE_SCALING_ENABLED
-                    && pointerIconVisible == DEFAULT_POINTER_ICON_VISIBLE;
+                    && pointerIconVisible == DEFAULT_POINTER_ICON_VISIBLE
+                    && forceShowTouches == DEFAULT_FORCE_SHOW_TOUCHES;
         }
 
         public void reset() {
             mouseScalingEnabled = DEFAULT_MOUSE_SCALING_ENABLED;
             pointerIconVisible = DEFAULT_POINTER_ICON_VISIBLE;
+            forceShowTouches = DEFAULT_FORCE_SHOW_TOUCHES;
         }
     }
 
@@ -4061,6 +4159,7 @@ public class InputManagerService extends IInputManager.Stub
             }
             final boolean oldPointerIconVisible = properties.pointerIconVisible;
             final boolean oldMouseScalingEnabled = properties.mouseScalingEnabled;
+            final boolean oldShowTouchesEnabled = properties.forceShowTouches;
             updater.accept(properties);
             if (oldPointerIconVisible != properties.pointerIconVisible) {
                 mNative.setPointerIconVisibility(displayId, properties.pointerIconVisible);
@@ -4068,6 +4167,9 @@ public class InputManagerService extends IInputManager.Stub
             if (oldMouseScalingEnabled != properties.mouseScalingEnabled) {
                 mNative.setMouseScalingEnabled(displayId,
                         properties.mouseScalingEnabled);
+            }
+            if (oldShowTouchesEnabled != properties.forceShowTouches) {
+                mNative.setForceShowTouchesOnDisplay(displayId, properties.forceShowTouches);
             }
             if (properties.allDefaults()) {
                 mAdditionalDisplayInputProperties.remove(displayId);
@@ -4220,6 +4322,25 @@ public class InputManagerService extends IInputManager.Stub
     @Nullable
     String getPhysicalLocationPath(int deviceId) {
         return mNative.getPhysicalLocationPath(deviceId);
+    }
+
+    private boolean isControllerButton(int locationCode) {
+        return switch (locationCode) {
+            case InputManager.ControllerButton.CONTROLLER_BUTTON_SOUTH,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_EAST,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_NORTH,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_WEST,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_L1,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_R1,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_L2,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_R2,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_SELECT,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_START,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_MODE,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_THUMBSTICK_LEFT,
+                 InputManager.ControllerButton.CONTROLLER_BUTTON_THUMBSTICK_RIGHT -> true;
+            default -> false;
+        };
     }
 
     interface KeyboardBacklightControllerInterface {

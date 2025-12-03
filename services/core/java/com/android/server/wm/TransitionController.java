@@ -809,7 +809,7 @@ class TransitionController {
             @NonNull WindowContainer readyGroupRef, @NonNull ActionChain chain) {
         if (mTransitionPlayers.isEmpty()) {
             if (Flags.fallbackTransitionPlayer()) {
-                throw new IllegalStateException("Somehow requesting transition while flushing");
+                Slog.wtfStack(TAG, "Somehow requesting transition while flushing");
             }
             return null;
         }
@@ -852,7 +852,8 @@ class TransitionController {
     Transition requestStartUserTransition(@NonNull Transition transition,
             @Nullable TransitionRequestInfo.UserChange userChange) {
         return requestStartTransition(transition, null /* startTask */,
-                null /* remoteTransition */, null /* displayChange */, userChange);
+                null /* remoteTransition */, null /* displayChange */, userChange,
+                null /* windowingLayerChange */);
     }
 
     @NonNull
@@ -860,7 +861,15 @@ class TransitionController {
             @Nullable RemoteTransition remoteTransition,
             @Nullable TransitionRequestInfo.DisplayChange displayChange) {
         return requestStartTransition(transition, startTask, remoteTransition, displayChange,
-                null /* userChange */);
+                null /* userChange */, null /* windowingLayerChange */);
+    }
+
+    @NonNull
+    Transition requestStartWindowingLayerTransition(@NonNull Transition transition,
+            @NonNull Task startTask,
+            @NonNull TransitionRequestInfo.WindowingLayerChange windowingLayerChange) {
+        return requestStartTransition(transition, startTask, null /* remoteTransition */,
+                null /* displayChange */, null /* userChange */, windowingLayerChange);
     }
 
     /** Asks the transition player (shell) to start a created but not yet started transition. */
@@ -868,7 +877,8 @@ class TransitionController {
     Transition requestStartTransition(@NonNull Transition transition, @Nullable Task startTask,
             @Nullable RemoteTransition remoteTransition,
             @Nullable TransitionRequestInfo.DisplayChange displayChange,
-            @Nullable TransitionRequestInfo.UserChange userChange) {
+            @Nullable TransitionRequestInfo.UserChange userChange,
+            @Nullable TransitionRequestInfo.WindowingLayerChange windowingLayerChange) {
         if (mIsWaitingForDisplayEnabled) {
             ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS,
                     "Disabling player for transition #%d because display isn't enabled yet",
@@ -912,9 +922,17 @@ class TransitionController {
                 transition.setPipActivity(null);
             }
 
+            final TransitionRequestInfo.RemoteTransitionInfo remoteInfo;
+            if (remoteTransition != null) {
+                transition.mRemoteDelegate = remoteTransition.getAppThread();
+                remoteInfo = new TransitionRequestInfo.RemoteTransitionInfo(remoteTransition);
+            } else {
+                remoteInfo = null;
+            }
+
             final TransitionRequestInfo request = new TransitionRequestInfo(transition.mType,
-                    startTaskInfo, pipChange, remoteTransition, displayChange,
-                    transition.getRequestedLocation(), userChange, null /* windowingLayerChange */,
+                    startTaskInfo, pipChange, remoteInfo, displayChange,
+                    transition.getRequestedLocation(), userChange, windowingLayerChange,
                     transition.getFlags(), transition.getSyncId());
 
             transition.mLogger.mRequestTimeNs = SystemClock.elapsedRealtimeNanos();
@@ -1246,6 +1264,20 @@ class TransitionController {
                     queued.mOnStartCollect.onCollectStarted(true /* deferred */);
                 }
             });
+        }
+    }
+
+    /**
+     * Removes transitions with {@link WindowManager.TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION} flag
+     * from the queue
+     */
+    void removeDisplayChangesFromQueue() {
+        for (int i = mQueuedTransitions.size() - 1; i >= 0; i--) {
+            final Transition t = mQueuedTransitions.get(i).mTransition;
+            if (t != null &&
+                    (t.getFlags() & WindowManager.TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION) != 0) {
+                mQueuedTransitions.remove(i);
+            }
         }
     }
 
@@ -1664,7 +1696,7 @@ class TransitionController {
     Transition createAndStartCollecting(int type) {
         if (isFlushing()) {
             if (Flags.fallbackTransitionPlayer()) {
-                throw new IllegalStateException("Can't create transition while flushing");
+                Slog.wtf(TAG, "Trying to create a transition while flushing");
             }
             return null;
         }

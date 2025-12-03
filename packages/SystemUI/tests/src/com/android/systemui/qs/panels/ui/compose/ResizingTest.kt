@@ -16,28 +16,33 @@
 
 package com.android.systemui.qs.panels.ui.compose
 
+import android.platform.test.flag.junit.FlagsParameterization
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.text.AnnotatedString
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.theme.PlatformTheme
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
+import com.android.systemui.qs.flags.QsEditModeV2
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.DefaultEditTileGrid
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.EditAction
 import com.android.systemui.qs.panels.ui.model.GridCell
@@ -52,11 +57,17 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4
+import platform.test.runner.parameterized.Parameters
 
 @OptIn(ExperimentalTestApi::class)
 @SmallTest
-@RunWith(AndroidJUnit4::class)
-class ResizingTest : SysuiTestCase() {
+@RunWith(ParameterizedAndroidJunit4::class)
+class ResizingTest(flags: FlagsParameterization) : SysuiTestCase() {
+
+    init {
+        mSetFlagsRule.setFlagsParameterization(flags)
+    }
 
     @get:Rule val composeRule = createComposeRule()
 
@@ -102,6 +113,45 @@ class ResizingTest : SysuiTestCase() {
     ) {
         setContent { EditTileGridUnderTest(listState, tiles, largeTiles, onResize) }
         waitForIdle()
+    }
+
+    @Test
+    fun toggleIconTileWithKeyboard_shouldBeLarge() {
+        val listState =
+            EditTileListState(TestEditTiles, TestLargeTilesSpecs, columns = 4, largeTilesSpan = 2)
+        var resizedAction: EditAction.ResizeTile? = null
+        composeRule.setEditContent(listState) { resizedAction = it }
+
+        // Tab over to the first tile
+        composeRule.onRoot().performKeyInput { pressKey(Key.Tab) }
+
+        composeRule.onNodeWithContentDescription("tileA").performKeyInput { pressKey(Key.R) }
+
+        assertTileHasWidth(listState.tiles, "tileA", 2)
+        assertThat(resizedAction!!.tileSpec).isEqualTo(TestEditTiles[0].tileSpec)
+        assertThat(resizedAction!!.toIcon).isFalse()
+    }
+
+    @Test
+    fun toggleLargeTileWithKeyboard_shouldBeIcon() {
+        val listState =
+            EditTileListState(TestEditTiles, TestLargeTilesSpecs, columns = 4, largeTilesSpan = 2)
+        var resizedAction: EditAction.ResizeTile? = null
+        composeRule.setEditContent(listState) { resizedAction = it }
+
+        // Tab over to the fourth tile
+        composeRule.onRoot().performKeyInput {
+            pressKey(Key.Tab)
+            pressKey(Key.Tab)
+            pressKey(Key.Tab)
+            pressKey(Key.Tab)
+        }
+
+        composeRule.onNodeWithContentDescription("tileD_large").performKeyInput { pressKey(Key.R) }
+
+        assertTileHasWidth(listState.tiles, "tileD_large", 1)
+        assertThat(resizedAction!!.tileSpec).isEqualTo(TestEditTiles[3].tileSpec)
+        assertThat(resizedAction!!.toIcon).isTrue()
     }
 
     @Test
@@ -255,6 +305,10 @@ class ResizingTest : SysuiTestCase() {
     }
 
     companion object {
+
+        @Parameters(name = "{0}")
+        @JvmStatic
+        fun data() = FlagsParameterization.progressionOf(QsEditModeV2.FLAG_NAME)
 
         private fun createEditTile(tileSpec: String): EditTileViewModel {
             return EditTileViewModel(

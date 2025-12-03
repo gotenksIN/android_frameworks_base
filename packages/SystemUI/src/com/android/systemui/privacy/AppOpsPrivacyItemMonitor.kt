@@ -16,6 +16,9 @@
 
 package com.android.systemui.privacy
 
+import android.Manifest.permission.PACKAGE_USAGE_STATS
+import android.annotation.RequiresPermission
+import android.annotation.WorkerThread
 import android.app.ActivityManager
 import android.app.AppOpsManager
 import android.content.Context
@@ -140,16 +143,10 @@ constructor(
                         logger.logUpdatedItemFromAppOps(code, uid, packageName, active)
 
                         if (code in OPS_LOCATION) {
-                            val procInfo =
-                                (activityManager.runningAppProcesses ?: emptyList()).find {
-                                    it.uid == uid
-                                }
-                            val importance =
-                                procInfo?.importance ?: -1 // Use -1 if process not found
                             logger.logLocationAppOps(
                                 uid,
                                 packageName,
-                                importance,
+                                getUidImportance(uid),
                                 !isBackgroundApp(uid),
                                 isSystemApp(code, uid, packageName),
                             )
@@ -457,6 +454,7 @@ constructor(
     private fun isSystemApp(item: AppOpItem): Boolean {
         return isSystemApp(item.code, item.uid, item.packageName)
     }
+
     private fun isSystemApp(code: Int, uid: Int, packageName: String): Boolean {
         val user = UserHandle.getUserHandleForUid(uid)
 
@@ -472,8 +470,7 @@ constructor(
         }
 
         val permission = AppOpsManager.opToPermission(code)
-        val permissionFlags: Int =
-            packageManager.getPermissionFlags(permission, packageName, user)
+        val permissionFlags: Int = packageManager.getPermissionFlags(permission, packageName, user)
         val isSystem =
             if (
                 PermissionChecker.checkPermissionForPreflight(
@@ -498,14 +495,28 @@ constructor(
      * <p>TODO(b/422799135): refactor isSystemApp() and isBackgroundApp(). Before this is fixed,
      * make sure to update PermissionUsageHelper when changing this method.
      */
+    @WorkerThread
+    @RequiresPermission(PACKAGE_USAGE_STATS)
     private fun isBackgroundApp(uid: Int): Boolean {
+        return getUidImportance(uid) >
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE
+    }
+
+    @WorkerThread
+    @RequiresPermission(PACKAGE_USAGE_STATS)
+    private fun getUidImportance(uid: Int): Int {
         for (processInfo in activityManager.runningAppProcesses) {
             if (processInfo.uid == uid) {
-                return (processInfo.importance >
-                    ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE)
+                return processInfo.importance
             }
         }
-        return false
+
+        if (android.location.flags.Flags.locationIndicatorGetUidImportanceFallback()) {
+            // In case a uid is not found because runningAppProcesses might return stale results
+            return activityManager.getUidImportance(uid)
+        }
+
+        return -1
     }
 
     override fun dump(pw: PrintWriter, args: Array<out String>) {

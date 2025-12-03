@@ -15,6 +15,8 @@ import static android.telephony.SubscriptionManager.PROFILE_CLASS_PROVISIONING;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.settingslib.wifi.WifiUtils.getHotspotIconResource;
+import static com.android.systemui.Flags.FLAG_QS_TILE_DETAILED_VIEW;
+import static com.android.systemui.Flags.FLAG_QS_WIFI_CONFIG;
 import static com.android.systemui.qs.tiles.dialog.InternetDetailsContentController.TOAST_PARAMS_HORIZONTAL_WEIGHT;
 import static com.android.systemui.qs.tiles.dialog.InternetDetailsContentController.TOAST_PARAMS_VERTICAL_WEIGHT;
 import static com.android.wifitrackerlib.WifiEntry.WIFI_LEVEL_MAX;
@@ -51,6 +53,8 @@ import android.net.NetworkCapabilities;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
+import android.platform.test.annotations.EnableFlags;
+import android.platform.test.annotations.DisableFlags;
 import android.telephony.ServiceState;
 import android.telephony.SignalStrength;
 import android.telephony.SubscriptionInfo;
@@ -59,6 +63,7 @@ import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyDisplayInfo;
 import android.telephony.TelephonyManager;
 import android.telephony.satellite.SatelliteManager;
+import android.testing.TestableContext;
 import android.testing.TestableLooper;
 import android.testing.TestableResources;
 import android.text.TextUtils;
@@ -78,6 +83,7 @@ import com.android.systemui.animation.DialogTransitionAnimator;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.flags.FakeFeatureFlags;
 import com.android.systemui.flags.Flags;
+import com.android.systemui.kosmos.KosmosJavaAdapter;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.connectivity.AccessPointController;
@@ -124,6 +130,8 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
     private static final int GRAVITY_FLAGS = Gravity.FILL_HORIZONTAL | Gravity.FILL_VERTICAL;
     private static final int TOAST_MESSAGE_STRING_ID = 1;
     private static final String TOAST_MESSAGE_STRING = "toast message";
+
+    private final KosmosJavaAdapter mKosmos = new KosmosJavaAdapter(this);
 
     @Mock
     private WifiManager mWifiManager;
@@ -198,9 +206,13 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
     @Mock
     private CarrierNameCustomization mCarrierNameCustomization;
 
+    // Let's create a second one, mainly to mock getSystemService call
+    private final TestableContext mShadeContext = spy(mContext.createDefaultDisplayContext());
+
     private FakeFeatureFlags mFlags = new FakeFeatureFlags();
 
     private TestableResources mTestableResources;
+    private TestableResources mShadeTestableResources;
     private InternetDetailsContentController mInternetDetailsContentController;
     private FakeExecutor mExecutor = new FakeExecutor(new FakeSystemClock());
     private List<WifiEntry> mAccessPoints = new ArrayList<>();
@@ -216,7 +228,10 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
                 .strictness(Strictness.LENIENT)
                 .startMocking();
         MockitoAnnotations.initMocks(this);
+        mShadeTestableResources = mShadeContext.getOrCreateTestableResources();
         mTestableResources = mContext.getOrCreateTestableResources();
+        mKosmos.getShadeDialogContextInteractor().setContextOverride(mShadeContext);
+        when(mShadeContext.getSystemService(WindowManager.class)).thenReturn(mWindowManager);
         doReturn(mTelephonyManager).when(mTelephonyManager).createForSubscriptionId(anyInt());
         when(mTelephonyManager.getSignalStrength()).thenReturn(mSignalStrength);
         when(mSignalStrength.getLevel()).thenReturn(SIGNAL_STRENGTH_GREAT);
@@ -248,7 +263,7 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
                 mock(KeyguardUpdateMonitor.class), mGlobalSettings, mKeyguardStateController,
                 mWindowManager, mToastFactory, mWorkerHandler, mCarrierConfigTracker,
                 mLocationController, mDialogTransitionAnimator, mWifiStateWorker, mFlags,
-                mCarrierNameCustomization);
+                mKosmos.getShadeDialogContextInteractor(), mCarrierNameCustomization);
         mSubscriptionManager.addOnSubscriptionsChangedListener(mExecutor,
                 mInternetDetailsContentController.mOnSubscriptionsChangedListener);
         mInternetDetailsContentController.onStart(mInternetDialogCallback, true);
@@ -282,7 +297,7 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
                 .thenReturn(false);
 
         when(mMergedCarrierEntry.canConnect()).thenReturn(true);
-        mTestableResources.addOverride(R.string.wifi_wont_autoconnect_for_now,
+        mShadeTestableResources.addOverride(R.string.wifi_wont_autoconnect_for_now,
             TOAST_MESSAGE_STRING);
 
         spyController.connectCarrierNetwork();
@@ -296,7 +311,7 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
     public void connectCarrierNetwork_mergedCarrierEntryCanConnect_doNothingWhenSettingsOff() {
         InternetDetailsContentController spyController = spy(mInternetDetailsContentController);
         when(spyController.isMobileDataEnabled()).thenReturn(false);
-        mTestableResources.addOverride(R.string.wifi_wont_autoconnect_for_now,
+        mShadeTestableResources.addOverride(R.string.wifi_wont_autoconnect_for_now,
             TOAST_MESSAGE_STRING);
 
         spyController.connectCarrierNetwork();
@@ -312,7 +327,7 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
         when(spyController.isMobileDataEnabled()).thenReturn(true);
         when(mKeyguardStateController.isUnlocked()).thenReturn(false);
 
-        mTestableResources.addOverride(R.string.wifi_wont_autoconnect_for_now,
+        mShadeTestableResources.addOverride(R.string.wifi_wont_autoconnect_for_now,
             TOAST_MESSAGE_STRING);
         spyController.connectCarrierNetwork();
 
@@ -330,7 +345,7 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
         when(mNetworkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR))
                 .thenReturn(true);
 
-        mTestableResources.addOverride(R.string.wifi_wont_autoconnect_for_now,
+        mShadeTestableResources.addOverride(R.string.wifi_wont_autoconnect_for_now,
             TOAST_MESSAGE_STRING);
         mInternetDetailsContentController.connectCarrierNetwork();
 
@@ -341,7 +356,7 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
 
     @Test
     public void makeOverlayToast_withGravityFlags_addViewWithLayoutParams() {
-        mTestableResources.addOverride(TOAST_MESSAGE_STRING_ID, TOAST_MESSAGE_STRING);
+        mShadeTestableResources.addOverride(TOAST_MESSAGE_STRING_ID, TOAST_MESSAGE_STRING);
 
         mInternetDetailsContentController.makeOverlayToast(TOAST_MESSAGE_STRING_ID);
 
@@ -357,7 +372,7 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
 
     @Test
     public void makeOverlayToast_withAnimation_verifyAnimatorStart() {
-        mTestableResources.addOverride(TOAST_MESSAGE_STRING_ID, TOAST_MESSAGE_STRING);
+        mShadeTestableResources.addOverride(TOAST_MESSAGE_STRING_ID, TOAST_MESSAGE_STRING);
 
         mInternetDetailsContentController.makeOverlayToast(TOAST_MESSAGE_STRING_ID);
 
@@ -687,7 +702,8 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
     }
 
     @Test
-    public void onAccessPointsChanged_oneConnectedEntryAndThreeOthers_callbackCutMore() {
+    @DisableFlags(FLAG_QS_WIFI_CONFIG)
+    public void onAccessPointsChanged_oneConnectedEntryAndThreeOthers_flagOff_callbackCutMore() {
         reset(mInternetDialogCallback);
         mAccessPoints.clear();
         mAccessPoints.add(mConnectedEntry);
@@ -705,7 +721,28 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
     }
 
     @Test
-    public void onAccessPointsChanged_fourWifiEntries_callbackCutMore() {
+    @EnableFlags({FLAG_QS_WIFI_CONFIG, FLAG_QS_TILE_DETAILED_VIEW})
+    public void onAccessPointsChanged_oneConnectedEntryAndThreeOthers_flagOn_callbackNoCutMore() {
+        reset(mInternetDialogCallback);
+        mAccessPoints.clear();
+        mAccessPoints.add(mConnectedEntry);
+        mAccessPoints.add(mWifiEntry1);
+        mAccessPoints.add(mWifiEntry2);
+        mAccessPoints.add(mWifiEntry3);
+
+        mInternetDetailsContentController.onAccessPointsChanged(mAccessPoints);
+
+        mWifiEntries.clear();
+        mWifiEntries.add(mWifiEntry1);
+        mWifiEntries.add(mWifiEntry2);
+        mWifiEntries.add(mWifiEntry3);
+        verify(mInternetDialogCallback).onAccessPointsChanged(mWifiEntries, mConnectedEntry,
+                true /* hasMoreEntry */);
+    }
+
+    @Test
+    @DisableFlags(FLAG_QS_WIFI_CONFIG)
+    public void onAccessPointsChanged_fourWifiEntries_flagOff_callbackCutMore() {
         reset(mInternetDialogCallback);
         mAccessPoints.clear();
         mAccessPoints.add(mWifiEntry1);
@@ -719,6 +756,27 @@ public class InternetDetailsContentControllerTest extends SysuiTestCase {
         mWifiEntries.add(mWifiEntry1);
         mWifiEntries.add(mWifiEntry2);
         mWifiEntries.add(mWifiEntry3);
+        verify(mInternetDialogCallback).onAccessPointsChanged(mWifiEntries,
+                null /* connectedEntry */, true /* hasMoreEntry */);
+    }
+
+    @Test
+    @EnableFlags({FLAG_QS_WIFI_CONFIG, FLAG_QS_TILE_DETAILED_VIEW})
+    public void onAccessPointsChanged_fourWifiEntries_flagOn_callbackNoCutMore() {
+        reset(mInternetDialogCallback);
+        mAccessPoints.clear();
+        mAccessPoints.add(mWifiEntry1);
+        mAccessPoints.add(mWifiEntry2);
+        mAccessPoints.add(mWifiEntry3);
+        mAccessPoints.add(mWifiEntry4);
+
+        mInternetDetailsContentController.onAccessPointsChanged(mAccessPoints);
+
+        mWifiEntries.clear();
+        mWifiEntries.add(mWifiEntry1);
+        mWifiEntries.add(mWifiEntry2);
+        mWifiEntries.add(mWifiEntry3);
+        mWifiEntries.add(mWifiEntry4);
         verify(mInternetDialogCallback).onAccessPointsChanged(mWifiEntries,
                 null /* connectedEntry */, true /* hasMoreEntry */);
     }

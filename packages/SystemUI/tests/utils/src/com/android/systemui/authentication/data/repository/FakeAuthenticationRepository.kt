@@ -76,7 +76,7 @@ class FakeAuthenticationRepository(private val currentTimeMs: () -> Long) :
         get() = currentTimeMs().milliseconds
 
     var maximumTimeToLock: Long = 0
-    var powerButtonInstantlyLocks: Boolean = true
+    var fakePowerButtonInstantlyLocks: Boolean = true
 
     override suspend fun getAuthenticationMethod(): AuthenticationMethodModel {
         return authenticationMethod.value
@@ -115,7 +115,11 @@ class FakeAuthenticationRepository(private val currentTimeMs: () -> Long) :
     override val isDuplicateAttempt: StateFlow<Boolean> = _isDuplicateAttempt.asStateFlow()
 
     override suspend fun reportLockoutStarted(durationMs: Int) {
-        _lockoutEndTime = (currentTime + durationMs.milliseconds).takeIf { durationMs > 0 }
+        reportLockoutStarted(durationMs.milliseconds)
+    }
+
+    fun reportLockoutStarted(duration: Duration) {
+        _lockoutEndTime = (currentTime + duration).takeIf { duration.isPositive() }
         hasLockoutOccurred.value = true
         lockoutStartedReportCount++
     }
@@ -190,8 +194,8 @@ class FakeAuthenticationRepository(private val currentTimeMs: () -> Long) :
         return maximumTimeToLock
     }
 
-    override suspend fun getPowerButtonInstantlyLocks(): Boolean {
-        return powerButtonInstantlyLocks
+    override fun getPowerButtonInstantlyLocks(): Boolean {
+        return fakePowerButtonInstantlyLocks
     }
 
     private fun getExpectedCredential(securityMode: SecurityMode): List<Any> {

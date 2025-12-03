@@ -20,6 +20,7 @@ import android.icu.text.SimpleDateFormat
 import android.text.TextUtils
 import androidx.annotation.VisibleForTesting
 import com.android.wm.shell.Flags
+import com.android.wm.shell.shared.bubbles.logging.BubbleEventHistoryLogger.Companion.MAX_EVENTS
 import java.io.PrintWriter
 import java.util.Locale
 
@@ -52,6 +53,16 @@ class BubbleEventHistoryLogger : DebugLogger {
         logEvent("e: ${TextUtils.formatSimple(message, *parameters)}", eventData)
     }
 
+    /**
+     * Logs a RECORD level message.
+     *
+     * The [message] is a format string, with [parameters] substituted into it. An optional
+     * [eventData] string may also be provided, which implementations can include in the log output.
+     */
+    fun record(message: String, vararg parameters: Any?, eventData: String?) {
+        logEvent("r: ${TextUtils.formatSimple(message, *parameters)}", eventData)
+    }
+
     @VisibleForTesting
     @Synchronized
     fun logEvent(
@@ -74,7 +85,7 @@ class BubbleEventHistoryLogger : DebugLogger {
         if (!Flags.enableBubbleEventHistoryLogs()) return
         val recentEventsCopy = synchronized(this) { ArrayList(recentEvents) }
         pw.println("${prefix}Bubbles events history:")
-        recentEventsCopy.reversed().forEach { event ->
+        recentEventsCopy.forEach { event ->
             val eventFormattedTime = DATE_FORMATTER.format(event.timestamp)
             var eventData = ""
             if (!event.eventData.isNullOrBlank()) {
@@ -86,7 +97,7 @@ class BubbleEventHistoryLogger : DebugLogger {
 
     companion object {
         const val DATE_FORMAT = "MM-dd HH:mm:ss.SSS"
-        const val MAX_EVENTS: Int = 25
+        const val MAX_EVENTS: Int = 200
         @VisibleForTesting
         val DATE_FORMATTER = SimpleDateFormat(DATE_FORMAT, Locale.US)
     }

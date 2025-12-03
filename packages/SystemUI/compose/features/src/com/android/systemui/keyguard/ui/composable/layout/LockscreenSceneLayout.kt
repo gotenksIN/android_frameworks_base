@@ -193,12 +193,6 @@ fun LockscreenScope<ContentScope>.LockscreenSceneLayout(
             upperRegionPlaceable.placeRelative(0, statusBarPlaceable.measuredHeight)
             lockIconPlaceable.place(lockIconBounds.left, lockIconBounds.top)
 
-            ambientIndicationPlaceable.place(
-                0,
-                if (viewModel.isUdfpsSupported) lockIconBounds.bottom
-                else lockIconBounds.top - ambientIndicationPlaceable.measuredHeight,
-            )
-
             lowerRegionPlaceable.place(
                 0,
                 constraints.maxHeight - lowerRegionPlaceable.measuredHeight,

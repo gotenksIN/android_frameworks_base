@@ -37,6 +37,7 @@ import com.android.internal.app.MediaRouteDialogPresenter;
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+import com.android.systemui.Flags;
 import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.animation.DialogCuj;
 import com.android.systemui.animation.DialogTransitionAnimator;
@@ -251,6 +252,9 @@ public class CastTile extends QSTileImpl<BooleanState> {
             SystemUIDialog.registerDismissListener(dialog);
             SystemUIDialog.setWindowOnTop(dialog, mKeyguard.isShowing());
             SystemUIDialog.setDialogSize(dialog);
+            if (Flags.fixCastDialogFlicker()) {
+                SystemUIDialog.resetElevation(dialog);
+            }
 
             mUiHandler.post(() -> {
                 if (expandable != null) {

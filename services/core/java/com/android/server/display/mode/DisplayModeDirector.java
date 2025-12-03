@@ -181,8 +181,6 @@ public class DisplayModeDirector {
     @DisplayManager.SwitchingType
     private int mModeSwitchingType = DisplayManager.SWITCHING_TYPE_WITHIN_GROUPS;
 
-    private final boolean mIsBackUpSmoothDisplayAndForcePeakRefreshRateEnabled;
-
     private final boolean mHasArrSupportFlagEnabled;
 
     private final DisplayManagerFlags mDisplayManagerFlags;
@@ -200,8 +198,6 @@ public class DisplayModeDirector {
             @NonNull Injector injector,
             @NonNull DisplayManagerFlags displayManagerFlags,
             @NonNull DisplayDeviceConfigProvider displayDeviceConfigProvider) {
-        mIsBackUpSmoothDisplayAndForcePeakRefreshRateEnabled = displayManagerFlags
-                .isBackUpSmoothDisplayAndForcePeakRefreshRateEnabled();
         mHasArrSupportFlagEnabled = displayManagerFlags.hasArrSupportFlag();
         mDisplayManagerFlags = displayManagerFlags;
         mDisplayDeviceConfigProvider = displayDeviceConfigProvider;
@@ -381,12 +377,13 @@ public class DisplayModeDirector {
 
             if (modeSwitchingDisabled || primarySummary.disableRefreshRateSwitching) {
                 float fps = baseMode.getRefreshRate();
+                float vsyncRate = baseMode.getVsyncRate();
                 primarySummary.disableModeSwitching(fps);
                 if (modeSwitchingDisabled) {
                     appRequestSummary.disableModeSwitching(fps);
-                    primarySummary.disableRenderRateSwitching(fps);
+                    primarySummary.disableRenderRateSwitching(vsyncRate, fps);
                     if (mModeSwitchingType == DisplayManager.SWITCHING_TYPE_NONE) {
-                        appRequestSummary.disableRenderRateSwitching(fps);
+                        appRequestSummary.disableRenderRateSwitching(vsyncRate, fps);
                     }
                 }
             }
@@ -643,6 +640,11 @@ public class DisplayModeDirector {
             default:
                 return "Unknown SwitchingType " + type;
         }
+    }
+
+    @VisibleForTesting
+    void injectHasArrSupport(SparseBooleanArray hasArrSupport) {
+        mHasArrSupport = hasArrSupport;
     }
 
     @VisibleForTesting
@@ -961,8 +963,6 @@ public class DisplayModeDirector {
         private final Uri mMatchContentFrameRateSetting =
                 Settings.Secure.getUriFor(Settings.Secure.MATCH_CONTENT_FRAME_RATE);
 
-        private final boolean mPeakRefreshRatePhysicalLimitEnabled;
-
         private final Context mContext;
         private final Handler mHandler;
         private float mDefaultPeakRefreshRate;
@@ -997,7 +997,6 @@ public class DisplayModeDirector {
             super(handler);
             mContext = context;
             mHandler = handler;
-            mPeakRefreshRatePhysicalLimitEnabled = flags.isPeakRefreshRatePhysicalLimitEnabled();
             // We don't want to load from the DeviceConfig while constructing since this leads to
             // a spike in the latency of DisplayManagerService startup. This happens because
             // reading from the DeviceConfig is an intensive IO operation and having it in the
@@ -1200,7 +1199,7 @@ public class DisplayModeDirector {
             // used to predict if we're going to be doing frequent refresh rate switching, and if
             // so, enable the brightness observer. The logic here is more complicated and fragile
             // than necessary, and we should improve it. See b/156304339 for more info.
-            if (mPeakRefreshRatePhysicalLimitEnabled) {
+            if (!isVrrSupportedLocked(displayId)) {
                 Vote peakVote = peakRefreshRate == 0f
                         ? null
                         : Vote.forPhysicalRefreshRates(0f,
@@ -1420,41 +1419,14 @@ public class DisplayModeDirector {
 
         public void observe() {
             mInjector.registerDisplayListener(this, mHandler);
-            if (mDisplayManagerFlags.isOnDisplayAddedInObserverEnabled()) {
-                final var enabledDisplays = mInjector.getEnabledDisplays();
-                // Populate existing displays
-                if (enabledDisplays != null && enabledDisplays.length > 0) {
-                    mHandler.post(() -> {
-                        for (Display d : enabledDisplays) {
-                            onDisplayAdded(d.getDisplayId());
-                        }
-                    });
-                }
-            } else {
-                // Populate existing displays
-                SparseArray<Display.Mode[]> modes = new SparseArray<>();
-                SparseArray<Display.Mode[]> appModes = new SparseArray<>();
-                SparseArray<Display.Mode> defaultModes = new SparseArray<>();
-                Display[] displays = mInjector.getDisplays();
-                for (Display d : displays) {
-                    final int displayId = d.getDisplayId();
-                    DisplayInfo info = getDisplayInfo(displayId);
-                    modes.put(displayId, info.supportedModes);
-                    appModes.put(displayId, info.appsSupportedModes);
-                    defaultModes.put(displayId, info.getDefaultMode());
-                }
-                DisplayDeviceConfig defaultDisplayConfig = mDisplayDeviceConfigProvider
-                        .getDisplayDeviceConfig(Display.DEFAULT_DISPLAY);
-                synchronized (mLock) {
-                    final int size = modes.size();
-                    for (int i = 0; i < size; i++) {
-                        mSupportedModesByDisplay.put(modes.keyAt(i), modes.valueAt(i));
-                        mAppSupportedModesByDisplay.put(appModes.keyAt(i), appModes.valueAt(i));
-                        mDefaultModeByDisplay.put(defaultModes.keyAt(i), defaultModes.valueAt(i));
+            final var enabledDisplays = mInjector.getEnabledDisplays();
+            // Populate existing displays
+            if (enabledDisplays != null && enabledDisplays.length > 0) {
+                mHandler.post(() -> {
+                    for (Display d : enabledDisplays) {
+                        onDisplayAdded(d.getDisplayId());
                     }
-                    mDisplayDeviceConfigByDisplay.put(Display.DEFAULT_DISPLAY,
-                            defaultDisplayConfig);
-                }
+                });
             }
         }
 
@@ -1792,7 +1764,7 @@ public class DisplayModeDirector {
                         }
                     }
                 };
-        private boolean mThermalRegistered;
+        private boolean mThermalListenerRegistered;
 
         // Enable light sensor only when mShouldObserveAmbientLowChange is true or
         // mShouldObserveAmbientHighChange is true, screen is on, peak refresh rate
@@ -2535,11 +2507,12 @@ public class DisplayModeDirector {
                 unregisterSensorListener();
             }
 
-            if (registerForThermals && !mThermalRegistered) {
-                mThermalRegistered = mInjector.registerThermalServiceListener(mThermalListener);
-            } else if (!registerForThermals && mThermalRegistered) {
-                mInjector.unregisterThermalServiceListener(mThermalListener);
-                mThermalRegistered = false;
+            if (registerForThermals && !mThermalListenerRegistered) {
+                mThermalListenerRegistered = mInjector.registerThermalEventListener(
+                        mThermalListener);
+            } else if (!registerForThermals && mThermalListenerRegistered) {
+                mInjector.unregisterThermalEventListener(mThermalListener);
+                mThermalListenerRegistered = false;
                 synchronized (mLock) {
                     mThermalStatus = Temperature.THROTTLING_NONE; // reset
                 }
@@ -3111,8 +3084,8 @@ public class DisplayModeDirector {
 
         boolean isDozeState(Display d);
 
-        boolean registerThermalServiceListener(IThermalEventListener listener);
-        void unregisterThermalServiceListener(IThermalEventListener listener);
+        boolean registerThermalEventListener(IThermalEventListener listener);
+        void unregisterThermalEventListener(IThermalEventListener listener);
 
         boolean supportsFrameRateOverride();
 
@@ -3224,7 +3197,7 @@ public class DisplayModeDirector {
         }
 
         @Override
-        public boolean registerThermalServiceListener(IThermalEventListener listener) {
+        public boolean registerThermalEventListener(IThermalEventListener listener) {
             IThermalService thermalService = getThermalService();
             if (thermalService == null) {
                 Slog.w(TAG, "Could not observe thermal status. Service not available");
@@ -3241,7 +3214,7 @@ public class DisplayModeDirector {
         }
 
         @Override
-        public void unregisterThermalServiceListener(IThermalEventListener listener) {
+        public void unregisterThermalEventListener(IThermalEventListener listener) {
             IThermalService thermalService = getThermalService();
             if (thermalService == null) {
                 Slog.w(TAG, "Could not unregister thermal status. Service not available");

@@ -16,14 +16,20 @@
 
 package com.android.systemui.qs.panels.ui.compose
 
+import android.content.testableContext
+import android.platform.test.annotations.EnableFlags
+import android.platform.test.flag.junit.FlagsParameterization
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -31,20 +37,20 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.theme.PlatformTheme
+import com.android.systemui.Flags
 import com.android.systemui.Flags.qsSplitInternetTile
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.compose.modifiers.resIdToTestTag
 import com.android.systemui.flags.DisableSceneContainer
-import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.haptics.msdl.tileHapticsViewModelFactoryProvider
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
+import com.android.systemui.qs.flags.QsEditModeV2
 import com.android.systemui.qs.panels.data.repository.defaultLargeTilesRepository
 import com.android.systemui.qs.panels.domain.interactor.iconTilesInteractor
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.InfiniteGridLayout
@@ -56,16 +62,23 @@ import com.android.systemui.qs.panels.ui.viewmodel.infiniteGridViewModelFactory
 import com.android.systemui.qs.panels.ui.viewmodel.textFeedbackContentViewModelFactory
 import com.android.systemui.qs.pipeline.domain.interactor.currentTilesInteractor
 import com.android.systemui.qs.pipeline.shared.TileSpec
+import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4
+import platform.test.runner.parameterized.Parameters
 
 @SmallTest
-@RunWith(AndroidJUnit4::class)
-class InfiniteGridLayoutEditTileGridTest : SysuiTestCase() {
+@RunWith(ParameterizedAndroidJunit4::class)
+class InfiniteGridLayoutEditTileGridTest(flags: FlagsParameterization) : SysuiTestCase() {
+
+    init {
+        mSetFlagsRule.setFlagsParameterization(flags)
+    }
 
     @get:Rule val composeRule = createComposeRule()
 
@@ -239,18 +252,14 @@ class InfiniteGridLayoutEditTileGridTest : SysuiTestCase() {
             composeRule.waitForIdle()
 
             // Perform first removal.
-            composeRule.onNodeWithContentDescription(internetTileSpec).performTouchInput {
-                click(position = topRight)
-            }
+            composeRule.removeTile(internetTileSpec)
             composeRule.waitForIdle()
 
             // Assert the removal happened
             assertThat(latest!!.find { it.tile.tileSpec == internetTileSpec }).isNull()
 
             // Perform second removal
-            composeRule.onNodeWithContentDescription("bt").performTouchInput {
-                click(position = topRight)
-            }
+            composeRule.removeTile("bt")
             composeRule.waitForIdle()
 
             // Assert the removal happened
@@ -319,16 +328,30 @@ class InfiniteGridLayoutEditTileGridTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableSceneContainer
+    @EnableFlags(Flags.FLAG_SCENE_CONTAINER, Flags.FLAG_DUAL_SHADE)
     fun onlySceneContainer_onlySettingsOption() =
         kosmos.runTest {
-            composeRule.setContent { TestEditTileGrid() }
+            enableDualShade(enabledBySetting = true)
+            composeRule.setContent {
+                CompositionLocalProvider(LocalResources provides testableContext.resources) {
+                    TestEditTileGrid()
+                }
+            }
             composeRule.waitForIdle()
 
             composeRule.onNodeWithContentDescription("Settings").assertExists()
             composeRule.onNodeWithContentDescription("Reset").assertDoesNotExist()
             composeRule.onNodeWithContentDescription("Options").assertDoesNotExist()
         }
+
+    private fun ComposeContentTestRule.removeTile(label: String) {
+        if (QsEditModeV2.isEnabled) {
+            onNodeWithContentDescription(label).performClick()
+            onNodeWithText("Remove").performClick()
+        } else {
+            onNodeWithContentDescription(label).performTouchInput { click(position = topRight) }
+        }
+    }
 
     private fun assertLargeTiles(largeSpecs: Set<String>) =
         kosmos.run {
@@ -337,6 +360,10 @@ class InfiniteGridLayoutEditTileGridTest : SysuiTestCase() {
         }
 
     companion object {
+
+        @Parameters(name = "{0}")
+        @JvmStatic
+        fun data() = FlagsParameterization.progressionOf(QsEditModeV2.FLAG_NAME)
 
         private val AVAILABLE_TILES_GRID_TEST_TAG = resIdToTestTag("AvailableTilesGrid")
         private const val OPTIONS_DROP_DOWN_TEST_TAG = "OptionsDropdown"

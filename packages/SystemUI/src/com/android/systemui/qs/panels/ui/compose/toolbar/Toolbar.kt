@@ -28,20 +28,24 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.core.graphics.drawable.toBitmap
 import com.android.compose.animation.Expandable
 import com.android.compose.theme.LocalAndroidColorScheme
@@ -55,6 +59,7 @@ import com.android.systemui.qs.panels.ui.viewmodel.TextFeedbackContentViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.TextFeedbackViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.toolbar.ToolbarViewModel
 import com.android.systemui.qs.ui.compose.borderOnFocus
+import com.android.systemui.res.R
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -75,8 +80,8 @@ fun Toolbar(
                 if (securityInfoCollapsed) {
                     StandardToolbarLayout(
                         animatedContentScope = this@AnimatedContent,
-                        viewModel,
-                        isFullyVisible,
+                        viewModel = viewModel,
+                        isFullyVisible = isFullyVisible,
                     )
                 } else {
                     SecurityInfo(
@@ -93,8 +98,8 @@ fun Toolbar(
         }
 
         IconButton(
-            viewModel.powerButtonViewModel,
-            Modifier.sysuiResTag("pm_lite").minimumInteractiveComponentSize(),
+            model = viewModel.powerButtonViewModel,
+            modifier = Modifier.sysuiResTag("pm_lite"),
         )
     }
 }
@@ -111,7 +116,7 @@ private fun SharedTransitionScope.StandardToolbarLayout(
         // User switcher button
         IconButton(
             model = viewModel.userSwitcherViewModel,
-            Modifier.sysuiResTag("multi_user_switch").minimumInteractiveComponentSize(),
+            Modifier.sysuiResTag("multi_user_switch"),
             iconColor = Color.Unspecified,
             useIconColorProtection = true,
         )
@@ -124,7 +129,7 @@ private fun SharedTransitionScope.StandardToolbarLayout(
         // Settings button
         IconButton(
             model = viewModel.settingsButtonViewModel,
-            Modifier.sysuiResTag("settings_button_container").minimumInteractiveComponentSize(),
+            modifier = Modifier.sysuiResTag("settings_button_container"),
         )
 
         // Security info button
@@ -162,7 +167,14 @@ private fun IconButton(
         shape = CircleShape,
         onClick = model.onClick,
         modifier =
-            modifier.borderOnFocus(MaterialTheme.colorScheme.secondary, CornerSize(percent = 50)),
+            modifier
+                .sizeIn(
+                    minHeight = IconButtonDimensions.MinimumSize,
+                    minWidth = IconButtonDimensions.MinimumSize
+                )
+                .aspectRatio(1.0F)
+                .borderOnFocus(MaterialTheme.colorScheme.secondary, CornerSize(percent = 50))
+                .wrapContentSize(),
         useModifierBasedImplementation = true,
     ) {
         val protectionColor =
@@ -173,10 +185,16 @@ private fun IconButton(
             }
         Box(
             modifier =
-                Modifier.size(36.dp).background(color = protectionColor, shape = CircleShape),
+                Modifier
+                    .size(IconButtonDimensions.ColoredBackgroundSize)
+                    .background(color = protectionColor, shape = CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            ToolbarIcon(icon = model.icon, modifier = Modifier.size(24.dp), tint = iconColor)
+            ToolbarIcon(
+                icon = model.icon,
+                modifier = Modifier.size(IconButtonDimensions.IconSize),
+                tint = iconColor
+            )
         }
     }
 }
@@ -221,4 +239,22 @@ private object Toolbar {
     object TransitionKeys {
         const val SecurityInfoKey = "SecurityInfo"
     }
+}
+
+object IconButtonDimensions {
+    val ColoredBackgroundSize: Dp
+        @Composable
+        @ReadOnlyComposable
+        get() = dimensionResource(id = R.dimen.toolbar_button_colored_background_size)
+
+    val IconSize: Dp
+        @Composable
+        @ReadOnlyComposable
+        get() = dimensionResource(id = R.dimen.toolbar_button_icon_size)
+
+    val MinimumSize: Dp
+        @Composable
+        @ReadOnlyComposable
+        get() =
+            dimensionResource(id = R.dimen.toolbar_button_size)
 }

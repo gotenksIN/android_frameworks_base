@@ -45,6 +45,8 @@ package android {
     field public static final String BIND_DREAM_SERVICE = "android.permission.BIND_DREAM_SERVICE";
     field public static final String BIND_INCALL_SERVICE = "android.permission.BIND_INCALL_SERVICE";
     field public static final String BIND_INPUT_METHOD = "android.permission.BIND_INPUT_METHOD";
+    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final String BIND_INSIGHT_RENDERER_SERVICE = "android.permission.BIND_INSIGHT_RENDERER_SERVICE";
+    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final String BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE = "android.permission.BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE";
     field public static final String BIND_MIDI_DEVICE_SERVICE = "android.permission.BIND_MIDI_DEVICE_SERVICE";
     field public static final String BIND_NFC_SERVICE = "android.permission.BIND_NFC_SERVICE";
     field public static final String BIND_NOTIFICATION_LISTENER_SERVICE = "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE";
@@ -244,6 +246,7 @@ package android {
     field public static final String NFC = "android.permission.NFC";
     field public static final String NFC_PREFERRED_PAYMENT_INFO = "android.permission.NFC_PREFERRED_PAYMENT_INFO";
     field public static final String NFC_TRANSACTION_EVENT = "android.permission.NFC_TRANSACTION_EVENT";
+    field @FlaggedApi("com.android.media.mediasession.flags.override_media_session_owner") public static final String OVERRIDE_MEDIA_SESSION_OWNER = "android.permission.OVERRIDE_MEDIA_SESSION_OWNER";
     field public static final String OVERRIDE_WIFI_CONFIG = "android.permission.OVERRIDE_WIFI_CONFIG";
     field public static final String PACKAGE_USAGE_STATS = "android.permission.PACKAGE_USAGE_STATS";
     field @Deprecated public static final String PERSISTENT_ACTIVITY = "android.permission.PERSISTENT_ACTIVITY";
@@ -255,6 +258,7 @@ package android {
     field @FlaggedApi("android.security.aapm_api") public static final String QUERY_ADVANCED_PROTECTION_MODE = "android.permission.QUERY_ADVANCED_PROTECTION_MODE";
     field public static final String QUERY_ALL_PACKAGES = "android.permission.QUERY_ALL_PACKAGES";
     field @FlaggedApi("android.media.audio.guard_stream_volume_apis") public static final String QUERY_AUDIO_VOLUME = "android.permission.QUERY_AUDIO_VOLUME";
+    field @FlaggedApi("android.view.inputmethod.guard_input_method_list_apis") public static final String QUERY_INPUT_METHOD = "android.permission.QUERY_INPUT_METHOD";
     field @FlaggedApi("android.permission.flags.ranging_permission_enabled") public static final String RANGING = "android.permission.RANGING";
     field public static final String READ_ASSISTANT_APP_SEARCH_DATA = "android.permission.READ_ASSISTANT_APP_SEARCH_DATA";
     field public static final String READ_BASIC_PHONE_STATE = "android.permission.READ_BASIC_PHONE_STATE";
@@ -345,6 +349,7 @@ package android {
     field @Deprecated public static final String USE_FINGERPRINT = "android.permission.USE_FINGERPRINT";
     field public static final String USE_FULL_SCREEN_INTENT = "android.permission.USE_FULL_SCREEN_INTENT";
     field public static final String USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER = "android.permission.USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER";
+    field @FlaggedApi("com.android.window.flags.enable_interactive_picture_in_picture") public static final String USE_PINNED_WINDOWING_LAYER = "android.permission.USE_PINNED_WINDOWING_LAYER";
     field public static final String USE_SIP = "android.permission.USE_SIP";
     field public static final String UWB_RANGING = "android.permission.UWB_RANGING";
     field public static final String VIBRATE = "android.permission.VIBRATE";
@@ -4558,7 +4563,6 @@ package android.app {
     method public boolean isDestroyed();
     method public boolean isFinishing();
     method @FlaggedApi("android.companion.enable_task_continuity") public final boolean isHandoffEnabled();
-    method @FlaggedApi("android.companion.enable_task_continuity") public final boolean isHandoffFullTaskRecreationAllowed();
     method public boolean isImmersive();
     method public boolean isInMultiWindowMode();
     method public boolean isInPictureInPictureMode();
@@ -4704,7 +4708,7 @@ package android.app {
     method public final void setFeatureDrawableResource(int, @DrawableRes int);
     method public final void setFeatureDrawableUri(int, android.net.Uri);
     method public void setFinishOnTouchOutside(boolean);
-    method @FlaggedApi("android.companion.enable_task_continuity") public final void setHandoffEnabled(boolean, boolean);
+    method @FlaggedApi("android.companion.enable_task_continuity") public final void setHandoffEnabled(boolean);
     method public void setImmersive(boolean);
     method public void setInheritShowWhenLocked(boolean);
     method public void setIntent(android.content.Intent);
@@ -4834,11 +4838,13 @@ package android.app {
     method @RequiresPermission(android.Manifest.permission.KILL_BACKGROUND_PROCESSES) public void killBackgroundProcesses(String);
     method @RequiresPermission(android.Manifest.permission.REORDER_TASKS) public void moveTaskToFront(int, int);
     method @RequiresPermission(android.Manifest.permission.REORDER_TASKS) public void moveTaskToFront(int, int, android.os.Bundle);
+    method @FlaggedApi("com.android.window.flags.enable_task_move_allowed_listener_api") public void registerTaskDisplayPolicyStateListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.util.List<android.app.TaskDisplayPolicyState>>);
     method public void removeApplicationStartInfoCompletionListener(@NonNull java.util.function.Consumer<android.app.ApplicationStartInfo>);
     method @Deprecated public void restartPackage(String);
     method public void setProcessStateSummary(@Nullable byte[]);
     method public static void setVrThread(int);
     method public void setWatchHeapLimit(long);
+    method @FlaggedApi("com.android.window.flags.enable_task_move_allowed_listener_api") public void unregisterTaskDisplayPolicyStateListener(@NonNull java.util.function.Consumer<java.util.List<android.app.TaskDisplayPolicyState>>);
     field public static final String ACTION_REPORT_HEAP_LIMIT = "android.app.action.REPORT_HEAP_LIMIT";
     field public static final int LOCK_TASK_MODE_LOCKED = 1; // 0x1
     field public static final int LOCK_TASK_MODE_NONE = 0; // 0x0
@@ -6200,8 +6206,9 @@ package android.app {
   }
 
   @FlaggedApi("android.companion.enable_task_continuity") public final class HandoffActivityData implements android.os.Parcelable {
+    method @NonNull public static android.app.HandoffActivityData createWebHandoff(@NonNull android.net.Uri);
     method public int describeContents();
-    method @NonNull public android.content.ComponentName getComponentName();
+    method @Nullable public android.content.ComponentName getComponentName();
     method @NonNull public android.os.PersistableBundle getExtras();
     method @Nullable public android.net.Uri getFallbackUri();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
@@ -6524,6 +6531,7 @@ package android.app {
     ctor @Deprecated public Notification(int, CharSequence, long);
     ctor public Notification(android.os.Parcel);
     method public android.app.Notification clone();
+    method @FlaggedApi("android.app.api_notification_semantic_style") @NonNull public static android.text.Annotation createSemanticStyleAnnotation(int);
     method public int describeContents();
     method @Nullable public android.util.Pair<android.app.RemoteInput,android.app.Notification.Action> findRemoteInputActionPair(boolean);
     method public boolean getAllowSystemGeneratedContextualActions();
@@ -6536,14 +6544,14 @@ package android.app {
     method public android.graphics.drawable.Icon getLargeIcon();
     method @Nullable public android.content.LocusId getLocusId();
     method public CharSequence getSettingsText();
-    method @FlaggedApi("android.app.api_rich_ongoing") @Nullable public String getShortCriticalText();
+    method @Nullable public String getShortCriticalText();
     method public String getShortcutId();
     method public android.graphics.drawable.Icon getSmallIcon();
     method public String getSortKey();
     method @FlaggedApi("android.app.nm_summarization_all") @Nullable public CharSequence getSummarizedContent();
     method public long getTimeoutAfter();
     method public boolean hasImage();
-    method @FlaggedApi("android.app.api_rich_ongoing") public boolean hasPromotableCharacteristics();
+    method public boolean hasPromotableCharacteristics();
     method @FlaggedApi("android.app.nm_summarization") public boolean hasSummarizedContent();
     method @FlaggedApi("android.app.opt_in_rich_ongoing") public boolean isRequestPromotedOngoing();
     method public void writeToParcel(android.os.Parcel, int);
@@ -6640,7 +6648,7 @@ package android.app {
     field public static final int FLAG_NO_CLEAR = 32; // 0x20
     field public static final int FLAG_ONGOING_EVENT = 2; // 0x2
     field public static final int FLAG_ONLY_ALERT_ONCE = 8; // 0x8
-    field @FlaggedApi("android.app.api_rich_ongoing") public static final int FLAG_PROMOTED_ONGOING = 262144; // 0x40000
+    field public static final int FLAG_PROMOTED_ONGOING = 262144; // 0x40000
     field @Deprecated public static final int FLAG_SHOW_LIGHTS = 1; // 0x1
     field public static final int FOREGROUND_SERVICE_DEFAULT = 0; // 0x0
     field public static final int FOREGROUND_SERVICE_DEFERRED = 2; // 0x2
@@ -6654,6 +6662,11 @@ package android.app {
     field @Deprecated public static final int PRIORITY_LOW = -1; // 0xffffffff
     field @Deprecated public static final int PRIORITY_MAX = 2; // 0x2
     field @Deprecated public static final int PRIORITY_MIN = -2; // 0xfffffffe
+    field @FlaggedApi("android.app.api_notification_semantic_style") public static final int SEMANTIC_STYLE_CAUTION = 3; // 0x3
+    field @FlaggedApi("android.app.api_notification_semantic_style") public static final int SEMANTIC_STYLE_DANGER = 4; // 0x4
+    field @FlaggedApi("android.app.api_notification_semantic_style") public static final int SEMANTIC_STYLE_INFO = 1; // 0x1
+    field @FlaggedApi("android.app.api_notification_semantic_style") public static final int SEMANTIC_STYLE_SAFE = 2; // 0x2
+    field @FlaggedApi("android.app.api_notification_semantic_style") public static final int SEMANTIC_STYLE_UNSPECIFIED = 0; // 0x0
     field @Deprecated public static final int STREAM_DEFAULT = -1; // 0xffffffff
     field public static final int VISIBILITY_PRIVATE = 0; // 0x0
     field public static final int VISIBILITY_PUBLIC = 1; // 0x1
@@ -6695,14 +6708,19 @@ package android.app {
     method public int describeContents();
     method public boolean getAllowGeneratedReplies();
     method public android.app.RemoteInput[] getDataOnlyRemoteInputs();
+    method @FlaggedApi("android.app.api_notification_action_custom") public int getEmphasisHint();
     method public android.os.Bundle getExtras();
     method public android.graphics.drawable.Icon getIcon();
     method public android.app.RemoteInput[] getRemoteInputs();
     method public int getSemanticAction();
+    method @FlaggedApi("android.app.api_notification_action_custom") public int getStyleHint();
     method public boolean isAuthenticationRequired();
     method public boolean isContextual();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.app.Notification.Action> CREATOR;
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int EMPHASIS_AUTO = 0; // 0x0
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int EMPHASIS_PRIMARY = 1; // 0x1
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int EMPHASIS_SECONDARY = 2; // 0x2
     field public static final int SEMANTIC_ACTION_ARCHIVE = 5; // 0x5
     field public static final int SEMANTIC_ACTION_CALL = 10; // 0xa
     field public static final int SEMANTIC_ACTION_DELETE = 4; // 0x4
@@ -6714,6 +6732,10 @@ package android.app {
     field public static final int SEMANTIC_ACTION_THUMBS_DOWN = 9; // 0x9
     field public static final int SEMANTIC_ACTION_THUMBS_UP = 8; // 0x8
     field public static final int SEMANTIC_ACTION_UNMUTE = 7; // 0x7
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int STYLE_AUTO = 0; // 0x0
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int STYLE_ICON_AND_TEXT = 2; // 0x2
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int STYLE_ICON_ONLY = 3; // 0x3
+    field @FlaggedApi("android.app.api_notification_action_custom") public static final int STYLE_TEXT_ONLY = 1; // 0x1
     field public android.app.PendingIntent actionIntent;
     field @Deprecated public int icon;
     field public CharSequence title;
@@ -6731,7 +6753,9 @@ package android.app {
     method @NonNull public android.app.Notification.Action.Builder setAllowGeneratedReplies(boolean);
     method @NonNull public android.app.Notification.Action.Builder setAuthenticationRequired(boolean);
     method @NonNull public android.app.Notification.Action.Builder setContextual(boolean);
+    method @FlaggedApi("android.app.api_notification_action_custom") @NonNull public android.app.Notification.Action.Builder setEmphasisHint(int);
     method @NonNull public android.app.Notification.Action.Builder setSemanticAction(int);
+    method @FlaggedApi("android.app.api_notification_action_custom") @NonNull public android.app.Notification.Action.Builder setStyleHint(int);
   }
 
   public static interface Notification.Action.Extender {
@@ -6868,7 +6892,7 @@ package android.app {
     method @NonNull public android.app.Notification.Builder setRemoteInputHistory(CharSequence[]);
     method @FlaggedApi("android.app.opt_in_rich_ongoing") @NonNull public android.app.Notification.Builder setRequestPromotedOngoing(boolean);
     method @NonNull public android.app.Notification.Builder setSettingsText(CharSequence);
-    method @FlaggedApi("android.app.api_rich_ongoing") @NonNull public android.app.Notification.Builder setShortCriticalText(@Nullable String);
+    method @NonNull public android.app.Notification.Builder setShortCriticalText(@Nullable String);
     method @NonNull public android.app.Notification.Builder setShortcutId(String);
     method @NonNull public android.app.Notification.Builder setShowWhen(boolean);
     method @NonNull public android.app.Notification.Builder setSmallIcon(@DrawableRes int);
@@ -6998,7 +7022,9 @@ package android.app {
 
   @FlaggedApi("android.app.api_metric_style") public static final class Notification.Metric {
     ctor public Notification.Metric(@NonNull android.app.Notification.Metric.MetricValue, @NonNull CharSequence);
+    ctor @FlaggedApi("android.app.api_notification_semantic_style") public Notification.Metric(@NonNull android.app.Notification.Metric.MetricValue, @NonNull CharSequence, int);
     method @NonNull public CharSequence getLabel();
+    method @FlaggedApi("android.app.api_notification_semantic_style") public int getSemanticStyle();
     method @NonNull public android.app.Notification.Metric.MetricValue getValue();
   }
 
@@ -7029,9 +7055,9 @@ package android.app {
     method public int getValue();
   }
 
-  public static final class Notification.Metric.FixedString extends android.app.Notification.Metric.MetricValue {
-    ctor public Notification.Metric.FixedString(@NonNull CharSequence);
-    ctor public Notification.Metric.FixedString(@NonNull CharSequence, @Nullable CharSequence);
+  public static final class Notification.Metric.FixedText extends android.app.Notification.Metric.MetricValue {
+    ctor public Notification.Metric.FixedText(@NonNull CharSequence);
+    ctor public Notification.Metric.FixedText(@NonNull CharSequence, @Nullable CharSequence);
     method @Nullable public CharSequence getUnit();
     method @NonNull public CharSequence getValue();
   }
@@ -7068,7 +7094,7 @@ package android.app {
     method @NonNull public android.app.Notification.MetricStyle setMetrics(@NonNull java.util.List<android.app.Notification.Metric>);
   }
 
-  @FlaggedApi("android.app.api_rich_ongoing") public static class Notification.ProgressStyle extends android.app.Notification.Style {
+  public static class Notification.ProgressStyle extends android.app.Notification.Style {
     ctor public Notification.ProgressStyle();
     method @NonNull public android.app.Notification.ProgressStyle addProgressPoint(@NonNull android.app.Notification.ProgressStyle.Point);
     method @NonNull public android.app.Notification.ProgressStyle addProgressSegment(@NonNull android.app.Notification.ProgressStyle.Segment);
@@ -7096,8 +7122,10 @@ package android.app {
     method @ColorInt public int getColor();
     method public int getId();
     method @IntRange(from=1) public int getPosition();
+    method @FlaggedApi("android.app.api_notification_semantic_style") public int getSemanticStyle();
     method @NonNull public android.app.Notification.ProgressStyle.Point setColor(@ColorInt int);
     method @NonNull public android.app.Notification.ProgressStyle.Point setId(int);
+    method @FlaggedApi("android.app.api_notification_semantic_style") @NonNull public android.app.Notification.ProgressStyle.Point setSemanticStyle(int);
   }
 
   public static final class Notification.ProgressStyle.Segment {
@@ -7105,8 +7133,10 @@ package android.app {
     method @ColorInt public int getColor();
     method public int getId();
     method @IntRange(from=1) public int getLength();
+    method @FlaggedApi("android.app.api_notification_semantic_style") public int getSemanticStyle();
     method @NonNull public android.app.Notification.ProgressStyle.Segment setColor(@ColorInt int);
     method @NonNull public android.app.Notification.ProgressStyle.Segment setId(int);
+    method @FlaggedApi("android.app.api_notification_semantic_style") @NonNull public android.app.Notification.ProgressStyle.Segment setSemanticStyle(int);
   }
 
   public abstract static class Notification.Style {
@@ -7271,7 +7301,7 @@ package android.app {
     method public boolean areNotificationsEnabled();
     method public boolean areNotificationsPaused();
     method public boolean canNotifyAsPackage(@NonNull String);
-    method @FlaggedApi("android.app.api_rich_ongoing") public boolean canPostPromotedNotifications();
+    method public boolean canPostPromotedNotifications();
     method public boolean canUseFullScreenIntent();
     method public void cancel(int);
     method public void cancel(@Nullable String, int);
@@ -7803,6 +7833,14 @@ package android.app {
     method @Deprecated public void setDefaultTab(int);
   }
 
+  @FlaggedApi("com.android.window.flags.enable_task_move_allowed_listener_api") public final class TaskDisplayPolicyState {
+    method public int getDisplayId();
+    method public int getTaskMoveState();
+    field public static final int TASK_MOVE_ALLOWED = 1; // 0x1
+    field public static final int TASK_MOVE_DISALLOWED = 2; // 0x2
+    field public static final int TASK_MOVE_UNKNOWN = 0; // 0x0
+  }
+
   public class TaskInfo {
     method public boolean isVisible();
     field @Nullable public android.content.ComponentName baseActivity;
@@ -8232,6 +8270,7 @@ package android.app.admin {
     field public static final String AUTO_TIME_POLICY = "autoTime";
     field public static final String BACKUP_SERVICE_POLICY = "backupService";
     field public static final String CAMERA_DISABLED_POLICY = "cameraDisabled";
+    field @FlaggedApi("android.app.admin.flags.common_criteria_mode_coexistence") public static final String COMMON_CRITERIA_MODE_POLICY = "commonCriteriaMode";
     field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final String CONTENT_PROTECTION_POLICY = "contentProtection";
     field @FlaggedApi("android.app.admin.flags.cross_profile_widget_provider_bulk_apis") public static final String CROSS_PROFILE_WIDGET_PROVIDER_POLICY = "crossProfileWidgetProvider";
     field public static final String KEYGUARD_DISABLED_FEATURES_POLICY = "keyguardDisabledFeatures";
@@ -9024,6 +9063,10 @@ package android.app.admin {
 
 package android.app.appfunctions {
 
+  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public interface AppFunction {
+    method public void onExecuteAppFunction(@NonNull android.app.appfunctions.ExecuteAppFunctionRequest, @NonNull android.os.CancellationSignal, @NonNull android.os.OutcomeReceiver<android.app.appfunctions.ExecuteAppFunctionResponse,android.app.appfunctions.AppFunctionException>);
+  }
+
   @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public final class AppFunctionAttribution implements android.os.Parcelable {
     method public int describeContents();
     method @Nullable public String getCustomInteractionType();
@@ -9075,6 +9118,7 @@ package android.app.appfunctions {
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public int getAccessRequestState(@NonNull String);
     method @RequiresPermission(value=android.Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional=true) public void isAppFunctionEnabled(@NonNull String, @NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
     method public void isAppFunctionEnabled(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
+    method @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") @NonNull public android.app.appfunctions.AppFunctionRegistration registerAppFunction(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.app.appfunctions.AppFunction);
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public void revokeSelfAccess(@NonNull String);
     method public void setAppFunctionEnabled(@NonNull String, int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,java.lang.Exception>);
     field @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public static final int ACCESS_REQUEST_STATE_DENIED = 1; // 0x1
@@ -9086,6 +9130,42 @@ package android.app.appfunctions {
     field public static final int APP_FUNCTION_STATE_DEFAULT = 0; // 0x0
     field public static final int APP_FUNCTION_STATE_DISABLED = 2; // 0x2
     field public static final int APP_FUNCTION_STATE_ENABLED = 1; // 0x1
+  }
+
+  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public class AppFunctionMetadata {
+    method @NonNull public android.app.appsearch.GenericDocument getMetadataDocument();
+    method @NonNull public android.app.appfunctions.AppFunctionName getName();
+    method @NonNull public android.app.appfunctions.AppFunctionPackageMetadata getPackageMetadata();
+    method @Nullable public android.app.appfunctions.AppFunctionSchemaMetadata getSchemaMetadata();
+    method public boolean isEnabled();
+    field public static final String PROPERTY_ENABLED_BY_DEFAULT = "enabledByDefault";
+    field public static final String PROPERTY_FUNCTION_ID = "id";
+    field public static final String PROPERTY_SCHEMA_CATEGORY = "schemaCategory";
+    field public static final String PROPERTY_SCHEMA_NAME = "schemaName";
+    field public static final String PROPERTY_SCHEMA_VERSION = "schemaVersion";
+  }
+
+  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public class AppFunctionName {
+    ctor public AppFunctionName(@NonNull String, @NonNull String);
+    method @NonNull public String getFunctionId();
+    method @NonNull public String getPackageName();
+  }
+
+  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public class AppFunctionPackageMetadata {
+    method @NonNull public android.app.appsearch.GenericDocument getMetadataDocument();
+    method @NonNull public String getPackageName();
+    field public static final String PROPERTY_TOP_LEVEL_DOCUMENTS = "topLevelMetadataDocuments";
+  }
+
+  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public interface AppFunctionRegistration {
+    method public void unregister();
+  }
+
+  @FlaggedApi("android.app.appfunctions.flags.enable_contextual_app_functions") public class AppFunctionSchemaMetadata {
+    ctor public AppFunctionSchemaMetadata(@NonNull String, @NonNull String, long);
+    method @NonNull public String getCategory();
+    method @NonNull public String getName();
+    method public long getVersion();
   }
 
   @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public abstract class AppFunctionService extends android.app.Service {
@@ -10284,6 +10364,7 @@ package android.companion {
     method @Nullable public android.net.MacAddress getDeviceMacAddress();
     method @Nullable public String getDeviceProfile();
     method @Nullable public CharSequence getDisplayName();
+    method @FlaggedApi("android.companion.association_extra_permission") @NonNull public java.util.Set<java.lang.String> getExtraPermissions();
     method public int getId();
     method public int getSystemDataSyncFlags();
     method public boolean isSelfManaged();
@@ -10296,6 +10377,7 @@ package android.companion {
     method @FlaggedApi("android.companion.association_device_icon") @Nullable public android.graphics.drawable.Icon getDeviceIcon();
     method @Nullable public String getDeviceProfile();
     method @Nullable public CharSequence getDisplayName();
+    method @FlaggedApi("android.companion.association_extra_permission") @NonNull public java.util.Set<java.lang.String> getExtraPermissions();
     method public boolean isForceConfirmation();
     method public boolean isSelfManaged();
     method public boolean isSingleDevice();
@@ -10310,6 +10392,7 @@ package android.companion {
     field @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_NEARBY_DEVICE_STREAMING) public static final String DEVICE_PROFILE_NEARBY_DEVICE_STREAMING = "android.app.role.COMPANION_DEVICE_NEARBY_DEVICE_STREAMING";
     field @FlaggedApi("android.companion.virtualdevice.flags.enable_limited_vdm_role") @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_PROFILE_VIRTUAL_DEVICE) public static final String DEVICE_PROFILE_VIRTUAL_DEVICE = "android.app.role.COMPANION_DEVICE_VIRTUAL_DEVICE";
     field public static final String DEVICE_PROFILE_WATCH = "android.app.role.COMPANION_DEVICE_WATCH";
+    field @FlaggedApi("android.companion.association_extra_permission") public static final String PERMISSION_GROUP_NEARBY = "NEARBY_DEVICES";
   }
 
   public static final class AssociationRequest.Builder {
@@ -10319,6 +10402,7 @@ package android.companion {
     method @FlaggedApi("android.companion.association_device_icon") @NonNull @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED) public android.companion.AssociationRequest.Builder setDeviceIcon(@NonNull android.graphics.drawable.Icon);
     method @NonNull public android.companion.AssociationRequest.Builder setDeviceProfile(@NonNull String);
     method @NonNull public android.companion.AssociationRequest.Builder setDisplayName(@NonNull CharSequence);
+    method @FlaggedApi("android.companion.association_extra_permission") @NonNull public android.companion.AssociationRequest.Builder setExtraPermissions(@NonNull java.util.Set<java.lang.String>);
     method @NonNull @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED) public android.companion.AssociationRequest.Builder setForceConfirmation(boolean);
     method @NonNull @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED) public android.companion.AssociationRequest.Builder setSelfManaged(boolean);
     method @NonNull public android.companion.AssociationRequest.Builder setSingleDevice(boolean);
@@ -12780,6 +12864,7 @@ package android.content.pm {
     ctor public ApplicationInfo();
     ctor public ApplicationInfo(android.content.pm.ApplicationInfo);
     method public boolean areAttributionsUserVisible();
+    method public int canOverrideRes();
     method public int describeContents();
     method public void dump(android.util.Printer, String);
     method public static CharSequence getCategoryTitle(android.content.Context, int);
@@ -12794,6 +12879,7 @@ package android.content.pm {
     method public boolean isResourceOverlay();
     method public boolean isVirtualPreload();
     method public CharSequence loadDescription(android.content.pm.PackageManager);
+    method public void setOverrideRes(int);
     field public static final int CATEGORY_ACCESSIBILITY = 8; // 0x8
     field public static final int CATEGORY_AUDIO = 1; // 0x1
     field public static final int CATEGORY_GAME = 0; // 0x0
@@ -12866,6 +12952,8 @@ package android.content.pm {
     field public String manageSpaceActivityName;
     field public int minSdkVersion;
     field public String nativeLibraryDir;
+    field public int overrideDensity;
+    field public int overrideRes;
     field public String permission;
     field public String processName;
     field public String publicSourceDir;
@@ -13801,6 +13889,7 @@ package android.content.pm {
     field public static final String FEATURE_MANAGED_USERS = "android.software.managed_users";
     field public static final String FEATURE_MICROPHONE = "android.hardware.microphone";
     field public static final String FEATURE_MIDI = "android.software.midi";
+    field @FlaggedApi("com.android.npumanager.npumanager_enabled") public static final String FEATURE_NEURAL_PROCESSING_UNIT = "android.hardware.npu";
     field public static final String FEATURE_NFC = "android.hardware.nfc";
     field public static final String FEATURE_NFC_BEAM = "android.sofware.nfc.beam";
     field @FlaggedApi("android.nfc.enable_nfc_charging") public static final String FEATURE_NFC_CHARGING = "android.hardware.nfc.charging";
@@ -14159,7 +14248,7 @@ package android.content.pm {
     field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_CAMERA}, anyOf={android.Manifest.permission.CAMERA}, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_CAMERA = 64; // 0x40
     field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE}, anyOf={android.Manifest.permission.BLUETOOTH_ADVERTISE, android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.CHANGE_NETWORK_STATE, android.Manifest.permission.CHANGE_WIFI_STATE, android.Manifest.permission.CHANGE_WIFI_MULTICAST_STATE, android.Manifest.permission.NFC, android.Manifest.permission.TRANSMIT_IR, android.Manifest.permission.UWB_RANGING, android.Manifest.permission.RANGING}, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE = 16; // 0x10
     field @RequiresPermission(value=android.Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_DATA_SYNC = 1; // 0x1
-    field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_HEALTH}, anyOf={android.Manifest.permission.ACTIVITY_RECOGNITION, android.Manifest.permission.HIGH_SAMPLING_RATE_SENSORS, android.health.connect.HealthPermissions.READ_HEART_RATE, android.health.connect.HealthPermissions.READ_SKIN_TEMPERATURE, android.health.connect.HealthPermissions.READ_OXYGEN_SATURATION}) public static final int FOREGROUND_SERVICE_TYPE_HEALTH = 256; // 0x100
+    field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_HEALTH}, anyOf={android.Manifest.permission.ACTIVITY_RECOGNITION, android.Manifest.permission.HIGH_SAMPLING_RATE_SENSORS, android.health.connect.HealthPermissions.READ_HEART_RATE, android.health.connect.HealthPermissions.READ_SKIN_TEMPERATURE, android.health.connect.HealthPermissions.READ_OXYGEN_SATURATION, android.health.connect.HealthPermissions.READ_BLOOD_PRESSURE, android.health.connect.HealthPermissions.READ_HEART_RATE_VARIABILITY, android.health.connect.HealthPermissions.READ_RESPIRATORY_RATE, android.health.connect.HealthPermissions.READ_VO2_MAX}) public static final int FOREGROUND_SERVICE_TYPE_HEALTH = 256; // 0x100
     field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_LOCATION}, anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_LOCATION = 8; // 0x8
     field public static final int FOREGROUND_SERVICE_TYPE_MANIFEST = -1; // 0xffffffff
     field @RequiresPermission(value=android.Manifest.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK = 2; // 0x2
@@ -16852,6 +16941,7 @@ package android.graphics {
   public static final class ImageDecoder.DecodeException extends java.io.IOException {
     method public int getError();
     method @NonNull public android.graphics.ImageDecoder.Source getSource();
+    field @FlaggedApi("com.android.graphics.hwui.flags.image_decoder_gainmap_fail") public static final int GAINMAP_EXTRACTION_FAILED = 4; // 0x4
     field public static final int SOURCE_EXCEPTION = 1; // 0x1
     field public static final int SOURCE_INCOMPLETE = 2; // 0x2
     field public static final int SOURCE_MALFORMED_DATA = 3; // 0x3
@@ -18989,12 +19079,16 @@ package android.hardware {
 
   @Deprecated public static class Camera.Face {
     ctor @Deprecated public Camera.Face();
+    field @Deprecated public int blinkDetected;
+    field @Deprecated public int faceRecognised;
     field @Deprecated public int id;
     field @Deprecated public android.graphics.Point leftEye;
     field @Deprecated public android.graphics.Point mouth;
     field @Deprecated public android.graphics.Rect rect;
     field @Deprecated public android.graphics.Point rightEye;
     field @Deprecated public int score;
+    field @Deprecated public int smileDegree;
+    field @Deprecated public int smileScore;
   }
 
   @Deprecated public static interface Camera.FaceDetectionListener {
@@ -22270,14 +22364,15 @@ package android.media {
     method public int getRingerMode();
     method @Deprecated public int getRouting(int);
     method @NonNull public android.media.Spatializer getSpatializer();
-    method public int getStreamMaxVolume(int);
+    method @FlaggedApi("android.media.audio.guard_stream_volume_apis") @RequiresPermission(value=android.Manifest.permission.QUERY_AUDIO_VOLUME, conditional=true) public int getStreamMaxVolume(int);
     method public int getStreamMinVolume(int);
-    method public int getStreamVolume(int);
+    method @FlaggedApi("android.media.audio.guard_stream_volume_apis") @RequiresPermission(value=android.Manifest.permission.QUERY_AUDIO_VOLUME, conditional=true) public int getStreamVolume(int);
     method public float getStreamVolumeDb(int, int, int);
     method @FlaggedApi("android.media.audio.supported_device_types_api") @NonNull public java.util.Set<java.lang.Integer> getSupportedDeviceTypes(int);
     method @NonNull public java.util.List<android.media.AudioMixerAttributes> getSupportedMixerAttributes(@NonNull android.media.AudioDeviceInfo);
     method @Deprecated public int getVibrateSetting(int);
     method public int getVolumeGroupIdForAttributes(@NonNull android.media.AudioAttributes);
+    method public void handleBluetoothA2dpActiveDeviceChange(android.bluetooth.BluetoothDevice, int, int, boolean, int);
     method @Deprecated public boolean isBluetoothA2dpOn();
     method public boolean isBluetoothScoAvailableOffCall();
     method @Deprecated public boolean isBluetoothScoOn();
@@ -24075,6 +24170,34 @@ package android.media {
     field public static final int VP9Profile3 = 8; // 0x8
     field public static final int VP9Profile3HDR = 8192; // 0x2000
     field public static final int VP9Profile3HDR10Plus = 32768; // 0x8000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCHighTierLevel40 = 64; // 0x40
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCHighTierLevel41 = 256; // 0x100
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCHighTierLevel50 = 1024; // 0x400
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCHighTierLevel51 = 4096; // 0x1000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCHighTierLevel52 = 16384; // 0x4000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCHighTierLevel60 = 65536; // 0x10000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCHighTierLevel61 = 262144; // 0x40000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCHighTierLevel62 = 1048576; // 0x100000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCHighTierLevel63 = 4194304; // 0x400000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel10 = 1; // 0x1
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel20 = 2; // 0x2
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel21 = 4; // 0x4
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel30 = 8; // 0x8
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel31 = 16; // 0x10
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel40 = 32; // 0x20
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel41 = 128; // 0x80
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel50 = 512; // 0x200
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel51 = 2048; // 0x800
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel52 = 8192; // 0x2000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel60 = 32768; // 0x8000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel61 = 131072; // 0x20000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel62 = 524288; // 0x80000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCMainTierLevel63 = 2097152; // 0x200000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCProfileMain10 = 2; // 0x2
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCProfileMain10HDR10 = 4096; // 0x1000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCProfileMain10HDR10Plus = 8192; // 0x2000
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCProfileMain10Still = 4; // 0x4
+    field @FlaggedApi("android.media.codec.vvc_support") public static final int VVCProfileMain8 = 1; // 0x1
     field public int level;
     field public int profile;
   }
@@ -24744,6 +24867,7 @@ package android.media {
     field public static final String MIMETYPE_VIDEO_SCRAMBLED = "video/scrambled";
     field public static final String MIMETYPE_VIDEO_VP8 = "video/x-vnd.on2.vp8";
     field public static final String MIMETYPE_VIDEO_VP9 = "video/x-vnd.on2.vp9";
+    field @FlaggedApi("android.media.codec.vvc_support") public static final String MIMETYPE_VIDEO_VVC = "video/vvc";
     field public static final int PICTURE_TYPE_B = 3; // 0x3
     field public static final int PICTURE_TYPE_I = 1; // 0x1
     field public static final int PICTURE_TYPE_P = 2; // 0x2
@@ -28018,6 +28142,7 @@ package android.media.session {
   public final class MediaSession {
     ctor public MediaSession(@NonNull android.content.Context, @NonNull String);
     ctor public MediaSession(@NonNull android.content.Context, @NonNull String, @Nullable android.os.Bundle);
+    ctor @FlaggedApi("com.android.media.mediasession.flags.override_media_session_owner") @RequiresPermission(android.Manifest.permission.OVERRIDE_MEDIA_SESSION_OWNER) public MediaSession(@NonNull android.content.Context, @NonNull String, @Nullable android.os.Bundle, @NonNull String);
     method @NonNull public android.media.session.MediaController getController();
     method @NonNull public android.media.session.MediaSessionManager.RemoteUserInfo getCurrentControllerInfo();
     method @NonNull public android.media.session.MediaSession.Token getSessionToken();
@@ -28087,16 +28212,21 @@ package android.media.session {
   public final class MediaSessionManager {
     method public void addOnActiveSessionsChangedListener(@NonNull android.media.session.MediaSessionManager.OnActiveSessionsChangedListener, @Nullable android.content.ComponentName);
     method public void addOnActiveSessionsChangedListener(@NonNull android.media.session.MediaSessionManager.OnActiveSessionsChangedListener, @Nullable android.content.ComponentName, @Nullable android.os.Handler);
+    method @FlaggedApi("com.android.media.mediasession.flags.fetch_media_controllers_for_app") @RequiresPermission(value=android.Manifest.permission.MEDIA_CONTENT_CONTROL, conditional=true) public void addOnActiveSessionsForPackageChangedListener(@NonNull java.util.concurrent.Executor, @NonNull String, @NonNull android.media.session.MediaSessionManager.OnActiveSessionsChangedListener);
+    method @FlaggedApi("com.android.media.mediasession.flags.fetch_media_controllers_for_app") @RequiresPermission(value=android.Manifest.permission.MEDIA_CONTENT_CONTROL, conditional=true) public void addOnActiveSessionsForPackageChangedListener(@NonNull java.util.concurrent.Executor, @NonNull String, @Nullable android.content.ComponentName, @NonNull android.media.session.MediaSessionManager.OnActiveSessionsChangedListener);
     method public void addOnMediaKeyEventSessionChangedListener(@NonNull java.util.concurrent.Executor, @NonNull android.media.session.MediaSessionManager.OnMediaKeyEventSessionChangedListener);
     method @Deprecated @FlaggedApi("com.android.media.mediasession.flags.deprecate_platform_mediasession2_apis") public void addOnSession2TokensChangedListener(@NonNull android.media.session.MediaSessionManager.OnSession2TokensChangedListener);
     method @Deprecated @FlaggedApi("com.android.media.mediasession.flags.deprecate_platform_mediasession2_apis") public void addOnSession2TokensChangedListener(@NonNull android.media.session.MediaSessionManager.OnSession2TokensChangedListener, @NonNull android.os.Handler);
     method @NonNull public java.util.List<android.media.session.MediaController> getActiveSessions(@Nullable android.content.ComponentName);
+    method @FlaggedApi("com.android.media.mediasession.flags.fetch_media_controllers_for_app") @NonNull @RequiresPermission(value=android.Manifest.permission.MEDIA_CONTENT_CONTROL, conditional=true) public java.util.List<android.media.session.MediaSession.Token> getActiveSessionsForPackage(@NonNull String);
+    method @FlaggedApi("com.android.media.mediasession.flags.fetch_media_controllers_for_app") @NonNull @RequiresPermission(value=android.Manifest.permission.MEDIA_CONTENT_CONTROL, conditional=true) public java.util.List<android.media.session.MediaSession.Token> getActiveSessionsForPackage(@NonNull String, @Nullable android.content.ComponentName);
     method @Nullable public android.media.session.MediaSession.Token getMediaKeyEventSession();
     method @NonNull public String getMediaKeyEventSessionPackageName();
     method @Deprecated @FlaggedApi("com.android.media.mediasession.flags.deprecate_platform_mediasession2_apis") @NonNull public java.util.List<android.media.Session2Token> getSession2Tokens();
     method public boolean isTrustedForMediaControl(@NonNull android.media.session.MediaSessionManager.RemoteUserInfo);
     method @Deprecated public void notifySession2Created(@NonNull android.media.Session2Token);
     method public void removeOnActiveSessionsChangedListener(@NonNull android.media.session.MediaSessionManager.OnActiveSessionsChangedListener);
+    method @FlaggedApi("com.android.media.mediasession.flags.fetch_media_controllers_for_app") public void removeOnActiveSessionsForPackageChangedListener(@NonNull android.media.session.MediaSessionManager.OnActiveSessionsChangedListener);
     method public void removeOnMediaKeyEventSessionChangedListener(@NonNull android.media.session.MediaSessionManager.OnMediaKeyEventSessionChangedListener);
     method @Deprecated @FlaggedApi("com.android.media.mediasession.flags.deprecate_platform_mediasession2_apis") public void removeOnSession2TokensChangedListener(@NonNull android.media.session.MediaSessionManager.OnSession2TokensChangedListener);
   }
@@ -33967,6 +34097,7 @@ package android.os {
     field public static final int BAKLAVA = 36; // 0x24
     field public static final int BASE = 1; // 0x1
     field public static final int BASE_1_1 = 2; // 0x2
+    field @FlaggedApi("android.sdk.version_codes_cinnamon_bun") public static final int CINNAMON_BUN = 10000; // 0x2710
     field public static final int CUPCAKE = 3; // 0x3
     field public static final int CUR_DEVELOPMENT = 10000; // 0x2710
     field public static final int DONUT = 4; // 0x4
@@ -34008,6 +34139,7 @@ package android.os {
     field public static final int BAKLAVA_1 = 3600001; // 0x36ee81
     field public static final int BASE = 100000; // 0x186a0
     field public static final int BASE_1_1 = 200000; // 0x30d40
+    field @FlaggedApi("android.sdk.version_codes_cinnamon_bun") public static final int CINNAMON_BUN = 1000000000; // 0x3b9aca00
     field public static final int CUPCAKE = 300000; // 0x493e0
     field public static final int DONUT = 400000; // 0x61a80
     field public static final int ECLAIR = 500000; // 0x7a120
@@ -34270,6 +34402,20 @@ package android.os {
     field public static final int SHOW_FULL_DETAIL = 1; // 0x1
     field public static final int SHOW_INITIALIZED = 4; // 0x4
     field @Deprecated public static final int TRACE_COUNT_ALLOCS = 1; // 0x1
+  }
+
+  public static class Debug.DmaBuffer {
+    ctor public Debug.DmaBuffer();
+    method public long Pss();
+    field public long count;
+    field public String exporter;
+    field public java.util.Map<java.lang.Integer,java.lang.Integer> fdRefs;
+    field public long inode;
+    field public java.util.Map<java.lang.Integer,java.lang.Integer> mapRefs;
+    field public String name;
+    field public java.util.List<java.lang.Integer> pids;
+    field public long size;
+    field public long totalRefs;
   }
 
   @Deprecated public static class Debug.InstructionCount {
@@ -35081,6 +35227,7 @@ package android.os {
     method public static boolean isApplicationUid(int);
     method public static final boolean isIsolated();
     method public static final boolean isIsolatedUid(int);
+    method @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final boolean isPccUid(int);
     method public static final boolean isSdkSandbox();
     method public static final boolean isSdkSandboxUid(int);
     method public static final void killProcess(int);
@@ -35195,6 +35342,7 @@ package android.os {
   @FlaggedApi("android.os.security_state_service") public class SecurityStateManager {
     method @FlaggedApi("android.os.security_state_service") @NonNull public android.os.Bundle getGlobalSecurityState();
     field public static final String KEY_KERNEL_VERSION = "kernel_version";
+    field @FlaggedApi("android.os.supplemental_security_patches") public static final String KEY_SUPPLEMENTAL_PATCHES = "supplemental_security_patches";
     field public static final String KEY_SYSTEM_SPL = "system_spl";
     field public static final String KEY_VENDOR_SPL = "vendor_spl";
   }
@@ -37216,6 +37364,7 @@ package android.provider {
     field public static final String FEATURES = "features";
     field public static final int FEATURES_ASSISTED_DIALING_USED = 16; // 0x10
     field public static final int FEATURES_HD_CALL = 4; // 0x4
+    field @FlaggedApi("com.android.server.telecom.flags.hd_plus_call") public static final int FEATURES_HD_PLUS_CALL = 128; // 0x80
     field public static final int FEATURES_PULLED_EXTERNALLY = 2; // 0x2
     field public static final int FEATURES_RTT = 32; // 0x20
     field public static final int FEATURES_VIDEO = 1; // 0x1
@@ -38509,6 +38658,7 @@ package android.provider {
   }
 
   public static final class DocumentsContract.Document {
+    field @FlaggedApi("android.provider.enable_sync_state") public static final String COLUMN_CONTENT_SYNC_STATE_FLAGS = "content_sync_state_flags";
     field public static final String COLUMN_DISPLAY_NAME = "_display_name";
     field public static final String COLUMN_DOCUMENT_ID = "document_id";
     field public static final String COLUMN_FLAGS = "flags";
@@ -38536,6 +38686,13 @@ package android.provider {
     field public static final int FLAG_VIRTUAL_DOCUMENT = 512; // 0x200
     field public static final int FLAG_WEB_LINKABLE = 4096; // 0x1000
     field public static final String MIME_TYPE_DIR = "vnd.android.document/directory";
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_AVAILABLE_LOCALLY = 1; // 0x1
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_DOWNLOAD_ERROR = 64; // 0x40
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_DOWNLOAD_PROGRESS = 16; // 0x10
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_LOCAL_CHANGES = 2; // 0x2
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_REMOTE_CHANGES = 4; // 0x4
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_UPLOAD_ERROR = 32; // 0x20
+    field @FlaggedApi("android.provider.enable_sync_state") public static final int SYNC_STATE_FLAG_UPLOAD_PROGRESS = 8; // 0x8
   }
 
   public static final class DocumentsContract.Path implements android.os.Parcelable {
@@ -38767,7 +38924,7 @@ package android.provider {
     field public static final String ACTION_APPLICATION_SETTINGS = "android.settings.APPLICATION_SETTINGS";
     field public static final String ACTION_APP_LOCALE_SETTINGS = "android.settings.APP_LOCALE_SETTINGS";
     field public static final String ACTION_APP_NOTIFICATION_BUBBLE_SETTINGS = "android.settings.APP_NOTIFICATION_BUBBLE_SETTINGS";
-    field @FlaggedApi("android.app.api_rich_ongoing") public static final String ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS = "android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS";
+    field public static final String ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS = "android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS";
     field public static final String ACTION_APP_NOTIFICATION_SETTINGS = "android.settings.APP_NOTIFICATION_SETTINGS";
     field public static final String ACTION_APP_OPEN_BY_DEFAULT_SETTINGS = "android.settings.APP_OPEN_BY_DEFAULT_SETTINGS";
     field public static final String ACTION_APP_SEARCH_SETTINGS = "android.settings.APP_SEARCH_SETTINGS";
@@ -38928,6 +39085,7 @@ package android.provider {
     field @Deprecated public static final String INSTALL_NON_MARKET_APPS = "install_non_market_apps";
     field public static final String MODE_RINGER = "mode_ringer";
     field public static final String NETWORK_PREFERENCE = "network_preference";
+    field public static final String NTP_SERVER_2 = "ntp_server_2";
     field public static final String RADIO_BLUETOOTH = "bluetooth";
     field public static final String RADIO_CELL = "cell";
     field public static final String RADIO_NFC = "nfc";
@@ -42976,6 +43134,99 @@ package android.service.persistentdata {
 
 }
 
+package android.service.personalcontext {
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class RenderToken implements android.os.Parcelable {
+    method public int describeContents();
+    method @NonNull public java.util.UUID getRendererComponentId();
+    method @NonNull public java.util.UUID getTokenId();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.RenderToken> CREATOR;
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class RenderToken.RenderTokenBuilder {
+    ctor public RenderToken.RenderTokenBuilder();
+    method @NonNull public android.service.personalcontext.RenderToken build();
+    method @NonNull public android.service.personalcontext.RenderToken.RenderTokenBuilder setRendererComponentId(@NonNull java.util.UUID);
+  }
+
+}
+
+package android.service.personalcontext.hint {
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class BundleHint extends android.service.personalcontext.hint.ContextHint {
+    ctor public BundleHint();
+    method @NonNull public android.os.Bundle getDataBundle();
+    method public int getHintType();
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContextHint {
+    method @NonNull public final java.util.UUID getHintId();
+    method public abstract int getHintType();
+    field public static final int HINT_TYPE_BUNDLE = 1; // 0x1
+    field public static final int HINT_TYPE_ERROR = -1; // 0xffffffff
+    field public static final int HINT_TYPE_NOTIFICATION = 2; // 0x2
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class NotificationEvent {
+    method public abstract int getEventType();
+    field public static final int EVENT_TYPE_ENQUEUED = 1; // 0x1
+    field public static final int EVENT_TYPE_REMOVED = 2; // 0x2
+    field public static final int EVENT_TYPE_UNKNOWN = -1; // 0xffffffff
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class NotificationEvent.NotificationEnqueuedEvent extends android.service.personalcontext.hint.NotificationEvent {
+    ctor public NotificationEvent.NotificationEnqueuedEvent(@NonNull android.service.notification.StatusBarNotification, @NonNull android.app.NotificationChannel, @NonNull android.service.notification.NotificationListenerService.RankingMap);
+    method public int getEventType();
+    method @NonNull public android.app.NotificationChannel getNotificationChannel();
+    method @NonNull public android.service.notification.NotificationListenerService.RankingMap getRankingMap();
+    method @NonNull public android.service.notification.StatusBarNotification getStatusBarNotification();
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class NotificationEvent.NotificationRemovedEvent extends android.service.personalcontext.hint.NotificationEvent {
+    ctor public NotificationEvent.NotificationRemovedEvent(@NonNull android.service.notification.StatusBarNotification, @NonNull android.service.notification.NotificationListenerService.RankingMap, int);
+    method public int getEventType();
+    method @NonNull public android.service.notification.NotificationListenerService.RankingMap getRankingMap();
+    method public int getReason();
+    method @NonNull public android.service.notification.StatusBarNotification getStatusBarNotification();
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class NotificationHint extends android.service.personalcontext.hint.ContextHint {
+    method public int getHintType();
+    method @NonNull public android.service.personalcontext.hint.NotificationEvent getNotificationEvent();
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class NotificationHint.NotificationHintBuilder {
+    ctor public NotificationHint.NotificationHintBuilder(@NonNull android.service.personalcontext.hint.NotificationEvent);
+    method @NonNull public android.service.personalcontext.hint.NotificationHint build();
+  }
+
+}
+
+package android.service.personalcontext.insight {
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class BundleInsight extends android.service.personalcontext.insight.ContextInsight {
+    method @NonNull public android.os.Bundle getDataBundle();
+    method public int getInsightType();
+  }
+
+  public static final class BundleInsight.Builder {
+    ctor public BundleInsight.Builder();
+    method @NonNull public android.service.personalcontext.insight.BundleInsight.Builder addOriginHint(@NonNull android.service.personalcontext.hint.ContextHint);
+    method @NonNull public android.service.personalcontext.insight.BundleInsight build();
+    method @NonNull public android.service.personalcontext.insight.BundleInsight.Builder setDataBundle(@NonNull android.os.Bundle);
+  }
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContextInsight {
+    method @NonNull public final java.util.UUID getInsightId();
+    method public abstract int getInsightType();
+    method @NonNull public final java.util.List<android.service.personalcontext.hint.ContextHint> getOriginHints();
+    field public static final int INSIGHT_TYPE_BUNDLE = 1; // 0x1
+    field public static final int INSIGHT_TYPE_ERROR = -1; // 0xffffffff
+  }
+
+}
+
 package android.service.quickaccesswallet {
 
   public interface GetWalletCardsCallback {
@@ -44454,6 +44705,8 @@ package android.telephony {
     field public static final String KEY_IS_IMS_CONFERENCE_SIZE_ENFORCED_BOOL = "is_ims_conference_size_enforced_bool";
     field public static final String KEY_IS_OPPORTUNISTIC_SUBSCRIPTION_BOOL = "is_opportunistic_subscription_bool";
     field @FlaggedApi("com.android.internal.telephony.flags.log_calls_answered_elsewhere") public static final String KEY_LOG_CALLS_ANSWERED_ELSEWHERE_BOOL = "log_calls_answered_elsewhere_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.support_low_battery_alert") public static final String KEY_LOW_BATTERY_ALERT_INTERVAL_INT = "low_battery_alert_interval_int";
+    field @FlaggedApi("com.android.internal.telephony.flags.support_low_battery_alert") public static final String KEY_LOW_BATTERY_ALERT_THRESHOLD_INT = "low_battery_alert_threshold_int";
     field public static final String KEY_LTE_ENABLED_BOOL = "lte_enabled_bool";
     field public static final String KEY_LTE_RSRQ_THRESHOLDS_INT_ARRAY = "lte_rsrq_thresholds_int_array";
     field public static final String KEY_LTE_RSSNR_THRESHOLDS_INT_ARRAY = "lte_rssnr_thresholds_int_array";
@@ -44510,6 +44763,7 @@ package android.telephony {
     field public static final String KEY_OPPORTUNISTIC_NETWORK_EXIT_THRESHOLD_RSSNR_INT = "opportunistic_network_exit_threshold_rssnr_int";
     field public static final String KEY_OPPORTUNISTIC_NETWORK_MAX_BACKOFF_TIME_LONG = "opportunistic_network_max_backoff_time_long";
     field public static final String KEY_OPPORTUNISTIC_NETWORK_PING_PONG_TIME_LONG = "opportunistic_network_ping_pong_time_long";
+    field @FlaggedApi("com.android.internal.telephony.flags.expose_oppt_auto_data_switch_policies") public static final String KEY_OPP_AUTO_DATA_SWITCH_POLICY_INT = "opp_auto_data_switch_policy_int";
     field @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") public static final String KEY_OVERRIDE_WFC_ROAMING_MODE_WHILE_USING_NTN_BOOL = "override_wfc_roaming_mode_while_using_ntn_bool";
     field public static final String KEY_PARAMETERS_USED_FOR_NTN_LTE_SIGNAL_BAR_INT = "parameters_used_for_ntn_lte_signal_bar_int";
     field public static final String KEY_PING_TEST_BEFORE_DATA_SWITCH_BOOL = "ping_test_before_data_switch_bool";
@@ -44586,9 +44840,11 @@ package android.telephony {
     field public static final String KEY_SUPPORTED_PREMIUM_CAPABILITIES_INT_ARRAY = "supported_premium_capabilities_int_array";
     field @FlaggedApi("com.android.server.telecom.flags.business_call_composer") public static final String KEY_SUPPORTS_BUSINESS_CALL_COMPOSER_BOOL = "supports_business_call_composer_bool";
     field public static final String KEY_SUPPORTS_CALL_COMPOSER_BOOL = "supports_call_composer_bool";
+    field @FlaggedApi("android.telecom.flags.is_using_crs") public static final String KEY_SUPPORTS_CUSTOMIZED_RINGING_SIGNAL_BOOL = "supports_customized_ringing_signal_bool";
     field public static final String KEY_SUPPORTS_DEVICE_TO_DEVICE_COMMUNICATION_USING_DTMF_BOOL = "supports_device_to_device_communication_using_dtmf_bool";
     field public static final String KEY_SUPPORTS_DEVICE_TO_DEVICE_COMMUNICATION_USING_RTP_BOOL = "supports_device_to_device_communication_using_rtp_bool";
     field public static final String KEY_SUPPORTS_SDP_NEGOTIATION_OF_D2D_RTP_HEADER_EXTENSIONS_BOOL = "supports_sdp_negotiation_of_d2d_rtp_header_extensions_bool";
+    field @FlaggedApi("com.android.server.telecom.flags.is_using_unidirectional_video_service") public static final String KEY_SUPPORTS_UNIDIRECTIONAL_VIDEO_SERVICE_BOOL = "supports_unidirectional_video_service_bool";
     field @FlaggedApi("com.android.server.telecom.flags.is_using_video_ringback") public static final String KEY_SUPPORTS_VIDEO_RINGBACK_BOOL = "supports_video_back_tone_bool";
     field public static final String KEY_SUPPORT_3GPP_CALL_FORWARDING_WHILE_ROAMING_BOOL = "support_3gpp_call_forwarding_while_roaming_bool";
     field public static final String KEY_SUPPORT_ADD_CONFERENCE_PARTICIPANTS_BOOL = "support_add_conference_participants_bool";
@@ -44633,6 +44889,10 @@ package android.telephony {
     field public static final String KEY_WFC_EMERGENCY_ADDRESS_CARRIER_APP_STRING = "wfc_emergency_address_carrier_app_string";
     field public static final String KEY_WORLD_MODE_ENABLED_BOOL = "world_mode_enabled_bool";
     field public static final String KEY_WORLD_PHONE_BOOL = "world_phone_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.expose_oppt_auto_data_switch_policies") public static final int OPP_AUTO_DATA_SWITCH_POLICY_DISABLED = 0; // 0x0
+    field @FlaggedApi("com.android.internal.telephony.flags.expose_oppt_auto_data_switch_policies") public static final int OPP_AUTO_DATA_SWITCH_POLICY_FOLLOW_SYSTEM = 2147483647; // 0x7fffffff
+    field @FlaggedApi("com.android.internal.telephony.flags.expose_oppt_auto_data_switch_policies") public static final int OPP_AUTO_DATA_SWITCH_POLICY_FOR_AVAILABILITY = 1; // 0x1
+    field @FlaggedApi("com.android.internal.telephony.flags.expose_oppt_auto_data_switch_policies") public static final int OPP_AUTO_DATA_SWITCH_POLICY_FOR_PERFORMANCE = 3; // 0x3
     field public static final String REMOVE_GROUP_UUID_STRING = "00000000-0000-0000-0000-000000000000";
     field @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") public static final int SATELLITE_DATA_SUPPORT_ALL = 2; // 0x2
     field @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") public static final int SATELLITE_DATA_SUPPORT_BANDWIDTH_CONSTRAINED = 1; // 0x1
@@ -46720,6 +46980,7 @@ package android.telephony {
     method public int getCarrierIdFromSimMccMnc();
     method @RequiresPermission(anyOf={android.Manifest.permission.READ_BASIC_PHONE_STATE, android.Manifest.permission.READ_PHONE_STATE}) public void getCarrierRestrictionStatus(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
     method @Deprecated @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public android.telephony.CellLocation getCellLocation();
+    method @FlaggedApi("com.android.server.telecom.flags.move_get_tty_mode_to_telephony_manager") @RequiresPermission("android.permission.READ_PRIVILEGED_PHONE_STATE") public int getCurrentTtyMode();
     method public int getDataActivity();
     method @RequiresPermission(anyOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.READ_BASIC_PHONE_STATE}) public int getDataNetworkType();
     method public int getDataState();
@@ -46759,6 +47020,7 @@ package android.telephony {
     method @NonNull public String getPrimaryImei();
     method @Nullable @RequiresPermission(allOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.ACCESS_COARSE_LOCATION}) public android.telephony.ServiceState getServiceState();
     method @Nullable @RequiresPermission(allOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.ACCESS_COARSE_LOCATION}) public android.telephony.ServiceState getServiceState(int);
+    method @FlaggedApi("com.android.internal.telephony.flags.get_service_state_for_slot") @Nullable @RequiresPermission(allOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.ACCESS_COARSE_LOCATION}) public android.telephony.ServiceState getServiceStateForSlot(int);
     method @Nullable public android.telephony.SignalStrength getSignalStrength();
     method public int getSimCarrierId();
     method @Nullable public CharSequence getSimCarrierIdName();
@@ -46799,6 +47061,7 @@ package android.telephony {
     method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_NETWORK_STATE, android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.READ_BASIC_PHONE_STATE}) public boolean isDataRoamingEnabled();
     method public boolean isDeviceSmsCapable();
     method public boolean isDeviceVoiceCapable();
+    method public static boolean isDsdsTransitionSupported();
     method public boolean isEmergencyNumber(@NonNull String);
     method public boolean isHearingAidCompatibilitySupported();
     method @RequiresPermission(anyOf={android.Manifest.permission.READ_PRECISE_PHONE_STATE, "android.permission.READ_PRIVILEGED_PHONE_STATE"}) public boolean isManualNetworkSelectionAllowed();
@@ -47028,6 +47291,10 @@ package android.telephony {
     field public static final int SIM_STATE_PUK_REQUIRED = 3; // 0x3
     field public static final int SIM_STATE_READY = 5; // 0x5
     field public static final int SIM_STATE_UNKNOWN = 0; // 0x0
+    field @FlaggedApi("com.android.server.telecom.flags.move_get_tty_mode_to_telephony_manager") public static final int TTY_MODE_FULL = 1; // 0x1
+    field @FlaggedApi("com.android.server.telecom.flags.move_get_tty_mode_to_telephony_manager") public static final int TTY_MODE_HCO = 2; // 0x2
+    field @FlaggedApi("com.android.server.telecom.flags.move_get_tty_mode_to_telephony_manager") public static final int TTY_MODE_OFF = 0; // 0x0
+    field @FlaggedApi("com.android.server.telecom.flags.move_get_tty_mode_to_telephony_manager") public static final int TTY_MODE_VCO = 3; // 0x3
     field public static final int UNINITIALIZED_CARD_ID = -2; // 0xfffffffe
     field public static final int UNKNOWN_CARRIER_ID = -1; // 0xffffffff
     field public static final int UNSUPPORTED_CARD_ID = -1; // 0xffffffff
@@ -52979,6 +53246,7 @@ package android.view {
     ctor public Surface(android.graphics.SurfaceTexture);
     method public void clearFrameRate();
     method public int describeContents();
+    method @FlaggedApi("com.android.graphics.libgui.flags.bq_producer_backpressure_control") public boolean isProducerThrottlingEnabled();
     method public boolean isValid();
     method public android.graphics.Canvas lockCanvas(android.graphics.Rect) throws java.lang.IllegalArgumentException, android.view.Surface.OutOfResourcesException;
     method public android.graphics.Canvas lockHardwareCanvas();
@@ -52987,6 +53255,7 @@ package android.view {
     method @FlaggedApi("com.android.graphics.surfaceflinger.flags.arr_setframerate_api") public void setFrameRate(@NonNull android.view.Surface.FrameRateParams);
     method public void setFrameRate(@FloatRange(from=0.0) float, int, int);
     method public void setFrameRate(@FloatRange(from=0.0) float, int);
+    method @FlaggedApi("com.android.graphics.libgui.flags.bq_producer_backpressure_control") public void setProducerThrottlingEnabled(boolean);
     method @Deprecated public void unlockCanvas(android.graphics.Canvas);
     method public void unlockCanvasAndPost(android.graphics.Canvas);
     method public void writeToParcel(android.os.Parcel, int);
@@ -55574,6 +55843,7 @@ package android.view.accessibility {
     method public android.view.accessibility.AccessibilityRecord getRecord(int);
     method public int getRecordCount();
     method public int getSpeechStateChangeTypes();
+    method @FlaggedApi("android.view.accessibility.a11y_text_change_types_api") public int getTextChangeTypes();
     method public int getWindowChanges();
     method public void initFromParcel(android.os.Parcel);
     method public boolean isAccessibilityDataSensitive();
@@ -55588,6 +55858,7 @@ package android.view.accessibility {
     method public void setMovementGranularity(int);
     method public void setPackageName(CharSequence);
     method public void setSpeechStateChangeTypes(int);
+    method @FlaggedApi("android.view.accessibility.a11y_text_change_types_api") public void setTextChangeTypes(int);
     method public void writeToParcel(android.os.Parcel, int);
     field @FlaggedApi("android.view.accessibility.tri_state_checked") public static final int CONTENT_CHANGE_TYPE_CHECKED = 8192; // 0x2000
     field public static final int CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION = 4; // 0x4
@@ -55614,6 +55885,10 @@ package android.view.accessibility {
     field public static final int SPEECH_STATE_LISTENING_START = 4; // 0x4
     field public static final int SPEECH_STATE_SPEAKING_END = 2; // 0x2
     field public static final int SPEECH_STATE_SPEAKING_START = 1; // 0x1
+    field @FlaggedApi("android.view.accessibility.a11y_text_change_types_api") public static final int TEXT_CHANGE_TYPE_COMMITTED_BY_IME = 2; // 0x2
+    field @FlaggedApi("android.view.accessibility.a11y_text_change_types_api") public static final int TEXT_CHANGE_TYPE_CONVERSION_SUGGESTION_SELECTED_BY_IME = 4; // 0x4
+    field @FlaggedApi("android.view.accessibility.a11y_text_change_types_api") public static final int TEXT_CHANGE_TYPE_IN_COMPOSITION = 1; // 0x1
+    field @FlaggedApi("android.view.accessibility.a11y_text_change_types_api") public static final int TEXT_CHANGE_TYPE_UNDEFINED = 0; // 0x0
     field public static final int TYPES_ALL_MASK = -1; // 0xffffffff
     field @Deprecated @FlaggedApi("android.view.accessibility.deprecate_accessibility_announcement_apis") public static final int TYPE_ANNOUNCEMENT = 16384; // 0x4000
     field public static final int TYPE_ASSIST_READING_CONTEXT = 16777216; // 0x1000000
@@ -62401,6 +62676,55 @@ package android.widget.inline {
     ctor public InlinePresentationSpec.Builder(@NonNull android.util.Size, @NonNull android.util.Size);
     method @NonNull public android.widget.inline.InlinePresentationSpec build();
     method @NonNull public android.widget.inline.InlinePresentationSpec.Builder setStyle(@NonNull android.os.Bundle);
+  }
+
+}
+
+package android.widget.location {
+
+  @FlaggedApi("android.widget.flags.location_button_enabled") public interface LocationButtonClient {
+    method public void onPermissionsResult(boolean);
+    method public void onSessionError(@NonNull Throwable);
+    method public void onSessionOpened(@NonNull android.widget.location.LocationButtonSession);
+  }
+
+  @FlaggedApi("android.widget.flags.location_button_enabled") public interface LocationButtonProvider {
+    method public void openSession(@NonNull android.os.IBinder, int, @NonNull android.widget.location.LocationButtonRequest, @NonNull java.util.concurrent.Executor, @NonNull android.widget.location.LocationButtonClient);
+  }
+
+  @FlaggedApi("android.widget.flags.location_button_enabled") public class LocationButtonProviderFactory {
+    method @NonNull public static android.widget.location.LocationButtonProvider create(@NonNull android.content.Context);
+  }
+
+  @FlaggedApi("android.widget.flags.location_button_enabled") public final class LocationButtonRequest implements android.os.Parcelable {
+    ctor public LocationButtonRequest(int, int, int, float, int, int, int);
+    method public int describeContents();
+    method @ColorInt public int getBackgroundColor();
+    method public float getCornerRadius();
+    method public int getHeight();
+    method @ColorInt public int getIconTint();
+    method @ColorInt public int getTextColor();
+    method public int getTextType();
+    method public int getWidth();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.widget.location.LocationButtonRequest> CREATOR;
+  }
+
+  @FlaggedApi("android.widget.flags.location_button_enabled") public interface LocationButtonSession extends java.lang.AutoCloseable {
+    method public void changeConfiguration(@NonNull android.content.res.Configuration);
+    method public void close();
+    method @NonNull public android.view.SurfaceControlViewHost.SurfacePackage getSurfacePackage();
+    method public void resize(int, int);
+    method public void setBackgroundColor(@ColorInt int);
+    method public void setCornerRadius(float);
+    method public void setIconTint(@ColorInt int);
+    method public void setTextColor(@ColorInt int);
+    method public void setTextType(int);
+    field public static final int TEXT_TYPE_NEAR_PRECISE_LOCATION = 1; // 0x1
+    field public static final int TEXT_TYPE_NONE = 0; // 0x0
+    field public static final int TEXT_TYPE_PRECISE_LOCATION = 2; // 0x2
+    field public static final int TEXT_TYPE_SHARE_PRECISE_LOCATION = 3; // 0x3
+    field public static final int TEXT_TYPE_USE_PRECISE_LOCATION = 4; // 0x4
   }
 
 }

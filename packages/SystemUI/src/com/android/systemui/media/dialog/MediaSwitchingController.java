@@ -19,9 +19,10 @@ package com.android.systemui.media.dialog;
 import static android.media.RouteListingPreference.ACTION_TRANSFER_MEDIA;
 import static android.media.RouteListingPreference.EXTRA_ROUTE_ID;
 import static android.media.RoutingChangeInfo.ENTRY_POINT_SYSTEM_OUTPUT_SWITCHER;
+import static android.media.RoutingSessionInfo.RELEASE_TYPE_CASTING;
+import static android.media.RoutingSessionInfo.RELEASE_TYPE_SHARING;
 import static android.provider.Settings.ACTION_BLUETOOTH_SETTINGS;
 
-import static com.android.systemui.Flags.enableOutputSwitcherAudioSharingButton;
 import static com.android.systemui.media.dialog.MediaItem.MediaItemType.TYPE_GROUP_DIVIDER;
 
 import android.app.KeyguardManager;
@@ -59,6 +60,7 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.graphics.drawable.IconCompat;
 
@@ -98,7 +100,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -142,6 +143,7 @@ public class MediaSwitchingController
     private final NearbyMediaDevicesManager mNearbyMediaDevicesManager;
     private final Map<String, Integer> mNearbyDeviceInfoMap = new ConcurrentHashMap<>();
     private final MediaSession.Token mToken;
+    @NonNull private final MediaSwitchingType mMediaSwitchingType;
     private final Executor mBackgroundExecutor;
     @VisibleForTesting
     boolean mIsRefreshing = false;
@@ -170,12 +172,6 @@ public class MediaSwitchingController
     private boolean mInAudioSharing = false;
     @Nullable private Job mAudioShareJob = null;
 
-    private Optional<MediaDevice> mCurrentInputDevice;
-
-    public Optional<MediaDevice> getCurrentInputDevice() {
-        return mCurrentInputDevice;
-    }
-
     @VisibleForTesting
     final InputRouteManager.InputDeviceCallback mInputDeviceCallback =
             new InputRouteManager.InputDeviceCallback() {
@@ -183,8 +179,6 @@ public class MediaSwitchingController
                 public void onInputDeviceListUpdated(@NonNull List<MediaDevice> devices) {
                     synchronized (mInputMediaDevicesLock) {
                         buildInputMediaItems(devices);
-                        mCurrentInputDevice =
-                                devices.stream().filter(MediaDevice::isSelected).findFirst();
                         mCallback.onDeviceListChanged();
                     }
                 }
@@ -196,6 +190,7 @@ public class MediaSwitchingController
             @Assisted String packageName,
             @Assisted @Nullable UserHandle userHandle,
             @Assisted @Nullable MediaSession.Token token,
+            @Assisted @Nullable MediaSwitchingType mediaSwitchingType,
             MediaSessionManager mediaSessionManager,
             @Nullable LocalBluetoothManager lbm,
             ActivityStarter starter,
@@ -235,7 +230,17 @@ public class MediaSwitchingController
         mNearbyMediaDevicesManager = nearbyMediaDevicesManager;
         mMediaOutputColorScheme = MediaOutputColorScheme.fromSystemColors(mContext);
 
-        if (enableInputRouting()) {
+        if (mediaSwitchingType == null) {
+            if (enableInputRouting()) {
+                mMediaSwitchingType = MediaSwitchingType.ALL;
+            } else {
+                mMediaSwitchingType = MediaSwitchingType.OUTPUT;
+            }
+        } else {
+            mMediaSwitchingType = mediaSwitchingType;
+        }
+
+        if (mMediaSwitchingType != MediaSwitchingType.OUTPUT) {
             mInputRouteManager = new InputRouteManager(mContext, audioManager, mInfoMediaManager);
         }
 
@@ -247,7 +252,10 @@ public class MediaSwitchingController
     public interface Factory {
         /** Construct a MediaSwitchingController */
         MediaSwitchingController create(
-                String packageName, UserHandle userHandle, MediaSession.Token token);
+                String packageName,
+                UserHandle userHandle,
+                MediaSession.Token token,
+                MediaSwitchingType mediaSwitchingType);
     }
 
     /**
@@ -260,10 +268,6 @@ public class MediaSwitchingController
         synchronized (mMediaDevicesLock) {
             mCachedMediaDevices.clear();
             mOutputMediaItemListProxy.clear();
-        }
-        mNearbyDeviceInfoMap.clear();
-        if (mNearbyMediaDevicesManager != null) {
-            mNearbyMediaDevicesManager.registerNearbyDevicesCallback(this);
         }
         if (!TextUtils.isEmpty(mPackageName)) {
             mMediaController = getMediaController();
@@ -281,23 +285,27 @@ public class MediaSwitchingController
             }
         }
         mCallback = cb;
-        mLocalMediaManager.registerCallback(this);
-        mLocalMediaManager.startScan();
+        mNearbyDeviceInfoMap.clear();
+        if (mMediaSwitchingType != MediaSwitchingType.INPUT) {
+            if (mNearbyMediaDevicesManager != null) {
+                mNearbyMediaDevicesManager.registerNearbyDevicesCallback(this);
+            }
+            mLocalMediaManager.registerCallback(this);
+            mLocalMediaManager.startScan();
+        }
 
-        if (enableInputRouting()) {
+        if (mMediaSwitchingType != MediaSwitchingType.OUTPUT) {
             mInputRouteManager.registerCallback(mInputDeviceCallback);
         }
         mHasAdjustVolumeUserRestriction = checkIfAdjustVolumeRestrictionEnforced();
 
-        if (enableOutputSwitcherAudioSharingButton()) {
-            mAudioShareJob =
-                    mJavaAdapter.alwaysCollectFlow(
-                            mAudioSharingRepository.getInAudioSharing(),
-                            inAudioSharing -> {
-                                mInAudioSharing = inAudioSharing;
-                                mCallback.onQuickAccessButtonsChanged();
-                            });
-        }
+        mAudioShareJob =
+                mJavaAdapter.alwaysCollectFlow(
+                        mAudioSharingRepository.getInAudioSharing(),
+                        inAudioSharing -> {
+                            mInAudioSharing = inAudioSharing;
+                            mCallback.onQuickAccessButtonsChanged();
+                        });
     }
 
     public boolean isRefreshing() {
@@ -312,18 +320,20 @@ public class MediaSwitchingController
         if (mMediaController != null) {
             mMediaController.unregisterCallback(mCb);
         }
-        mLocalMediaManager.unregisterCallback(this);
-        mLocalMediaManager.stopScan();
+        if (mMediaSwitchingType != MediaSwitchingType.INPUT) {
+            mLocalMediaManager.unregisterCallback(this);
+            mLocalMediaManager.stopScan();
+            if (mNearbyMediaDevicesManager != null) {
+                mNearbyMediaDevicesManager.unregisterNearbyDevicesCallback(this);
+            }
+        }
         synchronized (mMediaDevicesLock) {
             mCachedMediaDevices.clear();
             mOutputMediaItemListProxy.clear();
         }
-        if (mNearbyMediaDevicesManager != null) {
-            mNearbyMediaDevicesManager.unregisterNearbyDevicesCallback(this);
-        }
         mNearbyDeviceInfoMap.clear();
 
-        if (enableInputRouting()) {
+        if (mMediaSwitchingType != MediaSwitchingType.OUTPUT) {
             mInputRouteManager.unregisterCallback(mInputDeviceCallback);
             synchronized (mInputMediaDevicesLock) {
                 mInputMediaItemList.clear();
@@ -670,13 +680,6 @@ public class MediaSwitchingController
         }
     }
 
-    private void attachConnectNewDeviceItemIfNeeded(List<MediaItem> mediaItems) {
-        MediaItem connectNewDeviceItem = getConnectNewDeviceItem();
-        if (connectNewDeviceItem != null) {
-            mediaItems.add(connectNewDeviceItem);
-        }
-    }
-
     @NonNull
     MediaItem getConnectedSpeakersExpandableGroupDivider() {
         return MediaItem.createExpandableGroupDividerMediaItem(
@@ -693,12 +696,9 @@ public class MediaSwitchingController
                         false)).toList();
     }
 
-    @Nullable
-    MediaItem getConnectNewDeviceItem() {
-        // Attach "Connect a device" item only when current output is not remote and not a group
-        return (!isCurrentConnectedDeviceRemote() && !hasGroupPlayback())
-                ? MediaItem.createPairNewDeviceMediaItem()
-                : null;
+    boolean hasConnectDeviceButton() {
+        // Show the "Connect Device" button only when current output is not remote and not a group.
+        return !isCurrentConnectedDeviceRemote() && !hasGroupPlayback();
     }
 
     private void attachRangeInfo(List<MediaDevice> devices) {
@@ -726,7 +726,7 @@ public class MediaSwitchingController
                 device, LocalMediaManager.MediaDeviceState.STATE_CONNECTING);
         // If input routing is supported and the device is an input device, call mInputRouteManager
         // to handle routing.
-        if (enableInputRouting() && device instanceof InputMediaDevice) {
+        if (device instanceof InputMediaDevice) {
             mBackgroundExecutor.execute(() -> mInputRouteManager.selectDevice(device));
             return;
         }
@@ -740,17 +740,13 @@ public class MediaSwitchingController
         );
     }
 
-    private List<MediaItem> getOutputDeviceList(boolean addConnectDeviceButton) {
+    private List<MediaItem> getOutputDeviceList() {
         List<MediaItem> mediaItems = new ArrayList<>(
                 mOutputMediaItemListProxy.getOutputMediaItemList());
         addSeparatorForTheFirstGroupDivider(mediaItems);
         coalesceSelectedDevices(mediaItems);
-        if (addConnectDeviceButton) {
-            attachConnectNewDeviceItemIfNeeded(mediaItems);
-        }
         return mediaItems;
     }
-
 
     private void addSeparatorForTheFirstGroupDivider(List<MediaItem> outputList) {
         for (int i = 0; i < outputList.size(); i++) {
@@ -788,36 +784,27 @@ public class MediaSwitchingController
         mediaItems.addAll(mInputMediaItemList);
     }
 
-    private void addOutputDevices(List<MediaItem> mediaItems, boolean addConnectDeviceButton) {
+    private void addOutputDevices(List<MediaItem> mediaItems) {
         mediaItems.add(
                 MediaItem.createGroupDividerMediaItem(
                         mContext.getString(R.string.media_output_group_title)));
-        mediaItems.addAll(getOutputDeviceList(addConnectDeviceButton));
-    }
-
-    /**
-     * Returns a list of media items to be rendered in the device list. For backward compatibility
-     * reasons, adds a "Connect a device" button by default.
-     */
-    public List<MediaItem> getMediaItemList() {
-        return getMediaItemList(true /* addConnectDeviceButton */);
+        mediaItems.addAll(getOutputDeviceList());
     }
 
     /**
      * Returns a list of media items to be rendered in the device list.
-     * @param addConnectDeviceButton Whether to add a "Connect a device" button to the list.
      */
-    public List<MediaItem> getMediaItemList(boolean addConnectDeviceButton) {
-        // If input routing is not enabled, only return output media items.
-        if (!enableInputRouting()) {
-            return getOutputDeviceList(addConnectDeviceButton);
-        }
-
-        // If input routing is enabled, return both output and input media items.
-        List<MediaItem> mediaItems = new ArrayList<>();
-        addOutputDevices(mediaItems, addConnectDeviceButton);
-        addInputDevices(mediaItems);
-        return mediaItems;
+    public List<MediaItem> getMediaItemList() {
+        return switch (mMediaSwitchingType) {
+            case OUTPUT -> getOutputDeviceList();
+            case INPUT -> mInputMediaItemList;
+            case ALL -> {
+                List<MediaItem> mediaItems = new ArrayList<>();
+                addOutputDevices(mediaItems);
+                addInputDevices(mediaItems);
+                yield mediaItems;
+            }
+        };
     }
 
     public MediaDevice getCurrentConnectedMediaDevice() {
@@ -869,7 +856,7 @@ public class MediaSwitchingController
 
     void releaseSession() {
         if (Flags.enableOutputSwitcherPersonalAudioSharing()
-                && getSessionReleaseType() == RoutingSessionInfo.RELEASE_TYPE_SHARING) {
+                && getSessionReleaseType() == RELEASE_TYPE_SHARING) {
             mMetricLogger.logInteractionStopSharing();
         } else {
             mMetricLogger.logInteractionStopCasting();
@@ -1014,6 +1001,9 @@ public class MediaSwitchingController
      */
     @Nullable
     protected AudioSharingButtonState getAudioSharingButtonState() {
+        if (mMediaSwitchingType == MediaSwitchingType.INPUT) {
+            return null;
+        }
         if (mInAudioSharing) {
             return new AudioSharingButtonState(
                     /* resId= */ R.string.media_output_dialog_button_sharing_audio,
@@ -1025,6 +1015,39 @@ public class MediaSwitchingController
         }
 
         return null;
+    }
+
+    boolean hasStopButton() {
+        if (mMediaSwitchingType == MediaSwitchingType.INPUT) {
+            return false;
+        }
+
+        boolean inBroadcast = Flags.enableOutputSwitcherPersonalAudioSharing()
+                && getSessionReleaseType() == RELEASE_TYPE_SHARING;
+
+        return (isCurrentConnectedDeviceRemote() || inBroadcast);
+    }
+
+    @StringRes
+    Integer getStopButtonStringRes() {
+        if (Flags.enableOutputSwitcherPersonalAudioSharing()) {
+            Integer stopButtonText = getTextForSessionReleaseType();
+            if (stopButtonText != null) {
+                return stopButtonText;
+            }
+        }
+        return R.string.media_output_dialog_button_stop_casting;
+    }
+
+
+    @Nullable
+    // TODO: b/448827170 - use value returned by this method for both text and visibility getters.
+    private @StringRes Integer getTextForSessionReleaseType() {
+        return switch (getSessionReleaseType()) {
+            case RELEASE_TYPE_CASTING -> R.string.media_output_dialog_button_stop_casting;
+            case RELEASE_TYPE_SHARING -> R.string.media_output_dialog_button_stop_sharing;
+            default -> null;
+        };
     }
 
     private void startActivity(Intent intent, ActivityTransitionAnimator.Controller controller) {

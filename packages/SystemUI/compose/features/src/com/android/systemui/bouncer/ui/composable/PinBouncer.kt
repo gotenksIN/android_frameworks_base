@@ -16,6 +16,7 @@
 
 package com.android.systemui.bouncer.ui.composable
 
+import android.security.Flags.lockscreenTimeoutDeactivatePinPad
 import android.view.MotionEvent
 import android.view.View
 import androidx.compose.animation.animateColorAsState
@@ -28,6 +29,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -44,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
@@ -51,8 +54,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -136,6 +141,8 @@ fun PinPad(viewModel: PinBouncerViewModel, verticalSpacing: Dp, modifier: Modifi
             onClicked = viewModel::onBackspaceButtonClicked,
             onPointerDown = viewModel::onBackspaceButtonPressed,
             onLongPressed = viewModel::onBackspaceButtonLongPressed,
+            onLongClickLabel =
+                stringResource(R.string.keyguard_accessibility_pin_delete_long_click_partial),
             appearance = backspaceButtonAppearance,
             scaling = buttonScaleAnimatables[9]::value,
             elementId = "delete_button",
@@ -208,6 +215,7 @@ private fun ActionButton(
     elementId: String,
     onLongPressed: (() -> Unit)? = null,
     onPointerDown: ((View?) -> Unit)? = null,
+    onLongClickLabel: String? = null,
     appearance: ActionButtonAppearance,
     scaling: () -> Float,
 ) {
@@ -231,6 +239,7 @@ private fun ActionButton(
         isAnimationEnabled = true,
         elementId = elementId,
         onPointerDown = onPointerDown,
+        onLongClickLabel = onLongClickLabel,
         modifier =
             Modifier.graphicsLayer {
                 alpha = hiddenAlpha
@@ -254,6 +263,7 @@ private fun PinPadButton(
     elementId: String? = null,
     onLongPressed: (() -> Unit)? = null,
     onPointerDown: ((View?) -> Unit)? = null,
+    onLongClickLabel: String? = null,
     content: @Composable (contentColor: () -> Color) -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -281,6 +291,8 @@ private fun PinPadButton(
         animateColorAsState(
             when {
                 isAnimationEnabled && isPressed -> MaterialTheme.colorScheme.primary
+                lockscreenTimeoutDeactivatePinPad() && !isEnabled ->
+                    backgroundColor.copy(alpha = 0.18f)
                 else -> backgroundColor
             },
             label = "Pin button container color",
@@ -290,6 +302,8 @@ private fun PinPadButton(
         animateColorAsState(
             when {
                 isAnimationEnabled && isPressed -> MaterialTheme.colorScheme.onPrimary
+                lockscreenTimeoutDeactivatePinPad() && !isEnabled ->
+                    foregroundColor.copy(alpha = 0.38f)
                 else -> foregroundColor
             },
             label = "Pin button container color",
@@ -300,8 +314,9 @@ private fun PinPadButton(
         contentAlignment = Alignment.Center,
         modifier =
             modifier
-                .focusRequester(FocusRequester.Default)
-                .focusable()
+                .thenIf(!lockscreenTimeoutDeactivatePinPad() || isEnabled) {
+                    Modifier.focusRequester(FocusRequester.Default).focusable()
+                }
                 .sizeIn(maxWidth = pinButtonMaxSize, maxHeight = pinButtonMaxSize)
                 .aspectRatio(1f)
                 .drawBehind {
@@ -317,12 +332,21 @@ private fun PinPadButton(
                             indication = indication,
                             onClick = onClicked,
                             onLongClick = onLongPressed,
+                            onLongClickLabel = onLongClickLabel,
                         )
                         .pointerInteropFilter { motionEvent ->
                             if (motionEvent.action == MotionEvent.ACTION_DOWN) {
                                 onPointerDown?.let { it(view) }
                             }
                             false
+                        }
+                        .pointerInput(Unit) {
+                            detectDragGestures { change, _ ->
+                                // Consume any changes that are part of the drag to make it less
+                                // likely for accidental drags to happen while the user is trying to
+                                // tap on buttons in the pin pad.
+                                change.consume()
+                            }
                         }
                 }
                 .thenIf(elementId != null) { Modifier.sysuiResTag(elementId!!) },

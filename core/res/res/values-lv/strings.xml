@@ -1055,6 +1055,10 @@
     <string name="lockscreen_pattern_correct" msgid="8050630103651508582">"Pareizi!"</string>
     <string name="lockscreen_pattern_wrong" msgid="2940138714468358458">"Mēģināt vēlreiz"</string>
     <string name="lockscreen_password_wrong" msgid="8605355913868947490">"Mēģināt vēlreiz"</string>
+    <!-- no translation found for lockscreen_click_to_unlock_hint (6056691847669178119) -->
+    <skip />
+    <!-- no translation found for lockscreen_key_to_unlock_hint (9042402393653798264) -->
+    <skip />
     <string name="lockscreen_storage_locked" msgid="634993789186443380">"Atbloķēt visām funkcijām un datiem"</string>
     <string name="faceunlock_multiple_failures" msgid="681991538434031708">"Ir pārsniegts maksimālais Autorizācijas pēc sejas mēģinājumu skaits."</string>
     <string name="lockscreen_missing_sim_message_short" msgid="1229301273156907613">"Nav SIM kartes"</string>
@@ -1624,12 +1628,9 @@
     <string name="gpsNotifMessage" msgid="7346649122793758032">"Pieprasīja: <xliff:g id="NAME">%1$s</xliff:g> (<xliff:g id="SERVICE">%2$s</xliff:g>)"</string>
     <string name="gpsVerifYes" msgid="3719843080744112940">"Jā"</string>
     <string name="gpsVerifNo" msgid="1671201856091564741">"Nē"</string>
-    <!-- no translation found for emergency_location_notification_title (917557758257778958) -->
-    <skip />
-    <!-- no translation found for emergency_location_notification_message (1877038822515882885) -->
-    <skip />
-    <!-- no translation found for emergency_location_notification_learn_more (8718634939217070481) -->
-    <skip />
+    <string name="emergency_location_notification_title" msgid="917557758257778958">"Atrašanās vieta tika kopīgota, jo tika konstatēta ārkārtas situācija"</string>
+    <string name="emergency_location_notification_message" msgid="1877038822515882885">"Ārkārtas palīdzības dienesti saņēma jūsu atrašanās vietas datus no jūsu mobilo sakaru operatora."</string>
+    <string name="emergency_location_notification_learn_more" msgid="8718634939217070481">"Uzzināt vairāk"</string>
     <string name="sync_too_many_deletes" msgid="6999440774578705300">"Pārsniegts dzēšanas ierobežojums"</string>
     <string name="sync_too_many_deletes_desc" msgid="7409327940303504440">"<xliff:g id="TYPE_OF_SYNC">%2$s</xliff:g>, konts <xliff:g id="ACCOUNT_NAME">%3$s</xliff:g>: izdzēsti <xliff:g id="NUMBER_OF_DELETED_ITEMS">%1$d</xliff:g> vienumi. Kādas darbības vēlaties veikt?"</string>
     <string name="sync_really_delete" msgid="5657871730315579051">"Dzēsiet šos vienumus."</string>
@@ -1800,8 +1801,10 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"Turot nospiestas abas skaļuma pogas dažas sekundes, tiek ieslēgta pieejamības funkcija <xliff:g id="SERVICE">%1$s</xliff:g>. Tas var mainīt ierīces darbību.\n\nŠo saīsni uz citu funkciju varat mainīt šeit: Iestatījumi &gt; Pieejamība."</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"Ieslēgt"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"Neieslēgt"</string>
-    <string name="accessibility_shortcut_menu_item_status_on" msgid="6608392117189732543">"IESLĒGTA"</string>
-    <string name="accessibility_shortcut_menu_item_status_off" msgid="5531598275559472393">"IZSLĒGTA"</string>
+    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
+    <skip />
+    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
+    <skip />
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"Vai atļaut pakalpojumam <xliff:g id="SERVICE">%1$s</xliff:g> pilnībā kontrolēt jūsu ierīci?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"Pilnīga kontrole ir piemērota lietotnēm, kas nepieciešamas lietotājiem ar īpašām vajadzībām, taču ne lielākajai daļai lietotņu."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"Ekrāna skatīšana un pārvaldīšana"</string>
@@ -1815,6 +1818,16 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"Pieskarieties funkcijai, lai sāktu to izmantot"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"Izvēlieties funkcijas, ko izmantot ar pieejamības pogu"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"Izvēlieties funkcijas, kuras piešķirt skaļuma pogu saīsnei"</string>
+    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
+    <skip />
+    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
+    <skip />
+    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
+    <skip />
+    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
+    <skip />
+    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
+    <skip />
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"Pakalpojums <xliff:g id="SERVICE_NAME">%s</xliff:g> ir izslēgts."</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Rediģēt īsinājumtaustiņus"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Gatavs"</string>
@@ -2369,8 +2382,8 @@
     <string name="PERSOSUBSTATE_SIM_IMPI_ENTRY" msgid="7043865376145617024">"IMPI atbloķēšanas PIN"</string>
     <string name="PERSOSUBSTATE_SIM_NS_SP_ENTRY" msgid="6144227308185112176">"Tīkla apakškopas pakalpojuma sniedzēja atbloķēšanas PIN"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_IN_PROGRESS" msgid="4233355366318061180">"Notiek SIM tīkla atbloķēšanas pieprasīšana…"</string>
-    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_IN_PROGRESS" msgid="6742563947637715645">"Notiek SIM tīkla apakškopas atbloķēšanas pieprasīšana…"</string>
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_IN_PROGRESS" msgid="2033399698172403560">"Notiek SIM pakalpojuma sniedzēja atbloķēšanas pieprasīšana…"</string>
+    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_IN_PROGRESS" msgid="2917242135129860371">"Notiek SIM tīkla apakškopas atbloķēšanas pieprasīšana…"</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_IN_PROGRESS" msgid="4435641041692795695">"Notiek SIM pakalpojuma sniedzēja atbloķēšanas pieprasīšana…"</string>
     <string name="PERSOSUBSTATE_SIM_CORPORATE_IN_PROGRESS" msgid="4795977251920732254">"Notiek SIM Corporate atbloķēšanas pieprasīšana…"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_PUK_IN_PROGRESS" msgid="1090425878157254446">"Notiek PUK atbloķēšanas pieprasīšana…"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK_IN_PROGRESS" msgid="6476898876518094438">"Notiek PUK atbloķēšanas pieprasīšana…"</string>
@@ -2396,15 +2409,15 @@
     <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_PUK_IN_PROGRESS" msgid="2695678959963807782">"Notiek PUK atbloķēšanas pieprasīšana…"</string>
     <string name="PERSOSUBSTATE_RUIM_RUIM_PUK_IN_PROGRESS" msgid="1230605365926493599">"Notiek PUK atbloķēšanas pieprasīšana…"</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_ERROR" msgid="1924844017037151535">"SIM tīkla atbloķēšanas pieprasījums nebija veiksmīgs."</string>
-    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_ERROR" msgid="3372797822292089708">"SIM tīkla apakškopas atbloķēšanas pieprasījums nebija veiksmīgs."</string>
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_ERROR" msgid="1878443146720411381">"SIM pakalpojuma sniedzēja atbloķēšanas pieprasījums nebija veiksmīgs."</string>
+    <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_ERROR" msgid="7136658591279283417">"SIM tīkla apakškopas atbloķēšanas pieprasījums nebija sekmīgs."</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_ERROR" msgid="8344463467085504202">"SIM pakalpojuma sniedzēja atbloķēšanas pieprasījums nebija sekmīgs."</string>
     <string name="PERSOSUBSTATE_SIM_CORPORATE_ERROR" msgid="7664778312218023192">"SIM Corporate atbloķēšanas pieprasījums nebija veiksmīgs."</string>
     <string name="PERSOSUBSTATE_SIM_SIM_ERROR" msgid="2472944311643350302">"SIM atbloķēšanas pieprasījums nebija veiksmīgs."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK1_ERROR" msgid="828089694480999120">"RUIM 1. tīkla veida atbloķēšanas pieprasījums nebija veiksmīgs."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK2_ERROR" msgid="17619001007092511">"RUIM 2. tīkla veida atbloķēšanas pieprasījums nebija veiksmīgs."</string>
     <string name="PERSOSUBSTATE_RUIM_HRPD_ERROR" msgid="807214229604353614">"RUIM Hrpd atbloķēšanas pieprasījums nebija veiksmīgs."</string>
     <string name="PERSOSUBSTATE_RUIM_CORPORATE_ERROR" msgid="8644184447744175747">"RUIM Corporate atbloķēšanas pieprasījums nebija veiksmīgs."</string>
-    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_ERROR" msgid="3801002648649640407">"RUIM pakalpojuma sniedzēja atbloķēšanas pieprasījums nebija veiksmīgs."</string>
+    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_ERROR" msgid="1882547895012628428">"RUIM pakalpojuma sniedzēja atbloķēšanas pieprasījums nebija sekmīgs."</string>
     <string name="PERSOSUBSTATE_RUIM_RUIM_ERROR" msgid="707397021218680753">"RUIM atbloķēšanas pieprasījums nebija veiksmīgs."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_PUK_ERROR" msgid="894358680773257820">"PUK atbloķēšana neizdevās."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_PUK_ERROR" msgid="352466878146726991">"PUK atbloķēšana neizdevās."</string>
@@ -2424,13 +2437,13 @@
     <string name="PERSOSUBSTATE_SIM_NS_SP_ERROR" msgid="1890493954453456758">"Tīkla apakškopas pakalpojuma sniedzēja atbloķēšanas pieprasījums nebija veiksmīgs."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUCCESS" msgid="4886243367747126325">"SIM tīkla atbloķēšana bija veiksmīga."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_SUBSET_SUCCESS" msgid="4053809277733513987">"SIM tīkla apakškopas atbloķēšana bija veiksmīga."</string>
-    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_SUCCESS" msgid="8249342930499801740">"SIM pakalpojuma sniedzēja atbloķēšana bija veiksmīga."</string>
+    <string name="PERSOSUBSTATE_SIM_SERVICE_PROVIDER_SUCCESS" msgid="6233653087159353652">"SIM pakalpojuma sniedzēja atbloķēšana bija sekmīga."</string>
     <string name="PERSOSUBSTATE_SIM_CORPORATE_SUCCESS" msgid="2339794542560381270">"SIM Corporate atbloķēšana bija veiksmīga."</string>
     <string name="PERSOSUBSTATE_SIM_SIM_SUCCESS" msgid="6975608174152828954">"SIM atbloķēšana bija veiksmīga."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK1_SUCCESS" msgid="2846699261330463192">"RUIM 1. tīkla veida atbloķēšana bija veiksmīga."</string>
     <string name="PERSOSUBSTATE_RUIM_NETWORK2_SUCCESS" msgid="5335414726057102801">"RUIM 2. tīkla veida atbloķēšana bija veiksmīga."</string>
     <string name="PERSOSUBSTATE_RUIM_HRPD_SUCCESS" msgid="8868100318474971969">"RUIM Hrpd atbloķēšana bija veiksmīga."</string>
-    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_SUCCESS" msgid="6020936629725666932">"RUIM pakalpojuma sniedzēja atbloķēšana bija veiksmīga."</string>
+    <string name="PERSOSUBSTATE_RUIM_SERVICE_PROVIDER_SUCCESS" msgid="6724555357287036238">"RUIM pakalpojuma sniedzēja atbloķēšana bija sekmīga."</string>
     <string name="PERSOSUBSTATE_RUIM_CORPORATE_SUCCESS" msgid="6944873647584595489">"RUIM Corporate atbloķēšana bija veiksmīga."</string>
     <string name="PERSOSUBSTATE_RUIM_RUIM_SUCCESS" msgid="2526483514124121988">"RUIM atbloķēšana bija veiksmīga."</string>
     <string name="PERSOSUBSTATE_SIM_NETWORK_PUK_SUCCESS" msgid="7662200333621664621">"PUK atbloķēšana bija veiksmīga."</string>

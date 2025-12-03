@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@
 package com.android.systemui.statusbar.pipeline.shared.ui.viewmodel
 
 import android.annotation.ColorInt
+import android.content.res.Resources
 import android.graphics.Rect
 import android.graphics.RectF
 import android.view.Display
@@ -39,15 +40,16 @@ import com.android.systemui.keyguard.shared.model.KeyguardState.LOCKSCREEN
 import com.android.systemui.keyguard.shared.model.KeyguardState.OCCLUDED
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.lifecycle.Activatable
-import com.android.systemui.lifecycle.ExclusiveActivatable
-import com.android.systemui.lifecycle.Hydrator
+import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.log.table.TableLogBufferFactory
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.plugins.DarkIconDispatcher
+import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.shade.display.domain.interactor.ShadeExpansionTargetDisplayInteractor
 import com.android.systemui.shade.domain.interactor.ShadeDisplaysInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
@@ -67,7 +69,7 @@ import com.android.systemui.statusbar.layout.ui.viewmodel.AppHandlesViewModel
 import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarBoundsViewModel
 import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarContentInsetsViewModelStore
 import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor
-import com.android.systemui.statusbar.notification.domain.interactor.HeadsUpNotificationInteractor
+import com.android.systemui.statusbar.notification.icon.domain.interactor.StatusBarNotificationIconsInteractor
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi
 import com.android.systemui.statusbar.phone.domain.interactor.DarkIconInteractor
 import com.android.systemui.statusbar.phone.domain.interactor.IsAreaDark
@@ -75,6 +77,7 @@ import com.android.systemui.statusbar.phone.domain.interactor.LightsOutInteracto
 import com.android.systemui.statusbar.phone.ongoingcall.StatusBarChipsModernization
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryNextToPercentViewModel
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryViewModel
+import com.android.systemui.statusbar.pipeline.shared.StatusBarShowIconsInSecureCamera
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarIconBlockListInteractor
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarInteractor
 import com.android.systemui.statusbar.pipeline.shared.ui.model.ChipsVisibilityModel
@@ -171,6 +174,9 @@ interface HomeStatusBarViewModel : Activatable {
     /** Notifies that the notification icons container was clicked. */
     fun onNotificationIconChipClicked()
 
+    /** Notifies that there is an intent to start expansion of a shade */
+    fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int)
+
     /** Whether the QS Chip should be highlighted. */
     val isQuickSettingsChipHighlighted: Boolean
 
@@ -242,6 +248,9 @@ interface HomeStatusBarViewModel : Activatable {
     /** True if the desktop status bar is enabled. */
     val useDesktopStatusBar: Boolean
 
+    /** Emits `true` whenever there is at least one status bar notification. */
+    val hasStatusBarNotifications: Boolean
+
     /** Interface for the assisted factory, to allow for providing a fake in tests */
     interface HomeStatusBarViewModelFactory {
         fun create(): HomeStatusBarViewModel
@@ -251,26 +260,28 @@ interface HomeStatusBarViewModel : Activatable {
 class HomeStatusBarViewModelImpl
 @AssistedInject
 constructor(
-    @DisplayId thisDisplayId: Int,
+    @field:DisplayId @DisplayId private val thisDisplayId: Int,
     override val batteryNextToPercentViewModel: BatteryNextToPercentViewModel.Factory,
     override val unifiedBatteryViewModel: BatteryViewModel.BasedOnUserSetting.Factory,
     override val systemStatusIconsViewModelFactory: SystemStatusIconsViewModel.Factory,
     override val statusBarBoundsViewModelFactory: StatusBarBoundsViewModel.Factory,
     override val appHandlesViewModelFactory: AppHandlesViewModel.Factory,
     tableLoggerFactory: TableLogBufferFactory,
+    @DisplayAware private val resources: Resources,
     @DisplayAware homeStatusBarInteractor: HomeStatusBarInteractor,
     homeStatusBarIconBlockListInteractor: HomeStatusBarIconBlockListInteractor,
     lightsOutInteractor: LightsOutInteractor,
     notificationsInteractor: ActiveNotificationsInteractor,
     desktopInteractor: DesktopInteractor,
     darkIconInteractor: DarkIconInteractor,
-    headsUpNotificationInteractor: HeadsUpNotificationInteractor,
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
     keyguardInteractor: KeyguardInteractor,
+    statusBarNotificationIconsInteractor: StatusBarNotificationIconsInteractor,
     override val operatorNameViewModel: StatusBarOperatorNameViewModel,
     private val sceneInteractor: SceneInteractor,
     occlusionInteractor: KeyguardOcclusionInteractor,
     private val shadeInteractor: ShadeInteractor,
+    private val shadeExpansionTargetDisplayInteractor: ShadeExpansionTargetDisplayInteractor,
     shareToAppChipViewModel: ShareToAppChipViewModel,
     @DisplayAware private val ongoingActivityChipsViewModel: OngoingActivityChipsViewModel,
     statusBarPopupChipsViewModelFactory: StatusBarPopupChipsViewModel.Factory,
@@ -280,9 +291,7 @@ constructor(
     @Background bgDispatcher: CoroutineDispatcher,
     shadeDisplaysInteractor: Provider<ShadeDisplaysInteractor>,
     private val uiEventLogger: StatusBarChipsUiEventLogger,
-) : HomeStatusBarViewModel, ExclusiveActivatable() {
-
-    private val hydrator = Hydrator(traceName = "HomeStatusBarViewModel.hydrator")
+) : HomeStatusBarViewModel, HydratedActivatable() {
 
     val tableLogger = tableLoggerFactory.getOrCreate(tableLogBufferName(thisDisplayId), 200)
 
@@ -436,11 +445,9 @@ constructor(
             .flowOn(bgDispatcher)
 
     override val areaDark: IsAreaDark by
-        hydrator.hydratedStateOf(
-            traceName = "areaDark",
-            initialValue = IsAreaDark { true },
-            source = darkIconInteractor.isAreaDark(thisDisplayId),
-        )
+        darkIconInteractor
+            .isAreaDark(thisDisplayId)
+            .hydratedStateOf(traceName = "areaDark", initialValue = IsAreaDark { true })
 
     private val currentKeyguardState: Flow<KeyguardState> =
         keyguardTransitionInteractor.currentKeyguardState.onEach {
@@ -452,24 +459,27 @@ constructor(
         }
 
     override val useDesktopStatusBar: Boolean by
-        hydrator.hydratedStateOf(
+        desktopInteractor.useDesktopStatusBar.hydratedStateOf(
             traceName = "useDesktopStatusBar",
             initialValue = false,
-            source = desktopInteractor.useDesktopStatusBar,
         )
 
     override val isQuickSettingsChipHighlighted: Boolean by
-        hydrator.hydratedStateOf(
+        shadeInteractor.isQsExpanded.hydratedStateOf(
             traceName = "isQsChipHighlighted",
             initialValue = false,
-            source = shadeInteractor.isQsExpanded,
         )
 
     override val isNotificationsChipHighlighted: Boolean by
-        hydrator.hydratedStateOf(
+        shadeInteractor.isNotificationsExpanded.hydratedStateOf(
             traceName = "isNotificationsChipHighlighted",
             initialValue = false,
-            source = shadeInteractor.isNotificationsExpanded,
+        )
+
+    override val hasStatusBarNotifications: Boolean by
+        statusBarNotificationIconsInteractor.hasStatusBarNotifications.hydratedStateOf(
+            traceName = "hasStatusBarNotifications",
+            initialValue = false,
         )
 
     /**
@@ -504,17 +514,22 @@ constructor(
             .traceEach(trackGroup(TRACK_GROUP, "isHomeStatusBarAllowed"), logcat = true)
             .stateIn(bgDisplayScope, SharingStarted.WhileSubscribed(), initialValue = false)
 
+    private val shouldHideStatusBarForSecureCamera =
+        if (StatusBarShowIconsInSecureCamera.isEnabled) {
+            homeStatusBarInteractor.shouldHideStatusBarForSecureCamera
+        } else {
+            keyguardInteractor.isSecureCameraActive
+        }
+
     private val shouldHomeStatusBarBeVisible =
         combine(
                 isHomeStatusBarAllowed,
-                keyguardInteractor.isSecureCameraActive,
-                headsUpNotificationInteractor.statusBarHeadsUpStatus,
+                shouldHideStatusBarForSecureCamera,
                 isTransitioningFromGoneToDream,
                 keyguardInteractor.isKeyguardVisible,
             ) {
                 isHomeStatusBarAllowed,
-                isSecureCameraActive,
-                headsUpState,
+                shouldHideStatusBarForSecureCamera,
                 isGoneToDream,
                 isKeyguardVisible ->
                 // When launching the camera over the lockscreen, the status icons would typically
@@ -528,7 +543,7 @@ constructor(
                 // momentarily visible because the dream animation has finished, but SysUI has not
                 // been informed that the dream is full-screen. See b/273314977.
                 isHomeStatusBarAllowed &&
-                    !isSecureCameraActive &&
+                    !shouldHideStatusBarForSecureCamera &&
                     !isGoneToDream &&
                     // In legacy code, check if keyguard is visible to cover canceled
                     // transitions. In Flexi, the scene state is enough to cover this case.
@@ -541,6 +556,9 @@ constructor(
                 initialValue = false,
             )
             .stateIn(bgDisplayScope, SharingStarted.WhileSubscribed(), initialValue = false)
+
+    private val shadeInvocationSplitRatio: Float =
+        resources.getFloat(R.dimen.config_invocationGestureSplitRatio)
 
     override val shouldShowOperatorNameView: Flow<Boolean> =
         combine(
@@ -561,10 +579,10 @@ constructor(
             .flowOn(bgDispatcher)
 
     override val canShowOngoingActivityChips: Flow<Boolean> =
-        combine(isHomeStatusBarAllowed, keyguardInteractor.isSecureCameraActive) {
+        combine(isHomeStatusBarAllowed, shouldHideStatusBarForSecureCamera) {
             isHomeStatusBarAllowed,
-            isSecureCameraActive ->
-            isHomeStatusBarAllowed && !isSecureCameraActive
+            shouldHideStatusBarForSecureCamera ->
+            isHomeStatusBarAllowed && !shouldHideStatusBarForSecureCamera
         }
 
     private val chipsVisibilityModel: StateFlow<ChipsVisibilityModel> =
@@ -585,14 +603,13 @@ constructor(
             )
 
     override val ongoingActivityChips: ChipsVisibilityModel by
-        hydrator.hydratedStateOf(
+        chipsVisibilityModel.hydratedStateOf(
             traceName = "ongoingActivityChips",
             initialValue =
                 ChipsVisibilityModel(
                     chips = MultipleOngoingActivityChipsModel(),
                     areChipsAllowed = false,
                 ),
-            source = chipsVisibilityModel,
         )
 
     override fun onChipBoundsChanged(key: String, bounds: RectF) {
@@ -614,6 +631,17 @@ constructor(
         }
         shadeInteractor.toggleNotificationsShade(
             loggingReason = "HomeStatusBarViewModel.onNotificationIconChipClicked"
+        )
+    }
+
+    override fun onShadeExpansionIntent(eventX: Float, statusBarWidth: Int) {
+        val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        shadeExpansionTargetDisplayInteractor.setExpansionIntentFromStatusBarEvent(
+            eventX = eventX,
+            displayId = thisDisplayId,
+            statusBarWidth = statusBarWidth,
+            shadeInvocationSplitRatio = shadeInvocationSplitRatio,
+            isRtl = isRtl,
         )
     }
 
@@ -715,9 +743,8 @@ constructor(
     @View.Visibility
     private fun Boolean.toVisibleOrInvisible(): Int = if (this) View.VISIBLE else View.INVISIBLE
 
-    override suspend fun onActivated(): Nothing {
+    override suspend fun onActivated() {
         coroutineScope {
-            launch { hydrator.activate() }
             if (StatusBarPopupChips.isEnabled) {
                 launch { statusBarPopupChips.activate() }
             }

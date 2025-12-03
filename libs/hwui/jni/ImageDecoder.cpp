@@ -54,9 +54,11 @@
 #include "Utils.h"
 
 #include <cutils/properties.h>
-extern const char* __progname;
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+#include <sys/types.h>
+#include <unistd.h>
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 #define UI_PERFMODE "debug.ui.perfmode.enable"
-#define UI_PERFMODE_PROCESS "debug.ui.perfmode.process"
 
 using namespace android;
 
@@ -83,9 +85,10 @@ enum Allocator {
 
 // These need to stay in sync with ImageDecoder.java's Error constants.
 enum Error {
-    kSourceException     = 1,
-    kSourceIncomplete    = 2,
+    kSourceException = 1,
+    kSourceIncomplete = 2,
     kSourceMalformedData = 3,
+    kGainmapExtractionFailed = 4,
 };
 
 // These need to stay in sync with PixelFormat.java's Format constants.
@@ -240,6 +243,15 @@ static jobject ImageDecoder_nCreateByteBuffer(JNIEnv* env, jobject /*clazz*/,
 static jobject ImageDecoder_nCreateByteArray(JNIEnv* env, jobject /*clazz*/,
         jbyteArray byteArray, jint offset, jint length,
         jboolean preferAnimation, jobject source) {
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+    int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
+    if (ui_perfmode > 0 && ui_perfmode == getpid()) {
+        AutoJavaByteArray ar(env, byteArray);
+        std::unique_ptr<SkStream> stream =
+            std::make_unique<SkMemoryStream>(ar.ptr() + offset, length, false);
+        return native_create(env, std::move(stream), source, preferAnimation);
+    }
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
     std::unique_ptr<SkStream> stream(CreateByteArrayStreamAdaptor(env, byteArray, offset, length));
     return native_create(env, std::move(stream), source, preferAnimation);
 }
@@ -302,17 +314,11 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
     }
 
     bool should_use_sw = false;
-    if (decoder->mCodec->getEncodedFormat() == SkEncodedImageFormat::kHEIF) {
-        char value[PROPERTY_VALUE_MAX];
-        memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
-        property_get(UI_PERFMODE, value, "false");
-        if (strncmp(value, "true", 4) == 0) {
-            memset(value, 0 , sizeof(char)*PROPERTY_VALUE_MAX);
-            property_get(UI_PERFMODE_PROCESS, value, "");
-            if (strncmp(__progname, value, 10) == 0) {
-                should_use_sw = true;
-            }
-        }
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+    int32_t ui_perfmode = property_get_int32(UI_PERFMODE, 0);
+    if (ui_perfmode > 0 && ui_perfmode == getpid()) {
+        should_use_sw = true;
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
     }
 
     const bool isHardware = !requireMutable
@@ -383,17 +389,6 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
     jthrowable jexception = get_and_clear_exception(env);
     int onPartialImageError = jexception ? kSourceException : 0;  // No error.
 
-    // Only attempt to extract the gainmap if we're not post-processing, as we can't automatically
-    // mimic that to the gainmap and expect it to be meaningful. And also don't extract the gainmap
-    // if we're prioritizing RAM over quality, since the gainmap improves quality at the
-    // cost of RAM
-    if (result == SkCodec::kSuccess && !jpostProcess && !preferRamOverQuality) {
-        // The gainmap costs RAM to improve quality, so skip this if we're prioritizing RAM instead
-        result = decoder->extractGainmap(nativeBitmap.get(),
-                                         allocator == kSharedMemory_Allocator ? true : false);
-        jexception = get_and_clear_exception(env);
-    }
-
     switch (result) {
         case SkCodec::kSuccess:
             // Ignore the exception, since the decode was successful anyway.
@@ -415,6 +410,23 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
             msg.printf("getPixels failed with error %s", SkCodec::ResultToString(result));
             doThrowIOE(env, msg.c_str());
             return nullptr;
+    }
+
+    // Only attempt to extract the gainmap if we're not post-processing, as we can't automatically
+    // mimic that to the gainmap and expect it to be meaningful. And also don't extract the gainmap
+    // if we're prioritizing RAM over quality, since the gainmap improves quality at the
+    // cost of RAM
+    if (result == SkCodec::kSuccess && !jpostProcess && !preferRamOverQuality) {
+        // The gainmap costs RAM to improve quality, so skip this if we're prioritizing RAM instead
+        result = decoder->extractGainmap(nativeBitmap.get(),
+                                         allocator == kSharedMemory_Allocator ? true : false);
+        jexception = get_and_clear_exception(env);
+
+        if (result != SkCodec::kSuccess) {
+            if (!jexception) {
+                onPartialImageError = kGainmapExtractionFailed;
+            }
+        }
     }
 
     if (onPartialImageError) {

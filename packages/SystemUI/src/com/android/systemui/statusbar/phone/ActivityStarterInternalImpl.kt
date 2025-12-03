@@ -150,10 +150,18 @@ constructor(
                 ): ActivityTransitionAnimator.Controller {
                     val baseController = controllerFactory.createController(forLaunch)
                     val rootView = baseController.transitionContainer.rootView
-                    val controllerFromStatusBar: Optional<ActivityTransitionAnimator.Controller> =
-                        statusBarWindowControllerStore.defaultDisplay
-                            .wrapAnimationControllerIfInStatusBar(rootView, baseController)
-                    return if (controllerFromStatusBar.isPresent) {
+                    val statusBarWindowController =
+                        if (Flags.activityStarterDisplayAware()) {
+                            statusBarWindowControllerStore.forDisplay(rootView.context.displayId)
+                        } else {
+                            statusBarWindowControllerStore.defaultDisplay
+                        }
+                    val controllerFromStatusBar: Optional<ActivityTransitionAnimator.Controller>? =
+                        statusBarWindowController?.wrapAnimationControllerIfInStatusBar(
+                            rootView,
+                            baseController,
+                        )
+                    return if (controllerFromStatusBar?.isPresent == true) {
                         controllerFromStatusBar.get()
                     } else {
                         baseController
@@ -663,14 +671,32 @@ constructor(
         isActivityIntent: Boolean,
         showOverLockscreen: Boolean,
     ): Boolean {
+        val keyguardOccluded = isKeyguardOccluded()
         // TODO(b/294418322): always support launch animations when occluded.
         val ignoreOcclusion = showOverLockscreen
-        if (isKeyguardOccluded() && !ignoreOcclusion) {
+        val skipInDesktopFlag = shadeAppLaunchAnimationSkipInDesktop()
+        val isDesktopMode = isInDesktopModeOnCurrentShadeDisplay
+        val isDesktopFirst = desktopFirstRepository.isDisplayDesktopFirst(currentShadeDisplayId)
+        val keyguardShowing = isKeyguardShowing()
+
+        Log.i(
+            TAG,
+            "shouldAnimateLaunch: " +
+                "isActivityIntent=$isActivityIntent, " +
+                "showOverLockscreen=$showOverLockscreen, " +
+                "isKeyguardOccluded=$keyguardOccluded, " +
+                "ignoreOcclusion=$ignoreOcclusion, " +
+                "skipInDesktopFlag=$skipInDesktopFlag, " +
+                "isInDesktopModeOnCurrentShadeDisplay=$isDesktopMode, " +
+                "isDisplayDesktopFirst=$isDesktopFirst, " +
+                "isKeyguardShowing=$keyguardShowing",
+        )
+        if (keyguardOccluded && !ignoreOcclusion) {
             return false
         }
 
         if (
-            shadeAppLaunchAnimationSkipInDesktop() &&
+            skipInDesktopFlag &&
                 (isInDesktopModeOnCurrentShadeDisplay ||
                     desktopFirstRepository.isDisplayDesktopFirst(currentShadeDisplayId))
         ) {
@@ -730,12 +756,18 @@ constructor(
             return null
         }
         val rootView = animationController.transitionContainer.rootView
-        val controllerFromStatusBar: Optional<ActivityTransitionAnimator.Controller> =
-            statusBarWindowControllerStore.defaultDisplay.wrapAnimationControllerIfInStatusBar(
+        val statusBarWindowController =
+            if (Flags.activityStarterDisplayAware()) {
+                statusBarWindowControllerStore.forDisplay(rootView.context.displayId)
+            } else {
+                statusBarWindowControllerStore.defaultDisplay
+            }
+        val controllerFromStatusBar: Optional<ActivityTransitionAnimator.Controller>? =
+            statusBarWindowController?.wrapAnimationControllerIfInStatusBar(
                 rootView,
                 animationController,
             )
-        if (controllerFromStatusBar.isPresent) {
+        if (controllerFromStatusBar?.isPresent == true) {
             return controllerFromStatusBar.get()
         }
 
@@ -777,7 +809,7 @@ constructor(
 
                 override fun onTransitionAnimationStart(isExpandingFullyAbove: Boolean) {
                     super.onTransitionAnimationStart(isExpandingFullyAbove)
-                    if (Flags.communalHub()) {
+                    if (Flags.communalHub() && !SceneContainerFlag.isEnabled) {
                         communalSceneInteractor.snapToScene(
                             newScene = CommunalScenes.Blank,
                             loggingReason = "ActivityStarterInternalImpl",

@@ -135,8 +135,8 @@ import com.android.systemui.shared.Flags;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -1542,6 +1542,20 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
                 } catch (RemoteException ex) {
                 }
             }
+        }
+    }
+
+    @Override
+    public int getIcon(String slot) {
+        enforceStatusBar();
+        enforceValidCallingUser();
+
+        synchronized (mIcons) {
+            StatusBarIcon icon = mIcons.get(slot);
+            if (icon == null) {
+                throw new IllegalArgumentException("No icon for the slot:" + slot);
+            }
+            return icon.icon.getResId();
         }
     }
 

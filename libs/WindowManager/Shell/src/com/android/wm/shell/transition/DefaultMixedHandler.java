@@ -25,12 +25,14 @@ import static android.view.WindowManager.TRANSIT_PIP;
 import static android.window.TransitionInfo.FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY;
 
 import static com.android.wm.shell.shared.TransitionUtil.isOpeningType;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_UNDEFINED;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.PendingIntent;
+import android.app.TaskInfo;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.ArrayMap;
@@ -44,6 +46,7 @@ import android.window.TransitionRequestInfo;
 import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.activityembedding.ActivityEmbeddingController;
@@ -52,6 +55,7 @@ import com.android.wm.shell.common.ComponentUtils;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController;
 import com.android.wm.shell.pip.PipTransitionController;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.recents.RecentsTransitionHandler;
@@ -88,6 +92,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
     private BubbleTransitions mBubbleTransitions;
     private UnfoldTransitionHandler mUnfoldHandler;
     private ActivityEmbeddingController mActivityEmbeddingController;
+    private @Nullable PinnedLayerController mPinnedLayerController;
 
     abstract static class MixedTransition {
 
@@ -215,6 +220,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
         protected final PipTransitionController mPipHandler;
         protected final StageCoordinator mSplitHandler;
         protected final KeyguardTransitionHandler mKeyguardHandler;
+        protected final BubbleTransitions mBubbleTransitions;
 
         Transitions.TransitionHandler mLeftoversHandler = null;
         TransitionInfo mInfo = null;
@@ -238,7 +244,8 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
 
         MixedTransition(@MixedTransitionType int type, IBinder transition, Transitions player,
                 MixedTransitionHandler mixedHandler, PipTransitionController pipHandler,
-                StageCoordinator splitHandler, KeyguardTransitionHandler keyguardHandler) {
+                StageCoordinator splitHandler, KeyguardTransitionHandler keyguardHandler,
+                BubbleTransitions bubbleTransitions) {
             mType = type;
             mTransition = transition;
             mPlayer = player;
@@ -246,6 +253,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
             mPipHandler = pipHandler;
             mSplitHandler = splitHandler;
             mKeyguardHandler = keyguardHandler;
+            mBubbleTransitions = bubbleTransitions;
         }
 
         abstract boolean startAnimation(
@@ -305,13 +313,40 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 }
             }
         }
+
+        /**
+         * When a Transition is chosen during {@link #handleRequest}, there is a chance that the
+         * handler cannot actually animate the transition when {@link #startAnimation}.
+         */
+        boolean canAnimateTransition(@NonNull IBinder transition, @NonNull TransitionInfo info) {
+            if (!BubbleAnythingFlagHelper.enableRootTaskForBubble()) {
+                return true;
+            }
+            if (MixedTransition.isAppBubbleTypeTransition(mType)) {
+                if (com.android.window.flags.Flags.fixBubbleTrampolineLaunchTwice()) {
+                    return mBubbleTransitions.canAnimateTransition(transition, info);
+                }
+            } else {
+                // The previously resolved mixed handler is no longer relevant, and we can replace
+                // it entirely because there are only opening bubble tasks in the changes.
+                final List<Integer> openingAppBubbleChangeIndexes =
+                        getOpeningAppBubbleChangeIndexes(mBubbleTransitions, info);
+                return openingAppBubbleChangeIndexes.isEmpty()
+                        || openingAppBubbleChangeIndexes.size() != info.getChanges().size();
+            }
+            return true;
+        }
     }
 
-    private final ArrayList<MixedTransition> mActiveTransitions = new ArrayList<>();
+    @VisibleForTesting
+    final ArrayList<MixedTransition> mActiveTransitions = new ArrayList<>();
 
-    public DefaultMixedHandler(@NonNull ShellInit shellInit, @NonNull Transitions player,
+    public DefaultMixedHandler(
+            @NonNull ShellInit shellInit,
+            @NonNull Transitions player,
             Optional<SplitScreenController> splitScreenControllerOptional,
             @Nullable PipTransitionController pipTransitionController,
+            @Nullable PinnedLayerController pinnedLayerController,
             Optional<RecentsTransitionHandler> recentsHandlerOptional,
             KeyguardTransitionHandler keyguardHandler,
             Optional<DesktopTasksController> desktopTasksControllerOptional,
@@ -326,6 +361,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
             shellInit.addInitCallback(() -> {
                 mPipHandler = pipTransitionController;
                 pipTransitionController.setMixedHandler(this);
+                mPinnedLayerController = pinnedLayerController;
                 mSplitHandler = splitScreenControllerOptional.get().getTransitionHandler();
                 mPlayer.addHandler(this);
                 if (mSplitHandler != null) {
@@ -352,14 +388,14 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
         if (requestHasBubbleEnter(request)) {
             consumeRemoteTransitionIfNecessary(transition, request.getRemoteTransition());
 
+            final WindowContainerTransaction out = new WindowContainerTransaction();
             if (mSplitHandler.requestImpliesSplitToBubble(task)) {
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
                         " Got a Bubble-enter request from a split task");
                 mBubbleTransitions.storePendingEnterTransition(transition, request);
                 mActiveTransitions.add(createDefaultMixedTransition(
                         MixedTransition.TYPE_LAUNCH_OR_CONVERT_SPLIT_TASK_TO_BUBBLE, transition));
-
-                WindowContainerTransaction out = new WindowContainerTransaction();
+                mBubbleTransitions.handleRequest(out, transition, request);
                 mSplitHandler.addExitForBubblesIfNeeded(request, out);
                 return out;
             } else if (task != null && mPipHandler.isTaskActiveInPip(task.taskId)) {
@@ -368,7 +404,8 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 mBubbleTransitions.storePendingEnterTransition(transition, request);
                 mActiveTransitions.add(createDefaultMixedTransition(
                         MixedTransition.TYPE_LAUNCH_OR_CONVERT_PIP_TASK_TO_BUBBLE, transition));
-                return new WindowContainerTransaction();
+                mBubbleTransitions.handleRequest(out, transition, request);
+                return out;
             } else if (task != null && mDesktopTasksController != null
                     && mDesktopTasksController.isDesktopTask(task)) {
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
@@ -376,8 +413,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 mBubbleTransitions.storePendingEnterTransition(transition, request);
                 mActiveTransitions.add(createDefaultMixedTransition(
                         MixedTransition.TYPE_LAUNCH_OR_CONVERT_DESKTOP_TASK_TO_BUBBLE, transition));
-
-                final WindowContainerTransaction out = new WindowContainerTransaction();
+                mBubbleTransitions.handleRequest(out, transition, request);
                 mDesktopTasksController.addMoveToBubbleFromDesktopChange(out, task, transition);
                 return out;
             } else {
@@ -387,7 +423,8 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 mBubbleTransitions.storePendingEnterTransition(transition, request);
                 mActiveTransitions.add(createDefaultMixedTransition(
                         MixedTransition.TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE, transition));
-                return new WindowContainerTransaction();
+                mBubbleTransitions.handleRequest(out, transition, request);
+                return out;
             }
         } else if (requestHasBubbleEnterFromAppBubbleOrExistingBubble(request)) {
             consumeRemoteTransitionIfNecessary(transition, request.getRemoteTransition());
@@ -407,13 +444,9 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
             }
         }
 
-        if (mSplitHandler.requestImpliesSplitToPip(request)) {
+        if (isSplitToPip(request)) {
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Got a PiP-enter request while "
                     + "Split-Screen is active, so treat it as Mixed.");
-            if (request.getRemoteTransition() != null) {
-                throw new IllegalStateException("Unexpected remote transition in"
-                        + "pip-enter-from-split request");
-            }
             mActiveTransitions.add(createDefaultMixedTransition(
                     MixedTransition.TYPE_ENTER_PIP_FROM_SPLIT, transition));
 
@@ -423,6 +456,14 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 mSplitHandler.removePipFromSplitIfNeeded(request, out);
             }
             mSplitHandler.addEnterOrExitForPipIfNeeded(request, out);
+            if (TransitionUtil.isOpeningType(request.getType())
+                    && task != null
+                    && mSplitHandler.getSplitItemPosition(task.token) == SPLIT_POSITION_UNDEFINED) {
+                // If it's an OPEN and the trigger isn't pinned/split,
+                // bring the task to the front.
+                out.reorder(task.token, true);
+            }
+
             return out;
         } else if (request.getType() == TRANSIT_PIP
                 && (request.getFlags() & FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY) != 0 && (
@@ -506,6 +547,42 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
         return null;
     }
 
+    private boolean isSplitToPip(@NonNull TransitionRequestInfo request) {
+        final boolean isPipTransition =
+                (request.getType() == TRANSIT_PIP || request.getPipChange() != null);
+        if (!isPipTransition) {
+            return false;
+        }
+
+        if (!mSplitHandler.isSplitActive()) {
+            return false;
+        }
+
+        final TaskInfo triggerTask = request.getTriggerTask();
+        if (triggerTask != null) {
+            if (!mSplitHandler.isTaskOnSplitDisplay(triggerTask)) {
+                return false;
+            }
+
+            if (mSplitHandler.getSplitPosition(triggerTask.taskId) != SPLIT_POSITION_UNDEFINED) {
+                return true;
+            }
+        }
+
+        if (PipFlags.isPip2ExperimentEnabled() && request.getPipChange() != null) {
+            // In PiP2, PiP-able task can also come in through the pip change request field.
+            final TaskInfo pipChangeTask = request.getPipChange().getTaskInfo();
+            if (mSplitHandler.getSplitPosition(pipChangeTask.taskId) != SPLIT_POSITION_UNDEFINED) {
+                return true;
+            }
+        }
+
+        // If one of the splitting tasks support auto-pip, wm-core might reparent the task to TDA
+        // and file a TRANSIT_PIP transition when finishing transitions.
+        // @see com.android.server.wm.RootWindowContainer#moveActivityToPinnedRootTask
+        return mSplitHandler.hasEmptyStage();
+    }
+
     private DefaultMixedTransition createDefaultMixedTransition(
             @MixedTransition.MixedTransitionType int type, IBinder transition) {
         return new DefaultMixedTransition(
@@ -578,7 +655,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
             int displayId) {
         return new RecentsMixedTransition(type, transition, mPlayer, this, mPipHandler,
                 mSplitHandler, mKeyguardHandler, mRecentsHandler, mDesktopTasksController,
-                displayId);
+                mBubbleTransitions, displayId);
     }
 
     static TransitionInfo subCopy(@NonNull TransitionInfo info,
@@ -610,36 +687,35 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
             break;
         }
 
+        if (mixed != null && !mixed.canAnimateTransition(transition, info)) {
+            // Let the previous mixed handler do the cleanup.
+            mixed.onTransitionConsumed(transition, true /* aborted */, finishTransaction);
+
+            // The previously resolved mixed handler is no longer relevant. Let's see if any other
+            // mixed handler is going to animate it.
+            mActiveTransitions.remove(mixed);
+            mixed = null;
+        }
+
         if (BubbleAnythingFlagHelper.enableRootTaskForBubble()) {
-            final List<Integer> openingAppBubbleChangeIndexes = getOpeningAppBubbleChangeIndexes(
-                    info);
-            boolean handleAppBubbleTransition = false;
-            if (!openingAppBubbleChangeIndexes.isEmpty()) {
-                if (mixed == null) {
-                    // If there was no requested transition but the transition includes an opening
-                    // bubble task, then handle it here now.
-                    handleAppBubbleTransition = true;
-                } else if (!MixedTransition.isAppBubbleTypeTransition(mixed.mType)
-                        && openingAppBubbleChangeIndexes.size() == info.getChanges().size()) {
-                    // The previously resolved mixed handler is no longer relevant, and we can
-                    // replace it entirely because there are only opening bubble tasks in the
-                    // changes.
-                    mActiveTransitions.remove(mixed);
-                    handleAppBubbleTransition = true;
-                }
-            }
-            if (handleAppBubbleTransition) {
-                if (mSplitHandler.requestImpliesSplitToBubble(info.getChanges().get(
-                        openingAppBubbleChangeIndexes.getFirst()).getTaskInfo())) {
-                    // TODO: Handle from split
-                } else {
-                    // Add a mixed transition
-                    ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Got a Bubble-enter "
-                            + "transition from an app bubble or for an existing bubble");
-                    mixed = createDefaultMixedTransition(
-                            MixedTransition.TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE_FROM_EXISTING_BUBBLE,
-                            transition);
-                    mActiveTransitions.add(mixed);
+            if (mixed == null) {
+                // If there was no requested transition but the transition includes an opening
+                // bubble task, then handle it here now.
+                final List<Integer> openingAppBubbleChangeIndexes =
+                        getOpeningAppBubbleChangeIndexes(mBubbleTransitions, info);
+                if (!openingAppBubbleChangeIndexes.isEmpty()) {
+                    if (mSplitHandler.requestImpliesSplitToBubble(info.getChanges().get(
+                            openingAppBubbleChangeIndexes.getFirst()).getTaskInfo())) {
+                        // TODO: Handle from split
+                    } else {
+                        // Add a mixed transition
+                        ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Got a Bubble-enter "
+                                + "transition from an app bubble or for an existing bubble");
+                        mixed = createDefaultMixedTransition(MixedTransition
+                                        .TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE_FROM_EXISTING_BUBBLE,
+                                transition);
+                        mActiveTransitions.add(mixed);
+                    }
                 }
             }
         } else {
@@ -921,7 +997,8 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
      * Returns the associated indexes of the opening app bubble task changes in the given
      * started transition.
      */
-    private List<Integer> getOpeningAppBubbleChangeIndexes(@NonNull TransitionInfo info) {
+    private static List<Integer> getOpeningAppBubbleChangeIndexes(
+            @NonNull BubbleTransitions bubbleTransitions, @NonNull TransitionInfo info) {
         final ArrayList<Integer> bubbleChangeIndexes = new ArrayList<>();
         for (int i = 0; i < info.getChanges().size(); i++) {
             final TransitionInfo.Change chg = info.getChanges().get(i);
@@ -935,8 +1012,8 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 continue;
             }
             // Skip non-app-bubble tasks
-            if (!mBubbleTransitions.shouldBeAppBubble(taskInfo)
-                    && !mBubbleTransitions.isAppBubbleRootTask(taskInfo)) {
+            if (!bubbleTransitions.shouldBeAppBubble(taskInfo)
+                    && !bubbleTransitions.isAppBubbleRootTask(taskInfo)) {
                 continue;
             }
             bubbleChangeIndexes.add(i);

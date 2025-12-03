@@ -60,6 +60,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.LocalServices;
+import com.android.server.accessibility.AccessibilityLogUtil;
 import com.android.server.accessibility.AccessibilityManagerService;
 import com.android.server.accessibility.Flags;
 import com.android.server.wm.WindowManagerInternal;
@@ -95,8 +96,8 @@ public class MagnificationController implements MagnificationConnectionManager.C
         FullScreenMagnificationController.MagnificationInfoChangedCallback,
         WindowManagerInternal.AccessibilityControllerInternal.UiChangesForAccessibilityCallbacks {
 
-    private static final boolean DEBUG = false;
     private static final String TAG = "MagnificationController";
+    private static final boolean DEBUG = AccessibilityLogUtil.isDebugEnabled(TAG);
 
     private final AccessibilityManagerService mAms;
     private final PointF mTempPoint = new PointF();
@@ -128,6 +129,7 @@ public class MagnificationController implements MagnificationConnectionManager.C
     // panned time ensures that panning doesn't occur too frequently.
     private long mLastPannedTime = 0;
     private long mLastMotionEventTriggeredUiChangeTime = 0;
+    private boolean mLastMotionEventTriggeredByMouse = false;
     private boolean mRepeatKeysEnabled = true;
 
     private @ZoomDirection int mActiveZoomDirection = ZOOM_DIRECTION_IN;
@@ -551,9 +553,13 @@ public class MagnificationController implements MagnificationConnectionManager.C
     }
 
     private void handleUserInteractionChanged(int displayId, int mode, boolean isMouse) {
-        if (mMagnificationCapabilities != Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MODE_ALL) {
+        if (mMagnificationCapabilities != Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MODE_ALL
+                && mMagnificationCapabilities
+                != Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MODE_FULLSCREEN) {
             return;
         }
+
+        mLastMotionEventTriggeredByMouse = isMouse;
 
         // Mouse events are always throttled. Touch events are throttled only when the flag is on.
         if (isMouse || Flags.throttleMotionEventsForUiUpdate()) {
@@ -570,15 +576,18 @@ public class MagnificationController implements MagnificationConnectionManager.C
 
     private void updateMagnificationUIControls(int displayId, int mode) {
         final boolean isActivated = isActivated(displayId, mode);
-        final boolean showModeSwitchButton;
-        final boolean enableSettingsPanel;
-        synchronized (mLock) {
-            showModeSwitchButton = isActivated
-                    && mMagnificationCapabilities == ACCESSIBILITY_MAGNIFICATION_MODE_ALL;
-            enableSettingsPanel = isActivated
-                    && (mMagnificationCapabilities == ACCESSIBILITY_MAGNIFICATION_MODE_ALL
-                    || mMagnificationCapabilities == ACCESSIBILITY_MAGNIFICATION_MODE_WINDOW);
-        }
+        final int capabilities = mMagnificationCapabilities;
+        final boolean showMagnificationUIForFullScreen =
+                Flags.enableMagnificationUiForFullscreenOnlyCapability()
+                && capabilities == ACCESSIBILITY_MAGNIFICATION_MODE_FULLSCREEN
+                && mLastMotionEventTriggeredByMouse;
+        final boolean showModeSwitchButton = isActivated
+                && (capabilities == ACCESSIBILITY_MAGNIFICATION_MODE_ALL
+                || showMagnificationUIForFullScreen);
+        final boolean enableSettingsPanel = isActivated
+                && (capabilities == ACCESSIBILITY_MAGNIFICATION_MODE_ALL
+                || capabilities == ACCESSIBILITY_MAGNIFICATION_MODE_WINDOW
+                || showMagnificationUIForFullScreen);
 
         if (showModeSwitchButton) {
             getMagnificationConnectionManager().showMagnificationButton(displayId, mode);
@@ -1089,6 +1098,10 @@ public class MagnificationController implements MagnificationConnectionManager.C
      */
     public void onUserRemoved(int userId) {
         mScaleProvider.onUserRemoved(userId);
+    }
+
+    public int getMagnificationCapabilities() {
+        return mMagnificationCapabilities;
     }
 
     public void setMagnificationCapabilities(int capabilities) {

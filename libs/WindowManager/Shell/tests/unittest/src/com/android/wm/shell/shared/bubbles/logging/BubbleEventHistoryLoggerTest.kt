@@ -25,15 +25,14 @@ import com.android.wm.shell.shared.bubbles.logging.BubbleEventHistoryLogger.Comp
 import com.android.wm.shell.shared.bubbles.logging.BubbleEventHistoryLogger.Companion.DATE_FORMATTER
 import com.android.wm.shell.shared.bubbles.logging.BubbleEventHistoryLogger.Companion.MAX_EVENTS
 import com.google.common.truth.Truth.assertThat
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlin.text.split
-import org.junit.Rule
-import org.junit.Test
-import org.junit.runner.RunWith
 
 /** Unit tests for [BubbleEventHistoryLogger]. */
 @SmallTest
@@ -60,8 +59,8 @@ class BubbleEventHistoryLoggerTest {
         logger.logEvent("d: hey", timestamp = timestamp)
         val expectedOutput = """
             Bubbles events history:
-              $formattedTimeStamp d: hey
               $formattedTimeStamp e: test | eventData
+              $formattedTimeStamp d: hey
             """.trimIndent() + "\n"
         assertThat(getDumpOutput()).isEqualTo(expectedOutput)
     }
@@ -75,7 +74,7 @@ class BubbleEventHistoryLoggerTest {
     }
 
     @Test
-    fun dump_printsEventsInReverseChronologicalOrderStartingFromTheMostRecentEvent() {
+    fun dump_printsEventsInChronologicalOrderStartingFromTheOldestEvent() {
         val repetitions = MAX_EVENTS * 2
         repeat(repetitions) { repetition ->
             logger.logEvent(title = "", timestamp = repetition.toLong())
@@ -83,14 +82,14 @@ class BubbleEventHistoryLoggerTest {
         val lastEventDateTime = DATE_FORMATTER.format(repetitions - 1)
         val logLines = getTrimmedLogLines()
 
-        // reversed timestamps should be in chronological order
-        assertThat(logLines.reversed()).isInOrder()
-        // first log entry corresponds to the most recent event
-        assertThat(logLines.first()).contains(lastEventDateTime)
+        assertThat(logLines).isInOrder()
+        // last log entry corresponds to the most recent event
+        assertThat(logLines.last()).contains(lastEventDateTime)
     }
 
     @Test
     fun dump_printsEventsInExpectedFormat() {
+        logger.record("test", eventData = "dump record")
         logger.d("test %b", true, eventData = "eventData")
         logger.v("test %d", 0, eventData = "eventData")
         logger.i("test %s", "stringArgument", eventData = "eventData")
@@ -99,11 +98,12 @@ class BubbleEventHistoryLoggerTest {
 
         val logLines = getTrimmedLogLines()
 
-        assertLogFormat(logLines[4], "d: test true | eventData")
-        assertLogFormat(logLines[3], "v: test 0 | eventData")
-        assertLogFormat(logLines[2], "i: test stringArgument | eventData")
-        assertLogFormat(logLines[1], "w: test")
-        assertLogFormat(logLines[0], "e: test | eventData")
+        assertLogFormat(logLines[0], "r: test | dump record")
+        assertLogFormat(logLines[1], "d: test true | eventData")
+        assertLogFormat(logLines[2], "v: test 0 | eventData")
+        assertLogFormat(logLines[3], "i: test stringArgument | eventData")
+        assertLogFormat(logLines[4], "w: test")
+        assertLogFormat(logLines[5], "e: test | eventData")
     }
 
     @Test

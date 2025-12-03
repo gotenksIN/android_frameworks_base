@@ -22,8 +22,6 @@ import static android.hardware.fingerprint.FingerprintSensorProperties.TYPE_REAR
 import static android.hardware.fingerprint.FingerprintSensorProperties.TYPE_UNKNOWN;
 import static android.view.Display.INVALID_DISPLAY;
 
-import static com.android.systemui.Flags.contAuthPlugin;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityTaskManager;
@@ -91,8 +89,6 @@ import com.android.systemui.display.data.repository.FocusedDisplayRepository;
 import com.android.systemui.doze.DozeReceiver;
 import com.android.systemui.keyguard.WakefulnessLifecycle;
 import com.android.systemui.keyguard.data.repository.BiometricType;
-import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
-import com.android.systemui.keyguard.shared.model.KeyguardState;
 import com.android.systemui.log.core.LogLevel;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.VibratorHelper;
@@ -160,7 +156,6 @@ public class AuthController implements
     @NonNull private final Provider<CredentialViewModel> mCredentialViewModelProvider;
     @NonNull private final Provider<PromptViewModel> mPromptViewModelProvider;
     @NonNull private final Lazy<LogContextInteractor> mLogContextInteractor;
-    @NonNull private final Lazy<KeyguardTransitionInteractor> mKeyguardTransitionInteractor;
 
     private final Display mDisplay;
     private float mScaleFactor = 1f;
@@ -744,8 +739,7 @@ public class AuthController implements
             @NonNull MSDLPlayer msdlPlayer,
             WindowManagerProvider windowManagerProvider,
             @NonNull PromptFallbackViewModel.Factory promptFallbackViewModelFactory,
-            @NonNull FocusedDisplayRepository focusedDisplayRepository,
-            @NonNull Lazy<KeyguardTransitionInteractor> keyguardTransitionInteractor) {
+            @NonNull FocusedDisplayRepository focusedDisplayRepository) {
         mContext = context;
         mExecution = execution;
         mUserManager = userManager;
@@ -756,7 +750,7 @@ public class AuthController implements
         mActivityTaskManager = activityTaskManager;
         mFingerprintManager = fingerprintManager;
         mFaceManager = faceManager;
-        mContextPlugins = contAuthPlugin() ? contextPlugins.orElse(null) : null;
+        mContextPlugins = contextPlugins.orElse(null);
         mUdfpsControllerFactory = udfpsControllerFactory;
         mUdfpsLogger = udfpsLogger;
         mDisplayManager = displayManager;
@@ -770,7 +764,6 @@ public class AuthController implements
         mVibratorHelper = vibratorHelper;
         mMSDLPlayer = msdlPlayer;
         mPromptFallbackViewModelFactory = promptFallbackViewModelFactory;
-        mKeyguardTransitionInteractor = keyguardTransitionInteractor;
 
         mLogContextInteractor = logContextInteractor;
         mPromptSelectorInteractor = promptSelectorInteractorProvider;
@@ -1317,19 +1310,10 @@ public class AuthController implements
         }
         mCurrentDialog = newDialog;
 
-        // Dismiss if the keyguard is showing and not occluded. isOwnerInBackground() handles the
-        // check to ensure the occluding app is the bp caller
-        final KeyguardState keyguardState = mKeyguardTransitionInteractor.get().getCurrentState();
-        final boolean isKeyguardShowingAndNotOccluded =
-                keyguardState != KeyguardState.GONE
-                        && keyguardState != KeyguardState.UNDEFINED
-                        && keyguardState != KeyguardState.OCCLUDED;
+        // TODO(b/353597496): We should check whether |allowBackgroundAuthentication| should be
+        //  removed.
         if (!promptInfo.isAllowBackgroundAuthentication() && isOwnerInBackground()) {
-            // TODO(b/353597496): We should check whether |allowBackgroundAuthentication| should be
-            //  removed.
             cancelIfOwnerIsNotInForeground();
-        } else if (isKeyguardShowingAndNotOccluded) {
-            closeDialog("keyguard showing");
         } else {
             WindowManager wm = getWindowManagerForUser(userId);
             if (wm != null) {

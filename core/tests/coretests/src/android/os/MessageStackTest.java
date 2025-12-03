@@ -129,11 +129,11 @@ public final class MessageStackTest {
             stack.pushMessage(Message.obtain(h, keepWhat));
         }
         stack.heapSweep();
-        assertTrue(stack.moveMatchingToFreelist(new MatchHandlerWhatAndObject(),
+        assertEquals(5, stack.moveMatchingToFreelist(new MatchHandlerWhatAndObject(),
                 h, removeWhat, null, null, 0));
 
         // Try deleting a message we never pushed
-        assertFalse(stack.moveMatchingToFreelist(new MatchHandlerWhatAndObject(),
+        assertEquals(0, stack.moveMatchingToFreelist(new MatchHandlerWhatAndObject(),
                 h, neverPushedWhat, null, null, 0));
 
         assertEquals(5, stack.freelistSizeForTest());
@@ -364,5 +364,26 @@ public final class MessageStackTest {
         assertEquals(5, stack.sizeForTest());
         assertEquals(5, stack.freelistSizeForTest());
         assertEquals(5, stack.combinedHeapSizesForTest());
+    }
+
+    /*
+     * Grow the underlying heaps and ensure that they shrink after item deletion.
+     */
+    @Test
+    public void testMessageHeapShrunk() {
+        MessageStack stack = new MessageStack();
+        final int initialHeapCapacity = stack.combinedHeapCapacitiesForTest();
+        final int numMessagesToPush = 2 * initialHeapCapacity;
+        for (int i = 0; i < numMessagesToPush; i++) {
+            stack.pushMessage(new Message());
+        }
+        stack.heapSweep();
+        final int grownHeapCapacity = stack.combinedHeapCapacitiesForTest();
+        assertEquals(numMessagesToPush, stack.moveMatchingToFreelist(new MatchAllMessages(),
+                null, 0, null, null, 0));
+        stack.drainFreelist();
+        assertTrue("Expected stack to shrink: " + grownHeapCapacity + " <= "
+                + stack.combinedHeapCapacitiesForTest(),
+                grownHeapCapacity > stack.combinedHeapCapacitiesForTest());
     }
 }

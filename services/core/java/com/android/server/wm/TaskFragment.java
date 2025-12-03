@@ -484,9 +484,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     void setCompanionTaskFragment(@Nullable TaskFragment companionTaskFragment,
             @Nullable IBinder toBeFinishedActivity) {
         mCompanionTaskFragment = companionTaskFragment;
-        if (Flags.taskFragmentCompanionActivity()) {
-            mCompanionToBeFinishedActivity = toBeFinishedActivity;
-        }
+        mCompanionToBeFinishedActivity = toBeFinishedActivity;
     }
 
     @Nullable
@@ -809,34 +807,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     @Override
     boolean isEmbedded() {
         return mIsEmbedded;
-    }
-
-
-    /**
-     * Returns true if this container fills its parent by policy or bounds. Similar to
-     * {@link ActivityRecord}, this returns {@code true} if it has override bounds which equals
-     * to its parent bounds
-     */
-    @Override
-    boolean fillsParentBounds() {
-        if (com.android.window.flags.Flags.rootTaskForBubble()) {
-            final int windowingMode = getWindowingMode();
-            if (windowingMode == WINDOWING_MODE_PINNED) {
-                return false;
-            }
-            if (windowingMode == WINDOWING_MODE_FULLSCREEN) {
-                return true;
-            }
-
-            final Rect overrideBounds = getResolvedOverrideBounds();
-            if (overrideBounds.isEmpty()) {
-                return true;
-            }
-            final WindowContainer parent = getParent();
-            return parent == null || parent.getBounds().equals(overrideBounds);
-        }
-
-        return super.fillsParentBounds();
     }
 
     @EmbeddingCheckResult
@@ -1333,9 +1303,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      * @param source an activity in this TaskFragment that launches another activity.
      */
     boolean shouldAbortActivityLaunchOnFinishingTf(@NonNull ActivityRecord source) {
-        if (!Flags.activityEmbeddingAbortCrossUidLaunchInFinishingTaskFragment()) {
-            return false;
-        }
         // If the source activity is a cross-uid embedded activity, the newly launched activity is
         // always expected to be in the same TaskFragment. If this TaskFragment is being removed, we
         // should not allow a new activity to be launched by the source, because it may be placed
@@ -1396,6 +1363,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             }
         }
 
+        TaskFragment.AdjacentVisibilityHelper adjacentVisibilityHelper = null;
         final List<TaskFragment> adjacentTaskFragments = new ArrayList<>();
         for (int i = parent.getChildCount() - 1; i >= 0; --i) {
             final WindowContainer other = parent.getChildAt(i);
@@ -1403,22 +1371,33 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
             final boolean hasRunningActivities = hasRunningActivity(other);
             if (other == this) {
-                if (!adjacentTaskFragments.isEmpty() && !gotTranslucentAdjacent) {
-                    // The z-order of this TaskFragment is in middle of two adjacent TaskFragments
-                    // and it cannot be visible if the TaskFragment on top is not translucent and
-                    // is occluding this one.
-                    mTmpRect.set(getBounds());
-                    for (int j = adjacentTaskFragments.size() - 1; j >= 0; --j) {
-                        final TaskFragment taskFragment = adjacentTaskFragments.get(j);
-                        if (taskFragment.isAdjacentTo(this)) {
-                            continue;
-                        }
-                        final boolean isOccluding = mTmpRect.intersect(taskFragment.getBounds())
-                                || taskFragment.forOtherAdjacentTaskFragments(adjacentTf -> {
-                                    return mTmpRect.intersect(adjacentTf.getBounds());
-                                });
-                        if (isOccluding) {
+                if (com.android.window.flags.Flags.fixTfAdjacentVisibility()) {
+                    if (adjacentVisibilityHelper != null
+                            && !adjacentVisibilityHelper.isUnprocessedAdjacentTaskFragment(this)) {
+                        if (!adjacentVisibilityHelper.isBehindTranslucentTaskFragment(this)) {
                             return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
+                        } else {
+                            gotTranslucentFullscreen = true;
+                        }
+                    }
+                } else {
+                    if (!adjacentTaskFragments.isEmpty() && !gotTranslucentAdjacent) {
+                        // The z-order of this TaskFragment is in middle of two adjacent
+                        // TaskFragments and it cannot be visible if the TaskFragment on top is
+                        // not translucent and is occluding this one.
+                        mTmpRect.set(getBounds());
+                        for (int j = adjacentTaskFragments.size() - 1; j >= 0; --j) {
+                            final TaskFragment taskFragment = adjacentTaskFragments.get(j);
+                            if (taskFragment.isAdjacentTo(this)) {
+                                continue;
+                            }
+                            final boolean isOccluding = mTmpRect.intersect(taskFragment.getBounds())
+                                    || taskFragment.forOtherAdjacentTaskFragments(adjacentTf -> {
+                                        return mTmpRect.intersect(adjacentTf.getBounds());
+                                    });
+                            if (isOccluding) {
+                                return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
+                            }
                         }
                     }
                 }
@@ -1452,7 +1431,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             }
 
             final TaskFragment otherTaskFrag = other.asTaskFragment();
-            if (otherTaskFrag != null && otherTaskFrag.hasAdjacentTaskFragment()) {
+            if (otherTaskFrag != null) {
                 // For adjacent TaskFragments, we have assumptions that:
                 // 1. A set of adjacent TaskFragments always cover the entire Task window, so that
                 // if this TaskFragment is behind a set of opaque TaskFragments, then this
@@ -1460,25 +1439,50 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 // 2. Adjacent TaskFragments do not overlap, so that if this TaskFragment is behind
                 // any translucent TaskFragment in the adjacent set, then this TaskFragment is
                 // visible behind translucent.
-                final boolean hasTraversedAdj = otherTaskFrag.forOtherAdjacentTaskFragments(
-                        adjacentTaskFragments::contains);
-                if (hasTraversedAdj) {
-                    final boolean isTranslucent =
-                            isBehindTransparentTaskFragment(otherTaskFrag, starting)
-                                    || otherTaskFrag.forOtherAdjacentTaskFragments(
-                                    (Predicate<TaskFragment>) tf ->
-                                            isBehindTransparentTaskFragment(tf, starting));
-                    if (isTranslucent) {
-                        // Can be visible behind a translucent adjacent TaskFragments.
-                        gotTranslucentFullscreen = true;
-                        gotTranslucentAdjacent = true;
-                        continue;
+                if (com.android.window.flags.Flags.fixTfAdjacentVisibility()) {
+                    if (otherTaskFrag.hasAdjacentTaskFragment()
+                            && (adjacentVisibilityHelper == null
+                            || adjacentVisibilityHelper.isAllAdjacentTaskFragmentProcessed())) {
+                        // Same as above. The TaskFragment must have filling content itself,
+                        // otherwise it cannot affect the visibility.
+                        adjacentVisibilityHelper =
+                                otherTaskFrag.getAdjacentTaskFragments().getVisibilityHelper(
+                                        t -> t.hasFillingContent() && !isTranslucent(t, starting));
                     }
-                    // Can not be visible behind adjacent TaskFragments.
-                    return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
+
+                    if (adjacentVisibilityHelper != null) {
+                        adjacentVisibilityHelper.process(otherTaskFrag);
+                        if (adjacentVisibilityHelper.isAllAdjacentTaskFragmentProcessed()) {
+                            if (adjacentVisibilityHelper.occludesParent()) {
+                                // Can not be visible behind adjacent TaskFragments.
+                                return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
+                            }
+                            // Can be visible behind a translucent adjacent TaskFragments.
+                            gotTranslucentFullscreen = true;
+                        }
+                    }
+                } else if (otherTaskFrag.hasAdjacentTaskFragment()) {
+                    final boolean hasTraversedAdj = otherTaskFrag.forOtherAdjacentTaskFragments(
+                            adjacentTaskFragments::contains);
+                    if (hasTraversedAdj) {
+                        final boolean isTranslucent =
+                                isBehindTransparentTaskFragment(otherTaskFrag, starting)
+                                        || otherTaskFrag.forOtherAdjacentTaskFragments(
+                                        (Predicate<TaskFragment>) tf ->
+                                                isBehindTransparentTaskFragment(tf, starting));
+                        if (isTranslucent) {
+                            // Can be visible behind a translucent adjacent TaskFragments.
+                            gotTranslucentFullscreen = true;
+                            gotTranslucentAdjacent = true;
+                            continue;
+                        }
+                        // Can not be visible behind adjacent TaskFragments.
+                        return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
+                    }
+                    adjacentTaskFragments.add(otherTaskFrag);
                 }
-                adjacentTaskFragments.add(otherTaskFrag);
             }
+
         }
 
         if (!shouldBeVisible) {
@@ -2228,9 +2232,10 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
         if (prev != null) {
             prev.resumeKeyDispatchingLocked();
+            if (prev.isVisibleRequested()) {
+                mRootWindowContainer.ensureActivitiesVisible(resuming);
+            }
         }
-
-        mRootWindowContainer.ensureActivitiesVisible(resuming);
 
         // Notify when the task stack has changed, but only if visibilities changed (not just
         // focus). Also if there is an active root pinned task - we always want to notify it about
@@ -2528,9 +2533,9 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         AppCompatDisplayInsets compatInsets = null;
         boolean useOverrideInsetsForConfig = false;
         if (overrideHint != null) {
-            overrideDisplayInfo = overrideHint.mTmpOverrideDisplayInfo;
-            compatInsets = overrideHint.mTmpCompatInsets;
-            useOverrideInsetsForConfig = overrideHint.mUseOverrideInsetsForConfig;
+            overrideDisplayInfo = overrideHint.getOverrideDisplayInfo();
+            compatInsets = overrideHint.getAppCompatDisplayInsets();
+            useOverrideInsetsForConfig = overrideHint.shouldUseOverrideInsetsForConfig();
             if (overrideDisplayInfo != null) {
                 // Make sure the screen related configs can be computed by the provided
                 // display info.
@@ -2577,10 +2582,10 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             outAppBounds = inOutConfig.windowConfiguration.getAppBounds();
 
             if (insideParentBounds && useOverrideInsetsForConfig && !customContainerPolicy
-                    && overrideHint.mParentAppBoundsOverride != null
+                    && overrideHint.getParentAppBoundsOverride() != null
                     && !WindowConfiguration.isFloating(windowingMode)) {
                 // Clip decor insets for legacy apps (no INSETS_DECOUPLED_CONFIGURATION_ENFORCED).
-                outAppBounds.intersectUnchecked(overrideHint.mParentAppBoundsOverride);
+                outAppBounds.intersectUnchecked(overrideHint.getParentAppBoundsOverride());
             } else if (resolvedBounds.isEmpty()) {
                 // Inherit from parent if there is no override bounds.
                 final Rect parentAppBounds = parentConfig.windowConfiguration.getAppBounds();
@@ -2721,7 +2726,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             DisplayInfo displayInfo, boolean useLegacyInsetsForStableBounds) {
         outNonDecorBounds.set(bounds);
         outStableBounds.set(bounds);
-        if (mDisplayContent == null) {
+        if (!useLegacyInsetsForStableBounds || mDisplayContent == null) {
             return;
         }
         mTmpBounds.set(0, 0, displayInfo.logicalWidth, displayInfo.logicalHeight);
@@ -2729,13 +2734,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         final DisplayPolicy policy = mDisplayContent.getDisplayPolicy();
         final DisplayPolicy.DecorInsets.Info info = policy.getDecorInsetsInfo(
                 displayInfo.rotation, displayInfo.logicalWidth, displayInfo.logicalHeight);
-        if (!useLegacyInsetsForStableBounds) {
-            intersectWithInsetsIfFits(outStableBounds, mTmpBounds, info.mConfigInsets);
-            intersectWithInsetsIfFits(outNonDecorBounds, mTmpBounds, info.mNonDecorInsets);
-        } else {
-            intersectWithInsetsIfFits(outStableBounds, mTmpBounds, info.mOverrideConfigInsets);
-            intersectWithInsetsIfFits(outNonDecorBounds, mTmpBounds, info.mOverrideNonDecorInsets);
-        }
+        intersectWithInsetsIfFits(outStableBounds, mTmpBounds, info.mOverrideConfigInsets);
+        intersectWithInsetsIfFits(outNonDecorBounds, mTmpBounds, info.mOverrideNonDecorInsets);
     }
 
     /**
@@ -3360,45 +3360,18 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         return forAllWindows(getDimBehindWindow, true);
     }
 
-    // It is replaced by WindowState#getDimController().
-    @Deprecated
-    @Override
-    Dimmer getDimmer() {
-        // If this is in an embedded TaskFragment and we want the dim applies on the TaskFragment.
-        if (mIsEmbedded && !isDimmingOnParentTask()) {
-            return mDimmer;
-        }
-
-        return super.getDimmer();
-    }
-
     /** Bounds to be used for dimming, as well as touch related tests. */
     void getDimBounds(@NonNull Rect out) {
-        if (com.android.window.flags.Flags.removeGetDimmer()) {
-            if (mIsEmbedded && isDimmingOnParentTask()) {
-                // Return the task bounds if the dimmer is showing and should cover on the Task
-                // (not just on this embedded TaskFragment).
-                final Task task = getTask();
-                if (task != null && task.mDimmer.hasDimState()) {
-                    out.set(task.getBounds());
-                    return;
-                }
-            }
-            out.set(getBounds());
-            return;
-        }
-
-        if (mDimmer.hasDimState()) {
-            out.set(mDimmer.getDimBounds());
-        } else {
-            if (mIsEmbedded && isDimmingOnParentTask() && getDimmer().getDimBounds() != null) {
-                // Return the task bounds if the dimmer is showing and should cover on the Task (not
-                // just on this embedded TaskFragment).
-                out.set(getTask().getBounds());
-            } else {
-                out.set(getBounds());
+        if (mIsEmbedded && isDimmingOnParentTask()) {
+            // Return the task bounds if the dimmer is showing and should cover on the Task
+            // (not just on this embedded TaskFragment).
+            final Task task = getTask();
+            if (task != null && task.mDimmer.hasDimState()) {
+                out.set(task.getBounds());
+                return;
             }
         }
+        out.set(getBounds());
     }
 
     void setEmbeddedDimArea(@EmbeddedDimArea int embeddedDimArea) {
@@ -3703,6 +3676,12 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return false;
         }
 
+        @NonNull
+        AdjacentVisibilityHelper getVisibilityHelper(
+                @NonNull Predicate<TaskFragment> occludingCallback) {
+            return new AdjacentVisibilityHelper(mAdjacentSet, occludingCallback);
+        }
+
         int size() {
             return mAdjacentSet.size();
         }
@@ -3731,6 +3710,95 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             }
             sb.append("}");
             return sb.toString();
+        }
+    }
+
+    /**
+     * The helper class to calculate the visibility of the adjacent TaskFragments.
+     * </p>
+     * For a complex case as below, the adjacent TaskFragments contain a translucent TaskFragment.
+     * In that case, the TaskFragment B should be visible, but Task#1 should not be visible if
+     * TaskFragment B occludes the whole area of the translucent TaskFragment C.
+     * Task#2
+     *    - TaskFragment C (adjacent to A, translucent)
+     *    - TaskFragment B
+     *    - TaskFragment A (adjacent to C)
+     * Task#1
+     * </p>
+     * The visibility calculation should be done by processing the TaskFragments from top to
+     * bottom, by calling {@link #process(TaskFragment)}.
+     */
+    static class AdjacentVisibilityHelper {
+        final ArraySet<TaskFragment> mUnprocessedAdjacentTaskFragments;
+        final ArraySet<TaskFragment> mTranslucentTaskFragments = new ArraySet<>();
+        final Predicate<TaskFragment> mOccludingCallback;
+
+        AdjacentVisibilityHelper(@NonNull ArraySet<TaskFragment> adjacentTaskFragments,
+                @NonNull Predicate<TaskFragment> occludingCallback) {
+            mUnprocessedAdjacentTaskFragments = new ArraySet<>(adjacentTaskFragments);
+            mOccludingCallback = occludingCallback;
+        }
+
+        /**
+         * Process the given TaskFragment. The TaskFragment should be one of the adjacent
+         * TaskFragments or the TaskFragments in between the adjacent TFs.
+         */
+        public void process(@NonNull TaskFragment taskFragment) {
+            if (mUnprocessedAdjacentTaskFragments.contains(taskFragment)) {
+                mUnprocessedAdjacentTaskFragments.remove(taskFragment);
+            }
+
+            if (mOccludingCallback.test(taskFragment)) {
+                // Remove the translucent TaskFragments if it can be fully occluded by this
+                // TaskFragment.
+                mTranslucentTaskFragments.removeIf(
+                        t -> taskFragment.getBounds().contains(t.getBounds()));
+            } else {
+                mTranslucentTaskFragments.add(taskFragment);
+            }
+        }
+
+        /**
+         * Returns {@code true} if the process is done, i.e. the adjacent TaskFragments are all
+         * processed.
+         */
+        public boolean isAllAdjacentTaskFragmentProcessed() {
+            return mUnprocessedAdjacentTaskFragments.isEmpty();
+        }
+
+        /**
+         * Returns {@code true} if the given TaskFragment is one of the adjacent TaskFragment
+         * that's not yet processed.
+         */
+        public boolean isUnprocessedAdjacentTaskFragment(TaskFragment tf) {
+            return mUnprocessedAdjacentTaskFragments.contains(tf);
+        }
+
+        /**
+         * Returns {@code true} if the adjacent TaskFragments (and the TaskFragments in between)
+         * can occlude parent container. Must be called after all adjacent TFs are processed.
+         */
+        public boolean occludesParent() {
+            return mTranslucentTaskFragments.isEmpty();
+        }
+
+        /**
+         * Return {@code true} if the given TaskFragment is behind any of the translucent
+         * TaskFragments
+         */
+        public boolean isBehindTranslucentTaskFragment(@NonNull TaskFragment tf) {
+            if (mUnprocessedAdjacentTaskFragments.contains(tf)) {
+                return false;
+            }
+
+            final Rect bounds = tf.getBounds();
+            for (int i = mTranslucentTaskFragments.size() - 1; i >= 0; i--) {
+                final TaskFragment taskFragment = mTranslucentTaskFragments.valueAt(i);
+                if (bounds.intersect(taskFragment.getBounds())) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

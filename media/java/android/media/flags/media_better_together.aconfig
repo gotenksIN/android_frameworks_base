@@ -62,6 +62,13 @@ flag {
 }
 
 flag {
+    name: "enable_preferred_device_fixes"
+    namespace: "media_better_together"
+    description: "Prevents MediaRouter2 from changing routing policies in specific situations where it shouldn't change them."
+    bug: "448815259"
+}
+
+flag {
     name: "enable_suggested_device_api"
     is_exported: true
     namespace: "media_better_together"
@@ -258,4 +265,11 @@ flag {
     namespace: "media_better_together"
     description: "Add a preference for device suggestions in the media settings page"
     bug: "415096359"
+}
+
+flag {
+    name: "release_ringtone_as_api"
+    namespace: "telecom"
+    description: "Flag for unhiding ringtone APIs"
+    bug: "450092456"
 }

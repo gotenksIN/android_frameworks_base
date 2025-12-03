@@ -29,6 +29,7 @@ import com.android.internal.widget.remotecompose.core.operations.ColorConstant;
 import com.android.internal.widget.remotecompose.core.operations.ColorExpression;
 import com.android.internal.widget.remotecompose.core.operations.ComponentValue;
 import com.android.internal.widget.remotecompose.core.operations.ConditionalOperations;
+import com.android.internal.widget.remotecompose.core.operations.DataDynamicListFloat;
 import com.android.internal.widget.remotecompose.core.operations.DataListFloat;
 import com.android.internal.widget.remotecompose.core.operations.DataListIds;
 import com.android.internal.widget.remotecompose.core.operations.DataMapIds;
@@ -73,6 +74,7 @@ import com.android.internal.widget.remotecompose.core.operations.MatrixSkew;
 import com.android.internal.widget.remotecompose.core.operations.MatrixTranslate;
 import com.android.internal.widget.remotecompose.core.operations.NamedVariable;
 import com.android.internal.widget.remotecompose.core.operations.PaintData;
+import com.android.internal.widget.remotecompose.core.operations.ParticlesCompare;
 import com.android.internal.widget.remotecompose.core.operations.ParticlesCreate;
 import com.android.internal.widget.remotecompose.core.operations.ParticlesLoop;
 import com.android.internal.widget.remotecompose.core.operations.PathAppend;
@@ -96,6 +98,7 @@ import com.android.internal.widget.remotecompose.core.operations.TextSubtext;
 import com.android.internal.widget.remotecompose.core.operations.Theme;
 import com.android.internal.widget.remotecompose.core.operations.TimeAttribute;
 import com.android.internal.widget.remotecompose.core.operations.TouchExpression;
+import com.android.internal.widget.remotecompose.core.operations.UpdateDynamicFloatList;
 import com.android.internal.widget.remotecompose.core.operations.Utils;
 import com.android.internal.widget.remotecompose.core.operations.WakeIn;
 import com.android.internal.widget.remotecompose.core.operations.layout.CanvasContent;
@@ -161,6 +164,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -1250,6 +1254,26 @@ public class RemoteComposeBuffer {
     }
 
     /**
+     * add a dynamic float array
+     *
+     * @param id id of the array
+     * @param size size of the array
+     */
+    public void addDynamicFloatArray(int id, float size) {
+        DataDynamicListFloat.apply(mBuffer, id, size);
+    }
+
+    /**
+     * Set a value in the given DataDynamicListFloat
+     * @param id the id of the DataDynamicListFloat
+     * @param index the index of the value to modify
+     * @param value the new value
+     */
+    public void setArrayValue(int id, float index, float value) {
+        UpdateDynamicFloatList.apply(mBuffer, id, index, value);
+    }
+
+    /**
      * This creates a list of individual floats
      *
      * @param id list id
@@ -1922,6 +1946,28 @@ public class RemoteComposeBuffer {
         ParticlesLoop.apply(mBuffer, id, restart, expressions);
     }
 
+    /**
+     * Add a comparison of 1 or 2 particles
+     *
+     * @param id the particle engine id
+     * @param flags configuration flags
+     * @param min the min index to process
+     * @param max the max index to process
+     * @param condition apply if exp > 0
+     * @param apply1 the first result
+     * @param apply2 the second result
+     */
+    public void addParticlesComparison(
+            int id,
+            short flags,
+            float min,
+            float max,
+            @Nullable float [] condition,
+            @Nullable float [][] apply1,
+            @Nullable float [][] apply2) {
+        ParticlesCompare.apply(mBuffer, id, flags, min, max, condition, apply1, apply2);
+    }
+
     /** Closes the particle engine container */
     public void addParticleLoopEnd() {
         ContainerEnd.apply(mBuffer);
@@ -2045,6 +2091,19 @@ public class RemoteComposeBuffer {
                 BitmapData.ENCODING_INLINE,
                 (short) imageHeight,
                 data); // todo: potential npe
+        return imageId;
+    }
+
+    /**
+     * Store an image url in the buffer
+     *
+     * @param imageId the image id
+     * @param url the image url
+     * @return the image id
+     */
+    public int storeBitmapUrl(int imageId, @NonNull String url) {
+        BitmapData.apply(mBuffer, imageId, BitmapData.TYPE_PNG, (short) 1, BitmapData.ENCODING_URL,
+                (short) 1, url.getBytes(StandardCharsets.UTF_8));
         return imageId;
     }
 

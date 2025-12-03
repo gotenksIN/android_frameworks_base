@@ -50,6 +50,7 @@ import com.android.app.displaylib.PerDisplayRepository
 import com.android.compose.theme.PlatformTheme
 import com.android.keyguard.AlphaOptimizedLinearLayout
 import com.android.systemui.Dumpable
+import com.android.systemui.Flags
 import com.android.systemui.Flags.notificationShadeBlur
 import com.android.systemui.animation.ShadeInterpolation
 import com.android.systemui.battery.BatteryMeterView
@@ -148,6 +149,8 @@ constructor(
                 ?.statusBarContentInsetsProvider
 
     companion object {
+        const val TRACK_NAME = "ShadeHeaderController"
+
         /** IDs for transitions and constraints for the [MotionLayout]. */
         @VisibleForTesting internal val HEADER_TRANSITION_ID = R.id.header_transition
 
@@ -348,6 +351,9 @@ constructor(
                 if (!ShadeWindowGoesAround.isEnabled) {
                     // the clock handles the config change itself.
                     clock.onDensityOrFontScaleChanged()
+                }
+                if (Flags.fixShadeHeaderWrongDndIconSize()) {
+                    statusBarIconController.reloadIconGroupLayoutParams(iconManager)
                 }
             }
 

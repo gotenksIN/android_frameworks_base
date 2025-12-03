@@ -29,7 +29,8 @@ import android.window.TransitionInfo
 import android.window.TransitionRequestInfo
 import android.window.WindowContainerToken
 import androidx.test.filters.SmallTest
-import com.android.internal.hidden_from_bootclasspath.com.android.window.flags.Flags.FLAG_FIX_BUBBLE_TRAMPOLINE_ANIMATION
+import com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn
+import com.android.window.flags.Flags.FLAG_FIX_BUBBLE_TRAMPOLINE_ANIMATION
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestShellExecutor
@@ -38,11 +39,13 @@ import com.android.wm.shell.bubbles.BubbleController
 import com.android.wm.shell.bubbles.BubbleTransitions
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
 import com.android.wm.shell.pip.PipTransitionController
 import com.android.wm.shell.recents.RecentsTransitionHandler
 import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.splitscreen.StageCoordinator
 import com.android.wm.shell.sysui.ShellInit
+import com.android.wm.shell.transition.DefaultMixedHandler.MixedTransition.TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE
 import com.android.wm.shell.unfold.UnfoldTransitionHandler
 import com.google.common.truth.Truth.assertThat
 import java.util.Optional
@@ -84,6 +87,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         mock(),
         mock(),
     ))
+    private val pinnedLayerController = mock<PinnedLayerController>()
 
     private val shellInit: ShellInit = ShellInit(TestShellExecutor())
     private val mixedHandler = DefaultMixedHandler(
@@ -91,6 +95,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         transitions,
         Optional.of(splitScreenController),
         pipTransitionController,
+        pinnedLayerController,
         Optional.of(recentsTransitionHandler),
         keyguardTransitionHandler,
         Optional.of(desktopTasksController),
@@ -295,11 +300,34 @@ class DefaultMixedHandlerTest : ShellTestCase() {
             any(), eq(openingChange.taskInfo!!), eq(closingChange.taskInfo!!), any())
     }
 
+    @Test
+    fun test_startAnimation_prevMixedCanNotAnimateTransition() {
+        spyOn(mixedHandler)
+        val transition = Binder()
+        val mixedTransition = spy(DefaultMixedTransition(
+            TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE, transition, transitions, mixedHandler,
+            pipTransitionController, splitScreenController.getTransitionHandler(),
+            keyguardTransitionHandler, unfoldTransitionHandler, activityEmbeddingController,
+            desktopTasksController, bubbleTransitions
+        ))
+        mixedHandler.mActiveTransitions.add(mixedTransition)
+        val info = TransitionInfo(TRANSIT_OPEN, 0)
+        doReturn(false).`when`(mixedTransition).canAnimateTransition(transition, info)
+
+        mixedHandler.startAnimation(transition, info, mock<SurfaceControl.Transaction>(),
+            mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
+
+        verify(mixedTransition).onTransitionConsumed(eq(transition), eq(true), any())
+        assertThat(mixedHandler.mActiveTransitions.contains(mixedTransition)).isFalse()
+    }
+
     private fun createTransitionRequestInfo(
         runningTask: RunningTaskInfo? = null,
         remote: RemoteTransition? = null,
     ): TransitionRequestInfo {
-        return TransitionRequestInfo(TRANSIT_OPEN, runningTask, remote)
+        val remoteInfo =
+            if (remote != null) TransitionRequestInfo.RemoteTransitionInfo(remote) else null
+        return TransitionRequestInfo(TRANSIT_OPEN, runningTask, remoteInfo)
     }
 
     private fun createRunningTask(taskId: Int = 0): RunningTaskInfo {

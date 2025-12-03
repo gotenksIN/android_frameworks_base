@@ -26,9 +26,6 @@ import android.annotation.TestApi;
 import android.app.ActivityThread;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
-import android.ravenwood.annotation.RavenwoodRedirect;
-import android.ravenwood.annotation.RavenwoodRedirectionClass;
-import android.ravenwood.annotation.RavenwoodReplace;
 import android.ravenwood.annotation.RavenwoodThrow;
 import android.util.Log;
 import android.util.Printer;
@@ -61,7 +58,6 @@ import java.util.concurrent.locks.ReentrantLock;
  * {@link Looper#myQueue() Looper.myQueue()}.
  */
 @RavenwoodKeepWholeClass
-@RavenwoodRedirectionClass("MessageQueue_ravenwood")
 public final class MessageQueue {
     private static final String TAG = "DeliQueue";
     private static final boolean DEBUG = false;
@@ -74,21 +70,14 @@ public final class MessageQueue {
     @SuppressWarnings("unused")
     private long mPtr; // used by native code
 
-    @RavenwoodRedirect
     private native static long nativeInit();
-    @RavenwoodRedirect
     private native static void nativeDestroy(long ptr);
     @UnsupportedAppUsage
-    @RavenwoodRedirect
     private native void nativePollOnce(long ptr, int timeoutMillis); /*non-static for callbacks*/
 
-    @RavenwoodRedirect
     private native static void nativeWake(long ptr);
-    @RavenwoodRedirect
     private native static boolean nativeIsPolling(long ptr);
-    @RavenwoodRedirect
     private native static void nativeSetFileDescriptorEvents(long ptr, int fd, int events);
-    @RavenwoodRedirect
     private native static void nativeSetSkipEpollWaitForZeroTimeout(long ptr);
 
     @UnsupportedAppUsage
@@ -134,7 +123,6 @@ public final class MessageQueue {
     private static final VarHandle sMptrRefCount;
     private volatile long mMptrRefCountValue = 0;
 
-    private static final VarHandle sSyncBarrier;
     private volatile Message mSyncBarrier = null;
 
     static {
@@ -148,10 +136,7 @@ public final class MessageQueue {
                     long.class);
             sWaitState = l.findVarHandle(MessageQueue.class, "mWaitState",
                     long.class);
-            sMptrRefCount = l.findVarHandle(MessageQueue.class, "mMptrRefCountValue",
-                    long.class);
-            sSyncBarrier = l.findVarHandle(MessageQueue.class, "mSyncBarrier",
-                    Message.class);
+            sMptrRefCount = l.findVarHandle(MessageQueue.class, "mMptrRefCountValue", long.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -309,29 +294,46 @@ public final class MessageQueue {
         }
 
         while (true) {
-            long waitState = mWaitState;
-            long newWaitState;
-            boolean needWake = false;
-            Message barrier = msg.isAsynchronous() ? null :
-                    (Message) sSyncBarrier.getVolatile(this);
-            boolean reCheckBarrier = false;
+            final long waitState = mWaitState;
+            final long newWaitState;
+            final boolean needWake;
+            final Message checkBarrier;
 
             if (WaitState.isCounter(waitState)) {
+                // Looper is already awake
                 newWaitState = WaitState.incrementCounter(waitState);
+                checkBarrier = null;
+                needWake = false;
+            } else if (msg.when >= WaitState.getTSMillis(waitState)) {
+                // The enqueued message is not earlier than the current wake
+                // deadline, so we don't need to wake.
+                newWaitState = WaitState.incrementDeadline(waitState);
+                checkBarrier = null;
+                needWake = false;
+            } else if (msg.isAsynchronous()) {
+                // The enqueued message has an earlier deadline.
+                // It is async, so it can bypass barriers.
+                newWaitState = WaitState.initCounter();
+                checkBarrier = null;
+                needWake = true;
             } else {
-                final long TSmillis = WaitState.getTSMillis(waitState);
-                boolean weComeBeforeBarrier = barrier != null && msg.when <= barrier.when;
-                if (weComeBeforeBarrier || (msg.when < TSmillis
-                        && (!WaitState.hasSyncBarrier(waitState) || msg.isAsynchronous()))) {
-                    newWaitState = WaitState.initCounter();
-                    needWake = true;
-                } else {
+                // We may need to wake up, depending on the state of the sync barrier.
+                Message barrier = WaitState.hasSyncBarrier(waitState) ? mSyncBarrier : null;
+                boolean blockedByBarrier =
+                        barrier != null && Message.compareMessages(barrier, msg) < 0;
+                if (blockedByBarrier) {
                     newWaitState = WaitState.incrementDeadline(waitState);
-                    reCheckBarrier = true;
+                    checkBarrier = barrier;
+                    needWake = false;
+                } else {
+                    newWaitState = WaitState.initCounter();
+                    checkBarrier = null;
+                    needWake = true;
                 }
             }
+
             if (sWaitState.compareAndSet(this, waitState, newWaitState)) {
-                if (reCheckBarrier && barrier != (Message) sSyncBarrier.getVolatile(this)) {
+                if (checkBarrier != null && checkBarrier != mSyncBarrier) {
                     /*
                      * If barrier state changed underneath us and we chose not to wake the
                      * looper thread, we have to recheck to ensure that the barrier we saw was
@@ -344,6 +346,7 @@ public final class MessageQueue {
                 }
                 return true;
             }
+            // Failed to update wait state, loop and retry
         }
     }
 
@@ -524,7 +527,7 @@ public final class MessageQueue {
                 }
             }
 
-            sSyncBarrier.setVolatile(this, syncBarrier);
+            mSyncBarrier = syncBarrier;
             /*
              * Try to swap waitstate back from a counter to a deadline. If we can't then that means
              * the counter was incremented and we need to loop back to pick up any new items.

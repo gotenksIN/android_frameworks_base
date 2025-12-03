@@ -49,8 +49,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * <p>WiredAccessoryManager monitors for a wired headset on the main board or dock using
@@ -77,18 +75,8 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
     private static final String NAME_H2W = "h2w";
     private static final String NAME_USB_AUDIO = "usb_audio";
     private static final String NAME_HDMI_AUDIO = "hdmi_audio";
-    private static final String NAME_DP_AUDIO = "soc:qcom,msm-ext-disp";
-    // within a device, a single stream supports DP
-    private static final String[] DP_AUDIO_CONNS = {
-                                                     NAME_DP_AUDIO + "/3/0",
-                                                     NAME_DP_AUDIO + "/2/0",
-                                                     NAME_DP_AUDIO + "/1/0",
-                                                     NAME_DP_AUDIO + "/0/0"
-                                                   };
-
     private static final String NAME_HDMI = "hdmi";
-    private static final String INTF_DP = "DP";
-    private static final String INTF_HDMI = "HDMI";
+
     private static final int MSG_NEW_DEVICE_STATE = 1;
     private static final int MSG_SYSTEM_READY = 2;
 
@@ -98,8 +86,6 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
     private final AudioManager mAudioManager;
 
     private int mHeadsetState;
-    private int mDpCount;
-    private String mDetectedIntf = INTF_DP;
 
     private final WiredAccessoryObserver mObserver;
     private final WiredAccessoryExtconObserver mExtconObserver;
@@ -108,6 +94,17 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
     private final boolean mUseDevInputEventForAudioJack;
 
     private static final int MAX_DP_COUNT = 2;
+    private static final String INTF_DP = "DP";
+    private static final String INTF_HDMI = "HDMI";
+    private int mDpCount;
+    private String mDetectedIntf = INTF_DP;
+    private static final String NAME_DP_AUDIO = "soc:qcom,msm-ext-disp";
+    private static final String[] DP_AUDIO_CONNS = {
+                                                     NAME_DP_AUDIO + "/3/0",
+                                                     NAME_DP_AUDIO + "/2/0",
+                                                     NAME_DP_AUDIO + "/1/0",
+                                                     NAME_DP_AUDIO + "/0/0"
+                                                   };
 
     public WiredAccessoryManager(Context context, InputManagerService inputManager) {
         PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
@@ -655,10 +652,11 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
         private final class UEventInfo {
             private final String mDevName;
-            private String mDevAddress;
             private final int mState1Bits;
             private final int mState2Bits;
             private final int mStateNbits;
+
+            private String mDevAddress;
             private int mDevIndex;
             private int mCableIndex;
             private int mStream;
@@ -666,11 +664,13 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
 
             public UEventInfo(String devName, int state1Bits,
                               int state2Bits, int stateNbits) {
+
                 mDevName = devName;
-                mDevAddress = "controller=0;stream=0";
                 mState1Bits = state1Bits;
                 mState2Bits = state2Bits;
                 mStateNbits = stateNbits;
+
+                mDevAddress = "controller=0;stream=0";
                 mDevIndex = -1;
                 mCableIndex = -1;
                 mStream = 0;
@@ -687,6 +687,52 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
                     }
                 }
             }
+
+            public String getDevName() {
+                return mDevName;
+            }
+
+            public String getDevPath() {
+                if (mDevName.startsWith(NAME_DP_AUDIO)) {
+                    return String.format(Locale.US,
+                                         "/devices/platform/soc/%s/extcon/extcon%d",
+                                         NAME_DP_AUDIO,
+                                         mDevIndex);
+                } else {
+                    return String.format(Locale.US,
+                                     "/devices/virtual/switch/%s",
+                                     mDevName);
+                }
+            }
+
+            public String getSwitchStatePath() {
+                if (mDevName.startsWith(NAME_DP_AUDIO)) {
+                    return String.format(Locale.US,
+                           "/sys/devices/platform/soc/%s/extcon/extcon%d/cable.%d/state",
+                           NAME_DP_AUDIO, mDevIndex, mCableIndex);
+                } else {
+                    return String.format(Locale.US,
+                                    "/sys/class/switch/%s/state",
+                                    mDevName);
+                }
+            }
+
+            public boolean checkSwitchExists() {
+                File f = new File(getSwitchStatePath());
+                return f.exists();
+            }
+
+            public int computeNewHeadsetState(int headsetState, int switchState) {
+                int preserveMask = ~(mState1Bits | mState2Bits | mStateNbits);
+                int setBits = ((switchState == 1) ? mState1Bits :
+                        ((switchState == 2) ? mState2Bits :
+                                ((switchState == mStateNbits) ? mStateNbits : 0)));
+
+                return ((headsetState & preserveMask) | setBits);
+            }
+
+
+    public String getDevAddress() { return mDevAddress; }
 
     private void checkDevIndex(int index) {
         char[] buffer = new char[1024];
@@ -751,68 +797,23 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
     }
 
 
-            public void setStreamIndex(int streamIndex) {
-                mStream = streamIndex;
-                mDevAddress = String.format("controller=%d;stream=%d", mController, mStream);
-            }
+    public void setStreamIndex(int streamIndex) {
+        mStream = streamIndex;
+        mDevAddress = String.format("controller=%d;stream=%d", mController, mStream);
+    }
 
 
-            public void setController(int controller) {
-                mController = controller;
-                mDevAddress = String.format("controller=%d;stream=%d", mController, mStream);
-            }
+    public void setController(int controller) {
+        mController = controller;
+        mDevAddress = String.format("controller=%d;stream=%d", mController, mStream);
+    }
 
+    public String toString() {
+        return "UEventInfo " +
+                " name=" + mDevName +
+                " mDevAddress=" + mDevAddress;
+        }
 
-            public String getDevName() {
-                return mDevName;
-            }
-
-            public String getDevAddress() { return mDevAddress; }
-
-            public String getDevPath() {
-                if (mDevName.startsWith(NAME_DP_AUDIO)) {
-                    return String.format(Locale.US,
-                                         "/devices/platform/soc/%s/extcon/extcon%d",
-                                         NAME_DP_AUDIO,
-                                         mDevIndex);
-                } else {
-                    return String.format(Locale.US,
-                                     "/devices/virtual/switch/%s",
-                                     mDevName);
-                }
-            }
-
-            public String getSwitchStatePath() {
-                if (mDevName.startsWith(NAME_DP_AUDIO)) {
-                    return String.format(Locale.US,
-                           "/sys/devices/platform/soc/%s/extcon/extcon%d/cable.%d/state",
-                           NAME_DP_AUDIO, mDevIndex, mCableIndex);
-                } else {
-                    return String.format(Locale.US,
-                                    "/sys/class/switch/%s/state",
-                                    mDevName);
-                }
-            }
-
-            public boolean checkSwitchExists() {
-                File f = new File(getSwitchStatePath());
-                return f.exists();
-            }
-
-            public int computeNewHeadsetState(int headsetState, int switchState) {
-                int preserveMask = ~(mState1Bits | mState2Bits | mStateNbits);
-                int setBits = ((switchState == 1) ? mState1Bits :
-                        ((switchState == 2) ? mState2Bits :
-                                ((switchState == mStateNbits) ? mStateNbits : 0)));
-
-                return ((headsetState & preserveMask) | setBits);
-            }
-
-            public String toString() {
-                return "UEventInfo " +
-                       " name=" + mDevName +
-                       " mDevAddress=" + mDevAddress;
-            }
         }
     }
 

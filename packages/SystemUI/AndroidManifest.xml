@@ -546,6 +546,12 @@
             android:showForAllUsers="true"
             android:theme="@style/ScreenCapture.PostRecord" />
 
+        <activity
+            android:name=".screencapture.record.largescreen.ui.DirectoryPickerActivity"
+            android:exported="false"
+            android:showForAllUsers="true"
+            android:theme="@style/Theme.Transparent" />
+
         <service android:name=".screenrecord.service.ScreenRecordingService" />
 
         <service android:name=".screenrecord.RecordingService"
@@ -722,7 +728,7 @@
             android:visibleToInstantApps="true"/>
 
         <activity
-            android:name=".mediaprojection.permission.ShareScreenActivity"
+            android:name=".screencapture.ui.ShareScreenActivity"
             android:showForAllUsers="true"
             android:exported="true"
             android:theme="@style/Theme.SystemUI.MediaProjectionAlertDialog"

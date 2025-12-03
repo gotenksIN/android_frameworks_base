@@ -99,6 +99,7 @@ import android.app.IServiceConnection;
 import android.app.KeyguardManager;
 import android.app.admin.SecurityLog.SecurityEvent;
 import android.app.admin.flags.Flags;
+import android.app.admin.metadata.PolicyTransportValueConvertor;
 import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
@@ -2384,7 +2385,7 @@ public class DevicePolicyManager {
      *
      * <p> When returned from {@link #getPasswordComplexity()}, the constant represents
      * the exact complexity band the password is in.
-     * When passed to {@link #setRequiredPasswordComplexity(int), it sets the minimum complexity
+     * When passed to {@link #setRequiredPasswordComplexity(int)}, it sets the minimum complexity
      * band which the password must meet.
      */
     public static final int PASSWORD_COMPLEXITY_NONE = 0;
@@ -2400,7 +2401,7 @@ public class DevicePolicyManager {
      *
      * <p> When returned from {@link #getPasswordComplexity()}, the constant represents
      * the exact complexity band the password is in.
-     * When passed to {@link #setRequiredPasswordComplexity(int), it sets the minimum complexity
+     * When passed to {@link #setRequiredPasswordComplexity(int)}, it sets the minimum complexity
      * band which the password must meet.
      *
      * @see #PASSWORD_QUALITY_SOMETHING
@@ -2421,7 +2422,7 @@ public class DevicePolicyManager {
      *
      * <p> When returned from {@link #getPasswordComplexity()}, the constant represents
      * the exact complexity band the password is in.
-     * When passed to {@link #setRequiredPasswordComplexity(int), it sets the minimum complexity
+     * When passed to {@link #setRequiredPasswordComplexity(int)}, it sets the minimum complexity
      * band which the password must meet.
      *
      * @see #PASSWORD_QUALITY_NUMERIC_COMPLEX
@@ -2443,7 +2444,7 @@ public class DevicePolicyManager {
      *
      * <p> When returned from {@link #getPasswordComplexity()}, the constant represents
      * the exact complexity band the password is in.
-     * When passed to {@link #setRequiredPasswordComplexity(int), it sets the minimum complexity
+     * When passed to {@link #setRequiredPasswordComplexity(int)}, it sets the minimum complexity
      * band which the password must meet.
      *
      * @see #PASSWORD_QUALITY_NUMERIC_COMPLEX
@@ -4935,7 +4936,7 @@ public class DevicePolicyManager {
      * If this method is called on the {@link DevicePolicyManager} instance returned by
      * {@link #getParentProfileInstance(ComponentName)}, then password complexity requirements
      * set on the primary {@link DevicePolicyManager} must be cleared first by calling
-     * {@link #setRequiredPasswordComplexity} with {@link #PASSWORD_COMPLEXITY_NONE) first.
+     * {@link #setRequiredPasswordComplexity} with {@link #PASSWORD_COMPLEXITY_NONE} first.
      *
      * <p><string>Note:</strong> this method is ignored on
      * {PackageManager#FEATURE_AUTOMOTIVE automotive builds}.
@@ -13415,7 +13416,7 @@ public class DevicePolicyManager {
      * Admins can explicitly enable it with this API.
      *
      * <p> This method enables preferential network service with a default configuration.
-     * To fine-tune the configuration, use {@link #setPreferentialNetworkServiceConfigs) instead.
+     * To fine-tune the configuration, use {@link #setPreferentialNetworkServiceConfigs} instead.
      * <p> Before Android version {@link android.os.Build.VERSION_CODES#TIRAMISU}:
      * this method can be called by the profile owner of a managed profile.
      * <p> Starting from Android version {@link android.os.Build.VERSION_CODES#TIRAMISU}:
@@ -15347,7 +15348,7 @@ public class DevicePolicyManager {
 
     /**
      * Called by the device owner (since API 26) or profile owner (since API 24) or holders of the
-     * permission {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY
+     * permission {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY}
      * to retrieve the name of the organization under management.
      *
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with. Null if the
@@ -15685,7 +15686,7 @@ public class DevicePolicyManager {
     /**
      * @hide
      * Force update user setup completed status for the given {@code userId}.
-     * @throws {@link SecurityException} if the caller has no
+     * @throws SecurityException if the caller has no
      *         {@code android.Manifest.permission.MANAGE_PROFILE_AND_DEVICE_OWNERS}.
      */
     @TestApi
@@ -17279,6 +17280,29 @@ public class DevicePolicyManager {
     }
 
     /**
+     * Specifies enabled Common Criteria Mode.
+     * When the device is in Common Criteria mode, certain device functionalities are tuned to meet
+     * the higher security level required by Common Criteria certification.
+     *
+     * @hide
+     */
+    public static final int COMMON_CRITERIA_MODE_ENABLED = 0;
+
+    /**
+     * Specifies disabled Common Criteria Mode.
+     *
+     * @hide
+     */
+    public static final int COMMON_CRITERIA_MODE_DISABLED = 1;
+
+    /** @hide */
+    @IntDef(
+            prefix = {"COMMON_CRITERIA_MODE_"},
+            value = {COMMON_CRITERIA_MODE_ENABLED, COMMON_CRITERIA_MODE_DISABLED})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface CommonCriteriaMode {}
+
+    /**
      * Called by device owner or profile owner of an organization-owned managed profile to toggle
      * Common Criteria mode for the device. When the device is in Common Criteria mode,
      * certain device functionalities are tuned to meet the higher
@@ -18677,8 +18701,9 @@ public class DevicePolicyManager {
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface PolicyScope {}
-    // LINT.ThenChange(/frameworks/base/tools/processors/devicepolicy/proto/policy_metadata.proto:policy_scope)
+    // LINT.ThenChange(/tools/processors/devicepolicy/proto/policy_metadata.proto:policy_scope)
 
+    // LINT.IfChange(resource_type)
     /**
      * Indicates that a policy has a device wide effect. There is a single final value that
      * controls what the behaviour of the system should be.
@@ -18694,6 +18719,7 @@ public class DevicePolicyManager {
      * @hide
      */
     public static final int RESOURCE_PER_USER = 0x0002;
+    // LINT.ThenChange(/tools/processors/devicepolicy/proto/policy_metadata.proto:resource_type)
 
     /**
      * Possible resource types
@@ -18706,6 +18732,40 @@ public class DevicePolicyManager {
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ResourceType {}
+
+    /** @hide */
+    public static final int NOT_A_DPC = -1;
+    /** @hide */
+    public static final int DEFAULT_DEVICE_OWNER = 1;
+    /** @hide */
+    public static final int FINANCED_DEVICE_OWNER = 2;
+    /** @hide */
+    public static final int PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE = 3;
+    /** @hide */
+    public static final int PROFILE_OWNER_ON_USER_0 = 4;
+    /** @hide */
+    public static final int PROFILE_OWNER = 5;
+    /** @hide */
+    public static final int PROFILE_OWNER_ON_USER = 6;
+    /** @hide */
+    public static final int AFFILIATED_PROFILE_OWNER_ON_USER = 7;
+
+    /**
+     * Possible DPC types.
+     *
+     * @hide
+     */
+    @IntDef(value = {
+            NOT_A_DPC,
+            DEFAULT_DEVICE_OWNER,
+            FINANCED_DEVICE_OWNER,
+            PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE,
+            PROFILE_OWNER_ON_USER_0,
+            PROFILE_OWNER,
+            PROFILE_OWNER_ON_USER,
+            AFFILIATED_PROFILE_OWNER_ON_USER
+    })
+    public @interface DpcType {}
 
     /**
      * Sets the given policy.
@@ -18730,7 +18790,7 @@ public class DevicePolicyManager {
         if (mService != null) {
             try {
                 mService.setPolicy(mContext.getPackageName(), id.getId(), scope,
-                        policyValueToTransport(value));
+                        policyValueToTransport(id, value));
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -18738,15 +18798,30 @@ public class DevicePolicyManager {
     }
 
     @Nullable
-    private static PolicyValueTransport policyValueToTransport(@Nullable Object value) {
-        return switch (value) {
-            case null -> null;
-            case Integer i -> PolicyValueTransport.integerField(i);
-            case Boolean b -> PolicyValueTransport.booleanField(b);
-            default -> throw new IllegalArgumentException(
-                    "Type of policy is not supported: " + value + "(" + value.getClass().getName()
-                            + ")");
-        };
+    private static <T> PolicyValueTransport policyValueToTransport(
+            @NonNull PolicyIdentifier<T> id,
+            @Nullable T value
+    ) {
+        if (value == null) {
+            return null;
+        }
+
+        return PolicyTransportValueConvertor.getInstance(id).toTransport(value);
+    }
+
+    /**
+     * Template free version of setPolicy to clear policies. The other type specific versions
+     * defined below don't allow specifying null as a value.
+     *
+     * @hide
+     */
+    @TestApi
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
+    public void clearPolicy(
+            @NonNull String key,
+            @PolicyScope int scope) {
+        // TODO(b/434920631): Remove this method and use {@link #setPolicy} in tests directly.
+        setPolicy(new PolicyIdentifier(key), scope, null);
     }
 
     /**

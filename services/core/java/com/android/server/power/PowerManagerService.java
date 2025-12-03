@@ -24,6 +24,7 @@ import static android.os.PowerManager.WAKE_REASON_DISPLAY_GROUP_ADDED;
 import static android.os.PowerManager.WAKE_REASON_DISPLAY_GROUP_TURNED_ON;
 import static android.os.PowerManagerInternal.MODE_DEVICE_IDLE;
 import static android.os.PowerManagerInternal.MODE_DISPLAY_INACTIVE;
+import static android.os.PowerManagerInternal.UserActivityListener;
 import static android.os.PowerManagerInternal.WAKEFULNESS_ASLEEP;
 import static android.os.PowerManagerInternal.WAKEFULNESS_AWAKE;
 import static android.os.PowerManagerInternal.WAKEFULNESS_DOZING;
@@ -39,6 +40,7 @@ import static com.android.internal.display.BrightnessUtils.INVALID_BRIGHTNESS_IN
 import static com.android.server.display.brightness.BrightnessUtils.isValidBrightnessValue;
 import static com.android.server.power.ScreenTimeoutOverridePolicy.RELEASE_REASON_NOT_ACQUIRED;
 import static com.android.server.power.ScreenTimeoutOverridePolicy.RELEASE_REASON_WAKE_LOCK_DEATH;
+import static com.android.server.power.feature.flags.Flags.interactiveDozeExperience;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -89,6 +91,8 @@ import android.os.PowerManager;
 import android.os.PowerManager.FlagAmbientSuppression;
 import android.os.PowerManager.GoToSleepReason;
 import android.os.PowerManager.ServiceType;
+import android.os.PowerManager.UserActivityEvent;
+import android.os.PowerManager.UserActivityFlag;
 import android.os.PowerManager.WakeReason;
 import android.os.PowerManagerInternal;
 import android.os.PowerSaveState;
@@ -384,6 +388,10 @@ public final class PowerManagerService extends SystemService
     // Table of all wake locks acquired by applications.
     private final ArrayList<WakeLock> mWakeLocks = new ArrayList<>();
 
+    // All active user activity listeners.
+    @GuardedBy("mLock")
+    final ArrayList<UserActivityListener> mUserActivityListeners = new ArrayList<>();
+
     // A bitfield that summarizes the state of all active wakelocks.
     private int mWakeLockSummary;
 
@@ -448,6 +456,10 @@ public final class PowerManagerService extends SystemService
     // True if boot completed occurred. We keep the screen on until this happens.
     // The screen will be off if we are in quiescent mode.
     private boolean mBootCompleted;
+
+    // True if ACTION_BOOT_COMPLETED was delivered. We keep the screen on until this happens.
+    // The screen will be off if we are in quiescent mode.
+    private boolean mUserBootCompleted;
 
     // True if auto-suspend mode is enabled.
     // Refer to autosuspend.h.
@@ -768,33 +780,12 @@ public final class PowerManagerService extends SystemService
         public void onDisplayRemoved(int displayId) {
             mNotifier.clearScreenTimeoutPolicyListeners(displayId);
 
-            if (com.android.server.display.feature.flags.Flags.separateTimeouts()
-                    && !mFeatureFlags.isLockOnUnplugEnabled()) {
+            if ((com.android.server.display.feature.flags.Flags.separateTimeouts()
+                    && !mFeatureFlags.isLockOnUnplugEnabled())
+                    || com.android.server.power.feature.flags.Flags.lockOnPowerGroupDisconnect()) {
                 return;
             }
-
-            // if all the remaining devices are asleep, lock the default display.
-            synchronized (mLock) {
-                for (int i = 0; i < mPowerGroups.size(); i++) {
-                    PowerGroup pg = mPowerGroups.valueAt(i);
-                    // If a power group remains, that is an adjacent group
-                    // and it is awake, then do not lock the device.
-                    if (pg.isDefaultOrAdjacentGroup()
-                            && pg.getWakefulnessLocked() == WAKEFULNESS_AWAKE) {
-                        return;
-                    }
-                }
-            }
             tryToLockNow();
-        }
-
-        private void tryToLockNow() {
-            if (mWindowManagerInternal == null) {
-                mWindowManagerInternal =  getLocalService(WindowManagerInternal.class);
-            }
-            if (mWindowManagerInternal != null) {
-                mWindowManagerInternal.lockNow();
-            }
         }
 
         @Override
@@ -849,6 +840,11 @@ public final class PowerManagerService extends SystemService
                     return;
                 }
                 onPowerGroupEventLocked(DISPLAY_GROUP_REMOVED, mPowerGroups.get(groupId));
+
+                if (!com.android.server.power.feature.flags.Flags.lockOnPowerGroupDisconnect()) {
+                    return;
+                }
+                tryToLockNow();
             }
         }
 
@@ -1559,6 +1555,15 @@ public final class PowerManagerService extends SystemService
         filter = new IntentFilter();
         filter.addAction(Intent.ACTION_DOCK_EVENT);
         mContext.registerReceiver(new DockReceiver(), filter, null, mHandler);
+
+        if (mFeatureFlags.isWaitForUserBootCompleteEnabled()) {
+            filter = new IntentFilter();
+            filter.addAction(Intent.ACTION_BOOT_COMPLETED);
+            // To ensure that keeping suspendBlocker after finished the broadcast of BootCompleted
+            filter.setPriority(IntentFilter.SYSTEM_LOW_PRIORITY);
+            mContext.registerReceiver(new UserBootCompletedReceiver(), filter, null,
+                    mHandler, Context.RECEIVER_NOT_EXPORTED);
+        }
     }
 
     @VisibleForTesting
@@ -2250,6 +2255,10 @@ public final class PowerManagerService extends SystemService
 
             if (mScreenTimeoutOverridePolicy != null) {
                 mScreenTimeoutOverridePolicy.onUserActivity(mWakeLockSummary, event, flags);
+            }
+
+            if (interactiveDozeExperience()) {
+                notifyUserActivityToListeners(eventTime, event, flags);
             }
 
             if (mUserInactiveOverrideFromWindowManager) {
@@ -4116,10 +4125,18 @@ public final class PowerManagerService extends SystemService
         }
 
         // First acquire suspend blockers if needed.
-        if (!mBootCompleted && !mHoldingBootingSuspendBlocker) {
-            mBootingSuspendBlocker.acquire();
-            mHoldingBootingSuspendBlocker = true;
+        if (mFeatureFlags.isWaitForUserBootCompleteEnabled()) {
+            if (!mUserBootCompleted && !mHoldingBootingSuspendBlocker) {
+                mBootingSuspendBlocker.acquire();
+                mHoldingBootingSuspendBlocker = true;
+            }
+        } else {
+            if (!mBootCompleted && !mHoldingBootingSuspendBlocker) {
+                mBootingSuspendBlocker.acquire();
+                mHoldingBootingSuspendBlocker = true;
+            }
         }
+
         if (needWakeLockSuspendBlocker && !mHoldingWakeLockSuspendBlocker) {
             mWakeLockSuspendBlocker.acquire();
             mHoldingWakeLockSuspendBlocker = true;
@@ -4146,10 +4163,18 @@ public final class PowerManagerService extends SystemService
         }
 
         // Then release suspend blockers if needed.
-        if (mBootCompleted && mHoldingBootingSuspendBlocker) {
-            mBootingSuspendBlocker.release();
-            mHoldingBootingSuspendBlocker = false;
+        if (mFeatureFlags.isWaitForUserBootCompleteEnabled()) {
+            if (mUserBootCompleted && mHoldingBootingSuspendBlocker) {
+                mBootingSuspendBlocker.release();
+                mHoldingBootingSuspendBlocker = false;
+            }
+        } else {
+            if (mBootCompleted && mHoldingBootingSuspendBlocker) {
+                mBootingSuspendBlocker.release();
+                mHoldingBootingSuspendBlocker = false;
+            }
         }
+
         if (!needWakeLockSuspendBlocker && mHoldingWakeLockSuspendBlocker) {
             mWakeLockSuspendBlocker.release();
             mHoldingWakeLockSuspendBlocker = false;
@@ -4411,6 +4436,33 @@ public final class PowerManagerService extends SystemService
             EventLogTags.writeDeviceIdleOffPhase("power");
         }
         return true;
+    }
+
+    void registerUserActivityListenerInternal(UserActivityListener listener) {
+        synchronized (mLock) {
+            mUserActivityListeners.add(listener);
+        }
+    }
+
+    void unregisterUserActivityListenerInternal(UserActivityListener listener) {
+        synchronized (mLock) {
+            mUserActivityListeners.remove(listener);
+        }
+    }
+
+    private void notifyUserActivityToListeners(
+            long when, @UserActivityEvent int event, @UserActivityFlag int flags) {
+        UserActivityListener[] listeners;
+        synchronized (mLock) {
+            if (mUserActivityListeners.isEmpty()) {
+                return;
+            }
+            listeners = new UserActivityListener[mUserActivityListeners.size()];
+            listeners = mUserActivityListeners.toArray(listeners);
+        }
+        for (int i = 0; i < listeners.length; i++) {
+            listeners[i].onUserActivity(when, event, flags);
+        }
     }
 
     boolean setLightDeviceIdleModeInternal(boolean enabled) {
@@ -5627,6 +5679,16 @@ public final class PowerManagerService extends SystemService
         }
     }
 
+    private final class UserBootCompletedReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            synchronized (mLock) {
+                mUserBootCompleted = true;
+                updateSuspendBlockerLocked();
+            }
+        }
+    }
+
     private final class SettingsObserver extends ContentObserver {
         public SettingsObserver(Handler handler) {
             super(handler);
@@ -6243,19 +6305,11 @@ public final class PowerManagerService extends SystemService
 
             if (uids != null) {
                 ws = new WorkSource();
-                if (mFeatureFlags.isWakelockAttributionViaWorkchainEnabled()) {
-                    int callingUid = Binder.getCallingUid();
-                    for (int uid : uids) {
-                        WorkChain workChain = ws.createWorkChain();
-                        workChain.addNode(uid, null);
-                        workChain.addNode(callingUid, null);
-                    }
-                } else {
-                    // XXX should WorkSource have a way to set uids as an int[] instead of
-                    // adding them one at a time?
-                    for (int uid : uids) {
-                        ws.add(uid);
-                    }
+                int callingUid = Binder.getCallingUid();
+                for (int uid : uids) {
+                    WorkChain workChain = ws.createWorkChain();
+                    workChain.addNode(uid, null);
+                    workChain.addNode(callingUid, null);
                 }
             }
             updateWakeLockWorkSource(lock, ws, null);
@@ -7734,6 +7788,16 @@ public final class PowerManagerService extends SystemService
         }
 
         @Override
+        public void registerUserActivityListener(UserActivityListener listener) {
+            registerUserActivityListenerInternal(listener);
+        }
+
+        @Override
+        public void unregisterUserActivityListener(UserActivityListener listener) {
+            unregisterUserActivityListenerInternal(listener);
+        }
+
+        @Override
         public boolean setDeviceIdleMode(boolean enabled) {
             return setDeviceIdleModeInternal(enabled);
         }
@@ -7951,5 +8015,28 @@ public final class PowerManagerService extends SystemService
             return Display.INVALID_DISPLAY_GROUP;
         }
         return displayInfo.displayGroupId;
+    }
+
+    private void tryToLockNow() {
+        // if all the remaining devices are asleep, lock the default display.
+        synchronized (mLock) {
+            for (int i = 0; i < mPowerGroups.size(); i++) {
+                PowerGroup pg = mPowerGroups.valueAt(i);
+                // If a power group remains, that is an adjacent group
+                // and it is awake, then do not lock the device.
+                if (pg.isDefaultOrAdjacentGroup()
+                        && pg.getWakefulnessLocked() == WAKEFULNESS_AWAKE) {
+                    return;
+                }
+            }
+        }
+
+        if (mWindowManagerInternal == null) {
+            mWindowManagerInternal =  getLocalService(WindowManagerInternal.class);
+        }
+        if (mWindowManagerInternal != null) {
+            Slog.i(TAG, "Locking, due to no remaining awake power groups.");
+            mWindowManagerInternal.lockNow();
+        }
     }
 }

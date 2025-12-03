@@ -38,6 +38,7 @@ import com.android.systemui.media.remedia.shared.model.MediaColorScheme
 import com.android.systemui.media.remedia.shared.model.MediaSessionState
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.notification.collection.provider.OnReorderingAllowedListener
 import com.android.systemui.statusbar.notification.collection.provider.VisualStabilityProvider
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -311,7 +312,8 @@ constructor(
 
     /** Notifies that the card at [cardIndex] has been selected in the UI. */
     fun onCardSelected(cardIndex: Int) {
-        check(cardIndex >= 0 && cardIndex < cards.size)
+        if (cardIndex == selectedCardIndex) return
+        check(cardIndex >= 0 && cardIndex < cards.size) { "Invalid card index $cardIndex" }
         selectedCardIndex = cardIndex
         interactor.storeCurrentCarouselIndex(selectedCardIndex)
     }
@@ -321,9 +323,17 @@ constructor(
         interactor.resetScrollToFirst()
     }
 
+    private val reorderingAllowedListener = OnReorderingAllowedListener {
+        interactor.reorderMedia()
+    }
+
     override suspend fun onActivated(): Nothing {
-        visualStabilityProvider.addPersistentReorderingAllowedListener { interactor.reorderMedia() }
+        visualStabilityProvider.addPersistentReorderingAllowedListener(reorderingAllowedListener)
         awaitCancellation()
+    }
+
+    override suspend fun onDeactivated() {
+        visualStabilityProvider.removeReorderingAllowedListener(reorderingAllowedListener)
     }
 
     private fun MediaActionModel.toPlayPauseActionViewModel(

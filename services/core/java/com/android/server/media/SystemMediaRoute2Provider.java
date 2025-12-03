@@ -35,6 +35,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.UserHandle;
 import android.text.TextUtils;
+import android.util.ArraySet;
 import android.util.Log;
 import android.util.Slog;
 
@@ -47,7 +48,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Provides routes for local playbacks such as phone speaker, wired headset, or Bluetooth speakers.
@@ -127,6 +127,8 @@ class SystemMediaRoute2Provider extends MediaRoute2Provider {
     public void start() {
         IntentFilter intentFilter = new IntentFilter(AudioManager.VOLUME_CHANGED_ACTION);
         intentFilter.addAction(AudioManager.STREAM_DEVICES_CHANGED_ACTION);
+        intentFilter.addAction(AudioManager.STREAM_MUTE_CHANGED_ACTION);
+        intentFilter.addAction(AudioManager.MASTER_MUTE_CHANGED_ACTION);
         mContext.registerReceiverAsUser(mAudioReceiver, mUser,
                 intentFilter, null, null);
         mHandler.post(() -> mDeviceRouteController.start(mUser));
@@ -362,15 +364,16 @@ class SystemMediaRoute2Provider extends MediaRoute2Provider {
                     new RoutingSessionInfo.Builder(SYSTEM_SESSION_ID, packageName)
                             .setSystemSession(true);
             Set<String> selectedRouteIds =
-                    selectedDeviceRoutes.stream()
-                            .map(MediaRoute2Info::getId)
-                            .collect(Collectors.toUnmodifiableSet());
+                    new ArraySet<>(/* capacity= */ selectedDeviceRoutes.size());
+            for (var selectedRoute : selectedDeviceRoutes) {
+                var routeId = selectedRoute.getId();
+                selectedRouteIds.add(routeId);
+                builder.addSelectedRoute(routeId);
+            }
 
             for (MediaRoute2Info route : mDeviceRouteController.getAvailableRoutes()) {
                 String routeId = route.getId();
-                if (selectedRouteIds.contains(routeId)) {
-                    builder.addSelectedRoute(routeId);
-                } else {
+                if (!selectedRouteIds.contains(routeId)) {
                     builder.addTransferableRoute(routeId);
                 }
             }
@@ -704,13 +707,22 @@ class SystemMediaRoute2Provider extends MediaRoute2Provider {
         // This will be called in the main thread.
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (!intent.getAction().equals(AudioManager.VOLUME_CHANGED_ACTION)
-                    && !intent.getAction().equals(AudioManager.STREAM_DEVICES_CHANGED_ACTION)) {
+            String action = intent.getAction();
+            if (action == null) {
                 return;
             }
 
-            int streamType = intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_TYPE, -1);
-            if (streamType != AudioManager.STREAM_MUSIC) {
+            boolean shouldUpdateVolume = switch (action) {
+                case AudioManager.MASTER_MUTE_CHANGED_ACTION -> true;
+                case AudioManager.VOLUME_CHANGED_ACTION,
+                     AudioManager.STREAM_DEVICES_CHANGED_ACTION,
+                     AudioManager.STREAM_MUTE_CHANGED_ACTION ->
+                        intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_TYPE, -1)
+                                == AudioManager.STREAM_MUSIC;
+                default -> false;
+            };
+
+            if (!shouldUpdateVolume) {
                 return;
             }
 

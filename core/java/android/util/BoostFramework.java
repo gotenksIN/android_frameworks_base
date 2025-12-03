@@ -31,24 +31,29 @@
 package android.util;
 
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+import android.app.ActivityThread;
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.content.Context;
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 import android.database.ContentObserver;
-// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 // QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
 import android.graphics.BLASTBufferQueue;
 // QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
-// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 import android.net.Uri;
-// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+import android.os.Binder;
+import android.os.Process;
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 // QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
 import android.os.SystemProperties;
 // QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
 import android.provider.Settings;
-// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 import android.util.Log;
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
@@ -60,6 +65,8 @@ import dalvik.system.PathClassLoader;
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** @hide */
 public class BoostFramework {
@@ -87,7 +94,6 @@ public class BoostFramework {
     public final int board_first_api_lvl = SystemProperties.getInt("ro.board.first_api_level", 0);
     public final int board_api_lvl = SystemProperties.getInt("ro.board.api_level", 0);
 // QTI_END: 2022-06-06: Core: BoostFramework : Add new API and make sure IOP APIs are compatible for T.
-// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
     //key in privider settings global
     public static final String KEY_LEGACY_UI_PERF_PKGS = "LEGACY_UI_PERF_PROCS";
     public static final String KEY_GPU_PREFER = "UI_PERF_GPU_PREFER";
@@ -95,19 +101,16 @@ public class BoostFramework {
     public static final String KEY_CPU_AGGRESSIVE = "UI_PERF_CPU_AGGRESSIVE";
     public static final String KEY_CPU_GPU = "UI_PERF_CPU_GPU";
     public static final String KEY_PKGS = "UI_PERF_PKGS";
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+    public static final String KEY_IGNORE_PKGS = "UI_PERF_IGNORE_PKGS";
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
     //ui perf mode controller in android space
     public static final String UI_PERF_PROP = "debug.ui.perfmode.enable";
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
+    public static final String UI_LEGACY_PERF_PROP = "sys.ui.legacy_perfmode.enable";
+    //Deprecated, will be removed soon.
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
     public static final String UI_PERF_PROC_PROP = "debug.ui.perfmode.process";
-
-    private String[] mUIPerfProcs = null;
-    private String[] mLegacyUIPerfProcs = null;
-    private String[] mUIPerfGpuActivities = null;
-    private String[] mUIPerfCpuActivities = null;
-    private String[] mUIPerfCpuGpuActivities = null;
-    private String[] mUIPerfCpuAggressive = null;
-    private UiPerfProcsObserver mContentObserver = null;
-    private boolean mUiPerfInited = false;
-// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
 
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 /** @hide */
@@ -327,6 +330,8 @@ public class BoostFramework {
         public static final int GAME = 2;
         public static final int BROWSER = 3;
         public static final int PREPROAPP = 4;
+        public static final int VIDEO = 5;
+        public static final int APP_OF_INTEREST = 6;
     };
 
 // QTI_END: 2018-11-10: Core: Modify game detection logic
@@ -1232,159 +1237,350 @@ public class BoostFramework {
         }
     }
 // QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
-// QTI_BEGIN: 2025-03-24: Core: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 
-    public boolean isUiPerfEnabled(Context context, String pkgName) {
-        if (pkgName == null || pkgName.isEmpty()) {
-            return false;
+    //UI PERF START
+    private static class LRUMap<K,V> extends LinkedHashMap<K,V> {
+        private final int maxSize;
+
+        LRUMap(int maxSize) {
+            super(100, 0.75f, true);
+            this.maxSize = maxSize;
         }
-        uiPerfInit(context);
-        if (SystemProperties.getBoolean(UI_PERF_PROP, false) && mUIPerfProcs != null) {
-            for (int i = 0; i < mUIPerfProcs.length; i++) {
-                if (pkgName.equals(mUIPerfProcs[i])) {
-                    return true;
-                }
-            }
+
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<K,V> eldest) {
+            return size() > maxSize;
         }
-        return false;
     }
 
-    public synchronized boolean isLegacyUiPerfEnabled(Context context, String pkgName) {
-        if (pkgName == null || pkgName.isEmpty()) {
-            return false;
-        }
-        uiPerfInit(context);
-        legacyUIPerfPkgsObserver(context);
-        if (SystemProperties.getBoolean(UI_PERF_PROP, false) && mLegacyUIPerfProcs != null) {
-            for (int i = 0; i < mLegacyUIPerfProcs.length; i++) {
-                if (pkgName.equals(mLegacyUIPerfProcs[i])) {
-                    return true;
-                }
+    private static class UIPerfMode {
+        private static UIPerfMode instance = null;
+        private static String UI_PERF_ENABLE = "sys.ui.perfmode.enable";
+        private static String UI_PERF_ENHANCEMENT = "ro.vendor.ui.perfmode_enhance";
+        private Context mContext;
+        private String[] mUIPerfProcs = null;
+        private String[] mLegacyUIPerfProcs = null;
+        private String[] mIgnoreProcs = null;
+        private String[] mUIPerfGpuActivities = null;
+        private String[] mUIPerfCpuActivities = null;
+        private String[] mUIPerfCpuGpuActivities = null;
+        private String[] mUIPerfCpuAggressive = null;
+        private boolean mUiPerfInited = false;
+        private UiPerfProcsObserver observer = null;
+        private boolean mUIPerfEnhance = false;
+        private BoostFramework mPerf = new BoostFramework();
+        private LRUMap<String,Boolean> mLRUMap = new LRUMap(30);
+
+        private class UiPerfProcsObserver extends ContentObserver {
+            private Context mContext = null;
+            UiPerfProcsObserver(Context context) {
+                super(null);
+                mContext = context;
+            }
+
+            public void onChange(boolean selfChange, Uri uri) {
+                try {
+                    long callingId = Binder.clearCallingIdentity();
+                    if (Settings.Global.getUriFor(KEY_PKGS).equals(uri)) {
+                        synchronized (UIPerfMode.this) {
+                            update();
+                        }
+                    }
+                    Binder.restoreCallingIdentity(callingId);
+                } catch (Exception e) {}
             }
         }
-        return false;
-    }
 
-    public synchronized int getLegacyUiPerfHint(Context context, String pkgName) {
-        int hint = -1;
-        if (pkgName == null || pkgName.isEmpty()) {
-            return hint;
+        /** @hide */
+        public static UIPerfMode getInstance(Context context) {
+            synchronized(UIPerfMode.class) {
+                if (!ActivityThread.isSystem() ||
+                        !SystemProperties.getBoolean(UI_PERF_ENABLE, false)) {
+                    return null;
+                }
+                if (context != null) {
+                    if (instance == null) {
+                        instance = new UIPerfMode(context);
+                        if (!instance.isInit()) {
+                            instance.clean();
+                            instance = null;
+                        }
+                    }
+                    return instance;
+                }
+                return null;
+            }
         }
-        uiPerfInit(context);
-        legacyUIPerfPkgsObserver(context);
-        if (SystemProperties.getBoolean(UI_PERF_PROP, false)) {
-            if (mLegacyUIPerfProcs != null) {
-                for (int i = 0; i < mLegacyUIPerfProcs.length; i++) {
-                    if (pkgName.equals(mLegacyUIPerfProcs[i])) {
-                        hint = VENDOR_HINT_PERFORMANCE_MODE;
-                        return hint;
+
+        private UIPerfMode(Context context) {
+            if (context != null) {
+                mContext = context.getApplicationContext();
+            }
+            try {
+                if (mContext != null) {
+                    long callingId = Binder.clearCallingIdentity();
+                    update();
+                    observer = new UiPerfProcsObserver(mContext);
+                    mContext.getContentResolver()
+                            .registerContentObserver(Settings.Global.getUriFor(KEY_PKGS),
+                                                     false, observer);
+                    mUiPerfInited = true;
+                    Binder.restoreCallingIdentity(callingId);
+
+                    if (mPerf != null) {
+                        mUIPerfEnhance =
+                            Boolean.parseBoolean(mPerf.perfGetProp(UI_PERF_ENHANCEMENT,
+                                                                   "false"));
+                    }
+                }
+            } catch (Exception e) {
+                mUiPerfInited = false;
+            }
+        }
+
+        private void update() {
+            try {
+                if (mContext != null) {
+                    String str = Settings.Global.getString(mContext.getContentResolver(),
+                                     KEY_PKGS);
+                    if (str != null && !str.isEmpty()) {
+                        mUIPerfProcs = str.split(";");
+                    }
+                    str = Settings.Global.getString(mContext.getContentResolver(),
+                                     KEY_GPU_PREFER);
+                    if (str != null && !str.isEmpty()) {
+                        mUIPerfGpuActivities = str.split(";");
+                    }
+                    str = Settings.Global.getString(mContext.getContentResolver(),
+                                     KEY_CPU_PREFER);
+                    if (str != null && !str.isEmpty()) {
+                        mUIPerfCpuActivities = str.split(";");
+                    }
+                    str = Settings.Global.getString(mContext.getContentResolver(),
+                                     KEY_CPU_GPU);
+                    if (str != null && !str.isEmpty()) {
+                        mUIPerfCpuGpuActivities = str.split(";");
+                    }
+                    str = Settings.Global.getString(mContext.getContentResolver(),
+                                     KEY_CPU_AGGRESSIVE);
+                    if (str != null && !str.isEmpty()) {
+                        mUIPerfCpuAggressive = str.split(";");
+                    }
+                    str = Settings.Global.getString(mContext.getContentResolver(),
+                                     KEY_LEGACY_UI_PERF_PKGS);
+                    if (str != null && !str.isEmpty()) {
+                        mLegacyUIPerfProcs = str.split(";");
+                    }
+                    str = Settings.Global.getString(mContext.getContentResolver(),
+                                     KEY_IGNORE_PKGS);
+                    if (str != null && !str.isEmpty()) {
+                        mIgnoreProcs = str.split(";");
+                    }
+                }
+            } catch (Exception e) {
+            }
+        }
+
+        /** @hide */
+        public void clean() {
+            if (mContext != null && observer != null) {
+                try {
+                    mContext.getContentResolver().unregisterContentObserver(observer);
+                } catch (Exception e) {}
+            }
+        }
+
+        /** @hide */
+        public boolean isInit() {
+            return mUiPerfInited;
+        }
+
+        /** @hide */
+        public boolean shouldUseUiPerf(String pkgName) {
+            if (pkgName == null || pkgName.isEmpty()) {
+                return false;
+            }
+            synchronized (this) {
+                if (mUIPerfProcs != null) {
+                    for (int i = 0; i < mUIPerfProcs.length; i++) {
+                        if (pkgName.equals(mUIPerfProcs[i])) {
+                            return true;
+                        }
                     }
                 }
             }
+            return enhance(pkgName);
+        }
+
+        private boolean enhance(String pkgName) {
+            if (mUIPerfEnhance) {
+                if (mContext != null) {
+                    PackageManager pm = mContext.getPackageManager();
+                    if (pm != null) {
+                        try {
+                            ApplicationInfo aInfo = pm.getApplicationInfo(pkgName, 0);
+                            if (aInfo == null) {
+                                return false;
+                            }
+                            if (aInfo.isOdm() || aInfo.isOem()
+                                              || aInfo.isProduct()
+                                              || aInfo.isSystemApp()
+                                              || aInfo.isSystemExt()
+                                              || aInfo.isUpdatedSystemApp()
+                                              || aInfo.isVendor()
+                                              || aInfo.isPrivilegedApp()
+                                              || aInfo.isSignedWithPlatformKey()) {
+                                return false;
+                            }
+                        } catch (PackageManager.NameNotFoundException e) {
+                            return false;
+                        }
+                    }
+                }
+                synchronized (this) {
+                    if (mIgnoreProcs != null) {
+                        for (int i = 0; i < mIgnoreProcs.length; i++) {
+                            if (pkgName.equals(mIgnoreProcs[i])) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                if (mLRUMap.containsKey(pkgName)) {
+                    return mLRUMap.get(pkgName);
+                }
+                if (mPerf != null) {
+                    int type = mPerf.perfGetFeedback(VENDOR_FEEDBACK_WORKLOAD_TYPE, pkgName);
+                    if (type == WorkloadType.APP_OF_INTEREST) {
+                       mLRUMap.put(pkgName, true);
+                       return true;
+                    }
+                }
+                mLRUMap.put(pkgName, false);
+            }
+            return false;
+        }
+
+        /** @hide */
+        public void updateUiPerfState(String pkgName, int pid) {
+            if (shouldUseUiPerf(pkgName)) {
+                SystemProperties.set(UI_PERF_PROP, Integer.toString(pid));
+            } else {
+                SystemProperties.set(UI_PERF_PROP, "0");
+            }
+        }
+
+        /** @hide */
+        public int getLegacyUiPerfHint(String pkgName) {
+            int hint = -1;
+            if (pkgName == null || pkgName.isEmpty()) {
+                return hint;
+            }
+            synchronized (this) {
+                if (SystemProperties.getBoolean(UI_LEGACY_PERF_PROP, false) &&
+                        mLegacyUIPerfProcs != null) {
+                    for (int i = 0; i < mLegacyUIPerfProcs.length; i++) {
+                        if (pkgName.equals(mLegacyUIPerfProcs[i])) {
+                            hint = VENDOR_HINT_PERFORMANCE_MODE;
+                            return hint;
+                        }
+                    }
+                }
+            }
+            return hint;
+        }
+
+        /** @hide */
+        public int getUiPerfHint(String activityName) {
+            int hint = -1;
+            if (activityName == null || activityName.isEmpty()) {
+                return hint;
+            }
+            synchronized (this) {
+                if (mUIPerfGpuActivities != null) {
+                    for (int i = 0; i < mUIPerfGpuActivities.length; i++) {
+                        if (activityName.equals(mUIPerfGpuActivities[i])) {
+                            hint = VENDOR_HINT_SCENARIO_GPU;
+                            return hint;
+                        }
+                    }
+                }
+                if (mUIPerfCpuActivities != null) {
+                    for (int i = 0; i < mUIPerfCpuActivities.length; i++) {
+                        if (activityName.equals(mUIPerfCpuActivities[i])) {
+                            hint = VENDOR_HINT_SCENARIO_CPU;
+                            return hint;
+                        }
+                    }
+                }
+                if (mUIPerfCpuGpuActivities != null) {
+                    for (int i = 0; i < mUIPerfCpuGpuActivities.length; i++) {
+                        if (activityName.equals(mUIPerfCpuGpuActivities[i])) {
+                            hint = VENDOR_HINT_SCENARIO_CPU_GPU;
+                            return hint;
+                        }
+                    }
+                }
+                if (mUIPerfCpuAggressive != null) {
+                    for (int i = 0; i < mUIPerfCpuAggressive.length; i++) {
+                        if (activityName.equals(mUIPerfCpuAggressive[i])) {
+                            hint = VENDOR_HINT_SCENARIO_CPU_AGGRESSIVE;
+                            return hint;
+                        }
+                    }
+                }
+            }
+            return hint;
+        }
+    }
+
+    /** @hide */
+    public boolean shouldUseUiPerf(Context context, String pkgName) {
+        UIPerfMode uiPerf = UIPerfMode.getInstance(context);
+        if (uiPerf != null) {
+            return uiPerf.shouldUseUiPerf(pkgName);
+        }
+        return false;
+    }
+
+    /** @hide */
+    public void updateUiPerfState(Context context, String pkgName, int pid) {
+        UIPerfMode uiPerf = UIPerfMode.getInstance(context);
+        if (uiPerf != null) {
+            uiPerf.updateUiPerfState(pkgName, pid);
+        }
+    }
+
+    /** @hide */
+    public int getLegacyUiPerfHint(Context context, String pkgName) {
+        int hint = -1;
+        UIPerfMode uiPerf = UIPerfMode.getInstance(context);
+        if (uiPerf != null) {
+            hint = uiPerf.getLegacyUiPerfHint(pkgName);
         }
         return hint;
     }
 
+    /** @hide */
     public int getUiPerfHint(Context context, String activityName) {
         int hint = -1;
-        if (activityName == null || activityName.isEmpty()) {
-            return hint;
-        }
-        uiPerfInit(context);
-        if (SystemProperties.getBoolean(UI_PERF_PROP, false)) {
-            if (mUIPerfGpuActivities != null) {
-                for (int i = 0; i < mUIPerfGpuActivities.length; i++) {
-                    if (activityName.equals(mUIPerfGpuActivities[i])) {
-                        hint = VENDOR_HINT_SCENARIO_GPU;
-                        return hint;
-                    }
-                }
-            }
-            if (mUIPerfCpuActivities != null) {
-                for (int i = 0; i < mUIPerfCpuActivities.length; i++) {
-                    if (activityName.equals(mUIPerfCpuActivities[i])) {
-                        hint = VENDOR_HINT_SCENARIO_CPU;
-                        return hint;
-                    }
-                }
-            }
-            if (mUIPerfCpuGpuActivities != null) {
-                for (int i = 0; i < mUIPerfCpuGpuActivities.length; i++) {
-                    if (activityName.equals(mUIPerfCpuGpuActivities[i])) {
-                        hint = VENDOR_HINT_SCENARIO_CPU_GPU;
-                        return hint;
-                    }
-                }
-            }
-            if (mUIPerfCpuAggressive != null) {
-                for (int i = 0; i < mUIPerfCpuAggressive.length; i++) {
-                    if (activityName.equals(mUIPerfCpuAggressive[i])) {
-                        hint = VENDOR_HINT_SCENARIO_CPU_AGGRESSIVE;
-                        return hint;
-                    }
-                }
-            }
+        UIPerfMode uiPerf = UIPerfMode.getInstance(context);
+        if (uiPerf != null) {
+            hint = uiPerf.getUiPerfHint(activityName);
         }
         return hint;
     }
 
-    private void uiPerfInit(Context context) {
-        if (SystemProperties.getBoolean(UI_PERF_PROP, false) && context != null
-                                                             && !mUiPerfInited) {
-            String str = Settings.Global.getString(context.getContentResolver(),
-                             KEY_PKGS);
-            mUIPerfProcs = str.split(";");
-            str = Settings.Global.getString(context.getContentResolver(),
-                             KEY_GPU_PREFER);
-            mUIPerfGpuActivities = str.split(";");
-            str = Settings.Global.getString(context.getContentResolver(),
-                             KEY_CPU_PREFER);
-            mUIPerfCpuActivities = str.split(";");
-            str = Settings.Global.getString(context.getContentResolver(),
-                             KEY_CPU_GPU);
-            mUIPerfCpuGpuActivities = str.split(";");
-            str = Settings.Global.getString(context.getContentResolver(),
-                             KEY_CPU_AGGRESSIVE);
-            mUIPerfCpuAggressive = str.split(";");
-            str = Settings.Global.getString(context.getContentResolver(),
-                             KEY_LEGACY_UI_PERF_PKGS);
-            mLegacyUIPerfProcs = str.split(";");
-            mUiPerfInited = true;
+    /** @hide */
+    public static boolean shouldUseUiPerf() {
+        if (SystemProperties.getInt(UI_PERF_PROP, 0) == Process.myPid()) {
+            return true;
         }
+        return false;
     }
-
-    private void legacyUIPerfPkgsObserver(Context context) {
-        if (context != null && mContentObserver == null && mUiPerfInited) {
-            mContentObserver = new UiPerfProcsObserver(context);
-            mContentObserver.register();
-        }
-    }
-
-    private class UiPerfProcsObserver extends ContentObserver {
-        private Context mContext = null;
-        UiPerfProcsObserver(Context context) {
-            super(null);
-            mContext = context;
-        }
-
-        void register() {
-            if (mContext != null) {
-                mContext.getContentResolver().registerContentObserver(Settings.Global.getUriFor(
-                        KEY_LEGACY_UI_PERF_PKGS), false, this);
-            }
-        }
-
-        public void onChange(boolean selfChange, Uri uri) {
-            if (Settings.Global.getUriFor(KEY_LEGACY_UI_PERF_PKGS).equals(uri)) {
-                synchronized (BoostFramework.this) {
-                    String str = Settings.Global.getString(mContext.getContentResolver(),
-                                            KEY_LEGACY_UI_PERF_PKGS);
-                    mLegacyUIPerfProcs = str.split(";");
-                }
-            }
-        }
-    }
-// QTI_END: 2025-03-24: Core: Perf: UI perf mode optimization
+    //UI PERF END
+// QTI_END: 2025-10-13: Performance: Perf: Enable UI perf mode automatically according to pid
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
 };
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.

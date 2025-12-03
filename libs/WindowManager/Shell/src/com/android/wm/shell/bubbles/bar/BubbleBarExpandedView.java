@@ -322,6 +322,10 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
         return mCaptionView.getHandleView();
     }
 
+    public BubbleBarCaptionView getCaptionView() {
+        return mCaptionView;
+    }
+
     /** Updates the view based on the current theme. */
     public void applyThemeAttrs() {
         mCaptionHeight = getResources().getDimensionPixelSize(
@@ -389,22 +393,17 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
     }
 
     @Override
-    public void onTaskRemovalStarted() {
-        // No-op
-    }
-
-    @Override
     public void onTaskInfoChanged(ActivityManager.RunningTaskInfo taskInfo) {
         if (!isValidToBubble(taskInfo)) {
             Toast.makeText(mContext, R.string.bubble_not_supported_text, Toast.LENGTH_SHORT).show();
         } else if (mCaptionView != null && taskInfo != null && taskInfo.taskDescription != null) {
             final int statusBarColor = taskInfo.taskDescription.getStatusBarColor();
             final int bgColor = taskInfo.taskDescription.getBackgroundColor();
-            if (Color.alpha(statusBarColor) != 0) {
-                // Set the caption's color to the color of the status bar if not transparent.
+            if (Color.alpha(statusBarColor) == 0xff) {
+                // Set the caption's color to the color of the status bar if opaque.
                 mCaptionView.setBackgroundColor(statusBarColor);
-            } else if (Color.alpha(bgColor) != 0) {
-                // Otherwise, use the background color of the task if it's not transparent.
+            } else if (Color.alpha(bgColor) == 0xff) {
+                // Otherwise, use the background color of the task if opaque.
                 mCaptionView.setBackgroundColor(bgColor);
             }
         }

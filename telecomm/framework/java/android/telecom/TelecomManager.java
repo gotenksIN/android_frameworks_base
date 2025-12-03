@@ -49,6 +49,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.UserHandle;
 import android.telephony.Annotation.CallState;
+import android.telephony.Annotation.TtyMode;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
@@ -62,6 +63,7 @@ import com.android.server.telecom.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -858,18 +860,13 @@ public class TelecomManager {
     public static final char DTMF_CHARACTER_WAIT = ';';
 
     /**
-     * @hide
-     */
-    @IntDef(prefix = { "TTY_MODE_" },
-            value = {TTY_MODE_OFF, TTY_MODE_FULL, TTY_MODE_HCO, TTY_MODE_VCO})
-    @Retention(RetentionPolicy.SOURCE)
-    public @interface TtyMode {}
-
-    /**
      * TTY (teletypewriter) mode is off.
      *
+     * @deprecated Use {@link TelephonyManager#TTY_MODE_OFF} instead
      * @hide
      */
+    @Deprecated
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_OFF = 0;
 
@@ -877,8 +874,11 @@ public class TelecomManager {
      * TTY (teletypewriter) mode is on. The speaker is off and the microphone is muted. The user
      * will communicate with the remote party by sending and receiving text messages.
      *
+     * @deprecated Use {@link TelephonyManager#TTY_MODE_FULL} instead
      * @hide
      */
+    @Deprecated
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_FULL = 1;
 
@@ -887,8 +887,11 @@ public class TelecomManager {
      * speaker is on. The user will communicate with the remote party by sending text messages and
      * hearing an audible reply.
      *
+     * @deprecated Use {@link TelephonyManager#TTY_MODE_HCO} instead
      * @hide
      */
+    @Deprecated
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_HCO = 2;
 
@@ -897,8 +900,11 @@ public class TelecomManager {
      * microphone is still on. User will communicate with the remote party by speaking and receiving
      * text message replies.
      *
+     * @deprecated Use {@link TelephonyManager#TTY_MODE_VCO} instead
      * @hide
      */
+    @Deprecated
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_VCO = 3;
 
@@ -920,15 +926,15 @@ public class TelecomManager {
      *
      * Valid modes are:
      * <ul>
-     *     <li>{@link #TTY_MODE_OFF}</li>
-     *     <li>{@link #TTY_MODE_FULL}</li>
-     *     <li>{@link #TTY_MODE_HCO}</li>
-     *     <li>{@link #TTY_MODE_VCO}</li>
+     *     <li>{@link TelephonyManager#TTY_MODE_OFF}</li>
+     *     <li>{@link TelephonyManager#TTY_MODE_FULL}</li>
+     *     <li>{@link TelephonyManager#TTY_MODE_HCO}</li>
+     *     <li>{@link TelephonyManager#TTY_MODE_VCO}</li>
      * </ul>
      *
      * This TTY mode is distinct from the one sent via {@link #ACTION_TTY_PREFERRED_MODE_CHANGED},
-     * since the current TTY mode will always be {@link #TTY_MODE_OFF}unless a TTY terminal is
-     * plugged into the device.
+     * since the current TTY mode will always be {@link TelephonyManager#TTY_MODE_OFF}unless a TTY
+     * terminal is plugged into the device.
      * @hide
      */
     @SystemApi
@@ -953,10 +959,10 @@ public class TelecomManager {
      *
      * Valid modes are:
      * <ul>
-     *     <li>{@link #TTY_MODE_OFF}</li>
-     *     <li>{@link #TTY_MODE_FULL}</li>
-     *     <li>{@link #TTY_MODE_HCO}</li>
-     *     <li>{@link #TTY_MODE_VCO}</li>
+     *     <li>{@link TelephonyManager#TTY_MODE_OFF}</li>
+     *     <li>{@link TelephonyManager#TTY_MODE_FULL}</li>
+     *     <li>{@link TelephonyManager#TTY_MODE_HCO}</li>
+     *     <li>{@link TelephonyManager#TTY_MODE_VCO}</li>
      * </ul>
      * @hide
      */
@@ -2084,7 +2090,7 @@ public class TelecomManager {
      *
      * @return {@code true} if there is an ongoing call that is external, {@code false} otherwise.
      */
-    @FlaggedApi(Flags.FLAG_IS_IN_EXTERNAL_CALL)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_IS_IN_EXTERNAL_CALL)
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
     public boolean isInExternalCall() {
         ITelecomService service = getTelecomService();
@@ -2342,26 +2348,36 @@ public class TelecomManager {
     /**
      * Returns the current TTY mode of the device. For TTY to be on the user must enable it in
      * settings and have a wired headset plugged in.
-     * Valid modes are:
-     * - {@link TelecomManager#TTY_MODE_OFF}
-     * - {@link TelecomManager#TTY_MODE_FULL}
-     * - {@link TelecomManager#TTY_MODE_HCO}
-     * - {@link TelecomManager#TTY_MODE_VCO}
+     *
+     * @return the current TTY mode of the device.
+     *
+     * @deprecated Use {@link TelephonyManager#getCurrentTtyMode()} instead
      * @hide
      */
     @SystemApi
+    @Deprecated
     @RequiresPermission(READ_PRIVILEGED_PHONE_STATE)
+    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     public @TtyMode int getCurrentTtyMode() {
-        ITelecomService service = getTelecomService();
-        if (service != null) {
-            try {
-                return service.getCurrentTtyMode(mContext.getOpPackageName(),
-                        mContext.getAttributionTag());
-            } catch (RemoteException e) {
-                Log.e(TAG, "RemoteException attempting to get the current TTY mode.", e);
+        if (Flags.moveGetTtyModeToTelephonyManager()) {
+            TelephonyManager tm = mContext.getSystemService(TelephonyManager.class);
+            if (tm != null) {
+                return tm.getCurrentTtyMode();
+            } else {
+                return TelephonyManager.TTY_MODE_OFF;
             }
+        } else {
+            ITelecomService service = getTelecomService();
+            if (service != null) {
+                try {
+                    return service.getCurrentTtyMode(mContext.getOpPackageName(),
+                            mContext.getAttributionTag());
+                } catch (RemoteException e) {
+                    Log.e(TAG, "RemoteException attempting to get the current TTY mode.", e);
+                }
+            }
+            return TelephonyManager.TTY_MODE_OFF;
         }
-        return TTY_MODE_OFF;
     }
 
     /**
@@ -3233,6 +3249,184 @@ public class TelecomManager {
                         packageName, enabled);
             } catch (RemoteException e) {
                 Log.e(TAG, "RemoteException setVoipCallLogIntegrationEnabled: " + e);
+                throw e.rethrowFromSystemServer();
+            }
+        } else {
+            throw new IllegalStateException("Telecom is not available");
+        }
+    }
+
+    /**
+     * Determines if the device supports local voicemail or not.
+     * <p>
+     * Local voicemail is an OEM-provided service which enables the device to answer incoming calls
+     * and take a message for the user.
+     *
+     * @return {@code true} if local voicemail is supported, {@code false} otherwise.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_LOCAL_VOICEMAIL)
+    @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
+    public boolean isLocalVoicemailSupported() {
+        ITelecomService service = getTelecomService();
+        if (service != null) {
+            try {
+                return service.isLocalVoicemailSupported(mContext.getOpPackageName());
+            } catch (RemoteException e) {
+                Log.e(TAG, "RemoteException isLocalVoicemailSupported: " + e);
+                throw e.rethrowFromSystemServer();
+            }
+        } else {
+            throw new IllegalStateException("Telecom is not available");
+        }
+    }
+
+    /**
+     * Enables local voicemail for the given {@link PhoneAccountHandle}.
+     * <p>
+     * When a {@link android.telecom.Call} has been in {@link android.telecom.Call#STATE_RINGING}
+     * for longer than the specified {@link Duration}, the {@link LocalVoicemailService} configured
+     * on the device will be bound to handle taking a voicemail message for the user.
+     * <p>
+     * Intended for use by the settings app to configure voicemail timeouts.
+     * <p>
+     * Note, the timeout must be in the range specified by
+     * {@link PhoneAccount#EXTRA_LOCAL_VOICEMAIL_MINIMUM_TIMEOUT_MILLIS}
+     * and {@link PhoneAccount#EXTRA_LOCAL_VOICEMAIL_MAXIMUM_TIMEOUT_MILLIS} where a
+     * {@link PhoneAccount} specifies an allowed range.  If one is not specified, the range must be
+     * [0, 120].
+     *
+     * @param phoneAccountHandle the {@link PhoneAccountHandle} to enable local voicemail for.
+     * @param timeout the timeout after which the call will be answered for local voicemail
+     *                processing.
+     * @throws IllegalArgumentException if an invalid {@link PhoneAccountHandle} is specified.
+     * @throws IllegalArgumentException if {@link #isLocalVoicemailSupported()} is {@code false}.
+     * @throws IllegalArgumentException if the {@link Duration} is not within the allowed range.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_LOCAL_VOICEMAIL)
+    @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
+    public void enableLocalVoicemail(@NonNull PhoneAccountHandle phoneAccountHandle,
+            @NonNull Duration timeout) {
+        if (phoneAccountHandle == null) {
+            throw new NullPointerException("phoneAccountHandle is required");
+        }
+        if (timeout == null) {
+            throw new NullPointerException("timeout is required");
+        }
+        ITelecomService service = getTelecomService();
+        if (service != null) {
+            try {
+                service.enableLocalVoicemail(mContext.getOpPackageName(), phoneAccountHandle,
+                        timeout.toMillis());
+            } catch (RemoteException e) {
+                Log.e(TAG, "RemoteException disableLocalVoicemail: " + e);
+                throw e.rethrowFromSystemServer();
+            }
+        } else {
+            throw new IllegalStateException("Telecom is not available");
+        }
+    }
+
+    /**
+     * Disables local voicemail for the given {@link PhoneAccountHandle}.
+     * <p>
+     * Intended for use by the settings app to configure voicemail timeouts.
+     *
+     * @param phoneAccountHandle the {@link PhoneAccountHandle} for which local voicemail will be
+     *                           disabled.
+     * @throws IllegalArgumentException if an invalid {@link PhoneAccountHandle} is specified.
+     * @throws IllegalArgumentException if {@link #isLocalVoicemailSupported()} is {@code false}.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_LOCAL_VOICEMAIL)
+    @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
+    public void disableLocalVoicemail(@NonNull PhoneAccountHandle phoneAccountHandle) {
+        if (phoneAccountHandle == null) {
+            throw new NullPointerException("phoneAccountHandle is required");
+        }
+        ITelecomService service = getTelecomService();
+        if (service != null) {
+            try {
+                service.disableLocalVoicemail(mContext.getOpPackageName(), phoneAccountHandle);
+            } catch (RemoteException e) {
+                Log.e(TAG, "RemoteException disableLocalVoicemail: " + e);
+                throw e.rethrowFromSystemServer();
+            }
+        } else {
+            throw new IllegalStateException("Telecom is not available");
+        }
+    }
+
+    /**
+     * Determines if local voicemail is enabled for a given {@link PhoneAccountHandle}.
+     * <p>
+     * Where local voicemail is enabled, you can check how long a call must be ringing before it is
+     * sent to local voicemail using {@link #getLocalVoicemailTimeout(PhoneAccountHandle)}.
+     *
+     * @param phoneAccountHandle the phone account to check the local voicemail enabled state for.
+     * @return {@code true} if local voicemail is enabled for the specified
+     * {@link PhoneAccountHandle} or {@code false} otherwise.
+     * @throws IllegalArgumentException if {@link #isLocalVoicemailSupported()} is {@code false}.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_LOCAL_VOICEMAIL)
+    @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
+    public boolean isLocalVoicemailEnabled(@NonNull PhoneAccountHandle phoneAccountHandle) {
+        ITelecomService service = getTelecomService();
+        if (service != null) {
+            try {
+                return service.isLocalVoicemailEnabled(mContext.getOpPackageName(),
+                        phoneAccountHandle);
+            } catch (RemoteException e) {
+                Log.e(TAG, "RemoteException isLocalVoicemailSupported: " + e);
+                throw e.rethrowFromSystemServer();
+            }
+        } else {
+            throw new IllegalStateException("Telecom is not available");
+        }
+    }
+
+    /**
+     * Gets the user-specified local voicemail timeout for a given {@link PhoneAccountHandle}.
+     * <p>
+     * When a {@link android.telecom.Call} has been in {@link android.telecom.Call#STATE_RINGING}
+     * for longer than the specified {@link Duration}, the {@link LocalVoicemailService} configured
+     * on the device will be bound to handle taking a voicemail message for the user.
+     * <p>
+     * Intended for use by the settings app to configure voicemail timeouts.
+     * <p>
+     * You should only call this method for a {@link PhoneAccountHandle} which has local voicemail
+     * enabled (see {@link #isLocalVoicemailEnabled(PhoneAccountHandle)}.
+     *
+     * @param phoneAccountHandle the {@link PhoneAccountHandle} to get the local voicemail timeout
+     *                           for.
+     * @return a {@link Duration} specifying how long a {@link android.telecom.Call} needs to be in
+     * {@link android.telecom.Call#STATE_RINGING} state before the device's
+     * {@link LocalVoicemailService} will be bound to take a message for the user.  You should
+     * check if local voicemail is enabled before querying the timeout.
+     * @throws IllegalArgumentException if an invalid {@link PhoneAccountHandle} is specified.
+     * @throws IllegalArgumentException if {@link #isLocalVoicemailSupported()} is {@code false}.
+     * @throws IllegalArgumentException if local voicemail is disabled for the specified
+     * {@link PhoneAccountHandle}.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_LOCAL_VOICEMAIL)
+    @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
+    public @NonNull Duration getLocalVoicemailTimeout(
+            @NonNull PhoneAccountHandle phoneAccountHandle) {
+        ITelecomService service = getTelecomService();
+        if (service != null) {
+            try {
+                return Duration.ofMillis(service.getLocalVoicemailTimeout(
+                        mContext.getOpPackageName(), phoneAccountHandle));
+            } catch (RemoteException e) {
+                Log.e(TAG, "RemoteException isLocalVoicemailSupported: " + e);
                 throw e.rethrowFromSystemServer();
             }
         } else {

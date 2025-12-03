@@ -404,9 +404,7 @@ java_defaults {
         "aconfig_storage_reader_java",
         "android.hardware.common.fmq-V1-java",
         "bouncycastle-repackaged-unbundled",
-        "com.android.sysprop.foldlockbehavior",
         "com.android.sysprop.view",
-        "com.android.sysprop.nativebinderstats",
         "framework-internal-utils",
         "dropboxmanager_aidl-java",
         "dynamic_instrumentation_manager_aidl-java",
@@ -445,7 +443,6 @@ java_library {
     name: "framework-non-updatable-unbundled-impl-libs",
     static_libs: [
         "framework-location.impl",
-        "framework-network-security-config.impl",
         "framework-virtualization.impl",
     ] + select(release_flag("RELEASE_TELECOM_MAINLINE_MODULE"), {
         true: [],
@@ -463,6 +460,9 @@ java_library {
     }) + select(release_flag("RELEASE_TELEPHONY_MODULE"), {
         true: [],
         default: ["framework-platformtelephony.impl"],
+    }) + select(release_flag("RELEASE_CONSCRYPT_NSC"), {
+        true: [],
+        default: ["framework-network-security-config.impl"],
     }),
     sdk_version: "core_platform",
     installable: false,
@@ -510,10 +510,12 @@ java_library {
         "//packages/modules/Telephony:__subpackages__",
         "//packages/modules/Virtualization:__subpackages__",
     ],
-    libs: [
-        "framework-network-security-config.stubs.module_lib",
-        "framework-telecom.stubs.module_lib",
-    ],
+    libs: select(release_flag("RELEASE_TELECOM_MAINLINE_MODULE"), {
+        true: [],
+        default: [
+            "framework-telecom.stubs.module_lib",
+        ],
+    }),
     compile_dex: false,
     headers_only: true,
 }
@@ -552,6 +554,9 @@ java_library {
     header_jar_override: "framework-minus-apex-headers",
     jarjar_prefix: "com.android.internal.hidden_from_bootclasspath",
     jarjar_shards: "10",
+    optimize: {
+        force_disabled_with_source_stubs: true,
+    },
 }
 
 java_library {
@@ -600,7 +605,6 @@ java_library {
         "framework-minus-apex",
         "framework-platform-compat-config",
         "framework-location-compat-config",
-        "framework-network-security-config-compat-config",
         "services-platform-compat-config",
         "icu4j-platform-compat-config",
         "TeleService-platform-compat-config",
@@ -619,6 +623,9 @@ java_library {
     }) + select(release_flag("RELEASE_TELEPHONY_MODULE"), {
         true: [],
         default: ["framework-platformtelephony-compat-config"],
+    }) + select(release_flag("RELEASE_CONSCRYPT_NSC"), {
+        true: [],
+        default: ["framework-network-security-config-compat-config"],
     }) + select(release_flag("RELEASE_TELECOM_MAINLINE_MODULE"), {
         true: [],
         default: ["framework-telecom-compat-config"],
@@ -651,6 +658,13 @@ filegroup {
     name: "framework-android-os-unit-testable-src",
     srcs: [
         "core/java/android/os/DdmSyncState.java",
+    ],
+}
+
+filegroup {
+    name: "framework-telecom-shared-srcs",
+    srcs: [
+        "core/java/android/util/IndentingPrintWriter.java",
     ],
 }
 

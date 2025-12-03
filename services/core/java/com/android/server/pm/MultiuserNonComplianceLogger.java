@@ -13,21 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.android.server.pm;
 
 import android.annotation.Nullable;
+import android.annotation.SpecialUsers.CanBeALL;
+import android.annotation.UserIdInt;
+import android.app.Notification;
 import android.content.ComponentName;
 import android.content.Context;
-import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
 import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.service.notification.StatusBarNotification;
+import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.IndentingPrintWriter;
 import android.util.SparseIntArray;
 
-import java.io.PrintWriter;
+import java.util.Map;
 
 /**
  * Class used to report events that indicate the potential existence of non-multiuser-compliant
@@ -44,7 +49,9 @@ final class MultiuserNonComplianceLogger {
 
     private final Handler mHandler;
 
-    // TODO(b/414326600): merge collections below and/or use the proper proto / structure
+    // TODO(b/414326600): merge collections below and/or use the proper proto / structure. For
+    // example, instead of having 2 sets for mLaunchedHsuActivities and mBlockedHsuActivities,
+    // we should have just one for the activity and an @IntDef with the result.
 
     // Key is "absolute" uid  / app id (i.e., stripping out the user id part), value is count.
     @Nullable
@@ -58,6 +65,35 @@ final class MultiuserNonComplianceLogger {
     @Nullable
     private final ArraySet<ComponentName> mLaunchedHsuActivities;
 
+    // Activities blocked while the current user is the headless system user.
+    @Nullable
+    private final ArraySet<ComponentName> mBlockedHsuActivities;
+
+    // Notifications shown while the current user is the headless system user.
+    @Nullable
+    private final Map<HsuNotification, Integer> mShownHsuNotifications;
+
+    private record HsuNotification(
+            String pkg,
+            @Nullable String tag,
+            int id,
+            @CanBeALL @UserIdInt int targetUserId,
+            int visibility,
+            @Nullable String category,
+            @Nullable String channel) {
+
+        void dump(IndentingPrintWriter pw) {
+            pw.print("[pkg="); pw.print(pkg);
+            pw.print(", tag="); pw.print(tag);
+            pw.print(", id="); pw.print(id);
+            pw.print(", user="); pw.print(targetUserId);
+            pw.print(", vis="); pw.print(Notification.visibilityToString(visibility));
+            pw.print(", category="); pw.print(category);
+            pw.print(", channel="); pw.print(channel);
+            pw.print("]");
+        }
+    }
+
     MultiuserNonComplianceLogger(Context context, Handler handler) {
         mContext = context;
         mHandler = handler;
@@ -66,53 +102,78 @@ final class MultiuserNonComplianceLogger {
             mGetMainUserCalls = new SparseIntArray();
             mIsMainUserCalls = new SparseIntArray();
             mLaunchedHsuActivities = new ArraySet<>();
+            mBlockedHsuActivities = new ArraySet<>();
+            mShownHsuNotifications = new ArrayMap<>();
         } else {
             mGetMainUserCalls = null;
             mIsMainUserCalls = null;
             mLaunchedHsuActivities = null;
+            mBlockedHsuActivities = null;
+            mShownHsuNotifications = null;
         }
     }
 
-    // TODO(b/414326600): add unit tests (once the proper formats are determined).
-    void logGetMainUserCall() {
-        logMainUserCall(mGetMainUserCalls);
+    void logGetMainUserCall(int callingUid) {
+        logMainUserCall(mGetMainUserCalls, callingUid);
     }
 
-    // TODO(b/414326600): add unit tests (once the proper formats are determined).
-    void logIsMainUserCall() {
-        logMainUserCall(mIsMainUserCalls);
+    void logIsMainUserCall(int callingUid) {
+        logMainUserCall(mIsMainUserCalls, callingUid);
     }
 
-    private void logMainUserCall(@Nullable SparseIntArray calls) {
+    private void logMainUserCall(@Nullable SparseIntArray calls, int callingUid) {
         if (calls == null) {
             return;
         }
 
-        // Must set before posting to the handler (otherwise it would always return the system UID)
-        int uid = Binder.getCallingUid();
-
         mHandler.post(() -> {
-            int canonicalUid = UserHandle.getAppId(uid);
+            int canonicalUid = UserHandle.getAppId(callingUid);
             int newCount = calls.get(canonicalUid, 0) + 1;
             calls.put(canonicalUid, newCount);
         });
     }
 
-    // TODO(b/414326600): add unit tests (once the proper formats are determined).
     void logLaunchedHsuActivity(ComponentName activity) {
-        if (mLaunchedHsuActivities == null) {
+        logHsuActivity(mLaunchedHsuActivities, activity);
+    }
+
+    void logBlockedHsuActivity(ComponentName activity) {
+        logHsuActivity(mBlockedHsuActivities, activity);
+    }
+
+    private void logHsuActivity(@Nullable ArraySet<ComponentName> activities,
+            ComponentName activity) {
+        if (activities == null) {
             return;
         }
-        mHandler.post(() -> mLaunchedHsuActivities.add(activity));
+        mHandler.post(() -> activities.add(activity));
+    }
+
+    void logShownHsuNotification(StatusBarNotification sbn) {
+        Notification notification = sbn.getNotification();
+        HsuNotification notif = new HsuNotification(
+                sbn.getPackageName(), sbn.getTag(), sbn.getId(), sbn.getUser().getIdentifier(),
+                notification.visibility, notification.category, notification.getChannelId());
+        mHandler.post(() -> {
+            Integer currentCount = mShownHsuNotifications.get(notif);
+            if (currentCount == null) {
+                mShownHsuNotifications.put(notif, 1);
+            } else {
+                mShownHsuNotifications.put(notif, currentCount + 1);
+            }
+        });
     }
 
     void dump(IndentingPrintWriter pw) {
-        // TODO(b/414326600): add unit tests (once the proper formats are determined).
         dumpDeprecatedCalls(pw, "getMainUser", mGetMainUserCalls);
         pw.println();
         dumpDeprecatedCalls(pw, "isMainUser", mIsMainUserCalls);
         pw.println();
-        dumpLaunchedHsuActivities(pw);
+        dumpHsuActivities(pw, mBlockedHsuActivities, "blocked");
+        pw.println();
+        dumpHsuActivities(pw, mLaunchedHsuActivities, "launched");
+        pw.println();
+        dumpShownHsuNotifications(pw);
     }
 
     private void dumpDeprecatedCalls(
@@ -124,7 +185,6 @@ final class MultiuserNonComplianceLogger {
 
         // TODO(b/414326600): should dump in the mHandler thread (as its state is written in that
         // thread), but it would require blocking the caller until it's done
-
 
         // TODO(b/414326600): should also dump on proto, but we need to wait until the format is
         // properly defined (for example, we might want to log a generic "user violation" that would
@@ -143,27 +203,41 @@ final class MultiuserNonComplianceLogger {
         pw.decreaseIndent();
     }
 
-    private void dumpLaunchedHsuActivities(IndentingPrintWriter pw) {
-        if (mLaunchedHsuActivities == null) {
-            pw.println("Not logging launched HSU activities");
+    private void dumpHsuActivities(IndentingPrintWriter pw, ArraySet<ComponentName> activities,
+            String what) {
+        if (activities == null) {
+            pw.printf("Not logging %s HSU activities\n", what);
             return;
         }
         // TODO(b/414326600): should dump in the mHandler thread (as its state is written in that
         // thread), but it would require blocking the caller until it's done
-        int size = mLaunchedHsuActivities.size();
+        int size = activities.size();
 
-        // TODO(b/414326600): for now they're always launched, but once the allowlist mechanism is
-        // implemented, it should print the real action
-        pw.printf("%d activities launched on HSU\n", size);
+        pw.printf("%d activities %s on HSU\n", size, what);
         pw.increaseIndent();
         for (int i = 0; i < size; i++) {
-            pw.println(mLaunchedHsuActivities.valueAt(i).flattenToShortString());
+            pw.println(activities.valueAt(i).flattenToShortString());
         }
         pw.decreaseIndent();
     }
 
-    // TODO(b/414326600): add unit tests
-    void reset(PrintWriter pw) {
+    private void dumpShownHsuNotifications(IndentingPrintWriter pw) {
+        if (mShownHsuNotifications == null) {
+            pw.println("Not logging shown HSU notifications");
+            return;
+        }
+
+        int size = mShownHsuNotifications.size();
+        pw.printf("%d notifications shown on HSU\n", size);
+        pw.increaseIndent();
+        for (Map.Entry<HsuNotification, Integer> entry : mShownHsuNotifications.entrySet()) {
+            entry.getKey().dump(pw);
+            pw.printf(": %d times\n", entry.getValue());
+        }
+        pw.decreaseIndent();
+    }
+
+    void reset() {
         // TODO(b/414326600): should reset in the mHandler thread (as its state is written in that
         // thread), but it would require blocking the caller until it's done
 
@@ -176,7 +250,12 @@ final class MultiuserNonComplianceLogger {
         if (mLaunchedHsuActivities != null) {
             mLaunchedHsuActivities.clear();
         }
-        pw.println("Reset");
+        if (mBlockedHsuActivities != null) {
+            mBlockedHsuActivities.clear();
+        }
+        if (mShownHsuNotifications != null) {
+            mShownHsuNotifications.clear();
+        }
     }
 
     private String getPackageNameForLoggingPurposes(int uid) {

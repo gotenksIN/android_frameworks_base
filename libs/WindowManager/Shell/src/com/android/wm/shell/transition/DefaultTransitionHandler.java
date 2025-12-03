@@ -65,7 +65,6 @@ import static com.android.internal.policy.TransitionAnimation.WALLPAPER_TRANSITI
 import static com.android.internal.policy.TransitionAnimation.WALLPAPER_TRANSITION_INTRA_OPEN;
 import static com.android.internal.policy.TransitionAnimation.WALLPAPER_TRANSITION_NONE;
 import static com.android.internal.policy.TransitionAnimation.WALLPAPER_TRANSITION_OPEN;
-import static com.android.wm.shell.Flags.enableDynamicInsetsForAppLaunch;
 import static com.android.wm.shell.transition.DefaultSurfaceAnimator.buildSurfaceAnimation;
 import static com.android.wm.shell.transition.TransitionAnimationHelper.getTransitionBackgroundColorIfSet;
 import static com.android.wm.shell.transition.TransitionAnimationHelper.getTransitionTypeFromInfo;
@@ -307,9 +306,6 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
     @Nullable
     final TransitionAnimationHelper.RoundedContentPerDisplay getRoundedContentBounds(
             TransitionInfo.Change change) {
-        if (!enableDynamicInsetsForAppLaunch()) {
-            return null;
-        }
         if (change.getTaskInfo() == null && change.getActivityComponent() == null) {
             return null;
         }
@@ -392,7 +388,9 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
         // within the transition to interact with, so a background is unnecessary.
         final boolean allowBackground =
                 !com.android.window.flags.Flags.polishCloseWallpaperIncludesOpenChange()
-                        || info.getChanges().size() > 1;
+                        || (info.getChanges().size() > 1
+                        && (wallpaperTransit != WALLPAPER_TRANSITION_INTRA_OPEN
+                        && wallpaperTransit != WALLPAPER_TRANSITION_INTRA_CLOSE));
 
         for (int i = info.getChanges().size() - 1; i >= 0; --i) {
             final TransitionInfo.Change change = info.getChanges().get(i);

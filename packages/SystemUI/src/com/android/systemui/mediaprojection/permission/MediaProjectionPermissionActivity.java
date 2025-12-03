@@ -65,6 +65,7 @@ import com.android.systemui.mediaprojection.devicepolicy.ScreenCaptureDevicePoli
 import com.android.systemui.mediaprojection.devicepolicy.ScreenCaptureDisabledDialogDelegate;
 import com.android.systemui.res.R;
 import com.android.systemui.screencapture.sharescreen.domain.interactor.ScreenCaptureShareScreenFeaturesInteractor;
+import com.android.systemui.screencapture.ui.ShareScreenActivity;
 import com.android.systemui.statusbar.phone.AlertDialogWithDelegate;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
 
@@ -202,7 +203,7 @@ public class MediaProjectionPermissionActivity extends Activity {
 
         final boolean showLargeScreenShareDialog =
                 !hasCastingCapabilities
-                && ScreenCaptureShareScreenFeaturesInteractor
+                        && ScreenCaptureShareScreenFeaturesInteractor
                         .INSTANCE.isLargeScreenSharingEnabled();
         final Runnable screenShareDialogRunnable;
         if (showLargeScreenShareDialog) {

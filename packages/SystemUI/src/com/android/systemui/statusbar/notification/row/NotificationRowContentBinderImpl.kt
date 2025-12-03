@@ -50,6 +50,7 @@ import com.android.systemui.statusbar.NotificationRemoteInputManager
 import com.android.systemui.statusbar.notification.ConversationNotificationProcessor
 import com.android.systemui.statusbar.notification.CustomViewMemorySizeExceededException
 import com.android.systemui.statusbar.notification.InflationException
+import com.android.systemui.statusbar.notification.NmSummarizationAllFlag
 import com.android.systemui.statusbar.notification.NmSummarizationUiFlag
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.logKey
@@ -699,7 +700,10 @@ constructor(
 
             // process conversations and extract the messaging style
             val messagingStyle =
-                if (NmSummarizationUiFlag.isEnabled || entry.ranking.isConversation) {
+                if (
+                    (NmSummarizationUiFlag.isEnabled && !NmSummarizationAllFlag.isEnabled) ||
+                        entry.ranking.isConversation
+                ) {
                     conversationProcessor.processNotification(entry, builder, logger)
                 } else null
 
@@ -843,7 +847,8 @@ constructor(
                 val headsUp =
                     if (reInflateFlags and FLAG_CONTENT_VIEW_HEADS_UP != 0) {
                         logger.logAsyncTaskProgress(row.loggingKey, "creating heads up remote view")
-                        val isHeadsUpCompact = headsUpStyleProvider.shouldApplyCompactStyle()
+                        val isHeadsUpCompact =
+                            headsUpStyleProvider.shouldApplyCompactStyle(systemUiContext.displayId)
                         if (isHeadsUpCompact) {
                             builder.createCompactHeadsUpContentView()
                         } else {
@@ -913,13 +918,10 @@ constructor(
             expanded.setLayoutInflaterFactoryRecursively(FLAG_CONTENT_VIEW_EXPANDED)
             headsUp.setLayoutInflaterFactoryRecursively(FLAG_CONTENT_VIEW_HEADS_UP)
             public.setLayoutInflaterFactoryRecursively(FLAG_CONTENT_VIEW_PUBLIC)
-
-            if (android.app.Flags.notificationsRedesignAppIcons()) {
-                normalGroupHeader.setLayoutInflaterFactoryRecursively(FLAG_GROUP_SUMMARY_HEADER)
-                minimizedGroupHeader.setLayoutInflaterFactoryRecursively(
-                    FLAG_LOW_PRIORITY_GROUP_SUMMARY_HEADER
-                )
-            }
+            normalGroupHeader.setLayoutInflaterFactoryRecursively(FLAG_GROUP_SUMMARY_HEADER)
+            minimizedGroupHeader.setLayoutInflaterFactoryRecursively(
+                FLAG_LOW_PRIORITY_GROUP_SUMMARY_HEADER
+            )
             return this
         }
 

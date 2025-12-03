@@ -109,9 +109,8 @@ import com.android.systemui.qs.footer.dagger.FooterActionsModule;
 import com.android.systemui.qs.tiles.impl.qr.ui.model.QRCodeScannerModule;
 import com.android.systemui.recents.Recents;
 import com.android.systemui.recordissue.RecordIssueModule;
-import com.android.systemui.retail.RetailModeModule;
+import com.android.systemui.retail.impl.RetailModeModule;
 import com.android.systemui.rotation.impl.RotationModule;
-import com.android.systemui.rotationlock.DeviceStateAutoRotateModule.BoundsDeviceStateAutoRotateModule;
 import com.android.systemui.scene.shared.model.SceneContainerConfig;
 import com.android.systemui.scene.shared.model.SceneDataSource;
 import com.android.systemui.scene.shared.model.SceneDataSourceDelegator;
@@ -140,6 +139,7 @@ import com.android.systemui.statusbar.domain.interactor.StatusBarRegionSamplingI
 import com.android.systemui.statusbar.events.StatusBarEventsModule;
 import com.android.systemui.statusbar.events.SystemStatusAnimationScheduler;
 import com.android.systemui.statusbar.featurepods.av.AvControlsChipModule;
+import com.android.systemui.statusbar.featurepods.dagger.StatusBarFeaturePodsModule;
 import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.statusbar.notification.collection.NotifPipeline;
 import com.android.systemui.statusbar.notification.collection.inflation.NotificationRowBinder;
@@ -158,7 +158,6 @@ import com.android.systemui.statusbar.phone.LetterboxModule;
 import com.android.systemui.statusbar.pipeline.airplane.data.repository.impl.AirplaneModeDataLayerModule;
 import com.android.systemui.statusbar.pipeline.airplane.shared.impl.AirplaneModeSharedModule;
 import com.android.systemui.statusbar.pipeline.dagger.StatusBarPipelineModule;
-import com.android.systemui.statusbar.policy.DeviceStateRotationLockSettingController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.PolicyModule;
 import com.android.systemui.statusbar.policy.SensitiveNotificationProtectionController;
@@ -184,7 +183,7 @@ import com.android.systemui.util.kotlin.SysUICoroutinesModule;
 import com.android.systemui.util.reference.ReferenceModule;
 import com.android.systemui.util.sensors.SensorModule;
 import com.android.systemui.util.settings.SettingsProxy;
-import com.android.systemui.util.settings.SettingsUtilModule;
+import com.android.systemui.util.settings.impl.SettingsUtilModule;
 import com.android.systemui.wallet.dagger.WalletModule;
 import com.android.systemui.wmshell.BubblesManager;
 import com.android.wm.shell.bubbles.Bubbles;
@@ -291,6 +290,7 @@ import javax.inject.Named;
         SmartRepliesInflationModule.class,
         SmartspaceModule.class,
         StatusBarEventsModule.class,
+        StatusBarFeaturePodsModule.class,
         StatusBarModule.class,
         StatusBarChipsModule.class,
         StatusBarPipelineModule.class,
@@ -421,11 +421,6 @@ public abstract class SystemUIModule {
     @BindsOptionalOf
     abstract LockscreenContent optionalLockscreenContent();
 
-    @BindsOptionalOf
-    @BoundsDeviceStateAutoRotateModule
-    abstract Optional<DeviceStateRotationLockSettingController>
-            optionalDeviceStateRotationLockSettingController();
-
     // TODO: This should provided by the WM component
 
     /** Provides Optional of BubbleManager */
@@ -497,16 +492,6 @@ public abstract class SystemUIModule {
     static SceneDataSourceDelegator providesSceneDataSourceDelegator(
             @Application CoroutineScope applicationScope, SceneContainerConfig config) {
         return new SceneDataSourceDelegator(applicationScope, config);
-    }
-
-    @Provides
-    @SysUISingleton
-    static Optional<DeviceStateRotationLockSettingController>
-            provideDeviceStateRotationLockSettingController(
-            @BoundsDeviceStateAutoRotateModule
-            Optional<Optional<DeviceStateRotationLockSettingController>> optionalOfOptional
-    ) {
-        return optionalOfOptional.orElseGet(Optional::empty);
     }
 
     @Binds

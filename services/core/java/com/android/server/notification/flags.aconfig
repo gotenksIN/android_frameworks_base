@@ -120,6 +120,13 @@ flag {
 }
 
 flag {
+  name: "channel_vibration_ignore_invalid_pattern"
+  namespace: "notifications"
+  description: "Ignore invalid patterns (e.g. empty array) and fall back to default vibration instead of none"
+  bug: "447121175"
+}
+
+flag {
   name: "nm_binder_perf_reduce_zen_broadcasts"
   namespace: "systemui"
   description: "Don't send duplicate zen-related (policy changed, etc) broadcasts"
@@ -200,13 +207,10 @@ flag {
 }
 
 flag {
-  name: "use_on_binding_died"
+  name: "fix_managed_services_double_binding"
   namespace: "notifications"
-  description: "Prefer onBindingDied for package updates to avoid duplicate service bindings"
+  description: "Couple of tweaks to fix b/434679743"
   bug: "434679743"
-  metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -214,6 +218,16 @@ flag {
   namespace: "systemui"
   description: "Enforce a maximum number of allowed components in ManagedServices"
   bug: "428701593"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "disable_nas_affects_classification_and_summarization"
+  namespace: "notifications"
+  description: "Disabling NAS also unclassifies and unsummarizes existing notifications"
+  bug: "446994142"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

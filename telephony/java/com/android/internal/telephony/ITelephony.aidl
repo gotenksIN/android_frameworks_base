@@ -1130,6 +1130,12 @@ interface ITelephony {
      */
     boolean isTtyModeSupported();
 
+    /**
+     * Returns the current TTY mode of the device. For TTY to be on the user must enable it in
+     * settings and have a wired headset plugged in.
+     */
+    int getCurrentTtyMode();
+
     boolean isRttSupported(int subscriptionId);
 
     /**
@@ -3324,6 +3330,14 @@ interface ITelephony {
      * @return {@code true} if the value is set successfully, {@code false} otherwise.
      */
     boolean setMaxAllowedSatelliteDataModeForCtsTest(int maxAllowedDataMode);
+
+    /**
+     * This API can be used for testing purposes to uncap the max allowed data mode.
+     *
+     * @return {@code true} if the max allowed data mode is uncapped successfully,
+     * {@code false} otherwise.
+     */
+    boolean uncapMaxAllowedSatelliteDataMode();
 
     /**
      * Request to get the session stats of the satellite service.

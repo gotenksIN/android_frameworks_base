@@ -19,11 +19,15 @@ package com.android.systemui.screencapture.domain.interactor
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.screencapture.common.ScreenCaptureComponent
+import com.android.systemui.screencapture.common.ScreenCaptureUiComponent
+import com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters
 import com.android.systemui.screencapture.data.repository.screenCaptureComponentRepository
+import com.android.systemui.screencapture.ui.ScreenCaptureOverlayUi
 import com.android.systemui.screencapture.ui.ScreenCaptureUi
+import com.android.systemui.screencapture.ui.screenCaptureOverlayUi
 import com.android.systemui.screencapture.ui.screenCaptureUiFactory
-import com.android.systemui.screenrecord.domain.interactor.screenRecordingServiceInteractor
+import com.android.systemui.screenrecord.data.repository.screenRecordingServiceRepository
 import kotlinx.coroutines.CoroutineScope
 
 val Kosmos.screenCaptureComponentInteractor by
@@ -33,7 +37,7 @@ val Kosmos.screenCaptureComponentInteractor by
             repository = screenCaptureComponentRepository,
             screenCaptureUiInteractor = screenCaptureUiInteractor,
             componentBuilder = FakeScreenCaptureComponentBuilder(this),
-            screenRecordingServiceInteractor = screenRecordingServiceInteractor,
+            screenRecordingServiceRepository = screenRecordingServiceRepository,
         )
     }
 
@@ -59,7 +63,16 @@ private class FakeScreenCaptureComponentBuilder(private val kosmos: Kosmos) :
         object : ScreenCaptureComponent {
             override fun coroutineScope(): CoroutineScope = scope
 
+            override fun screenCaptureOverlayStateInteractor():
+                ScreenCaptureOverlayStateInteractor = kosmos.screenCaptureOverlayStateInteractor
+
+            override fun screenRecordOverlayUi(): ScreenCaptureOverlayUi =
+                kosmos.screenCaptureOverlayUi
+
             override fun screenCaptureUiFactory(): ScreenCaptureUi.Factory =
                 kosmos.screenCaptureUiFactory
+
+            override fun uiComponentBuilders():
+                Map<ScreenCaptureType, ScreenCaptureUiComponent.Builder> = emptyMap()
         }
 }

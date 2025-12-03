@@ -16,7 +16,6 @@
 
 package com.android.server.notification;
 
-import static android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR;
 import static android.content.Context.BIND_ALLOW_WHITELIST_MANAGEMENT;
 import static android.content.Context.BIND_AUTO_CREATE;
 import static android.content.Context.BIND_FOREGROUND_SERVICE;
@@ -76,8 +75,9 @@ import android.util.SparseArray;
 import android.util.SparseSetArray;
 import android.util.proto.ProtoOutputStream;
 
+import androidx.annotation.VisibleForTesting;
+
 import com.android.internal.annotations.GuardedBy;
-import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.XmlUtils;
 import com.android.internal.util.function.TriPredicate;
 import com.android.modules.utils.TypedXmlPullParser;
@@ -114,11 +114,11 @@ abstract public class ManagedServices {
     protected final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     private static final int ON_BINDING_DIED_REBIND_DELAY_MS = 10000;
-    private boolean mRebindAsyncDelay = true;
     protected static final String ENABLED_SERVICES_SEPARATOR = ":";
     private static final String DB_VERSION_1 = "1";
     private static final String DB_VERSION_2 = "2";
     private static final String DB_VERSION_3 = "3";
+
 
     /**
      * List of components and apps that can have running {@link ManagedServices}.
@@ -1186,31 +1186,48 @@ abstract public class ManagedServices {
                     anyServicesInvolved = removeUninstalledItemsFromApprovedLists(userId, pkg);
                 }
             }
-            for (String pkgName : pkgList) {
+            for (int i = 0; i < pkgList.length; i++) {
+                String pkgName = pkgList[i];
                 if (!managedServicesConcurrentMultiuser()) {
                     if (isComponentEnabledForPackage(pkgName)) {
                         anyServicesInvolved = true;
                     }
                 }
-                if (uidList != null && uidList.length > 0) {
-                    for (int uid : uidList) {
+
+                if (Flags.fixManagedServicesDoubleBinding()) {
+                    if (uidList != null && uidList.length == pkgList.length) {
+                        @UserIdInt int userId = UserHandle.getUserId(uidList[i]);
                         if (managedServicesConcurrentMultiuser()) {
-                            if (isComponentEnabledForPackage(pkgName, UserHandle.getUserId(uid))) {
+                            if (isComponentEnabledForPackage(pkgName, userId)) {
                                 anyServicesInvolved = true;
                             }
                         }
-                        if (isPackageAllowed(pkgName, UserHandle.getUserId(uid))) {
+                        if (isPackageAllowed(pkgName, userId)) {
                             anyServicesInvolved = true;
-                            trimApprovedListsForInvalidServices(pkgName, UserHandle.getUserId(uid));
+                            trimApprovedListsForInvalidServices(pkgName, userId);
+                        }
+                    }
+                } else {
+                    if (uidList != null && uidList.length > 0) {
+                        for (int uid : uidList) {
+                            @UserIdInt int userId = UserHandle.getUserId(uid);
+                            if (managedServicesConcurrentMultiuser()) {
+                                if (isComponentEnabledForPackage(pkgName, userId)) {
+                                    anyServicesInvolved = true;
+                                }
+                            }
+                            if (isPackageAllowed(pkgName, userId)) {
+                                anyServicesInvolved = true;
+                                trimApprovedListsForInvalidServices(pkgName, userId);
+                            }
                         }
                     }
                 }
             }
-            if (!Flags.useOnBindingDied()) {
-                if (anyServicesInvolved) {
-                    // make sure we're still bound to any of our services who may have just upgraded
-                    rebindServices(false, USER_ALL);
-                }
+
+            if (anyServicesInvolved) {
+                // make sure we're still bound to any of our services who may have just upgraded
+                rebindServices(false, USER_ALL);
             }
         }
     }
@@ -1799,8 +1816,7 @@ abstract public class ManagedServices {
     /**
      * Version of registerService that takes the name of a service component to bind to.
      */
-    @VisibleForTesting
-    void registerService(final ServiceInfo si, final int userId) {
+    private void registerService(final ServiceInfo si, final int userId) {
         ensureFilters(si, userId);
         registerService(si.getComponentName(), userId);
     }
@@ -1819,10 +1835,6 @@ abstract public class ManagedServices {
         if (isPackageOrComponentAllowedWithPermission(cn, userId)) {
             registerService(cn, userId);
         } else {
-            if (Flags.useOnBindingDied()) {
-                // clean up enabled component list
-                mEnabledServicesByUser.get(resolveUserId(userId)).remove(cn);
-            }
             if (DEBUG) Slog.v(TAG, "skipped reregisterService cn=" + cn + " u=" + userId
                     + " because of isPackageOrComponentAllowedWithPermission check");
         }
@@ -1831,6 +1843,7 @@ abstract public class ManagedServices {
     /**
      * Inject a system service into the management list.
      */
+    @VisibleForTesting(otherwise = VisibleForTesting.NONE)
     public void registerSystemService(final ComponentName name, final int userid) {
         synchronized (mMutex) {
             registerServiceLocked(name, userid, true /* isSystem */);
@@ -1838,24 +1851,7 @@ abstract public class ManagedServices {
     }
 
     @GuardedBy("mMutex")
-    private void disconnectServiceLocked(ServiceConnection sc, IInterface service,
-            @UserIdInt int userId, ComponentName cn) {
-        if (service != null) {
-            Slog.w(TAG, userId + " " + getCaption() + " unregister: " + cn);
-            unregisterService(service, userId);
-        } else {
-            Slog.w(TAG, userId + " " + getCaption() + " unbind: " + cn);
-            unbindService(sc, cn, userId);
-        }
-    }
-
-    @GuardedBy("mMutex")
-    private void registerServiceLocked(final ComponentName name, final int userid) {
-        registerServiceLocked(name, userid, false /* isSystem */);
-    }
-
-    @GuardedBy("mMutex")
-    private boolean isServiceAlreadyBoundLocked(ManagedServiceInfo info) {
+    private boolean isServiceBoundLocked(ManagedServiceInfo info) {
         for (ManagedServiceInfo info2 : mServices) {
             if (Objects.equals(info.component, info2.component) && info.userid == info2.userid) {
                 return true;
@@ -1865,30 +1861,33 @@ abstract public class ManagedServices {
     }
 
     @GuardedBy("mMutex")
+    private void registerServiceLocked(final ComponentName name, final int userid) {
+        registerServiceLocked(name, userid, false /* isSystem */);
+    }
+
+    @GuardedBy("mMutex")
     private void registerServiceLocked(final ComponentName name, final int userid,
             final boolean isSystem) {
         if (DEBUG) Slog.v(TAG, "registerService: " + name + " u=" + userid);
 
         final Pair<ComponentName, Integer> servicesBindingTag = Pair.create(name, userid);
         if (mServicesBound.contains(servicesBindingTag)) {
-            Slog.v(TAG, "Not registering " + name + " is already binding");
+            Slog.v(TAG, "Not registering " + name + " is already bound");
             // stop registering this thing already! we're working on it
             return;
         }
         mServicesBound.add(servicesBindingTag);
 
-        if (!Flags.useOnBindingDied()) {
-            final int N = mServices.size();
-            for (int i = N - 1; i >= 0; i--) {
-                final ManagedServiceInfo info = mServices.get(i);
-                if (name.equals(info.component)
-                        && info.userid == userid) {
-                    // cut old connections
-                    Slog.v(TAG, "    disconnecting old " + getCaption() + ": " + info.service);
-                    removeServiceLocked(i);
-                    if (info.connection != null) {
-                        unbindService(info.connection, info.component, info.userid);
-                    }
+        final int N = mServices.size();
+        for (int i = N - 1; i >= 0; i--) {
+            final ManagedServiceInfo info = mServices.get(i);
+            if (name.equals(info.component)
+                && info.userid == userid) {
+                // cut old connections
+                Slog.v(TAG, "    disconnecting old " + getCaption() + ": " + info.service);
+                removeServiceLocked(i);
+                if (info.connection != null) {
+                    unbindService(info.connection, info.component, info.userid);
                 }
             }
         }
@@ -1925,7 +1924,7 @@ abstract public class ManagedServices {
                 @Override
                 public void onServiceConnected(ComponentName name, IBinder binder,
                         IBinderSession binderSession) {
-                    Slog.v(TAG, userid + " " + getCaption() + " service connected: " + name);
+                    Slog.v(TAG,  userid + " " + getCaption() + " service connected: " + name);
                     boolean added = false;
                     ManagedServiceInfo info = null;
                     synchronized (mMutex) {
@@ -1939,20 +1938,14 @@ abstract public class ManagedServices {
                                 info = new ManagedServiceInfo(mService, name, userid, isSystem,
                                         this, targetSdkVersion, uid);
                             }
-                            if (!Flags.useOnBindingDied()) {
-                                binder.linkToDeath(info, 0);
-                            }
-                            if (Flags.useOnBindingDied() && isServiceAlreadyBoundLocked(info)) {
+                            binder.linkToDeath(info, 0);
+
+                            if (Flags.fixManagedServicesDoubleBinding()
+                                    && isServiceBoundLocked(info)) {
                                 Slog.wtfStack(TAG, "Duplicate binding " + info);
                             }
                             added = mServices.add(info);
                         } catch (RemoteException e) {
-                            if (Flags.useOnBindingDied()) {
-                                // This block is likely unreachable because RemoteException is
-                                // typically thrown by binder.linkToDeath, which is skipped
-                                // when Flags.useOnBindingDied() is true.
-                                mServicesBound.remove(servicesBindingTag);
-                            }
                             Slog.e(TAG, "Failed to linkToDeath, already dead", e);
                         }
                     }
@@ -1976,22 +1969,14 @@ abstract public class ManagedServices {
 
                 @Override
                 public void onBindingDied(ComponentName name) {
-                    Slog.w(TAG, userid + " " + getCaption() + " binding died: " + name);
+                    Slog.w(TAG,  userid + " " + getCaption() + " binding died: " + name);
                     synchronized (mMutex) {
-                        if (Flags.useOnBindingDied()) {
-                            disconnectServiceLocked(this, mService, userid, name);
-                        } else {
-                            unbindService(this, name, userid);
-                        }
+                        unbindService(this, name, userid);
                         if (!mServicesRebinding.contains(servicesBindingTag)) {
                             mServicesRebinding.add(servicesBindingTag);
-                            if (mRebindAsyncDelay) {
-                                mHandler.postDelayed(() ->
-                                                reregisterService(name, userid),
-                                        ON_BINDING_DIED_REBIND_DELAY_MS);
-                            } else {
-                                reregisterService(name, userid);
-                            }
+                            mHandler.postDelayed(() ->
+                                    reregisterService(name, userid),
+                                    ON_BINDING_DIED_REBIND_DELAY_MS);
                         } else {
                             Slog.v(TAG, getCaption() + " not rebinding in user " + userid
                                     + " as a previous rebind attempt was made: " + name);
@@ -2002,20 +1987,24 @@ abstract public class ManagedServices {
                 @Override
                 public void onNullBinding(ComponentName name) {
                     Slog.v(TAG, "onNullBinding() called with: name = [" + name + "]");
-                    if (Flags.useOnBindingDied()) {
-                        disconnectServiceLocked(this, mService, userid, name);
-                    } else {
-                        mContext.unbindService(this);
-                    }
+                    mContext.unbindService(this);
                 }
             };
+
             if (!mContext.bindServiceAsUser(intent,
                     serviceConnection,
                     BindServiceFlags.of(getBindFlags()),
                     new UserHandle(userid))) {
-                mServicesBound.remove(servicesBindingTag);
+                if (!Flags.fixManagedServicesDoubleBinding()) {
+                    mServicesBound.remove(servicesBindingTag);
+                }
                 Slog.w(TAG, "Unable to bind " + getCaption() + " service: " + intent
                         + " in user " + userid);
+                // Need to call Context.unbindService() to dispose of the ServiceConnection even
+                // when bindService returns false.
+                if (Flags.fixManagedServicesDoubleBinding()) {
+                    unbindService(serviceConnection, name, userid);
+                }
             }
         } catch (SecurityException ex) {
             mServicesBound.remove(servicesBindingTag);
@@ -2104,7 +2093,15 @@ abstract public class ManagedServices {
     private ManagedServiceInfo registerServiceImpl(ManagedServiceInfo info) {
         synchronized (mMutex) {
             try {
-                info.service.asBinder().linkToDeath(info, 0);
+                if (Flags.fixManagedServicesDoubleBinding()) {
+                    if (!info.isGuest(this)) {
+                        // Guest services are already linkedToDeath in their hosts, and the host
+                        // will call unregisterService() to remove them from this.mServices.
+                        info.service.asBinder().linkToDeath(info, 0);
+                    }
+                } else {
+                    info.service.asBinder().linkToDeath(info, 0);
+                }
                 mServices.add(info);
                 return info;
             } catch (RemoteException e) {
@@ -2186,17 +2183,11 @@ abstract public class ManagedServices {
      */
     protected abstract boolean allowRebindForParentUser();
 
-    @VisibleForTesting
-    void setRebindAsyncDelay(boolean rebindAsyncDelay) {
-        mRebindAsyncDelay = rebindAsyncDelay;
-    }
-
     public class ManagedServiceInfo implements IBinder.DeathRecipient {
         public IInterface service;
         public ComponentName component;
         public int userid;
         public boolean isSystem;
-        @FlaggedApi(FLAG_LIFETIME_EXTENSION_REFACTOR)
         public boolean isSystemUi;
         public ServiceConnection connection;
         public int targetSdkVersion;
@@ -2246,7 +2237,6 @@ abstract public class ManagedServices {
             return isSystem;
         }
 
-        @FlaggedApi(FLAG_LIFETIME_EXTENSION_REFACTOR)
         public boolean isSystemUi() {
             return isSystemUi;
         }
@@ -2308,9 +2298,6 @@ abstract public class ManagedServices {
 
         @Override
         public void binderDied() {
-            if (Flags.useOnBindingDied()) {
-                return;
-            }
             if (DEBUG) Slog.d(TAG, "binderDied " + this);
             // Remove the service, but don't unbind from the service. The system will bring the
             // service back up, and the onServiceConnected handler will read the service with the

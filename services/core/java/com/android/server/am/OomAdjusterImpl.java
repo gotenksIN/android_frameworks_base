@@ -59,32 +59,32 @@ import static com.android.server.am.ActivityManagerService.TAG_BACKUP;
 import static com.android.server.am.ActivityManagerService.TAG_OOM_ADJ;
 import static com.android.server.am.ActivityManagerService.TAG_UID_OBSERVERS;
 import static com.android.server.am.ProcessCachedOptimizerRecord.SHOULD_NOT_FREEZE_REASON_BINDER_ALLOW_OOM_MANAGEMENT;
-import static com.android.server.am.ProcessList.BACKUP_APP_ADJ;
-import static com.android.server.am.ProcessList.CACHED_APP_MAX_ADJ;
-import static com.android.server.am.ProcessList.CACHED_APP_MIN_ADJ;
-import static com.android.server.am.ProcessList.FOREGROUND_APP_ADJ;
-import static com.android.server.am.ProcessList.HEAVY_WEIGHT_APP_ADJ;
-import static com.android.server.am.ProcessList.HOME_APP_ADJ;
-import static com.android.server.am.ProcessList.NATIVE_ADJ;
-import static com.android.server.am.ProcessList.PERCEPTIBLE_APP_ADJ;
-import static com.android.server.am.ProcessList.PERCEPTIBLE_LOW_APP_ADJ;
-import static com.android.server.am.ProcessList.PERCEPTIBLE_MEDIUM_APP_ADJ;
-import static com.android.server.am.ProcessList.PERCEPTIBLE_RECENT_FOREGROUND_APP_ADJ;
-import static com.android.server.am.ProcessList.PERSISTENT_PROC_ADJ;
-import static com.android.server.am.ProcessList.PERSISTENT_SERVICE_ADJ;
-import static com.android.server.am.ProcessList.PREVIOUS_APP_ADJ;
-import static com.android.server.am.ProcessList.PREVIOUS_APP_MAX_ADJ;
-import static com.android.server.am.ProcessList.SCHED_GROUP_BACKGROUND;
-import static com.android.server.am.ProcessList.SCHED_GROUP_DEFAULT;
-import static com.android.server.am.ProcessList.SCHED_GROUP_RESTRICTED;
-import static com.android.server.am.ProcessList.SCHED_GROUP_TOP_APP;
-import static com.android.server.am.ProcessList.SCHED_GROUP_TOP_APP_BOUND;
-import static com.android.server.am.ProcessList.SERVICE_ADJ;
-import static com.android.server.am.ProcessList.SERVICE_B_ADJ;
-import static com.android.server.am.ProcessList.SYSTEM_ADJ;
-import static com.android.server.am.ProcessList.UNKNOWN_ADJ;
-import static com.android.server.am.ProcessList.VISIBLE_APP_ADJ;
-import static com.android.server.am.ProcessList.VISIBLE_APP_MAX_ADJ;
+import static com.android.server.am.psc.Constants.BACKUP_APP_ADJ;
+import static com.android.server.am.psc.Constants.CACHED_APP_MAX_ADJ;
+import static com.android.server.am.psc.Constants.CACHED_APP_MIN_ADJ;
+import static com.android.server.am.psc.Constants.FOREGROUND_APP_ADJ;
+import static com.android.server.am.psc.Constants.HEAVY_WEIGHT_APP_ADJ;
+import static com.android.server.am.psc.Constants.HOME_APP_ADJ;
+import static com.android.server.am.psc.Constants.NATIVE_ADJ;
+import static com.android.server.am.psc.Constants.PERCEPTIBLE_APP_ADJ;
+import static com.android.server.am.psc.Constants.PERCEPTIBLE_LOW_APP_ADJ;
+import static com.android.server.am.psc.Constants.PERCEPTIBLE_MEDIUM_APP_ADJ;
+import static com.android.server.am.psc.Constants.PERCEPTIBLE_RECENT_FOREGROUND_APP_ADJ;
+import static com.android.server.am.psc.Constants.PERSISTENT_PROC_ADJ;
+import static com.android.server.am.psc.Constants.PERSISTENT_SERVICE_ADJ;
+import static com.android.server.am.psc.Constants.PREVIOUS_APP_ADJ;
+import static com.android.server.am.psc.Constants.PREVIOUS_APP_MAX_ADJ;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_BACKGROUND;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_DEFAULT;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_RESTRICTED;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_TOP_APP;
+import static com.android.server.am.psc.Constants.SCHED_GROUP_TOP_APP_BOUND;
+import static com.android.server.am.psc.Constants.SERVICE_ADJ;
+import static com.android.server.am.psc.Constants.SERVICE_B_ADJ;
+import static com.android.server.am.psc.Constants.SYSTEM_ADJ;
+import static com.android.server.am.psc.Constants.UNKNOWN_ADJ;
+import static com.android.server.am.psc.Constants.VISIBLE_APP_ADJ;
+import static com.android.server.am.psc.Constants.VISIBLE_APP_MAX_ADJ;
 import static com.android.server.am.psc.PlatformCompatCache.CACHED_COMPAT_CHANGE_CAMERA_MICROPHONE_CAPABILITY;
 import static com.android.server.am.psc.PlatformCompatCache.CACHED_COMPAT_CHANGE_PROCESS_CAPABILITY;
 
@@ -107,6 +107,7 @@ import com.android.server.am.psc.ActiveUidsInternal;
 import com.android.server.am.psc.ConnectionRecordInternal;
 import com.android.server.am.psc.ContentProviderConnectionInternal;
 import com.android.server.am.psc.ContentProviderRecordInternal;
+import com.android.server.am.psc.ProcessListInternal;
 import com.android.server.am.psc.ProcessProviderRecordInternal;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.am.psc.ProcessServiceRecordInternal;
@@ -252,7 +253,7 @@ public class OomAdjusterImpl extends OomAdjuster {
 
     /**
      * A container node in the {@link LinkedProcessRecordList},
-     * holding the references to {@link ProcessRecord}.
+     * holding the references to {@link ProcessRecordInternal}.
      * TODO(b/425766486): Change to package-private after moving the class to the psc package.
      */
     public static class ProcessRecordNode {
@@ -270,9 +271,9 @@ public class OomAdjusterImpl extends OomAdjuster {
 
         @Nullable ProcessRecordNode mPrev;
         @Nullable ProcessRecordNode mNext;
-        final @Nullable ProcessRecord mApp;
+        final @Nullable ProcessRecordInternal mApp;
 
-        ProcessRecordNode(@Nullable ProcessRecord app) {
+        ProcessRecordNode(@Nullable ProcessRecordInternal app) {
             mApp = app;
         }
 
@@ -351,7 +352,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             }
         }
 
-        ProcessRecord poll() {
+        ProcessRecordInternal poll() {
             ProcessRecordNode node = null;
             final int size = mProcessRecordNodes.length;
             // Find the next node.
@@ -615,10 +616,11 @@ public class OomAdjusterImpl extends OomAdjuster {
     private final ComputeConnectionsConsumer mComputeConnectionsConsumer =
             new ComputeConnectionsConsumer();
 
-    OomAdjusterImpl(ActivityManagerService service, ProcessList processList,
-            ActiveUids activeUids, ServiceThread adjusterThread, GlobalState globalState,
-            Injector injector, Callback callback) {
-        super(service, processList, activeUids, adjusterThread, globalState, injector, callback);
+    OomAdjusterImpl(ActivityManagerService service, ProcessListInternal processList,
+            ActiveUids activeUids, ServiceThread adjusterThread, Constants oomConstants,
+            GlobalState globalState, Injector injector, Callback callback) {
+        super(service, processList, activeUids, adjusterThread, oomConstants, globalState, injector,
+                callback);
 
         if(mPerfBoost != null) {
             mIsTopAppRenderThreadBoostEnabled = Boolean.parseBoolean(mPerfBoost.perfGetProp("vendor.perf.topAppRenderThreadBoost.enable", "false"));
@@ -691,7 +693,8 @@ public class OomAdjusterImpl extends OomAdjuster {
 
     @GuardedBy({"mService", "mProcLock"})
     @Override
-    protected boolean performUpdateOomAdjLSP(ProcessRecord app, @OomAdjReason int oomAdjReason) {
+    protected boolean performUpdateOomAdjLSP(ProcessRecordInternal app,
+            @OomAdjReason int oomAdjReason) {
         mPendingProcessSet.add(app);
         performUpdateOomAdjPendingTargetsLocked(oomAdjReason);
         return true;
@@ -767,7 +770,7 @@ public class OomAdjusterImpl extends OomAdjuster {
     @GuardedBy({"mService", "mProcLock"})
     private void computeConnectionsLSP() {
         // 1st pass, iterate all nodes in order of procState importance.
-        ProcessRecord proc = mProcessRecordProcStateNodes.poll();
+        ProcessRecordInternal proc = mProcessRecordProcStateNodes.poll();
         while (proc != null) {
             mTmpOomAdjusterArgs.mApp = proc;
             mComputeConnectionsConsumer.accept(mTmpOomAdjusterArgs);
@@ -856,7 +859,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             final UidRecord ur = activeUids.valueAt(i);
             ur.reset();
             for (int j = ur.getNumOfProcs() - 1; j >= 0; j--) {
-                final ProcessRecord proc = ur.getProcessRecordByIndex(j);
+                final ProcessRecordInternal proc = ur.getProcessRecordByIndex(j);
                 updateAppUidRecIfNecessaryLSP(proc);
             }
         }
@@ -1164,11 +1167,9 @@ public class OomAdjusterImpl extends OomAdjuster {
         app.setShouldNotFreeze(uidRec != null && uidRec.isCurAllowListed(), false /* dryRun */,
                 ProcessCachedOptimizerRecord.SHOULD_NOT_FREEZE_REASON_UID_ALLOWLISTED, mAdjSeq);
 
-        final boolean reportDebugMsgs =
-                DEBUG_OOM_ADJ_REASON || mService.mCurOomAdjUid == app.getApplicationUid();
+        final boolean reportDebugMsgs = DEBUG_OOM_ADJ_REASON || mGlobalState.isDebugEnabled(app);
 
-        // TODO: b/425766486 - Use ProcessServiceRecordInternal directly.
-        final ProcessServiceRecord psr = (ProcessServiceRecord) app.getServices();
+        final ProcessServiceRecordInternal psr = app.getServices();
 
         if (app.getMaxAdj() <= FOREGROUND_APP_ADJ) {
             // The max adjustment doesn't allow this app to be anything
@@ -1305,12 +1306,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             // It's placed in a sched group based on the nature of the
             // broadcast as reflected by which queue it's active in.
             adj = FOREGROUND_APP_ADJ;
-            if (Flags.pushBroadcastStateToOomadjuster()) {
-                schedGroup = app.getReceivers().getBroadcastReceiverSchedGroup();
-            } else {
-                /// Priority was stored in mTmpSchedGroup by {@link #isReceivingBroadcast)
-                schedGroup = mTmpSchedGroup[0];
-            }
+            schedGroup = app.getReceivers().getBroadcastReceiverSchedGroup();
             app.setAdjType("broadcast");
             procState = ActivityManager.PROCESS_STATE_RECEIVER;
             if (reportDebugMsgs) {
@@ -1338,7 +1334,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             // As far as we know the process is empty.  We may change our mind later.
             schedGroup = SCHED_GROUP_BACKGROUND;
             // At this point we don't actually know the adjustment, assign to UNKNOWN_ADJ for now.
-            adj = ProcessList.UNKNOWN_ADJ;
+            adj = UNKNOWN_ADJ;
             procState = PROCESS_STATE_CACHED_EMPTY;
             app.setAdjType("cch-empty");
             if (reportDebugMsgs) {
@@ -1857,8 +1853,7 @@ public class OomAdjusterImpl extends OomAdjuster {
         final int prevSchedGroup = schedGroup;
         final int prevCapability = capability;
 
-        final boolean reportDebugMsgs =
-                DEBUG_OOM_ADJ_REASON || mService.mCurOomAdjUid == app.getApplicationUid();
+        final boolean reportDebugMsgs = DEBUG_OOM_ADJ_REASON || mGlobalState.isDebugEnabled(app);
 
         if (!dryRun) {
             app.setCurBoundByNonBgRestrictedApp(app.isCurBoundByNonBgRestrictedApp()
@@ -2310,8 +2305,7 @@ public class OomAdjusterImpl extends OomAdjuster {
         final int prevSchedGroup = schedGroup;
         final int prevCapability = capability;
 
-        final boolean reportDebugMsgs =
-                DEBUG_OOM_ADJ_REASON || mService.mCurOomAdjUid == app.getApplicationUid();
+        final boolean reportDebugMsgs = DEBUG_OOM_ADJ_REASON || mGlobalState.isDebugEnabled(app);
 
         // We always propagate PROCESS_CAPABILITY_BFSL to providers here,
         // but, right before actually setting it to the process,

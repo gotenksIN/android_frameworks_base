@@ -35,6 +35,7 @@ import android.window.RemoteTransition
 import com.android.app.displaylib.PerDisplayRepository
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.systemui.ActivityIntentHelper
+import com.android.systemui.Flags
 import com.android.systemui.Flags.shadeAppLaunchAnimationSkipInDesktop
 import com.android.systemui.animation.ActivityTransitionAnimator
 import com.android.systemui.animation.DelegateTransitionAnimatorController
@@ -146,10 +147,18 @@ constructor(
                 ): ActivityTransitionAnimator.Controller {
                     val baseController = controllerFactory.createController(forLaunch)
                     val rootView = baseController.transitionContainer.rootView
-                    val controllerFromStatusBar: Optional<ActivityTransitionAnimator.Controller> =
-                        statusBarWindowControllerStore.defaultDisplay
-                            .wrapAnimationControllerIfInStatusBar(rootView, baseController)
-                    return if (controllerFromStatusBar.isPresent) {
+                    val statusBarWindowController =
+                        if (Flags.activityStarterDisplayAware()) {
+                            statusBarWindowControllerStore.forDisplay(rootView.context.displayId)
+                        } else {
+                            statusBarWindowControllerStore.defaultDisplay
+                        }
+                    val controllerFromStatusBar: Optional<ActivityTransitionAnimator.Controller>? =
+                        statusBarWindowController?.wrapAnimationControllerIfInStatusBar(
+                            rootView,
+                            baseController,
+                        )
+                    return if (controllerFromStatusBar?.isPresent == true) {
                         controllerFromStatusBar.get()
                     } else {
                         baseController
@@ -684,12 +693,18 @@ constructor(
             return null
         }
         val rootView = animationController.transitionContainer.rootView
-        val controllerFromStatusBar: Optional<ActivityTransitionAnimator.Controller> =
-            statusBarWindowControllerStore.defaultDisplay.wrapAnimationControllerIfInStatusBar(
+        val statusBarWindowController =
+            if (Flags.activityStarterDisplayAware()) {
+                statusBarWindowControllerStore.forDisplay(rootView.context.displayId)
+            } else {
+                statusBarWindowControllerStore.defaultDisplay
+            }
+        val controllerFromStatusBar: Optional<ActivityTransitionAnimator.Controller>? =
+            statusBarWindowController?.wrapAnimationControllerIfInStatusBar(
                 rootView,
                 animationController,
             )
-        if (controllerFromStatusBar.isPresent) {
+        if (controllerFromStatusBar?.isPresent == true) {
             return controllerFromStatusBar.get()
         }
 
@@ -802,12 +817,28 @@ constructor(
     ): Boolean {
         // TODO(b/294418322): always support launch animations when occluded.
         val ignoreOcclusion = showOverLockscreen || isCommunalWidgetLaunch()
+        val skipInDesktopFlag = shadeAppLaunchAnimationSkipInDesktop()
+        val isDesktopMode = isInDesktopModeOnCurrentShadeDisplay
+        val isDesktopFirst = desktopFirstRepository.isDisplayDesktopFirst(currentShadeDisplayId)
+        val keyguardShowing = keyguardStateController.isShowing
+
+        Log.i(
+            TAG,
+            "shouldAnimateLaunch: " +
+                "isActivityIntent=$isActivityIntent, " +
+                "showOverLockscreen=$showOverLockscreen, " +
+                "ignoreOcclusion=$ignoreOcclusion, " +
+                "skipInDesktopFlag=$skipInDesktopFlag, " +
+                "isInDesktopModeOnCurrentShadeDisplay=$isDesktopMode, " +
+                "isDisplayDesktopFirst=$isDesktopFirst, " +
+                "isKeyguardShowing=$keyguardShowing",
+        )
         if (keyguardStateController.isOccluded && !ignoreOcclusion) {
             return false
         }
 
         if (
-            shadeAppLaunchAnimationSkipInDesktop() &&
+            skipInDesktopFlag &&
                 (isInDesktopModeOnCurrentShadeDisplay ||
                     desktopFirstRepository.isDisplayDesktopFirst(currentShadeDisplayId))
         ) {
@@ -816,7 +847,7 @@ constructor(
 
         // Always animate if we are not showing the keyguard or if we animate over the lockscreen
         // (without unlocking it).
-        if (showOverLockscreen || !keyguardStateController.isShowing) {
+        if (showOverLockscreen || !keyguardShowing) {
             return true
         }
 

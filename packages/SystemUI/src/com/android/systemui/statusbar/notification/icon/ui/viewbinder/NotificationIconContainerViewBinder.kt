@@ -63,6 +63,7 @@ object NotificationIconContainerViewBinder {
         failureTracker: StatusBarIconViewBindingFailureTracker,
         viewStore: IconViewStore,
     ): Unit = coroutineScope {
+        view.setLogTag("statusbar")
         launch {
             val contrastColorUtil = ContrastColorUtil.getInstance(view.context)
             val iconColors: StateFlow<NotificationIconColors> =
@@ -106,6 +107,7 @@ object NotificationIconContainerViewBinder {
         viewStore: IconViewStore,
     ): Unit = coroutineScope {
         view.setUseIncreasedIconScale(true)
+        view.setLogTag("aod")
         launch {
             // Collect state shared across all icon views, so that we are not duplicating collects
             // for each individual icon.
@@ -286,6 +288,16 @@ object NotificationIconContainerViewBinder {
                             }
                             if (actual === expected) {
                                 continue
+                            }
+                            if (expected.parent !== view) {
+                                val viewGroup = expected.parent as? ViewGroup
+                                viewGroup?.also {
+                                    Log.e(
+                                        TAG,
+                                        "re-sort[$logTag]: View parent is changed!\nold parent = $it, new parent = $view, expected = $expected",
+                                    )
+                                    it.removeView(expected)
+                                }
                             }
                             view.removeView(expected)
                             view.addView(expected, i)

@@ -612,7 +612,7 @@ public class BubbleTransitions {
             mTaskViewTransitions.enqueueRunningExternal(tv.getController(), mTransition);
             // TODO(b/456051408): this should not be needed after we support switch in root task
             if (BubbleAnythingFlagHelper.enableRootTaskForBubble()
-                    && mBubble.getTaskView().isInitialized()) {
+                    && mBubble.getTaskView().isSurfaceCreated()) {
                 surfaceCreated();
             }
         }
@@ -1456,7 +1456,7 @@ public class BubbleTransitions {
         private void cleanup() {
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "LaunchOrConvertToBubble.cleanup(): removeCookie=%s",
                     mLaunchCookie.binder);
-            if (!mHasPlayed && com.android.window.flags.Flags.fixBubbleTrampolineLaunchTwice()) {
+            if (!mHasPlayed) {
                 // Cleanup the new Bubble which is never used.
                 // This would happen when the animation is aborted.
                 mBubbleData.dismissBubbleWithKey(mBubble.getKey(),

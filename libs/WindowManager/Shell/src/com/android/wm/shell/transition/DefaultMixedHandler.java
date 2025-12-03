@@ -337,9 +337,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 return true;
             }
             if (MixedTransition.isAppBubbleTypeTransition(mType)) {
-                if (com.android.window.flags.Flags.fixBubbleTrampolineLaunchTwice()) {
-                    return mBubbleTransitions.canAnimateTransition(transition, info);
-                }
+                return mBubbleTransitions.canAnimateTransition(transition, info);
             } else {
                 // The previously resolved mixed handler is no longer relevant, and we can replace
                 // it entirely because there are only opening bubble tasks in the changes.
@@ -348,7 +346,6 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 return openingAppBubbleChangeIndexes.isEmpty()
                         || openingAppBubbleChangeIndexes.size() != info.getChanges().size();
             }
-            return true;
         }
     }
 

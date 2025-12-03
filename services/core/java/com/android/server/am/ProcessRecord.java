@@ -397,6 +397,11 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     final ProcessCachedOptimizerRecord mOptRecord;
 
     /**
+     * The MemoryLimiter associated with this process.  The limiter may be null.
+     */
+    private final MemoryLimiter mMemoryLimiter;
+
+    /**
      * The preceding instance of the process, which would exist when the previous process is killed
      * but not fully dead yet; in this case, the new instance of the process should be held until
      * this preceding instance is fully dead.
@@ -620,6 +625,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         mErrorState = new ProcessErrorStateRecord(this);
         mWindowProcessController = new WindowProcessController(
                 mService.mActivityTaskManager, info, processName, uid, userId, this, this);
+        mMemoryLimiter = new MemoryLimiter();
 
         mOptRecord = new ProcessCachedOptimizerRecord(this);
         final long now = SystemClock.uptimeMillis();
@@ -699,6 +705,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         }
         mPid = pid;
         mWindowProcessController.setPid(pid);
+        mMemoryLimiter.setPidUid(getPid(), (mUidRecord != null) ? mUidRecord.getUid() : 0);
         mShortStringName = null;
         mStringName = null;
         synchronized (mProfile.mProfilerLock) {
@@ -1598,6 +1605,10 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         // Release the lock before calling the notifier, in case that calls back into AM.
         if (t != null) t.onProcessPausedCancelled();
         mServices.onProcessFrozenCancelled();
+    }
+
+    void onProcStateUpdated() {
+        mMemoryLimiter.onProcStateUpdated(getCurProcState());
     }
 
     /*

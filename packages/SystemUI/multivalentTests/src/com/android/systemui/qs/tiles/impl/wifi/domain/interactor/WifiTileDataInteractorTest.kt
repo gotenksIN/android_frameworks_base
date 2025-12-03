@@ -147,8 +147,7 @@ class WifiTileDataInteractorTest(flags: FlagsParameterization) : SysuiTestCase()
                     icon = WifiTileIconModel(R.drawable.ic_signal_wifi_off),
                     secondaryLabel = null,
                 )
-            assertThat(tileData?.icon).isEqualTo(expectedModel.icon)
-            assertThat(tileData?.secondaryLabel).isEqualTo(expectedModel.secondaryLabel)
+            assertThat(tileData).isEqualTo(expectedModel)
         }
 
     @Test
@@ -156,6 +155,7 @@ class WifiTileDataInteractorTest(flags: FlagsParameterization) : SysuiTestCase()
         kosmos.runTest {
             val tileData by collectLastValue(underTest.tileData())
 
+            wifiRepository.setIsWifiEnabled(true)
             wifiRepository.setToggleState(WifiToggleState.Pausing)
 
             val expectedModel =
@@ -172,6 +172,7 @@ class WifiTileDataInteractorTest(flags: FlagsParameterization) : SysuiTestCase()
         kosmos.runTest {
             val tileData by collectLastValue(underTest.tileData())
 
+            wifiRepository.setIsWifiEnabled(true)
             wifiRepository.setToggleState(WifiToggleState.Scanning)
 
             val expectedModel =

@@ -5330,7 +5330,8 @@ public final class ActiveServices {
                                                             sInfo.name);
                 ComponentName name = comp != null ? comp : className;
                 if (!mAm.validateAssociationAllowedLocked(callingPackage, callingUid,
-                        name.getPackageName(), sInfo.applicationInfo.uid)) {
+                        name.getPackageName(), sInfo.applicationInfo.uid,
+                        ActivityManagerService.ASSOCIATION_TYPE_SERVICE)) {
                     String msg = "association not allowed between packages "
                             + callingPackage + " and " + name.getPackageName();
                     Slog.w(TAG, "Service lookup failed: " + msg);
@@ -5496,8 +5497,9 @@ public final class ActiveServices {
                                 0, UserHandle.getUserId(callingUid));
             } catch (PackageManager.NameNotFoundException e) {
             }
-            if (!mAm.validateAssociationAllowedLocked(callingPackage, callingUid, r.packageName,
-                    r.appInfo.uid)) {
+            if (!mAm.validateAssociationAllowedLocked(callingPackage, callingUid,
+                    r.packageName, r.appInfo.uid,
+                    ActivityManagerService.ASSOCIATION_TYPE_SERVICE)) {
                 String msg = "association not allowed between packages "
                         + callingPackage + " and " + r.packageName;
                 Slog.w(TAG, "Service lookup failed: " + msg);

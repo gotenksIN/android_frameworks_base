@@ -16,10 +16,9 @@
 
 package com.android.server.theming;
 
-import static com.android.server.theming.ThemeOverlayHelper.createDynamicOverlay;
-
 import android.annotation.NonNull;
 import android.annotation.UserIdInt;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.theming.IThemeChangedCallback;
 import android.content.theming.IThemeSettingsCallback;
@@ -56,6 +55,7 @@ public class ThemeManagerInternal {
     private final ThemeStateManager mStateManager;
     private final ThemeSettingsManager mThemeSettingsManager;
     private final SystemPropertiesReader mSystemPropertiesReader;
+    private final ThemeOverlayHelper mOverlayHelper;
 
     private final Object mLock = new Object();
 
@@ -67,15 +67,14 @@ public class ThemeManagerInternal {
     private final SparseArray<RemoteCallbackList<IThemeChangedCallback>> mThemeChangedListeners =
             new SparseArray<>();
 
-    @GuardedBy("mLock")
-    private final SparseArray<ThemeSettings> mCurrentSettings = new SparseArray<>();
-
     ThemeManagerInternal(Context context, ThemeSettingsManager themeSettingsManager,
-            SystemPropertiesReader systemPropertiesReader, ThemeStateManager stateManager) {
+            SystemPropertiesReader systemPropertiesReader, ThemeStateManager stateManager,
+            ThemeOverlayHelper overlayHelper) {
         mContext = context;
         mStateManager = stateManager;
         mThemeSettingsManager = themeSettingsManager;
         mSystemPropertiesReader = systemPropertiesReader;
+        mOverlayHelper = overlayHelper;
     }
 
     /**
@@ -115,8 +114,7 @@ public class ThemeManagerInternal {
      * @param options The {@link ThemeInfo} with the desired seed color, style, and contrast.
      * @return The generated {@link FabricatedOverlayInternal}.
      */
-    public FabricatedOverlayInternal generateDynamicColorOverlay(int userId,
-            ThemeInfo options) {
+    public FabricatedOverlayInternal generateDynamicColorOverlay(int userId, ThemeInfo options) {
         ThemeState state = mStateManager.getState(userId).getCurrentState();
 
         int newSeed = Optional.ofNullable(options.seedColor).map(Color::toArgb).orElse(
@@ -127,7 +125,7 @@ public class ThemeManagerInternal {
         ColorScheme newDarkScheme = new ColorScheme(newSeed, true, newStyle, newContrast);
         ColorScheme newLightScheme = new ColorScheme(newSeed, false, newStyle, newContrast);
 
-        return createDynamicOverlay(newLightScheme, newDarkScheme).getInternal();
+        return mOverlayHelper.createDynamicOverlay(newLightScheme, newDarkScheme).getInternal();
     }
 
     /**
@@ -138,20 +136,15 @@ public class ThemeManagerInternal {
      */
     public ThemeInfo getUserThemeInfo(int userId) {
         ThemeState state = mStateManager.getState(userId).getCurrentState();
-        return new ThemeInfo(
-                Color.valueOf(state.seedColor()),
-                state.style(),
-                state.contrast(),
-                DynamicScheme.DEFAULT_SPEC_VERSION.name(),
-                DynamicScheme.DEFAULT_PLATFORM.name());
+        return new ThemeInfo(Color.valueOf(state.seedColor()), state.style(), state.contrast(),
+                DynamicScheme.DEFAULT_SPEC_VERSION.name(), DynamicScheme.DEFAULT_PLATFORM.name());
     }
 
-    void notifySettingsChange(@UserIdInt int userId, ThemeSettings newSettings) {
+    void notifySettingsChange(@UserIdInt int userId, ThemeSettings oldSettings,
+            ThemeSettings newSettings) {
         final RemoteCallbackList<IThemeSettingsCallback> userListeners;
-        final ThemeSettings oldSettings;
         synchronized (mLock) {
             userListeners = mSettingsListeners.get(userId);
-            oldSettings = mCurrentSettings.get(userId);
         }
 
         if (userListeners != null) {
@@ -191,9 +184,8 @@ public class ThemeManagerInternal {
                 mSettingsListeners.put(userId, userListeners);
             }
 
-            if (mCurrentSettings.get(userId) == null) {
-                mCurrentSettings.put(userId, getThemeSettings(userId));
-            }
+            // Ensure settings are loaded into cache so there is a baseline for oldSettings
+            getThemeSettings(userId);
 
             return userListeners.register(cb);
         }
@@ -205,7 +197,7 @@ public class ThemeManagerInternal {
      * <p>This method allows clients to unregister an {@link IThemeSettingsCallback}
      * that was previously registered using
      * {@link #registerThemeSettingsCallback(int, IThemeSettingsCallback)}}.
- *
+     *
      * @param userId The ID of a Full User to unregister the callback from.
      * @param cb     The {@link IThemeSettingsCallback} to unregister.
      * @return {@code true} if the callback was successfully unregistered, {@code false} otherwise.
@@ -222,7 +214,7 @@ public class ThemeManagerInternal {
 
             if (userListeners.getRegisteredCallbackCount() == 0) {
                 mSettingsListeners.remove(userId);
-                mCurrentSettings.remove(userId);
+                // Deliberately keeping cache for future `oldSettings` baseline
             }
 
             return didRemove;
@@ -232,7 +224,7 @@ public class ThemeManagerInternal {
     /**
      * Registers a callback for theme changed events.
      *
-     * @param userId The ID of a Full User to register the callback for.
+     * @param userId   The ID of a Full User to register the callback for.
      * @param callback The {@link IThemeChangedCallback}  to add.
      */
     public void registerThemeChangedCallback(@UserIdInt int userId,
@@ -251,7 +243,7 @@ public class ThemeManagerInternal {
     /**
      * Unregisters a callback for theme changed events.
      *
-     * @param userId The ID of a Full User to unregister the callback from.
+     * @param userId   The ID of a Full User to unregister the callback from.
      * @param callback The The {@link IThemeChangedCallback}  to remove.
      */
     public void unregisterThemeChangedCallback(@UserIdInt int userId,
@@ -282,18 +274,14 @@ public class ThemeManagerInternal {
      *                    If the userId is not a full user, it will throw an exception.
      */
     public boolean updateThemeSettings(@UserIdInt int userId, ThemeSettings newSettings) {
-        try {
-            Context userContext = mContext.createContextAsUser(UserHandle.of(userId),
-                    Context.CONTEXT_IGNORE_SECURITY);
-            mThemeSettingsManager.writeSettings(userId, userContext.getContentResolver(),
-                    newSettings);
-            synchronized (mLock) {
-                mCurrentSettings.put(userId, newSettings);
-            }
-            return true;
-        } catch (Exception e) {
-            return false;
+        ContentResolver resolver = mContext.createContextAsUser(UserHandle.of(userId),
+                Context.CONTEXT_IGNORE_SECURITY).getContentResolver();
+        ThemeSettings oldSettings = mThemeSettingsManager.getSettings(userId, resolver);
+        boolean success = mThemeSettingsManager.setSettings(userId, resolver, newSettings);
+        if (success) {
+            notifySettingsChange(userId, oldSettings, newSettings);
         }
+        return success;
     }
 
     /**
@@ -306,13 +294,9 @@ public class ThemeManagerInternal {
      * or {@code null} if an error occurs or no settings are found.
      */
     public ThemeSettings getThemeSettings(@UserIdInt int userId) {
-        try {
-            Context userContext = mContext.createContextAsUser(UserHandle.of(userId),
-                    Context.CONTEXT_IGNORE_SECURITY);
-            return mThemeSettingsManager.readSettings(userId, userContext.getContentResolver());
-        } catch (Exception e) {
-            throw new RuntimeException(e.getMessage());
-        }
+        return mThemeSettingsManager.getSettings(userId,
+                mContext.createContextAsUser(UserHandle.of(userId),
+                        Context.CONTEXT_IGNORE_SECURITY).getContentResolver());
     }
 
     /**

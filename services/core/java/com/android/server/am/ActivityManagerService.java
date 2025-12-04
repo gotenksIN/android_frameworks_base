@@ -226,6 +226,7 @@ import android.Manifest;
 import android.Manifest.permission;
 import android.annotation.EnforcePermission;
 import android.annotation.FlaggedApi;
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.PermissionMethod;
@@ -636,6 +637,32 @@ public class ActivityManagerService extends IActivityManager.Stub
     // How long we allow a receiver to run before giving up on it.
     static final int BROADCAST_FG_TIMEOUT = 10 * 1000 * Build.HW_TIMEOUT_MULTIPLIER;
     static final int BROADCAST_BG_TIMEOUT = 60 * 1000 * Build.HW_TIMEOUT_MULTIPLIER;
+
+
+    // The type of association between two apps.
+    // @hide
+    @IntDef(prefix = {"ASSOCIATION_TYPE_"}, value = {
+            ASSOCIATION_TYPE_PROVIDER,
+            ASSOCIATION_TYPE_RECEIVER,
+            ASSOCIATION_TYPE_SERVICE,
+    })
+    public @interface AssociationType {}
+
+    /**
+     * A content provider association.
+     * @hide
+     */
+    public static final int ASSOCIATION_TYPE_PROVIDER = 1;
+    /**
+     * A broadcast receiver association.
+     * @hide
+     */
+    public static final int ASSOCIATION_TYPE_RECEIVER = 2;
+    /**
+     * A service association.
+     * @hide
+     */
+    public static final int ASSOCIATION_TYPE_SERVICE = 3;
 
     public static final int MY_PID = myPid();
 
@@ -2485,6 +2512,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 .setHandlerThread(handlerThread)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
+        MemoryLimiter.init();
 
         mIntentFirewall = injector.getIntentFirewall();
         mProcessStats = new ProcessStatsService(this, mContext.getCacheDir());
@@ -2559,6 +2587,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 .setProcessLruUpdater(mProcessList)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
+        MemoryLimiter.init();
 
         mBroadcastQueue = mInjector.getBroadcastQueue(this);
         mBroadcastController = new BroadcastController(mContext, this, mBroadcastQueue);
@@ -2699,13 +2728,14 @@ public class ActivityManagerService extends IActivityManager.Stub
      * <p> If either of the packages are running as  part of the core system, then the
      * association is implicitly allowed.
      */
-    boolean validateAssociationAllowedLocked(String pkg1, int uid1, String pkg2, int uid2) {
+    boolean validateAssociationAllowedLocked(String pkg1, int uid1, String pkg2, int uid2,
+            @AssociationType int associationType) {
         boolean callerOrTargetIsPcc = false;
         if (enablePccFrameworkSupport()) {
             callerOrTargetIsPcc =
                     Process.isPrivateComputeCoreUid(uid1) || Process.isPrivateComputeCoreUid(uid2);
             if (callerOrTargetIsPcc && validateAssociationAllowedForPccLocked(
-                    uid1, pkg1, uid2, pkg2)) {
+                    uid1, pkg1, uid2, pkg2, associationType)) {
                 return true;
             }
         }
@@ -2745,14 +2775,15 @@ public class ActivityManagerService extends IActivityManager.Stub
      * {@code targetPackage} running under user handle {@code targetUid}.
      */
     boolean validateAssociationAllowedForPccLocked(
-            int callerUid, String callerPackage, int targetUid, String targetPackage) {
+            int callerUid, String callerPackage, int targetUid, String targetPackage,
+            @AssociationType int associationType) {
         final PccSandboxManagerInternal pccSandboxManagerInternal =
                 LocalServices.getService(PccSandboxManagerInternal.class);
         if (pccSandboxManagerInternal == null) {
             return false;
         }
         return pccSandboxManagerInternal.validateAssociationAllowed(
-                callerUid, callerPackage, targetUid, targetPackage);
+                callerUid, callerPackage, targetUid, targetPackage, associationType);
     }
 
     /**
@@ -19891,6 +19922,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                     Slog.d(TAG_OOM_ADJ, msg);
                     reportOomAdjMessageLocked(msg);
                 }
+
+                app.onProcStateUpdated();
 
                 final boolean setImportant = app.getSetProcState() < PROCESS_STATE_SERVICE;
                 final boolean curImportant = app.getCurProcState() < PROCESS_STATE_SERVICE;

@@ -361,16 +361,6 @@ flag {
 }
 
 flag {
-    name: "enable_desktop_app_launch_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enabling an umbrella flag for various bugfixes related to app launch transitions."
-    bug: "353651446"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_desktop_app_launch_transitions"
     namespace: "lse_desktop_experience"
     description: "Enables custom transitions for app launches in Desktop Mode."
@@ -797,16 +787,6 @@ flag {
 }
 
 flag {
-    name: "enable_filter_removing_display_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Filter out removing display when reporting top display."
-    bug: "441826525"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_focus_transition_observer_cleanup"
     namespace: "lse_desktop_experience"
     description: "Enable migration from TaskInfo#isFocused to FocusTransitionObserver on per display focus use case"
@@ -939,16 +919,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Add new keyboard shortcut of moving a task into next display"
     bug: "364154795"
-}
-
-flag {
-    name: "enable_multi_display_home_focus_bug_fix"
-    namespace: "lse_desktop_experience"
-    description: "Fix home focus behavior in multi display environment"
-    bug: "371096166"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

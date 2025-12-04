@@ -81,7 +81,9 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
+// QTI_BEGIN: 2019-10-31: Core: Enable App Compaction for LOW_RAM Targets.
 import android.os.SystemProperties;
+// QTI_END: 2019-10-31: Core: Enable App Compaction for LOW_RAM Targets.
 import android.os.Trace;
 import android.provider.DeviceConfig;
 import android.provider.DeviceConfig.OnPropertiesChangedListener;
@@ -93,7 +95,9 @@ import android.util.EventLog;
 import android.util.IntArray;
 import android.util.Pair;
 import android.util.Slog;
+// QTI_BEGIN: 2020-04-17: Performance: AppCompaction
 import android.util.BoostFramework;
+// QTI_END: 2020-04-17: Performance: AppCompaction
 import android.util.SparseArray;
 
 import com.android.internal.annotations.GuardedBy;
@@ -127,8 +131,12 @@ public class CachedAppOptimizer {
 
     // Flags stored in the DeviceConfig API.
     @VisibleForTesting static final String KEY_USE_COMPACTION = "use_compaction";
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
     @VisibleForTesting static final String KEY_DEBUG_COMPACTION = "debug_compaction";
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
+// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
     @VisibleForTesting static final String KEY_COMPACTION_PRIORITY = "compaction_priority";
+// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
     @VisibleForTesting static final String KEY_USE_FREEZER = "use_freezer";
     @VisibleForTesting static final String KEY_COMPACT_THROTTLE_1 = "compact_throttle_1";
     @VisibleForTesting static final String KEY_COMPACT_THROTTLE_2 = "compact_throttle_2";
@@ -302,7 +310,9 @@ public class CachedAppOptimizer {
     @VisibleForTesting static final long DEFAULT_COMPACT_THROTTLE_1 = 5_000;
     @VisibleForTesting static final long DEFAULT_COMPACT_THROTTLE_2 = 10_000;
     @VisibleForTesting static final long DEFAULT_COMPACT_THROTTLE_3 = 500;
+// QTI_BEGIN: 2024-07-04: Performance: CachedAppOptimizer: Initialize compactProfile and compactTime
     @VisibleForTesting static final long DEFAULT_COMPACT_THROTTLE_4 = 5*60*1000;
+// QTI_END: 2024-07-04: Performance: CachedAppOptimizer: Initialize compactProfile and compactTime
     @VisibleForTesting static final long DEFAULT_COMPACT_THROTTLE_5 = 10 * 60 * 1000;
     @VisibleForTesting static final long DEFAULT_COMPACT_THROTTLE_6 = 10 * 60 * 1000;
     @VisibleForTesting static final long DEFAULT_ZRAM_WRITEBACK_WAIT_SECONDS = 10 * 60;
@@ -448,9 +458,13 @@ public class CachedAppOptimizer {
                 public void onPropertiesChanged(Properties properties) {
                     synchronized (mPhenotypeFlagLock) {
                         for (String name : properties.getKeyset()) {
+// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
                             if (KEY_USE_COMPACTION.equals(name) ||
+// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                                 KEY_COMPACTION_PRIORITY.equals(name) ||
                                 KEY_DEBUG_COMPACTION.equals(name)) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                                 updateUseCompaction();
                             } else if (KEY_COMPACT_THROTTLE_1.equals(name)
                                     || KEY_COMPACT_THROTTLE_2.equals(name)
@@ -551,11 +565,15 @@ public class CachedAppOptimizer {
             DEFAULT_ZRAM_WRITEBACK_WAIT_SECONDS;
     @GuardedBy("mPhenotypeFlagLock")
     private volatile boolean mUseCompaction = DEFAULT_USE_COMPACTION;
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
     private volatile boolean mDebugCompaction = DEBUG_COMPACTION;
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
     private volatile boolean mUseFreezer = false; // set to DEFAULT in init()
     @GuardedBy("this")
     private int mFreezerDisableCount = 1; // Freezer is initially disabled, until enabled
+// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
     public volatile int  mCompactionPriority = Process.THREAD_GROUP_BACKGROUND;
+// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
     private final Random mRandom = new Random();
     @GuardedBy("mPhenotypeFlagLock")
     @VisibleForTesting volatile float mCompactStatsdSampleRate = DEFAULT_STATSD_SAMPLE_RATE;
@@ -604,7 +622,9 @@ public class CachedAppOptimizer {
 
     private final ProcessDependencies mProcessDependencies;
     private final ProcLocksReader mProcLocksReader;
+// QTI_BEGIN: 2020-04-17: Performance: AppCompaction
     public static BoostFramework mPerf = new BoostFramework();
+// QTI_END: 2020-04-17: Performance: AppCompaction
     public static boolean vendorCompactAll = false;
 
     private final Freezer mFreezer;
@@ -625,7 +645,9 @@ public class CachedAppOptimizer {
         mAm = am;
         mProcLock = am.mProcLock;
         mCachedAppOptimizerThread = new ServiceThread("CachedAppOptimizerThread",
+// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
             mCompactionPriority, true);
+// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
         mProcStateThrottle = new HashSet<>();
         mProcessDependencies = processDependencies;
         mTestCallback = callback;
@@ -691,19 +713,26 @@ public class CachedAppOptimizer {
             updateMaxOomAdjThrottle();
             updateZramWritebackWait();
         }
+// QTI_BEGIN: 2020-09-29: Performance: AppCompaction handle reset of useCompaction due to ActivityManager Namespace flush.
         setAppCompactProperties();
     }
 
     private void setAppCompactProperties() {
+// QTI_END: 2020-09-29: Performance: AppCompaction handle reset of useCompaction due to ActivityManager Namespace flush.
+// QTI_BEGIN: 2020-04-17: Performance: AppCompaction
         boolean useCompaction =
                     Boolean.valueOf(mPerf.perfGetProp("vendor.appcompact.enable_app_compact",
                         "false"));
+// QTI_END: 2020-04-17: Performance: AppCompaction
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
         boolean debugCompaction =
                     Boolean.valueOf(mPerf.perfGetProp("vendor.appcompact.debug_app_compact",
                         "false"));
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
         vendorCompactAll =
                     Boolean.valueOf(mPerf.perfGetProp("vendor.appcompact.compactAll",
                         "true"));
+// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
         int threadPriority =
                     Integer.valueOf(mPerf.perfGetProp("vendor.appcompact.thread_priority",
                         String.valueOf(Process.THREAD_GROUP_BACKGROUND)));
@@ -712,6 +741,8 @@ public class CachedAppOptimizer {
         if (threadPriority != Process.THREAD_GROUP_SYSTEM)
             threadPriority = Process.THREAD_GROUP_BACKGROUND;
 
+// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
+// QTI_BEGIN: 2020-04-17: Performance: AppCompaction
         int someCompactionType =
                     Integer.valueOf(mPerf.perfGetProp("vendor.appcompact.some_compact_type",
                         String.valueOf(COMPACT_ACTION_ANON_FLAG)));
@@ -770,12 +801,17 @@ public class CachedAppOptimizer {
         DeviceConfig.setProperty(
                     DeviceConfig.NAMESPACE_ACTIVITY_MANAGER, KEY_USE_COMPACTION,
                         String.valueOf(useCompaction), true);
+// QTI_END: 2020-04-17: Performance: AppCompaction
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
         DeviceConfig.setProperty(
                     DeviceConfig.NAMESPACE_ACTIVITY_MANAGER, KEY_DEBUG_COMPACTION,
                         String.valueOf(debugCompaction), true);
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
+// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
         DeviceConfig.setProperty(
                     DeviceConfig.NAMESPACE_ACTIVITY_MANAGER, KEY_COMPACTION_PRIORITY,
                         String.valueOf(threadPriority), true);
+// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
     }
 
     /**
@@ -807,8 +843,12 @@ public class CachedAppOptimizer {
         pw.println("Compaction settings");
         synchronized (mPhenotypeFlagLock) {
             pw.println("  " + KEY_USE_COMPACTION + "=" + mUseCompaction);
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
             pw.println("  " + KEY_DEBUG_COMPACTION + "=" + mDebugCompaction);
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
+// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
             pw.println("  " + KEY_COMPACTION_PRIORITY  + "=" + mCompactionPriority);
+// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
             pw.println("  " + KEY_COMPACT_THROTTLE_1 + "=" + mCompactThrottleSomeSome);
             pw.println("  " + KEY_COMPACT_THROTTLE_2 + "=" + mCompactThrottleSomeFull);
             pw.println("  " + KEY_COMPACT_THROTTLE_3 + "=" + mCompactThrottleFullSome);
@@ -890,7 +930,9 @@ public class CachedAppOptimizer {
         mCompactStatsManager.logCompactionRequested(source, compactProfile, processName);
 
         if (!app.mOptRecord.hasPendingCompact()) {
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
             if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                 Slog.d(TAG_AM,
                         "compactApp " + app.mOptRecord.getReqCompactSource().name() + " "
                                 + app.mOptRecord.getReqCompactProfile().name() + " " + processName);
@@ -903,7 +945,9 @@ public class CachedAppOptimizer {
             return true;
         }
 
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
         if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
             Slog.d(TAG_AM,
                     " compactApp Skipped for " + app.processName + " pendingCompact= "
                             + app.mOptRecord.hasPendingCompact() + ". Requested compact profile: "
@@ -922,7 +966,9 @@ public class CachedAppOptimizer {
 
     void compactAllSystem() {
         if (useCompaction()) {
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
             if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                 Slog.d(TAG_AM, "compactAllSystem");
             }
 
@@ -995,21 +1041,27 @@ public class CachedAppOptimizer {
      */
     @GuardedBy("mPhenotypeFlagLock")
     private void updateUseCompaction() {
+// QTI_BEGIN: 2020-09-29: Performance: AppCompaction handle reset of useCompaction due to ActivityManager Namespace flush.
         // If this property is null there must have been some unexpected reset
         String useCompaction = DeviceConfig.getProperty(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER, KEY_USE_COMPACTION);
         if (useCompaction == null) {
             setAppCompactProperties();
         }
 
+// QTI_END: 2020-09-29: Performance: AppCompaction handle reset of useCompaction due to ActivityManager Namespace flush.
         mUseCompaction = DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER,
                     KEY_USE_COMPACTION, DEFAULT_USE_COMPACTION);
 
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
         mDebugCompaction = DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER,
                     KEY_DEBUG_COMPACTION, DEBUG_COMPACTION);
 
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
+// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
         mCompactionPriority = DeviceConfig.getInt(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER,
                     KEY_COMPACTION_PRIORITY, Process.THREAD_GROUP_BACKGROUND);
 
+// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
         if (mUseCompaction && mCompactionHandler == null) {
             if (!mCachedAppOptimizerThread.isAlive()) {
                 mCachedAppOptimizerThread.start();
@@ -1019,9 +1071,11 @@ public class CachedAppOptimizer {
             mCompactStatsManager = CompactionStatsManager.getInstance();
 
         }
+// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
 
         Process.setThreadGroupAndCpuset(mCachedAppOptimizerThread.getThreadId(),
                 mCompactionPriority);
+// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
     }
 
     /**
@@ -1121,8 +1175,10 @@ public class CachedAppOptimizer {
                 }
 
                 Process.setThreadGroupAndCpuset(mCachedAppOptimizerThread.getThreadId(),
+// QTI_BEGIN: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
                     mCompactionPriority);
 
+// QTI_END: 2021-07-06: Performance: appcompaction: Enable system compaction at bootup
             } else {
                 Slog.d(TAG_AM, "Freezer disabled");
                 enableFreezer(false);
@@ -1691,7 +1747,9 @@ public class CachedAppOptimizer {
         }
         if (cancelled) {
             mCompactStatsManager.logCompactionCancelled(cancelReason);
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
             if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                 Slog.d(TAG_AM,
                         "Cancelled pending or running compactions for process: " +
                                 app.processName != null ? app.processName : "" +
@@ -1744,7 +1802,9 @@ public class CachedAppOptimizer {
             if (swapFreePercent < COMPACT_DOWNGRADE_FREE_SWAP_THRESHOLD) {
                 profile = CompactProfile.SOME;
                 mCompactStatsManager.logCompactionDowngrade();
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                 if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                     Slog.d(TAG_AM,
                             "Downgraded compaction to "+ profile +" due to low swap."
                                     + " Swap Free% " + swapFreePercent);
@@ -1993,14 +2053,20 @@ public class CachedAppOptimizer {
 
         private boolean shouldOomAdjThrottleCompaction(ProcessRecord proc) {
             final String name = proc.processName;
+// QTI_BEGIN: 2023-04-05: Performance: CachedAppOptimizer: Fix persistent compact skipped
             final ProcessCachedOptimizerRecord opt = proc.mOptRecord;
             CompactSource compactSource = opt.getReqCompactSource();
+// QTI_END: 2023-04-05: Performance: CachedAppOptimizer: Fix persistent compact skipped
 
             // don't compact if the process has returned to perceptible
             // and this is only a cached/home/prev compaction
+// QTI_BEGIN: 2023-04-05: Performance: CachedAppOptimizer: Fix persistent compact skipped
             if (compactSource == CompactSource.APP
+// QTI_END: 2023-04-05: Performance: CachedAppOptimizer: Fix persistent compact skipped
                     && proc.getSetAdj() <= PERCEPTIBLE_APP_ADJ) {
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                 if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                     Slog.d(TAG_AM,
                             "Skipping compaction as process " + name + " is "
                                     + "now perceptible.");
@@ -2032,7 +2098,9 @@ public class CachedAppOptimizer {
                                     && (start - lastCompactTime < mCompactThrottleSomeSome))
                                 || (lastCompactProfile == CompactProfile.FULL
                                         && (start - lastCompactTime < mCompactThrottleSomeFull))) {
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                             if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                                 Slog.d(TAG_AM,
                                         "Skipping some compaction for " + name
                                                 + ": too soon. throttle=" + mCompactThrottleSomeSome
@@ -2046,7 +2114,9 @@ public class CachedAppOptimizer {
                                     && (start - lastCompactTime < mCompactThrottleFullSome))
                                 || (lastCompactProfile == CompactProfile.FULL
                                         && (start - lastCompactTime < mCompactThrottleFullFull))) {
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                             if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                                 Slog.d(TAG_AM,
                                         "Skipping full compaction for " + name
                                                 + ": too soon. throttle=" + mCompactThrottleFullSome
@@ -2064,7 +2134,9 @@ public class CachedAppOptimizer {
 
         private boolean shouldThrottleMiscCompaction(ProcessRecord proc, int procState) {
             if (mProcStateThrottle.contains(procState)) {
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                 if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                     final String name = proc.processName;
                     Slog.d(TAG_AM,
                             "Skipping full compaction for process " + name + "; proc state is "
@@ -2084,7 +2156,9 @@ public class CachedAppOptimizer {
 
             if (rssBefore[RSS_TOTAL_INDEX] == 0 && rssBefore[RSS_FILE_INDEX] == 0
                     && rssBefore[RSS_ANON_INDEX] == 0 && rssBefore[RSS_SWAP_INDEX] == 0) {
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                 if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                     Slog.d(TAG_AM,
                             "Skipping compaction for"
                                     + "process " + pid + " with no memory usage. Dead?");
@@ -2094,7 +2168,9 @@ public class CachedAppOptimizer {
 
             if (profile == CompactProfile.FULL) {
                 if (mFullAnonRssThrottleKb > 0L && anonRssBefore < mFullAnonRssThrottleKb) {
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                     if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                         Slog.d(TAG_AM,
                                 "Skipping full compaction for process " + name
                                         + "; anon RSS is too small: " + anonRssBefore + "KB.");
@@ -2108,7 +2184,9 @@ public class CachedAppOptimizer {
                             + Math.abs(rssBefore[RSS_ANON_INDEX] - lastRss[RSS_ANON_INDEX])
                             + Math.abs(rssBefore[RSS_SWAP_INDEX] - lastRss[RSS_SWAP_INDEX]);
                     if (absDelta <= mFullDeltaRssThrottleKb) {
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                         if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                             Slog.d(TAG_AM,
                                     "Skipping full compaction for process " + name
                                             + "; abs delta is too small: " + absDelta + "KB.");
@@ -2158,7 +2236,9 @@ public class CachedAppOptimizer {
                     boolean hasActivities;
                     synchronized (mProcLock) {
                         if (mPendingCompactionProcesses.isEmpty()) {
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                             if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                                 Slog.d(TAG_AM, "No processes pending compaction, bail out");
                             }
                             return;
@@ -2183,7 +2263,9 @@ public class CachedAppOptimizer {
                     long[] rssBefore;
                     if (pid == 0) {
                         // not a real process, either one being launched or one being killed
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                         if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                             Slog.d(TAG_AM, "Compaction failed, pid is 0");
                         }
                         mCompactStatsManager.logCompactionThrottled(
@@ -2221,7 +2303,9 @@ public class CachedAppOptimizer {
                         }
                     } else {
                         rssBefore = mProcessDependencies.getRss(pid);
+// QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                         if (mDebugCompaction) {
+// QTI_END: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
                             Slog.d(TAG_AM, "Forcing compaction for " + name);
                         }
                     }

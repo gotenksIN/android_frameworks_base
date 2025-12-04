@@ -293,11 +293,13 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         mContext.getContentResolver().registerContentObserver(Global.getUriFor(
                 Global.MOBILE_DATA + mSubscriptionInfo.getSubscriptionId()),
                 true, mObserver);
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
         mContext.getContentResolver().registerContentObserver(Global.getUriFor(Global.DATA_ROAMING),
                 true, mObserver);
         mContext.getContentResolver().registerContentObserver(Global.getUriFor(
                 Global.DATA_ROAMING + mSubscriptionInfo.getSubscriptionId()),
                 true, mObserver);
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
 // QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
         mContext.registerReceiver(mVolteSwitchObserver,
 // QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
@@ -849,8 +851,10 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
             }
         }
 // QTI_END: 2019-04-28: Android_UI: SystemUI: Rework qti feature
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
         mCurrentState.mobileDataEnabled = mPhone.isDataEnabled();
         mCurrentState.roamingDataEnabled = mPhone.isDataRoamingEnabled();
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
 
         notifyListenersIfNecessary();
     }
@@ -1044,6 +1048,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
     }
 
 // QTI_END: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
     private boolean showDataRatIcon() {
         boolean result = false;
         if ( mCurrentState.mobileDataEnabled ) {
@@ -1055,6 +1060,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
     }
 
     private int getEnhancementDataRatIcon() {
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
 // QTI_BEGIN: 2021-01-25: Android_UI: SystemUI: Don't show network type icon if device is in limited service
         return showDataRatIcon() && mCurrentState.connected ? getRatIconGroup().dataType : 0;
 // QTI_END: 2021-01-25: Android_UI: SystemUI: Don't show network type icon if device is in limited service
@@ -1076,12 +1082,16 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         }else {
             iconGroup = getNetworkTypeIconGroup();
 // QTI_END: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
         }
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
 // QTI_BEGIN: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
         return iconGroup;
 // QTI_END: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
+// QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
     }
 
+// QTI_END: 2020-03-31: Android_UI: SystemUI: Rat icon enhancement
 // QTI_BEGIN: 2020-06-01: Android_UI: SystemUI: support VoWIFI icons
     private boolean isVowifiAvailable() {
 // QTI_END: 2020-06-01: Android_UI: SystemUI: support VoWIFI icons

@@ -132,7 +132,9 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.service.voice.IVoiceInteractionSession;
 import android.text.TextUtils;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.Pools.SynchronizedPool;
 import android.util.Slog;
 import android.widget.Toast;
@@ -3264,7 +3266,9 @@ class ActivityStarter {
 
     /** Places {@link #mStartActivity} in {@code task} or an embedded {@link TaskFragment}. */
     private void addOrReparentStartingActivity(@NonNull Task task, String reason) {
+// QTI_BEGIN: 2023-09-19: Performance: Perf: Activity boost optimization.
         mStartActivity.acquireActivityBoost();
+// QTI_END: 2023-09-19: Performance: Perf: Activity boost optimization.
         TaskFragment newParent = task;
         if (mInTaskFragment != null) {
             int embeddingCheckResult = canEmbedActivity(mInTaskFragment, mStartActivity, task);

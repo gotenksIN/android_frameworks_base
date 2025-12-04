@@ -16,7 +16,9 @@
 
 package android.hardware.camera2.impl;
 
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import static android.hardware.camera2.CameraAccessException.CAMERA_IN_USE;
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import static com.android.internal.util.function.pooled.PooledLambda.obtainRunnable;
 
 import android.annotation.FlaggedApi;
@@ -28,8 +30,10 @@ import android.compat.annotation.EnabledSince;
 import android.content.Context;
 import android.graphics.ImageFormat;
 import android.hardware.ICameraService;
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import android.app.ActivityThread;
 import android.graphics.ImageFormat;
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -74,8 +78,10 @@ import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.os.SystemClock;
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import android.os.SystemProperties;
 import android.text.TextUtils;
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -122,7 +128,9 @@ public class CameraDeviceImpl extends CameraDevice
     };
 
     private static final int REQUEST_ID_NONE = -1;
+// QTI_BEGIN: 2018-06-19: Camera: Camera2: Notify fps as Session Based Parameter
     private int customOpMode = 0;
+// QTI_END: 2018-06-19: Camera: Camera2: Notify fps as Session Based Parameter
 
     /**
      * Starting {@link Build.VERSION_CODES#VANILLA_ICE_CREAM},
@@ -210,7 +218,9 @@ public class CameraDeviceImpl extends CameraDevice
     private int mNextSessionId = 0;
 
     private final int mAppTargetSdkVersion;
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
     private boolean mIsPrivilegedApp = false;
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 
     private ExecutorService mOfflineSwitchService;
     private CameraOfflineSessionImpl mOfflineSessionImpl;
@@ -462,7 +472,9 @@ public class CameraDeviceImpl extends CameraDevice
         } else {
             mTotalPartialCount = partialCount;
         }
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
         mIsPrivilegedApp = checkPrivilegedAppList();
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
     }
 
     /**
@@ -594,10 +606,12 @@ public class CameraDeviceImpl extends CameraDevice
         }
     }
 
+// QTI_BEGIN: 2018-06-19: Camera: Camera2: Notify fps as Session Based Parameter
     public void setVendorStreamConfigMode(int fpsrange) {
         customOpMode = fpsrange;
     }
 
+// QTI_END: 2018-06-19: Camera: Camera2: Notify fps as Session Based Parameter
     @Override
     public String getId() {
         return mCameraId;
@@ -2083,6 +2097,7 @@ public class CameraDeviceImpl extends CameraDevice
         return false;
     }
 
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
     private boolean checkPrivilegedAppList() {
         String packageName = ActivityThread.currentOpPackageName();
         String packageList = SystemProperties.get("persist.vendor.camera.privapp.list");
@@ -2104,6 +2119,7 @@ public class CameraDeviceImpl extends CameraDevice
         return mIsPrivilegedApp;
     }
 
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
     private boolean checkSurfaceSizesCompatible(List<OutputConfiguration> outputConfigs) {
         for (OutputConfiguration outputConfig : outputConfigs) {
             Size configuredSize = outputConfig.getConfiguredSize();
@@ -2162,6 +2178,7 @@ public class CameraDeviceImpl extends CameraDevice
                         inputConfig.getWidth() + "x" + inputConfig.getHeight() + " is not valid");
             }
         } else {
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
             /*
              * don't check input format and size,
              * if the package name is in the white list
@@ -2170,6 +2187,7 @@ public class CameraDeviceImpl extends CameraDevice
                 Log.w(TAG, "ignore input format/size check for white listed app");
                 return;
             }
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
             if (!checkInputConfigurationWithStreamConfigurations(inputConfig, /*maxRes*/false) &&
                     !checkInputConfigurationWithStreamConfigurations(inputConfig, /*maxRes*/true)) {
                 throw new IllegalArgumentException("Input config with format " +

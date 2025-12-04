@@ -178,7 +178,9 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.util.Xml;
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.util.BoostFramework;
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.view.Display;
 
 import com.android.internal.R;
@@ -952,7 +954,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     int mNextInstallToken = 1;  // nonzero; will be wrapped back to 1 when ++ overflows
 
     final @NonNull String[] mRequiredVerifierPackages;
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
     final @Nullable String mOptionalVerifierPackage;
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
     final @NonNull String mRequiredInstallerPackage;
     final @NonNull String mRequiredUninstallerPackage;
     final @NonNull String mRequiredPermissionControllerPackage;
@@ -2187,14 +2191,18 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mStorageEventHelper = new StorageEventHelper(this, mDeletePackageHelper,
                 mRemovePackageHelper);
 
+// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
         t.traceBegin("readListOfTelephonyPackagesToBeDisabled");
         mInstallPackageHelper.readListOfTelephonyPackagesToBeDisabled();
         t.traceEnd();
 
+// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
+// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
         t.traceBegin("readListOfPackagesToBeDisabled");
         mInstallPackageHelper.readListOfPackagesToBeDisabled();
         t.traceEnd();
 
+// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
         synchronized (mLock) {
             // Create the computer as soon as the state objects have been installed.  The
             // cached computer is the same as the live computer until the end of the
@@ -4554,7 +4562,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }, overlayFilter);
 
         mModuleInfoProvider.systemReady();
+// QTI_BEGIN: 2020-04-03: Performance: Add support for UxPerformance to receive context information.
         new BoostFramework(mContext, true);
+// QTI_END: 2020-04-03: Performance: Add support for UxPerformance to receive context information.
 
         // Installer service might attempt to install some packages that have been staged for
         // installation on reboot. Make sure this is the last component to be call since the

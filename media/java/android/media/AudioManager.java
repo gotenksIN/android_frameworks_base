@@ -2129,8 +2129,10 @@ public class AudioManager {
      */
     @Deprecated public void setSpeakerphoneOn(boolean on) {
         final IAudioService service = getService();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In setSpeakerphoneOn(), on: " + on + ", calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.setSpeakerphoneOn(sLegacyRouteToken, on, getAttributionSource());
         } catch (RemoteException e) {
@@ -2151,8 +2153,10 @@ public class AudioManager {
      * @deprecated Use {@link AudioManager#getCommunicationDevice()} instead.
      */
     @Deprecated public boolean isSpeakerphoneOn() {
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In isSpeakerphoneOn(), calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         final IAudioService service = getService();
         try {
             return service.isSpeakerphoneOn();
@@ -3257,12 +3261,14 @@ public class AudioManager {
      * @see #startBluetoothSco()
     */
     public boolean isBluetoothScoAvailableOffCall() {
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         boolean retval;
         retval = getContext().getResources().getBoolean(
                   com.android.internal.R.bool.config_bluetooth_sco_off_call);
         Log.i(TAG, "In isBluetoothScoAvailableOffCall(), calling appilication: " +
               mApplicationContext.getOpPackageName()+", return value: " + retval);
         return retval;
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
     }
 
     /**
@@ -3313,8 +3319,10 @@ public class AudioManager {
      */
     @Deprecated public void startBluetoothSco() {
         final IAudioService service = getService();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In startbluetoothSco(), calling application: "
                      + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.startBluetoothSco(sLegacyRouteToken,
                     getContext().getApplicationInfo().targetSdkVersion,
@@ -3341,8 +3349,10 @@ public class AudioManager {
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public void startBluetoothScoVirtualCall() {
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In startBluetoothScoVirtualCall(), calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         final IAudioService service = getService();
         try {
             service.startBluetoothScoVirtualCall(sLegacyRouteToken, getAttributionSource());
@@ -3364,8 +3374,10 @@ public class AudioManager {
     // Also used for connections started with {@link #startBluetoothScoVirtualCall()}
     @Deprecated public void stopBluetoothSco() {
         final IAudioService service = getService();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In stopBluetoothSco(), calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.stopBluetoothSco(sLegacyRouteToken,  getAttributionSource());
         } catch (RemoteException e) {
@@ -3384,8 +3396,10 @@ public class AudioManager {
      */
     public void setBluetoothScoOn(boolean on){
         final IAudioService service = getService();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In setBluetoothScoOn(), on: " + on + ", calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.setBluetoothScoOn(on);
         } catch (RemoteException e) {
@@ -3402,8 +3416,10 @@ public class AudioManager {
      */
     @Deprecated public boolean isBluetoothScoOn() {
         final IAudioService service = getService();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In isBluetoothScoOn(), calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             return service.isBluetoothScoOn();
         } catch (RemoteException e) {
@@ -3950,6 +3966,7 @@ public class AudioManager {
      *
      */
     public void setParameters(String keyValuePairs) {
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
         List swbKeys = Arrays.asList("bt_lc3_swb","bt_swb");
         boolean hasSwbParams= false;
         String[] kvpairs = keyValuePairs.split(";");
@@ -3958,7 +3975,11 @@ public class AudioManager {
             hasSwbParams = swbKeys.contains(kv[0]);
             break;
         }
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
+// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
         final IAudioService service = getService();
+// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
         if (hasSwbParams) {
             try {
                 service.setSwbParameters(keyValuePairs);
@@ -3972,7 +3993,10 @@ public class AudioManager {
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
+// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
         }
+// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     }
 
     /**
@@ -4009,12 +4033,14 @@ public class AudioManager {
     @RequiresPermission(Manifest.permission.BLUETOOTH_STACK)
     public void setBluetoothHeadsetProperties(@NonNull String name, boolean hasNrecEnabled,
             boolean hasWbsEnabled) {
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
         final IAudioService service = getService();
         try {
             service.setScoParameters(name, hasNrecEnabled, hasWbsEnabled);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     }
 
     /**
@@ -7261,6 +7287,7 @@ public class AudioManager {
     }
 
     /**
+// QTI_BEGIN: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
      * Indicate A2DP source or sink active device change and eventually suppress
      * the {@link AudioManager.ACTION_AUDIO_BECOMING_NOISY} intent.
      * This operation is asynchronous but its execution will still be sequentially scheduled
@@ -7292,6 +7319,7 @@ public class AudioManager {
          }
     }
 
+// QTI_END: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
     /** @hide */
     public IRingtonePlayer getRingtonePlayer() {
         try {

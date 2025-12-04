@@ -245,7 +245,9 @@ import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.AtomicFile;
 import android.util.AtomicFileOutputStream;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.IntArray;
@@ -372,7 +374,9 @@ import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
 import com.android.server.utils.PriorityDump;
+// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.server.am.ProcessFreezerManager;
+// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.window.flags.Flags;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -415,8 +419,10 @@ public class WindowManagerService extends IWindowManager.Stub
 
     static final int LAYOUT_REPEAT_THRESHOLD = 4;
 
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     static WindowState mFocusingWindow;
     String mFocusingActivity;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 
     /** The maximum length we will accept for a loaded animation duration:
      * this is 10 seconds.
@@ -492,8 +498,10 @@ public class WindowManagerService extends IWindowManager.Stub
 
     private final DisplayAreaPolicy.Provider mDisplayAreaPolicyProvider;
 
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     private BoostFramework mPerf = null;
 
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     final private KeyguardDisableHandler mKeyguardDisableHandler;
 
     private final RemoteCallbackList<IKeyguardLockedStateListener> mKeyguardLockedStateListeners =
@@ -1876,7 +1884,9 @@ public class WindowManagerService extends IWindowManager.Stub
             // UID, otherwise we allow unlimited duration. When a UID looses focus we
             // schedule hiding all of its toast windows.
             if (type == TYPE_TOAST) {
+// QTI_BEGIN: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
                 mAtmService.setToastWindow();
+// QTI_END: 2023-06-08: Performance: DSR: Fix DSR when we have toast window
                 if (!displayContent.canAddToastWindowForUid(callingUid)) {
                     ProtoLog.w(WM_ERROR, "Adding more than one toast window for UID at a time.");
                     return WindowManagerGlobal.ADD_DUPLICATE_ADD;
@@ -3007,11 +3017,15 @@ public class WindowManagerService extends IWindowManager.Stub
 
     void finishDrawingWindow(Session session, IWindow client,
             @Nullable SurfaceControl.Transaction postDrawTransaction, int seqId) {
+// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         //unfreeze process if the first frame appeared
+// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
         ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
         if (freezer != null && freezer.useFreezerManager()) {
             freezer.startUnfreeze(session.mPackageName, ProcessFreezerManager.COMPLETE_LAUNCH_UNFREEZE);
         }
+// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
 
         if (postDrawTransaction != null) {
             postDrawTransaction.sanitize(Binder.getCallingPid(), Binder.getCallingUid());

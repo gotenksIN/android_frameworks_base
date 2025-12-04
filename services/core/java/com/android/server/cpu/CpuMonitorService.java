@@ -113,11 +113,13 @@ public final class CpuMonitorService extends SystemService {
     private long mCurrentMonitoringIntervalMillis = DEFAULT_MONITORING_INTERVAL_MILLISECONDS;
     private Handler mHandler;
 
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
     private static final int DELAY_INTERVAL = 5000; // 5 second
     private static final int MAX_DELAY_COUNT = 20;
     private Runnable mMonitorCpuset;
     private int mCurrentDelayCount = 0;
 
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
     private final CpuMonitorInternal mLocalService = new CpuMonitorInternal() {
         @Override
         public void addCpuAvailabilityCallback(Executor executor,
@@ -217,6 +219,7 @@ public final class CpuMonitorService extends SystemService {
                 mHandler.post(mMonitorCpuStats);
             }
         }
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
 
         mMonitorCpuset = new Runnable() {
             @Override
@@ -238,6 +241,7 @@ public final class CpuMonitorService extends SystemService {
             }
         };
         mHandler.postDelayed(mMonitorCpuset, DELAY_INTERVAL);
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
     }
 
     @Override

@@ -3634,9 +3634,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
                 for (SimData data : mSimDatasBySlotId.values()) {
                     if (data.slotId == slotId) {
                         data.simState = TelephonyManager.SIM_STATE_NOT_READY;
-// QTI_BEGIN: 2024-12-17: Android_UI: SystemUI: Adapt change for dual sims.
                     }
-// QTI_END: 2024-12-17: Android_UI: SystemUI: Adapt change for dual sims.
                 }
             }
         }

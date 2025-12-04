@@ -12,11 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+// QTI_BEGIN: 2023-03-24: Audio: base: check for audio mode in getBluetoothContextualVolumeStream
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  *
+// QTI_END: 2023-03-24: Audio: base: check for audio mode in getBluetoothContextualVolumeStream
  */
 
 package com.android.server.audio;
@@ -387,9 +389,11 @@ public class AudioService extends IAudioService.Stub
     /** Debug log sound fx (touchsounds...) in dumpsys */
     protected static final boolean DEBUG_LOG_SOUND_FX = Log.isLoggable(TAG + ".SoundFx", Log.DEBUG);
 
+// QTI_BEGIN: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
     /** debug SCO modes */
     protected static final boolean DEBUG_SCO = true;
 
+// QTI_END: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
     /** How long to delay before persisting a change in volume/ringer mode. */
     private static final int PERSIST_DELAY = 500;
 
@@ -431,9 +435,11 @@ public class AudioService extends IAudioService.Stub
     // indicates whether the system maps all streams to a single stream.
     private final boolean mIsSingleVolume;
 
+// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     private static HashMap<String, String> mCachedParams =
         new HashMap<String, String>();
 
+// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     /**
      * indicates whether STREAM_NOTIFICATION is aliased to STREAM_RING
      *     not final due to test method, see {@link #setNotifAliasRingForTest(boolean)}.
@@ -1780,6 +1786,7 @@ public class AudioService extends IAudioService.Stub
         // done with service initialization, continue additional work in our Handler thread
         queueMsgUnderWakeLock(mAudioHandler, MSG_INIT_STREAMS_VOLUMES,
                 0 /* arg1 */,  0 /* arg2 */, null /* obj */,  0 /* delay */);
+// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
 
         mCachedParams.put("hdr_record_on", "false");
         mCachedParams.put("wnr_on", "false");
@@ -1789,6 +1796,7 @@ public class AudioService extends IAudioService.Stub
         mCachedParams.put("facing", "none");
         mCachedParams.put("hdr_audio_channel_count", "0");
         mCachedParams.put("hdr_audio_sampling_rate", "0");
+// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
 
         queueMsgUnderWakeLock(mAudioHandler, MSG_INIT_ADI_DEVICE_STATES,
                 0 /* arg1 */, 0 /* arg2 */, null /* obj */, 0 /* delay */);
@@ -2249,6 +2257,7 @@ public class AudioService extends IAudioService.Stub
         // process restarts after a crash, not the first time it is started.
         AudioSystem.setParameters("restarting=true");
 
+// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
         // Restore cached parameters
         String params = new String("");
         Log.i(TAG, "Cached params " + mCachedParams.toString());
@@ -2269,6 +2278,7 @@ public class AudioService extends IAudioService.Stub
             Log.i(TAG, "Empty cached params " + params);
         }
 
+// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
         readAndSetLowRamDevice();
 
         mIsCallScreeningModeSupported = AudioSystem.isCallScreeningModeSupported();
@@ -4135,29 +4145,39 @@ public class AudioService extends IAudioService.Stub
         }
 
         int streamType;
+// QTI_BEGIN: 2018-01-16: Audio: AudioService: synchronize access to user selected volume ctrl stream
         synchronized (mForceControlStreamLock) {
             if (DEBUG_VOL) Log.d(TAG, "adjustSuggestedStreamVolume() stream=" + suggestedStreamType
                     + ", flags=" + flags + ", caller=" + caller
                     + ", volControlStream=" + mVolumeControlStream
                     + ", userSelect=" + mUserSelectedVolumeControlStream);
+// QTI_END: 2018-01-16: Audio: AudioService: synchronize access to user selected volume ctrl stream
             // Request lock in case mVolumeControlStream is changed by other thread.
+// QTI_BEGIN: 2018-01-16: Audio: AudioService: synchronize access to user selected volume ctrl stream
             if (mUserSelectedVolumeControlStream) { // implies mVolumeControlStream != -1
+// QTI_END: 2018-01-16: Audio: AudioService: synchronize access to user selected volume ctrl stream
                 streamType = mVolumeControlStream;
+// QTI_BEGIN: 2018-01-16: Audio: AudioService: synchronize access to user selected volume ctrl stream
             } else {
+// QTI_END: 2018-01-16: Audio: AudioService: synchronize access to user selected volume ctrl stream
                 // TODO discard activity on a muted stream?
+// QTI_BEGIN: 2018-01-16: Audio: AudioService: synchronize access to user selected volume ctrl stream
                 final int maybeActiveStreamType = getActiveStreamType(suggestedStreamType);
                 final boolean activeForReal;
                 if (maybeActiveStreamType == AudioSystem.STREAM_RING
                         || maybeActiveStreamType == AudioSystem.STREAM_NOTIFICATION) {
                     activeForReal = wasStreamActiveRecently(maybeActiveStreamType, 0);
                 } else {
+// QTI_END: 2018-01-16: Audio: AudioService: synchronize access to user selected volume ctrl stream
                     activeForReal = mAudioSystem.isStreamActive(maybeActiveStreamType, 0);
+// QTI_BEGIN: 2018-01-16: Audio: AudioService: synchronize access to user selected volume ctrl stream
                 }
                 if (activeForReal || mVolumeControlStream == -1) {
                     streamType = maybeActiveStreamType;
                 } else {
                     streamType = mVolumeControlStream;
                 }
+// QTI_END: 2018-01-16: Audio: AudioService: synchronize access to user selected volume ctrl stream
             }
         }
 
@@ -7990,7 +8010,9 @@ public class AudioService extends IAudioService.Stub
         final String eventSource = new StringBuilder("setSpeakerphoneOn(").append(on)
                 .append(") from u/pid:").append(uid).append("/")
                 .append(pid).toString();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In setSpeakerphoneOn(), on: " + on + ", eventSource: " + eventSource);
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
 
         new MediaMetrics.Item(MediaMetrics.Name.AUDIO_DEVICE
                 + MediaMetrics.SEPARATOR + "setSpeakerphoneOn")
@@ -8025,9 +8047,11 @@ public class AudioService extends IAudioService.Stub
         }
         // Only enable calls from system components
         if (UserHandle.getCallingAppId() >= FIRST_APPLICATION_UID) {
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
             Log.i(TAG, "In setBluetoothScoOn(), on: "+on+". The calling application Uid: "
                   + Binder.getCallingUid() + ", is greater than FIRST_APPLICATION_UID"
                   + " exiting from setBluetoothScoOn()");
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
             mBtScoOnByApp = on;
             return;
         }
@@ -8037,7 +8061,9 @@ public class AudioService extends IAudioService.Stub
         final int pid = Binder.getCallingPid();
         final String eventSource = new StringBuilder("setBluetoothScoOn(").append(on)
                 .append(") from u/pid:").append(uid).append("/").append(pid).toString();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In setBluetoothScoOn(), eventSource: " + eventSource);
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
 
         //bt sco
         new MediaMetrics.Item(MediaMetrics.Name.AUDIO_DEVICE
@@ -8108,6 +8134,7 @@ public class AudioService extends IAudioService.Stub
         return mDeviceBroker.isBluetoothA2dpOn();
     }
 
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     public void setSwbParameters(String keyValuePairs) {
         mDeviceBroker.setSwbParameters(keyValuePairs);
     }
@@ -8116,10 +8143,13 @@ public class AudioService extends IAudioService.Stub
         mDeviceBroker.setScoParameters(name, hasNrecEnabled, hasWbsEnabled);
     }
 
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     /** @see AudioManager#startBluetoothSco() */
     public void startBluetoothSco(IBinder cb, int targetSdkVersion,
             @NonNull AttributionSource attributionSource) {
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In startBluetoothSco()");
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         if (attributionSource == null) {
             return;
         }
@@ -8146,7 +8176,9 @@ public class AudioService extends IAudioService.Stub
     /** @see AudioManager#startBluetoothScoVirtualCall() */
     public void startBluetoothScoVirtualCall(IBinder cb,
             @NonNull AttributionSource attributionSource) {
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In startBluetoothScoVirtualCall()");
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         if (attributionSource == null) {
             return;
         }
@@ -8196,7 +8228,9 @@ public class AudioService extends IAudioService.Stub
     /** @see AudioManager#stopBluetoothSco() */
     public void stopBluetoothSco(IBinder cb,
             @NonNull AttributionSource attributionSource) {
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In stopBluetoothSco()");
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         if (attributionSource == null) {
             return;
         }
@@ -9443,6 +9477,7 @@ public class AudioService extends IAudioService.Stub
         getVssForStreamOrDefault(AudioSystem.STREAM_MUSIC).muteInternally(mute);
     }
 
+// QTI_BEGIN: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
     /**
      * @see AudioManager#handleBluetoothA2dpActiveDeviceChange(BluetoothDevice, int, int,
      *                                                        boolean, int)
@@ -9460,10 +9495,13 @@ public class AudioService extends IAudioService.Stub
                 && state != BluetoothProfile.STATE_DISCONNECTED) {
             throw new IllegalArgumentException("Invalid state " + state);
         }
+// QTI_END: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
         mDeviceBroker.queueOnBluetoothActiveDeviceChanged(
                   new AudioDeviceBroker.BtDeviceChangedData(device, device, new BluetoothProfileConnectionInfo(profile), "AudioService"));
+// QTI_BEGIN: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
     }
 
+// QTI_END: 2019-06-20: Audio: Revert the change: AudioService: remove dead BT code.
     /** Mute or unmute call audio */
     /*package*/ void setCallMute(boolean mute) {
         getVssForStreamOrDefault(AudioSystem.STREAM_VOICE_CALL).muteInternally(mute);
@@ -13941,7 +13979,9 @@ public class AudioService extends IAudioService.Stub
                         + " FromRestrictions=" + mMicMuteFromRestrictions
                         + " FromApi=" + mMicMuteFromApi
                         + " from system=" + mMicMuteFromSystemCached);
+// QTI_BEGIN: 2020-09-15: Audio: AudioService: CleanUp and add dumpsys info.
         pw.print("  mMonitorRotation="); pw.println(mMonitorRotation);
+// QTI_END: 2020-09-15: Audio: AudioService: CleanUp and add dumpsys info.
         pw.print("  mMasterMute="); pw.println(mMasterMute.get());
         pw.print("  supportsBluetoothVariableLatency=");
         pw.println(AudioSystem.supportsBluetoothVariableLatency());
@@ -16249,6 +16289,7 @@ public class AudioService extends IAudioService.Stub
         }
     }
 
+// QTI_BEGIN: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     public void cacheParameters(String keyValuePairs) {
         String[] kvpairs = keyValuePairs.split(";");
         for (String pair : kvpairs) {
@@ -16260,6 +16301,7 @@ public class AudioService extends IAudioService.Stub
         }
     }
 
+// QTI_END: 2021-05-17: Audio: Add HDR restore param functionality in AudioService
     /**
      * Queries whether multi-audio focus is enabled or not.
      * @return true if multi-audio focus is enabled, false otherwise

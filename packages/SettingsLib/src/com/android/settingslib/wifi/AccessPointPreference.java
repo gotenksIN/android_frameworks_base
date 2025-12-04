@@ -249,9 +249,11 @@ public class AccessPointPreference extends Preference {
 // QTI_BEGIN: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
         int wifiStandard = mAccessPoint.getWifiStandard();
 // QTI_END: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
+// QTI_BEGIN: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
 
         if (level != mLevel ||
             wifiSpeed != mWifiSpeed ||
+// QTI_END: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
             wifiStandard != mWifiStandard) {
             mLevel = level;
             mWifiSpeed = wifiSpeed;
@@ -264,9 +266,11 @@ public class AccessPointPreference extends Preference {
 
         updateBadge(context);
 
+// QTI_BEGIN: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
         String summary = mForSavedNetworks ? mAccessPoint.getSavedNetworkSummary()
                                            : mAccessPoint.getSettingsSummary();
 
+// QTI_END: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
 // QTI_BEGIN: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
         if (mAccessPoint.isPskSaeTransitionMode()) {
            summary = "WPA3(SAE Transition Mode) " + summary;
@@ -274,12 +278,14 @@ public class AccessPointPreference extends Preference {
            summary = "WPA3(OWE Transition Mode) " + summary;
         } else if (mAccessPoint.getSecurity() == AccessPoint.SECURITY_SAE) {
 // QTI_END: 2020-04-22: WLAN: wifi: refactor Wi-Fi generation UI enhancements
+// QTI_BEGIN: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
            summary = "WPA3(SAE) " + summary;
         } else if (mAccessPoint.getSecurity() == AccessPoint.SECURITY_OWE) {
            summary = "WPA3(OWE) " + summary;
         }
 
         setSummary(summary);
+// QTI_END: 2019-04-03: WLAN: wifi: Wifi generation and WPA3 UI enhancements for Access points.
 
         mContentDescription = buildContentDescription(getContext(), this /* pref */, mAccessPoint);
     }

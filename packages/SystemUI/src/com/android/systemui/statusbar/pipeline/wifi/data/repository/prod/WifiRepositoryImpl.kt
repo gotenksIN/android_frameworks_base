@@ -387,9 +387,9 @@ constructor(
             level = this.level,
             ssid = this.title,
             hotspotDeviceType = hotspotDeviceType,
-// QTI_BEGIN: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
+// QTI_BEGIN: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
             wifiStandard = this.wifiStandard,
-// QTI_END: 2025-02-26: Data: SystemUI: Show wifistandard in SystemUI.
+// QTI_END: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
         )
     }
 

@@ -207,9 +207,13 @@
         <item>Enabled</item>
 <!-- QTI_BEGIN: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
 <!-- QTI_END: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
+<!-- QTI_BEGIN: 2019-04-01: Bluetooth: Add Filtering for vendor snoop logs (4/4)-->
+<!-- QTI_END: 2019-04-01: Bluetooth: Add Filtering for vendor snoop logs (4/4)-->
         <item>Enabled Headers Filtered</item>
 <!-- QTI_BEGIN: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
 <!-- QTI_END: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
+<!-- QTI_BEGIN: 2019-04-01: Bluetooth: Add Filtering for vendor snoop logs (4/4)-->
+<!-- QTI_END: 2019-04-01: Bluetooth: Add Filtering for vendor snoop logs (4/4)-->
         <item>Enabled Media Pkts Filtered</item>
 <!-- QTI_BEGIN: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
 <!-- QTI_END: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
@@ -233,9 +237,13 @@
         <item>full</item>
 <!-- QTI_BEGIN: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
 <!-- QTI_END: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
+<!-- QTI_BEGIN: 2019-04-01: Bluetooth: Add Filtering for vendor snoop logs (4/4)-->
+<!-- QTI_END: 2019-04-01: Bluetooth: Add Filtering for vendor snoop logs (4/4)-->
         <item>snoopheadersfiltered</item>
 <!-- QTI_BEGIN: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
 <!-- QTI_END: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
+<!-- QTI_BEGIN: 2019-04-01: Bluetooth: Add Filtering for vendor snoop logs (4/4)-->
+<!-- QTI_END: 2019-04-01: Bluetooth: Add Filtering for vendor snoop logs (4/4)-->
         <item>mediapktsfiltered</item>
 <!-- QTI_BEGIN: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
 <!-- QTI_END: 2022-10-07: Bluetooth: Merge "BT Snoop: Add Adavnce snoop properties (1/4)" into t-keystone-qcom-dev-->
@@ -333,31 +341,47 @@
 
     <!-- Titles for Bluetooth AVRCP Versions -->
     <string-array name="bluetooth_avrcp_versions">
+<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
+<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
         <item>AVRCP 1.6 (Default)</item>
         <item>AVRCP 1.3</item>
         <item>AVRCP 1.4</item>
+<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
+<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
         <item>AVRCP 1.5</item>
     </string-array>
 
     <!-- Values for Bluetooth AVRCP Versions -->
     <string-array name="bluetooth_avrcp_version_values">
+<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
+<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
         <item>avrcp16</item>
         <item>avrcp13</item>
         <item>avrcp14</item>
+<!-- QTI_BEGIN: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
+<!-- QTI_END: 2024-07-16: Bluetooth: BT: Default AVRCP TG version as v1.6 in Dev Options (2/2)-->
         <item>avrcp15</item>
     </string-array>
 
     <!-- Titles for Bluetooth MAP Versions -->
     <string-array name="bluetooth_map_versions">
+<!-- QTI_BEGIN: 2025-05-16: Bluetooth: Map: Show MAP V1.4 as default version-->
+<!-- QTI_END: 2025-05-16: Bluetooth: Map: Show MAP V1.4 as default version-->
         <item>MAP 1.4 (Default)</item>
         <item>MAP 1.3</item>
+<!-- QTI_BEGIN: 2025-05-16: Bluetooth: Map: Show MAP V1.4 as default version-->
+<!-- QTI_END: 2025-05-16: Bluetooth: Map: Show MAP V1.4 as default version-->
         <item>MAP 1.2</item>
     </string-array>
 
     <!-- Values for Bluetooth MAP Versions -->
     <string-array name="bluetooth_map_version_values">
         <item>map14</item>
+<!-- QTI_BEGIN: 2025-05-16: Bluetooth: Map: Show MAP V1.4 as default version-->
+<!-- QTI_END: 2025-05-16: Bluetooth: Map: Show MAP V1.4 as default version-->
         <item>map13</item>
+<!-- QTI_BEGIN: 2025-05-16: Bluetooth: Map: Show MAP V1.4 as default version-->
+<!-- QTI_END: 2025-05-16: Bluetooth: Map: Show MAP V1.4 as default version-->
         <item>map12</item>
     </string-array>
 

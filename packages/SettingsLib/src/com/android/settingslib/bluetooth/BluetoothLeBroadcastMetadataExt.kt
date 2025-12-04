@@ -71,12 +71,16 @@ object BluetoothLeBroadcastMetadataExt {
      */
     fun BluetoothLeBroadcastMetadata.toQrCodeString(): String {
         val entries = mutableListOf<Pair<String, String>>()
+// QTI_BEGIN: 2025-05-16: Bluetooth: Allow broadcast name to be null
         try {
+// QTI_END: 2025-05-16: Bluetooth: Allow broadcast name to be null
         // Generate data elements for directing Broadcast Assistants
+// QTI_BEGIN: 2025-05-16: Bluetooth: Allow broadcast name to be null
         if (this.broadcastName != null) {
             entries.add(Pair(KEY_BT_BROADCAST_NAME, Base64.encodeToString(
                 this.broadcastName?.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)))
         }
+// QTI_END: 2025-05-16: Bluetooth: Allow broadcast name to be null
         entries.add(Pair(KEY_BT_ADVERTISER_ADDRESS_TYPE, this.sourceAddressType.toString()))
         entries.add(Pair(KEY_BT_ADVERTISER_ADDRESS, this.sourceDevice.address.replace(":", "")))
         entries.add(Pair(KEY_BT_BROADCAST_ID, String.format("%X", this.broadcastId.toLong())))
@@ -115,9 +119,11 @@ object BluetoothLeBroadcastMetadataExt {
                     Base64.encodeToString(it.contentMetadata.rawMetadata, Base64.NO_WRAP)))
             }
         }
+// QTI_BEGIN: 2025-05-16: Bluetooth: Allow broadcast name to be null
         } catch (e: Exception) {
             Log.w(TAG, "toQrCodeString - Exception thrown: ", e)
         }
+// QTI_END: 2025-05-16: Bluetooth: Allow broadcast name to be null
         val qrCodeString = SCHEME_BT_BROADCAST_METADATA +
                 entries.toQrCodeString(DELIMITER_ELEMENT) + SUFFIX_QR_CODE
         Log.d(TAG, "Generated QR string : $qrCodeString")
@@ -385,4 +391,6 @@ object BluetoothLeBroadcastMetadataExt {
         }
         return channels
     }
+// QTI_BEGIN: 2025-05-16: Bluetooth: Allow broadcast name to be null
 }
+// QTI_END: 2025-05-16: Bluetooth: Allow broadcast name to be null

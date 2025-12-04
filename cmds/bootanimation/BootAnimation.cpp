@@ -719,6 +719,7 @@ bool BootAnimation::findBootAnimationFileInternal(const std::vector<std::string>
 
 void BootAnimation::findBootAnimationFile() {
 
+// QTI_BEGIN: 2020-02-11: Android_UI: BootAnimation: Add bootanimation configuration prop
     std::string custAnimProp = !mShuttingDown ?
         android::base::GetProperty("persist.sys.customanim.boot", ""):
         android::base::GetProperty("persist.sys.customanim.shutdown", "");
@@ -730,6 +731,7 @@ void BootAnimation::findBootAnimationFile() {
         return;
     }
 
+// QTI_END: 2020-02-11: Android_UI: BootAnimation: Add bootanimation configuration prop
     ATRACE_CALL();
     const bool playDarkAnim = android::base::GetIntProperty("ro.boot.theme", 0) == 1;
     const std::string productBootanimationFile = PRODUCT_BOOTANIMATION_DIR +

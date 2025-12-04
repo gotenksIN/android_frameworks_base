@@ -29,7 +29,9 @@ import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
+// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
 import android.app.ActivityThread;
+// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
 import android.app.ActivityManager;
 import android.app.CameraCompatTaskInfo;
 import android.app.TaskInfo;
@@ -73,8 +75,10 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.ServiceSpecificException;
 import android.os.SystemProperties;
+// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
 import android.text.TextUtils;
 import android.util.Log;
+// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
@@ -2830,6 +2834,7 @@ public final class CameraManager {
                     throw new IllegalArgumentException("cameraId was null");
                 }
 
+// QTI_BEGIN: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
                 /* Force to expose only two cameras
                  * if the package name does not falls in this bucket
                  */
@@ -2850,6 +2855,7 @@ public final class CameraManager {
                     throw new IllegalArgumentException("invalid cameraId");
                 }
 
+// QTI_END: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
                 ICameraService cameraService = getCameraService();
                 if (cameraService == null) {
                     throw new CameraAccessException(CameraAccessException.CAMERA_DISCONNECTED,
@@ -3108,6 +3114,7 @@ public final class CameraManager {
         }
 
         private void onStatusChangedLocked(int status, DeviceCameraInfo info) {
+// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
             /* Force to ignore the last mono/aux camera status update
              * if the package name does not falls in this bucket
              */
@@ -3126,12 +3133,15 @@ public final class CameraManager {
             }
 
             if (exposeMonoCamera == false) {
+// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
                 if (Integer.parseInt(info.mCameraId) >= 2) {
                     Log.w(TAG, "[soar.cts] ignore the status update of camera: " + info.mCameraId);
+// QTI_BEGIN: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
                     return;
                 }
             }
 
+// QTI_END: 2018-03-10: Camera: Expose Aux camera to apps present in the whitelist
             if (DEBUG) {
                 Log.v(TAG,
                         String.format("Camera id %s has status changed to 0x%x for device %d",
@@ -3292,6 +3302,7 @@ public final class CameraManager {
                         info.mCameraId, status, info.mDeviceId));
             }
 
+// QTI_BEGIN: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
             /* Force to ignore the aux or composite camera torch status update
              * if the package name does not falls in this bucket
              */
@@ -3310,13 +3321,16 @@ public final class CameraManager {
             }
 
             if (exposeMonoCamera == false) {
+// QTI_END: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
                 if (Integer.parseInt(info.mCameraId) >= 2) {
                     Log.w(TAG, "ignore the torch status update of camera: " + info.mCameraId);
+// QTI_BEGIN: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
                     return;
                 }
             }
 
 
+// QTI_END: 2018-03-10: Camera: Ignore torch status update for aux or compsite camera
             if (!validTorchStatus(status)) {
                 Log.e(TAG, String.format(
                         "Ignoring invalid camera %s torch status 0x%x for device %d",

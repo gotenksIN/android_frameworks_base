@@ -100,8 +100,10 @@ public final class EncoderProfiles
                 return MediaFormat.MIMETYPE_VIDEO_VP8;
             } else if (codec == MediaRecorder.VideoEncoder.HEVC) {
                 return MediaFormat.MIMETYPE_VIDEO_HEVC;
+// QTI_BEGIN: 2024-09-12: Video: base: Define MIMETYPE_VIDEO_MVHEVC and Profile/Level handling for MVHEVC
             } else if (codec == MediaRecorder.VideoEncoder.MVHEVC) {
                 return MediaFormat.MIMETYPE_VIDEO_MVHEVC;
+// QTI_END: 2024-09-12: Video: base: Define MIMETYPE_VIDEO_MVHEVC and Profile/Level handling for MVHEVC
             } else if (codec == MediaRecorder.VideoEncoder.VP9) {
                 return MediaFormat.MIMETYPE_VIDEO_VP9;
             } else if (codec == MediaRecorder.VideoEncoder.DOLBY_VISION) {

@@ -1,3 +1,4 @@
+// QTI_BEGIN: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
 /*
  * Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
@@ -29,13 +30,19 @@
 
 package com.android.systemui.statusbar.policy;
 
+// QTI_END: 2019-01-24: Android_UI: SystemUI: Add unit test for 5G
+// QTI_BEGIN: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
  import android.os.RemoteException;
  import android.util.Log;
  import android.test.suitebuilder.annotation.SmallTest;
  import android.testing.AndroidTestingRunner;
  import android.testing.TestableLooper.RunWithLooper;
 
+// QTI_END: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
+// QTI_BEGIN: 2023-01-24: Telephony: FR84002: Re-design ExtTelephonyManager interface
  import com.qti.extphone.ExtPhoneCallbackListener;
+// QTI_END: 2023-01-24: Telephony: FR84002: Re-design ExtTelephonyManager interface
+// QTI_BEGIN: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
  import com.qti.extphone.NrIconType;
  import com.qti.extphone.Status;
  import com.qti.extphone.Token;
@@ -56,7 +63,11 @@ package com.android.systemui.statusbar.policy;
  public class FiveGServiceClientTest extends NetworkControllerBaseTest {
      private final static String TAG = "FiveGServiceClientTest";
      private FiveGServiceClient mFiveGServiceClient;
+// QTI_END: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
+// QTI_BEGIN: 2023-01-24: Telephony: FR84002: Re-design ExtTelephonyManager interface
      protected ExtPhoneCallbackListener mCallback;
+// QTI_END: 2023-01-24: Telephony: FR84002: Re-design ExtTelephonyManager interface
+// QTI_BEGIN: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
 
      Token mToken;
      Status mSuccessStatus;
@@ -70,7 +81,11 @@ package com.android.systemui.statusbar.policy;
          mSuccessStatus = new Status(Status.SUCCESS);
          mFailStatus = new Status(Status.FAILURE);
          mFiveGServiceClient = mNetworkController.getFiveGServiceClient();
+// QTI_END: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
+// QTI_BEGIN: 2023-01-24: Telephony: FR84002: Re-design ExtTelephonyManager interface
          mCallback = mFiveGServiceClient.mExtPhoneCallbackListener;
+// QTI_END: 2023-01-24: Telephony: FR84002: Re-design ExtTelephonyManager interface
+// QTI_BEGIN: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient
 
      }
 
@@ -143,3 +158,4 @@ package com.android.systemui.statusbar.policy;
      }
 
  }
+// QTI_END: 2022-02-16: Android_UI: SystemUI: Enable FiveGServiceClient

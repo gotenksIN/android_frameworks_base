@@ -204,13 +204,13 @@ public class ZygoteInit {
             System.loadLibrary("compiler_rt");
         }
 
-// QTI_BEGIN: 2019-06-18: Core: perf: Load performance lib from Zygote
+// QTI_BEGIN: 2019-06-18: Performance: perf: Load performance lib from Zygote
         try {
             System.loadLibrary("qti_performance");
         } catch (UnsatisfiedLinkError e) {
             Log.e(TAG, "Couldn't load qti_performance");
         }
-// QTI_END: 2019-06-18: Core: perf: Load performance lib from Zygote
+// QTI_END: 2019-06-18: Performance: perf: Load performance lib from Zygote
     }
 
     native private static void nativePreloadAppProcessHALs();

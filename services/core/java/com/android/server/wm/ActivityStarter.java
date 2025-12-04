@@ -3189,9 +3189,9 @@ class ActivityStarter {
 
     /** Places {@link #mStartActivity} in {@code task} or an embedded {@link TaskFragment}. */
     private void addOrReparentStartingActivity(@NonNull Task task, String reason) {
-// QTI_BEGIN: 2023-09-19: Core: Perf: Activity boost optimization.
+// QTI_BEGIN: 2023-09-19: Performance: Perf: Activity boost optimization.
         mStartActivity.acquireActivityBoost();
-// QTI_END: 2023-09-19: Core: Perf: Activity boost optimization.
+// QTI_END: 2023-09-19: Performance: Perf: Activity boost optimization.
         TaskFragment newParent = task;
         if (mInTaskFragment != null) {
             int embeddingCheckResult = canEmbedActivity(mInTaskFragment, mStartActivity, task);

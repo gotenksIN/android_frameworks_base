@@ -83,7 +83,9 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
+// QTI_BEGIN: 2025-06-16: Bluetooth: Squash VOIP LeAudio WAR changes in frameworks
 import android.os.SystemProperties;
+// QTI_END: 2025-06-16: Bluetooth: Squash VOIP LeAudio WAR changes in frameworks
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -2052,8 +2054,10 @@ public class AudioManager {
      */
     @Deprecated public void setSpeakerphoneOn(boolean on) {
         final IAudioService service = getService();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In setSpeakerphoneOn(), on: " + on + ", calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.setSpeakerphoneOn(mICallBack, on, getAttributionSource());
         } catch (RemoteException e) {
@@ -2074,8 +2078,10 @@ public class AudioManager {
      * @deprecated Use {@link AudioManager#getCommunicationDevice()} instead.
      */
     @Deprecated public boolean isSpeakerphoneOn() {
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In isSpeakerphoneOn(), calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         final IAudioService service = getService();
         try {
             return service.isSpeakerphoneOn();
@@ -3180,12 +3186,14 @@ public class AudioManager {
      * @see #startBluetoothSco()
     */
     public boolean isBluetoothScoAvailableOffCall() {
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         boolean retval;
         retval = getContext().getResources().getBoolean(
                   com.android.internal.R.bool.config_bluetooth_sco_off_call);
         Log.i(TAG, "In isBluetoothScoAvailableOffCall(), calling appilication: " +
               mApplicationContext.getOpPackageName()+", return value: " + retval);
         return retval;
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
     }
 
     /**
@@ -3236,8 +3244,10 @@ public class AudioManager {
      */
     @Deprecated public void startBluetoothSco() {
         final IAudioService service = getService();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In startbluetoothSco(), calling application: "
                      + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.startBluetoothSco(mICallBack,
                     getContext().getApplicationInfo().targetSdkVersion,
@@ -3264,8 +3274,10 @@ public class AudioManager {
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public void startBluetoothScoVirtualCall() {
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In startBluetoothScoVirtualCall(), calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         final IAudioService service = getService();
         try {
             service.startBluetoothScoVirtualCall(mICallBack, getAttributionSource());
@@ -3287,8 +3299,10 @@ public class AudioManager {
     // Also used for connections started with {@link #startBluetoothScoVirtualCall()}
     @Deprecated public void stopBluetoothSco() {
         final IAudioService service = getService();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In stopBluetoothSco(), calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.stopBluetoothSco(mICallBack,  getAttributionSource());
         } catch (RemoteException e) {
@@ -3307,8 +3321,10 @@ public class AudioManager {
      */
     public void setBluetoothScoOn(boolean on){
         final IAudioService service = getService();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In setBluetoothScoOn(), on: " + on + ", calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             service.setBluetoothScoOn(on);
         } catch (RemoteException e) {
@@ -3325,8 +3341,10 @@ public class AudioManager {
      */
     @Deprecated public boolean isBluetoothScoOn() {
         final IAudioService service = getService();
+// QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         Log.i(TAG, "In isBluetoothScoOn(), calling application: "
                     + mApplicationContext.getOpPackageName());
+// QTI_END: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         try {
             return service.isBluetoothScoOn();
         } catch (RemoteException e) {
@@ -3348,9 +3366,11 @@ public class AudioManager {
      * @deprecated Use {@link AudioManager#getDevices(int)} instead to list available audio devices.
      */
     public boolean isBluetoothA2dpOn() {
+// QTI_BEGIN: 2025-06-16: Bluetooth: Squash VOIP LeAudio WAR changes in frameworks
         boolean mVoipLeaWarEnabled =
                 SystemProperties.getBoolean("persist.enable.bluetooth.voipleawar", false);
 
+// QTI_END: 2025-06-16: Bluetooth: Squash VOIP LeAudio WAR changes in frameworks
         if (AudioSystem.getDeviceConnectionState(DEVICE_OUT_BLUETOOTH_A2DP,"")
                 == AudioSystem.DEVICE_STATE_AVAILABLE) {
             return true;
@@ -3360,11 +3380,13 @@ public class AudioManager {
         } else if (AudioSystem.getDeviceConnectionState(DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER,"")
                 == AudioSystem.DEVICE_STATE_AVAILABLE) {
             return true;
+// QTI_BEGIN: 2025-06-16: Bluetooth: Squash VOIP LeAudio WAR changes in frameworks
         } else if (mVoipLeaWarEnabled &&
                 AudioSystem.getDeviceConnectionState(DEVICE_OUT_BLE_HEADSET,"")
                 == AudioSystem.DEVICE_STATE_AVAILABLE) {
             Log.i(TAG, "isBluetoothA2dpOn: return true for DEVICE_OUT_BLE_HEADSET");
             return true;
+// QTI_END: 2025-06-16: Bluetooth: Squash VOIP LeAudio WAR changes in frameworks
         }
         return false;
     }

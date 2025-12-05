@@ -4293,7 +4293,7 @@ public class KeyguardViewMediator implements CoreStartable,
     }
 
     private void notifyDefaultDisplayCallbacks(boolean showing) {
-        if (SceneContainerFlag.isEnabled() || KeyguardWmStateRefactor.isEnabled()) {
+        if (SceneContainerFlag.isEnabled()) {
             return;
         }
 

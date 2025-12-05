@@ -10788,6 +10788,7 @@ package android.companion.virtual {
   @RestrictedForEnvironment(environments=android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME, from=android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) public final class VirtualDeviceManager {
     method @Nullable public android.companion.virtual.VirtualDevice getVirtualDevice(int);
     method @NonNull public java.util.List<android.companion.virtual.VirtualDevice> getVirtualDevices();
+    method @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_support_api") public static boolean isVirtualCameraSupported();
     method public void registerVirtualDeviceListener(@NonNull java.util.concurrent.Executor, @NonNull android.companion.virtual.VirtualDeviceManager.VirtualDeviceListener);
     method public void unregisterVirtualDeviceListener(@NonNull android.companion.virtual.VirtualDeviceManager.VirtualDeviceListener);
   }
@@ -57202,6 +57203,8 @@ package android.view.accessibility {
     method public int describeContents();
     method @Nullable public android.view.accessibility.AccessibilityNodeInfo getNode();
     method public int getOffset();
+    method @FlaggedApi("android.view.accessibility.a11y_selection_position_app_getters_api") @Nullable public android.view.View getView();
+    method @FlaggedApi("android.view.accessibility.a11y_selection_position_app_getters_api") public int getVirtualDescendantId();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.view.accessibility.AccessibilityNodeInfo.SelectionPosition> CREATOR;
   }

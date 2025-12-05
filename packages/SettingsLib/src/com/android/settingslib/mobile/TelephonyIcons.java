@@ -287,27 +287,21 @@ public class TelephonyIcons {
     public static final MobileIconGroup FIVE_G_BASIC_6RX = new MobileIconGroup(
             "5GBasic_6Rx",
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description am: 5d05a98b9d
             R.string.data_connection_5g_basic,
-// QTI_END: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description am: 5d05a98b9d
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
             TelephonyIcons.ICON_5G_BASIC_6RX);
 
     public static final MobileIconGroup FIVE_G_UWB_6RX = new MobileIconGroup(
             "5GUWB_6Rx",
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description am: 5d05a98b9d
             R.string.data_connection_5g_uwb,
-// QTI_END: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description am: 5d05a98b9d
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
             TelephonyIcons.ICON_5G_UWB_6RX);
 
     public static final MobileIconGroup FIVE_G_PLUS_PLUS_6RX = new MobileIconGroup(
             "5G_PLUS_PLUS_6Rx",
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description am: 5d05a98b9d
             R.string.data_connection_5g_plus_plus,
-// QTI_END: 2025-05-21: Telephony: SystemUI: Correct 6RX Icons Data Content Description am: 5d05a98b9d
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
             TelephonyIcons.ICON_5G_PLUS_PLUS_6RX);
 

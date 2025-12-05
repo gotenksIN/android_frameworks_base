@@ -71,9 +71,9 @@
 #include <unistd.h>
 #include <utils/String8.h>
 #include <utils/Trace.h>
-// QTI_BEGIN: 2020-07-29: Core: Add beluga function
+// QTI_BEGIN: 2020-07-29: Performance: Add beluga function
 #include <dlfcn.h>
-// QTI_END: 2020-07-29: Core: Add beluga function
+// QTI_END: 2020-07-29: Performance: Add beluga function
 
 #include <algorithm>
 #include <array>
@@ -665,7 +665,7 @@ static void PreApplicationInit() {
 
   // Set the jemalloc decay time to 1.
   mallopt(M_DECAY_TIME, 1);
-// QTI_BEGIN: 2020-07-29: Core: Add beluga function
+// QTI_BEGIN: 2020-07-29: Performance: Add beluga function
 
   void *mBelugaHandle = nullptr;
   void (*mBeluga)() = nullptr;
@@ -679,7 +679,7 @@ static void PreApplicationInit() {
       mBeluga();
     dlclose(mBelugaHandle);
   }
-// QTI_END: 2020-07-29: Core: Add beluga function
+// QTI_END: 2020-07-29: Performance: Add beluga function
 }
 
 static void SetUpSeccompFilter(uid_t uid, bool is_child_zygote) {

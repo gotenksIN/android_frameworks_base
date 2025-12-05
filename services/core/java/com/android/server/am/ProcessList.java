@@ -468,10 +468,12 @@ public final class ProcessList extends ProcessListInternal
 
     ActivityManagerGlobalLock mProcLock;
 
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
     /**
      * BoostFramework Object
      */
     public static BoostFramework mPerfServiceStartHint = new BoostFramework();
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
 
     private static final String PROPERTY_APPLY_SDK_SANDBOX_AUDIT_RESTRICTIONS =
             "apply_sdk_sandbox_audit_restrictions";
@@ -1477,6 +1479,7 @@ public final class ProcessList extends ProcessListInternal
         }
     }
 
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
     /**
      * Set the out-of-memory badness adjustment for a process.
      * If {@code pid <= 0}, this method will be a no-op.
@@ -1513,6 +1516,7 @@ public final class ProcessList extends ProcessListInternal
         }
     }
 
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
 
     // The max size for PROCS_PRIO cmd in LMKD
     private static final int MAX_PROCS_PRIO_PACKET_SIZE = 3;
@@ -1552,6 +1556,7 @@ public final class ProcessList extends ProcessListInternal
             buf.putInt(uid);
             buf.putInt(amt);
             buf.putInt(0);  // Default proc type to PROC_TYPE_APP
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             total_procs_in_buf++;
         }
         writeLmkd(buf, null);
@@ -1564,7 +1569,9 @@ public final class ProcessList extends ProcessListInternal
      *
      * {@hide}
      */
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
     public static void batchSetOomAdjExt(ArrayList<ProcessRecordInternal> apps) {
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         final int totalApps = apps.size();
         if (totalApps == 0) {
             return;
@@ -1575,10 +1582,12 @@ public final class ProcessList extends ProcessListInternal
         int total_procs_in_buf = 0;
         buf.putInt(LMK_PROCS_PRIO);
         for (int i = 0; i < totalApps; i++) {
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             final ProcessRecord app = (ProcessRecord) apps.get(i);
             final int pid = app.getPid();
             final int amt = app.getCurAdj();
             final int uid = app.uid;
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             if (pid <= 0 || amt == UNKNOWN_ADJ) continue;
             if (total_procs_in_buf >= MAX_PROCS_PRIO_PACKET_SIZE) {
                 writeLmkd(buf, null);
@@ -1587,14 +1596,18 @@ public final class ProcessList extends ProcessListInternal
                 buf.allocate(MAX_OOM_ADJ_BATCH_LENGTH);
                 buf.putInt(LMK_PROCS_PRIO);
             }
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             String packageName = app.info.packageName;
             String processName = app.processName;
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             int isMainProc = 0;
             int isSystemApp = 0;
             if (packageName.equals(processName)) {
                 isMainProc = 1;
             }
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             if (app.info.isSystemApp()) {
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                 isSystemApp = 1;
             }
             buf.putInt(pid);
@@ -1603,6 +1616,7 @@ public final class ProcessList extends ProcessListInternal
             buf.putInt(isSystemApp);
             buf.putInt(isMainProc);
             buf.putInt(0);  // Default proc type to PROC_TYPE_APP
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             total_procs_in_buf++;
         }
         writeLmkd(buf, null);
@@ -2620,16 +2634,24 @@ public final class ProcessList extends ProcessListInternal
                 storageManagerInternal.prepareStorageDirs(userId, pkgDataInfoMap.keySet(),
                         app.processName);
             }
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
             if (mPerfServiceStartHint != null) {
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_BEGIN: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
                 if ((hostingRecord.getType() != null)
+// QTI_END: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
                        && (hostingRecord.getType().equals(HostingRecord.HOSTING_TYPE_NEXT_ACTIVITY)
                                || hostingRecord.getType().equals(HostingRecord.HOSTING_TYPE_NEXT_TOP_ACTIVITY))) {
+// QTI_BEGIN: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
                                    //TODO: not acting on pre-activity
+// QTI_END: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
                     if (startResult != null) {
                         mPerfServiceStartHint.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName, startResult.pid, BoostFramework.Launch.TYPE_START_PROC);
                     }
                 }
             }
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
             checkSlow(startTime, "startProcess: returned from zygote!");
             return startResult;
         } finally {

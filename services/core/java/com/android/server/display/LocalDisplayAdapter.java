@@ -784,7 +784,9 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                 }
 
                 final Resources res = getOverlayContext().getResources();
+// QTI_BEGIN: 2019-05-01: Display: Add support to check for Built-in Display
                 final boolean isBuiltIn = ((mInfo.address) != null) ?
+// QTI_END: 2019-05-01: Display: Add support to check for Built-in Display
                    ((((DisplayAddress) mInfo.address).getPort() & 0x80) == 0x80) : false;
 
                 mInfo.flags |= DisplayDeviceInfo.FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY;
@@ -795,8 +797,11 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                             && SystemProperties.getBoolean(PROPERTY_EMULATOR_CIRCULAR, false))) {
                         mInfo.flags |= DisplayDeviceInfo.FLAG_ROUND;
                     }
+// QTI_BEGIN: 2019-05-01: Display: Add support to check for Built-in Display
                 } else if (isBuiltIn) {
+// QTI_END: 2019-05-01: Display: Add support to check for Built-in Display
                     mInfo.type = Display.TYPE_INTERNAL;
+// QTI_BEGIN: 2019-05-01: Display: Add support to check for Built-in Display
                     mInfo.touch = DisplayDeviceInfo.TOUCH_INTERNAL;
                     mInfo.name = getContext().getResources().getString(
                             com.android.internal.R.string.display_manager_built_in_display_name);
@@ -814,6 +819,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                         mInfo.flags |= DisplayDeviceInfo.FLAG_OWN_CONTENT_ONLY;
                     }
 
+// QTI_END: 2019-05-01: Display: Add support to check for Built-in Display
                     mInfo.setAssumedDensityForExternalDisplay(mActiveSfDisplayMode.width, mActiveSfDisplayMode.height);
                 } else {
                     if (shouldOwnContentOnly()) {

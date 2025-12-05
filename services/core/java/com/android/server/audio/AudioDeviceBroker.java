@@ -12,11 +12,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  *
+// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
  */
 package com.android.server.audio;
 
@@ -1056,6 +1058,7 @@ public class AudioDeviceBroker {
     @GuardedBy("mBluetoothAudioStateLock")
     private boolean mBluetoothLeSuspendedApplied;
 
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     // SCO SWB params
     @GuardedBy("mBluetoothAudioStateLock")
     private boolean mHasSwbLc3Enabled;
@@ -1069,6 +1072,7 @@ public class AudioDeviceBroker {
     @GuardedBy("mBluetoothAudioStateLock")
     private boolean mHasWbsEnabled;
 
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     private void initAudioHalBluetoothState() {
         synchronized (mBluetoothAudioStateLock) {
             mBluetoothScoOnApplied = false;
@@ -1078,6 +1082,7 @@ public class AudioDeviceBroker {
         }
     }
 
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     private void initScoParams() {
         synchronized (mBluetoothAudioStateLock) {
             mHasSwbLc3Enabled = false;
@@ -1094,10 +1099,14 @@ public class AudioDeviceBroker {
             String[] kvpairs = keyValuePairs.split(";");
             for (String pair : kvpairs) {
                 String[] kv = pair.split("=");
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
+// QTI_BEGIN: 2024-08-22: Audio: Fix string comparison for received SCO params
                 if (kv[0].equals("bt_lc3_swb")) {
                     mHasSwbLc3Enabled = ((kv[1].equals("on")) ? true : false);
                 } else if (kv[0].equals("bt_swb")) {
                     mHasSwbAptXEnabled = ((kv[1].equals("0")) ? true : false);
+// QTI_END: 2024-08-22: Audio: Fix string comparison for received SCO params
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
                 }
             }
         }
@@ -1115,6 +1124,7 @@ public class AudioDeviceBroker {
         }
     }
 
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
     @GuardedBy("mBluetoothAudioStateLock")
     private void updateAudioHalBluetoothState() {
         if (mBluetoothScoOn != mBluetoothScoOnApplied) {
@@ -1131,12 +1141,14 @@ public class AudioDeviceBroker {
                     AudioSystem.setParameters("LeAudioSuspended=true");
                     mBluetoothLeSuspendedApplied = true;
                 }
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
                 // set SCO related parameters before sending SCO on
                 AudioSystem.setParameters("bt_lc3_swb=" + (mHasSwbLc3Enabled ? "on" : "off"));
                 AudioSystem.setParameters("bt_swb=" + (mHasSwbAptXEnabled ? "0" : "65535"));
                 AudioSystem.setParameters("bt_headset_name=" + mBtHeadsetName
                         + ";bt_headset_nrec=" + (mHasNrecEnabled ? "on" : "off")
                         + ";bt_wbs=" + (mHasWbsEnabled ? "on" : "off"));
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
                 AudioSystem.setParameters("BT_SCO=on");
             } else {
                 AudioSystem.setParameters("BT_SCO=off");
@@ -1192,12 +1204,14 @@ public class AudioDeviceBroker {
         if (mBluetoothScoOnApplied) {
             AudioSystem.setParameters("A2dpSuspended=true");
             AudioSystem.setParameters("LeAudioSuspended=true");
+// QTI_BEGIN: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
             // apply cached SCO parameters before sending SCO on
             AudioSystem.setParameters("bt_lc3_swb=" + (mHasSwbLc3Enabled ? "on" : "off"));
             AudioSystem.setParameters("bt_swb=" + (mHasSwbAptXEnabled ? "0" : "65535"));
             AudioSystem.setParameters("bt_headset_name=" + mBtHeadsetName
                     + ";bt_headset_nrec=" + (mHasNrecEnabled ? "on" : "off")
                     + ";bt_wbs=" + (mHasWbsEnabled ? "on" : "off"));
+// QTI_END: 2024-07-18: Audio: Route SCO related params through AudioDeviceBroker to AHAL
             AudioSystem.setParameters("BT_SCO=on");
             mBluetoothA2dpSuspendedApplied = true;
             mBluetoothLeSuspendedApplied = true;
@@ -1742,8 +1756,10 @@ public class AudioDeviceBroker {
 
     /*package*/ void setLeAudioTimeout(String address, int device, int codec, int delayMs) {
         sendIILMsg(MSG_IIL_BTLEAUDIO_TIMEOUT, SENDMSG_QUEUE, device, codec, address, delayMs);
+// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
     }
 
+// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
     /*package*/ void setHearingAidTimeout(String address, int delayMs) {
         sendLMsg(MSG_IL_BT_HEARING_AID_TIMEOUT, SENDMSG_QUEUE, address, delayMs);
     }

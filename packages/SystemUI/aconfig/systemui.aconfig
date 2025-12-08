@@ -175,16 +175,6 @@ flag {
 }
 
 flag {
-  name: "communal_edit_widgets_activity_finish_fix"
-  namespace: "systemui"
-  description: "finish edit widgets activity when stopping"
-  bug: "354725145"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "communal_hub_use_thread_pool_for_widgets"
   namespace: "systemui"
   description: "Use a dedicated thread pool executor for loading widgets on glanceable hub"
@@ -233,16 +223,6 @@ flag {
   namespace: "systemui"
   description: "Allow resizing of widgets on glanceable hub"
   bug: "368053818"
-}
-
-flag {
-  name: "communal_widget_trampoline_fix"
-  namespace: "systemui"
-  description: "fixes activity starts caused by non-activity trampolines from widgets."
-  bug: "350468769"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -324,16 +304,6 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-   name: "disable_flags_per_display"
-   namespace: "systemui"
-   description: "Make sure DisableFlags are implemented per display"
-   bug: "437310166"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -1577,16 +1547,6 @@ flag {
 }
 
 flag {
-    name: "screenshot_scroll_crop_view_crash_fix"
-    namespace: "systemui"
-    description: "Mitigate crash on invalid computed range in CropView"
-    bug: "232633995"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
   name: "secondary_user_widget_host"
   namespace: "systemui"
   description: "Host communal widgets in the current secondary user on HSUM."
@@ -1604,13 +1564,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-  name: "shade_expands_on_status_bar_long_press"
-  namespace: "systemui"
-  description: "Expands the shade on long press of any status bar"
-  bug: "371224114"
 }
 
 flag {
@@ -1945,6 +1898,13 @@ flag {
 }
 
 flag {
+    name: "stl_user_action_gesture"
+    namespace: "systemui"
+    description: "Enables internal support for the UserActionGesture interface in STL"
+    bug: "419520966"
+}
+
+flag {
    name: "switch_user_on_bg"
    namespace: "systemui"
    description: "Does user switching on a background thread"
@@ -2047,4 +2007,15 @@ flag {
          purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "wider_landscape_notifications"
+    namespace: "systemui"
+    description: "Make notifications take up more horizontal space in landscape single shade."
+    bug: "433921584"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
 # go/keep-sorted end

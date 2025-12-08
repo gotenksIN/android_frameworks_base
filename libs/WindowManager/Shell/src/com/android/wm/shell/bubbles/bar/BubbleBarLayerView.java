@@ -542,8 +542,7 @@ public class BubbleBarLayerView extends FrameLayout
 
     public void removeBubble(@NonNull Bubble bubble, @NonNull Runnable endAction) {
         final boolean inTransition = bubble.getCurrentTransition() != null;
-        ProtoLog.d(WM_SHELL_BUBBLES_NOISY,
-                "BBLayerView.removeBubble(): bubble=%s hasBubbles=%b inTransition=%b",
+        BubbleLog.d("BubbleBarLayerView.removeBubble(): bubble=%s hasBubbles=%b inTransition=%b",
                 bubble, !mBubbleData.getBubbles().isEmpty(), inTransition);
         Runnable cleanUp = () -> {
             // The transition is already managing the task/wm state.
@@ -758,13 +757,19 @@ public class BubbleBarLayerView extends FrameLayout
     }
 
 
-    private void startMonitoringSwipeUpGesture() {
+    /**
+     * Starts the monitoring of gestures on the nav bar.
+     */
+    public void startMonitoringSwipeUpGesture() {
         if (ContextUtils.isGestureNavigationMode(mContext)) {
             mBubbleBarGestureNavSwipeController.startMonitoring();
         }
     }
 
-    private void stopMonitoringSwipeUpGesture() {
+    /**
+     * Stops the monitoring of gestures on the nav bar.
+     */
+    public void stopMonitoringSwipeUpGesture() {
         if (ContextUtils.isGestureNavigationMode(mContext)) {
             mBubbleBarGestureNavSwipeController.stopMonitoring();
         }

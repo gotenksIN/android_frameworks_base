@@ -1627,9 +1627,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return false;
         }
 
-        // The activity may be waiting for stop, but that is no longer
-        // appropriate for it.
-        mTaskSupervisor.mStoppingActivities.remove(next);
 // QTI_BEGIN: 2023-05-22: Performance: DSR: Fix broken DSR
 
         if (!next.translucentWindowLaunch)
@@ -1828,6 +1825,10 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             mAtmService.updateCpuStats();
 
             ProtoLog.v(WM_DEBUG_STATES, "Moving to RESUMED: %s (in existing)", next);
+
+            // The activity may be waiting for stop, but that is no longer
+            // appropriate for it.
+            mTaskSupervisor.mStoppingActivities.remove(next);
 
             next.setState(RESUMED, "resumeTopActivity");
 
@@ -2221,8 +2222,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 } else if (!prev.isVisibleRequested() || shouldSleepOrShutDownActivities()) {
                     // If we were visible then resumeTopActivities will release resources before
                     // stopping.
-                    prev.addToStopping(true /* scheduleIdle */, false /* idleDelayed */,
-                            "completePauseLocked");
+                    prev.addToStopping(true /* scheduleIdle */, "completePauseLocked");
                 }
             } else {
                 ProtoLog.v(WM_DEBUG_STATES, "App died during pause, not stopping: %s", prev);

@@ -29,7 +29,6 @@ import android.accounts.AccountManager;
 import android.accounts.IAccountManager;
 import android.adservices.AdServicesFrameworkInitializer;
 import android.aiseal.AiSealManager;
-import android.aiseal.IAiSealHostService;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -113,6 +112,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ShortcutManager;
 import android.content.pm.verify.domain.DomainVerificationManager;
 import android.content.pm.verify.domain.IDomainVerificationManager;
+import android.content.pm.webapp.WebAppFrameworkInitializer;
 import android.content.res.Resources;
 import android.content.rollback.RollbackManagerFrameworkInitializer;
 import android.credentials.CredentialManager;
@@ -275,6 +275,7 @@ import android.service.persistentdata.IPersistentDataBlockService;
 import android.service.persistentdata.PersistentDataBlockManager;
 import android.service.personalcontext.IPersonalContextManager;
 import android.service.personalcontext.PersonalContextManager;
+import android.service.uprobestats.DynamicInstrumentationManager;
 import android.service.uprobestats.UprobestatsFrameworkInitializer;
 import android.service.vr.IVrManager;
 import android.system.virtualmachine.VirtualizationFrameworkInitializer;
@@ -320,6 +321,7 @@ import com.android.internal.net.INetworkWatchlistManager;
 import com.android.internal.os.IBinaryTransparencyService;
 import com.android.internal.os.IDropBoxManagerService;
 import com.android.internal.policy.PhoneLayoutInflater;
+import com.android.internal.telecom.TelecomDependencies;
 import com.android.internal.util.Preconditions;
 import com.android.modules.utils.ravenwood.RavenwoodHelper;
 
@@ -829,12 +831,15 @@ public final class SystemServiceRegistry {
                     return new TelephonyRegistryManager(ctx);
                 }});
 
-        registerService(Context.TELECOM_SERVICE, TelecomManager.class,
+        if (!android.telecom.flags.Flags.telecomMainlineApi()) {
+            registerService(Context.TELECOM_SERVICE, TelecomManager.class,
                 new CachedServiceFetcher<TelecomManager>() {
-            @Override
-            public TelecomManager createService(ContextImpl ctx) {
-                return new TelecomManager(ctx.getOuterContext());
-            }});
+                    @Override
+                    public TelecomManager createService(ContextImpl ctx) {
+                        return TelecomDependencies.createTelecomManager(ctx);
+                    }
+                });
+        }
 
         registerService(Context.MMS_SERVICE, MmsManager.class,
                 new CachedServiceFetcher<MmsManager>() {
@@ -2042,6 +2047,20 @@ public final class SystemServiceRegistry {
                     });
         }
 
+        registerService(Context.DYNAMIC_INSTRUMENTATION_SERVICE,
+                DynamicInstrumentationManager.class,
+                new CachedServiceFetcher<DynamicInstrumentationManager>() {
+                    @Override
+                    public DynamicInstrumentationManager createService(ContextImpl ctx)
+                            throws ServiceNotFoundException {
+                        if (!android.security.Flags.dynamicInstrumentationApi()) {
+                            throw new ServiceNotFoundException(
+                                    Context.DYNAMIC_INSTRUMENTATION_SERVICE + " is not supported");
+                        }
+                        return new DynamicInstrumentationManager(ctx);
+                    }
+                });
+
         sInitializing = true;
         try {
             // Note: the following functions need to be @SystemApis, once they become mainline
@@ -2073,6 +2092,14 @@ public final class SystemServiceRegistry {
             NpuManagerFrameworkInitializer.registerServiceWrappers();
             VirtualizationFrameworkInitializer.registerServiceWrappers();
             ConnectivityFrameworkInitializerBaklava.registerServiceWrappers();
+
+            if (android.telecom.flags.Flags.telecomMainlineApi()) {
+                TelecomDependencies.registerServiceWrapper();
+            }
+
+            if (com.android.webapp.flags.Flags.enableWebAppService()) {
+                WebAppFrameworkInitializer.registerServiceWrappers();
+            }
 
             if (newStoragePublicApi()) {
                 ConfigInfrastructureFrameworkInitializer.registerServiceWrappers();

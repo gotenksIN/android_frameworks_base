@@ -2121,8 +2121,9 @@
          See com.android.server.timezonedetector.TimeZoneDetectorStrategy for more information. -->
     <bool name="config_supportTelephonyTimeZoneFallback" translatable="false">true</bool>
 
-    <!-- Whether the time notifications feature is enabled. Settings this to false means the feature
-         cannot be used. Setting this to true means the feature can be enabled on the device. -->
+    <!-- Whether the time zone notifications feature is enabled. Settings this to false means the
+         feature cannot be used. Setting this to true means the feature can be enabled on the
+         device. -->
     <bool name="config_enableTimeZoneNotificationsSupported" translatable="false">true</bool>
 
     <!-- Whether the time zone notifications tracking feature is enabled. Settings this to false
@@ -2132,6 +2133,11 @@
     <!-- Whether the time zone manual change tracking feature is enabled. Settings this to false
          means the feature cannot be used. -->
     <bool name="config_enableTimeZoneManualChangeTrackingSupported" translatable="false">true</bool>
+
+    <!-- Whether the time zone offset change notifications feature is enabled. Settings this to
+         false means the feature cannot be used. Setting this to true means the feature can be enabled
+         on the device. -->
+    <bool name="config_enableTimeZoneOffsetChangeNotificationsSupported" translatable="false">true</bool>
 
     <!-- Whether to enable network location overlay which allows network location provider to be
          replaced by an app at run-time. When disabled, only the
@@ -3346,7 +3352,9 @@
          ignored, since an initial Admin MainUser will necessarily be created regardless. -->
     <bool name="config_createInitialAdminUserOnHsum">true</bool>
 
-    <!-- Whether the system should "designate" the main user on boot:
+    <!-- Experimental development-only config specifying whether the system should "designate" the
+         main user on boot.
+         TODO(b/428080837): Remove this config now that it is no longer needed.
          - If it's true and the device doesn't have a main user (meaning it's the first boot or it
            migrated from false to true), then the system will either promote the first admin
            (migration) to be the main user, or create a main user (first boot).
@@ -3356,7 +3364,7 @@
          Notice that if config_isMainUserPermanentAdmin is true, this config is
          ignored (i.e, the system will act as it was true) as main user is required in this case.
     -->
-    <bool name="config_designateMainUser">false</bool>
+    <bool name="config_experimental_designateMainUser">false</bool>
 
     <!-- Whether switching to the headless system user is allowed.
          If allowed, the headless system user can run in the foreground even though it is not a
@@ -3387,6 +3395,15 @@
          1 : boot to the headless system user, except on the initial boot (unprovisioned device),
              in which case, boot to the first full user. -->
     <integer name="config_hsumBootStrategy">0</integer>
+
+    <!-- Indicates the mode of activities allowlist for HSU (Headless System User)
+         This config has no effect if the device is not in HSUM.
+         0 (Default): disabled
+         1: enabled (allowlist read from arrays/hsu_allowlist_activities)
+         2: log-only (disabled, but logs what would be blocked if enabled)
+    -->
+    <integer name="config_hsuActivitiesAllowlistMode">0</integer>
+
 
     <!-- Whether multiple admins are allowed on the device. If set to true, new users can be created
          with admin privileges and admin privileges can be granted/revoked from existing users. -->
@@ -7942,4 +7959,7 @@
     <!-- The number of overuses a package has to exceed for TV watchdog to attribute
          recurring overuse. -->
     <integer name="config_tvWatchdogRecurringOveruseTimes">3</integer>
+
+     <!-- Whether to enable app launch blur -->
+    <bool name="config_enableAppLaunchBlur">true</bool>
 </resources>

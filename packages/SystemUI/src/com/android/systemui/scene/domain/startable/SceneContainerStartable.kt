@@ -21,6 +21,7 @@ import android.view.Display
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
+import com.android.compose.animation.scene.TransitionKey
 import com.android.internal.logging.UiEventLogger
 import com.android.keyguard.AuthInteractionProperties
 import com.android.systemui.CoreStartable
@@ -49,6 +50,7 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardEnabledInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardOcclusionInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardSurfaceBehindInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardWakeDirectlyToGoneInteractor
 import com.android.systemui.keyguard.domain.interactor.TrustInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.log.table.TableLogBuffer
@@ -73,6 +75,7 @@ import com.android.systemui.scene.shared.logger.SceneLogger
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.SceneFamilies
 import com.android.systemui.scene.shared.model.Scenes
+import com.android.systemui.scene.shared.model.TransitionKeys.ToAlwaysOnDisplay
 import com.android.systemui.scene.shared.model.isKeyguardScene
 import com.android.systemui.shade.domain.interactor.ShadeDisplaysInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
@@ -165,6 +168,7 @@ constructor(
     private val surfaceBehindInteractor: KeyguardSurfaceBehindInteractor,
     private val lockscreenUserManager: NotificationLockscreenUserManager,
     private val keyguardDismissActionInteractor: KeyguardDismissActionInteractor,
+    private val wakeDirectlyToGoneInteractor: KeyguardWakeDirectlyToGoneInteractor,
 ) : CoreStartable {
     private val centralSurfaces: CentralSurfaces?
         get() = centralSurfacesOptLazy.get().getOrNull()
@@ -290,7 +294,13 @@ constructor(
     /** Updates the visibility of the scene container. */
     private fun hydrateVisibility() {
         applicationScope.launch {
-            deviceProvisioningInteractor.isDeviceProvisioned
+            combine(
+                    deviceProvisioningInteractor.isDeviceProvisioned,
+                    deviceUnlockedInteractor.deviceUnlockStatus,
+                ) { isProvisioned, unlockStatus ->
+                    isProvisioned || !unlockStatus.isUnlocked
+                }
+                .distinctUntilChanged()
                 .flatMapLatest { isAllowedToBeVisible ->
                     if (isAllowedToBeVisible) {
                         combine(
@@ -352,7 +362,7 @@ constructor(
                             }
                             .distinctUntilChanged()
                     } else {
-                        flowOf(false to "Device not provisioned or Factory Reset Protection active")
+                        flowOf(false to "Device not provisioned and unlocked")
                     }
                 }
                 .collect { (isVisible, loggingReason) ->
@@ -726,22 +736,23 @@ constructor(
                     switchToScene(
                         targetSceneKey = Scenes.Lockscreen,
                         loggingReason = "device is starting to sleep",
+                        transitionKey =
+                            if (keyguardInteractor.isAodAvailable.value) ToAlwaysOnDisplay
+                            else null,
                         keyguardState = getKeyguardStateForWakefulness(isAwake = false),
                         freezeAndAnimateToCurrentState = true,
+                        instantlySnapScenes = keyguardInteractor.isAodAvailable.value,
                     )
                 } else {
-                    val canSwipeToEnter = deviceEntryInteractor.canSwipeToEnter.value
-                    val isUnlocked = deviceUnlockedInteractor.deviceUnlockStatus.value.isUnlocked
-                    if (isUnlocked && canSwipeToEnter == false) {
+                    if (wakeDirectlyToGoneInteractor.canWakeDirectlyToGone.value) {
                         val isTransitioningToLockscreen =
                             sceneInteractor.transitioningTo.value == Scenes.Lockscreen
                         if (!isTransitioningToLockscreen) {
                             switchToScene(
                                 targetSceneKey = Scenes.Gone,
                                 loggingReason =
-                                    "device is waking up while unlocked without the ability to" +
-                                        " swipe up on lockscreen to enter and not on or" +
-                                        " transitioning to, the lockscreen scene.",
+                                    "device is waking up while we can wake directly to gone, and " +
+                                        "is not already en route to lockscreen",
                             )
                         }
                     } else if (
@@ -751,6 +762,14 @@ constructor(
                         sceneInteractor.showOverlay(
                             overlay = Overlays.Bouncer,
                             loggingReason = "device is starting to wake up with a locked sim",
+                        )
+                    } else if (
+                        occlusionInteractor.isKeyguardOccluded.value &&
+                            !keyguardInteractor.isDreaming.value
+                    ) {
+                        switchToScene(
+                            targetSceneKey = Scenes.Occluded,
+                            loggingReason = "device is waking up while occluded",
                         )
                     }
                 }
@@ -1154,6 +1173,7 @@ constructor(
     private fun switchToScene(
         targetSceneKey: SceneKey,
         loggingReason: String,
+        transitionKey: TransitionKey? = null,
         keyguardState: KeyguardState? = null,
         freezeAndAnimateToCurrentState: Boolean = false,
         hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
@@ -1176,6 +1196,7 @@ constructor(
             sceneInteractor.changeScene(
                 toScene = targetSceneKey,
                 loggingReason = loggingReason,
+                transitionKey = transitionKey,
                 keyguardState = keyguardState,
                 forceSettleToTargetScene = freezeAndAnimateToCurrentState,
                 hideAllOverlays = hideOverlays == HideOverlayCommand.HideAll,

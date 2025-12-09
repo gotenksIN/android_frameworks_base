@@ -2473,7 +2473,7 @@ public class UserManagerService extends IUserManager.Stub {
         unlockIntent.putExtra(Intent.EXTRA_INTENT, pendingIntent.getIntentSender());
         unlockIntent.setFlags(FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
 
-        if (Flags.enablePrivateSpaceFeatures() && Flags.usePrivateSpaceIconInBiometricPrompt()
+        if (Flags.enablePrivateSpaceFeatures()
                 && getUserInfo(userId).isPrivateProfile()) {
             unlockIntent.putExtra(CUSTOM_BIOMETRIC_PROMPT_LOGO_RES_ID_KEY,
                     com.android.internal.R.drawable.stat_sys_private_profile_status);
@@ -5254,8 +5254,10 @@ public class UserManagerService extends IUserManager.Stub {
                         allowlistedActivities.length, userType);
 
             }
+
+            int allowlistMode = resources.getInteger(R.integer.config_hsuActivitiesAllowlistMode);
             userActivitiesAllowlist.put(userType,
-                    new UserActivitiesAllowlist(allowlistedActivities));
+                    new UserActivitiesAllowlist(allowlistMode, allowlistedActivities));
         }
         return userActivitiesAllowlist;
     }

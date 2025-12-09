@@ -2319,7 +2319,6 @@ public final class NotificationPanelViewController implements
             Log.i(TAG, "Ignoring status Bar long press on virtualized test device.");
             return;
         }
-        ShadeExpandsOnStatusBarLongPress.unsafeAssertInNewMode();
         mStatusBarLongPressDowntime = event.getDownTime();
         if (isTracking()) {
             onTrackingStopped(true);
@@ -4047,8 +4046,7 @@ public final class NotificationPanelViewController implements
             boolean handled = mHeadsUpTouchHelper.onTouchEvent(event);
 
             // This touch session has already resulted in shade expansion. Ignore everything else.
-            if (ShadeExpandsOnStatusBarLongPress.isEnabled()
-                    && event.getActionMasked() != MotionEvent.ACTION_DOWN
+            if (event.getActionMasked() != MotionEvent.ACTION_DOWN
                     && event.getDownTime() == mStatusBarLongPressDowntime) {
                 mShadeLog.d("Touch has same down time as Status Bar long press. Ignoring.");
                 return false;

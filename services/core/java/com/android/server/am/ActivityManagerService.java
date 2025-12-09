@@ -83,6 +83,7 @@ import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_HIGH;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_NORMAL;
 import static android.os.IServiceManager.DUMP_FLAG_PROTO;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
+import static android.os.PerfettoTrace.BIG_LOCKS_V3;
 import static android.os.PowerExemptionManager.REASON_ACTIVITY_VISIBILITY_GRACE_PERIOD;
 import static android.os.PowerExemptionManager.REASON_BACKGROUND_ACTIVITY_PERMISSION;
 import static android.os.PowerExemptionManager.REASON_BOOT_COMPLETED;
@@ -256,6 +257,7 @@ import android.app.ActivityTaskManager.RootTaskInfo;
 import android.app.ActivityThread;
 import android.app.AnrController;
 import android.app.AppGlobals;
+import android.app.AppLockInternal;
 import android.app.AppOpsManager;
 import android.app.AppOpsManager.AttributionFlags;
 import android.app.AppOpsManagerInternal.CheckOpsDelegate;
@@ -456,6 +458,7 @@ import com.android.internal.app.procstats.ProcessStats;
 import com.android.internal.app.ActivityTrigger;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import com.android.internal.content.InstallLocationUtils;
+import com.android.internal.dev.perfetto.sdk.PerfettoTrace;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.notification.SystemNotificationChannels;
 import com.android.internal.os.ApplicationSharedMemory;
@@ -898,17 +901,20 @@ public class ActivityManagerService extends IActivityManager.Stub
             THREAD_PRIORITY_FOREGROUND, LockGuard.INDEX_ACTIVITY);
 
     static void boostPriorityForLockedSection() {
+        PerfettoTrace.begin(BIG_LOCKS_V3, "ams_lock_acquire").emit();
         sThreadPriorityBooster.boost();
     }
 
     static void resetPriorityAfterLockedSection() {
         sThreadPriorityBooster.reset();
+        PerfettoTrace.end(BIG_LOCKS_V3).emit();
     }
 
     private static ThreadPriorityBooster sProcThreadPriorityBooster = new ThreadPriorityBooster(
             THREAD_PRIORITY_FOREGROUND, LockGuard.INDEX_PROC);
 
     static void boostPriorityForProcLockedSection() {
+        PerfettoTrace.begin(BIG_LOCKS_V3, "proc_lock_acquire").emit();
         if (ENABLE_PROC_LOCK) {
             sProcThreadPriorityBooster.boost();
         } else {
@@ -922,6 +928,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         } else {
             sThreadPriorityBooster.reset();
         }
+        PerfettoTrace.end(BIG_LOCKS_V3).emit();
     }
 
     /**
@@ -1244,6 +1251,13 @@ public class ActivityManagerService extends IActivityManager.Stub
                         startInfo.getRealUid(),
                         startInfo.getPackageName(),
                         ProfilingTrigger.TRIGGER_TYPE_APP_FULLY_DRAWN);
+
+                if (android.os.profiling.Flags.profilingTriggerColdStart()) {
+                    stopActiveProfiling(
+                            startInfo.getRealUid(),
+                            startInfo.getPackageName(),
+                            ProfilingTrigger.TRIGGER_TYPE_COLD_START);
+                }
             }
         }
     };
@@ -1595,6 +1609,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     UriGrantsManagerInternal mUgmInternal;
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public final ActivityManagerInternal mInternal;
+    @Nullable private final AppLockLocalService mAppLockLocalService;
     final ActivityThread mSystemThread;
 
     final UidObserverController mUidObserverController;
@@ -2552,6 +2567,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         mFactoryTest = FACTORY_TEST_OFF;
         mUgmInternal = LocalServices.getService(UriGrantsManagerInternal.class);
         mInternal = new LocalService();
+        mAppLockLocalService =
+                (android.security.Flags.appLockApis() && android.security.Flags.appLockCore())
+                        ? new AppLockLocalService(this) : null;
         mPendingStartActivityUids = new PendingStartActivityUids();
         mUseFifoUiScheduling = false;
         mBroadcastQueue = injector.getBroadcastQueue(this);
@@ -2672,6 +2690,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         mInternal = new LocalService();
+        mAppLockLocalService =
+                (android.security.Flags.appLockApis() && android.security.Flags.appLockCore())
+                        ? new AppLockLocalService(this) : null;
         mPendingStartActivityUids = new PendingStartActivityUids();
         mTraceErrorLogger = new TraceErrorLogger();
         mComponentAliasResolver = new ComponentAliasResolver(this);
@@ -2717,6 +2738,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         mProcessStats.publish();
         Slog.d("AppOps", "AppOpsService published");
         LocalServices.addService(ActivityManagerInternal.class, mInternal);
+        if (mAppLockLocalService != null) {
+            LocalServices.addService(AppLockInternal.class, mAppLockLocalService);
+        }
         LocalManagerRegistry.addManager(ActivityManagerLocal.class,
                 (ActivityManagerLocal) mInternal);
         mActivityTaskManager.onActivityManagerInternalAdded();
@@ -2751,12 +2775,26 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     boolean validateAssociationAllowedLocked(String pkg1, int uid1, String pkg2, int uid2,
             @AssociationType int associationType) {
+        return validateAssociationAllowedLocked(pkg1, uid1, pkg2, uid2, associationType,
+                /* extras= */ null);
+    }
+
+    /**
+     * Returns true if the package {@code pkg1} running under user handle {@code uid1} is
+     * allowed association with the package {@code pkg2} running under user handle {@code uid2}.
+     * <p> If either of the packages are running as  part of the core system, then the
+     * association is implicitly allowed.
+     * <p> {@code extras} are checked for some associations to enforce one-way data flow into the
+     * PCC sandbox.
+     */
+    boolean validateAssociationAllowedLocked(String pkg1, int uid1, String pkg2, int uid2,
+            @AssociationType int associationType, @Nullable Bundle extras) {
         boolean callerOrTargetIsPcc = false;
         if (enablePccFrameworkSupport()) {
             callerOrTargetIsPcc =
                     Process.isPrivateComputeCoreUid(uid1) || Process.isPrivateComputeCoreUid(uid2);
             if (callerOrTargetIsPcc && validateAssociationAllowedForPccLocked(
-                    uid1, pkg1, uid2, pkg2, associationType)) {
+                    uid1, pkg1, uid2, pkg2, associationType, extras)) {
                 return true;
             }
         }
@@ -2797,14 +2835,14 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     boolean validateAssociationAllowedForPccLocked(
             int callerUid, String callerPackage, int targetUid, String targetPackage,
-            @AssociationType int associationType) {
+            @AssociationType int associationType, Bundle extras) {
         final PccSandboxManagerInternal pccSandboxManagerInternal =
                 LocalServices.getService(PccSandboxManagerInternal.class);
         if (pccSandboxManagerInternal == null) {
             return false;
         }
         return pccSandboxManagerInternal.validateAssociationAllowed(
-                callerUid, callerPackage, targetUid, targetPackage, associationType);
+                callerUid, callerPackage, targetUid, targetPackage, associationType, extras);
     }
 
     /**
@@ -20687,6 +20725,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     /** Helper method for sending profiling triggers asynchronously. */
+    // TODO: b/465855549 - Refactor profiling logic out of ActivityManagerService
     public void sendProfilingTrigger(int uid, @NonNull String packageName, int triggerType) {
         mHandler.post(new Runnable() {
             @Override public void run() {
@@ -20696,6 +20735,23 @@ public class ActivityManagerService extends IActivityManager.Stub
                 } catch (IllegalStateException e) {
                     // Service isn't set up yet, do nothing, trigger will not be sent.
                    Slog.d(TAG, "Profiling trigger not sent due to Service not running.", e);
+                }
+            }
+        });
+    }
+
+    /**
+     * Stops all active profiling sessions for the given uid, package and trigger type.
+     */
+    private void stopActiveProfiling(int uid, @NonNull String packageName, int triggerType) {
+        mHandler.post(new Runnable() {
+            @Override public void run() {
+                try {
+                    ProfilingServiceHelper.getInstance().stopActiveProfiling(
+                            uid, packageName, triggerType);
+                } catch (IllegalStateException e) {
+                    Slog.d(TAG, "Stop profiling for uid " + uid + ", package " + packageName
+                            + " failed due to service not running.", e);
                 }
             }
         });

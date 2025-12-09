@@ -533,6 +533,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     }
 
     void onSystemReady() {
+        mPersisterQueue.onSystemReady(mService.mContext);
         mLaunchParamsPersister.onSystemReady();
     }
 

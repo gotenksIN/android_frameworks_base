@@ -297,3 +297,23 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "resolve_trampoline_destination_packages"
+    namespace: "multitasking"
+    description: "Fixes a bug where resolving package name for task trampoline."
+    bug: "370653710"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_open_app_bubble_from_lockscreen"
+    namespace: "multitasking"
+    description: "Fix opening app bubble from notification on lock screen"
+    bug: "416389130"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}

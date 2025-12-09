@@ -340,6 +340,23 @@ class SceneContainerStartableTest : SysuiTestCase() {
             assertThat(isVisible).isTrue()
         }
 
+    // Edge case when resuming SetupWizard for a user that has already set an authentication
+    // factor.
+    @Test
+    fun hydrateVisibility_deviceNotProvisionedAndLocked() =
+        kosmos.runTest {
+            val isVisible by collectLastValue(sceneInteractor.isVisible)
+            prepareState(
+                authenticationMethod = AuthenticationMethodModel.Pin,
+                isDeviceUnlocked = false,
+                initialSceneKey = Scenes.Lockscreen,
+                isDeviceProvisioned = false,
+            )
+
+            underTest.start()
+            assertThat(isVisible).isTrue()
+        }
+
     @Test
     fun hydrateVisibility_basedOnOcclusion() =
         kosmos.runTest {
@@ -907,6 +924,26 @@ class SceneContainerStartableTest : SysuiTestCase() {
         }
 
     @Test
+    fun switchToOccluded_whenWakingUp_whileOccluded() =
+        kosmos.runTest {
+            val currentSceneKey by collectLastValue(sceneInteractor.currentScene)
+            prepareState(
+                isDeviceUnlocked = false,
+                initialSceneKey = Scenes.Lockscreen,
+                startsAwake = false,
+            )
+            underTest.start()
+            runCurrent()
+            assertThat(currentSceneKey).isEqualTo(Scenes.Lockscreen)
+
+            keyguardOcclusionInteractor.setWmNotifiedShowWhenLockedActivityOnTop(true, mock())
+            powerInteractor.setAwakeForTest()
+            runCurrent()
+
+            assertThat(currentSceneKey).isEqualTo(Scenes.Occluded)
+        }
+
+    @Test
     @DisableFlags(Flags.FLAG_MSDL_FEEDBACK)
     fun playSuccessHaptics_onSuccessfulLockscreenAuth_udfps() =
         kosmos.runTest {
@@ -1361,7 +1398,8 @@ class SceneContainerStartableTest : SysuiTestCase() {
         }
 
     @Test
-    fun switchToGoneWhenDeviceStartsToWakeUp_authMethodNone() =
+    @EnableSceneContainer
+    fun switchToGoneWhenDeviceStartsToWakeUp_authMethodNone_canIgnoreAuth() =
         kosmos.runTest {
             val currentSceneKey by collectLastValue(sceneInteractor.currentScene)
             prepareState(
@@ -1374,10 +1412,35 @@ class SceneContainerStartableTest : SysuiTestCase() {
             runCurrent()
             assertThat(currentSceneKey).isEqualTo(Scenes.Lockscreen)
 
+            kosmos.keyguardRepository.setCanIgnoreAuthAndReturnToGone(true)
+            runCurrent()
+
             powerInteractor.setAwakeForTest()
             runCurrent()
 
             assertThat(currentSceneKey).isEqualTo(Scenes.Gone)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun doesNotSwitchToGoneWhenDeviceStartsToWakeUp_authMethodNone_canNotIgnoreAuth() =
+        kosmos.runTest {
+            val currentSceneKey by collectLastValue(sceneInteractor.currentScene)
+            prepareState(
+                initialSceneKey = Scenes.Lockscreen,
+                authenticationMethod = AuthenticationMethodModel.None,
+                isLockscreenEnabled = false,
+            )
+            powerInteractor.setAsleepForTest()
+            kosmos.keyguardRepository.setCanIgnoreAuthAndReturnToGone(false)
+            underTest.start()
+            runCurrent()
+            assertThat(currentSceneKey).isEqualTo(Scenes.Lockscreen)
+
+            powerInteractor.setAwakeForTest()
+            runCurrent()
+
+            assertThat(currentSceneKey).isEqualTo(Scenes.Lockscreen)
         }
 
     @Test

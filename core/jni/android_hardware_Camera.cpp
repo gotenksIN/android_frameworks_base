@@ -1229,8 +1229,9 @@ static void android_hardware_Camera_setAudioRestriction(
         jniThrowRuntimeException(env, "camera has been disconnected");
         return;
     }
-
-    int32_t ret = camera->setAudioRestriction(mode);
+    auto modeEnum =
+            static_cast<android::hardware::camera2::ICameraDeviceUser::AudioRestriction>(mode);
+    int32_t ret = camera->setAudioRestriction(modeEnum);
     if (ret < 0) {
         jniThrowRuntimeException(env, "Illegal argument or low-level eror");
         return;
@@ -1247,7 +1248,7 @@ static int32_t android_hardware_Camera_getAudioRestriction(
         return -1;
     }
 
-    int32_t ret = camera->getGlobalAudioRestriction();
+    int32_t ret = static_cast<int32_t>(camera->getGlobalAudioRestriction());
     if (ret < 0) {
         jniThrowRuntimeException(env, "Illegal argument or low-level eror");
         return -1;

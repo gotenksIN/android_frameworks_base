@@ -108,8 +108,10 @@ import com.qti.extphone.ExtPhoneCallbackListener;
 import com.qti.extphone.NrIcon;
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
 // QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
-import com.qti.extphone.NrIconType;
 // QTI_BEGIN: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+import com.qti.extphone.NrIconType;
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 import com.qti.extphone.RadioIcon;
 import com.qti.extphone.RadioIconType;
 import com.qti.extphone.RxCountType;
@@ -176,7 +178,9 @@ public class FiveGServiceClient {
     public static class FiveGServiceState{
 // QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
 // QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
-        private static final String COL_NR_ICON_TYPE = "NrIconType";
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        private static final String COL_Radio_ICON_TYPE = "RadioIconType";
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 // QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
 // QTI_BEGIN: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
@@ -194,9 +198,9 @@ public class FiveGServiceClient {
         public FiveGServiceState(){
 // QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information
 // QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
-// QTI_BEGIN: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
-            mRadioIconType = NrIconType.INVALID;
-// QTI_END: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            mRadioIconType = RadioIconType.TYPE_NONE;
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
             mIs6Rx = false;
@@ -228,10 +232,11 @@ public class FiveGServiceClient {
 
 // QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 // QTI_BEGIN: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
-        public boolean isNrIconTypeValid() {
-// QTI_BEGIN: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
-            return mRadioIconType != NrIconType.INVALID && mRadioIconType != NrIconType.TYPE_NONE;
-// QTI_END: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        public boolean isRadioIconTypeValid() {
+            return mRadioIconType != NrIconType.INVALID
+                    && mRadioIconType != RadioIconType.TYPE_NONE;
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
 // QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
         }
@@ -252,7 +257,9 @@ public class FiveGServiceClient {
         @VisibleForTesting
 // QTI_END: 2019-03-11: Android_UI: SystemUI: Upgrade the logic of 5G NSA icons
 // QTI_BEGIN: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
-        public int getNrIconType() {
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        public int getRadioIconType() {
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 // QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Upgrade the logic of 5G NSA icons
 // QTI_BEGIN: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
@@ -411,9 +418,9 @@ public class FiveGServiceClient {
     private void resetState(int phoneId) {
         Log.d(TAG, "resetState phoneId=" + phoneId);
         FiveGServiceState currentState = getCurrentServiceState(phoneId);
-// QTI_BEGIN: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
-        currentState.mRadioIconType = NrIconType.INVALID;
-// QTI_END: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        currentState.mRadioIconType = RadioIconType.TYPE_NONE;
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2021-05-19: Android_UI: SystemUI: Reset the cache state when registering the listener
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
         currentState.mIs6Rx = false;
@@ -422,9 +429,9 @@ public class FiveGServiceClient {
         currentState.mIconGroup = TelephonyIcons.UNKNOWN;
 
         FiveGServiceState lastState = getLastServiceState(phoneId);
-// QTI_BEGIN: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
-        lastState.mRadioIconType = NrIconType.INVALID;
-// QTI_END: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        lastState.mRadioIconType = RadioIconType.TYPE_NONE;
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2021-05-19: Android_UI: SystemUI: Reset the cache state when registering the listener
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
         lastState.mIs6Rx = false;
@@ -693,7 +700,9 @@ public class FiveGServiceClient {
 // QTI_BEGIN: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
         switch (radioIconType){
 // QTI_END: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
-            case NrIconType.TYPE_5G_BASIC:
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            case RadioIconType.TYPE_5G_BASIC:
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
                 iconGroup = (show6RxConfig && is6Rx) ?
@@ -701,7 +710,9 @@ public class FiveGServiceClient {
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
 // QTI_BEGIN: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
                 break;
-            case NrIconType.TYPE_5G_UWB:
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            case RadioIconType.TYPE_5G_UWB:
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
 // QTI_BEGIN: 2024-05-22: Android_UI: SystemUI: Display 5GA icon for 3CC
                 if (show5Ga) {
@@ -715,7 +726,9 @@ public class FiveGServiceClient {
                 break;
 // QTI_END: 2019-03-11: Android_UI: SystemUI: Change 5G icons by NrIconType
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-            case NrIconType.TYPE_5G_PLUS_PLUS:
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            case RadioIconType.TYPE_5G_PLUS_PLUS:
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
                 iconGroup = (show6RxConfig && is6Rx) ?
                         TelephonyIcons.FIVE_G_PLUS_PLUS_6RX : TelephonyIcons.FIVE_G_PLUS_PLUS;
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons

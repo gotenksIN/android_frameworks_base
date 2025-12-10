@@ -95,13 +95,17 @@ package com.android.systemui.statusbar.policy;
          NrIconType nrIconType = new NrIconType(NrIconType.TYPE_5G_BASIC);
          updateNrIconType(mPhoneId, mToken, mSuccessStatus, nrIconType);
          FiveGServiceState fiveGState = mFiveGServiceClient.getCurrentServiceState(mPhoneId);
-         assertEquals(fiveGState.getNrIconType(), NrIconType.TYPE_5G_BASIC);
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+         assertEquals(fiveGState.getRadioIconType(), NrIconType.TYPE_5G_BASIC);
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 
          //Failure status case
          nrIconType = new NrIconType(NrIconType.TYPE_NONE);
          updateNrIconType(mPhoneId, mToken, mSuccessStatus, nrIconType);
          fiveGState = mFiveGServiceClient.getCurrentServiceState(mPhoneId);
-         assertEquals(fiveGState.getNrIconType(), NrIconType.TYPE_5G_BASIC);
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+         assertEquals(fiveGState.getRadioIconType(), NrIconType.TYPE_5G_BASIC);
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
      }
 
      @Test

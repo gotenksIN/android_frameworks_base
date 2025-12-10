@@ -30,9 +30,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import android.telephony.CellSignalStrength
 import android.telephony.TelephonyManager
-import com.qti.extphone.NrIconType
 // QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_NONE
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+import com.qti.extphone.RadioIconType
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
 
 fun BuildScope.MobileConnectionRepositoryKairosAdapter(
@@ -223,7 +226,9 @@ class MobileConnectionRepositoryKairosAdapter(
     override val dataNetworkType = MutableStateFlow(TelephonyManager.NETWORK_TYPE_UNKNOWN)
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
 // QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
-    override val nrIconType = MutableStateFlow(NrIconType.TYPE_NONE)
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+    override val radioIconType = MutableStateFlow(RadioIconType.TYPE_NONE)
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
     override val is6Rx = MutableStateFlow(false)

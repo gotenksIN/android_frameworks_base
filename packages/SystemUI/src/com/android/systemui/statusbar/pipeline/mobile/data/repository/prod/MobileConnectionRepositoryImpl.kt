@@ -124,9 +124,11 @@ import com.android.systemui.statusbar.policy.FiveGServiceClient.FiveGServiceStat
 import com.android.systemui.statusbar.policy.FiveGServiceClient.IFiveGStateListener
 // QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 // QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
-import com.qti.extphone.NrIconType
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
 import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+import com.qti.extphone.RadioIconType
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -320,9 +322,13 @@ class MobileConnectionRepositoryImpl(
                     override fun onStateChanged(serviceState: FiveGServiceState) {
 // QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-                        logger.logOnNrIconTypeChanged(serviceState.nrIconType,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                        logger.logOnRadioIconTypeChanged(serviceState.radioIconType,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
                             serviceState.is6Rx, subId)
-                        trySend(CallbackEvent.OnNrIconTypeChanged(serviceState.nrIconType,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                        trySend(CallbackEvent.OnRadioIconTypeChanged(serviceState.radioIconType,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
                             serviceState.is6Rx))
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
 // QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
@@ -345,7 +351,9 @@ class MobileConnectionRepositoryImpl(
         val initial = flowOf(TelephonyCallbackState()
 // QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-            .applyEvent(CallbackEvent.OnNrIconTypeChanged(NrIconType.TYPE_NONE, false))
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            .applyEvent(CallbackEvent.OnRadioIconTypeChanged(RadioIconType.TYPE_NONE, false))
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
 // QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
             .applyEvent(CallbackEvent.OnCiwlanAvailableChanged(false)))
@@ -685,21 +693,27 @@ class MobileConnectionRepositoryImpl(
 
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
 // QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
-    override val nrIconType: StateFlow<Int> =
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+    override val radioIconType: StateFlow<Int> =
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
 // QTI_BEGIN: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
         fiveGState
 // QTI_END: 2024-04-19: Android_UI: SystemUI: Fix FiveGStateListener registration failure issue
 // QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
-            .mapNotNull {it.onNrIconTypeChanged }
-            .map { it.nrIconType}
-            .stateIn(scope, SharingStarted.WhileSubscribed(), NrIconType.TYPE_NONE)
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            .mapNotNull {it.onRadioIconTypeChanged }
+            .map { it.radioIconType}
+            .stateIn(scope, SharingStarted.WhileSubscribed(), RadioIconType.TYPE_NONE)
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
     override val is6Rx: StateFlow<Boolean> =
         fiveGState
-            .mapNotNull {it.onNrIconTypeChanged }
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            .mapNotNull {it.onRadioIconTypeChanged }
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             .map { it.is6Rx}
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
@@ -1056,7 +1070,9 @@ sealed interface CallbackEvent {
     data class OnSignalStrengthChanged(val signalStrength: SignalStrength) : CallbackEvent
 
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-    data class OnNrIconTypeChanged(val nrIconType: Int, val is6Rx: Boolean) : CallbackEvent
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+    data class OnRadioIconTypeChanged(val radioIconType: Int, val is6Rx: Boolean) : CallbackEvent
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
 // QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 
@@ -1084,7 +1100,9 @@ data class TelephonyCallbackState(
     val onDisplayInfoChanged: CallbackEvent.OnDisplayInfoChanged? = null,
     val onServiceStateChanged: CallbackEvent.OnServiceStateChanged? = null,
     val onSignalStrengthChanged: CallbackEvent.OnSignalStrengthChanged? = null,
-    val onNrIconTypeChanged: CallbackEvent.OnNrIconTypeChanged? = null,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+    val onRadioIconTypeChanged: CallbackEvent.OnRadioIconTypeChanged? = null,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
     val onCiwlanAvailableChanged: CallbackEvent.OnCiwlanAvailableChanged? = null,
 // QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
@@ -1109,7 +1127,9 @@ data class TelephonyCallbackState(
                 copy(onServiceStateChanged = event)
             }
             is CallbackEvent.OnSignalStrengthChanged -> copy(onSignalStrengthChanged = event)
-            is CallbackEvent.OnNrIconTypeChanged -> copy(onNrIconTypeChanged = event)
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            is CallbackEvent.OnRadioIconTypeChanged -> copy(onRadioIconTypeChanged = event)
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
             is CallbackEvent.OnCiwlanAvailableChanged -> copy(onCiwlanAvailableChanged = event)
 // QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature

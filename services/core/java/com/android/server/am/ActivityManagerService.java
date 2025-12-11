@@ -9829,7 +9829,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             final VolatileDropboxEntryStates volatileStates, final StringBuilder sb) {
         sb.append("SystemUptimeMs: ").append(SystemClock.uptimeMillis()).append("\n");
 
-// QTI_BEGIN: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
         // Watchdog thread ends up invoking this function (with
         // a null ProcessRecord) to add the stack file to dropbox.
         // Do not acquire a lock on this (am) in such cases, as it
@@ -9837,12 +9836,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         // is invoked due to unavailability of lock on am and it
         // would prevent watchdog from killing system_server.
         if (process == null) {
-// QTI_END: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
             sb.append("Process: ").append(processName).append("\n");
-// QTI_BEGIN: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
             return;
         }
-// QTI_END: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
         // Note: ProcessRecord 'process' is guarded by the service
         // instance.  (notably process.pkgList, which could otherwise change
         // concurrently during execution of this method)

@@ -364,8 +364,12 @@ class ActivityStarter {
                 if (mService.mRootWindowContainer == null) {
                     throw new IllegalStateException("Too early to start activity.");
                 }
+                UserHelper userHelper = android.multiuser.Flags.hsuAllowlistActivities()
+                        ? new UserHelper(mService.getUserManagerInternal())
+                        : null;
+
                 starter = new ActivityStarter(mController, mService, mSupervisor, mInterceptor,
-                        mService.mRootWindowContainer.getUserHelper());
+                        userHelper);
             }
 
             return starter;
@@ -3148,7 +3152,8 @@ class ActivityStarter {
             final Task topTask = curTop != null ? curTop.getTask() : null;
             differentTopTask = topTask != intentTask
                     || (focusRootTask != null && topTask != focusRootTask.getTopMostTask())
-                    || (focusRootTask != null && focusRootTask != origRootTask);
+                    || (focusRootTask != null && focusRootTask != origRootTask)
+                    || mTargetRootTask != origRootTask;
         } else {
             // The existing task should always be different from those in other displays.
             differentTopTask = true;

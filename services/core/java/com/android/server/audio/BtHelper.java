@@ -49,9 +49,9 @@ import android.media.AudioManager;
 import android.media.AudioManager.AudioDeviceCategory;
 import android.media.AudioSystem;
 import android.media.BluetoothProfileConnectionInfo;
-// QTI_BEGIN: 2025-03-09: WConnect/BTHOST_IOE: [autocherry] LE AUDIO : Do not reset A2dpSuspended flag during call am: b630d67497 am: b630d67497
+// QTI_BEGIN: 2025-03-09: Bluetooth: LE AUDIO : Do not reset A2dpSuspended flag during call am: b630d67497 am: b630d67497
 import android.telecom.TelecomManager;
-// QTI_END: 2025-03-09: WConnect/BTHOST_IOE: [autocherry] LE AUDIO : Do not reset A2dpSuspended flag during call am: b630d67497 am: b630d67497
+// QTI_END: 2025-03-09: Bluetooth: LE AUDIO : Do not reset A2dpSuspended flag during call am: b630d67497 am: b630d67497
 import android.os.Binder;
 import android.os.Bundle;
 // QTI_BEGIN: 2025-07-24: Bluetooth: VOIP WAR: allow to start SCO while dummy HFP device exist
@@ -790,14 +790,14 @@ public class BtHelper {
 // QTI_END: 2019-03-15: Bluetooth: HFP: Porting changes for AudioService file
         mScoAudioState = SCO_STATE_INACTIVE;
         broadcastScoConnectionState(AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
-// QTI_BEGIN: 2025-03-09: WConnect/BTHOST_IOE: [autocherry] LE AUDIO : Do not reset A2dpSuspended flag during call am: b630d67497 am: b630d67497
+// QTI_BEGIN: 2025-03-09: Bluetooth: LE AUDIO : Do not reset A2dpSuspended flag during call am: b630d67497 am: b630d67497
 
         TelecomManager telecomManager =
                 (TelecomManager) mContext.getSystemService(Context.TELECOM_SERVICE);
         if (telecomManager == null || !telecomManager.isInCall()) {
             mDeviceBroker.clearA2dpSuspended(false /* internalOnly */);
         }
-// QTI_END: 2025-03-09: WConnect/BTHOST_IOE: [autocherry] LE AUDIO : Do not reset A2dpSuspended flag during call am: b630d67497 am: b630d67497
+// QTI_END: 2025-03-09: Bluetooth: LE AUDIO : Do not reset A2dpSuspended flag during call am: b630d67497 am: b630d67497
         mDeviceBroker.clearLeAudioSuspended(false /* internalOnly */);
         mScoClientDevices.clear();
         mDeviceBroker.setBluetoothScoOn(false, "resetBluetoothSco");
@@ -1101,16 +1101,21 @@ public class BtHelper {
         return btHeadsetDeviceToAudioDevice(mBluetoothHeadsetDummyDevice);
     }
 
+// QTI_END: 2021-09-01: Bluetooth: HFP: Porting the change in BtHelper to avoid extra device switch
     private static AudioDeviceAttributes btHeadsetDeviceToAudioDevice(BluetoothDevice btDevice) {
         if (btDevice == null) {
             return new AudioDeviceAttributes(AudioSystem.DEVICE_OUT_BLUETOOTH_SCO, "");
         }
         String address = btDevice.getAddress();
+// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         String name = getName(btDevice);
+// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         if (!BluetoothAdapter.checkBluetoothAddress(address)) {
             address = "";
         }
+// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         BluetoothClass btClass = btDevice.getBluetoothClass();
+// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         int nativeType = AudioSystem.DEVICE_OUT_BLUETOOTH_SCO;
         if (btClass != null) {
             switch (btClass.getDeviceClass()) {
@@ -1139,7 +1144,9 @@ public class BtHelper {
         }
         boolean result = false;
         AudioDeviceAttributes audioDevice = null; // Only used if isActive is true
+// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         String address = btDevice.getAddress();
+// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         String name = getName(btDevice);
         // Handle output device
         if (isActive) {
@@ -1195,20 +1202,26 @@ public class BtHelper {
         if (Objects.equals(btDevice, previousActiveDevice)) {
             return;
         }
+// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         if (!handleBtScoActiveDeviceChange(previousActiveDevice, false, deviceSwitch)) {
             Log.w(TAG, "onSetBtScoActiveDevice() failed to remove previous device "
                         + getAnonymizedAddress(previousActiveDevice));
+// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         }
+// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         // mBluetoothHeadsetDevice must correspond to previous device until now and new device from
         // now on for SCO activation/deactivation requests made by
         // AudioDeviceBroker.onUpdateCommunicationRouteClient() to succeed.
+// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         mBluetoothHeadsetDevice = btDevice;
+// QTI_BEGIN: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         if (!handleBtScoActiveDeviceChange(btDevice, true, false /*deviceSwitch*/)) {
             Log.e(TAG, "onSetBtScoActiveDevice() failed to add new device "
                         + getAnonymizedAddress(btDevice));
             // set mBluetoothHeadsetDevice to null when failing to add new devicei
             mBluetoothHeadsetDevice = null;
         }
+// QTI_END: 2025-10-20: Bluetooth: remove dummy device logic to algin with AOSP
         if (mBluetoothHeadsetDevice == null) {
             resetBluetoothSco();
         }

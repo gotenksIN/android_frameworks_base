@@ -174,7 +174,7 @@ import com.android.server.pm.SaferIntentUtils;
 import com.android.server.utils.Slogf;
 import com.android.server.wm.ActivityMetricsLogger.LaunchingState;
 // QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-import com.android.server.am.ProcessFreezerManager;
+import com.android.server.am.AppBackgroundManager;
 // QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 
 import java.io.FileDescriptor;
@@ -1232,9 +1232,9 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         final boolean isTop = andResume && r.isTopRunningActivity();
 // QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
         if (isTop) {
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.startFreeze(r.processName, ProcessFreezerManager.COLD_LAUNCH_FREEZE);
+            AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+            if (appBgManager != null) {
+                appBgManager.startFreeze(r.processName, AppBackgroundManager.COLD_LAUNCH_FREEZE);
             }
         }
 // QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google

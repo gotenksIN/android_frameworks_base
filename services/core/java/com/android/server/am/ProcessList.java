@@ -2764,6 +2764,13 @@ public final class ProcessList {
             int zygotePolicyFlags, boolean allowWhileBooting, boolean isolated, int isolatedUid,
             boolean isSdkSandbox, int sdkSandboxUid, String sdkSandboxClientAppPackage,
             String abiOverride, String entryPoint, String[] entryPointArgs, Runnable crashHandler) {
+        AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+        if (appBgManager != null) {
+            if (appBgManager.shouldPreventProcessStart(processName, info)) {
+                return null;
+            }
+        }
+
         long startTime = SystemClock.uptimeMillis();
         final long startTimeNs = SystemClock.elapsedRealtimeNanos();
         ProcessRecord app;

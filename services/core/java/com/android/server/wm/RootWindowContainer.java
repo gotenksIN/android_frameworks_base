@@ -156,7 +156,7 @@ import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.utils.Slogf;
 // QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-import com.android.server.am.ProcessFreezerManager;
+import com.android.server.am.AppBackgroundManager;
 // QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.server.wm.utils.RegionUtils;
 import com.android.window.flags.Flags;
@@ -2524,9 +2524,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                          }
                      }
 // QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-                    ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-                    if (freezer != null && freezer.useFreezerManager()) {
-                        freezer.startFreeze(r.packageName, ProcessFreezerManager.WARM_LAUNCH_FREEZE);
+                    AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+                    if (appBgManager != null) {
+                        appBgManager.startFreeze(r.packageName, AppBackgroundManager.WARM_LAUNCH_FREEZE);
                     }
 // QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
 // QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
@@ -2550,9 +2550,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 acquireAppLaunchPerfLock(r);
 // QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
 // QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-                ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-                if (freezer != null && freezer.useFreezerManager()) {
-                    freezer.startFreeze(r.packageName, ProcessFreezerManager.FIRST_LAUNCH_FREEZE);
+                AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+                if (appBgManager != null) {
+                    appBgManager.startFreeze(r.packageName, AppBackgroundManager.FIRST_LAUNCH_FREEZE);
                 }
 // QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
 // QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.

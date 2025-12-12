@@ -430,9 +430,6 @@ public class OomAdjuster {
     // Enable hooks for background apps transition
     boolean mEnableBgt = false;
 // QTI_END: 2020-07-09: Performance: Hooks for background apps transition
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-    boolean mLazyLmkKillMainProc = false;
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
 // QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
 
     public static BoostFramework mPerf = new BoostFramework();
@@ -536,8 +533,9 @@ public class OomAdjuster {
         }
 
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-        void batchSetOomAdjExt(ArrayList<ProcessRecord> procsToOomAdj) {
-            ProcessList.batchSetOomAdjExt(procsToOomAdj);
+        void batchSetOomAdjExt(ArrayList<ProcessRecord> procsToOomAdj,
+                ArrayList<Integer> weights) {
+            ProcessList.batchSetOomAdjExt(procsToOomAdj, weights);
         }
 
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
@@ -546,8 +544,8 @@ public class OomAdjuster {
         }
 
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-        void setOomAdjExt(int pid, int uid, int adj, int isSystemApp, int isMainProc) {
-            ProcessList.setOomAdjExt(pid, uid, adj, isSystemApp, isMainProc);
+        void setOomAdjExt(int pid, int uid, int adj, int weight) {
+            ProcessList.setOomAdjExt(pid, uid, adj, weight);
         }
 
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
@@ -616,9 +614,6 @@ public class OomAdjuster {
 // QTI_BEGIN: 2020-07-09: Performance: Hooks for background apps transition
             mEnableBgt = Boolean.parseBoolean(mPerf.perfGetProp("vendor.perf.bgt.enable","false"));
 // QTI_END: 2020-07-09: Performance: Hooks for background apps transition
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            mLazyLmkKillMainProc = Boolean.parseBoolean(mPerf.perfGetProp("ro.lmk.lazy_killing_3rd_app_main_proc","false"));
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
 // QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
         }
 
@@ -1660,13 +1655,13 @@ public class OomAdjuster {
         }
 
         if (!mProcsToOomAdj.isEmpty()) {
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            if (mLazyLmkKillMainProc) {
-                mInjector.batchSetOomAdjExt(mProcsToOomAdj);
+            if (AppBackgroundManager.getInstance().useAppKeepaliveManager()) {
+                ArrayList<Integer> weights =
+                    AppBackgroundManager.getInstance().getProcsKeepaliveWeight(mProcsToOomAdj);
+                mInjector.batchSetOomAdjExt(mProcsToOomAdj, weights);
             } else {
                 mInjector.batchSetOomAdj(mProcsToOomAdj);
             }
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             mProcsToOomAdj.clear();
         }
 
@@ -1688,29 +1683,15 @@ public class OomAdjuster {
 // QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                 && (selectedAppRecord != null)) {
 // QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            if (mLazyLmkKillMainProc) {
-                String packageName = selectedAppRecord.info.packageName;
-                String processName = selectedAppRecord.processName;
-                int isMainProc = 0;
-                int isSystemApp = 0;
-                if (packageName.equals(processName)) {
-                    isMainProc = 1;
-                }
-                if (selectedAppRecord.info.isSystemApp()) {
-                    isSystemApp = 1;
-                }
+            if (AppBackgroundManager.getInstance().useAppKeepaliveManager()) {
+                int weight =
+                    AppBackgroundManager.getInstance().getProcKeepaliveWeight(selectedAppRecord);
                 ProcessList.setOomAdjExt(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
-                    ProcessList.CACHED_APP_MAX_ADJ, isSystemApp, isMainProc);
+                    ProcessList.CACHED_APP_MAX_ADJ, weight);
             } else {
                 ProcessList.setOomAdj(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                     ProcessList.CACHED_APP_MAX_ADJ);
-// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             }
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             selectedAppRecord.mState.setSetAdj(selectedAppRecord.mState.getCurAdj());
 // QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
             if (DEBUG_OOM_ADJ) Slog.d(TAG,"app.processName = " + selectedAppRecord.processName
@@ -3920,23 +3901,13 @@ public class OomAdjuster {
             if (isBatchingOomAdj && mConstants.ENABLE_BATCHING_OOM_ADJ) {
                 mProcsToOomAdj.add(app);
             } else {
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-                if (mLazyLmkKillMainProc) {
-                    String packageName = app.info.packageName;
-                    String processName = app.processName;
-                    int isMainProc = 0;
-                    int isSystemApp = 0;
-                    if (packageName.equals(processName)) {
-                        isMainProc = 1;
-                    }
-                    if (app.info.isSystemApp()) {
-                        isSystemApp = 1;
-                    }
-                    mInjector.setOomAdjExt(app.getPid(), app.uid, app.mState.getCurAdj(), isSystemApp, isMainProc);
+                if (AppBackgroundManager.getInstance().useAppKeepaliveManager()) {
+                    int weight =
+                        AppBackgroundManager.getInstance().getProcKeepaliveWeight(app);
+                    mInjector.setOomAdjExt(app.getPid(), app.uid, state.getCurAdj(), weight);
                 } else {
-                    mInjector.setOomAdj(app.getPid(), app.uid, app.mState.getCurAdj());
+                    mInjector.setOomAdj(app.getPid(), app.uid, state.getCurAdj());
                 }
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             }
 
             if (DEBUG_SWITCH || DEBUG_OOM_ADJ || mService.mCurOomAdjUid == app.info.uid) {
@@ -3999,7 +3970,8 @@ public class OomAdjuster {
                     // do nothing if we already switched to RT
                     if (oldSchedGroup != SCHED_GROUP_TOP_APP) {
                         app.getWindowProcessController().onTopProcChanged();
-                        if (app.useFifoUiScheduling()) {
+                        if (app.useFifoUiScheduling()
+                                || AppBackgroundManager.getInstance().useUIRTSettings()) {
                             // Switch UI pipeline for app to SCHED_FIFO
                             state.setSavedPriority(Process.getThreadPriority(app.getPid()));
                             ActivityManagerService.setFifoPriority(app, true /* enable */);
@@ -4017,7 +3989,8 @@ public class OomAdjuster {
                             }
                         }
 
-                        if (mUsePerfCoreAffinity) {
+                        if (mUsePerfCoreAffinity
+                                || AppBackgroundManager.getInstance().useUIAffinitySettings()) {
                             if (!app.info.isSystemApp() && !app.info.isUpdatedSystemApp()
                                     && app.processName.equals(app.info.packageName)) {
                                 mProcessGroupHandler.sendMessage(mProcessGroupHandler.obtainMessage(
@@ -4028,7 +4001,8 @@ public class OomAdjuster {
                 } else if (oldSchedGroup == SCHED_GROUP_TOP_APP
                         && curSchedGroup != SCHED_GROUP_TOP_APP) {
                     app.getWindowProcessController().onTopProcChanged();
-                    if (app.useFifoUiScheduling()) {
+                    if (app.useFifoUiScheduling()
+                            || AppBackgroundManager.getInstance().useUIRTSettings()) {
                         // Reset UI pipeline to SCHED_OTHER
                         ActivityManagerService.setFifoPriority(app, false /* enable */);
                         mInjector.setThreadPriority(app.getPid(), state.getSavedPriority());
@@ -4041,7 +4015,8 @@ public class OomAdjuster {
                         mInjector.setThreadPriority(renderThreadTid, THREAD_PRIORITY_DISPLAY);
                     }
 
-                    if (mUsePerfCoreAffinity) {
+                    if (mUsePerfCoreAffinity
+                            || AppBackgroundManager.getInstance().useUIAffinitySettings()) {
                         if (!app.info.isSystemApp() && !app.info.isUpdatedSystemApp()
                                 && app.processName.equals(app.info.packageName)) {
                             mProcessGroupHandler.sendMessage(mProcessGroupHandler.obtainMessage(
@@ -4488,6 +4463,9 @@ public class OomAdjuster {
     @GuardedBy({"mService", "mProcLock"})
     void updateAppFreezeStateLSP(ProcessRecord app, @OomAdjReason int oomAdjReason,
             boolean immediate, int oldOomAdj) {
+        if (AppBackgroundManager.getInstance().usePackageLevelFreezer()) {
+            return;
+        }
         if (!mCachedAppOptimizer.useFreezer()) {
             return;
         }
@@ -4557,6 +4535,9 @@ public class OomAdjuster {
 
     @GuardedBy("mService")
     void unfreezeTemporarily(ProcessRecord app, @OomAdjReason int reason) {
+        if (AppBackgroundManager.getInstance().usePackageLevelFreezer()) {
+            return;
+        }
         if (!mCachedAppOptimizer.useFreezer()) {
             return;
         }

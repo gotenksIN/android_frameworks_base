@@ -941,6 +941,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mAppWarnings.onSystemReady();
             mGrammaticalManagerInternal = LocalServices.getService(
                     GrammaticalInflectionManagerInternal.class);
+            mPackageUpdateManager.onSystemReady();
         }
     }
 

@@ -772,6 +772,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     public final IntentFirewall mIntentFirewall;
 
+    private final MemoryLimiter mMemoryLimiter = new MemoryLimiter();
+
     /**
      * The global lock for AMS, it's de-facto the ActivityManagerService object as of now.
      */
@@ -2344,6 +2346,9 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (phase == PHASE_SYSTEM_SERVICES_READY) {
                 mService.mBatteryStatsService.systemServicesReady();
                 mService.mServices.systemServicesReady();
+                if (mService.mAppLockLocalService != null) {
+                    mService.mAppLockLocalService.systemServicesReady();
+                }
             } else if (phase == PHASE_ACTIVITY_MANAGER_READY) {
                 mService.mBroadcastController.startBroadcastObservers();
             } else if (phase == PHASE_THIRD_PARTY_APPS_CAN_START) {
@@ -2548,7 +2553,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 .setHandlerThread(handlerThread)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
-        MemoryLimiter.init();
 
         mIntentFirewall = injector.getIntentFirewall();
         mProcessStats = new ProcessStatsService(this, mContext.getCacheDir());
@@ -2627,7 +2631,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 .setProcessLruUpdater(mProcessList)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
-        MemoryLimiter.init();
 
         mBroadcastQueue = mInjector.getBroadcastQueue(this);
         mBroadcastController = new BroadcastController(mContext, this, mBroadcastQueue);
@@ -2731,6 +2734,10 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     public void setInstaller(Installer installer) {
         mInstaller = installer;
+    }
+
+    MemoryLimiter.Limiter newMemoryLimiter() {
+        return mMemoryLimiter.newLimiter();
     }
 
     private void start() {
@@ -15877,6 +15884,9 @@ public class ActivityManagerService extends IActivityManager.Stub
             } else if ((enqueuedChange & UidRecord.CHANGE_PROCSTATE) != 0) {
                 mLocalPowerManager.updateUidProcState(uid, procState);
             }
+        }
+        if (mAppLockLocalService != null) {
+            mAppLockLocalService.handleUidChangeLocked(uidRec, uid, enqueuedChange, procState);
         }
     }
 

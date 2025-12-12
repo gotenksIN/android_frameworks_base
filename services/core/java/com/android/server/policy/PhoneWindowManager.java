@@ -632,7 +632,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private boolean mHandleVolumeKeysInWM;
 
     private boolean mPendingKeyguardOccluded;
-    private boolean mKeyguardOccludedChanged;
 
     Intent mHomeIntent;
     Intent mCarDockIntent;
@@ -3986,17 +3985,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     public void onKeyguardOccludedChangedLw(boolean occluded) {
         if (mKeyguardDelegate != null) {
             mPendingKeyguardOccluded = occluded;
-            mKeyguardOccludedChanged = true;
         }
     }
 
     @Override
     public int applyKeyguardOcclusionChange() {
         if (DEBUG_KEYGUARD) Slog.d(TAG, "transition/occluded commit occluded="
-                + mPendingKeyguardOccluded + " changed=" + mKeyguardOccludedChanged);
+                + mPendingKeyguardOccluded);
 
-        // TODO(b/276433230): Explicitly save before/after for occlude state in each
-        // Transition so we don't need to update SysUI every time.
         if (setKeyguardOccludedLw(mPendingKeyguardOccluded)) {
             return FINISH_LAYOUT_REDO_LAYOUT | FINISH_LAYOUT_REDO_WALLPAPER;
         } else {
@@ -4313,7 +4309,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     private boolean setKeyguardOccludedLw(boolean isOccluded) {
         if (DEBUG_KEYGUARD) Slog.d(TAG, "setKeyguardOccluded occluded=" + isOccluded);
-        mKeyguardOccludedChanged = false;
         mPendingKeyguardOccluded = isOccluded;
         mKeyguardDelegate.setOccluded(isOccluded);
         return mKeyguardDelegate.isShowing();
@@ -6515,7 +6510,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         proto.write(WINDOW_MANAGER_DRAW_COMPLETE,
                 mDefaultDisplayPolicy.isWindowManagerDrawComplete());
         proto.write(KEYGUARD_OCCLUDED, isKeyguardOccluded());
-        proto.write(KEYGUARD_OCCLUDED_CHANGED, mKeyguardOccludedChanged);
         proto.write(KEYGUARD_OCCLUDED_PENDING, mPendingKeyguardOccluded);
         if (mKeyguardDelegate != null) {
             mKeyguardDelegate.dumpDebug(proto, KEYGUARD_DELEGATE);
@@ -6616,7 +6610,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             pw.print(prefix); pw.print("  "); pw.println(mDisplayHomeButtonHandlers.get(key));
         }
         pw.print(prefix); pw.print("mKeyguardOccluded="); pw.print(isKeyguardOccluded());
-                pw.print(" mKeyguardOccludedChanged="); pw.print(mKeyguardOccludedChanged);
                 pw.print(" mPendingKeyguardOccluded="); pw.println(mPendingKeyguardOccluded);
         pw.print(prefix); pw.print("mAllowLockscreenWhenOnDisplays=");
                 pw.print(!mAllowLockscreenWhenOnDisplays.isEmpty());

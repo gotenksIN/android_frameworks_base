@@ -533,7 +533,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     }
 
     void onSystemReady() {
-        mPersisterQueue.onSystemReady(mService.mContext);
         mLaunchParamsPersister.onSystemReady();
     }
 
@@ -2260,6 +2259,8 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     }
 
     boolean shutdownLocked(int timeout) {
+        mPersisterQueue.onSystemShutdown();
+
         mRootWindowContainer.prepareForShutdown();
         goingToSleepLocked();
         mRootWindowContainer.forAllDisplays(display -> display.setIsSleeping(true));

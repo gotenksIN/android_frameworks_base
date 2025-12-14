@@ -1002,14 +1002,12 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int pid = app.getPid();
         synchronized (mPidsSelfLocked) {
             mPidsSelfLocked.doAddInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
             if (appBgManager != null) {
                 appBgManager.addPidLocked(app);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             }
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
         synchronized (sActiveProcessInfoSelfLocked) {
             if (app.processInfo != null) {
@@ -1035,16 +1033,14 @@ public class ActivityManagerService extends IActivityManager.Stub
         final boolean removed;
         synchronized (mPidsSelfLocked) {
             removed = mPidsSelfLocked.doRemoveInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
             if (appBgManager != null) {
                 appBgManager.removePidLocked(pid, app);
                 appBgManager.startUnfreeze(
                         app.processName, AppBackgroundManager.REMOVE_PROCESS_UNFREEZE);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             }
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
         if (removed) {
             synchronized (sActiveProcessInfoSelfLocked) {

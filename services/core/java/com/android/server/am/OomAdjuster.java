@@ -599,7 +599,9 @@ public class OomAdjuster {
         mLogger = new OomAdjusterDebugLogger(this, mService.mConstants);
 // QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
         if(mPerf != null) {
+// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
             mUsePerfCoreAffinity = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.perf.affinity","false"));
+// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
             mMinBServiceAgingTime = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_age", "5000"));
             mBServiceAppThreshold = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_limit", "5"));
             mEnableBServicePropagation = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_enable", "false"));
@@ -3837,24 +3839,32 @@ public class OomAdjuster {
             state.setSetRawAdj(state.getCurRawAdj());
         }
 
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         if (appBgManager != null) {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
             // unfreeze process if user press home key before the first frame appeared
             if ((state.getSetAdj() >= ProcessList.FOREGROUND_APP_ADJ &&
                         state.getSetAdj() <= ProcessList.VISIBLE_APP_ADJ) &&
                         state.getCurAdj() > ProcessList.VISIBLE_APP_ADJ) {
+// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                 appBgManager.startUnfreeze(app.processName,
                         AppBackgroundManager.INTERRUPT_LAUNCH_UNFREEZE);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
             }
             // check whether process/service that launching app depend on is in the freeze list
             if (state.getSetAdj() >= state.getCurAdj() &&
                         state.getCurAdj() <= ProcessList.VISIBLE_APP_ADJ) {
+// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                 if (appBgManager.checkNeedFreezeProcessLocked(app)) {
                     appBgManager.startUnfreezeService(app,
                             AppBackgroundManager.DEPEND_LAUNCH_UNFREEZE);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
                 }
             }
         }
@@ -3975,11 +3985,13 @@ public class OomAdjuster {
                     processGroup = THREAD_GROUP_DEFAULT;
                     break;
             }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
             if (appBgManager != null) {
                 appBgManager.handleSchedGroupTransition(app);
             }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             setAppAndChildProcessGroup(app, processGroup);
             try {
                 final int renderThreadTid = app.getRenderThreadTid();

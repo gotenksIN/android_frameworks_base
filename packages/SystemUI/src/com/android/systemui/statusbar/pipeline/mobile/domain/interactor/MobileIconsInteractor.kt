@@ -50,6 +50,7 @@ import com.android.systemui.statusbar.pipeline.shared.data.model.ConnectivitySlo
 import com.android.systemui.statusbar.pipeline.shared.data.repository.ConnectivityRepository
 import com.android.systemui.statusbar.policy.data.repository.UserSetupRepository
 import com.android.systemui.util.CarrierConfigTracker
+import com.android.systemui.util.kotlin.mapDirect
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.util.CarrierNameCustomization
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
@@ -67,7 +68,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
@@ -207,7 +207,7 @@ constructor(
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val activeDataIconInteractor: StateFlow<MobileIconInteractor?> =
         mobileConnectionsRepo.activeMobileDataSubscriptionId
-            .mapLatest {
+            .mapDirect {
                 if (it != null) {
                     getMobileConnectionInteractorForSubId(it)
                 } else {
@@ -310,7 +310,7 @@ constructor(
     override val defaultDataSubId = mobileConnectionsRepo.defaultDataSubId
     override val icons =
         filteredSubscriptions
-            .mapLatest { subs ->
+            .mapDirect { subs ->
                 subs.map { getMobileConnectionInteractorForSubId(it.subscriptionId) }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
@@ -372,11 +372,11 @@ constructor(
         )
     override val alwaysShowDataRatIcon: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
-            .mapLatest { it.alwaysShowDataRatIcon }
+            .mapDirect { it.alwaysShowDataRatIcon }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val alwaysUseCdmaLevel: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
-            .mapLatest { it.alwaysShowCdmaRssi }
+            .mapDirect { it.alwaysShowCdmaRssi }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val isSingleCarrier: StateFlow<Boolean> =
         filteredSubscriptions
@@ -429,17 +429,17 @@ constructor(
 
     override val alwaysUseRsrpLevelForLte: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
-            .mapLatest { it.showRsrpSignalLevelforLTE }
+            .mapDirect { it.showRsrpSignalLevelforLTE }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     override val hideNoInternetState: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
-            .mapLatest { it.hideNoInternetState }
+            .mapDirect { it.hideNoInternetState }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     override val networkTypeIconCustomization: StateFlow<MobileIconCustomizationMode> =
         mobileConnectionsRepo.defaultDataSubRatConfig
-            .mapLatest { defaultConfig ->
+            .mapDirect { defaultConfig ->
                 val enabled = defaultConfig.alwaysShowNetworkTypeIcon
                     || defaultConfig.enableDdsRatIconEnhancement
                     || defaultConfig.enableRatIconEnhancement
@@ -455,17 +455,17 @@ constructor(
 
     override val showVolteIcon: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
-            .mapLatest { it.showVolteIcon }
+            .mapDirect { it.showVolteIcon }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     override val showVowifiIcon: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
-            .mapLatest { it.showVowifiIcon }
+            .mapDirect { it.showVowifiIcon }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     private val crossSimdisplaySingnalLevel: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
-            .mapLatest { it.crossSimdisplaySingnalLevel }
+            .mapDirect { it.crossSimdisplaySingnalLevel }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)

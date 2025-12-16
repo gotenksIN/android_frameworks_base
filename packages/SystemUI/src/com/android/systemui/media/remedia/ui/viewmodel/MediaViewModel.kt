@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import com.android.internal.logging.InstanceId
 import com.android.systemui.animation.Expandable
 import com.android.systemui.classifier.Classifier
 import com.android.systemui.common.shared.model.ContentDescription
@@ -34,13 +35,14 @@ import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.media.controls.shared.MediaLogger
+import com.android.systemui.media.controls.util.MediaUiEventLogger
 import com.android.systemui.media.remedia.domain.interactor.MediaInteractor
 import com.android.systemui.media.remedia.domain.model.MediaActionModel
+import com.android.systemui.media.remedia.domain.model.MediaSessionModel
 import com.android.systemui.media.remedia.shared.model.MediaColorScheme
 import com.android.systemui.media.remedia.shared.model.MediaSessionState
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
-import com.android.systemui.statusbar.notification.collection.provider.VisualStabilityProvider
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -56,7 +58,7 @@ constructor(
     private val interactor: MediaInteractor,
     private val falsingSystem: MediaFalsingSystem,
     val mediaLogger: MediaLogger,
-    val visualStabilityProvider: VisualStabilityProvider,
+    val mediaUiEventLogger: MediaUiEventLogger,
     @Assisted private val context: Context,
     @Assisted private val carouselVisibility: MediaCarouselVisibility,
 ) : ExclusiveActivatable() {
@@ -110,11 +112,11 @@ constructor(
                     override val isExplicit = session.isExplicit
                     override val actionButtonLayout = session.actionButtonLayout
                     override val playPauseAction =
-                        session.playPauseAction.toPlayPauseActionViewModel(session.state)
+                        session.playPauseAction.toPlayPauseActionViewModel(session)
                     override val additionalActions: List<MediaSecondaryActionViewModel>
                         get() {
                             return session.additionalActions.map { action ->
-                                action.toSecondaryActionViewModel()
+                                action.toSecondaryActionViewModel(session)
                             }
                         }
 
@@ -133,6 +135,11 @@ constructor(
                                     dragDelta.isHorizontal() &&
                                         !falsingSystem.isFalseTouch(Classifier.MEDIA_SEEKBAR)
                                 ) {
+                                    mediaUiEventLogger.logSeek(
+                                        session.uid,
+                                        session.packageName,
+                                        session.key as InstanceId,
+                                    )
                                     interactor.seek(
                                         sessionKey = session.key,
                                         to = (seekProgress * session.durationMs).roundToLong(),
@@ -149,8 +156,8 @@ constructor(
                                         } else {
                                             seekProgress
                                         },
-                                    left = session.leftAction.toSecondaryActionViewModel(),
-                                    right = session.rightAction.toSecondaryActionViewModel(),
+                                    left = session.leftAction.toSecondaryActionViewModel(session),
+                                    right = session.rightAction.toSecondaryActionViewModel(session),
                                     isSquiggly =
                                         session.state != MediaSessionState.Paused &&
                                             !isCurrentSessionAndScrubbing,
@@ -168,8 +175,8 @@ constructor(
                                 )
                             } else {
                                 MediaNavigationViewModel.Hidden(
-                                    left = session.leftAction.toSecondaryActionViewModel(),
-                                    right = session.rightAction.toSecondaryActionViewModel(),
+                                    left = session.leftAction.toSecondaryActionViewModel(session),
+                                    right = session.rightAction.toSecondaryActionViewModel(session),
                                 )
                             }
                         }
@@ -198,6 +205,11 @@ constructor(
                                                 falsingSystem.runIfNotFalseTap(
                                                     FalsingManager.LOW_PENALTY
                                                 ) {
+                                                    mediaUiEventLogger.logLongPressDismiss(
+                                                        session.uid,
+                                                        session.packageName,
+                                                        session.key as InstanceId,
+                                                    )
                                                     interactor.hide(
                                                         session.key,
                                                         MEDIA_PLAYER_ANIMATION_DELAY_MS,
@@ -246,6 +258,11 @@ constructor(
                                             falsingSystem.runIfNotFalseTap(
                                                 FalsingManager.LOW_PENALTY
                                             ) {
+                                                mediaUiEventLogger.logLongPressSettings(
+                                                    session.uid,
+                                                    session.packageName,
+                                                    session.key as InstanceId,
+                                                )
                                                 interactor.openMediaSettings()
                                             }
                                         },
@@ -288,6 +305,11 @@ constructor(
                                     falsingSystem.runIfNotFalseTap(
                                         FalsingManager.MODERATE_PENALTY
                                     ) {
+                                        mediaUiEventLogger.logOpenOutputSwitcher(
+                                            session.uid,
+                                            session.packageName,
+                                            session.key as InstanceId,
+                                        )
                                         session.outputDevice.onClick(expandable)
                                     }
                                 },
@@ -310,12 +332,24 @@ constructor(
 
                     override val onClick = { expandable: Expandable ->
                         falsingSystem.runIfNotFalseTap(FalsingManager.LOW_PENALTY) {
+                            mediaUiEventLogger.logTapContentView(
+                                session.uid,
+                                session.packageName,
+                                session.key as InstanceId,
+                            )
                             session.onClick(expandable)
                         }
                     }
                     override val onClickLabel =
                         context.getString(R.string.controls_media_playing_item_description)
-                    override val onLongClick = { interactor.setIsGutsVisible(true) }
+                    override val onLongClick = {
+                        mediaUiEventLogger.logLongPressOpen(
+                            session.uid,
+                            session.packageName,
+                            session.key as InstanceId,
+                        )
+                        interactor.setIsGutsVisible(true)
+                    }
                 }
             }
             .let {
@@ -339,6 +373,7 @@ constructor(
                 ),
             onClick = {
                 falsingSystem.runIfNotFalseTap(FalsingManager.LOW_PENALTY) {
+                    mediaUiEventLogger.logCarouselSettings()
                     interactor.openMediaSettings()
                 }
             },
@@ -367,6 +402,9 @@ constructor(
             "Invalid card index $cardIndex"
         }
         selectedCardIndex = cardIndex
+        if (selectedCardIndex != currentIndex) {
+            mediaUiEventLogger.logMediaCarouselPage(selectedCardIndex)
+        }
         interactor.storeCurrentCarouselIndex(selectedCardIndex)
     }
 
@@ -380,17 +418,23 @@ constructor(
     }
 
     private fun MediaActionModel.toPlayPauseActionViewModel(
-        mediaSessionState: MediaSessionState
+        session: MediaSessionModel
     ): MediaPlayPauseActionViewModel? {
         return when (this) {
             is MediaActionModel.Action ->
                 MediaPlayPauseActionViewModel(
-                    state = mediaSessionState,
+                    state = session.state,
                     icon = icon,
                     onClick =
                         onClick?.let {
                             {
                                 falsingSystem.runIfNotFalseTap(FalsingManager.MODERATE_PENALTY) {
+                                    mediaUiEventLogger.logTapAction(
+                                        id,
+                                        session.uid,
+                                        session.packageName,
+                                        session.key as InstanceId,
+                                    )
                                     it()
                                 }
                             }
@@ -401,7 +445,9 @@ constructor(
         }
     }
 
-    private fun MediaActionModel.toSecondaryActionViewModel(): MediaSecondaryActionViewModel {
+    private fun MediaActionModel.toSecondaryActionViewModel(
+        session: MediaSessionModel
+    ): MediaSecondaryActionViewModel {
         return when (this) {
             is MediaActionModel.Action ->
                 MediaSecondaryActionViewModel.Action(
@@ -410,6 +456,12 @@ constructor(
                         onClick?.let {
                             {
                                 falsingSystem.runIfNotFalseTap(FalsingManager.MODERATE_PENALTY) {
+                                    mediaUiEventLogger.logTapAction(
+                                        id,
+                                        session.uid,
+                                        session.packageName,
+                                        session.key as InstanceId,
+                                    )
                                     it()
                                 }
                             }

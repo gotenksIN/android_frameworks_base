@@ -603,7 +603,7 @@ class ActivityClientController extends IActivityClientController.Stub {
                 }
 
                 if (res) {
-                    r.mAppCompatController.getDisplayCompatModePolicy().onActivityFinishing();
+                    r.mAppCompatController.getDisplayCompatPolicy().onActivityFinishing();
                 }
                 return res;
             } finally {

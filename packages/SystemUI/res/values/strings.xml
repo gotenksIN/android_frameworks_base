@@ -1604,6 +1604,9 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_status_bar_assistant_icon">Assistant</string>
 
+    <!-- Accessibility text describing the input method indicator chip in the status bar. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_status_bar_input_method_indicator">Input method</string>
+
     <!-- The overflow indicator shown when a group has more notification inside the group than the visible ones. An example is "+ 3" [CHAR LIMIT=5] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

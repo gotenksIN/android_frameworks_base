@@ -44,6 +44,7 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconMod
 import com.android.systemui.statusbar.pipeline.mobile.ui.model.MobileContentDescription
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
+import com.android.systemui.util.kotlin.mapDirect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,7 +55,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 /** Common interface for all of the location-based mobile icon view models. */
 interface MobileIconViewModelCommon {
@@ -119,7 +119,7 @@ class MobileIconViewModel(
      */
     private val vmProvider: Flow<MobileIconViewModelCommon> =
         iconInteractor.isNonTerrestrial
-            .mapLatest { nonTerrestrial ->
+            .mapDirect { nonTerrestrial ->
                 if (nonTerrestrial) {
                     satelliteProvider
                 } else {

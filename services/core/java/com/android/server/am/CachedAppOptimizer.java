@@ -146,6 +146,8 @@ public class CachedAppOptimizer {
     @VisibleForTesting static final String KEY_COMPACT_THROTTLE_6 = "compact_throttle_6";
     @VisibleForTesting static final String KEY_ZRAM_WRITEBACK_WAIT_SECONDS =
             "zram_writeback_wait_seconds";
+    @VisibleForTesting static final String KEY_ZRAM_WRITEBACK_OOM_ADJ =
+            "zram_writeback_oom_adj";
     @VisibleForTesting static final String KEY_COMPACT_THROTTLE_MIN_OOM_ADJ =
             "compact_throttle_min_oom_adj";
     @VisibleForTesting static final String KEY_COMPACT_THROTTLE_MAX_OOM_ADJ =
@@ -489,6 +491,8 @@ public class CachedAppOptimizer {
                                 updateMaxOomAdjThrottle();
                             } else if (KEY_ZRAM_WRITEBACK_WAIT_SECONDS.equals(name)) {
                                 updateZramWritebackWait();
+                            } else if (KEY_ZRAM_WRITEBACK_OOM_ADJ.equals(name)) {
+                                updateZramWritebackOomAdj();
                             }
                         }
                     }
@@ -563,6 +567,9 @@ public class CachedAppOptimizer {
     @GuardedBy("mPhenotypeFlagLock")
     @VisibleForTesting volatile long mZramWritebackWaitSeconds =
             DEFAULT_ZRAM_WRITEBACK_WAIT_SECONDS;
+    @GuardedBy("mPhenotypeFlagLock")
+    @VisibleForTesting volatile int mZramWritebackOomAdj =
+            OomAdjuster.DEFAULT_ZRAM_WRITEBACK_OOM_ADJ;
     @GuardedBy("mPhenotypeFlagLock")
     private volatile boolean mUseCompaction = DEFAULT_USE_COMPACTION;
 // QTI_BEGIN: 2023-03-15: Performance: CachedAppOptimizer : Fix compaction configuration being ignored
@@ -712,6 +719,7 @@ public class CachedAppOptimizer {
             updateMinOomAdjThrottle();
             updateMaxOomAdjThrottle();
             updateZramWritebackWait();
+            updateZramWritebackOomAdj();
         }
 // QTI_BEGIN: 2020-09-29: Performance: AppCompaction handle reset of useCompaction due to ActivityManager Namespace flush.
         setAppCompactProperties();
@@ -855,6 +863,8 @@ public class CachedAppOptimizer {
             pw.println("  " + KEY_COMPACT_THROTTLE_4 + "=" + mCompactThrottleFullFull);
             pw.println("  " + KEY_COMPACT_THROTTLE_MIN_OOM_ADJ + "=" + mCompactThrottleMinOomAdj);
             pw.println("  " + KEY_COMPACT_THROTTLE_MAX_OOM_ADJ + "=" + mCompactThrottleMaxOomAdj);
+            pw.println("  " + KEY_ZRAM_WRITEBACK_WAIT_SECONDS + "=" + mZramWritebackWaitSeconds);
+            pw.println("  " + KEY_ZRAM_WRITEBACK_OOM_ADJ + "=" + mZramWritebackOomAdj);
             pw.println("  " + KEY_COMPACT_STATSD_SAMPLE_RATE + "=" + mCompactStatsdSampleRate);
             pw.println("  " + KEY_COMPACT_FULL_RSS_THROTTLE_KB + "="
                     + mFullAnonRssThrottleKb);
@@ -1331,6 +1341,13 @@ public class CachedAppOptimizer {
     }
 
     @GuardedBy("mPhenotypeFlagLock")
+    private void updateZramWritebackOomAdj() {
+        mZramWritebackOomAdj = DeviceConfig.getInt(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER,
+                KEY_ZRAM_WRITEBACK_OOM_ADJ, OomAdjuster.DEFAULT_ZRAM_WRITEBACK_OOM_ADJ);
+        mAm.mOomAdjuster.configureAdjForZramWriteback(mZramWritebackOomAdj);
+    }
+
+    @GuardedBy("mPhenotypeFlagLock")
     private void updateFreezerDebounceTimeout() {
         mFreezerDebounceTimeout = DeviceConfig.getLong(
                 DeviceConfig.NAMESPACE_ACTIVITY_MANAGER_NATIVE_BOOT,
@@ -1604,6 +1621,7 @@ public class CachedAppOptimizer {
 
             opt.setFreezeUnfreezeTime(SystemClock.uptimeMillis());
             opt.setFrozen(false);
+            mAm.mProcessStateController.setIsZramWrittenBack(app, false);
             mFrozenProcesses.delete(pid);
         } catch (Exception e) {
             Slog.e(TAG_AM, "Unable to unfreeze " + pid + " " + app.processName
@@ -1867,8 +1885,8 @@ public class CachedAppOptimizer {
         return 0;
     }
 
-    private void maybeWritebackZram(int pid, String processName, String packageName, int uid,
-            long zramUsedDeltaKb, boolean hasActivities) {
+    private void maybeWritebackZram(ProcessRecord app, int pid, String processName,
+            String packageName, int uid, long zramUsedDeltaKb, boolean hasActivities) {
         if (DEBUG_WRITEBACK) {
             Slog.i(
                 TAG_AM,
@@ -1978,6 +1996,15 @@ public class CachedAppOptimizer {
                                                 + pid
                                                 + " status: "
                                                 + status);
+                                if (status
+                                        == IMmdProcessWritebackCallback.WritebackStatus.SUCCESS) {
+                                    synchronized (mAm) {
+                                        synchronized (mAm.mProcLock) {
+                                            mAm.mProcessStateController
+                                                    .setIsZramWrittenBack(app, true);
+                                        }
+                                    }
+                                }
                                 FrameworkStatsLog.write(FrameworkStatsLog.ZRAM_WRITEBACK_EVENT,
                                         getZramWritebackEventType(status), uid, processName,
                                         hasActivities, zramUsedDeltaKb, bytesWritten,
@@ -2043,8 +2070,8 @@ public class CachedAppOptimizer {
         }
     }
 
-    private record ZramWritebackData(int pid, String processName, String packageName, int uid,
-            long zramUsedDeltaKb, boolean hasActivities) {}
+    private record ZramWritebackData(ProcessRecord app, int pid, String processName,
+            String packageName, int uid, long zramUsedDeltaKb, boolean hasActivities) {}
 
     private final class MemCompactionHandler extends Handler {
         private MemCompactionHandler() {
@@ -2346,7 +2373,7 @@ public class CachedAppOptimizer {
                         long deltaFileRss = rssAfter[RSS_FILE_INDEX] - rssBefore[RSS_FILE_INDEX];
                         long deltaAnonRss = rssAfter[RSS_ANON_INDEX] - rssBefore[RSS_ANON_INDEX];
                         long deltaSwapRss = rssAfter[RSS_SWAP_INDEX] - rssBefore[RSS_SWAP_INDEX];
-                        final ZramWritebackData data = new ZramWritebackData(
+                        final ZramWritebackData data = new ZramWritebackData(proc,
                                 pid, name, packageName, uid, rssAfter[RSS_SWAP_INDEX],
                                 hasActivities);
                         sendMessageDelayed(obtainMessage(ZRAM_WRITEBACK_MSG, data),
@@ -2440,8 +2467,9 @@ public class CachedAppOptimizer {
                 }
                 case ZRAM_WRITEBACK_MSG: {
                     final ZramWritebackData data = (ZramWritebackData) msg.obj;
-                    maybeWritebackZram(data.pid(), data.processName(), data.packageName(),
-                            data.uid(), data.zramUsedDeltaKb(), data.hasActivities());
+                    maybeWritebackZram(data.app(), data.pid(), data.processName(),
+                            data.packageName(), data.uid(), data.zramUsedDeltaKb(),
+                            data.hasActivities());
                     break;
                 }
             }

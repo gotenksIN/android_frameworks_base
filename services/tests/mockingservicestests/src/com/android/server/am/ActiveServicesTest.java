@@ -106,6 +106,9 @@ public final class ActiveServicesTest {
                         .strictness(Strictness.LENIENT)
                         .mockStatic(CompatChanges.class)
                         .startMocking();
+        // Most tests require a non-null ActivityManagerService.  Create one now.  If the test
+        // requires a specialized mock, the test can replace this value.
+        mService = mock(ActivityManagerService.class);
     }
 
     @After
@@ -759,6 +762,7 @@ public final class ActiveServicesTest {
         r.appInfo.pccUid = 30001;
         r.appInfo.packageName = "com.android.pcc";
         final ServiceInfo si = new ServiceInfo();
+        si.applicationInfo = r.appInfo;
         si.flags = ServiceInfo.FLAG_RUN_IN_PCC_SANDBOX;
         setFieldValue(ServiceRecord.class, r, "serviceInfo", si);
         setFieldValue(ServiceRecord.class, r, "processName", "test");

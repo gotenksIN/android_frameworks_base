@@ -993,6 +993,7 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
+    @RavenwoodKeepWholeClass
     static final class AppBindData {
         @UnsupportedAppUsage
         AppBindData() {
@@ -3119,6 +3120,7 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @UnsupportedAppUsage
+    @RavenwoodKeep
     public static String currentPackageName() {
         ActivityThread am = currentActivityThread();
         return (am != null && am.mBoundApplication != null)

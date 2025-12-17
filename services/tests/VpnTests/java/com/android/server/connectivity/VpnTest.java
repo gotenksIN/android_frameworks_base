@@ -43,7 +43,6 @@ import static android.net.ipsec.ike.IkeSessionParams.ESP_ENCAP_TYPE_UDP;
 import static android.net.ipsec.ike.IkeSessionParams.ESP_IP_VERSION_AUTO;
 import static android.net.ipsec.ike.IkeSessionParams.ESP_IP_VERSION_IPV4;
 import static android.net.ipsec.ike.IkeSessionParams.ESP_IP_VERSION_IPV6;
-import static android.net.platform.flags.Flags.FLAG_REENABLE_INNER_IPV6_ON_VPN;
 import static android.os.UserHandle.PER_USER_RANGE;
 import static android.telephony.CarrierConfigManager.KEY_CARRIER_CONFIG_APPLIED_BOOL;
 import static android.telephony.CarrierConfigManager.KEY_MIN_UDP_PORT_4500_NAT_TIMEOUT_SEC_INT;
@@ -159,7 +158,6 @@ import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.test.TestLooper;
-import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.Settings;
 import android.security.Credentials;
@@ -287,6 +285,9 @@ public class VpnTest extends VpnTestBase {
     private static final long TIMEOUT_CROSSTHREAD_MS = 20_000L;
     private static final String PRIMARY_USER_APP_EXCLUDE_KEY =
             "VPNAPPEXCLUDED_27_com.testvpn.vpn";
+    protected static final String TEST_OTHER_PKG = "com.other.app";
+    private static final String PRIMARY_USER_OTHER_APP_EXCLUDE_KEY =
+            "VPNAPPEXCLUDED_27_com.other.app";
     static final String PKGS_BYTES = getPackageByteString(List.of(PKGS));
     private static final Range<Integer> PRIMARY_USER_RANGE = uidRangeForUser(PRIMARY_USER.id);
     private static final int TEST_KEEPALIVE_TIMER = 800;
@@ -1145,20 +1146,29 @@ public class VpnTest extends VpnTestBase {
         return vpn;
     }
 
+    private void verifySetAppExclusionList(Vpn vpn, String sessionKey, String[] packages) {
+        verify(mVpnProfileStore, never()).put(eq(PRIMARY_USER_APP_EXCLUDE_KEY), any());
+        vpn.setAppExclusionList(TEST_VPN_PKG, Arrays.asList(packages));
+        verify(mVpnProfileStore)
+                .put(eq(PRIMARY_USER_APP_EXCLUDE_KEY),
+                        eq(HexDump.hexStringToByteArray(PKGS_BYTES)));
+
+        verifyUidRangeUpdate(vpn, sessionKey, packages);
+        assertEquals(Arrays.asList(packages), vpn.getAppExclusionList(TEST_VPN_PKG));
+    }
+
+    private void verifyUidRangeUpdate(Vpn vpn, String sessionKey, String[] packages) {
+        final Set<Range<Integer>> uidRanges = vpn.createUserAndRestrictedProfilesRanges(
+                PRIMARY_USER.id, null /* allowedApplications */, Arrays.asList(packages));
+        verify(mConnectivityManager).setVpnDefaultForUids(eq(sessionKey), eq(uidRanges));
+        assertEquals(uidRanges, vpn.mNetworkCapabilities.getUids());
+    }
+
     @Test
     public void testSetAndGetAppExclusionList() throws Exception {
         final Vpn vpn = createVpn(AppOpsManager.OPSTR_ACTIVATE_PLATFORM_VPN);
         final String sessionKey = startVpnForVerifyAppExclusionList(vpn);
-        verify(mVpnProfileStore, never()).put(eq(PRIMARY_USER_APP_EXCLUDE_KEY), any());
-        vpn.setAppExclusionList(TEST_VPN_PKG, Arrays.asList(PKGS));
-        verify(mVpnProfileStore)
-                .put(eq(PRIMARY_USER_APP_EXCLUDE_KEY),
-                     eq(HexDump.hexStringToByteArray(PKGS_BYTES)));
-        final Set<Range<Integer>> uidRanges = vpn.createUserAndRestrictedProfilesRanges(
-                PRIMARY_USER.id, null /* allowedApplications */, Arrays.asList(PKGS));
-        verify(mConnectivityManager).setVpnDefaultForUids(eq(sessionKey), eq(uidRanges));
-        assertEquals(uidRanges, vpn.mNetworkCapabilities.getUids());
-        assertEquals(Arrays.asList(PKGS), vpn.getAppExclusionList(TEST_VPN_PKG));
+        verifySetAppExclusionList(vpn, sessionKey, PKGS);
     }
 
     @Test
@@ -1260,6 +1270,60 @@ public class VpnTest extends VpnTestBase {
                 () -> vpn.setAppExclusionList(TEST_VPN_PKG, new ArrayList<>()));
 
         assertEquals(Arrays.asList(PKGS), vpn.getAppExclusionList(TEST_VPN_PKG));
+    }
+
+    @Test
+    public void testClearAppExclusionList() throws Exception {
+        final Vpn vpn = createVpn(AppOpsManager.OPSTR_ACTIVATE_PLATFORM_VPN);
+        final String sessionKey = startVpnForVerifyAppExclusionList(vpn);
+        verifySetAppExclusionList(vpn, sessionKey, PKGS);
+
+        // Mock VpnProfileStore.remove to return true.
+        when(mVpnProfileStore.remove(eq(PRIMARY_USER_APP_EXCLUDE_KEY))).thenReturn(true);
+
+        assertTrue(vpn.clearAppExclusionList(TEST_VPN_PKG));
+        verify(mVpnProfileStore).remove(eq(PRIMARY_USER_APP_EXCLUDE_KEY));
+
+        // After clearing, subsequent calls to get should return null.
+        when(mVpnProfileStore.get(PRIMARY_USER_APP_EXCLUDE_KEY)).thenReturn(null);
+
+        assertEquals(Collections.emptyList(), vpn.getAppExclusionList(TEST_VPN_PKG));
+        verifyUidRangeUpdate(vpn, sessionKey, new String[0]);
+    }
+
+    @Test
+    public void testClearAppExclusionList_forNotRunningVpn() throws Exception {
+        final Vpn vpn = createVpn(AppOpsManager.OPSTR_ACTIVATE_PLATFORM_VPN);
+        final String sessionKey = startVpnForVerifyAppExclusionList(vpn);
+        verifySetAppExclusionList(vpn, sessionKey, PKGS);
+
+        // Mock the remove operation for a *different* app's list to succeed.
+        when(mVpnProfileStore.remove(eq(PRIMARY_USER_OTHER_APP_EXCLUDE_KEY))).thenReturn(true);
+
+        clearInvocations(mConnectivityManager);
+
+        assertTrue(vpn.clearAppExclusionList(TEST_OTHER_PKG));
+        verify(mVpnProfileStore).remove(eq(PRIMARY_USER_OTHER_APP_EXCLUDE_KEY));
+        assertEquals(Arrays.asList(PKGS), vpn.getAppExclusionList(TEST_VPN_PKG));
+        verify(mConnectivityManager, never()).setVpnDefaultForUids(eq(sessionKey), any());
+    }
+
+    @Test
+    public void testClearAppExclusionList_forNonExistentList()
+            throws Exception {
+        final Vpn vpn = createVpn(AppOpsManager.OPSTR_ACTIVATE_PLATFORM_VPN);
+        final String sessionKey = startVpnForVerifyAppExclusionList(vpn);
+        verifySetAppExclusionList(vpn, sessionKey, PKGS);
+
+        // Mock VpnProfileStore.remove to return false for a *different* app's exclusion list.
+        when(mVpnProfileStore.remove(eq(PRIMARY_USER_OTHER_APP_EXCLUDE_KEY))).thenReturn(false);
+
+        clearInvocations(mConnectivityManager);
+
+        assertFalse(vpn.clearAppExclusionList(TEST_OTHER_PKG));
+        verify(mVpnProfileStore).remove(eq(PRIMARY_USER_OTHER_APP_EXCLUDE_KEY));
+        assertEquals(Arrays.asList(PKGS), vpn.getAppExclusionList(TEST_VPN_PKG));
+        verify(mConnectivityManager, never()).setVpnDefaultForUids(anyString(), any());
     }
 
     @Test
@@ -2564,7 +2628,6 @@ public class VpnTest extends VpnTestBase {
     }
 
     @Test
-    @EnableFlags(FLAG_REENABLE_INNER_IPV6_ON_VPN)
     public void testOnChildMigrated_remove_v6() throws Exception {
         final int newMtu = IPV6_MIN_MTU - 1;
         doTestOnChildMigrated(true /* supportsV6Before */, newMtu);
@@ -2613,7 +2676,6 @@ public class VpnTest extends VpnTestBase {
     }
 
     @Test
-    @EnableFlags(FLAG_REENABLE_INNER_IPV6_ON_VPN)
     public void testOnChildMigrated_v6_support_unchanged() throws Exception {
         final int newMtu = IPV6_MIN_MTU + 1;
         doTestOnChildMigrated(true /* supportsV6Before */, newMtu);
@@ -2631,7 +2693,6 @@ public class VpnTest extends VpnTestBase {
     }
 
     @Test
-    @EnableFlags(FLAG_REENABLE_INNER_IPV6_ON_VPN)
     public void testOnChildMigrated_reenable_IPv6() throws Exception {
         final int newMtu = IPV6_MIN_MTU + 1;
         doTestOnChildMigrated(false /* supportsV6Before */, newMtu);
@@ -2678,7 +2739,6 @@ public class VpnTest extends VpnTestBase {
     }
 
     @Test
-    @EnableFlags(FLAG_REENABLE_INNER_IPV6_ON_VPN)
     public void testOnVpnNetworkLpChanged_v6_support_unchanged() throws Exception {
         // Create a VPN support IPv4+IPv6, and simulate network still have v6 capability
         doTestOnVpnNetworkLpChanged(
@@ -2694,7 +2754,6 @@ public class VpnTest extends VpnTestBase {
     }
 
     @Test
-    @EnableFlags(FLAG_REENABLE_INNER_IPV6_ON_VPN)
     public void testOnVpnNetworkLpChanged_reenable_IPv6() throws Exception {
         // Create a VPN support IPv4 only, and simulate receiving callback that LinkProperties's mtu
         // got updated to support v6

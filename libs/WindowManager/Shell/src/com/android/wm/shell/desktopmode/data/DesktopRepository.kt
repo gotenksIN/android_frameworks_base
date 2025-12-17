@@ -167,8 +167,13 @@ class DesktopRepository(
     }
 
     /** Stores the last state of a single desk, creating a new PreservedDisplay if needed. */
-    fun preserveDesk(deskId: Int, uniqueDisplayId: String) {
-        logD("preserveDesk for deskId=%d, uniqueDisplayId=%s", deskId, uniqueDisplayId)
+    fun preserveDesk(deskId: Int, uniqueDisplayId: String, preserveAsActive: Boolean) {
+        logD(
+            "preserveDesk for deskId=%d, uniqueDisplayId=%s, preserveAsActive=%b",
+            deskId,
+            uniqueDisplayId,
+            preserveAsActive,
+        )
         val desk = desktopData.getDesk(deskId) ?: return
         if (desk.activeTasks.isEmpty()) return
         val preservedDisplay =
@@ -177,6 +182,7 @@ class DesktopRepository(
                     preservedDisplaysByUniqueId[uniqueDisplayId] = it
                 }
         preservedDisplay.orderedDesks.add(desk)
+        if (preserveAsActive) preservedDisplay.activeDeskId = deskId
         // The transient desk is preserved and has served its purpose, it can be removed now.
         if (desk.transientDesk) removeDesk(deskId)
     }
@@ -1216,6 +1222,10 @@ class DesktopRepository(
             desktopGestureExclusionListener?.accept(calculateDesktopExclusionRegion())
         }
     }
+
+    /** Returns the bounds saved before snapping or maximizing the given task. */
+    fun getBoundsBeforeSnapOrMaximize(taskId: Int): Rect? =
+        boundsBeforeSnapOrMaximizeByTaskId.get(taskId)
 
     /** Removes and returns the bounds saved before snapping or maximizing the given task. */
     fun removeBoundsBeforeSnapOrMaximize(taskId: Int): Rect? =

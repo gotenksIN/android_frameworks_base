@@ -19,15 +19,13 @@ package com.android.wm.shell.bubbles
 import android.app.ActivityManager
 import android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD
 import com.android.internal.protolog.ProtoLog
-import com.android.wm.shell.ShellTaskOrganizer
-import com.android.wm.shell.bubbles.util.BubbleUtils.getExitBubbleTransaction
 import com.android.wm.shell.bubbles.util.BubbleUtils.isBubbleToFullscreen
 import com.android.wm.shell.bubbles.util.BubbleUtils.isBubbleToSplit
+import com.android.wm.shell.bubbles.util.DefaultBubblePolicyHelper
 import com.android.wm.shell.common.TaskStackListenerCallback
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BUBBLES_NOISY
 import com.android.wm.shell.shared.bubbles.logging.BubbleLog
 import com.android.wm.shell.splitscreen.SplitScreenController
-import com.android.wm.shell.taskview.TaskViewTaskController
 import dagger.Lazy
 import java.util.Optional
 
@@ -62,7 +60,10 @@ class BubbleTaskStackListener(
         )
         bubbleData.getBubbleInStackWithTaskId(taskId)?.let { bubble ->
             when {
-                task.isBubbleToFullscreen() -> moveExistingBubbleToFullscreen(bubble, task)
+                task.isBubbleToFullscreen() -> {
+                    DefaultBubblePolicyHelper.moveExistingTaskOutOfBubble(bubble, task)
+                    if (bubbleData.isExpanded) bubbleData.isExpanded = false
+                }
                 task.isBubbleToSplit(splitScreenController) -> return // skip split task restarts
                 !task.isAppBubbleMovingToFront() -> selectAndExpandInStackBubble(bubble, task)
             }
@@ -71,9 +72,16 @@ class BubbleTaskStackListener(
 
     override fun onTaskMovedToFront(task: ActivityManager.RunningTaskInfo) {
         val taskId = task.taskId
-        BubbleLog.d("BubbleTaskStackListener.onTaskMovedToFront(): taskId=%d", taskId)
         bubbleData.getBubbleInStackWithTaskId(taskId)?.let { bubble ->
-            if (task.isBubbleToFullscreen()) moveExistingBubbleToFullscreen(bubble, task)
+            BubbleLog.d(
+                "BubbleTaskStackListener.onTaskMovedToFront(): taskId=%d bubble=%s",
+                taskId,
+                bubble.key,
+            )
+            if (task.isBubbleToFullscreen()) {
+                DefaultBubblePolicyHelper.moveExistingTaskOutOfBubble(bubble, task)
+                if (bubbleData.isExpanded) bubbleData.isExpanded = false
+            }
         }
     }
 
@@ -98,27 +106,5 @@ class BubbleTaskStackListener(
             bubble.key,
         )
         bubbleData.setSelectedBubbleAndExpandStack(bubble)
-    }
-
-    /** Moves a bubble that is currently in the stack to fullscreen. */
-    private fun moveExistingBubbleToFullscreen(
-        bubble: Bubble,
-        task: ActivityManager.RunningTaskInfo,
-    ) {
-        BubbleLog.d(
-            "BubbleTaskStackListener.moveExistingBubbleToFullscreen() taskId=%d bubble=%s" +
-                " to fullscreen",
-            task.taskId,
-            bubble.key,
-        )
-        val taskViewTaskController: TaskViewTaskController = bubble.taskView.controller
-        val taskOrganizer: ShellTaskOrganizer = taskViewTaskController.taskOrganizer
-
-        val wct = getExitBubbleTransaction(task.token, bubble.taskView.captionInsetsOwner)
-        taskOrganizer.applyTransaction(wct)
-
-        taskViewTaskController.notifyTaskRemovalStarted(task)
-
-        if (bubbleData.isExpanded) bubbleData.isExpanded = false
     }
 }

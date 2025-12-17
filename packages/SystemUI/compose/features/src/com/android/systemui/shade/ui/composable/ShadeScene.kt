@@ -67,6 +67,7 @@ import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.animateContentFloatAsState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.transitions
+import com.android.compose.gesture.effect.rememberOffsetOverscrollEffect
 import com.android.compose.gesture.gesturesDisabled
 import com.android.compose.lifecycle.LaunchedEffectWithLifecycle
 import com.android.compose.modifiers.padding
@@ -284,6 +285,7 @@ private fun ContentScope.SingleShade(
             ) {
                 ScrollState(initial = 0)
             }
+        val scrimOverscrollEffect = rememberOffsetOverscrollEffect()
 
         ShadePanelScrim(viewModel.isTransparencyEnabled)
         SingleShadeNestedScrollLayout(
@@ -295,7 +297,8 @@ private fun ContentScope.SingleShade(
                 },
             shadeSession = shadeSession,
             viewModel = notificationsPlaceholderViewModel,
-            scrollState = scrollState,
+            contentScrollState = scrollState,
+            contentOverScrollEffect = scrimOverscrollEffect,
             jankMonitor = jankMonitor,
             statusBarHeader = {
                 CollapsedShadeHeader(viewModel = headerViewModel, isSplitShade = false)
@@ -360,7 +363,7 @@ private fun ContentScope.SingleShade(
                     mediaInRow = mediaInRow,
                 )
             },
-            scrollableScrim = { onContentHeightChanged, scrimOverscrollEffect ->
+            scrollableScrim = { onContentHeightChanged ->
                 NestedScrollingNotificationPanel(
                     tag = "$tag.Single",
                     shadeSession = shadeSession,
@@ -370,8 +373,8 @@ private fun ContentScope.SingleShade(
                     isTransparencyEnabled = viewModel.isTransparencyEnabled,
                     stackTopPadding = notificationStackPadding,
                     stackBottomPadding = navBarHeight,
-                    scrollState = scrollState,
-                    overscrollEffect = scrimOverscrollEffect,
+                    contentScrollState = scrollState,
+                    contentOverscrollEffect = scrimOverscrollEffect,
                     onEmptySpaceClick =
                         viewModel::onEmptySpaceClicked.takeIf { viewModel.isEmptySpaceClickable },
                     modifier = Modifier.padding(horizontal = shadeHorizontalPadding),

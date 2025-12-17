@@ -1292,20 +1292,20 @@ flag {
 }
 
 flag {
+    name: "optimize_flow_map_operators"
+    namespace: "systemui"
+    description: "Use map instead of mapLatest for non-suspend flow transformations"
+    bug: "466952109"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
    name: "override_suppress_overlay_condition"
    namespace: "systemui"
    description: "Allow override the conditions to suppress the clipboard overlay"
    bug: "358473717"
-}
-
-flag {
-   name: "per_display_ongoing_call_status_bar_visibility"
-   namespace: "systemui"
-   description: "Adds per display implementation for the logic of whether the status bar should be visible for ongoing calls."
-   bug: "433704306"
-   metadata {
-     purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -1632,16 +1632,6 @@ flag {
 }
 
 flag {
-   name: "sim_next_sub_id"
-   namespace: "systemui"
-   description: "Update for determining the next SIM subscription ID for a given state"
-   bug: "410750970"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "sim_pin_bouncer_reset"
    namespace: "systemui"
    description: "The SIM PIN bouncer does not close after unlocking"
@@ -1752,16 +1742,6 @@ flag {
     namespace: "systemui"
     description: "Feature flag for the assistant icon in desktop status bar"
     bug: "440281094"
-}
-
-flag {
-    name: "status_bar_call_chip_use_is_hidden"
-    namespace: "systemui"
-    description: "Enables isHidden field for all call chips"
-    bug: "427747840"
-    metadata {
-       purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

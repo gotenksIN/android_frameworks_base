@@ -14,17 +14,15 @@
  * limitations under the License.
  */
 
-package com.android.systemui.statusbar.chips.call.ui.viewmodel
+package com.android.systemui.screencapture.record.smallscreen.ui.viewmodel
 
-import com.android.systemui.Flags
+import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.screencapture.record.smallscreen.domain.interactor.recordDetailsTargetInteractor
 
-/** Helper for reading or using the status_bar_call_chip_use_is_hidden flag state. */
-object StatusBarCallChipUseIsHidden {
-    /** The aconfig flag name */
-    const val FLAG_NAME = Flags.FLAG_STATUS_BAR_CALL_CHIP_USE_IS_HIDDEN
-
-    /** Is the feature enabled. */
-    @JvmStatic
-    inline val isEnabled
-        get() = Flags.statusBarCallChipUseIsHidden()
-}
+val Kosmos.recordDetailsTargetViewModelFactory by
+    Kosmos.Fixture {
+        object : RecordDetailsTargetViewModel.Factory {
+            override fun create(): RecordDetailsTargetViewModel =
+                RecordDetailsTargetViewModel(interactor = recordDetailsTargetInteractor)
+        }
+    }

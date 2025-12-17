@@ -107,6 +107,7 @@ import static com.android.server.wm.TaskFragment.EMBEDDING_ALLOWED;
 import static com.android.server.wm.TaskFragment.FLAG_FORCE_HIDDEN_FOR_TASK_FRAGMENT_ORG;
 import static com.android.server.wm.WindowContainer.POSITION_BOTTOM;
 import static com.android.server.wm.WindowContainer.POSITION_TOP;
+import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -1352,18 +1353,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                     Slog.e(TAG, "Attempt to operate on detached container: " + wc);
                     break;
                 }
-                if (!DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX.isTrue()) {
-                    // There is no use case to ask the reparent operation in lock-task mode now,
-                    // so keep skipping this operation as usual.
-                    if (isInLockTaskMode && type == HIERARCHY_OP_TYPE_REPARENT) {
-                        Slog.w(TAG, "Skip applying hierarchy operation " + hop
-                                + " while in lock task mode");
-                        break;
-                    }
-                    if (isLockTaskModeViolation(wc.getParent(), wc.asTask(), isInLockTaskMode)) {
-                        break;
-                    }
-                }  else if (type == HIERARCHY_OP_TYPE_REPARENT && hop.getNewParent() != null) {
+                if (type == HIERARCHY_OP_TYPE_REPARENT && hop.getNewParent() != null) {
                     final WindowContainer parentWc = WindowContainer.fromBinder(hop.getNewParent());
                     final Task parentTask = parentWc != null ? parentWc.asTask() : null;
                     if (parentTask != null && parentTask.isLeafTask()
@@ -1915,6 +1905,19 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                         && adjacentParams.shouldDelayPrimaryLastActivityRemoval());
                 secondaryTaskFragment.setDelayLastActivityRemoval(adjacentParams != null
                         && adjacentParams.shouldDelaySecondaryLastActivityRemoval());
+
+                if (Flags.fixTfAdjacentFocus()) {
+                    final ActivityRecord focusedApp = taskFragment.getDisplayContent().mFocusedApp;
+                    final TaskFragment focusedTaskFragment = focusedApp != null
+                            ? focusedApp.getTaskFragment()
+                            : null;
+                    if (focusedTaskFragment == taskFragment
+                            || focusedTaskFragment == secondaryTaskFragment) {
+                        // The focused window may change due to this adjacency change.
+                        mService.mWindowManager.updateFocusedWindowLocked(UPDATE_FOCUS_NORMAL,
+                                true /*updateInputWindows*/);
+                    }
+                }
                 break;
             }
             case OP_TYPE_CLEAR_ADJACENT_TASK_FRAGMENTS: {
@@ -1936,9 +1939,14 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
 
                 // Clear the focused app if the focused app is no longer visible after reset the
                 // adjacent TaskFragments.
-                if (wasFocusedInAdjacent
-                        && !focusedTaskFragment.shouldBeVisible(null /* starting */)) {
-                    focusedTaskFragment.getDisplayContent().setFocusedApp(null /* newFocus */);
+                if (wasFocusedInAdjacent) {
+                    if (!focusedTaskFragment.shouldBeVisible(null /* starting */)) {
+                        focusedTaskFragment.getDisplayContent().setFocusedApp(null /* newFocus */);
+                    } else if (Flags.fixTfAdjacentFocus()) {
+                        // The focused window may change due to this adjacency change.
+                        mService.mWindowManager.updateFocusedWindowLocked(UPDATE_FOCUS_NORMAL,
+                                true /*updateInputWindows*/);
+                    }
                 }
                 break;
             }
@@ -2849,7 +2857,8 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                     OP_TYPE_CREATE_TASK_FRAGMENT, exception);
             return;
         }
-        if (!ownerActivity.isResizeable()) {
+        if (!ownerActivity.isResizeable()
+                && !ownerActivity.info.isChangeEnabled(ActivityInfo.FORCE_RESIZE_APP)) {
             final IllegalArgumentException exception = new IllegalArgumentException("Not allowed"
                     + " to operate with non-resizable owner Activity");
             sendTaskFragmentOperationFailure(organizer, errorCallbackToken, null /* taskFragment */,

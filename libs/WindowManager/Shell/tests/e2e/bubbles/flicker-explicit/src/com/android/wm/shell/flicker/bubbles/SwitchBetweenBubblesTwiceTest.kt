@@ -21,7 +21,6 @@ import android.platform.test.annotations.RequiresFlagsEnabled
 import android.tools.NavBar
 import android.tools.device.apphelpers.MessagingAppHelper
 import android.tools.traces.component.ComponentNameMatcher.Companion.LAUNCHER
-import androidx.test.filters.FlakyTest
 import androidx.test.filters.RequiresDevice
 import com.android.wm.shell.Flags
 import com.android.wm.shell.Utils.testSetupRule
@@ -65,7 +64,6 @@ import org.junit.runners.Parameterized.Parameters
  * - [previousApp] becomes invisible, and then becomes visible.
  * - [testApp] becomes visible, and then becomes invisible.
  */
-@FlakyTest(bugId = 420909828) // The "USB debugging connected" cover the Bubble icon
 @RequiresFlagsEnabled(Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE)
 @RequiresDevice
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -116,23 +114,11 @@ class SwitchBetweenBubblesTwiceTest(navBar: NavBar) :
                 previousApp.toWindowName(),
             )
         } else {
-            if (Flags.fixBubblesImeFocusFlicker()) {
-                eventLogSubject.focusChanges(
-                    previousApp.toWindowName(),
-                    testApp.toWindowName(),
-                    previousApp.toWindowName(),
-                )
-            } else {
-                eventLogSubject.focusChanges(
-                    previousApp.toWindowName(),
-                    // Launcher may get focus when tapping on bubble icon.
-                    LAUNCHER.toWindowName(),
-                    testApp.toWindowName(),
-                    // Launcher may get focus when tapping on bubble icon.
-                    LAUNCHER.toWindowName(),
-                    previousApp.toWindowName(),
-                )
-            }
+            eventLogSubject.focusChanges(
+                previousApp.toWindowName(),
+                testApp.toWindowName(),
+                previousApp.toWindowName(),
+            )
         }
     }
 

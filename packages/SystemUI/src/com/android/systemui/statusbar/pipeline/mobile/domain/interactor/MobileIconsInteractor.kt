@@ -35,6 +35,9 @@ import com.android.systemui.flags.FeatureFlagsClassic
 import com.android.systemui.flags.Flags.FILTER_PROVISIONING_NETWORK_SUBSCRIPTIONS
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.logDiffsForTable
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
+import com.android.systemui.res.R
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
 import com.android.systemui.statusbar.core.NewStatusBarIcons
 import com.android.systemui.statusbar.pipeline.dagger.MobileSummaryLog
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
@@ -176,7 +179,10 @@ constructor(
     private val reuseCache = mutableMapOf<Int, WeakReference<MobileIconInteractor>>()
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     private var ddsIcon: StateFlow<SignalIconModel?> = MutableStateFlow(null)
-
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
+    private val enableStackedIcon: Boolean =
+        context.resources.getBoolean(R.bool.config_enable_stacked_icon)
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
     override fun setDdsIconFLow(iconFlow: StateFlow<SignalIconModel?>) {
         ddsIcon = iconFlow
     }
@@ -315,7 +321,9 @@ constructor(
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
     override val isStackable =
-        if (NewStatusBarIcons.isEnabled) {
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
+        if (NewStatusBarIcons.isEnabled && enableStackedIcon) {
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
             icons.flatMapLatest { icons ->
                 if (icons.isEmpty()) {
                     flowOf(false)
@@ -429,17 +437,23 @@ constructor(
 
     override val alwaysUseRsrpLevelForLte: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .mapDirect { it.showRsrpSignalLevelforLTE }
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     override val hideNoInternetState: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .mapDirect { it.hideNoInternetState }
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     override val networkTypeIconCustomization: StateFlow<MobileIconCustomizationMode> =
         mobileConnectionsRepo.defaultDataSubRatConfig
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .mapDirect { defaultConfig ->
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                 val enabled = defaultConfig.alwaysShowNetworkTypeIcon
                     || defaultConfig.enableDdsRatIconEnhancement
                     || defaultConfig.enableRatIconEnhancement
@@ -455,17 +469,23 @@ constructor(
 
     override val showVolteIcon: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .mapDirect { it.showVolteIcon }
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     override val showVowifiIcon: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .mapDirect { it.showVowifiIcon }
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     private val crossSimdisplaySingnalLevel: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .mapDirect { it.crossSimdisplaySingnalLevel }
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)

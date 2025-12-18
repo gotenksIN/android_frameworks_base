@@ -723,7 +723,9 @@ class MobileConnectionRepositoryImpl(
     override val dataRoamingEnabled: StateFlow<Boolean> = run {
         val initial = telephonyManager.isDataRoamingEnabled
         dataRoamingSettingChangedEvent
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
             .mapDirect { telephonyManager.isDataRoamingEnabled }
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
             .distinctUntilChanged()
             .logDiffsForTable(
                     tableLogBuffer,

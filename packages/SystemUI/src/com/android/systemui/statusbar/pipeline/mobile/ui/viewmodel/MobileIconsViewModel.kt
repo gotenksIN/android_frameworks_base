@@ -75,7 +75,9 @@ constructor(
 // QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
     val subscriptionIdsFlow: StateFlow<List<Int>> =
         interactor.filteredSubscriptions
+// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
             .mapDirect { subscriptions ->
+// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
                 subscriptions.map { subscriptionModel -> subscriptionModel.subscriptionId }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), listOf())

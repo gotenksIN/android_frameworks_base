@@ -800,12 +800,20 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_toolbar_settings_button_a11y">Screen capture settings</string>
     <!-- Content description for the share button in the post recording shelf. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_post_recording_shelf_share_button_a11y">Share screen recording </string>
     <!-- Content description for the folder button in the post recording shelf. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_post_recording_shelf_folder_button_a11y">Open screen recording in file manager</string>
     <!-- Content description for the delete button in the post recording shelf. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_post_recording_shelf_delete_button_a11y">Delete screen recording</string>
     <!-- Content description for the thumbnail in the post recording shelf. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_post_recording_shelf_thumbnail_a11y">Open screen recording in video viewer</string>
 
     <!-- Screen capture setting to show clicks and keys when recording [CHAR LIMIT=35] -->
@@ -1613,6 +1621,8 @@
     <string name="accessibility_status_bar_assistant_icon">Assistant</string>
 
     <!-- Accessibility text describing the input method indicator chip in the status bar. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_status_bar_input_method_indicator">Input method</string>
 
     <!-- The overflow indicator shown when a group has more notification inside the group than the visible ones. An example is "+ 3" [CHAR LIMIT=5] -->
@@ -2894,6 +2904,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_action_label_unselect_widget">unselect widget</string>
     <!-- Label for accessibility action to resize a widget in edit mode. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_action_label_resize_widget">Resize widget</string>
     <!-- Label for accessibility action to shrink a widget in edit mode. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -2904,8 +2916,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_action_label_expand_widget">Increase height</string>
     <!-- Label for accessibility announcement when a widget has been expanded in edit mode. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_announcement_expand_widget">Height expanded</string>
     <!-- Label for accessibility announcement when a widget has been shrunk in edit mode. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_announcement_shrink_widget">Height decreased</string>
     <!-- Label for accessibility action to show the next media player. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -3316,6 +3332,8 @@
     <string name="unlock_to_see_notif_text">Unlock to see older notifications</string>
 
     <!-- Disclosure at the bottom of Quick Settings that indicates that parental controls are enabled. [CHAR LIMIT=100] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="quick_settings_disclosure_parental_controls">Parental controls are active</string>
 
     <!-- Disclosure at the bottom of Quick Settings that indicates that parental controls are enabled. [CHAR LIMIT=100] -->

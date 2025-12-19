@@ -352,6 +352,8 @@ import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 
+import vendor.qti.applauncher.AppLauncherService;
+
 /**
  * Entry point to {@code system_server}.
  */
@@ -1995,6 +1997,15 @@ public final class SystemServer implements Dumpable {
                 }
             }
         }
+
+        t.traceBegin("StartAppLauncherService");
+                try {
+                    Slog.i(TAG , "*****************SystemServer Add AppLauncherService Service*************************");
+                    ServiceManager.addService("vendor.qti.appLauncherService.IAppLauncherService/default", new AppLauncherService(context));
+                }catch (Throwable e) {
+                    Slog.e(TAG , "Failure starting AppLauncherService", e);
+                }
+        t.traceEnd();
 
         // We start this here so that we update our configuration to set watch or television
         // as appropriate.

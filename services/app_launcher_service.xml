@@ -1,0 +1,9 @@
+<!-- Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. -->
+<!-- SPDX-License-Identifier: BSD-3-Clause-Clear -->
+
+<manifest version="1.0" type="framework">
+    <hal format="aidl">
+        <name>vendor.qti.appLauncherService</name>
+        <fqname>IAppLauncherService/default</fqname>
+    </hal>
+</manifest>

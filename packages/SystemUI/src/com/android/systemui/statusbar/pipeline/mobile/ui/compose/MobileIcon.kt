@@ -84,12 +84,10 @@ fun MobileIcon(viewModel: MobileIconViewModelCommon, modifier: Modifier = Modifi
     val context = LocalContext.current
     val contentColor = LocalContentColor.current
     val spacing = with(LocalDensity.current) { MobileIconDimensions.IconSpacingSp.toDp() }
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
     val volteId by
         viewModel.volteId.collectAsStateWithLifecycle(initialValue = 0)
     val showSignalStrengthIcon by
         viewModel.showSignalStrengthIcon.collectAsStateWithLifecycle(initialValue = true)
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
@@ -99,7 +97,6 @@ fun MobileIcon(viewModel: MobileIconViewModelCommon, modifier: Modifier = Modifi
                 }
             },
     ) {
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
         if (volteId != 0) {
             val volteHeight = with(LocalDensity.current) {
                 MobileIconDimensions.VolteIconHeightSp.toDp() }
@@ -112,7 +109,6 @@ fun MobileIcon(viewModel: MobileIconViewModelCommon, modifier: Modifier = Modifi
             )
             Spacer(Modifier.size(spacing))
         }
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
 
         if (activityContainerVisible) {
             Column {
@@ -139,13 +135,11 @@ fun MobileIcon(viewModel: MobileIconViewModelCommon, modifier: Modifier = Modifi
 
         Spacer(Modifier.size(spacing))
 
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
         if (showSignalStrengthIcon) {
             MobileSignalIcon(viewModel = icon as SignalIconModel.Cellular, color = contentColor)
 
             Spacer(Modifier.size(spacing))
         }
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
 
         if (roaming) {
             val height =
@@ -346,7 +340,5 @@ private object MobileIconDimensions {
     val RoamingIconHeightSp = 10.sp
     val RoamingIconPaddingTopSp = 1.sp
     val ActivityIndicatorSizeSp = 12.sp
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
     val VolteIconHeightSp = 8.sp
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar.
 }

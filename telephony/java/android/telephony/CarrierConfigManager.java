@@ -900,16 +900,6 @@ public class CarrierConfigManager {
      */
     public static final String KEY_VILTE_DATA_IS_METERED_BOOL = "vilte_data_is_metered_bool";
 
-// QTI_BEGIN: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
-    /**
-     * Flag indicating whether we should reset UT capability or not for IMS deregistration
-     * and for IMS feature state not ready
-     * @hide
-     */
-    public static final String KEY_IGNORE_RESET_UT_CAPABILITY_BOOL =
-            "ignore_reset_ut_capability_bool";
-
-// QTI_END: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
     /**
      * Flag specifying whether WFC over IMS should be available for carrier: independent of
      * carrier provisioning. If false: hard disabled. If true: then depends on carrier
@@ -11713,9 +11703,6 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_CONFIG_TELEPHONY_USE_OWN_NUMBER_FOR_VOICEMAIL_BOOL, false);
         sDefaults.putBoolean(KEY_IGNORE_DATA_ENABLED_CHANGED_FOR_VIDEO_CALLS, true);
         sDefaults.putBoolean(KEY_VILTE_DATA_IS_METERED_BOOL, true);
-// QTI_BEGIN: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
-        sDefaults.putBoolean(KEY_IGNORE_RESET_UT_CAPABILITY_BOOL, false);
-// QTI_END: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
         sDefaults.putBoolean(KEY_CARRIER_WFC_IMS_AVAILABLE_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_CROSS_SIM_IMS_AVAILABLE_BOOL, false);
 // QTI_BEGIN: 2024-01-11: Telephony: Add config to show signal strength for MSIM CIWLAN

@@ -213,7 +213,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     static final ActivityTrigger mActivityTrigger = new ActivityTrigger();
 // QTI_END: 2021-11-22: Performance: perf: Move ActivityResumeTrigger based on refactored code.
 
-    // TODO(b/233177466): Move mMinWidth and mMinHeight to Task and remove usages in TaskFragment
     /**
      * Minimal width of this task fragment when it's resizeable. {@link #INVALID_MIN_SIZE} means it
      * should use the default minimal width.
@@ -3563,7 +3562,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     }
 
     @Override
-    void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
+    public void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
         final long token = proto.start(fieldId);
         proto.write(HASH_CODE, System.identityHashCode(this));
         final ActivityRecord topActivity = topRunningActivity();

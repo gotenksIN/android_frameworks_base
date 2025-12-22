@@ -221,7 +221,9 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -752,7 +754,8 @@ public final class DisplayManagerService extends SystemService {
         mDisplayNotificationManager = new DisplayNotificationManager(mContext,
                 mExternalDisplayStatsService);
         mExternalDisplayPolicy = new ExternalDisplayPolicy(new ExternalDisplayPolicyInjector());
-        mPluginManager = new PluginManager(mContext, mFlags);
+        mPluginManager =
+                new PluginManager(context, new PluginProviderDependencyInjector() , mFlags);
         mSecondaryDisplayPolicy =
                 new SecondaryDisplayPolicy(mContext, () -> mInjector.canEnterDesktopMode(mContext));
     }
@@ -7047,4 +7050,22 @@ public final class DisplayManagerService extends SystemService {
     private record DisplayInfoChangedFields(int changedGroups,
                                             DisplayInfo.DisplayInfoChangeSource source) {}
 
+    /**
+     * Provides needed dependencies for {@link PluginManager} to pass to Plugin Providers
+     */
+    public class PluginProviderDependencyInjector
+            implements PluginManager.PluginProviderDependencies{
+        @Override
+        public Map<String, DisplayDeviceConfig> getDisplayDeviceConfigs() {
+            Map<String, DisplayDeviceConfig> configMap = new HashMap<>();
+            synchronized (mSyncRoot) {
+                mDisplayDeviceRepo.forEachLocked(device -> {
+                    configMap.put(
+                            device.getUniqueId(), device.getDisplayDeviceConfig());
+                });
+            }
+            return configMap;
+        }
+
+    }
 }

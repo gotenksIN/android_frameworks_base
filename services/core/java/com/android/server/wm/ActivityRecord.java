@@ -70,7 +70,6 @@ import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 import static android.content.pm.ActivityInfo.CONFIG_SMALLEST_SCREEN_SIZE;
 import static android.content.pm.ActivityInfo.CONFIG_UI_MODE;
 import static android.content.pm.ActivityInfo.CONFIG_WINDOW_CONFIGURATION;
-import static android.content.pm.ActivityInfo.FLAG_ALWAYS_FOCUSABLE;
 import static android.content.pm.ActivityInfo.FLAG_EXCLUDE_FROM_RECENTS;
 import static android.content.pm.ActivityInfo.FLAG_IMMERSIVE;
 import static android.content.pm.ActivityInfo.FLAG_INHERIT_SHOW_WHEN_LOCKED;
@@ -3171,7 +3170,7 @@ public final class ActivityRecord extends WindowToken {
 
     @Override
     boolean isFocusable() {
-        return super.isFocusable() && (canReceiveKeys() || isAlwaysFocusable());
+        return super.isFocusable() && canReceiveKeys();
     }
 
     boolean canReceiveKeys() {
@@ -3434,18 +3433,10 @@ public final class ActivityRecord extends WindowToken {
         return mAtmService.getAppOpsManager().checkOpNoThrow(
                 OP_PICTURE_IN_PICTURE, getUid(), packageName) == MODE_ALLOWED;
     }
-
-    private boolean isAlwaysFocusable() {
-        return (info.flags & FLAG_ALWAYS_FOCUSABLE) != 0;
-    }
-
     boolean windowsAreFocusable() {
         return windowsAreFocusable(false /* fromUserTouch */);
     }
 
-    // TODO: Does this really need to be different from isAlwaysFocusable()? For the activity side
-    // focusable means resumeable. I guess with that in mind maybe we should rename the other
-    // method to isResumeable() or something like that.
     boolean windowsAreFocusable(boolean fromUserTouch) {
         if (!fromUserTouch && mTargetSdk < Build.VERSION_CODES.Q) {
             final int pid = getPid();
@@ -3461,7 +3452,7 @@ public final class ActivityRecord extends WindowToken {
         // Check isAttached() because the method may be called when removing this activity from
         // display, and WindowContainer#compareTo will throw exception if it doesn't have a parent
         // when updating focused window from DisplayContent#findFocusedWindow.
-        return (canReceiveKeys() || isAlwaysFocusable()) && isAttached();
+        return canReceiveKeys() && isAttached();
     }
 
     /**
@@ -9597,7 +9588,7 @@ public final class ActivityRecord extends WindowToken {
     }
 
     @Override
-    void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
+    public void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
         final long token = proto.start(fieldId);
         proto.write(HASH_CODE, System.identityHashCode(this));
         proto.write(USER_ID, mUserId);

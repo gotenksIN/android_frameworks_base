@@ -163,6 +163,24 @@ flag {
     }
 }
 
+flag {
+    name: "pass_through_unprocessed_motion_events"
+    namespace: "accessibility"
+    description: "Fixes screen freeze by passing through motion events that AccessibilityInputFilter declines to process (e.g. during mid-gesture feature enables)."
+    bug: "397138372"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+flag {
+    name: "send_a11y_action_cancel_on_reset"
+    namespace: "accessibility"
+    description: "Sends ACTION_CANCEL to InputDispatcher when AccessibilityInputFilter resets with active pointers to prevent state desynchronization."
+    bug: "433890873"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
 
 flag {
     name: "send_a11y_events_based_on_state"
@@ -186,4 +204,14 @@ flag {
     namespace: "accessibility"
     description: "Allow global dispatch for TYPE_SPEECH_STATE_CHANGE"
     bug: "444032233"
+}
+
+flag {
+    name: "use_state_for_action_up_injection"
+    namespace: "accessibility"
+    description: "Uses the current injected pointer state from mState as the source of truth for the pointer bitmask when sending ACTION_UP, preventing injection failures."
+    bug: "445338326"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

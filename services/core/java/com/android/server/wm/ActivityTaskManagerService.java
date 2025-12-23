@@ -268,7 +268,6 @@ import android.view.RemoteAnimationDefinition;
 import android.view.WindowManager;
 import android.window.BackAnimationAdapter;
 import android.window.BackNavigationInfo;
-import android.window.DesktopExperienceFlags;
 import android.window.ITaskSnapshotManager;
 import android.window.IWindowOrganizerController;
 import android.window.SplashScreenView.SplashScreenViewParcelable;
@@ -6993,7 +6992,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
 
         @Override
-        public int startActivitiesAsPackage(String packageName, @Nullable String featureId,
+        public int startActivitiesAsPackage(@Nullable IBinder callingActivityToken,
+                String packageName, @Nullable String featureId,
                 int userId, Intent[] intents, Bundle bOptions) {
             Objects.requireNonNull(intents, "intents");
             final String[] resolvedTypes = new String[intents.length];
@@ -7022,7 +7022,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             final int callingUid = Binder.getCallingUid();
             return getActivityStartController().startActivitiesInPackage(
                     packageUid, packageName, featureId,
-                    intents, resolvedTypes, null /* resultTo */,
+                    intents, resolvedTypes, callingActivityToken /* resultTo */,
                     SafeActivityOptions.fromBundle(bOptions, callingPid, callingUid), userId,
                     false /* validateIncomingUser */, null /* originatingPendingIntent */,
                     false);

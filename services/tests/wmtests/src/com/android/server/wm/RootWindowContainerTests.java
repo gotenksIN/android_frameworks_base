@@ -24,7 +24,6 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
-import static android.content.pm.ActivityInfo.FLAG_ALWAYS_FOCUSABLE;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.window.DisplayAreaOrganizer.FEATURE_VENDOR_FIRST;
 
@@ -836,13 +835,6 @@ public class RootWindowContainerTests extends WindowTestsBase {
         // We should not be focusable when in pinned mode
         assertFalse(pinnedTask.isTopActivityFocusable());
         assertFalse(pinnedActivity.isFocusable());
-
-        // Add flag forcing focusability.
-        pinnedActivity.info.flags |= FLAG_ALWAYS_FOCUSABLE;
-
-        // Task with FLAG_ALWAYS_FOCUSABLE should be focusable.
-        assertTrue(pinnedTask.isTopActivityFocusable());
-        assertTrue(pinnedActivity.isFocusable());
     }
 
     /**
@@ -1835,6 +1827,43 @@ public class RootWindowContainerTests extends WindowTestsBase {
         mRootWindowContainer.onDisplayRemoved(displayId);
 
         verify(mAtm, times(2)).onTaskMoveAllowedChanged();
+    }
+
+    @Test
+    public void testUpdateFocusedWindowLocked_skipsRemovingOrRemovedDisplay() {
+        // Create a second display and spy on it and the default display.
+        final TestDisplayContent secondDisplay =
+                addNewDisplayContentAt(DisplayContent.POSITION_TOP);
+        spyOn(mDisplayContent);
+        spyOn(secondDisplay);
+
+        // Case 1: Test that a "removing" display is skipped.
+        doReturn(true).when(secondDisplay).isRemoving();
+
+        // Update focused window.
+        mRootWindowContainer.updateFocusedWindowLocked(
+                WindowManagerService.UPDATE_FOCUS_NORMAL, true /* updateInputWindows */);
+
+        // Verify that updateFocusedWindowLocked is called on the default display.
+        verify(mDisplayContent).updateFocusedWindowLocked(anyInt(), anyBoolean(), anyInt());
+        // Verify that updateFocusedWindowLocked is NOT called on the removing display.
+        verify(secondDisplay, never()).updateFocusedWindowLocked(anyInt(), anyBoolean(), anyInt());
+
+        // Reset mocks for the next case.
+        reset(mDisplayContent, secondDisplay);
+
+        // Case 2: Test that a "removed" display is skipped.
+        doReturn(false).when(secondDisplay).isRemoving(); // ensure previous mock is gone
+        doReturn(true).when(secondDisplay).isRemoved();
+
+        // Update focused window again.
+        mRootWindowContainer.updateFocusedWindowLocked(
+                WindowManagerService.UPDATE_FOCUS_NORMAL, true /* updateInputWindows */);
+
+        // Verify that updateFocusedWindowLocked is called on the default display.
+        verify(mDisplayContent).updateFocusedWindowLocked(anyInt(), anyBoolean(), anyInt());
+        // Verify that updateFocusedWindowLocked is NOT called on the removed display.
+        verify(secondDisplay, never()).updateFocusedWindowLocked(anyInt(), anyBoolean(), anyInt());
     }
 
     /**

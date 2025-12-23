@@ -4651,14 +4651,18 @@ public class AccountManagerService
         for (int userId : userIds) {
             UserAccounts userAccounts = getUserAccounts(userId);
             if (userAccounts == null) continue;
-            Account[] accounts = getAccountsFromCache(
-                    userAccounts,
-                    null /* type */,
-                    Binder.getCallingUid(),
-                    "android"/* packageName */,
-                    false /* include managed not visible*/);
-            for (Account account : accounts) {
-                runningAccounts.add(new AccountAndUser(account, userId));
+            try {
+                Account[] accounts = getAccountsFromCache(
+                        userAccounts,
+                        null /* type */,
+                        Binder.getCallingUid(),
+                        "android"/* packageName */,
+                        false /* include managed not visible*/);
+                for (Account account : accounts) {
+                    runningAccounts.add(new AccountAndUser(account, userId));
+                }
+            } catch (SQLiteException e) {
+                Log.w(TAG, "Could not get accounts for user " + userId, e);
             }
         }
 

@@ -747,7 +747,6 @@ public final class ViewRootImpl implements ViewParent,
     boolean mLayoutRequested;
     boolean mFirst;
 
-    @Nullable
     int mContentCaptureEnabled = CONTENT_CAPTURE_ENABLED_NOT_CHECKED;
     boolean mPerformContentCapture;
 
@@ -859,8 +858,21 @@ public final class ViewRootImpl implements ViewParent,
     // Surface can never be reassigned or cleared (use Surface.clear()).
     @UnsupportedAppUsage
     public final Surface mSurface = new Surface();
+    /**
+     * The SurfaceControl for this window.
+     * <p>Note: This instance is final to ensure that internal accesses of
+     * {@link #getSurfaceControl}) maintain a consistent reference.
+     */
     @NonNull
-    private SurfaceControl mSurfaceControl = new SurfaceControl();
+    private final SurfaceControl mSurfaceControl = new SurfaceControl();
+
+    /**
+     * The cached surface if {@link #mViewVisibility} is invisible. This can reduce surface creation
+     * when it becomes visible again. The common case is notification shade.
+     * TODO(b/308662081): Remove this field and keep mSurfaceControl valid while VRI is alive.
+     */
+    @Nullable
+    private SurfaceControl mCachedSurfaceControl;
 
     private BLASTBufferQueue mBlastBufferQueue;
     private IBinder mBbqApplyToken = new Binder();
@@ -9776,12 +9788,24 @@ public final class ViewRootImpl implements ViewParent,
         int relayoutResult = 0;
         if (viewVisibility == View.VISIBLE) {
             if (!mSurfaceControl.isValid()) {
-                Trace.traceBegin(Trace.TRACE_TAG_VIEW, "createSurfaceControl");
-                mSurfaceControl = createSurfaceControl();
-                Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                final SurfaceControl cachedSurfaceControl = mCachedSurfaceControl;
+                mCachedSurfaceControl = null;
+                if (cachedSurfaceControl == null || !cachedSurfaceControl.isValid()) {
+                    Trace.traceBegin(Trace.TRACE_TAG_VIEW, "createSurfaceControl");
+                    final SurfaceControl newSc = createSurfaceControl();
+                    mSurfaceControl.copyFrom(newSc, "VRI-new");
+                    newSc.release();
+                    Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                } else {
+                    mSurfaceControl.copyFrom(cachedSurfaceControl, "VRI-from-cache");
+                    cachedSurfaceControl.release();
+                }
                 relayoutResult |= RELAYOUT_RES_SURFACE_CHANGED | RELAYOUT_RES_FIRST_TIME;
             }
         } else if (mSurfaceControl.isValid()) {
+            if (viewVisibility == View.INVISIBLE) {
+                mCachedSurfaceControl = new SurfaceControl(mSurfaceControl, "VRI-cache");
+            }
             mSurfaceControl.release();
         }
         return relayoutResult;
@@ -10527,6 +10551,10 @@ public final class ViewRootImpl implements ViewParent,
                     }
 
                     destroySurface();
+                    if (mCachedSurfaceControl != null) {
+                        mCachedSurfaceControl.release();
+                        mCachedSurfaceControl = null;
+                    }
                 }
             }
 

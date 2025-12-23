@@ -155,9 +155,9 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.utils.Slogf;
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-import com.android.server.am.ProcessFreezerManager;
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+import com.android.server.am.AppBackgroundManager;
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 import com.android.server.wm.utils.RegionUtils;
 import com.android.window.flags.Flags;
 
@@ -2353,13 +2353,14 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             mService.getTaskChangeNotificationController().notifyActivityPinned(r);
         } else {
             mService.getTaskChangeNotificationController().notifyActivityUnpinned();
+            // Revoke the TRUSTED_OVERLAY here as a blanket policy.
+            if (task.getSurfaceControl() != null) {
+                mWmService.mTransactionFactory.get()
+                        .setTrustedOverlay(task.getSurfaceControl(), false)
+                        .apply();
+            }
         }
         mWindowManager.mPolicy.setPipVisibilityLw(inPip);
-        if (task.getSurfaceControl() != null) {
-            mWmService.mTransactionFactory.get()
-                    .setTrustedOverlay(task.getSurfaceControl(), inPip)
-                    .apply();
-        }
     }
 
     void executeAppTransitionForAllDisplay() {
@@ -2522,12 +2523,12 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                              mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_WARM_LAUNCH, r.packageName, 2, 0, 0);
                          }
                      }
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-                    ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-                    if (freezer != null && freezer.useFreezerManager()) {
-                        freezer.startFreeze(r.packageName, ProcessFreezerManager.WARM_LAUNCH_FREEZE);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+                    AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+                    if (appBgManager != null) {
+                        appBgManager.startFreeze(r.packageName, AppBackgroundManager.WARM_LAUNCH_FREEZE);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                     }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
 // QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 }
 // QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
@@ -2548,12 +2549,12 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (r != null && r.isMainIntent(r.intent)) {
                 acquireAppLaunchPerfLock(r);
 // QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-                ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-                if (freezer != null && freezer.useFreezerManager()) {
-                    freezer.startFreeze(r.packageName, ProcessFreezerManager.FIRST_LAUNCH_FREEZE);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+                AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+                if (appBgManager != null) {
+                    appBgManager.startFreeze(r.packageName, AppBackgroundManager.FIRST_LAUNCH_FREEZE);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                 }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
 // QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
             } else if (r == null) {
                 Slog.w(TAG, "Should not happen! Didn't apply launch boost");

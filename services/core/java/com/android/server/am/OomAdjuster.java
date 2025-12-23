@@ -462,6 +462,7 @@ public class OomAdjuster {
     protected final ArraySet<ProcessRecord> mPendingProcessSet = new ArraySet<>();
     protected final ArraySet<ProcessRecord> mProcessesInCycle = new ArraySet<>();
 
+    public static boolean mUsePerfCoreAffinity = false;
     /**
      * List of processes that we want to batch for LMKD to adjust their respective
      * OOM scores.
@@ -598,6 +599,9 @@ public class OomAdjuster {
         mLogger = new OomAdjusterDebugLogger(this, mService.mConstants);
 // QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
         if(mPerf != null) {
+// QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
+            mUsePerfCoreAffinity = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.perf.affinity","false"));
+// QTI_BEGIN: 2019-06-26: Performance: perf: Use get API for perf Properties.
             mMinBServiceAgingTime = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_age", "5000"));
             mBServiceAppThreshold = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_limit", "5"));
             mEnableBServicePropagation = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.sys.fw.bservice_enable", "false"));
@@ -620,6 +624,23 @@ public class OomAdjuster {
 
 // QTI_END: 2019-06-26: Performance: perf: Use get API for perf Properties.
         mProcessGroupHandler = new Handler(adjusterThread.getLooper(), msg -> {
+            try {
+                // switch to top sched ground or non-top sched ground
+                if (msg.arg1 == 1 || msg.arg1 == 2) {
+                    final ProcessRecord app = (ProcessRecord) msg.obj;
+                    boolean enable = msg.arg1 == 1;
+                    Process.setPerfCoreAffinity(app.getPid(), enable);
+                    Process.setPerfCoreAffinity(app.getRenderThreadTid(), enable);
+                }
+                if (msg.arg1 > 0 || msg.arg2 > 0) {
+                    return true;
+                }
+            } catch (Exception e) {
+                Slog.e("UI_Affinity",
+                        msg.arg1 == 1 ? "Failed to set perf core affinity"
+                        : "Failed to unset perf core affinity", e);
+            }
+
             final int group = msg.what;
             final ProcessRecord app = (ProcessRecord) msg.obj;
             setProcessGroup(app.getPid(), group, app.processName);
@@ -3818,24 +3839,32 @@ public class OomAdjuster {
             state.setSetRawAdj(state.getCurRawAdj());
         }
 
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-        ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+        AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+        if (appBgManager != null) {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 // QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-        if (freezer != null && freezer.useFreezerManager()) {
             // unfreeze process if user press home key before the first frame appeared
             if ((state.getSetAdj() >= ProcessList.FOREGROUND_APP_ADJ &&
                         state.getSetAdj() <= ProcessList.VISIBLE_APP_ADJ) &&
                         state.getCurAdj() > ProcessList.VISIBLE_APP_ADJ) {
-                freezer.startUnfreeze(app.processName,
-                        ProcessFreezerManager.INTERRUPT_LAUNCH_UNFREEZE);
+// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+                appBgManager.startUnfreeze(app.processName,
+                        AppBackgroundManager.INTERRUPT_LAUNCH_UNFREEZE);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
             }
             // check whether process/service that launching app depend on is in the freeze list
             if (state.getSetAdj() >= state.getCurAdj() &&
                         state.getCurAdj() <= ProcessList.VISIBLE_APP_ADJ) {
-                if (freezer.checkNeedFreezeProcessLocked(app)) {
-                    freezer.startUnfreezeService(app,
-                            ProcessFreezerManager.DEPEND_LAUNCH_UNFREEZE);
+// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+                if (appBgManager.checkNeedFreezeProcessLocked(app)) {
+                    appBgManager.startUnfreezeService(app,
+                            AppBackgroundManager.DEPEND_LAUNCH_UNFREEZE);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
                 }
             }
         }
@@ -3956,6 +3985,13 @@ public class OomAdjuster {
                     processGroup = THREAD_GROUP_DEFAULT;
                     break;
             }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+
+            if (appBgManager != null) {
+                appBgManager.handleSchedGroupTransition(app);
+            }
+
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             setAppAndChildProcessGroup(app, processGroup);
             try {
                 final int renderThreadTid = app.getRenderThreadTid();
@@ -3980,6 +4016,14 @@ public class OomAdjuster {
                                 }
                             }
                         }
+
+                        if (mUsePerfCoreAffinity) {
+                            if (!app.info.isSystemApp() && !app.info.isUpdatedSystemApp()
+                                    && app.processName.equals(app.info.packageName)) {
+                                mProcessGroupHandler.sendMessage(mProcessGroupHandler.obtainMessage(
+                                        0 /*not used*/, 1, 0 /*not used*/, app));
+                            }
+                        }
                     }
                 } else if (oldSchedGroup == SCHED_GROUP_TOP_APP
                         && curSchedGroup != SCHED_GROUP_TOP_APP) {
@@ -3995,6 +4039,14 @@ public class OomAdjuster {
 
                     if (renderThreadTid != 0) {
                         mInjector.setThreadPriority(renderThreadTid, THREAD_PRIORITY_DISPLAY);
+                    }
+
+                    if (mUsePerfCoreAffinity) {
+                        if (!app.info.isSystemApp() && !app.info.isUpdatedSystemApp()
+                                && app.processName.equals(app.info.packageName)) {
+                            mProcessGroupHandler.sendMessage(mProcessGroupHandler.obtainMessage(
+                                    0 /*not used*/, 2, 0 /*not used*/, app));
+                        }
                     }
                 }
             } catch (Exception e) {

@@ -2764,6 +2764,15 @@ public final class ProcessList {
             int zygotePolicyFlags, boolean allowWhileBooting, boolean isolated, int isolatedUid,
             boolean isSdkSandbox, int sdkSandboxUid, String sdkSandboxClientAppPackage,
             String abiOverride, String entryPoint, String[] entryPointArgs, Runnable crashHandler) {
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+        AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+        if (appBgManager != null) {
+            if (appBgManager.shouldPreventProcessStart(processName, info)) {
+                return null;
+            }
+        }
+
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         long startTime = SystemClock.uptimeMillis();
         final long startTimeNs = SystemClock.elapsedRealtimeNanos();
         ProcessRecord app;

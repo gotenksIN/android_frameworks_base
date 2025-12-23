@@ -1002,14 +1002,12 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int pid = app.getPid();
         synchronized (mPidsSelfLocked) {
             mPidsSelfLocked.doAddInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.addPidLocked(app);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+            AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+            if (appBgManager != null) {
+                appBgManager.addPidLocked(app);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             }
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
         synchronized (sActiveProcessInfoSelfLocked) {
             if (app.processInfo != null) {
@@ -1035,15 +1033,14 @@ public class ActivityManagerService extends IActivityManager.Stub
         final boolean removed;
         synchronized (mPidsSelfLocked) {
             removed = mPidsSelfLocked.doRemoveInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.removePidLocked(pid, app);
-                freezer.startUnfreeze(app.processName, ProcessFreezerManager.REMOVE_PROCESS_UNFREEZE);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+            AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+            if (appBgManager != null) {
+                appBgManager.removePidLocked(pid, app);
+                appBgManager.startUnfreeze(
+                        app.processName, AppBackgroundManager.REMOVE_PROCESS_UNFREEZE);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             }
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
         if (removed) {
             synchronized (sActiveProcessInfoSelfLocked) {
@@ -8481,6 +8478,17 @@ public class ActivityManagerService extends IActivityManager.Stub
                         setThreadPriority(proc.getRenderThreadTid(),
                             THREAD_PRIORITY_TOP_APP_BOOST);
                     }
+
+                    if (mOomAdjuster.mUsePerfCoreAffinity) {
+                        if (!proc.info.isSystemApp() && !proc.info.isUpdatedSystemApp()
+                                && proc.processName.equals(proc.info.packageName)) {
+                            try {
+                                Process.setPerfCoreAffinity(proc.getRenderThreadTid(), true);
+                            } catch (Exception e) {
+                                Slog.e("UI_Affinity", "Failed to set perf core affinity", e);
+                            }
+                        }
+                    }
                 }
             } else {
                 if (DEBUG_OOM_ADJ) {
@@ -9829,7 +9837,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             final VolatileDropboxEntryStates volatileStates, final StringBuilder sb) {
         sb.append("SystemUptimeMs: ").append(SystemClock.uptimeMillis()).append("\n");
 
-// QTI_BEGIN: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
         // Watchdog thread ends up invoking this function (with
         // a null ProcessRecord) to add the stack file to dropbox.
         // Do not acquire a lock on this (am) in such cases, as it
@@ -9837,12 +9844,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         // is invoked due to unavailability of lock on am and it
         // would prevent watchdog from killing system_server.
         if (process == null) {
-// QTI_END: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
             sb.append("Process: ").append(processName).append("\n");
-// QTI_BEGIN: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
             return;
         }
-// QTI_END: 2011-02-15: Core: frameworks/base: acquire lock on am only when needed
         // Note: ProcessRecord 'process' is guarded by the service
         // instance.  (notably process.pkgList, which could otherwise change
         // concurrently during execution of this method)

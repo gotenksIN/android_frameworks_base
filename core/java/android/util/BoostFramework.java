@@ -47,6 +47,9 @@ import android.database.ContentObserver;
 // QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
 import android.graphics.BLASTBufferQueue;
 // QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+import android.hardware.display.DisplayManager;
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
 // QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 import android.net.Uri;
 // QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
@@ -77,6 +80,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 // QTI_END: 2025-10-15: Performance: Perf: Add using WLC to detect UI perf target
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+import android.view.Display;
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
+
 
 /** @hide */
 public class BoostFramework {
@@ -116,6 +123,10 @@ public class BoostFramework {
 // QTI_BEGIN: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
     public static final String KEY_IGNORE_PKGS = "UI_PERF_IGNORE_PKGS";
 // QTI_END: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+    public static final String KEY_LOW_FPS_PREFER = "UI_PERF_LOW_FPS_PREFER";
+    public static final String KEY_FPS_BY_DEFAULT = "UI_PERF_FPS_BY_DEFAULT";
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
 // QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
     //ui perf mode controller in android space
     public static final String UI_PERF_PROP = "debug.ui.perfmode.enable";
@@ -1287,6 +1298,9 @@ public class BoostFramework {
 // QTI_BEGIN: 2025-10-15: Performance: Perf: Add using WLC to detect UI perf target
         private static String UI_PERF_ENHANCEMENT = "ro.vendor.ui.perfmode_enhance";
 // QTI_END: 2025-10-15: Performance: Perf: Add using WLC to detect UI perf target
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+        private static String UI_PERF_DYNAMIC_FPS = "sys.ui.perfmode_dynamic_fps";
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
 // QTI_BEGIN: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
         private Context mContext;
         private String[] mUIPerfProcs = null;
@@ -1296,6 +1310,10 @@ public class BoostFramework {
         private String[] mUIPerfCpuActivities = null;
         private String[] mUIPerfCpuGpuActivities = null;
         private String[] mUIPerfCpuAggressive = null;
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+        private String[] mUIPerfLowFpsActivities = null;
+        private String[] mUIPerfDefFpsActivities = null;
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
         private boolean mUiPerfInited = false;
         private UiPerfProcsObserver observer = null;
         private boolean mUIPerfEnhance = false;
@@ -1304,6 +1322,13 @@ public class BoostFramework {
 // QTI_BEGIN: 2025-10-15: Performance: Perf: Add using WLC to detect UI perf target
         private LRUMap<String,Boolean> mLRUMap = new LRUMap(30);
 // QTI_END: 2025-10-15: Performance: Perf: Add using WLC to detect UI perf target
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+        private Float mMaxDisplayFps = null;
+        private Float mMinDisplayFps = null;
+        private Float mDefaultMin = null;
+        private Float mDefaultPeak = null;
+        private Float mCurrentRefresh = null;
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
 // QTI_BEGIN: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
 
         private class UiPerfProcsObserver extends ContentObserver {
@@ -1394,6 +1419,29 @@ public class BoostFramework {
         }
 
 // QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+        private void findDisplayFPS() {
+            if (mContext != null || !SystemProperties.getBoolean(UI_PERF_DYNAMIC_FPS, false)) {
+                DisplayManager dm = mContext.getSystemService(DisplayManager.class);
+                Display display = dm.getDisplay(Display.DEFAULT_DISPLAY);
+                float minFps = 0;
+                float maxFps = 0;
+                if (display != null) {
+                    Display.Mode[] modes = display.getSupportedModes();
+                    for(Display.Mode mode : modes) {
+                        if (Math.round(mode.getRefreshRate()) > maxFps) {
+                            maxFps = mode.getRefreshRate();
+                        }
+                        if (minFps == 0 || Math.round(mode.getRefreshRate()) < minFps) {
+                            minFps = mode.getRefreshRate();
+                        }
+                    }
+                    mMaxDisplayFps = new Float(maxFps);
+                    mMinDisplayFps = new Float(minFps);
+                }
+            }
+        }
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
 // QTI_BEGIN: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
         private void update() {
             try {
@@ -1433,6 +1481,18 @@ public class BoostFramework {
                     if (str != null && !str.isEmpty()) {
                         mIgnoreProcs = str.split(";");
 // QTI_END: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+                    str = Settings.Global.getString(mContext.getContentResolver(),
+                                     KEY_LOW_FPS_PREFER);
+                    if (str != null && !str.isEmpty()) {
+                        mUIPerfLowFpsActivities = str.split(";");
+                    }
+                    str = Settings.Global.getString(mContext.getContentResolver(),
+                                     KEY_FPS_BY_DEFAULT);
+                    if (str != null && !str.isEmpty()) {
+                        mUIPerfDefFpsActivities = str.split(";");
+                    }
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
 // QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
                     }
                 }
@@ -1557,6 +1617,9 @@ public class BoostFramework {
         public int getLegacyUiPerfHint(String pkgName) {
             int hint = -1;
             if (pkgName == null || pkgName.isEmpty()) {
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+                displayRefreshRateRestore();
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
                 return hint;
             }
             synchronized (this) {
@@ -1565,6 +1628,9 @@ public class BoostFramework {
                     for (int i = 0; i < mLegacyUIPerfProcs.length; i++) {
                         if (pkgName.equals(mLegacyUIPerfProcs[i])) {
                             hint = VENDOR_HINT_PERFORMANCE_MODE;
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+                            usePeakDisplayRefreshRate();
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
                             return hint;
                         }
 // QTI_END: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
@@ -1573,6 +1639,11 @@ public class BoostFramework {
                 }
             }
 // QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+            if (!shouldUseUiPerf(pkgName)) {
+                displayRefreshRateRestore();
+            }
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
 // QTI_BEGIN: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
             return hint;
         }
@@ -1625,6 +1696,131 @@ public class BoostFramework {
 // QTI_END: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
 // QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
+// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+        private void usePeakDisplayRefreshRate() {
+            if (mContext == null) {
+                return;
+            }
+            synchronized(this) {
+                long callingId = Binder.clearCallingIdentity();
+                if (mDefaultPeak == null && mDefaultMin == null) {
+                    float min = Settings.System.getFloat(mContext.getContentResolver(),
+                                    Settings.System.MIN_REFRESH_RATE, 0);
+                    float peak = Settings.System.getFloat(mContext.getContentResolver(),
+                                    Settings.System.PEAK_REFRESH_RATE, 0);
+                    mDefaultPeak = new Float(peak);
+                    mDefaultMin = new Float(min);
+                }
+                if (mMaxDisplayFps == null && mMinDisplayFps == null) {
+                    findDisplayFPS();
+                }
+                if (mMaxDisplayFps != null) {
+                    float fps = mMaxDisplayFps.floatValue();
+                    if (mCurrentRefresh == null || mCurrentRefresh.floatValue() != fps) {
+                        Settings.System.putFloat(mContext.getContentResolver(),
+                            Settings.System.MIN_REFRESH_RATE, fps);
+                        Settings.System.putFloat(mContext.getContentResolver(),
+                            Settings.System.PEAK_REFRESH_RATE, fps);
+                        mCurrentRefresh = new Float(fps);
+                    }
+                }
+                Binder.restoreCallingIdentity(callingId);
+            }
+        }
+
+        public void pickDisplayRefreshRate(String activityName) {
+            if (mContext == null || activityName == null || activityName.isEmpty() || !SystemProperties.getBoolean(UI_PERF_DYNAMIC_FPS, false)) {
+                return;
+            }
+            if (mUIPerfDefFpsActivities != null) {
+                for (String str : mUIPerfDefFpsActivities) {
+                    if (str.equals(activityName)) {
+                        displayRefreshRateRestore();
+                        return;
+                    }
+                }
+            }
+            synchronized(this) {
+                long callingId = Binder.clearCallingIdentity();
+                if (mDefaultPeak == null && mDefaultMin == null) {
+                    float min = Settings.System.getFloat(mContext.getContentResolver(),
+                                    Settings.System.MIN_REFRESH_RATE, 0);
+                    float peak = Settings.System.getFloat(mContext.getContentResolver(),
+                                    Settings.System.PEAK_REFRESH_RATE, 0);
+                    mDefaultPeak = new Float(peak);
+                    mDefaultMin = new Float(min);
+                }
+                boolean lowFpsPrefer = false;
+                if (mUIPerfLowFpsActivities != null) {
+                    for (String str : mUIPerfLowFpsActivities) {
+                        if (str.equals(activityName)) {
+                            lowFpsPrefer = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (mMaxDisplayFps == null || mMinDisplayFps == null) {
+                    findDisplayFPS();
+                }
+                if (mMaxDisplayFps != null && mMinDisplayFps != null) {
+                    float fps = lowFpsPrefer? mMinDisplayFps.floatValue() : mMaxDisplayFps.floatValue();
+
+                    if (mCurrentRefresh == null || mCurrentRefresh.floatValue() != fps) {
+
+                        Settings.System.putFloat(mContext.getContentResolver(),
+                            Settings.System.MIN_REFRESH_RATE, fps);
+                        Settings.System.putFloat(mContext.getContentResolver(),
+                            Settings.System.PEAK_REFRESH_RATE, fps);
+                        mCurrentRefresh = new Float(fps);
+                    }
+                }
+                Binder.restoreCallingIdentity(callingId);
+            }
+        }
+
+        public void displayRefreshRateRestore() {
+            if (mContext == null || !SystemProperties.getBoolean(UI_PERF_DYNAMIC_FPS, false)) {
+                return;
+            }
+            synchronized(this) {
+                if (mDefaultPeak != null && mDefaultMin != null
+                                         && mCurrentRefresh != null) {
+                    long callingId = Binder.clearCallingIdentity();
+                    float min = Settings.System.getFloat(mContext.getContentResolver(),
+                                    Settings.System.MIN_REFRESH_RATE, 0);
+                    float peak = Settings.System.getFloat(mContext.getContentResolver(),
+                                    Settings.System.PEAK_REFRESH_RATE, 0);
+                    if (min == mCurrentRefresh.floatValue()) {
+                        Settings.System.putFloat(mContext.getContentResolver(),
+                            Settings.System.MIN_REFRESH_RATE, mDefaultMin.floatValue());
+                    }
+                    if (peak == mCurrentRefresh.floatValue()) {
+                        Settings.System.putFloat(mContext.getContentResolver(),
+                            Settings.System.PEAK_REFRESH_RATE, mDefaultPeak.floatValue());
+                    }
+                    mDefaultPeak = null;
+                    mDefaultMin = null;
+                    mCurrentRefresh = null;
+                    Binder.restoreCallingIdentity(callingId);
+                }
+            }
+        }
+    }
+
+    public void pickDisplayRefreshRate(Context context, String activityName) {
+        UIPerfMode uiPerf = UIPerfMode.getInstance(context);
+        if (uiPerf != null) {
+            uiPerf.pickDisplayRefreshRate(activityName);
+        }
+    }
+
+    public void displayRefreshRateRestore(Context context) {
+        UIPerfMode uiPerf = UIPerfMode.getInstance(context);
+        if (uiPerf != null) {
+            uiPerf.displayRefreshRateRestore();
+        }
+// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
     }
 
 // QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization

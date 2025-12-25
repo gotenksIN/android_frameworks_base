@@ -1002,12 +1002,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int pid = app.getPid();
         synchronized (mPidsSelfLocked) {
             mPidsSelfLocked.doAddInternal(pid, app);
-// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
-            AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
-            if (appBgManager != null) {
-                appBgManager.addPidLocked(app);
-// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
-            }
         }
         synchronized (sActiveProcessInfoSelfLocked) {
             if (app.processInfo != null) {
@@ -1033,14 +1027,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         final boolean removed;
         synchronized (mPidsSelfLocked) {
             removed = mPidsSelfLocked.doRemoveInternal(pid, app);
-// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
-            AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
-            if (appBgManager != null) {
-                appBgManager.removePidLocked(pid, app);
-                appBgManager.startUnfreeze(
-                        app.processName, AppBackgroundManager.REMOVE_PROCESS_UNFREEZE);
-// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
-            }
         }
         if (removed) {
             synchronized (sActiveProcessInfoSelfLocked) {
@@ -8471,7 +8457,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 // promote to FIFO now
                 if (proc.mState.getCurrentSchedulingGroup() == ProcessList.SCHED_GROUP_TOP_APP) {
                     if (DEBUG_OOM_ADJ) Slog.d("UI_FIFO", "Promoting " + tid + "out of band");
-                    if (proc.useFifoUiScheduling()) {
+                    if (proc.useFifoUiScheduling()
+                            || AppBackgroundManager.getInstance().useUIRTSettings()) {
                         setThreadScheduler(proc.getRenderThreadTid(),
                                 SCHED_FIFO | SCHED_RESET_ON_FORK, 1);
                     } else {
@@ -8479,7 +8466,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                             THREAD_PRIORITY_TOP_APP_BOOST);
                     }
 
-                    if (mOomAdjuster.mUsePerfCoreAffinity) {
+                    if (mOomAdjuster.mUsePerfCoreAffinity
+                            || AppBackgroundManager.getInstance().useUIAffinitySettings()) {
                         if (!proc.info.isSystemApp() && !proc.info.isUpdatedSystemApp()
                                 && proc.processName.equals(proc.info.packageName)) {
                             try {
@@ -9350,6 +9338,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             t.traceEnd(); // PhaseActivityManagerReady
         }
+
+        AppBackgroundManager.getInstance().setAMS(this);
     }
 
     private class MyBinderProxyCountEventListener implements BinderProxyCountEventListener {
@@ -11148,6 +11138,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mProcessList.mAppExitInfoTracker.dumpHistoryProcessExitInfo(pw, dumpPackage);
             } else if ("component-alias".equals(cmd)) {
                 mComponentAliasResolver.dump(pw);
+            } else if ("ui-fluency".equals(cmd)){
+                AppBackgroundManager.getInstance().dump(fd, pw, args);
             } else {
                 // Dumping a single activity?
                 if (!mAtmInternal.dumpActivity(fd, pw, cmd, args, opti, dumpAll,
